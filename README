@@ -1,0 +1,23 @@
+cicada
+
+A statistical machine translation toolkit based on a semiring parsing framework.
+Based on the generic framework, we can
+   - learn grammar
+   - align bitext
+   - translate sentence
+
+Basically we have three distinct structures:
+   - lattice: a representation of graph implemented as a two-dimentional array.
+   - grammar: a collection of WFST implemented as a trie structure.
+   - hypergraph: a compact representation of forest.
+
+Translation can be carried out by:
+   - A lattice is composed with a grammar by generating a hypergraph.
+   or
+   - A hypergraph is composed with a grammar by generating another hypergraph.
+
+After the hypergraph generation, you can:
+   - Additional features are evaluated to generate another hypergraph.
+   - K-bests sentences are generated from hypergraph.
+
+Remark: cicada is 蝉, (or セミ) in Japanese, pronounsed "semi"
