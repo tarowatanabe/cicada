@@ -382,7 +382,7 @@ namespace cicada
       using qi::eps;
       using qi::inf;
       using qi::attr;
-      using qi::char_;
+      using standard::char_;
       using qi::double_;
       using qi::int_;
       
@@ -598,7 +598,7 @@ namespace cicada
       using karma::repeat;
       using karma::lit;
       using karma::inf;
-      using karma::char_;
+      using standard::char_;
       using karma::double_;
       using karma::int_;
       
@@ -646,7 +646,7 @@ namespace cicada
       using karma::repeat;
       using karma::lit;
       using karma::inf;
-      using karma::char_;
+      using standard::char_;
       using karma::double_;
       using karma::int_;
       

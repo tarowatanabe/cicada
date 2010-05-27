@@ -28,18 +28,30 @@ typedef cicada::Vocab vocab_type;
 
 
 // input mode... use of one-line lattice input or sentence input?
-int options(int argc, char** argv, variable_set_type& variables);
-
+void options(int argc, char** argv, variable_set_type& variables);
 
 int main(int argc, char ** argv)
 {
-  variable_set_type variables;
-  if (options(argc, argv, variables) != 0)
+  try {
+    variable_set_type variables;
+    
+    options(argc, argv, variables);
+    
+    if (variables.count("feature-function-list")) {
+      std::cout << cicada::FeatureFunction::lists();
+      return 0;
+    }
+    
+  }
+  catch (const std::exception& err) {
+    std::cerr << "error: " << err.what() << std::endl;
     return 1;
+  }
+  return 0;
 }
 
 
-int options(int argc, char** argv, variable_set_type& variables)
+void options(int argc, char** argv, variable_set_type& variables)
 {
   namespace po = boost::program_options;
 
@@ -98,18 +110,11 @@ int options(int argc, char** argv, variable_set_type& variables)
   }
   
   po::notify(variables);
-  
 
   if (variables.count("help")) {
     std::cout << argv[0] << " [options]\n"
 	      << desc_command << std::endl;
-    return 1;
-  }
-
-  if (variables.count("feature-function-list")) {
-    std::cout << cicada::FeatureFunction::lists();
-    return 1;
+    exit(0);
   }
   
-  return 0;
 }

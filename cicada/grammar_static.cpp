@@ -602,10 +602,10 @@ namespace cicada
   typedef boost::fusion::tuple<std::string, phrase_parsed_type, phrase_parsed_type, scores_parsed_type > rule_parsed_type;
 
   template <typename Iterator>
-  struct rule_grammar_parser : boost::spirit::qi::grammar<Iterator, rule_parsed_type(), boost::spirit::standard::space_type>
+  struct rule_grammar_parser_static : boost::spirit::qi::grammar<Iterator, rule_parsed_type(), boost::spirit::standard::space_type>
   {
     
-    rule_grammar_parser() : rule_grammar_parser::base_type(rule_grammar)
+    rule_grammar_parser_static() : rule_grammar_parser_static::base_type(rule_grammar)
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
@@ -615,21 +615,18 @@ namespace cicada
       using qi::lexeme;
       using qi::attr;
       using qi::hold;
-      using qi::char_;
+      using standard::char_;
       using qi::float_; // FLOAT!
       using qi::_1;
       using standard::space;
       
       lhs %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);
       phrase %= *(lexeme[+(char_ - space) - "|||"]);
-      scores %= (+float_);
-      
-      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> -("|||" >> scores);
+      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> "|||" >> (+float_);
     }
-  
+    
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> lhs;
     boost::spirit::qi::rule<Iterator, phrase_parsed_type(), boost::spirit::standard::space_type> phrase;
-    boost::spirit::qi::rule<Iterator, scores_parsed_type(), boost::spirit::standard::space_type> scores;
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), boost::spirit::standard::space_type> rule_grammar;
   };
 
@@ -690,7 +687,7 @@ namespace cicada
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
     
-typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
+    typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
     
     if (path != "-" && ! boost::filesystem::exists(path))
       throw std::runtime_error(std::string("no file? ") + path.file_string());
@@ -736,250 +733,261 @@ typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
     std::string line;
     
     // we will construct this parser everytimt...
-    rule_grammar_parser<std::string::const_iterator> rule_parser;
+    rule_grammar_parser_static<std::string::const_iterator> rule_parser;
 
-     size_type arity_source = 0;
+    size_type arity_source = 0;
 
-     while (std::getline(is, line)) {
-       boost::fusion::get<0>(rule).clear();
-       boost::fusion::get<1>(rule).clear();
-       boost::fusion::get<2>(rule).clear();
-       boost::fusion::get<3>(rule).clear();
-
-       std::string::const_iterator iter_end = line.end();
-       std::string::const_iterator iter = line.begin();
-       
-       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
-       
-       if (! result || iter != iter_end) continue;
-       
-       source.clear();
-       source.insert(source.end(), boost::fusion::get<1>(rule).begin(), boost::fusion::get<1>(rule).end());
-
-       target.clear();
-       target.insert(target.end(), boost::fusion::get<2>(rule).begin(), boost::fusion::get<2>(rule).end());
-
-       if (source != source_prev) {
-
-	 if (! rule_options.empty()) {
-	   // encode options...
-	   
-	   {
-	     codes_option.clear();
-	     codes_option.resize(rule_options.size() * 16 + 16, 0);
-	     
-	     code_set_type::iterator hiter = codes_option.begin();
-	     code_set_type::iterator citer = codes_option.begin();
-	     size_type pos = 0;
-
-	     const id_type id_feature = boost::get<0>(rule_options.front());
-
-	     encode_phrase(source_prev, codes_source);
-	     
-	     const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
-							 hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
-	     
-	     const size_type offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
-	     citer = hiter + offset_feature;
-	     hiter += offset_feature & (- size_type((pos & 0x03) == 0x03));
-	     ++ pos;
-	     
-	     const size_type offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
-	     citer = hiter + offset_source;
-	     hiter += offset_source & (- size_type((pos & 0x03) == 0x03));
-	     ++ pos;
-
-	     rule_option_set_type::const_iterator piter_end = rule_options.end();
-	     for (rule_option_set_type::const_iterator piter = rule_options.begin(); piter != piter_end; ++ piter) {
-
-	       const symbol_type::id_type id_lhs = boost::get<1>(*piter);
-	       const id_type              id_target = boost::get<2>(*piter);
-
-	       const size_type offset_lhs = utils::group_aligned_encode(id_lhs, &(*hiter), pos);
-	       citer = hiter + offset_lhs;
-	       hiter += offset_lhs & (- size_type((pos & 0x03) == 0x03));
-	       ++ pos;
-	       
-	       const size_type offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
-	       citer = hiter + offset_target;
-	       hiter += offset_target & (- size_type((pos & 0x03) == 0x03));
-	       ++ pos;
-	     }
-	     
-	     codes_option.resize(citer - codes_option.begin());
-	   }
-	   
-	   // encode source.. we will use index-stripped indexing!
-	   {
-	     codes_source.resize(source_prev.size() * 8);
-	     
-	     code_set_type::iterator citer = codes_source.begin();
-
-	     sequence_type::const_iterator siter_begin = source_prev.begin();
-	     sequence_type::const_iterator siter_end = source_prev.end();
-	     for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	       citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
-	     codes_source.resize(citer - codes_source.begin());
-	   }
-
-	   // insert...
-	   rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
-	 }
-
-	 rule_options.clear();
-	 source_prev = source;
-
-	 arity_source = 0;
-	 for (sequence_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter)
-	   arity_source += siter->is_non_terminal();
-       }
-       
-       size_type arity_target = 0;
-       for (sequence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer)
-	 arity_target += titer->is_non_terminal();
-       
-       if (arity_source != arity_target)
-	 throw std::runtime_error("# of non-terminals do not match...");
-       
-       // lhs...
-       const std::string& lhs = boost::fusion::get<0>(rule);
-       const word_type::id_type id_lhs = word_type(lhs.empty() ? vocab_type::X : word_type(lhs)).id();
+    while (std::getline(is, line)) {
+      boost::fusion::get<0>(rule).clear();
+      boost::fusion::get<1>(rule).clear();
+      boost::fusion::get<2>(rule).clear();
+      boost::fusion::get<3>(rule).clear();
       
-       // scores...
-       if (feature_size < 0) {
-	 feature_size = boost::fusion::get<3>(rule).size();
+      std::string::const_iterator iter_end = line.end();
+      std::string::const_iterator iter = line.begin();
+      
+      const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
+      
+      if (! result || iter != iter_end) continue;
+      
+      source.clear();
+      source.insert(source.end(), boost::fusion::get<1>(rule).begin(), boost::fusion::get<1>(rule).end());
+      
+      target.clear();
+      target.insert(target.end(), boost::fusion::get<2>(rule).begin(), boost::fusion::get<2>(rule).end());
+      
+      if (source != source_prev) {
 	
-	 score_streams.reserve(feature_size);
-	 score_streams.resize(feature_size);
+	if (! rule_options.empty()) {
+	  // encode options...
+	   
+	  {
+	    codes_option.clear();
+	    codes_option.resize(rule_options.size() * 16 + 16, 0);
+	     
+	    code_set_type::iterator hiter = codes_option.begin();
+	    code_set_type::iterator citer = codes_option.begin();
+	    size_type pos = 0;
+
+	    const id_type id_feature = boost::get<0>(rule_options.front());
+
+	    encode_phrase(source_prev, codes_source);
+	     
+	    const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
+							hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
+	     
+	    const size_type offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
+	    citer = hiter + offset_feature;
+	    hiter += offset_feature & (- size_type((pos & 0x03) == 0x03));
+	    ++ pos;
+	     
+	    const size_type offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
+	    citer = hiter + offset_source;
+	    hiter += offset_source & (- size_type((pos & 0x03) == 0x03));
+	    ++ pos;
+
+	    rule_option_set_type::const_iterator piter_end = rule_options.end();
+	    for (rule_option_set_type::const_iterator piter = rule_options.begin(); piter != piter_end; ++ piter) {
+
+	      const symbol_type::id_type id_lhs = boost::get<1>(*piter);
+	      const id_type              id_target = boost::get<2>(*piter);
+
+	      const size_type offset_lhs = utils::group_aligned_encode(id_lhs, &(*hiter), pos);
+	      citer = hiter + offset_lhs;
+	      hiter += offset_lhs & (- size_type((pos & 0x03) == 0x03));
+	      ++ pos;
+	       
+	      const size_type offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
+	      citer = hiter + offset_target;
+	      hiter += offset_target & (- size_type((pos & 0x03) == 0x03));
+	      ++ pos;
+	    }
+	     
+	    codes_option.resize(citer - codes_option.begin());
+	  }
+	   
+	  // encode source.. we will use index-stripped indexing!
+	  {
+	    codes_source.resize(source_prev.size() * 8);
+	     
+	    code_set_type::iterator citer = codes_source.begin();
+
+	    sequence_type::const_iterator siter_begin = source_prev.begin();
+	    sequence_type::const_iterator siter_end = source_prev.end();
+	    for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	      citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
+	    codes_source.resize(citer - codes_source.begin());
+	  }
+
+	  // insert...
+	  rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
+	}
+
+	rule_options.clear();
+	source_prev = source;
+
+	arity_source = 0;
+	for (sequence_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter)
+	  arity_source += siter->is_non_terminal();
+      }
+       
+      size_type arity_target = 0;
+      for (sequence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer)
+	arity_target += titer->is_non_terminal();
+       
+      if (arity_source != arity_target)
+	throw std::runtime_error("# of non-terminals do not match...");
+       
+      // lhs...
+      const std::string& lhs = boost::fusion::get<0>(rule);
+      const word_type::id_type id_lhs = word_type(lhs.empty() ? vocab_type::X : word_type(lhs)).id();
+
+#if 0
+      std::cerr << "lhs: " << lhs;
+      std::cerr << " source: ";
+      std::copy(source_prev.begin(), source_prev.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+      std::cerr << "target: ";
+      std::copy(target.begin(), target.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+      std::cerr << "features: ";
+      std::copy(boost::fusion::get<3>(rule).begin(), boost::fusion::get<3>(rule).end(), std::ostream_iterator<score_type>(std::cerr, " "));
+      std::cerr << std::endl;
+#endif
+      
+      // scores...
+      if (feature_size < 0) {
+	feature_size = boost::fusion::get<3>(rule).size();
 	
-	 for (int feature = 0; feature < feature_size; ++ feature) {
-	   score_streams[feature].path = utils::tempfile::file_name(tmp_dir / "cicada.feature.XXXXXX");
-	   utils::tempfile::insert(score_streams[feature].path);
+	score_streams.reserve(feature_size);
+	score_streams.resize(feature_size);
+	
+	for (int feature = 0; feature < feature_size; ++ feature) {
+	  score_streams[feature].path = utils::tempfile::file_name(tmp_dir / "cicada.feature.XXXXXX");
+	  utils::tempfile::insert(score_streams[feature].path);
 	  
-	   score_streams[feature].ostream.reset(new utils::compress_ostream(score_streams[feature].path, 1024 * 1024));
-	 }
-       } else if (feature_size != boost::fusion::get<3>(rule).size())
-	 throw std::runtime_error("invalid # of features...");
+	  score_streams[feature].ostream.reset(new utils::compress_ostream(score_streams[feature].path, 1024 * 1024));
+	}
+      } else if (feature_size != boost::fusion::get<3>(rule).size())
+	throw std::runtime_error("invalid # of features...");
       
-       for (int feature = 0; feature < feature_size; ++ feature)
-	 score_streams[feature].ostream->write((char*) &boost::fusion::get<3>(rule)[feature], sizeof(score_type));
+      for (int feature = 0; feature < feature_size; ++ feature)
+	score_streams[feature].ostream->write((char*) &boost::fusion::get<3>(rule)[feature], sizeof(score_type));
        
-       // encode target...
-       encode_phrase(target, codes_target);
+      // encode target...
+      encode_phrase(target, codes_target);
        
-       const id_type id_target = targets_db.insert(&(*codes_target.begin()), codes_target.size(),
-						   hasher_type::operator()(codes_target.begin(), codes_target.end(), 0));
+      const id_type id_target = targets_db.insert(&(*codes_target.begin()), codes_target.size(),
+						  hasher_type::operator()(codes_target.begin(), codes_target.end(), 0));
        
-       // put into rule_options...
-       rule_options.push_back(boost::make_tuple(id_rule ++, id_lhs, id_target));
-     }
+      // put into rule_options...
+      rule_options.push_back(boost::make_tuple(id_rule ++, id_lhs, id_target));
+    }
      
-     if (! rule_options.empty()) {
-       // encode options...
+    if (! rule_options.empty()) {
+      // encode options...
 	   
-       {
-	 codes_option.clear();
-	 codes_option.resize(rule_options.size() * 16 + 16, 0);
+      {
+	codes_option.clear();
+	codes_option.resize(rule_options.size() * 16 + 16, 0);
 	     
-	 code_set_type::iterator hiter = codes_option.begin();
-	 code_set_type::iterator citer = codes_option.begin();
-	 size_type pos = 0;
+	code_set_type::iterator hiter = codes_option.begin();
+	code_set_type::iterator citer = codes_option.begin();
+	size_type pos = 0;
 
-	 const id_type id_feature = boost::get<0>(rule_options.front());
+	const id_type id_feature = boost::get<0>(rule_options.front());
 
-	 encode_phrase(source_prev, codes_source);
+	encode_phrase(source_prev, codes_source);
 	     
-	 const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
-						     hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
+	const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
+						    hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
 	     
-	 const size_type offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
-	 citer = hiter + offset_feature;
-	 hiter += offset_feature & (- size_type((pos & 0x03) == 0x03));
-	 ++ pos;
+	const size_type offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
+	citer = hiter + offset_feature;
+	hiter += offset_feature & (- size_type((pos & 0x03) == 0x03));
+	++ pos;
 	     
-	 const size_type offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
-	 citer = hiter + offset_source;
-	 hiter += offset_source & (- size_type((pos & 0x03) == 0x03));
-	 ++ pos;
+	const size_type offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
+	citer = hiter + offset_source;
+	hiter += offset_source & (- size_type((pos & 0x03) == 0x03));
+	++ pos;
 
-	 rule_option_set_type::const_iterator piter_end = rule_options.end();
-	 for (rule_option_set_type::const_iterator piter = rule_options.begin(); piter != piter_end; ++ piter) {
+	rule_option_set_type::const_iterator piter_end = rule_options.end();
+	for (rule_option_set_type::const_iterator piter = rule_options.begin(); piter != piter_end; ++ piter) {
 
-	   const symbol_type::id_type id_lhs = boost::get<1>(*piter);
-	   const id_type              id_target = boost::get<2>(*piter);
+	  const symbol_type::id_type id_lhs = boost::get<1>(*piter);
+	  const id_type              id_target = boost::get<2>(*piter);
 
-	   const size_type offset_lhs = utils::group_aligned_encode(id_lhs, &(*hiter), pos);
-	   citer = hiter + offset_lhs;
-	   hiter += offset_lhs & (- size_type((pos & 0x03) == 0x03));
-	   ++ pos;
+	  const size_type offset_lhs = utils::group_aligned_encode(id_lhs, &(*hiter), pos);
+	  citer = hiter + offset_lhs;
+	  hiter += offset_lhs & (- size_type((pos & 0x03) == 0x03));
+	  ++ pos;
 	       
-	   const size_type offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
-	   citer = hiter + offset_target;
-	   hiter += offset_target & (- size_type((pos & 0x03) == 0x03));
-	   ++ pos;
-	 }
+	  const size_type offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
+	  citer = hiter + offset_target;
+	  hiter += offset_target & (- size_type((pos & 0x03) == 0x03));
+	  ++ pos;
+	}
 	     
-	 codes_option.resize(citer - codes_option.begin());
-       }
+	codes_option.resize(citer - codes_option.begin());
+      }
 	   
-       // encode source.. we will use index-stripped indexing!
-       {
-	 codes_source.resize(source_prev.size() * 8);
+      // encode source.. we will use index-stripped indexing!
+      {
+	codes_source.resize(source_prev.size() * 8);
 	     
-	 code_set_type::iterator citer = codes_source.begin();
+	code_set_type::iterator citer = codes_source.begin();
 
-	 sequence_type::const_iterator siter_begin = source_prev.begin();
-	 sequence_type::const_iterator siter_end = source_prev.end();
-	 for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	   citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
-	 codes_source.resize(citer - codes_source.begin());
-       }
+	sequence_type::const_iterator siter_begin = source_prev.begin();
+	sequence_type::const_iterator siter_end = source_prev.end();
+	for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	  citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
+	codes_source.resize(citer - codes_source.begin());
+      }
 
-       // insert...
-       rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
-     }
+      // insert...
+      rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
+    }
 
-     // source phrases...
-     sources_db.write(path_source);
-     sources_db.clear();
-     source_db.open(path_source);
+    // source phrases...
+    sources_db.write(path_source);
+    sources_db.clear();
+    source_db.open(path_source);
     
-     // target phrases...
-     targets_db.write(path_target);
-     targets_db.clear();
-     target_db.open(path_target);
+    // target phrases...
+    targets_db.write(path_target);
+    targets_db.clear();
+    target_db.open(path_target);
 
-     // rules....
-     rule_db.close();
-     rule_db.open(path_rule);
+    // rules....
+    rule_db.close();
+    rule_db.open(path_rule);
      
-     // vocabulary...
-     word_type::write(path_vocab);
-     vocab.open(path_vocab);
+    // vocabulary...
+    word_type::write(path_vocab);
+    vocab.open(path_vocab);
         
-     // scores...
-     score_db.reserve(feature_size);
-     score_db.resize(feature_size);
+    // scores...
+    score_db.reserve(feature_size);
+    score_db.resize(feature_size);
     
-     feature_names.clear();
-     feature_names.reserve(feature_size);
-     feature_names.resize(feature_size, feature_type());
+    feature_names.clear();
+    feature_names.reserve(feature_size);
+    feature_names.resize(feature_size, feature_type());
      
-     for (int feature = 0; feature < feature_size; ++ feature) {
-       score_streams[feature].ostream->reset();
-       utils::tempfile::permission(score_streams[feature].path);
-       score_db[feature].score.open(score_streams[feature].path);
+    for (int feature = 0; feature < feature_size; ++ feature) {
+      score_streams[feature].ostream->reset();
+      utils::tempfile::permission(score_streams[feature].path);
+      score_db[feature].score.open(score_streams[feature].path);
 
-       const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
 
-       parameter_type::const_iterator piter = param.find(name);
-       if (piter != param.end())
-	 feature_names[feature] = feature_type(piter->second);
+      parameter_type::const_iterator piter = param.find(name);
+      if (piter != param.end())
+	feature_names[feature] = feature_type(piter->second);
       
-       // default name...!
-       if (feature_names[feature] == feature_type())
-	 feature_names[feature] = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
-     }
+      // default name...!
+      if (feature_names[feature] == feature_type())
+	feature_names[feature] = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
+    }
   }
   
   

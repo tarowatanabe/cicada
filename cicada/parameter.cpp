@@ -22,7 +22,7 @@ namespace cicada
 	
     using qi::phrase_parse;
     using qi::lexeme;
-    using qi::char_;
+    using standard::char_;
     using qi::_1;
     using standard::space;
     

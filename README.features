@@ -1,0 +1,18 @@
+Feature functions in cicada
+
+You can assign features to each rule by indicating feature names for
+each rule:
+
+[x] ||| [x,1] good ||| [x,1] bad ||| feature1=0.5 another-feature5=0.6
+
+or, when specifying by --grammar option, you can include additional parameters,
+
+<grammar-file>,feature0=a-name,feature1=another-name, etc.
+
+which will assign non-named features to pre-specified names. By default, we will
+assign, rule-table-0, rule-table-1, etc.
+
+For "static grammar", such as grammar learned by moses, joshua, nicttm etc.,
+you cannot assign arbitrary different features, since the number of features
+should be equal. However, you can assign feature-names, as in non-static mutable
+grammar.

@@ -45,20 +45,22 @@ namespace cicada
       using qi::lit;
       using qi::inf;
       using qi::attr;
-      using qi::char_;
+      using standard::char_;
       using qi::double_;
       using qi::_1;
       using standard::space;
       
-      lhs %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);
+      lhs    %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);
       phrase %= *(lexeme[+(char_ - space) - "|||"]);
-      scores %= *((hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> double_);
+      score  %= lexeme[+(char_ - space - '=')] >> '=' >> double_;
+      scores %= +score;
       
       rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> -("|||" >> scores);
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> lhs;
     boost::spirit::qi::rule<Iterator, phrase_parsed_type(), boost::spirit::standard::space_type> phrase;
+    boost::spirit::qi::rule<Iterator, score_parsed_type(), boost::spirit::standard::space_type>  score;
     boost::spirit::qi::rule<Iterator, scores_parsed_type(), boost::spirit::standard::space_type> scores;
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), boost::spirit::standard::space_type> rule_grammar;
   };
