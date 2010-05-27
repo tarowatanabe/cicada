@@ -10,7 +10,7 @@ int main(int argc, char** argv)
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
 
   if (argc == 1) {
-    std::cout << argv[0] << "[indexed-grammar]" << std::endl;
+    std::cout << argv[0] << " [indexed-grammar]" << std::endl;
     return 1;
   }
   

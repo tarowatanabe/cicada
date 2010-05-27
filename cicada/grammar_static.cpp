@@ -658,7 +658,7 @@ namespace cicada
     typename Codes::iterator citer = codes.begin();
     
     typename Phrase::const_iterator piter_begin = phrase.begin();
-    typename Phrase::const_iterator piter_end = phrase.begin();
+    typename Phrase::const_iterator piter_end = phrase.end();
     
     for (typename Phrase::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
       const size_type offset = utils::group_aligned_encode(piter->id(), &(*hiter), piter - piter_begin);
