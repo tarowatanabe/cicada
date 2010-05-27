@@ -23,7 +23,11 @@
     #endif
   #elif defined(HAVE_HASH_SET)
       #include <hash_set>
-      namespace sgi { using ::hash_set; };
+      namespace sgi
+      {
+	using ::hash_set;
+	using ::hash_multiset;
+      };
   #endif
 #endif
 

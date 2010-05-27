@@ -33,11 +33,13 @@ namespace cicada
     // where:
     // file-name: file name for the grammar, "-" for stdin
     // key,value: key, value pair... valid pairs are:
-    // 
-    //    feature-1
-    //    feature-2 etc. where value indicated feature value name assigned to the grammar
     //
-    // if not supplied we will use rule-table-1, rule-table-2 etc.
+    //    max-span = 15 : maximum non-terminals span
+    // 
+    //    feature0 = feature-name0
+    //    feature1 = feature-name1
+    //
+    // if not supplied we will use rule-table-0, rule-table-1 etc.
     
 
     GrammarStatic(const std::string& parameter);
@@ -49,6 +51,7 @@ namespace cicada
     GrammarStatic& operator=(const GrammarStatic& x) { return *this; }
   public:
     // virtual members
+    bool valid_span(int first, int last, int distance) const;
     id_type root() const;
     id_type next(const id_type& node, const symbol_type& symbol) const;
     bool has_next(const id_type& node) const;

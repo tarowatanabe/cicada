@@ -1,0 +1,167 @@
+// -*- mode: c++ -*-
+
+#ifndef __CICADA__GRAMMAR_HIERO__HPP__
+#define __CICADA__GRAMMAR_HIERO__HPP__ 1
+
+// very siple mutable grammar class..
+
+#include <string>
+#include <vector>
+
+#include <cicada/grammar_mutable.hpp>
+#include <cicada/lattice.hpp>
+
+namespace cicada
+{
+  
+  class GrammarGlue : public GrammarMutable
+  {
+  public:
+    GrammarGlue(const symbol_type& goal, const symbol_type& non_terminal, const bool __straight, const bool __inverted)
+      : straight(__straight), inverted(__inverted)
+    {
+      rule_ptr_type rule_unary(new rule_type(goal,
+					     rule_type::symbol_set_type(1, non_terminal.non_terminal(1)),
+					     rule_type::symbol_set_type(1, non_terminal.non_terminal(1)),
+					     1));
+      insert(rule_unary);
+
+      if (straight) {
+	std::vector<symbol_type, std::allocator<symbol_type> > phrase(2);
+	phrase.front() = goal.non_terminal(1);
+	phrase.back()  = non_terminal.non_terminal(2);
+	
+	rule_ptr_type rule(new rule_type(goal,
+					 rule_type::symbol_set_type(phrase.begin(), phrase.end()),
+					 rule_type::symbol_set_type(phrase.begin(), phrase.end()),
+					 2));
+	rule->features["glue-straight-penalty"] = -1;
+	
+	insert(rule);
+      }
+      
+      if (inverted) {
+	std::vector<symbol_type, std::allocator<symbol_type> > phrase1(2);
+	std::vector<symbol_type, std::allocator<symbol_type> > phrase2(2);
+	
+	phrase1.front() = goal.non_terminal(1);
+	phrase1.back()  = non_terminal.non_terminal(2);
+	
+	phrase2.front() = non_terminal.non_terminal(2);
+	phrase2.back()  = goal.non_terminal(1);
+	
+	rule_ptr_type rule(new rule_type(goal,
+					 rule_type::symbol_set_type(phrase1.begin(), phrase1.end()),
+					 rule_type::symbol_set_type(phrase2.begin(), phrase2.end()),
+					 2));
+	rule->features["glue-inverted-penalty"] = -1;
+	
+	insert(rule);
+      }
+    }
+    
+    bool valid_span(int first, int last, int distance) const
+    {
+      // how to check inverted only...?
+      if (straight && ! inverted)
+	return first == 0;
+      else
+	return true;
+    }
+    
+  private:
+    bool straight;
+    bool inverted;
+  };
+
+  class GrammarInsertion : public GrammarMutable
+  {
+  public:
+    typedef Lattice lattice_type;
+
+  private:
+    typedef std::vector<bool, std::allocator<bool> > pos_set_type;
+    typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
+    
+  public:
+    GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
+      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
+    {
+      for (int first = 0; first < lattice.size(); ++ first) {
+	const lattice_type::arc_set_type& arcs = lattice[first];
+	
+	if (arcs.empty())
+	  positions[first].clear();
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
+	  const int last = first + aiter->distance;
+	  
+	  positions[first][last] = true;
+	  
+	  rule_ptr_type rule(new rule_type(non_terminal,
+					   rule_type::symbol_set_type(1, aiter->label),
+					   rule_type::symbol_set_type(1, aiter->label)));
+	  rule->features["insertion-penalty"] = - 1.0;
+	  
+	  insert(rule);
+	}
+      }
+    }
+
+    bool valid_span(int first, int last, int distance) const
+    {
+      return (! positions[first].empty() && (first == last || positions[first][last]));
+    }
+
+  private:    
+    pos_pair_set_type positions;
+  };
+  
+  
+  class GrammarDeletion : public GrammarMutable
+  {
+  public:
+    typedef Lattice lattice_type;
+
+  private:
+    typedef std::vector<bool, std::allocator<bool> > pos_set_type;
+    typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
+
+  public:
+    GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
+      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
+    {
+      for (int first = 0; first < lattice.size(); ++ first) {
+	const lattice_type::arc_set_type& arcs = lattice[first];
+
+	if (arcs.empty())
+	  positions[first].clear();
+		
+	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
+	  const int last = first + aiter->distance;
+
+	  positions[first][last] = true;
+	  
+	  rule_ptr_type rule(new rule_type(non_terminal,
+					   rule_type::symbol_set_type(1, aiter->label),
+					   rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+	  rule->features["deletion-penalty"] = - 1.0;
+
+	  insert(rule);
+	}
+      }
+    }
+    
+    bool valid_span(int first, int last, int distance) const
+    {
+      return (! positions[first].empty() && (first == last || positions[first][last]));
+    }
+
+  private:    
+    pos_pair_set_type positions;
+  };
+};
+
+#endif

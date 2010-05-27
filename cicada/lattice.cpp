@@ -15,6 +15,10 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 
+#include <boost/thread.hpp>
+
+#include "utils/config.hpp"
+
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Lattice::arc_type,
 			  (cicada::Lattice::symbol_type, label)
@@ -113,9 +117,10 @@ namespace cicada
       jlf_lattice_set %= '[' >> (plf_lattice_arc % ',') >> ']';
       plf_lattice_set %= '(' >> +(plf_lattice_arc >> ',') >> ')';
       
-      lattice_grammar %= ('(' >> *(plf_lattice_set >> ',') >> ')' | '[' >> -(jlf_lattice_set % ',') >> ']'); 
+      lattice_grammar %= (lit('(') >> *(plf_lattice_set >> ',') >> lit(')') | '[' >> -(jlf_lattice_set % ',') >> ']'); 
     }
-    
+
+
     boost::spirit::qi::symbols<char, char> jlf_escape_char;
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> jlf_label_double_quote;
@@ -137,7 +142,25 @@ namespace cicada
 
   void Lattice::assign(const std::string& x)
   {
-    static lattice_grammar_parser<std::string::const_iterator > grammar;
+    typedef lattice_grammar_parser<std::string::const_iterator > grammar_type;
+    
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    
+    if (! __grammar_tls) {
+      __grammar.reset(new grammar_type());
+      __grammar_tls = __grammar.get();
+    }
+    
+    grammar_type& grammar = *__grammar_tls;
+#else
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    if (! __grammar.get())
+      __grammar.reset(new grammar_type());
+    
+    hypergraph_parser<grammar_type>& grammar = *__grammar;
+#endif
 
     clear();
     if (x.empty()) return;
@@ -154,7 +177,25 @@ namespace cicada
   
   std::istream& operator>>(std::istream& is, Lattice& x)
   {
-    static lattice_grammar_parser<std::string::const_iterator > grammar;
+    typedef lattice_grammar_parser<std::string::const_iterator > grammar_type;
+    
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    
+    if (! __grammar_tls) {
+      __grammar.reset(new grammar_type());
+      __grammar_tls = __grammar.get();
+    }
+    
+    grammar_type& grammar = *__grammar_tls;
+#else
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    if (! __grammar.get())
+      __grammar.reset(new grammar_type());
+    
+    hypergraph_parser<grammar_type>& grammar = *__grammar;
+#endif
 
     std::string line;
     
@@ -164,10 +205,10 @@ namespace cicada
       std::string::const_iterator end = line.end();
       
       const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, x.lattice);
-      if (! result || iter != end)
-	throw std::runtime_error("LATTICE format parsing failed...");
-      
-      x.initialize_distance();
+      if (result && iter == end)
+	x.initialize_distance();
+      else
+	x.clear();
     }
     
     return is;
@@ -229,7 +270,24 @@ namespace cicada
   {
     typedef std::ostream_iterator<char> iterator_type;
 
-    static lattice_grammar_generator<iterator_type> grammar;
+    typedef lattice_grammar_generator<iterator_type> grammar_type;
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    
+    if (! __grammar_tls) {
+      __grammar.reset(new grammar_type());
+      __grammar_tls = __grammar.get();
+    }
+    
+    grammar_type& grammar = *__grammar_tls;
+#else
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    if (! __grammar.get())
+      __grammar.reset(new grammar_type());
+    
+    hypergraph_parser<grammar_type>& grammar = *__grammar;
+#endif
     
     iterator_type iter(os);
     

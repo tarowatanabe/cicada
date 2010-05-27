@@ -28,6 +28,22 @@ namespace cicada
   // arc-set = (arc, arc, arc, ..., arc,)
   // lattice = (arc-set, arc-set, ..., arc-set,)
   
+  // The use of "shortest path" is motivated by:
+  //
+  // @InProceedings{dyer-muresan-resnik:2008:ACLMain,
+  //   author    = {Dyer, Christopher  and  Muresan, Smaranda  and  Resnik, Philip},
+  //   title     = {Generalizing Word Lattice Translation},
+  //   booktitle = {Proceedings of ACL-08: HLT},
+  //   month     = {June},
+  //   year      = {2008},
+  //   address   = {Columbus, Ohio},
+  //   publisher = {Association for Computational Linguistics},
+  //   pages     = {1012--1020},
+  //   url       = {http://www.aclweb.org/anthology/P/P08/P08-1115}
+  //  }
+
+
+  
   class Lattice
   {
   public:
@@ -84,7 +100,7 @@ namespace cicada
     const_reference operator[](size_type x) const { return lattice[x]; }
     reference operator[](size_type x) { return lattice[x]; }
     
-    difference_type distance(int begin, difference_type end) const 
+    difference_type shortest_distance(difference_type begin, difference_type end) const 
     {
       return (dist.empty() ? end - begin : dist(begin, end));
     }

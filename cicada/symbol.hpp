@@ -43,6 +43,7 @@ namespace cicada
   public:
     Symbol() : __id(__allocate_empty()) { }
     Symbol(const symbol_type& x) : __id(__allocate(x)) { }
+    Symbol(const char* x) : __id(__allocate(x)) { }
     Symbol(const id_type& x) : __id(x) {}
     template <typename Iterator>
     Symbol(Iterator first, Iterator last) : __id(__allocate(symbol_type(first, last))) { }

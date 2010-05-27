@@ -17,7 +17,7 @@ namespace cicada
     
     class NGramImpl;
 
-    class NGram : protected FeatureFunction
+    class NGram : public FeatureFunction
     {
     public:
       typedef size_t    size_type;
@@ -57,7 +57,7 @@ namespace cicada
 			      feature_set_type& features,
 			      feature_set_type& estimates) const;
       virtual void operator()(state_ptr_type& state,
-			      feature_set_tyep& features) const;
+			      feature_set_type& features) const;
       
     private:
       

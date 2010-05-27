@@ -1,8 +1,34 @@
+
 #include "hypergraph.hpp"
+
+
 
 #define BOOST_SPIRIT_THREADSAFE
 
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
 
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
+#include <boost/tuple/tuple.hpp>
+
+#include <boost/thread.hpp>
+
+#include "utils/config.hpp"
+#include "utils/hashmurmur.hpp"
+#include "utils/sgi_hash_map.hpp"
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  cicada::Rule,
+			  (cicada::Rule::symbol_type,     lhs)
+			  (cicada::Rule::symbol_set_type, source)
+			  (cicada::Rule::symbol_set_type, target)
+			  (cicada::Rule::feature_set_type, features)
+			  )
 
 namespace cicada
 {
@@ -157,7 +183,6 @@ namespace cicada
       }
       
       sorted.goal = sorted.nodes.size() - 1;
-      sorted.is_sorted = true;
       
       sorted.swap(x);
     }
@@ -202,8 +227,6 @@ namespace cicada
 	// -1 to adjust goal
 	x.nodes.resize(x.nodes.size() + y.nodes.size() - 1);
 	x.edges.resize(x.edges.size() + y.edges.size());
-	
-	x.is_sorted = false;
 	
 	// merge nodes
 	for (id_type id = 0; id < y.nodes.size(); ++ id)
@@ -251,8 +274,6 @@ namespace cicada
 	x.nodes.resize(x.nodes.size() + y.nodes.size() + 1);
 	// +2 to adjust edges toward goal
 	x.edges.resize(x.edges.size() + y.edges.size() + 2);
-	
-	x.is_sorted = false;
 	
 	// merge nodes
 	for (id_type id = 0; id < y.nodes.size(); ++ id) {
@@ -325,8 +346,449 @@ namespace cicada
   {
     UnionImpl()(*this, x);
   }
-    
   
+  typedef std::string rule_parsed_type;
+  typedef std::vector<rule_parsed_type> rule_parsed_set_type;
+  
+  typedef std::vector<int> tail_node_set_type;
+  typedef std::pair<std::string, double> feature_parsed_type;
+  typedef std::vector<feature_parsed_type> feature_parsed_set_type;
+  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, int> edge_parsed_type;
+  
+  typedef std::vector<edge_parsed_type> node_parsed_type;
+  typedef std::vector<node_parsed_type> node_parsed_set_type;
+  
+  typedef boost::tuple<rule_parsed_set_type, node_parsed_set_type> hypergraph_parsed_type;
+  
+  template <typename Iterator>
+  struct hypergraph_parser : boost::spirit::qi::grammar<Iterator, hypergraph_parsed_type(), boost::spirit::standard::space_type>
+  {
+    typedef HyperGraph hypergraph_type;
+    typedef hypergraph_type::rule_type rule_type; 
+    typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+    typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> > rule_ptr_set_type;
+    
+    hypergraph_parser() : hypergraph_parser::base_type(hypergraph)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using qi::phrase_parse;
+      using qi::lexeme;
+      using qi::omit;
+      using qi::repeat;
+      using qi::lit;
+      using qi::eps;
+      using qi::inf;
+      using qi::attr;
+      using qi::char_;
+      using qi::double_;
+      using qi::int_;
+      
+      using namespace qi::labels;
+      
+      using standard::space;
+      
+      escape_char.add
+	("\\\"", '\"')
+	("\\\\", '\\')
+	("\\/", '/')
+	("\\b", '\b')
+	("\\f", '\f')
+	("\\n", '\n')
+	("\\r", '\r')
+	("\\t", '\t');
+      
+      rule_string %= ('\"' >> lexeme[*(escape_char | ~char_('\"'))] >> '\"') ;
+      rule_string_action = rule_string [add_rule(rules)];
+      rule_string_set = '[' >> -(rule_string_action % ',')  >> ']';
+      
+      tail_node_set %= '[' >> -(int_ % ',') >> ']';
+      
+      feature       %= '\"' >> lexeme[*(escape_char | ~char_('\"'))] >> lit('\"') >> lit(':') >> double_;
+      feature_set   %= '{' >> -(feature % ',' )  >> '}';
+      
+      edge %= ('{' >> lit("\"tail\"")    >> ':' >> tail_node_set >> ','
+	       >> lit("\"feature\"") >> ':' >> feature_set >> ','
+	       >> lit("\"rule\"")    >> ':' >> int_ >> '}');
+      
+      edge_action = edge [add_edge(*graph, rules)];
+      
+      // here, we will call add_node...
+      node = (lit('[')[add_node(*graph)] >> -(edge_action % ',')  >> ']');
+      
+      node_set = ('[' >> -(node % ',') >> ']');
+      
+      hypergraph = ('{'
+		    >> lit("\"rules\"") >> ':' >> rule_string_set >> ','
+		    >> lit("\"nodes\"") >> ':' >> node_set >> ','
+		    >> lit("\"goal\"") >> ':' >> int_ [finish_graph(*graph)]
+		    >> '}');
+    }
+    
+    struct finish_graph
+    {
+      finish_graph(hypergraph_type& __graph)
+	: _graph(&__graph) {}
 
+      void operator()(const int& goal, boost::spirit::qi::unused_type, boost::spirit::qi::unused_type) const
+      {
+	hypergraph_type& graph   = const_cast<hypergraph_type&>(*_graph);
+	
+	graph.goal = goal;
+	
+	// fix-up out-edges...
+	hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+	for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  
+	  hypergraph_type::edge_type::node_set_type::const_iterator niter_end = eiter->tail_nodes.end();
+	  for (hypergraph_type::edge_type::node_set_type::const_iterator niter = eiter->tail_nodes.begin(); niter != niter_end; ++ niter)
+	    graph.nodes[*niter].out_edges.push_back(eiter->id);
+	}
+      }
+      
+      hypergraph_type* _graph;
+    };
+
+    
+    struct add_node
+    {
+      add_node(hypergraph_type& __graph)
+	: _graph(&__graph) {}
+      
+      void operator()(boost::spirit::qi::unused_type, boost::spirit::qi::unused_type, boost::spirit::qi::unused_type) const
+      {
+	hypergraph_type& graph   = const_cast<hypergraph_type&>(*_graph);
+	graph.add_node();
+      }
+      
+      hypergraph_type* _graph;
+    };
+
+
+    struct add_edge
+    {
+      add_edge(hypergraph_type& __graph,
+	       rule_ptr_set_type& __rules)
+	: _graph(&__graph), _rules(&__rules) {}
+
+      void operator()(const edge_parsed_type& edge_parsed, boost::spirit::qi::unused_type, boost::spirit::qi::unused_type) const
+      {
+	hypergraph_type& graph   = const_cast<hypergraph_type&>(*_graph);
+	rule_ptr_set_type& rules = const_cast<rule_ptr_set_type&>(*_rules);
+	
+	// here, we have not set-up in-edges (yet)
+	hypergraph_type::edge_type& edge = graph.add_edge();
+	
+	edge.tail_nodes = hypergraph_type::edge_type::node_set_type(boost::fusion::get<0>(edge_parsed).begin(), boost::fusion::get<0>(edge_parsed).end());
+	edge.features.insert(boost::fusion::get<1>(edge_parsed).begin(), boost::fusion::get<1>(edge_parsed).end());
+	edge.rule = rules[boost::fusion::get<2>(edge_parsed)];
+	
+	graph.connect_edge(edge.id, graph.nodes.back().id);
+      }
+      
+      hypergraph_type* _graph;
+      rule_ptr_set_type* _rules;
+      
+    };
+
+    struct add_rule
+    {
+      add_rule(rule_ptr_set_type& __rules)
+	: rules(&__rules) {}
+      
+      void operator()(const std::string& pattern, boost::spirit::qi::unused_type, boost::spirit::qi::unused_type) const
+      {
+	const_cast<rule_ptr_set_type&>(*rules).push_back(rule_ptr_type(new rule_type(pattern)));
+      }
+      
+      rule_ptr_set_type* rules;
+    };
+    
+    hypergraph_type* graph;
+    rule_ptr_set_type rules;
+
+    typedef boost::spirit::standard::space_type space_type;
+    
+    
+    boost::spirit::qi::symbols<char, char> escape_char;
+    
+    boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string;
+    boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string_action;
+    
+    boost::spirit::qi::rule<Iterator, rule_parsed_set_type(), space_type> rule_string_set;
+    
+    boost::spirit::qi::rule<Iterator, tail_node_set_type(), space_type>      tail_node_set;
+    boost::spirit::qi::rule<Iterator, feature_parsed_type(), space_type>     feature;
+    boost::spirit::qi::rule<Iterator, feature_parsed_set_type(), space_type> feature_set;
+    
+    boost::spirit::qi::rule<Iterator, edge_parsed_type(), space_type> edge;
+    boost::spirit::qi::rule<Iterator, edge_parsed_type(), space_type> edge_action;
+    
+    boost::spirit::qi::rule<Iterator, node_parsed_type(), space_type>        node;
+    
+    boost::spirit::qi::rule<Iterator, node_parsed_set_type(), space_type>    node_set;
+    
+    boost::spirit::qi::rule<Iterator, hypergraph_parsed_type(), space_type> hypergraph;
+  };
+
+  
+  std::istream& operator>>(std::istream& is, HyperGraph& x)
+  {
+    typedef hypergraph_parser<std::string::const_iterator> grammar_type;
+    
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    
+    if (! __grammar_tls) {
+      __grammar.reset(new grammar_type());
+      __grammar_tls = __grammar.get();
+    }
+    
+    grammar_type& grammar = *__grammar_tls;
+#else
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    if (! __grammar.get())
+      __grammar.reset(new grammar_type());
+    
+    hypergraph_parser<grammar_type>& grammar = *__grammar;
+#endif
+    
+    std::string line;
+    
+    
+    x.clear();
+    if (std::getline(is, line)) {
+      grammar.rules.clear();
+      grammar.rules.push_back(HyperGraph::rule_ptr_type());
+      grammar.graph = &x;
+      
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+      
+      const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space);
+      if (! result || iter != end) {
+	x.clear();
+	grammar.rules.clear();
+      }
+    }
+    
+    return is;
+  }
+
+  // do we use karma...?
+  
+  template <typename Iterator>
+  struct rule_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule()>
+  {
+    typedef cicada::Rule                rule_type;
+    typedef rule_type::symbol_type      symbol_type;
+    typedef rule_type::symbol_set_type  symbol_set_type;
+    typedef rule_type::feature_set_type feature_set_type;
+    
+    rule_generator() : rule_generator::base_type(rule)
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using karma::omit;
+      using karma::repeat;
+      using karma::lit;
+      using karma::inf;
+      using karma::char_;
+      using karma::double_;
+      using karma::int_;
+      
+      using namespace karma::labels;
+      
+      escape_char.add
+	('\\', "\\\\")
+	('\"', "\\\"")
+	('/', "\\/")
+	('\b', "\\b")
+	('\f', "\\f")
+	('\n', "\\n")
+	('\r', "\\r")
+	('\t', "\\t");
+      
+      lhs %= *(escape_char | ~char_('\"'));
+      phrase %= -(lhs % ' ');
+      
+      features %= (+(escape_char | ~char_('\"')) << '=' << double_) % ' ';
+      
+      rule %= lhs << " ||| " << phrase << " ||| " << phrase << -( " ||| " << features);
+    }
+    
+    boost::spirit::karma::symbols<char, const char*> escape_char;
+    
+    boost::spirit::karma::rule<Iterator, symbol_type()>      lhs;
+    boost::spirit::karma::rule<Iterator, symbol_set_type()>  phrase;
+    boost::spirit::karma::rule<Iterator, feature_set_type()> features;
+    boost::spirit::karma::rule<Iterator, rule_type()>        rule;
+  };
+
+  template <typename Iterator>
+  struct features_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::feature_set_type()>
+  {
+    typedef cicada::Rule                rule_type;
+    typedef rule_type::feature_set_type feature_set_type;
+    
+    features_generator() : features_generator::base_type(features)
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using karma::omit;
+      using karma::repeat;
+      using karma::lit;
+      using karma::inf;
+      using karma::char_;
+      using karma::double_;
+      using karma::int_;
+      
+      using namespace karma::labels;
+      
+      escape_char.add
+	('\\', "\\\\")
+	('\"', "\\\"")
+	('/', "\\/")
+	('\b', "\\b")
+	('\f', "\\f")
+	('\n', "\\n")
+	('\r', "\\r")
+	('\t', "\\t");
+      
+      features %= ('\"' << (+(escape_char | ~char_('\"')) << '\"' << ':' << double_) % ", ");
+    }
+    
+    boost::spirit::karma::symbols<char, const char*> escape_char;
+    boost::spirit::karma::rule<Iterator, feature_set_type()> features;
+  };
+  
+  std::ostream& operator<<(std::ostream& os, const HyperGraph& graph)
+  {
+    typedef HyperGraph hypergraph_type;
+    typedef hypergraph_type::rule_type rule_type;
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*>,
+      std::allocator<std::pair<const rule_type*, int> > > rule_unique_map_type;
+#else
+    typedef sfi::hash_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*>,
+			  std::allocator<std::pair<const rule_type*, int> > > rule_unique_map_type;
+#endif
+    
+    typedef std::back_insert_iterator<std::string> iterator_type;
+    
+    os << '{';
+
+    rule_unique_map_type rules_unique;
+    
+    {
+      os << "\"rules\"" << ": " << '[';
+
+      // dump rule part...
+      
+      rule_generator<iterator_type>     rule_grammar;
+      
+      
+      bool initial_rule = true;
+      std::string output_rule;
+      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
+	if (eiter->rule) {
+	  const rule_type& rule = *(eiter->rule);
+	  
+	  rule_unique_map_type::iterator riter = rules_unique.find(&rule);
+	  if (riter == rules_unique.end()) {
+	    
+	    // + 1 for none-rule which will be zero-rule-id
+	    const int rule_id = rules_unique.size() + 1;
+	    
+	    rules_unique.insert(std::make_pair(&rule, rule_id));
+	    
+	    output_rule.clear();
+	    iterator_type iter(output_rule);
+	    
+	    boost::spirit::karma::generate(iter, rule_grammar, rule);
+	    
+	    if (! initial_rule)
+	      os << ", ";
+	    os << '\"' << output_rule << '\"';
+	    
+	    initial_rule = false;
+	  }
+	}
+      os << ']';
+    }
+    
+    os << ", ";
+    
+    {
+      os << "\"nodes\"" << ": " << '[';
+
+      features_generator<iterator_type> features_grammar;
+      std::string output_features;
+      
+      // dump nodes...
+      bool initial_node = true;
+      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+	if (! initial_node)
+	  os << ", ";
+	initial_node = false;
+
+	os << '[';
+	
+	bool initial_edge = true;
+	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = niter->in_edges.end();
+	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = niter->in_edges.begin(); eiter != eiter_end; ++ eiter) {
+	  if (! initial_edge)
+	    os << ", ";
+	  initial_edge = false;
+
+	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+	  
+	  os << "{\"tail\": [";
+	  if (! edge.tail_nodes.empty()) {
+	    std::copy(edge.tail_nodes.begin(), edge.tail_nodes.end() - 1, std::ostream_iterator<hypergraph_type::id_type>(os, ","));
+	    os << edge.tail_nodes.back();
+	  }
+	  os << "], ";
+	  os << "\"feature\": {";
+	  // dump features!
+	  
+	  output_features.clear();
+	  iterator_type iter(output_features);
+	  boost::spirit::karma::generate(iter, features_grammar, edge.features);
+	  
+	  os << output_features;
+	  
+	  os << "}, ";
+	  os << "\"rule\": ";
+	  os << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
+	  os << '}';
+	}
+	
+	os << ']';
+      }
+      
+      os << ']';
+    }
+    
+    os << ", ";
+    
+    {
+      // dump goal...
+      os << "\"goal\": " << graph.goal;
+    }
+    os << '}';
+    
+    return os;
+  }
   
 };

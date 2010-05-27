@@ -333,6 +333,7 @@ AC_CHECK_FUNCS([dup2 gethostname getpagesize gettimeofday memset munmap pow sele
 
 AC_CONFIG_FILES([Makefile
 		 cicada/Makefile
+		 progs/Makefile
                  succinct_db/Makefile
                  utils/Makefile])
 AC_OUTPUT

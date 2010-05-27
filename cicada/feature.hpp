@@ -10,8 +10,6 @@
 #include <string>
 #include <vector>
 
-#include <cicada/symbol.hpp>
-
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
@@ -24,9 +22,6 @@ namespace cicada
 {
   class Feature
   {
-  public:
-    typedef cicada::Symbol symbol_type;
-    
   public:
     typedef std::string feature_type;
     typedef uint32_t    id_type;
@@ -46,8 +41,8 @@ namespace cicada
     
   public:
     Feature() : __id(__allocate_empty()) { }
-    Feature(const symbol_type& x) : __id(__allocate(static_cast<const std::string&>(x))) {}
     Feature(const feature_type& x) : __id(__allocate(x)) { }
+    Feature(const char* x) : __id(__allocate(x)) { }
     Feature(const id_type& x) : __id(x) {}
     template <typename Iterator>
     Feature(Iterator first, Iterator last) : __id(__allocate(feature_type(first, last))) { }

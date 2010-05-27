@@ -8,19 +8,19 @@ namespace cicada
   
   Model::state_type Model::operator()(const hypergraph_type& graph,
 				      const state_set_type& node_states,
-				      edge_type& edge) const
+				      edge_type& edge,
+				      feature_set_type& estimates) const
   {
-    state_impl_type state_impl(states_size, 0);
+    state_type state_impl(states_size, 0);
     
     feature_function_type::state_ptr_set_type states(edge.tail_nodes.size());
-    feature_set_type estimates;
     
     for (int i = 0; i < models.size(); ++ i) {
       const feature_function_type& feature_function = *models[i];
       
       if (feature_function.state_size())
 	for (int k = 0; k < states.size(); ++ k)
-	  states[k] = const_cast<char*>(&(node_states[edge.tail_nodes[k]].value()[offsets[i]]));
+	  states[k] = const_cast<char*>(&(node_states[edge.tail_nodes[k]][offsets[i]]));
       
       feature_function_type::state_ptr_type state = (feature_function.state_size() ? &(state_impl[offsets[i]]) : 0);
       
@@ -34,14 +34,14 @@ namespace cicada
   void Model::operator()(const state_type& state,
 			 edge_type& edge) const
   {
-    state_impl_type state_impl(state.value());
+    const state_type& state_impl(state);
     
     for (int i = 0; i < models.size(); ++ i) {
       const feature_function_type& feature_function = *models[i];
       
-      feature_function_type::state_ptr_type child_state = (feature_function.state_size() ? &(state_impl[offsets[i]]) : 0);
+      feature_function_type::state_ptr_type antecedent_state = (feature_function.state_size() ? const_cast<char*>(&(state_impl[offsets[i]])) : 0);
       
-      feature_function(child_state, edge.features);
+      feature_function(antecedent_state, edge.features);
     }
   }
   

@@ -15,6 +15,9 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 
+#include <boost/thread.hpp>
+
+#include "utils/config.hpp"
 
 namespace cicada
 {
@@ -66,7 +69,26 @@ namespace cicada
     
     if (x.empty()) return;
     
-    static rule_grammar_parser<std::string::const_iterator> grammar;
+    typedef rule_grammar_parser<std::string::const_iterator> grammar_type;
+    
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    
+    if (! __grammar_tls) {
+      __grammar.reset(new grammar_type());
+      __grammar_tls = __grammar.get();
+    }
+    
+    grammar_type& grammar = *__grammar_tls;
+#else
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+    if (! __grammar.get())
+      __grammar.reset(new grammar_type());
+    
+    hypergraph_parser<grammar_type>& grammar = *__grammar;
+#endif
+    
       
     rule_parsed_type rule_parsed;
     
@@ -96,7 +118,26 @@ namespace cicada
     
     std::string line;
     if (std::getline(is, line) && ! line.empty()) {
-      static rule_grammar_parser<std::string::const_iterator> grammar;
+      
+      typedef rule_grammar_parser<std::string::const_iterator> grammar_type;
+      
+#ifdef HAVE_TLS
+      static __thread grammar_type* __grammar_tls = 0;
+      static boost::thread_specific_ptr<grammar_type > __grammar;
+      
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      grammar_type& grammar = *__grammar_tls;
+#else
+      static boost::thread_specific_ptr<grammar_type > __grammar;
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      hypergraph_parser<grammar_type>& grammar = *__grammar;
+#endif
       
       rule_parsed_type rule_parsed;
       

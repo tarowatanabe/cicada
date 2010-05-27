@@ -23,7 +23,11 @@
     #endif
   #elif defined(HAVE_HASH_MAP)
       #include <hash_map>
-      namespace sgi { using ::hash_map; };
+      namespace sgi
+      {
+	using ::hash_map;
+	using ::hash_multimap;
+      };
   #endif
 #endif
 

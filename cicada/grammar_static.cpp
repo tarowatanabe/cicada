@@ -171,7 +171,7 @@ namespace cicada
         
 
   public:
-    GrammarStaticImpl(const std::string& parameter) { read(parameter); }
+    GrammarStaticImpl(const std::string& parameter) : max_span(15) { read(parameter); }
     
   public:
     
@@ -392,6 +392,9 @@ namespace cicada
 
     cache_find_root_set_type     cache_find_root;
     cache_find_set_type          cache_find;
+
+  public:
+    int max_span;
   };
 
   template <typename Path, typename Data>
@@ -514,6 +517,10 @@ namespace cicada
       read_binary(path);
     else
       read_text(parameter);
+    
+    parameter_type::const_iterator siter = param.find("max-span");
+    if (siter != param.end())
+      max_span = boost::lexical_cast<int>(siter->second);
   }
   
   void GrammarStaticImpl::write(const path_type& file) const
@@ -537,13 +544,12 @@ namespace cicada
       
       score_db[feature].write(rep.path(stream_score.str()));
 
-      const std::string name(std::string("feature-") + boost::lexical_cast<std::string>(feature));
+      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
       
       rep[name] = feature_names[feature];
     }
     
     rep["feature-size"] = boost::lexical_cast<std::string>(feature_size);
-
   }
   
   void GrammarStaticImpl::read_binary(const path_type& path)
@@ -561,7 +567,7 @@ namespace cicada
     repository_type::const_iterator iter = rep.find("feature-size");
     if (iter == rep.end())
       throw std::runtime_error("no feature size?");
-    
+
     const size_type feature_size = atoi(iter->second.c_str());
     
     feature_names.reserve(feature_size);
@@ -575,7 +581,7 @@ namespace cicada
       
       score_db[feature].read(rep.path(stream_score.str()));
       
-      const std::string name(std::string("feature-") + boost::lexical_cast<std::string>(feature));
+      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
       repository_type::const_iterator iter = rep.find(name);
       if (iter == rep.end())
 	throw std::runtime_error(std::string("no feature name?: ") + name);
@@ -728,8 +734,9 @@ typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
     utils::compress_istream is(path, 1024 * 1024);
     
     std::string line;
-
-    static rule_grammar_parser<std::string::const_iterator> rule_parser;
+    
+    // we will construct this parser everytimt...
+    rule_grammar_parser<std::string::const_iterator> rule_parser;
 
      size_type arity_source = 0;
 
@@ -963,14 +970,11 @@ typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
        utils::tempfile::permission(score_streams[feature].path);
        score_db[feature].score.open(score_streams[feature].path);
 
-       const std::string name(std::string("feature-") + boost::lexical_cast<std::string>(feature));
-      
-       parameter_type::iterator piter_end = param.end();
-       for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter)
-	 if (piter->first == name) {
-	   feature_names[feature] = feature_type(piter->second);
-	   break;
-	 }
+       const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+
+       parameter_type::const_iterator piter = param.find(name);
+       if (piter != param.end())
+	 feature_names[feature] = feature_type(piter->second);
       
        // default name...!
        if (feature_names[feature] == feature_type())
@@ -985,6 +989,11 @@ typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
   }
 
   GrammarStatic::~GrammarStatic() { std::auto_ptr<impl_type> tmp(pimpl); }
+
+  bool GrammarStatic::valid_span(int first, int last, int distance) const
+  {
+    return distance <= pimpl->max_span;
+  }
   
   GrammarStatic::id_type GrammarStatic::root() const
   {

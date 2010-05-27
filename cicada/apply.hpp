@@ -1,0 +1,9 @@
+// -*- mode: c++ -*-
+
+#ifndef __CICADA__APPLY__HPP__
+#define __CICADA__APPLY__HPP__ 1
+
+#include <cicada/apply_cube_prune.hpp>
+#include <cicada/apply_exact.hpp>
+
+#endif

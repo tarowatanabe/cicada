@@ -34,6 +34,14 @@ namespace cicada
     const_iterator begin() const { return __values.begin(); }
     const_iterator end() const { return __values.end(); }
     bool empty() const { return __values.empty(); }
+
+    const_iterator find(const std::string& key) const
+    {
+      for (const_iterator iter = begin(); iter != end(); ++ iter)
+	if (iter->first == key)
+	  return iter;
+      return end();
+    }
       
   private:
     void parse(const std::string& parameter);

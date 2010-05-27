@@ -5,6 +5,10 @@
 
 #include <cicada/transducer.hpp>
 
+#include <cicada/grammar_mutable.hpp>
+#include <cicada/grammar_static.hpp>
+#include <cicada/grammar_hiero.hpp>
+
 #include <boost/shared_ptr.hpp>
 
 namespace cicada
@@ -15,6 +19,10 @@ namespace cicada
   public:
     typedef Transducer transducer_type;
     typedef boost::shared_ptr<transducer_type> transducer_ptr_type;
+
+    typedef transducer_type::rule_type     rule_type;
+    typedef transducer_type::rule_ptr_type rule_ptr_type;
+    typedef transducer_type::rule_set_type rule_set_type;
 
   private:
     typedef std::vector<transducer_ptr_type, std::allocator<transducer_ptr_type> > transducer_ptr_set_type;

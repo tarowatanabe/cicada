@@ -3,6 +3,7 @@
 #ifndef __CICADA__HYPERGRAPH__HPP__
 #define __CICADA__HYPERGRAPH__HPP__ 1
 
+#include <iostream>
 #include <vector>
 
 #include <cicada/symbol.hpp>
@@ -24,14 +25,17 @@ namespace cicada
     typedef uint32_t       id_type;
     typedef cicada::Symbol symbol_type;
     typedef cicada::Vocab  vocab_type;
-    typedef cicada::Rule   rule_type;
+    
+    typedef cicada::Rule                 rule_type;
+    typedef boost::shared_ptr<rule_type> rule_ptr_type;
+
     typedef rule_type::feature_set_type feature_set_type;
     
   public:
     static const id_type invalid = id_type(-1);
     
   public:
-    HyperGraph() : goal(invalid), is_sorted(false) {}
+    HyperGraph() : goal(invalid) {}
     
   public:
     struct Node
@@ -60,7 +64,7 @@ namespace cicada
       
       feature_set_type features;
       
-      boost::shared_ptr<rule_type> rule;
+      rule_ptr_type rule;
       
       id_type id;
     };
@@ -131,8 +135,6 @@ namespace cicada
       nodes.clear();
       
       goal = invalid;
-      
-      is_sorted = false;
     }
     
     void swap(HyperGraph& x)
@@ -140,7 +142,6 @@ namespace cicada
       nodes.swap(x.nodes);
       edges.swap(x.edges);
       std::swap(goal, x.goal);
-      std::swap(is_sorted, x.is_sorted);
     }
 
   public:
@@ -149,14 +150,18 @@ namespace cicada
     void topologically_sort();
     
     void unite(const HyperGraph& x);
+
+  public:
+    friend
+    std::ostream& operator<<(std::ostream& os, const HyperGraph& x);
+    friend
+    std::istream& operator>>(std::istream& is, HyperGraph& x);
     
   public:
     node_set_type nodes;
     edge_set_type edges;
     
     id_type goal;
-    
-    bool is_sorted;
   };
   
 };

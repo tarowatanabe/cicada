@@ -54,7 +54,6 @@ indexed_set.hpp \
 istream_line_iterator.hpp \
 lockfree_list_queue.hpp \
 lockfree_queue.hpp \
-logprob.hpp \
 malloc_stats.hpp \
 map_file.hpp \
 map_file_allocator.hpp \
@@ -106,7 +105,6 @@ sample_indexed_set \
 sample_istream_line_iterator \
 sample_lockfree_list_queue \
 sample_lockfree_queue \
-sample_logprob \
 sample_map_file_allocator \
 sample_packed_vector \
 sample_program_options \
@@ -188,15 +186,9 @@ sample_lockfree_queue_SOURCES = sample_lockfree_queue.cpp
 sample_lockfree_queue_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 sample_lockfree_queue_LDADD = $(BOOST_THREAD_LIBS) $(BOOST_SYSTEM_LIBS)
 
-sample_logprob_SOURCES = sample_logprob.cpp
-
 sample_map_file_allocator_SOURCES = sample_map_file_allocator.cpp
 sample_map_file_allocator_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 sample_map_file_allocator_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS) $(perftools_LDADD)
-
-sample_pfor_vector_SOURCES = sample_pfor_vector.cpp
-sample_pfor_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
-sample_pfor_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
 
 
 sample_packed_vector_SOURCES = sample_packed_vector.cpp

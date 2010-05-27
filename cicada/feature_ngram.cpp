@@ -2,7 +2,7 @@
 #include <memory>
 
 #include "cicada/ngram.hpp"
-
+#include "cicada/feature_ngram.hpp"
 #include "cicada/parameter.hpp"
 
 namespace cicada
@@ -18,9 +18,18 @@ namespace cicada
       typedef cicada::Symbol symbol_type;
       typedef cicada::Vocab  vocab_type;
       
-      typedef cicad::NGram ngram_type;
+      typedef cicada::NGram ngram_type;
       
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
+
+      typedef cicada::FeatureFunction feature_function_type;
+      
+      typedef feature_function_type::state_ptr_type     state_ptr_type;
+      typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
+
+      typedef feature_function_type::edge_type edge_type;
+      
+      typedef feature_function_type::rule_type rule_type;
       
     public:
       typedef boost::filesystem::path path_type;
@@ -36,7 +45,7 @@ namespace cicada
 			 const edge_type& edge) const
       {
 	const rule_type& rule = *(edge.rule);
-	const symbol_set_type& target = rule.target;
+	const rule_type::symbol_set_type& target = rule.target;
 	
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	
@@ -52,14 +61,14 @@ namespace cicada
 	
 	buffer_type::const_iterator iter_first = buffer.begin();
 	
-	symbol_set_type::const_iterator titer_end = target.end();
-	for (symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
+	rule_type::symbol_set_type::const_iterator titer_end = target.end();
+	for (rule_type::symbol_set_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
 	  if (titer->is_non_terminal()) {
-	    const int child_index = titer->non_terminal_index() - 1;
-	    if (child_index < 0)
+	    const int antecedent_index = titer->non_terminal_index() - 1;
+	    if (antecedent_index < 0)
 	      throw std::runtime_error("this is a non-terminal, but no index!");
 	    
-	    const symbol_type* context = reinterpret_cast<const symbol_type*>(states[child_index]);
+	    const symbol_type* context = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
 	    
 	    buffer_type::const_iterator citer = buffer.end();
 	    
@@ -88,7 +97,8 @@ namespace cicada
 	    const bool score_ngram = (buffer.end() - iter_first == order);
 	    
 	    if (score_ngram) {
-	      score += ngram.logprob(iter_first, buffer.end());
+	      buffer_type::const_iterator iter_end = buffer.end();
+	      score += ngram.logprob(iter_first, iter_end);
 	      ++ iter_first;
 	    }
 	  }
@@ -108,7 +118,7 @@ namespace cicada
 	} else {
 	  if (buffer.size() <= order - 1) {
 	    std::copy(buffer.begin(), buffer.end(), context);
-	    context[order] = vocab_type::EMPTY;
+	    context[buffer.size()] = vocab_type::EMPTY;
 	  } else {
 	    std::copy(buffer.begin(), buffer.begin() + order - 1, context);
 	    context[order] = vocab_type::STAR;
@@ -141,7 +151,9 @@ namespace cicada
 	double score = 0.0;
 	
 	// compute score until we reach STAR
-	for (buffer_type::const_iterator iter = iter_begin + 1; iter != iter_end && *iter != vocab_type::STAR; ++ iter) {
+	
+	buffer_type::const_iterator iter = iter_begin + 1;
+	for (/**/; iter != iter_end && *iter != vocab_type::STAR; ++ iter) {
 	  score += ngram.logprob(iter_first, iter + 1);
 	  iter_first += (iter + 1 - iter_first == order);
 	}
@@ -159,8 +171,9 @@ namespace cicada
 	const symbol_type* context_end = context + order - 1;
 	
 	double score = 0.0;
-	for (const symbol_type* citer = context + 1; citer != context_end && *citer != vocab_type::STAR && *citer != vocab_type::EMPTY; ++ citer)
-	  score += ngram.logbound(context, citer + 1);
+	if (*context != vocab_type::EMPTY)
+	  for (const symbol_type* citer = context + 1; citer != context_end && *citer != vocab_type::STAR && *citer != vocab_type::EMPTY; ++ citer)
+	    score += ngram.logbound(context, citer + 1);
 	
 	return score;
       }
@@ -178,26 +191,32 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (! boost::filesystem::exists(param.name()))
-	throw std::runtime_error(std::string("no ngram file") + param.name());
+      if (param.name() != "ngram")
+	throw std::runtime_error("is this really ngram feature function? " + parameter);
 
+      parameter_type::const_iterator fiter = param.find("file");
+      if (fiter == param.end() || ! boost::filesystem::exists(fiter->second))
+	throw std::runtime_error("no ngram file?");
+
+      const path_type path = fiter->second;
+      
       int order = 3;
-      parameter_type::const_iterator oiter = std::find(param.begin(), param.end(), "order");
-      if (piter != param.end())
-	order = atoi(piter->second.c_str());
+      parameter_type::const_iterator oiter = param.find("order");
+      if (oiter != param.end())
+	order = boost::lexical_cast<int>(oiter->second);
       if (order <= 0)
 	throw std::runtime_error("invalid ngram order");
       
-      std::auto_ptr<impl_type> ngram_impl(new impl_type(param.name(), order));
+      std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
       
       // two contexts (order - 1) for each edge, with two separator..
       base_type::__state_size = sizeof(symbol_type) * ngram_impl->order * 2;
       
-      parameter_type::const_iterator niter = std::find(param.begin(), param.end(), "name");
+      parameter_type::const_iterator niter = param.find("name");
       if (niter != param.end())
 	base_type::__feature_name = niter->second;
       else
-	base_type::__feature_name = "ngram";
+	base_type::__feature_name = std::string("ngram");
       
       pimpl = ngram_impl.release();
     }
@@ -207,17 +226,17 @@ namespace cicada
     void NGram::operator()(state_ptr_type& state,
 			   const state_ptr_set_type& states,
 			   const edge_type& edge,
-			   feature_vector_type& features,
-			   feature_vector_type& estimates) const
+			   feature_set_type& features,
+			   feature_set_type& estimates) const
     {
-      features[feature_name] += pimpl->ngram_score(state, states, edge);
-      estimates[feature_name] += pimpl->ngram_estimate(state);
+      features[base_type::feature_name()] = pimpl->ngram_score(state, states, edge);
+      estimates[base_type::feature_name()] = pimpl->ngram_estimate(state);
     }
     
     void NGram::operator()(state_ptr_type& state,
-			   feature_vector_tyep& features) const
+			   feature_set_type& features) const
     {
-      features[feature_name] += pimpl->ngram_final_score(state);
+      features[base_type::feature_name()] = pimpl->ngram_final_score(state);
     }
   };
 };
