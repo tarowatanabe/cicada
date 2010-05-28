@@ -34,7 +34,7 @@ namespace cicada
       {
 	friend struct Logprob;
 	
-	proxy_type(const weight_type& x) : __value(__round(x)) {}
+	proxy_type(const weight_type& x) : __value(x) {}
 	
 	operator Logprob() const { return Logprob(*this); }
 	
@@ -103,7 +103,7 @@ namespace cicada
       }
       
       friend
-      std::isteram& operator>>(std::istream& is, self_type& x)
+      std::istream& operator>>(std::istream& is, self_type& x)
       {
 	is >> x.__value;
 	return is;
@@ -134,8 +134,9 @@ namespace cicada
     template <typename Tp>
     struct traits<Logprob<Tp> >
     {
-      static inline Tp zero() { return Logprob<Tp>::zero();  }
-      static inline Tp one()  { return Logprob<Tp>::one(); }
+      static inline Logprob<Tp> log(const Tp& x) { return Logprob<Tp>::log(x); }
+      static inline Logprob<Tp> zero() { return Logprob<Tp>::zero();  }
+      static inline Logprob<Tp> one()  { return Logprob<Tp>::one(); }
     };
 
   };

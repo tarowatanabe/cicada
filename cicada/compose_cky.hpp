@@ -227,7 +227,7 @@ namespace cicada
 	  apply_rule(goal_rule, feature_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph);
       
       // we will sort to remove unreachable nodes......
-      graph.topologically_sort();
+      //graph.topologically_sort();
     }
 
   private:
@@ -257,33 +257,6 @@ namespace cicada
       if (! features.empty())
 	edge.features += features;
       
-      // we will sort tail_nodes with its corresponding index in source-side..
-      if (edge.tail_nodes.size() > 1) {
-	typedef std::pair<symbol_type, hypergraph_type::id_type> symbol_id_type;
-	typedef std::vector<symbol_id_type, std::allocator<symbol_id_type> > non_terminal_set_type;
-	
-	non_terminal_set_type non_terminals;
-	non_terminals.reserve(edge.tail_nodes.size());
-	
-	hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tail_nodes.begin();
-	rule_type::symbol_set_type::const_iterator siter_end = rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = rule->source.begin(); siter != siter_end; ++ siter, ++ niter)
-	  if (siter->is_non_terminal())
-	    non_terminals.push_back(std::make_pair(*siter, *niter));
-	
-	// we will use stable sort so that we can maintain relative ordering...
-	std::stable_sort(non_terminals.begin(), non_terminals.end(), less_non_terminal_index<symbol_id_type>());
-	
-	// then, re-assign...
-	{
-	  hypergraph_type::edge_type::node_set_type::iterator niter = edge.tail_nodes.begin();
-	  
-	  non_terminal_set_type::const_iterator siter_end = non_terminals.end();
-	  for (non_terminal_set_type::const_iterator siter = non_terminals.begin(); siter != siter_end; ++ siter, ++ niter)
-	    *niter = siter->second;
-	}
-      }
-      
       node_map_type::iterator niter = node_map.find(rule->lhs);
       if (niter == node_map.end()) {
 	hypergraph_type::node_type& node = graph.add_node();
@@ -301,6 +274,15 @@ namespace cicada
       }
       
       graph.connect_edge(edge.id, niter->second);
+
+#if 0
+      std::cerr << "new rule: " << *(edge.rule)
+		<< " head: " << edge.head_node
+		<< ' ';
+      std::copy(edge.tail_nodes.begin(), edge.tail_nodes.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::cerr << std::endl;
+#endif
+      
     }
     
     void extend_actives(const transducer_type& transducer,
@@ -333,7 +315,7 @@ namespace cicada
     
   private:
     const symbol_type goal;
-    const grammar_type grammar;
+    const grammar_type& grammar;
     
     rule_ptr_type goal_rule;
     
@@ -343,6 +325,11 @@ namespace cicada
     
     non_terminal_set_type non_terminals;
   };
+
+  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph)
+  {
+    ComposeCKY(goal, grammar)(lattice, graph);
+  }
 };
 
 #endif

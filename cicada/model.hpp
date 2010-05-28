@@ -20,7 +20,6 @@ namespace cicada
   public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
-    typedef float     weight_type;
 
     typedef cicada::Symbol     symbol_type;
     typedef cicada::Feature    feature_type;
@@ -37,14 +36,12 @@ namespace cicada
     
     typedef FeatureFunction                          feature_function_type;
     typedef boost::shared_ptr<feature_function_type> feature_function_ptr_type;
+
+  private:
     typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type > > model_set_type;
     
   public:
-    Model() : states_size(0) {}
-    Model(const model_set_type& __models)
-      : models(__models),
-	offsets(__models.size()),
-	states_size(0) { initialize(); }
+    Model() {}
 
   public:
     
@@ -52,12 +49,28 @@ namespace cicada
 			  const state_set_type& node_states,
 			  edge_type& edge,
 			  feature_set_type& estimates) const;
-
+    
     void operator()(const state_type& state,
 		    edge_type& edge) const;
-
-  private:
+    
+    // you should call this at least once, when you are going to use this model.
     void initialize();
+
+    bool empty() const { return models.empty(); }
+    size_type size() const { return models.size(); }
+    
+    void push_back(const feature_function_ptr_type& x)
+    {
+      models.push_back(x);
+    }
+    
+    void clear()
+    {
+      models.clear();
+      offsets.clear();
+      states_size = 0;
+    }
+    
     
   private:
     typedef std::vector<size_type, std::allocator<size_type> > offset_set_type;

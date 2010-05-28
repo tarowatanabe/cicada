@@ -291,6 +291,7 @@ namespace cicada
 	    const phrase_type rule_target = read_phrase(pos_target, cache_targets, target_db);
 	    
 	    rule_ptr_type rule(new rule_type(lhs, rule_source, rule_target, rule_arity));
+	    rule->sort_source_index();
 	    
 	    for (int feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];

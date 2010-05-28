@@ -53,6 +53,7 @@ namespace cicada
     iterator end() { return transducers.end(); }
     
     void push_back(const transducer_ptr_type& x) { transducers.push_back(x); }
+    void pop_back() { transducers.pop_back(); }
     void clear() { transducers.clear(); }
     
   private:

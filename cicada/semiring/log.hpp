@@ -32,11 +32,11 @@ namespace cicada
     public:
       struct proxy_type
       {
-	friend struct Logprob;
+	friend struct Log;
 	
-	proxy_type(const weight_type& x, const bool& s) : __value(__round(x)), __sign(s) {}
+	proxy_type(const weight_type& x, const bool& s) : __value(x), __sign(s) {}
 	
-	operator Logprob() const { return Logprob(*this); }
+	operator Log() const { return Log(*this); }
 	
       private:
 	weight_type __value;
@@ -54,7 +54,7 @@ namespace cicada
     public:
       Log() : __value(- std::numeric_limits<value_type>::infinity()), __sign(false) {}
       Log(const weight_type& x) : __value(std::signbit(x) ? std::log(-x) : std::log(x)), __sign(std::signbit(x)) {}
-      explitit Log(const proxy_type& x) : __value(x.__value), __sign(x.__sign) {}
+      explicit Log(const proxy_type& x) : __value(x.__value), __sign(x.__sign) {}
 
       operator Tp() const { return  __sign ? - std::exp(__value) : std::exp(__value); }
       

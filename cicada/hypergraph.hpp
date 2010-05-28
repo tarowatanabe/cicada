@@ -53,6 +53,7 @@ namespace cicada
     struct Edge
     {
       typedef utils::simple_vector<id_type, std::allocator<id_type> > node_set_type;
+      typedef cicada::Rule rule_type;
       
       Edge() : head_node(invalid), tail_nodes(), rule() {}
       
@@ -80,7 +81,7 @@ namespace cicada
 
     edge_type& add_edge(const edge_type& edge)
     {
-      const id_type edge_id = edges.size() - 1;
+      const id_type edge_id = edges.size();
       
       edges.push_back(edge);
       edges.back().id = edge_id;
@@ -95,6 +96,10 @@ namespace cicada
       
       edges.push_back(edge_type());
       edges.back().id = edge_id;
+
+      edge_type::node_set_type::const_iterator eiter_end = edges.back().tail_nodes.end();
+      for (edge_type::node_set_type::const_iterator eiter = edges.back().tail_nodes.begin(); eiter != eiter_end; ++ eiter)
+	nodes[*eiter].out_edges.push_back(edge_id);
       
       return edges.back();
     }

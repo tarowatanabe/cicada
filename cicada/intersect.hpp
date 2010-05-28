@@ -69,25 +69,31 @@ namespace cicada
       yield_source.insert(yield_source.end(), edge.rule->target.begin(), edge.rule->target.end());
       yield_target.insert(yield_target.end(), edge.rule->source.begin(), edge.rule->source.end());
 
-      yield_type::iterator siter_end = yield_source.end();
-      for (yield_type::iterator siter = yield_source.begin(); siter != siter_end; ++ siter)
-	if (siter->is_non_terminal()) {
-	  const int non_terminal_index = siter->non_terminal_index();
-	  if (non_terminal_index <= 0)
-	    throw std::runtime_error("no index in synchronous-rule...");
-	  
-	  *siter = non_terminals[edge.tail_nodes[non_terminal_index - 1]].non_terminal(non_terminal_index);
-	}
-      
-      yield_type::iterator titer_end = yield_target.end();
-      for (yield_type::iterator titer = yield_target.begin(); titer != titer_end; ++ titer) 
-	if (titer->is_non_terminal()) {
-	  const int non_terminal_index = titer->non_terminal_index();
-	  if (non_terminal_index <= 0)
-	    throw std::runtime_error("no index in synchronous-rule...");
-	  
-	  *titer = non_terminals[edge.tail_nodes[non_terminal_index - 1]].non_terminal(non_terminal_index);
-	}
+      // sort by source-index...
+      if (! edge.tail_nodes.empty()) {
+
+	std::vector<int, std::allocator<int> > index(edge.tail_nodes.size() + 1);
+	
+	int pos = 1;
+	yield_type::iterator siter_end = yield_source.end();
+	for (yield_type::iterator siter = yield_source.begin(); siter != siter_end; ++ siter)
+	  if (siter->is_non_terminal()) {
+	    const int non_terminal_index = siter->non_terminal_index();
+
+	    index[non_terminal_index] = pos;
+	    *siter = non_terminals[edge.tail_nodes[non_terminal_index - 1]].non_terminal(pos);
+	    ++ pos;
+	  }
+	
+	pos = 1;
+	yield_type::iterator titer_end = yield_target.end();
+	for (yield_type::iterator titer = yield_target.begin(); titer != titer_end; ++ titer) 
+	  if (titer->is_non_terminal()) {
+	    const int non_terminal_index = titer->non_terminal_index();
+	    *titer = non_terminals[edge.tail_nodes[non_terminal_index - 1]].non_terminal(index[pos]);
+	    ++ pos;
+	  }
+      }
       
       rule_ptr_type rule(new rule_type(non_terminals[edge.head_node],
 				       symbol_set_type(yield_source.begin(), yield_source.end()),

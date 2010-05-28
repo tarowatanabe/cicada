@@ -70,7 +70,7 @@ namespace cicada
 	       const function_type& _function)
       : model(_model),
 	function(_function)
-    {}
+    { const_cast<model_type&>(model).initialize(); }
     
     void operator()(const hypergraph_type& graph_in,
 		    hypergraph_type&       graph_out)
@@ -156,7 +156,6 @@ namespace cicada
 	}
       }
     }
-    
     
   private:
     node_map_type       node_map;

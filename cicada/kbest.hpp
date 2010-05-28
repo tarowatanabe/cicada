@@ -39,9 +39,7 @@ namespace cicada
   // semiring function
   
   
-  template <typename Semiring,
-	    typename Yield,
-	    typename Traversal,
+  template <typename Traversal,
 	    typename Function>
   struct KBest
   {
@@ -54,11 +52,13 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
     
-    typedef Semiring semiring_type;
-    typedef Semiring weight_type;
-    typedef Yield    yield_type;
+    
     typedef Traversal traversal_type;
     typedef Function  function_type;
+
+    typedef typename traversal_type::value_type yield_type;
+    typedef typename function_type::value_type  semiring_type;
+    typedef typename function_type::value_type  weight_type;
     
     KBest(const hypergraph_type& __graph,
 	  const size_type& __k_prime,
@@ -68,7 +68,11 @@ namespace cicada
 	k_prime(__k_prime),
 	traversal(__traversal),
 	function(__function),
-	states(__graph.nodes.size()) {}
+	states(__graph.nodes.size()) 
+    {
+      if (graph.goal == hypergraph_type::invalid)
+	throw std::runtime_error("invalid hypergraph...");
+    }
     
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
     
@@ -78,7 +82,7 @@ namespace cicada
       
       yield_type yield;
       const edge_type* edge;
-      const index_set_type j;
+      index_set_type   j;
       weight_type      score;
     };
     
@@ -108,7 +112,7 @@ namespace cicada
     {
       size_t operator()(const derivation_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), x->edge);
+	return utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), (intptr_t) x->edge);
       }
     };
     
@@ -140,14 +144,14 @@ namespace cicada
     typedef State state_type;
     typedef std::vector<state_type, std::allocator<state_type> > state_set_type;
 
-    bool operator()(int v, int k, yield_type& yield)
+    bool operator()(int k, yield_type& yield)
     {
-      const derivation_type* derivation = lazy_kth_best(v, k);
+      const derivation_type* derivation = lazy_kth_best(graph.goal, k);
       if (derivation) {
 	yield = derivation->yield;
 	return true;
       } else {
-	yield = yield();
+	yield = yield_type();
 	return false;
       }
     }
@@ -159,7 +163,7 @@ namespace cicada
       typedef std::vector<const yield_type*, std::allocator<const yield_type*> > yield_set_type;
 
       state_type & state = get_candidate(v);
-      derivation_heap_type& cand = state.scand;
+      derivation_heap_type& cand = state.cand;
       derivation_list_type& D = state.D;
 
       yield_set_type yields;
@@ -177,10 +181,10 @@ namespace cicada
 	  // perform traversal here...
 	  
 	  yields.clear();
-	  for (int i = 0; i < derivation->edge->tail_ndoes.size(); ++ i)
+	  for (int i = 0; i < derivation->edge->tail_nodes.size(); ++ i)
 	    yields.push_back(&lazy_kth_best(derivation->edge->tail_nodes[i], derivation->j[i])->yield);
 	  
-	  traversal(*(derivation->edge), &derivation->yield, yields.begin(), yields.end());
+	  traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yields.begin(), yields.end());
 	  
 	  // perform filtering here...!
 	  // if we have duplicates, do not insert...
@@ -253,7 +257,7 @@ namespace cicada
 	const edge_type& edge = graph.edges[*eiter];
 	
 	const index_set_type j(edge.tail_nodes.size(), 0);
-	derivation_type* derivation = make_derivation(edge, j);
+	const derivation_type* derivation = make_derivation(edge, j);
 	
 	if (! derivation)
 	  throw std::runtime_error("no derivation?");
@@ -284,7 +288,7 @@ namespace cicada
     
     const size_type k_prime;
   };
-  
+
 };
 
 #endif

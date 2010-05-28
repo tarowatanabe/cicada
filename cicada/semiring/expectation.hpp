@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__SEMIRING__LOGPROB__HPP__
-#define __CICADA__SEMIRING__LOGPROB__HPP__ 1
+#ifndef __CICADA__SEMIRING__EXPECTATION__HPP__
+#define __CICADA__SEMIRING__EXPECTATION__HPP__ 1
 
 #include <cmath>
 #include <cfloat>

@@ -49,6 +49,10 @@ namespace cicada
       features.clear();
       arity = 0;
     }
+    
+    // sort non-terminal index wrt source-side or target-side
+    void sort_source_index();
+    void sort_target_index();
 
     friend
     std::ostream& operator<<(std::ostream& os, const Rule& x);

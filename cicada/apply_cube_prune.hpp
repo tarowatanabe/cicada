@@ -65,8 +65,8 @@ namespace cicada
     {
       int node;
 
-      edge_type* in_edge;
-      edge_type  out_edge;
+      const edge_type* in_edge;
+      edge_type        out_edge;
       
       state_type state;
       
@@ -75,14 +75,18 @@ namespace cicada
       score_type score;
       score_type estimate;
       
-      Candidate() : node(-1), in_edge(0) {}
+      Candidate(const index_set_type& __j)
+	: in_edge(0), j(__j) {}
+
+      Candidate(const edge_type& __edge, const index_set_type& __j)
+	: in_edge(&__edge), out_edge(__edge), j(__j) {}
     };
 
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
-    typedef std::vector<candidate_type*, std::allocator<candidate_type*> > candidate_heap_type;
-    typedef std::vector<candidate_type*, std::allocator<candidate_type*> > candidate_list_type;
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_list_type;
     typedef std::vector<candidate_list_type, std::allocator<candidate_list_type> > candidate_node_type;
     
     struct state_hash_type : public utils::hashmurmur<size_t>
@@ -149,7 +153,7 @@ namespace cicada
       : model(_model),
 	function(_function),
 	cube_size_max(_cube_size_max)
-    {}
+    { const_cast<model_type&>(model).initialize(); }
     
     void operator()(const hypergraph_type& graph_in,
 		    hypergraph_type&       graph_out)
@@ -174,6 +178,8 @@ namespace cicada
     
     void kbest(id_type v, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
+      std::cerr << "kbest node: " << v << std::endl;
+
       const node_type& node = graph_in.nodes[v];
       const bool is_goal(v == graph_in.goal);
       
@@ -192,20 +198,26 @@ namespace cicada
 	cand_unique.insert(cand.back());
       }
       
+      std::cerr << "heapify" << std::endl;
+      
       // heapify
       std::make_heap(cand.begin(), cand.end(), compare_heap_type());
       
+      std::cerr << "perform cube-prune" << std::endl;
+
       state_node_map_type buf;
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...
 	std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
-	candidate_type* item = cand.back();
+	const candidate_type* item = cand.back();
 	cand.pop_back();
 	
 	push_succ(*item, is_goal, cand, cand_unique, graph_out);
 	append_item(*item, buf, graph_out);
       }
+
+      std::cerr << "finished" << std::endl;
       
       // sort buf to D(v)
       D[v].reserve(buf.size());
@@ -224,9 +236,15 @@ namespace cicada
     {
       edge_type& edge_new = graph.add_edge(item.out_edge);
 
+      std::cerr << "edge-id: " << edge_new.id
+		<< " head: " << edge_new.head_node
+		<< std::endl;
+
       // hypothesis re-combination...
       typename state_node_map_type::iterator biter = buf.find(item.state);
       if (biter == buf.end()) {
+	std::cerr << "added node!" << std::endl;
+
 	biter = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item))).first;
 	
 	const node_type& node_new = graph.add_node();
@@ -235,7 +253,10 @@ namespace cicada
 	node_states.push_back(item.state);
       }
       
+      std::cerr << "node: " << biter->second->node << std::endl;
+      
       candidate_type& item_graph = *(biter->second);
+      
       node_type& node = graph.nodes[item_graph.node];
       
       graph.connect_edge(edge_new.id, node.id);
@@ -246,6 +267,8 @@ namespace cicada
 	item_graph.score  = item.score;
 	item_graph.estimate = item.estimate;
       }
+      
+      std::cerr << "finished append-item" << std::endl;
     }
     
     // push succ...
@@ -270,6 +293,8 @@ namespace cicada
 
       candidate_type query(candidate.j);
       index_set_type& j = query.j;
+
+      size_t inserted = 0;
       
       for (int i = 0; i < candidate.j.size(); ++ i) {
 	
@@ -277,15 +302,16 @@ namespace cicada
 	++ j[i];
 	
 	for (/**/; j[i] < D[candidate.in_edge->tail_nodes[i]].size(); ++ j[i]) {
-	  query.edge = candidate.in_edge;
+	  query.in_edge = candidate.in_edge;
 	  
-	  if (candidates_unique.find(query) == candidates_unique.end()) {
+	  if (candidates_unique.find(&query) == candidates_unique.end()) {
 	    // new candidate...
-	    candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
+	    const candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
 	    
-	    cand.push(candidate_new);
+	    cand.push_back(candidate_new);
 	    std::push_heap(cand.begin(), cand.end(), compare_heap_type());
 	    candidates_unique.insert(candidate_new);
+	    ++ inserted;
 	    
 	    break;
 	  }
@@ -293,10 +319,14 @@ namespace cicada
 	
 	j[i] = j_i_prev;
       }
+
+      std::cerr << "inserted: " << inserted << std::endl;
     }
     
-    candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const hypergraph_type& graph, const bool is_goal)
+    const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const hypergraph_type& graph, const bool is_goal)
     {
+      std::cerr << "make candidate for: " << *(edge.rule) << std::endl;
+
       candidates.push_back(candidate_type(edge, j));
       
       candidate_type& candidate = candidates.back();
@@ -313,7 +343,7 @@ namespace cicada
       }
       
       // perform actual model application...
-      
+
       if (is_goal)
 	model(node_states[candidate.out_edge.tail_nodes.front()], candidate.out_edge);
       else {
@@ -324,6 +354,8 @@ namespace cicada
       
       candidate.score *= function(candidate.out_edge.features);
       candidate.estimate *= candidate.score;
+
+      std::cerr << "make candidate done" << std::endl;
       
       return &candidate;
     };
@@ -338,6 +370,12 @@ namespace cicada
     size_type  cube_size_max;
   };
   
+  template <typename Function>
+  void apply_cube_prune(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
+  {
+    ApplyCubePrune<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+  }
+
 };
 
 #endif

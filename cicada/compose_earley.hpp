@@ -680,7 +680,7 @@ namespace cicada
     
     
   private:  
-    const grammar_type grammar;
+    const grammar_type& grammar;
     
     symbol_type           goal_symbol;
     grammar_node_set_type grammar_nodes;
@@ -702,6 +702,13 @@ namespace cicada
     edge_set_active_type  edges_active;
     edge_set_passive_type edges_passive;
   };
+  
+  void compose_earley(const Grammar& grammar, const HyperGraph& source, HyperGraph& target)
+  {
+    ComposeEarley composer(grammar);
+      
+    composer(source, target);
+  }
   
 };
 

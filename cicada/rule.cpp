@@ -21,7 +21,71 @@
 
 namespace cicada
 {
+ 
+  void Rule::sort_source_index()
+  {
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
+    typedef std::vector<int, std::allocator<int> > index_type;
+
+    if (arity <= 1 || target.empty()) return;
+    
+    index_type index(arity + 1);
+    sequence_type source_new(source.begin(), source.end());
+    sequence_type target_new(target.begin(), target.end());
+    
+    int pos = 1;
+    sequence_type::iterator siter_end = source_new.end();
+    for (sequence_type::iterator siter = source_new.begin(); siter != siter_end; ++ siter)
+      if (siter->is_non_terminal()) {
+	index[siter->non_terminal_index()] = pos;
+	*siter = siter->non_terminal(pos);
+	++ pos;
+      }
+    
+    pos = 1;
+    sequence_type::iterator titer_end = target_new.end();
+    for (sequence_type::iterator titer = target_new.begin(); titer != titer_end; ++ titer)
+      if (titer->is_non_terminal()) {
+	*titer = titer->non_terminal(index[pos]);
+	++ pos;
+      }
+    
+    source.assign(source_new.begin(), source_new.end());
+    target.assign(target_new.begin(), target_new.end());
+  }
   
+  void Rule::sort_target_index()
+  {
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
+    typedef std::vector<int, std::allocator<int> > index_type;
+    
+    if (arity <= 1 || target.empty()) return;
+    
+    index_type index(arity + 1);
+    sequence_type source_new(source.begin(), source.end());
+    sequence_type target_new(target.begin(), target.end());
+    
+    int pos = 1;
+    sequence_type::iterator titer_end = target_new.end();
+    for (sequence_type::iterator titer = target_new.begin(); titer != titer_end; ++ titer)
+      if (titer->is_non_terminal()) {
+	index[titer->non_terminal_index()] = pos;
+	*titer = titer->non_terminal(pos);
+	++ pos;
+      }
+    
+    pos = 1;
+    sequence_type::iterator siter_end = source_new.end();
+    for (sequence_type::iterator siter = source_new.begin(); siter != siter_end; ++ siter)
+      if (siter->is_non_terminal()) {
+	*siter = siter->non_terminal(index[pos]);
+	++ pos;
+      }
+
+    source.assign(source_new.begin(), source_new.end());
+    target.assign(target_new.begin(), target_new.end());
+  }
+ 
   typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
   typedef std::pair<std::string, double> score_parsed_type;
   typedef std::vector<score_parsed_type, std::allocator<score_parsed_type> > scores_parsed_type;
