@@ -539,7 +539,7 @@ namespace cicada
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
-    hypergraph_parser<grammar_type>& grammar = *__grammar;
+    grammar_type& grammar = *__grammar;
 #endif
     
     std::string line;
@@ -705,36 +705,65 @@ namespace cicada
 
       // dump rule part...
       
-      rule_generator<iterator_type>     rule_grammar;
+      typedef rule_generator<iterator_type> grammar_type;
+
+#ifdef HAVE_TLS
+      static __thread grammar_type* __grammar_tls = 0;
+      static boost::thread_specific_ptr<grammar_type > __grammar;
       
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      grammar_type& rule_grammar = *__grammar_tls;
+#else
+      static boost::thread_specific_ptr<grammar_type > __grammar;
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      grammar_type& rule_grammar = *__grammar;
+#endif
       
       bool initial_rule = true;
       std::string output_rule;
-      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
-	if (eiter->rule) {
-	  const rule_type& rule = *(eiter->rule);
+      
+      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+
+	const hypergraph_type::node_type& node = *niter;
+	
+	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
 	  
-	  rule_unique_map_type::iterator riter = rules_unique.find(&rule);
-	  if (riter == rules_unique.end()) {
+	  if (edge.rule) {
+	    const rule_type& rule = *(edge.rule);
+
+	    rule_unique_map_type::iterator riter = rules_unique.find(&rule);
 	    
-	    // + 1 for none-rule which will be zero-rule-id
-	    const int rule_id = rules_unique.size() + 1;
-	    
-	    rules_unique.insert(std::make_pair(&rule, rule_id));
-	    
-	    output_rule.clear();
-	    iterator_type iter(output_rule);
-	    
-	    boost::spirit::karma::generate(iter, rule_grammar, rule);
-	    
-	    if (! initial_rule)
-	      os << ", ";
-	    os << '\"' << output_rule << '\"';
-	    
-	    initial_rule = false;
+	    if (riter == rules_unique.end()) {
+	      
+	      // + 1 for none-rule which will be zero-rule-id
+	      const int rule_id = rules_unique.size() + 1;
+	      
+	      rules_unique.insert(std::make_pair(&rule, rule_id));
+	      
+	      output_rule.clear();
+	      iterator_type iter(output_rule);
+	      
+	      boost::spirit::karma::generate(iter, rule_grammar, rule);
+	      
+	      if (! initial_rule)
+		os << ", ";
+	      os << '\"' << output_rule << '\"';
+	      
+	      initial_rule = false;
+	    }
 	  }
 	}
+      }
+      
       os << ']';
     }
     
@@ -743,7 +772,26 @@ namespace cicada
     {
       os << "\"nodes\"" << ": " << '[';
 
-      features_generator<iterator_type> features_grammar;
+      typedef features_generator<iterator_type> grammar_type;
+
+#ifdef HAVE_TLS
+      static __thread grammar_type* __grammar_tls = 0;
+      static boost::thread_specific_ptr<grammar_type > __grammar;
+      
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      grammar_type& features_grammar = *__grammar_tls;
+#else
+      static boost::thread_specific_ptr<grammar_type > __grammar;
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      grammar_type& features_grammar = *__grammar;
+#endif
+
       std::string output_features;
       
       // dump nodes...

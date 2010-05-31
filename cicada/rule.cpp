@@ -152,7 +152,7 @@ namespace cicada
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
-    hypergraph_parser<grammar_type>& grammar = *__grammar;
+    grammar_type& grammar = *__grammar;
 #endif
     
       
@@ -202,7 +202,7 @@ namespace cicada
       if (! __grammar.get())
 	__grammar.reset(new grammar_type());
       
-      hypergraph_parser<grammar_type>& grammar = *__grammar;
+      grammar_type& grammar = *__grammar;
 #endif
       
       rule_parsed_type rule_parsed;

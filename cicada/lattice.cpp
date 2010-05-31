@@ -159,7 +159,7 @@ namespace cicada
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
-    hypergraph_parser<grammar_type>& grammar = *__grammar;
+    grammar_type& grammar = *__grammar;
 #endif
 
     clear();
@@ -194,7 +194,7 @@ namespace cicada
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
-    hypergraph_parser<grammar_type>& grammar = *__grammar;
+    grammar_type& grammar = *__grammar;
 #endif
 
     std::string line;
@@ -286,7 +286,7 @@ namespace cicada
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
-    hypergraph_parser<grammar_type>& grammar = *__grammar;
+    grammar_type& grammar = *__grammar;
 #endif
     
     iterator_type iter(os);
