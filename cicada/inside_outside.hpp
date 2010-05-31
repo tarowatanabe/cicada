@@ -48,13 +48,13 @@ namespace cicada
       
       weight_type& weight = weights[node.id];
       
-      node_type::edge_set_type::const_iterator eiter_end = node.in_edges.end();
-      for (node_type::edge_set_type::const_iterator eiter = node.in_edges.begin(); eiter != eiter_end; ++ eiter) {
+      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[*eiter];
 	
 	weight_type score = function(edge);
-	edge_type::node_set_type::const_iterator niter_end = edge.tail_nodes.end();
-	for (edge_type::node_set_type::const_iterator niter = edge.tail_nodes.begin(); niter != niter_end; ++ niter)
+	edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	  score *= weights[*niter];
 	
 	weight += score;
@@ -88,16 +88,16 @@ namespace cicada
 
       const weight_type& score_head = weights_outside[node.id];
       
-      node_type::edge_set_type::const_iterator eiter_end = node.in_edges.end();
-      for (node_type::edge_set_type::const_iterator eiter = node.in_edges.begin(); eiter != eiter_end; ++ eiter) {
+      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	
 	const edge_type& edge = graph.edges[*eiter];
 	
 	weight_type score_head_edge = function(edge);
 	score_head_edge *= score_head;
 	
-	edge_type::node_set_type::const_iterator niter_begin = edge.tail_nodes.begin();
-	edge_type::node_set_type::const_iterator niter_end = edge.tail_nodes.end();
+	edge_type::node_set_type::const_iterator niter_begin = edge.tails.begin();
+	edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator niter = niter_begin; niter != niter_end; ++ niter) {
 	  
 	  weight_type score_outside = score_head_edge;
@@ -140,14 +140,14 @@ namespace cicada
     for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
       const node_type& node = *niter;
       
-      node_type::edge_set_type::const_iterator eiter_end = node.in_edges.end();
-      for (node_type::edge_set_type::const_iterator eiter = node.in_edges.begin(); eiter != eiter_end; ++ eiter) {
+      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[*eiter];
 	
 	KWeight score_k = outside_k[node.id];
 	
-	edge_type::node_set_type::const_iterator niter_end = edge.tail_nodes.end();
-	for (edge_type::node_set_type::const_iterator niter = edge.tail_nodes.begin(); niter != niter_end; ++ niter)
+	edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	  score_k *= inside_k[*niter];
 	
 	x += function_x(edge) * score_k;

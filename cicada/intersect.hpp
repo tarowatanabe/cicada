@@ -70,9 +70,9 @@ namespace cicada
       yield_target.insert(yield_target.end(), edge.rule->source.begin(), edge.rule->source.end());
 
       // sort by source-index...
-      if (! edge.tail_nodes.empty()) {
+      if (! edge.tails.empty()) {
 
-	std::vector<int, std::allocator<int> > index(edge.tail_nodes.size() + 1);
+	std::vector<int, std::allocator<int> > index(edge.tails.size() + 1);
 	
 	int pos = 1;
 	yield_type::iterator siter_end = yield_source.end();
@@ -81,7 +81,7 @@ namespace cicada
 	    const int non_terminal_index = siter->non_terminal_index();
 
 	    index[non_terminal_index] = pos;
-	    *siter = non_terminals[edge.tail_nodes[non_terminal_index - 1]].non_terminal(pos);
+	    *siter = non_terminals[edge.tails[non_terminal_index - 1]].non_terminal(pos);
 	    ++ pos;
 	  }
 	
@@ -90,15 +90,15 @@ namespace cicada
 	for (yield_type::iterator titer = yield_target.begin(); titer != titer_end; ++ titer) 
 	  if (titer->is_non_terminal()) {
 	    const int non_terminal_index = titer->non_terminal_index();
-	    *titer = non_terminals[edge.tail_nodes[non_terminal_index - 1]].non_terminal(index[pos]);
+	    *titer = non_terminals[edge.tails[non_terminal_index - 1]].non_terminal(index[pos]);
 	    ++ pos;
 	  }
       }
       
-      rule_ptr_type rule(new rule_type(non_terminals[edge.head_node],
+      rule_ptr_type rule(new rule_type(non_terminals[edge.head],
 				       symbol_set_type(yield_source.begin(), yield_source.end()),
 				       symbol_set_type(yield_target.begin(), yield_target.end()),
-				       edge.tail_nodes.size()));
+				       edge.tails.size()));
       rule->features = edge.features;
       
       g->insert(*rule);

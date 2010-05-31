@@ -49,17 +49,17 @@ namespace cicada
     struct ActiveItem
     {
       ActiveItem(const transducer_type::id_type& __node,
-		 const hypergraph_type::edge_type::node_set_type __tail_nodes,
+		 const hypergraph_type::edge_type::node_set_type __tails,
 		 const feature_set_type& __features)
 	: node(__node),
-	  tail_nodes(__tail_nodes),
+	  tails(__tails),
 	  features(__features) {}
       ActiveItem(const transducer_type::id_type& __node)
 	: node(__node),
-	  tail_nodes() {}
+	  tails() {}
       
       transducer_type::id_type                  node;
-      hypergraph_type::edge_type::node_set_type tail_nodes;
+      hypergraph_type::edge_type::node_set_type tails;
       feature_set_type                          features;
     };
     
@@ -151,7 +151,7 @@ namespace cicada
 		  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 		  if (node == transducer.root()) continue;
 		  
-		  cell.push_back(active_type(node, aiter->tail_nodes, aiter->features + piter->features));
+		  cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features));
 		}
 	      }
 	    }
@@ -169,7 +169,7 @@ namespace cicada
 	      
 	      transducer_type::rule_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(*riter, citer->features, citer->tail_nodes.begin(), citer->tail_nodes.end(), node_map, passive_arcs, graph);
+		apply_rule(*riter, citer->features, citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph);
 	    }
 	  }
 	  
@@ -227,7 +227,7 @@ namespace cicada
 	  apply_rule(goal_rule, feature_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph);
       
       // we will sort to remove unreachable nodes......
-      //graph.topologically_sort();
+      graph.topologically_sort();
     }
 
   private:
@@ -277,9 +277,9 @@ namespace cicada
 
 #if 0
       std::cerr << "new rule: " << *(edge.rule)
-		<< " head: " << edge.head_node
+		<< " head: " << edge.head
 		<< ' ';
-      std::copy(edge.tail_nodes.begin(), edge.tail_nodes.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::copy(edge.tails.begin(), edge.tails.end(), std::ostream_iterator<int>(std::cerr, " "));
       std::cerr << std::endl;
 #endif
       
@@ -303,11 +303,11 @@ namespace cicada
 	  const transducer_type::id_type node = transducer.next(aiter->node, non_terminal);
 	  if (node == transducer.root()) continue;
 	  
-	  hypergraph_type::edge_type::node_set_type tail_nodes(aiter->tail_nodes.size() + 1);
-	  std::copy(aiter->tail_nodes.begin(), aiter->tail_nodes.end(), tail_nodes.begin());
-	  tail_nodes.back() = *piter;
+	  hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
+	  std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
+	  tails.back() = *piter;
 	  
-	  cell.push_back(active_type(node, tail_nodes, aiter->features));
+	  cell.push_back(active_type(node, tails, aiter->features));
 	}
     }
 

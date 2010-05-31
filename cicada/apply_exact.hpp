@@ -86,6 +86,7 @@ namespace cicada
       for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
 	process(node_id, graph_in, graph_out);
       
+      // topologically sort...
       graph_out.topologically_sort();
     };
     
@@ -98,31 +99,31 @@ namespace cicada
 
       state_node_map_type buf;
       
-      node_type::edge_set_type::const_iterator eiter_end = node.in_edges.end();
-      for (node_type::edge_set_type::const_iterator eiter = node.in_edges.begin(); eiter != eiter_end; ++ eiter) {
+      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph_in.edges[*eiter];
 	
-	index_set_type j_ends(edge.tail_nodes.size(), 0);
-	index_set_type j(edge.tail_nodes.size(), 0);
+	index_set_type j_ends(edge.tails.size(), 0);
+	index_set_type j(edge.tails.size(), 0);
 
-	for (int i = 0; i < edge.tail_nodes.size(); ++ i)
-	  j_ends[i] = node_map[edge.tail_nodes[i]].size();
+	for (int i = 0; i < edge.tails.size(); ++ i)
+	  j_ends[i] = node_map[edge.tails[i]].size();
 
-	edge_type::node_set_type tail_nodes(edge.tail_nodes.size());
+	edge_type::node_set_type tails(edge.tails.size());
 	
 	bool finished = false;
 	while (! finished) {
 	  
-	  for (int i = 0; i < edge.tail_nodes.size(); ++ i)
-	    tail_nodes[i] = node_map[edge.tail_nodes[i]][j[i]];
+	  for (int i = 0; i < edge.tails.size(); ++ i)
+	    tails[i] = node_map[edge.tails[i]][j[i]];
 	  
-	  edge_type& edge_new = graph_out.add_edge(tail_nodes.begin(), tail_nodes.end());
+	  edge_type& edge_new = graph_out.add_edge(tails.begin(), tails.end());
 	  edge_new.rule = edge.rule;
 	  edge_new.features = edge.features;
 
 	  state_type state;
 	  if (is_goal)
-	    model(node_states[tail_nodes.front()], edge_new);
+	    model(node_states[tails.front()], edge_new);
 	  else {
 	    feature_set_type estimates;
 	    state = model(graph_out, node_states, edge_new, estimates);
@@ -136,7 +137,7 @@ namespace cicada
 	    
 	    node_states.push_back(state);
 	    
-	    node_map[edge.head_node].push_back(node_new.id);
+	    node_map[edge.head].push_back(node_new.id);
 	    
 	    biter = buf.insert(std::make_pair(state, node_new.id));
 	  }
@@ -146,12 +147,12 @@ namespace cicada
 	  // proceed to the next id...
 
 	  int index = 0;
-	  for (/**/; index < edge.tail_nodes.size(); ++ index) {
+	  for (/**/; index < edge.tails.size(); ++ index) {
 	    ++ j[index];
 	    if (j[index] < j_ends[index]) break;
 	    j[index] = 0;
 	  }
-	  finished = (index == edge.tail_nodes.size());
+	  finished = (index == edge.tails.size());
 	  
 	}
       }

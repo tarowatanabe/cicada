@@ -170,7 +170,11 @@ namespace cicada
       graph_out.clear();
       for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
 	kbest(node_id, graph_in, graph_out);
+
+      if (! graph_out.nodes.empty())
+	graph_out.goal = graph_out.nodes.size() - 1;
       
+      // topologically sort...
       graph_out.topologically_sort();
     };
     
@@ -178,7 +182,7 @@ namespace cicada
     
     void kbest(id_type v, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
-      std::cerr << "kbest node: " << v << std::endl;
+      //std::cerr << "kbest node: " << v << std::endl;
 
       const node_type& node = graph_in.nodes[v];
       const bool is_goal(v == graph_in.goal);
@@ -187,23 +191,23 @@ namespace cicada
       
       // for each incoming e, cand \leftarrow { <e, 1>}
       candidate_heap_type cand;
-      cand.reserve(node.in_edges.size());
+      cand.reserve(node.edges.size());
       
-      node_type::edge_set_type::const_iterator eiter_end = node.in_edges.end();
-      for (node_type::edge_set_type::const_iterator eiter = node.in_edges.begin(); eiter != eiter_end; ++ eiter) {
+      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph_in.edges[*eiter];
-	const index_set_type j(edge.tail_nodes.size(), 0);
+	const index_set_type j(edge.tails.size(), 0);
 	
 	cand.push_back(make_candidate(edge, j, graph_out, is_goal));
 	cand_unique.insert(cand.back());
       }
       
-      std::cerr << "heapify" << std::endl;
+      //std::cerr << "heapify" << std::endl;
       
       // heapify
       std::make_heap(cand.begin(), cand.end(), compare_heap_type());
       
-      std::cerr << "perform cube-prune" << std::endl;
+      //std::cerr << "perform cube-prune" << std::endl;
 
       state_node_map_type buf;
       
@@ -217,7 +221,7 @@ namespace cicada
 	append_item(*item, buf, graph_out);
       }
 
-      std::cerr << "finished" << std::endl;
+      //std::cerr << "finished" << std::endl;
       
       // sort buf to D(v)
       D[v].reserve(buf.size());
@@ -236,14 +240,16 @@ namespace cicada
     {
       edge_type& edge_new = graph.add_edge(item.out_edge);
 
+#if 0
       std::cerr << "edge-id: " << edge_new.id
-		<< " head: " << edge_new.head_node
+		<< " head: " << edge_new.head
 		<< std::endl;
+#endif
 
       // hypothesis re-combination...
       typename state_node_map_type::iterator biter = buf.find(item.state);
       if (biter == buf.end()) {
-	std::cerr << "added node!" << std::endl;
+	//std::cerr << "added node!" << std::endl;
 
 	biter = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item))).first;
 	
@@ -253,7 +259,7 @@ namespace cicada
 	node_states.push_back(item.state);
       }
       
-      std::cerr << "node: " << biter->second->node << std::endl;
+      //std::cerr << "node: " << biter->second->node << std::endl;
       
       candidate_type& item_graph = *(biter->second);
       
@@ -268,7 +274,7 @@ namespace cicada
 	item_graph.estimate = item.estimate;
       }
       
-      std::cerr << "finished append-item" << std::endl;
+      //std::cerr << "finished append-item" << std::endl;
     }
     
     // push succ...
@@ -301,7 +307,7 @@ namespace cicada
 	const int j_i_prev = j[i];
 	++ j[i];
 	
-	for (/**/; j[i] < D[candidate.in_edge->tail_nodes[i]].size(); ++ j[i]) {
+	for (/**/; j[i] < D[candidate.in_edge->tails[i]].size(); ++ j[i]) {
 	  query.in_edge = candidate.in_edge;
 	  
 	  if (candidates_unique.find(&query) == candidates_unique.end()) {
@@ -320,32 +326,32 @@ namespace cicada
 	j[i] = j_i_prev;
       }
 
-      std::cerr << "inserted: " << inserted << std::endl;
+      //std::cerr << "inserted: " << inserted << std::endl;
     }
     
     const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const hypergraph_type& graph, const bool is_goal)
     {
-      std::cerr << "make candidate for: " << *(edge.rule) << std::endl;
+      //std::cerr << "make candidate for: " << *(edge.rule) << std::endl;
 
       candidates.push_back(candidate_type(edge, j));
       
       candidate_type& candidate = candidates.back();
       
-      candidate.out_edge.tail_nodes = edge_type::node_set_type(j.size());
+      candidate.out_edge.tails = edge_type::node_set_type(j.size());
       
       candidate.score = semiring::traits<score_type>::one();
       candidate.estimate = semiring::traits<score_type>::one();
       for (int i = 0; i < j.size(); ++ i) {
-	const candidate_type& antecedent = *D[edge.tail_nodes[i]][j[i]];
+	const candidate_type& antecedent = *D[edge.tails[i]][j[i]];
 	
-	candidate.out_edge.tail_nodes[i] = antecedent.node;
+	candidate.out_edge.tails[i] = antecedent.node;
 	candidate.score *= antecedent.score;
       }
       
       // perform actual model application...
 
       if (is_goal)
-	model(node_states[candidate.out_edge.tail_nodes.front()], candidate.out_edge);
+	model(node_states[candidate.out_edge.tails.front()], candidate.out_edge);
       else {
 	feature_set_type estimates;
 	candidate.state = model(graph, node_states, candidate.out_edge, estimates);
@@ -355,7 +361,7 @@ namespace cicada
       candidate.score *= function(candidate.out_edge.features);
       candidate.estimate *= candidate.score;
 
-      std::cerr << "make candidate done" << std::endl;
+      //std::cerr << "make candidate done" << std::endl;
       
       return &candidate;
     };

@@ -23,6 +23,7 @@
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/resource.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -232,6 +233,8 @@ int main(int argc, char ** argv)
 
       if (debug)
 	std::cerr << "composition" << std::endl;
+
+      utils::resource compose_start;
       
       if (input_forest_mode) {
 	// we assume cfg-fst composition
@@ -243,6 +246,13 @@ int main(int argc, char ** argv)
 	cicada::compose_cky(symbol_goal, grammar_translation, lattice, hypergraph_composed);
       }
 
+      utils::resource compose_end;
+      
+      if (debug)
+	std::cerr << "compose cpu time: " << (compose_end.cpu_time() - compose_start.cpu_time())
+		  << " user time: " << (compose_end.user_time() - compose_start.user_time())
+		  << std::endl;
+
       if (debug)
 	std::cerr << "# of nodes: " << hypergraph_composed.nodes.size()
 		  << " # of edges: " << hypergraph_composed.edges.size()
@@ -252,7 +262,16 @@ int main(int argc, char ** argv)
       if (debug)
 	std::cerr << "apply features" << std::endl;
 
+      utils::resource apply_start;
+
       cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+
+      utils::resource apply_end;
+      
+      if (debug)
+	std::cerr << "apply cpu time: " << (apply_end.cpu_time() - apply_start.cpu_time())
+		  << " user time: " << (apply_end.user_time() - apply_start.user_time())
+		  << std::endl;
 
       if (debug)
 	std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
@@ -305,8 +324,8 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("input",  po::value<path_type>(&input_file)->default_value(input_file),  "input file")
-    ("output", po::value<path_type>(&input_file)->default_value(output_file), "output file")
+    ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
     // options for input/output format
     ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")

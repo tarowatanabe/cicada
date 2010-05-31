@@ -79,6 +79,7 @@ namespace cicada
     struct Derivation
     {
       Derivation(const index_set_type& __j) : j(__j) {}
+      Derivation(const edge_type& __edge, const index_set_type& __j) : edge(&__edge), j(__j) {}
       
       yield_type yield;
       const edge_type* edge;
@@ -162,6 +163,8 @@ namespace cicada
     {
       typedef std::vector<const yield_type*, std::allocator<const yield_type*> > yield_set_type;
 
+      //std::cerr << "lazy-kth-best: node: " <<  v << " kbest: " << k << std::endl;
+
       state_type & state = get_candidate(v);
       derivation_heap_type& cand = state.cand;
       derivation_list_type& D = state.D;
@@ -181,8 +184,14 @@ namespace cicada
 	  // perform traversal here...
 	  
 	  yields.clear();
-	  for (int i = 0; i < derivation->edge->tail_nodes.size(); ++ i)
-	    yields.push_back(&lazy_kth_best(derivation->edge->tail_nodes[i], derivation->j[i])->yield);
+	  for (int i = 0; i < derivation->edge->tails.size(); ++ i) {
+	    const derivation_type* antecedent = lazy_kth_best(derivation->edge->tails[i], derivation->j[i]);
+
+	    if (! antecedent)
+	      throw std::runtime_error("no antecedent???");
+	    
+	    yields.push_back(&(antecedent->yield));
+	  }
 	  
 	  traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yields.begin(), yields.end());
 	  
@@ -204,7 +213,7 @@ namespace cicada
       for (int i = 0; i < j.size(); ++ i) {
 	++ j[i];
 	
-	const derivation_type* antecedent = lazy_kth_best(derivation.edge->tail_nodes[i], j[i]);
+	const derivation_type* antecedent = lazy_kth_best(derivation.edge->tails[i], j[i]);
 	
 	if (antecedent) {
 	  query.edge = derivation.edge;
@@ -225,15 +234,15 @@ namespace cicada
 
     const derivation_type* make_derivation(const edge_type& edge, const index_set_type& j)
     {
-      derivations.push_back(derivation_type(j));
+      derivations.push_back(derivation_type(edge, j));
       
       derivation_type& derivation = derivations.back();
       
       derivation.score = function(edge);
       
       index_set_type::const_iterator iiter = j.begin();
-      edge_type::node_set_type::const_iterator niter_end = edge.tail_nodes.end();
-      for (edge_type::node_set_type::const_iterator niter = edge.tail_nodes.begin(); niter != niter_end; ++ niter, ++ iiter) {
+      edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+      for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ iiter) {
 	const derivation_type* antecedent = lazy_kth_best(*niter, *iiter);
 	
 	if (! antecedent) return 0;
@@ -252,11 +261,11 @@ namespace cicada
       
       const node_type& node = graph.nodes[v];
       
-      node_type::edge_set_type::const_iterator eiter_end = node.in_edges.end();
-      for (node_type::edge_set_type::const_iterator eiter = node.in_edges.begin(); eiter != eiter_end; ++ eiter) {
+      node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+      for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[*eiter];
 	
-	const index_set_type j(edge.tail_nodes.size(), 0);
+	const index_set_type j(edge.tails.size(), 0);
 	const derivation_type* derivation = make_derivation(edge, j);
 	
 	if (! derivation)

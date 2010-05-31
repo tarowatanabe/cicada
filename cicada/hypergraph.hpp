@@ -44,8 +44,7 @@ namespace cicada
       
       Node() : id(invalid) {}
       
-      edge_set_type in_edges;
-      edge_set_type out_edges;
+      edge_set_type edges;
       
       id_type id;
     };
@@ -55,13 +54,13 @@ namespace cicada
       typedef utils::simple_vector<id_type, std::allocator<id_type> > node_set_type;
       typedef cicada::Rule rule_type;
       
-      Edge() : head_node(invalid), tail_nodes(), rule() {}
+      Edge() : head(invalid), tails(), rule() {}
       
       template <typename Iterator>
-      Edge(Iterator first, Iterator last) : head_node(invalid), tail_nodes(first, last), rule() {}
+      Edge(Iterator first, Iterator last) : head(invalid), tails(first, last), rule() {}
       
-      id_type       head_node;
-      node_set_type tail_nodes;
+      id_type       head;
+      node_set_type tails;
       
       feature_set_type features;
       
@@ -96,10 +95,6 @@ namespace cicada
       
       edges.push_back(edge_type());
       edges.back().id = edge_id;
-
-      edge_type::node_set_type::const_iterator eiter_end = edges.back().tail_nodes.end();
-      for (edge_type::node_set_type::const_iterator eiter = edges.back().tail_nodes.begin(); eiter != eiter_end; ++ eiter)
-	nodes[*eiter].out_edges.push_back(edge_id);
       
       return edges.back();
     }
@@ -111,10 +106,7 @@ namespace cicada
       
       edges.push_back(edge_type(first, last));
       edges.back().id = edge_id;
-      
-      for (/**/; first != last; ++ first)
-	nodes[*first].out_edges.push_back(edge_id);
-      
+            
       return edges.back();
     }
     
@@ -130,8 +122,8 @@ namespace cicada
     
     void connect_edge(const id_type edge, const id_type head)
     {
-      edges[edge].head_node = head;
-      nodes[head].in_edges.push_back(edge);
+      edges[edge].head = head;
+      nodes[head].edges.push_back(edge);
     };
     
     void clear()

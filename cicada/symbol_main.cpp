@@ -18,4 +18,5 @@ int main(int argc, char** argv)
   
   std::cout << symbol_type("[x,3]") << " non-terminal? " << symbol_type("[x,3]").non_terminal() << std::endl;
   std::cout << symbol_type("[x]") << " non-terminal? " << symbol_type("[x]").non_terminal() << std::endl;
+
 }

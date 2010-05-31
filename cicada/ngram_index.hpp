@@ -74,8 +74,8 @@ namespace cicada
 	cache_backoff_type() : pos(size_type(-1)), pos_prev(size_type(-1)), shard_prev(-1) {}
       };
 
-      typedef utils::array_power2<cache_pos_type,     1024 * 64, std::allocator<cache_pos_type> > cache_pos_set_type;
-      typedef utils::array_power2<cache_backoff_type, 1024 * 64, std::allocator<cache_backoff_type> > cache_backoff_set_type;
+      typedef utils::array_power2<cache_pos_type,     1024 * 128, std::allocator<cache_pos_type> > cache_pos_set_type;
+      typedef utils::array_power2<cache_backoff_type, 1024 * 128, std::allocator<cache_backoff_type> > cache_backoff_set_type;
       
     public:
       Shard() {}

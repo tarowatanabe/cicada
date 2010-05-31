@@ -634,7 +634,7 @@ namespace cicada
       
       for (size_type id = 0; id < source.edges.size(); ++ id) {
 	const hypergraph_type::edge_type& edge = source.edges[id];
-	const symbol_type& non_terminal = non_terminals[edge.head_node];
+	const symbol_type& non_terminal = non_terminals[edge.head];
 	
 	id_map_type::iterator niter = grammar_nodes[0].non_terminals.find(non_terminal);
 	if (niter == grammar_nodes[0].non_terminals.end()) {
@@ -647,7 +647,7 @@ namespace cicada
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
 	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
-	    const symbol_type& non_terminal = non_terminals[edge.tail_nodes[tail_pos]];
+	    const symbol_type& non_terminal = non_terminals[edge.tails[tail_pos]];
 	    
 	    const id_type grammar_node = niter->second;
 	    

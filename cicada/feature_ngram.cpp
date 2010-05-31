@@ -4,12 +4,17 @@
 #include "cicada/ngram.hpp"
 #include "cicada/feature_ngram.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/symbol_vector.hpp"
+
+#include "utils/array_power2.hpp"
+#include "utils/hashmurmur.hpp"
+
 
 namespace cicada
 {
   namespace feature
   {
-    class NGramImpl
+    class NGramImpl : public utils::hashmurmur<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -30,6 +35,22 @@ namespace cicada
       typedef feature_function_type::edge_type edge_type;
       
       typedef feature_function_type::rule_type rule_type;
+
+      typedef std::vector<double, std::allocator<double> > decay_set_type;
+
+      typedef SymbolVector phrase_type;
+
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      struct CacheBound
+      {
+	phrase_type context;
+	double      logprob;
+	
+	CacheBound() : context(), logprob() {}
+      };
+      typedef CacheBound cache_bound_type;
+      typedef utils::array_power2<cache_bound_type, 1024 * 64, std::allocator<cache_bound_type> > cache_bound_set_type;
       
     public:
       typedef boost::filesystem::path path_type;
@@ -38,7 +59,38 @@ namespace cicada
 	: ngram(__path), order(__order)
       {
 	order = utils::bithack::min(order, ngram.index.order());
+
+	initialize_decay();
       }
+
+      void initialize_decay()
+      {
+	decays.clear();
+	decays.resize(order + 1, 1.0);
+	
+	for (int n = 1; n < order - 1; ++ n) {
+	  // 0.7 ^ (order - 1 - n)
+	  for (int i = 0; i < order - 1 - n; ++ i)
+	    decays[n] *= 0.7;
+	}
+      }
+
+      template <typename Iterator>
+      inline
+      size_t hash_phrase(Iterator first, Iterator last, size_t seed=0) const
+      {
+	for (/**/; first != last; ++ first)
+	  seed = hasher_type::operator()(first->id(), seed);
+	return seed;
+      }
+      
+      template <typename Iterator, typename __Phrase>
+      inline
+      bool equal_phrase(Iterator first, Iterator last, const __Phrase& x) const
+      {
+	return x.size() == std::distance(first, last) && std::equal(first, last, x.begin());
+      }
+
       
       double ngram_score(state_ptr_type& state,
 			 const state_ptr_set_type& states,
@@ -170,14 +222,43 @@ namespace cicada
 	const symbol_type* context = reinterpret_cast<const symbol_type*>(state);
 	const symbol_type* context_end = context + order - 1;
 	
-	double score = 0.0;
-	if (*context != vocab_type::EMPTY)
-	  for (const symbol_type* citer = context + 1; citer != context_end && *citer != vocab_type::STAR && *citer != vocab_type::EMPTY; ++ citer)
-	    score += ngram.logbound(context, citer + 1);
+	if (*context == vocab_type::EMPTY)
+	  return 0.0;
 	
-	return score;
+	const symbol_type* citer = context;
+	const symbol_type* citer_end = context;
+	
+	size_t seed = 0;
+	for (/**/; citer_end != context_end && *citer_end != vocab_type::STAR && *citer_end != vocab_type::EMPTY; ++ citer_end)
+	  seed = hasher_type::operator()(citer_end->id(), seed);
+	
+	const size_type cache_pos = seed & (cache_bounds.size() - 1);
+	cache_bound_type& cache = const_cast<cache_bound_type&>(cache_bounds[cache_pos]);
+	
+	if (! equal_phrase(citer, citer_end, cache.context)) {
+	  cache.context.assign(citer, citer_end);
+	  cache.logprob = 0.0;
+	  
+	  for (/**/; citer != citer_end; ++ citer) {
+	    bool estimated = false;
+	    double logbound = ngram.logbound(context, citer + 1, estimated);
+	    
+	    if (estimated && logbound < 0.0)
+	      logbound *= decays[citer + 1 - context];
+	    
+	    cache.logprob += logbound;
+	  }
+	}
+	return cache.logprob;
       }
+
+      decay_set_type decays;
       
+      // caching...
+      cache_bound_set_type cache_bounds;
+      
+      
+      // actual buffers...
       ngram_type  ngram;
       buffer_type buffer_impl;
       int         order;
