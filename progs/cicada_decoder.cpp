@@ -97,7 +97,7 @@ struct kbest_traversal
       if (titer->is_non_terminal()) {
 	const int pos = titer->non_terminal_index() - 1;
 	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(*(first + pos))).begin(), boost::get<0>(*(*(first + pos))).end());
-      } else
+      } else if (*titer != vocab_type::EPSILON)
 	boost::get<0>(yield).push_back(*titer);
     
     // collect features...
@@ -226,10 +226,18 @@ int main(int argc, char ** argv)
       if (! is) break;
       
       grammar_type grammar_translation(grammar);
-      if (grammar_insertion)
-	grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, symbol_non_terminal)));
-      if (grammar_deletion)
-	grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, symbol_non_terminal)));
+
+      if (input_forest_mode) {
+	if (grammar_insertion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(hypergraph, symbol_non_terminal)));
+	if (grammar_deletion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(hypergraph, symbol_non_terminal)));
+      } else {
+	if (grammar_insertion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, symbol_non_terminal)));
+	if (grammar_deletion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, symbol_non_terminal)));
+      }
 
       if (debug)
 	std::cerr << "composition" << std::endl;

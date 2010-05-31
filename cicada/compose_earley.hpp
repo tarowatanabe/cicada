@@ -294,6 +294,15 @@ namespace cicada
 			  std::allocator<std::pair<const edge_type*, hypergraph_type::id_type> > > non_terminal_node_set_type;
 #endif
     
+#ifdef HAVE_TR1_UNORDERED_SET
+    typedef std::tr1::unordered_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
+				    std::allocator<hypergraph_type::id_type> > goal_node_set_type;
+#else
+    typedef sgi::hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
+			  std::allocator<hypergraph_type::id_type> > goal_node_set_type;
+    
+#endif
+
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -342,6 +351,22 @@ namespace cicada
 	    complete_passive(*edge);
 	}
       }
+
+      
+      if (! goal_nodes.empty()) {
+	// add new node for root...
+	target.goal = target.add_node().id;
+	
+	goal_node_set_type::const_iterator niter_end = goal_nodes.end();
+	for (goal_node_set_type::const_iterator niter = goal_nodes.begin(); niter != niter_end; ++ niter) {
+	  hypergraph_type::edge_type& edge = target.add_edge(&(*niter), &(*niter) + 1);
+	  
+	  edge.rule = rule_goal;
+	  
+	  target.connect_edge(edge.id, target.goal);
+	}
+      }
+
       
       if (target.goal != hypergraph_type::invalid)
 	target.topologically_sort();
@@ -534,6 +559,12 @@ namespace cicada
       
       hypergraph_type::node_type& node_head = target.nodes[niter->second];
       
+      if (edge.lhs == goal_symbol && edge.is_passive()
+	  && edge.first.first >= 0 && edge.last.first >= 0
+	  && edge.first.second == grammar[edge.first.first].root()
+	  && edge.last.second == grammar[edge.last.first].root())
+	goal_nodes.insert(node_head.id);
+      
       std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails;
       
       if (edge.is_predicted()) {
@@ -598,6 +629,7 @@ namespace cicada
       edges_active.clear();
       edges_passive.clear();
 
+      goal_nodes.clear();
       
       if (! rule_epsilon)
 	rule_epsilon.reset(new rule_type(vocab_type::X,
@@ -628,6 +660,11 @@ namespace cicada
 
       // assign goal-symbol!
       goal_symbol = non_terminals[source.goal];
+      
+      rule_goal.reset(new rule_type(vocab_type::GOAL,
+				    rule_type::symbol_set_type(1, goal_symbol.non_terminal(1)),
+				    rule_type::symbol_set_type(1, goal_symbol.non_terminal(1)),
+				    1));
       
       grammar_nodes.clear();
       grammar_nodes.resize(1);
@@ -685,6 +722,7 @@ namespace cicada
     symbol_type           goal_symbol;
     grammar_node_set_type grammar_nodes;
 
+    rule_ptr_type rule_goal;
     rule_ptr_type rule_epsilon;
     rule_ptr_type rule_x1;
     rule_ptr_type rule_x1_x2;
@@ -701,6 +739,8 @@ namespace cicada
     edge_set_unique_type  edges_unique;
     edge_set_active_type  edges_active;
     edge_set_passive_type edges_passive;
+
+    goal_node_set_type goal_nodes;
   };
   
   void compose_earley(const Grammar& grammar, const HyperGraph& source, HyperGraph& target)

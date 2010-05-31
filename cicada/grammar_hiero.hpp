@@ -9,7 +9,10 @@
 #include <vector>
 
 #include <cicada/grammar_mutable.hpp>
+#include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
+
+#include <utils/sgi_hash_set.hpp>
 
 namespace cicada
 {
@@ -77,13 +80,45 @@ namespace cicada
   class GrammarInsertion : public GrammarMutable
   {
   public:
-    typedef Lattice lattice_type;
+    typedef Lattice    lattice_type;
+    typedef HyperGraph hypergraph_type;
 
   private:
     typedef std::vector<bool, std::allocator<bool> > pos_set_type;
     typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
     
   public:
+    GrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
+    {
+#ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#else
+      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#endif
+      
+      symbol_set_type symbols;
+      
+      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
+	if (eiter->rule) {
+	  const rule_type& rule = *(eiter->rule);
+	  
+	  rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
+	  for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter) 
+	    if (siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
+	      
+	      rule_ptr_type rule(new rule_type(non_terminal,
+					       rule_type::symbol_set_type(1, *siter),
+					       rule_type::symbol_set_type(1, *siter)));
+	      rule->features["insertion-penalty"] = - 1.0;
+	      
+	      insert(rule);
+	      
+	      symbols.insert(*siter);
+	    }
+	}
+    }
+
     GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
@@ -111,7 +146,7 @@ namespace cicada
 
     bool valid_span(int first, int last, int distance) const
     {
-      return (! positions[first].empty() && (first == last || positions[first][last]));
+      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
 
   private:    
@@ -122,13 +157,45 @@ namespace cicada
   class GrammarDeletion : public GrammarMutable
   {
   public:
-    typedef Lattice lattice_type;
+    typedef Lattice    lattice_type;
+    typedef HyperGraph hypergraph_type;
 
   private:
     typedef std::vector<bool, std::allocator<bool> > pos_set_type;
     typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
 
   public:
+    GrammarDeletion(const hypergraph_type& graph, const symbol_type& non_terminal)
+    {
+ #ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#else
+      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#endif
+      
+      symbol_set_type symbols;
+      
+      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
+	if (eiter->rule) {
+	  const rule_type& rule = *(eiter->rule);
+	  
+	  rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
+	  for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter) 
+	    if (siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
+	      
+	      rule_ptr_type rule(new rule_type(non_terminal,
+					       rule_type::symbol_set_type(1, *siter),
+					       rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+	      rule->features["deletion-penalty"] = - 1.0;
+	      
+	      insert(rule);
+	      
+	      symbols.insert(*siter);
+	    }
+	}
+    }
+
     GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
@@ -156,7 +223,7 @@ namespace cicada
     
     bool valid_span(int first, int last, int distance) const
     {
-      return (! positions[first].empty() && (first == last || positions[first][last]));
+      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
 
   private:    
