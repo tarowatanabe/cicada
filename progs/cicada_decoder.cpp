@@ -16,6 +16,8 @@
 #include "cicada/compose.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/intersect.hpp"
+#include "cicada/permute.hpp"
+#include "cicada/sort.hpp"
 
 #include "cicada/feature_function.hpp"
 #include "cicada/weight_vector.hpp"
@@ -62,8 +64,25 @@ struct weight_set_function
   }
 };
 
+
+struct weight_set_function_one
+{
+  typedef cicada::semiring::Logprob<double> value_type;
+
+  weight_set_function_one(const weight_set_type& __weights) {}
+  
+  template <typename FeatureSet>
+  value_type operator()(const FeatureSet& x) const
+  {
+    return cicada::semiring::traits<value_type>::log(x.dot());
+  }
+};
+
+
 struct kbest_function
 {
+  typedef rule_type::feature_set_type feature_set_type;
+
   typedef cicada::semiring::Logprob<double> value_type;
 
   kbest_function(const weight_set_type& __weights)
@@ -76,7 +95,34 @@ struct kbest_function
   {
     return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
   }
+
+  value_type operator()(const feature_set_type& features) const
+  {
+    return cicada::semiring::traits<value_type>::log(features.dot(weights));
+  }
+
 };
+
+struct kbest_function_one
+{
+  typedef rule_type::feature_set_type feature_set_type;
+
+  typedef cicada::semiring::Logprob<double> value_type;
+  
+  kbest_function_one(const weight_set_type& __weights) {}
+
+  template <typename Edge>
+  value_type operator()(const Edge& edge) const
+  {
+    return cicada::semiring::traits<value_type>::log(edge.features.dot());
+  }
+
+  value_type operator()(const feature_set_type& features) const
+  {
+    return cicada::semiring::traits<value_type>::log(features.dot());
+  }
+};
+
 
 struct kbest_traversal
 {
@@ -106,12 +152,78 @@ struct kbest_traversal
   }
 };
 
+struct kbest_filter
+{
+  kbest_filter(const hypergraph_type& graph) {}
+  
+  template <typename Node, typename Yield>
+  bool operator()(const Node& node, const Yield& yield) const
+  {
+    return false;
+  }
+};
+
+struct kbest_filter_unique
+{
+ #ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<sentence_type, boost::hash<sentence_type>, std::equal_to<sentence_type>, std::allocator<sentence_type> > unique_type;
+#else
+  typedef sgi::hash_set<sentence_type, boost::hash<sentence_type>, std::equal_to<sentence_type>, std::allocator<sentence_type> > unique_type;
+#endif
+  typedef std::vector<unique_type, std::allocator<unique_type> > unique_set_type;
+ 
+
+  kbest_filter_unique(const hypergraph_type& graph) : uniques(graph.nodes.size()) {}
+  
+  template <typename Node, typename Yield>
+  bool operator()(const Node& node, const Yield& yield) const
+  {
+    unique_set_type& sents = const_cast<unique_set_type&>(uniques);
+    unique_type::iterator iter = sents[node.id].find(boost::get<0>(yield));
+    if (iter == sents[node.id].end()) {
+      sents[node.id].insert(boost::get<0>(yield));
+      return false;
+    } else
+      return true;
+  }
+
+  unique_set_type uniques;
+};
+
+
+template <typename Traversal, typename Function, typename Filter>
+void kbest_derivations(std::ostream& os,
+		       const size_t id,
+		       const hypergraph_type& graph,
+		       const int kbest_size,
+		       const Traversal& traversal, 
+		       const Function& function,
+		       const Filter& filter)
+{
+  cicada::KBest<Traversal, Function, Filter> derivations(graph, kbest_size, traversal, function, filter);
+  
+  typename Traversal::value_type derivation;
+  
+  for (int k = 0; k < kbest_size; ++ k) {
+    if (! derivations(k, derivation))
+      break;
+    
+    os << id << " ||| " << boost::get<0>(derivation) << " |||";
+    rule_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
+    for (rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
+      os << ' ' << fiter->first << '=' << fiter->second;
+    os << " ||| ";
+    os << function(boost::get<1>(derivation));
+    os << '\n';
+  }
+}
 
 path_type input_file = "-";
 path_type output_file = "-";
 
 bool input_lattice_mode = false;
 bool input_forest_mode = false;
+bool input_directory_mode = false;
 bool output_forest_mode = false;
 bool output_directory_mode = false;
 
@@ -131,7 +243,11 @@ bool grammar_deletion = false;
 
 feature_parameter_set_type feature_parameters;
 path_type                  feature_weights_file;
+bool feature_weights_one = false;
 bool feature_list = false;
+
+bool permute_graph = false;
+int  permute_size = 4;
 
 bool intersection_cube = false;
 bool intersection_full = false;
@@ -196,6 +312,9 @@ int main(int argc, char ** argv)
       if (feature_weights_file != "-" && ! boost::filesystem::exists(feature_weights_file))
 	throw std::runtime_error("no feture weights?" + feature_weights_file.file_string());
       
+      if (feature_weights_one)
+	throw std::runtime_error("feature weights file supplied but you have enabled one-initialized weights");
+      
       utils::compress_istream is(feature_weights_file);
       is >> weights;
     }
@@ -240,6 +359,41 @@ int main(int argc, char ** argv)
       }
 
       if (debug)
+	if (input_forest_mode)
+	  std::cerr << "# of nodes: " << hypergraph.nodes.size()
+		    << " # of edges: " << hypergraph.edges.size()
+		    << " valid? " << (hypergraph.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+      
+      if (input_forest_mode && permute_graph) {
+	
+	hypergraph_type hypergraph_permuted;
+
+	if (debug)
+	  std::cerr << "permutation" << std::endl;
+	
+	utils::resource permute_start;
+	
+	cicada::permute(hypergraph, hypergraph_permuted, permute_size);
+	
+	utils::resource permute_end;
+	
+	if (debug)
+	  std::cerr << "permute cpu time: " << (permute_end.cpu_time() - permute_start.cpu_time())
+		    << " user time: " << (permute_end.user_time() - permute_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_permuted.nodes.size()
+		    << " # of edges: " << hypergraph_permuted.edges.size()
+		    << " valid? " << (hypergraph_permuted.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph.swap(hypergraph_permuted);
+      }
+
+
+      if (debug)
 	std::cerr << "composition" << std::endl;
 
       utils::resource compose_start;
@@ -264,15 +418,19 @@ int main(int argc, char ** argv)
       if (debug)
 	std::cerr << "# of nodes: " << hypergraph_composed.nodes.size()
 		  << " # of edges: " << hypergraph_composed.edges.size()
-		  << " valid? " << (hypergraph_composed.goal != hypergraph_type::invalid)
+		  << " valid? " << (hypergraph_composed.goal != hypergraph_type::invalid ? "true" : "false")
 		  << std::endl;
       
+
       if (debug)
 	std::cerr << "apply features" << std::endl;
 
       utils::resource apply_start;
 
-      cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+      if (feature_weights_one)
+	cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+      else
+	cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
 
       utils::resource apply_end;
       
@@ -284,35 +442,28 @@ int main(int argc, char ** argv)
       if (debug)
 	std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
 		  << " # of edges: " << hypergraph_applied.edges.size()
-		  << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid)
+		  << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
 		  << std::endl;
       
       if (output_forest_mode)
 	os << hypergraph_applied << '\n';
       else {
 	// extract k-best ...
-	cicada::KBest<kbest_traversal, kbest_function> kbest_derivations(hypergraph_applied,
-									 kbest_size,
-									 kbest_traversal(),
-									 kbest_function(weights));
 	
-	kbest_traversal::value_type derivation;
-	for (int k = 0; k < kbest_size; ++ k) {
-	  if (! kbest_derivations(k, derivation))
-	    break;
-	  
-	  os << id << " ||| " << boost::get<0>(derivation) << " |||";
-	  rule_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	  for (rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
-	    os << ' ' << fiter->first << '=' << fiter->second;
-	  os << " ||| ";
-	  os << boost::get<1>(derivation).dot(weights);
-	  os << '\n';
+	if (feature_weights_one) {
+	  if (kbest_unique)
+	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
+	  else
+	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
+	} else {
+	  if (kbest_unique)
+	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
+	  else
+	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
 	}
-	++ id;
-	
       }
       
+      ++ id;
       os << std::flush;
     }
 
@@ -338,6 +489,7 @@ void options(int argc, char** argv)
     // options for input/output format
     ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")
     ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
+    ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
     ("output-forest",    po::bool_switch(&output_forest_mode),    "forest output")
     ("output-directory", po::bool_switch(&output_directory_mode), "output in directory")
     
@@ -359,8 +511,13 @@ void options(int argc, char** argv)
     
     // models...
     ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters), "feature function(s)")
-    ("feature-weights",       po::value<path_type>(&feature_weights_file),                  "feature weights")
+    ("feature-weights",       po::value<path_type>(&feature_weights_file),                 "feature weights")
+    ("feature-weights-one",   po::bool_switch(&feature_weights_one),                       "one initialized feature weights")
     ("feature-function-list", po::bool_switch(&feature_list),                              "list of available feature function(s)")
+
+    // permutation...
+    ("permute",      po::bool_switch(&permute_graph), "perform hypergraph permutation")
+    ("permute-size", po::value<int>(&permute_size),   "permutation size (zero for one, negative for all permutation)")
     
     // intersection strategy
     ("intersection-cube", po::bool_switch(&intersection_cube),                  "intersetion by cube-pruning")

@@ -325,7 +325,8 @@ namespace cicada
     
     non_terminal_set_type non_terminals;
   };
-
+  
+  inline
   void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph)
   {
     ComposeCKY(goal, grammar)(lattice, graph);

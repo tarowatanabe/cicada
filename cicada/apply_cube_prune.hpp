@@ -377,6 +377,7 @@ namespace cicada
   };
   
   template <typename Function>
+  inline
   void apply_cube_prune(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
   {
     ApplyCubePrune<typename Function::value_type, Function>(model, func, cube_size)(source, target);

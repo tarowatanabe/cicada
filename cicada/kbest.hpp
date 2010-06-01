@@ -40,7 +40,8 @@ namespace cicada
   
   
   template <typename Traversal,
-	    typename Function>
+	    typename Function,
+	    typename Filter>
   struct KBest
   {
     typedef size_t    size_type;
@@ -52,9 +53,9 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
     
-    
     typedef Traversal traversal_type;
     typedef Function  function_type;
+    typedef Filter    filter_type;
 
     typedef typename traversal_type::value_type yield_type;
     typedef typename function_type::value_type  semiring_type;
@@ -63,11 +64,13 @@ namespace cicada
     KBest(const hypergraph_type& __graph,
 	  const size_type& __k_prime,
 	  const traversal_type& __traversal,
-	  const function_type& __function)
+	  const function_type& __function,
+	  const filter_type& __filter)
       : graph(__graph),
 	k_prime(__k_prime),
 	traversal(__traversal),
 	function(__function),
+	filter(__filter),
 	states(__graph.nodes.size()) 
     {
       if (graph.goal == hypergraph_type::invalid)
@@ -170,11 +173,15 @@ namespace cicada
       derivation_list_type& D = state.D;
 
       yield_set_type yields;
+
+      bool add_next = true;
       
       while (D.size() <= k) {
 	
-	if (D.size() > 0)
+	if (add_next && D.size() > 0)
 	  lazy_next(*D.back(), state);
+
+	add_next = false;
 	
 	if (cand.size() > 0) {
 	  std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
@@ -197,7 +204,12 @@ namespace cicada
 	  
 	  // perform filtering here...!
 	  // if we have duplicates, do not insert...
-	  D.push_back(derivation);
+	  
+	  if (! filter(graph.nodes[v], derivation->yield)) {
+	    D.push_back(derivation);
+	    
+	    add_next = true;
+	  }
 	} else
 	  break;
       }
@@ -289,6 +301,7 @@ namespace cicada
   private:
     const traversal_type traversal;
     const function_type  function;
+    const filter_type    filter;
     
     const hypergraph_type& graph;
     

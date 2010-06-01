@@ -122,6 +122,14 @@ namespace cicada
     GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
+ #ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#else
+      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#endif
+      
+      symbol_set_type symbols;
+
       for (int first = 0; first < lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 	
@@ -133,13 +141,18 @@ namespace cicada
 	  const int last = first + aiter->distance;
 	  
 	  positions[first][last] = true;
+
+	  if (symbols.find(aiter->label) == symbols.end()) {
 	  
-	  rule_ptr_type rule(new rule_type(non_terminal,
-					   rule_type::symbol_set_type(1, aiter->label),
-					   rule_type::symbol_set_type(1, aiter->label)));
-	  rule->features["insertion-penalty"] = - 1.0;
-	  
-	  insert(rule);
+	    rule_ptr_type rule(new rule_type(non_terminal,
+					     rule_type::symbol_set_type(1, aiter->label),
+					     rule_type::symbol_set_type(1, aiter->label)));
+	    rule->features["insertion-penalty"] = - 1.0;
+	    
+	    insert(rule);
+	    
+	    symbols.insert(aiter->label);
+	  }
 	}
       }
     }
@@ -199,6 +212,14 @@ namespace cicada
     GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
+ #ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#else
+      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+#endif
+      
+      symbol_set_type symbols;
+      
       for (int first = 0; first < lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 
@@ -210,13 +231,18 @@ namespace cicada
 	  const int last = first + aiter->distance;
 
 	  positions[first][last] = true;
-	  
-	  rule_ptr_type rule(new rule_type(non_terminal,
-					   rule_type::symbol_set_type(1, aiter->label),
-					   rule_type::symbol_set_type(1, vocab_type::EPSILON)));
-	  rule->features["deletion-penalty"] = - 1.0;
 
-	  insert(rule);
+	  if (symbols.find(aiter->label) == symbols.end()) {
+	  
+	    rule_ptr_type rule(new rule_type(non_terminal,
+					     rule_type::symbol_set_type(1, aiter->label),
+					     rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+	    rule->features["deletion-penalty"] = - 1.0;
+	    
+	    insert(rule);
+	    
+	    symbols.insert(aiter->label);
+	  }
 	}
       }
     }

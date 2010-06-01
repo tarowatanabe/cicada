@@ -86,6 +86,9 @@ namespace cicada
       for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
 	process(node_id, graph_in, graph_out);
       
+      if (! graph_out.nodes.empty())
+	graph_out.goal = graph_out.nodes.size() - 1;
+      
       // topologically sort...
       graph_out.topologically_sort();
     };
@@ -165,6 +168,14 @@ namespace cicada
     const model_type& model;
     const function_type& function;
   };
+
+
+  template <typename Function>
+  inline
+  void apply_exact(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
+  {
+    ApplyExact<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+  }
 
 };
 

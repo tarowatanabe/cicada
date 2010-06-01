@@ -26,6 +26,7 @@ namespace cicada
       typedef cicada::NGram ngram_type;
       
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
+      typedef std::vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > buffer_id_type;
 
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -41,17 +42,7 @@ namespace cicada
       typedef SymbolVector phrase_type;
 
       typedef utils::hashmurmur<size_t> hasher_type;
-      
-      struct CacheBound
-      {
-	phrase_type context;
-	double      logprob;
-	
-	CacheBound() : context(), logprob() {}
-      };
-      typedef CacheBound cache_bound_type;
-      typedef utils::array_power2<cache_bound_type, 1024 * 64, std::allocator<cache_bound_type> > cache_bound_set_type;
-      
+            
     public:
       typedef boost::filesystem::path path_type;
       
@@ -186,9 +177,38 @@ namespace cicada
       
       double ngram_final_score(state_ptr_type& state) const
       {
+	const symbol_type* context      = reinterpret_cast<const symbol_type*>(state);
+	const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
+	const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
+	
+	buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
+	
+	buffer_id.clear();
+	buffer_id.reserve(order * 2 + 2);
+	
+	buffer_id.push_back(ngram.index.vocab()[vocab_type::BOS]);
+	
+	double score = 0.0;
+	for (const symbol_type* citer = context; citer != context_star; ++ citer) {
+	  buffer_id.push_back(ngram.index.vocab()[*citer]);
+	  score += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	}
+
+	if (context_star != context_end) {
+	  buffer_id.clear();
+	  for (const symbol_type* citer = context_star; citer != context_end; ++ citer)
+	    buffer_id.push_back(ngram.index.vocab()[*citer]);
+	}
+	
+	buffer_id.push_back(ngram.index.vocab()[vocab_type::EOS]);
+	score += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	
+	return score;
+	
+#if 0
 	const symbol_type* context = reinterpret_cast<const symbol_type*>(state);
 
-	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	buffer_type& buffer       = const_cast<buffer_type&>(buffer_impl);
 	
 	buffer.clear();
 	buffer.push_back(vocab_type::BOS);
@@ -215,6 +235,7 @@ namespace cicada
 	  score += ngram.logprob(std::max(iter + 1, iter_end - order), iter_end);
 	
 	return score;
+#endif
       }
       
       double ngram_estimate(state_ptr_type& state) const
@@ -225,43 +246,32 @@ namespace cicada
 	if (*context == vocab_type::EMPTY)
 	  return 0.0;
 	
-	const symbol_type* citer = context;
-	const symbol_type* citer_end = context;
+	buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
+	buffer_id.clear();
 	
-	size_t seed = 0;
-	for (/**/; citer_end != context_end && *citer_end != vocab_type::STAR && *citer_end != vocab_type::EMPTY; ++ citer_end)
-	  seed = hasher_type::operator()(citer_end->id(), seed);
-	
-	const size_type cache_pos = seed & (cache_bounds.size() - 1);
-	cache_bound_type& cache = const_cast<cache_bound_type&>(cache_bounds[cache_pos]);
-	
-	if (! equal_phrase(citer, citer_end, cache.context)) {
-	  cache.context.assign(citer, citer_end);
-	  cache.logprob = 0.0;
+	double estimate = 0.0;
+	for (const symbol_type* citer = context; citer != context_end && *citer != vocab_type::STAR && *citer != vocab_type::EMPTY; ++ citer) {
+	  buffer_id.push_back(ngram.index.vocab()[*citer]);
+	  bool estimated = false;
+	  double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
 	  
-	  for (/**/; citer != citer_end; ++ citer) {
-	    bool estimated = false;
-	    double logbound = ngram.logbound(context, citer + 1, estimated);
-	    
-	    if (estimated && logbound < 0.0)
-	      logbound *= decays[citer + 1 - context];
-	    
-	    cache.logprob += logbound;
-	  }
+	  if (estimated && logbound < 0.0)
+	    logbound *= decays[buffer_id.size()];
+	  
+	  estimate += logbound;
 	}
-	return cache.logprob;
+	return estimate;
       }
 
       decay_set_type decays;
       
-      // caching...
-      cache_bound_set_type cache_bounds;
-      
-      
       // actual buffers...
-      ngram_type  ngram;
-      buffer_type buffer_impl;
-      int         order;
+      buffer_type    buffer_impl;
+      buffer_id_type buffer_id_impl;
+      
+      // ngrams
+      ngram_type     ngram;
+      int            order;
     };
     
     
