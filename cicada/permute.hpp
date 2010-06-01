@@ -10,6 +10,8 @@
 
 #include <utils/bithack.hpp>
 
+#include <boost/lexical_cast.hpp>
+
 // we will add more permuted edges to the existing hypergraph
 // with features, rule=1 score...
 
@@ -52,21 +54,20 @@ namespace cicada
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	
 	  hypergraph_type::edge_type& edge = target.add_edge(edge_source.tails.begin(), edge_source.tails.end());
+
+	  permutation.clear();
+	  for (int i = 0; i < edge_source.tails.size(); ++ i)
+	    permutation.push_back(i);
 	  
 	  edge.rule = edge_source.rule;
 	  
 	  edge.features = edge_source.features;
-	  edge.features[rule_feature(*edge.rule)] = 1.0;
-	  edge.features["rule:original"] = 1.0;
+	  edge.features[rule_feature(*edge_source.rule, permutation)] = 1.0;
 	  
 	  target.connect_edge(edge.id, node.id);
 	  
 	  if (edge_source.tails.size() > 1) {
 	    
-	    permutation.clear();
-	    for (int i = 0; i < edge_source.tails.size(); ++ i)
-	      permutation.push_back(i);
-
 	    source_non_terminals.clear();
 	    rule_type::symbol_set_type::const_iterator siter_end = edge_source.rule->source.end();
 	    for (rule_type::symbol_set_type::const_iterator siter = edge_source.rule->source.begin(); siter != siter_end; ++ siter)
@@ -82,35 +83,45 @@ namespace cicada
 	    // perform permutation...
 	    // minus for all permutation
 	    // zero for no-permutation
-	    if (permute_size < 0 || permute_size >= 1)
-	      while (std::next_permutation(permutation.begin(), permutation.end())) {
+	    if (permute_size < 0 || permute_size >= 1) {
+	      
+	      if (permute_size < 0 || permutation.size() <= 6) {
+		while (std::next_permutation(permutation.begin(), permutation.end())) {
+		  
+		  if (! is_valid_permutation(permutation, permute_size)) continue;
+		  
+		  // permute nodes...
+		  for (int i = 0; i < tails.size(); ++ i)
+		    tails[i] = edge_source.tails[permutation[i]];
+		  
+		  // permute source-phrase
+		  int non_terminal_pos = 0;
+		  phrase_type::iterator siter_end = source_phrase.end();
+		  for (phrase_type::iterator siter = source_phrase.begin(); siter != siter_end; ++ siter)
+		    if (siter->is_non_terminal()) {
+		      *siter = source_non_terminals[permutation[non_terminal_pos]];
+		      
+		      ++ non_terminal_pos;
+		    }
+		  
+		  hypergraph_type::edge_type& edge = target.add_edge(tails.begin(), tails.end());
+		  
+		  edge.rule.reset(new rule_type(*edge_source.rule));
+		  edge.rule->source = rule_type::symbol_set_type(source_phrase.begin(), source_phrase.end());
+		  
+		  edge.features = edge_source.features;
+		  edge.features[rule_feature(*edge_source.rule, permutation)] = 1.0;
+		  
+		  target.connect_edge(edge.id, node.id);
+		}
+	      } else {
+		// we will permute by traversing via transducer... actually, it is almost the same as word-based permutation with "skip"
 		
-		if (! is_valid_permutation(permutation, permute_size)) continue;
 		
-		// permute nodes...
-		for (int i = 0; i < tails.size(); ++ i)
-		  tails[i] = edge_source.tails[permutation[i]];
 		
-		// permute source-phrase
-		int non_terminal_pos = 0;
-		phrase_type::iterator siter_end = source_phrase.end();
-		for (phrase_type::iterator siter = source_phrase.begin(); siter != siter_end; ++ siter)
-		  if (siter->is_non_terminal()) {
-		    *siter = source_non_terminals[permutation[non_terminal_pos]];
-		    
-		    ++ non_terminal_pos;
-		  }
 		
-		hypergraph_type::edge_type& edge = target.add_edge(tails.begin(), tails.end());
-		
-		edge.rule.reset(new rule_type(*edge_source.rule));
-		edge.rule->source = rule_type::symbol_set_type(source_phrase.begin(), source_phrase.end());
-		
-		edge.features = edge_source.features;
-		edge.features[rule_feature(*edge.rule)] = 1.0;
-		
-		target.connect_edge(edge.id, node.id);
 	      }
+	    }
 	  }
 	}
       }
@@ -130,21 +141,33 @@ namespace cicada
       return true;
     }
 
-    feature_type rule_feature(const rule_type& rule)
+    feature_type rule_feature(const rule_type& rule, const permutation_type& permutation)
     {
+      non_terminal_symbols.clear();
+      
+      int non_terminal_pos = 0;
+      rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
+      for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  non_terminal_symbols.push_back('[' + static_cast<const std::string&>(*siter).substr(1, siter->size() - 2) + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
+	  ++ non_terminal_pos;
+	}
+    
       std::string rule_string("rule:");
       rule_string += static_cast<const std::string&>(rule.lhs) + "->";
       
-      rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
+      int permutation_pos = 0;
       for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
-	if (siter->is_non_terminal())
-	  rule_string += static_cast<const std::string&>(*siter);
-	else
+	if (siter->is_non_terminal()) {
+	  rule_string += non_terminal_symbols[permutation[permutation_pos]];
+	  ++ permutation_pos;
+	} else
 	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
       
       return rule_string;
     }
 
+    std::vector<std::string, std::allocator<std::string> > non_terminal_symbols;
   };
   
   inline

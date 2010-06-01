@@ -351,7 +351,6 @@ namespace cicada
 	    complete_passive(*edge);
 	}
       }
-
       
       if (! goal_nodes.empty()) {
 	// add new node for root...
@@ -683,8 +682,10 @@ namespace cicada
       
       // assigne pseudo non-terminals
       non_terminal_set_type non_terminals(source.nodes.size());
-      for (size_type id = 0; id < source.nodes.size(); ++ id)
+      for (size_type id = 0; id < source.nodes.size(); ++ id) {
 	non_terminals[id] = std::string("[NODE_") + boost::lexical_cast<std::string>(id) + ']';
+	//non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
+      }
 
       // assign goal-symbol!
       goal_symbol = non_terminals[source.goal];

@@ -247,7 +247,7 @@ bool feature_weights_one = false;
 bool feature_list = false;
 
 bool permute_graph = false;
-int  permute_size = 4;
+int  permute_size = 3;
 
 bool intersection_cube = false;
 bool intersection_full = false;
