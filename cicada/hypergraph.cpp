@@ -170,8 +170,9 @@ namespace cicada
 	
 	goal_node.edges.push_back(goal_edge_x.id);
 	goal_node.edges.push_back(goal_edge_y.id);
-	
       }
+      
+      cicada::topologically_sort(x);
     }
   };
   

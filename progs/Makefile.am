@@ -15,11 +15,15 @@ LIBUTILS   = $(top_builddir)/utils/libutils.la
 
 bin_PROGRAMS = \
 	cicada_decoder \
+	cicada_mert \
 	filter_penntreebank \
 	grammar_index
 
 cicada_decoder_SOURCES = cicada_decoder.cpp
 cicada_decoder_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_mert_SOURCES = cicada_mert.cpp
+cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 grammar_index_SOURCES = grammar_index.cpp
 grammar_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

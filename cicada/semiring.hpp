@@ -6,6 +6,7 @@
 // traits..
 #include <cicada/semiring/traits.hpp>
 
+#include <cicada/semiring/envelope.hpp>
 #include <cicada/semiring/expectation.hpp>
 #include <cicada/semiring/logprob.hpp>
 #include <cicada/semiring/log.hpp>

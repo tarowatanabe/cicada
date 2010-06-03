@@ -37,9 +37,6 @@ namespace cicada
     
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
-
-    weights.clear();
-    weights.resize(graph.nodes.size(), weight_type());
     
     // visit in topological order... (we assume that the graph is "always" topologically ordered)
     hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
@@ -73,10 +70,8 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
     
-    weights_outside.clear();
-    weights_outside.resize(graph.nodes.size(), weight_type());
 
-    weights_outside.back() = semiring::traits<weight_type>::one();
+    weights_outside[graph.nodes.size() - 1] = semiring::traits<weight_type>::one();
 
     if (weights_inside.size() != weights_outside.size())
       throw std::runtime_error("different inside/outside scores?");
@@ -127,8 +122,8 @@ namespace cicada
 
     typedef std::vector<KWeight, std::allocator<KWeight> > k_weight_set_type;
 
-    k_weight_set_type inside_k;
-    k_weight_set_type outside_k;
+    k_weight_set_type inside_k(graph.nodes.size());
+    k_weight_set_type outside_k(graph.nodes.size());
     
     inside<k_weight_set_type, KFunction>(graph, inside_k, function_k);
     outside<k_weight_set_type, KFunction>(graph, inside_k, outside_k, function_k);

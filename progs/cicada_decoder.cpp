@@ -6,6 +6,7 @@
 
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
+#include "cicada/hypergraph.hpp"
 
 #include "cicada/kbest.hpp"
 
@@ -16,6 +17,7 @@
 #include "cicada/compose.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/intersect.hpp"
+#include "cicada/binarize.hpp"
 #include "cicada/permute.hpp"
 #include "cicada/sort.hpp"
 
@@ -30,6 +32,7 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
+#include <boost/lexical_cast.hpp>
 
 typedef boost::filesystem::path path_type;
 
@@ -246,6 +249,9 @@ path_type                  feature_weights_file;
 bool feature_weights_one = false;
 bool feature_list = false;
 
+bool binarize_graph = false;
+int  binarize_size = 2;
+
 bool permute_graph = false;
 int  permute_size = 3;
 
@@ -319,30 +325,46 @@ int main(int argc, char ** argv)
       is >> weights;
     }
     
+    // we will force non directory-input-mode....
+    input_directory_mode = false;
     
-    utils::compress_istream is(input_file);
-    utils::compress_ostream os(output_file, 1024 * 1024);
+    boost::shared_ptr<utils::compress_istream> is(! input_directory_mode  ? new utils::compress_istream(input_file) : 0);
+    boost::shared_ptr<utils::compress_ostream> os(! output_directory_mode ? new utils::compress_ostream(output_file, 1024 * 1024) : 0);
 
+    if (output_directory_mode) {
+      
+      if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
+	boost::filesystem::remove_all(output_file);
+      
+      boost::filesystem::create_directories(output_file);
+      
+      // remove all the files..
+      boost::filesystem::directory_iterator iter_end;
+      for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
+	boost::filesystem::remove_all(*iter);
+    }
+    
     std::string     line;
     lattice_type    lattice;
     hypergraph_type hypergraph;
     hypergraph_type hypergraph_composed;
     hypergraph_type hypergraph_applied;
     
+    
     size_t id = 0;
     while (1) {
       if (input_lattice_mode)
-	is >> lattice;
+	*is >> lattice;
       else if (input_forest_mode)
-	is >> hypergraph;
+	*is >> hypergraph;
       else {
 	sentence_type sentence;
-	is >> sentence;
-	if (is)
+	*is >> sentence;
+	if (*is)
 	  lattice = lattice_type(sentence);
       }
       
-      if (! is) break;
+      if (! *is) break;
       
       grammar_type grammar_translation(grammar);
 
@@ -364,6 +386,32 @@ int main(int argc, char ** argv)
 		    << " # of edges: " << hypergraph.edges.size()
 		    << " valid? " << (hypergraph.goal != hypergraph_type::invalid ? "true" : "false")
 		    << std::endl;
+
+      if (input_forest_mode && binarize_graph) {
+	hypergraph_type hypergraph_binarized;
+
+	if (debug)
+	  std::cerr << "binarization" << std::endl;
+	
+	utils::resource binarize_start;
+	
+	cicada::binarize(hypergraph, hypergraph_binarized, binarize_size);
+	
+	utils::resource binarize_end;
+	
+	if (debug)
+	  std::cerr << "binarize cpu time: " << (binarize_end.cpu_time() - binarize_start.cpu_time())
+		    << " user time: " << (binarize_end.user_time() - binarize_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_binarized.nodes.size()
+		    << " # of edges: " << hypergraph_binarized.edges.size()
+		    << " valid? " << (hypergraph_binarized.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph.swap(hypergraph_binarized);
+      }
       
       if (input_forest_mode && permute_graph) {
 	
@@ -427,11 +475,18 @@ int main(int argc, char ** argv)
 
       utils::resource apply_start;
 
-      if (feature_weights_one)
-	cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
-      else
-	cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
-
+      if (intersection_full) {
+	if (feature_weights_one)
+	  cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	else
+	  cicada::apply_exact<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+      } else {
+	if (feature_weights_one)
+	  cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	else
+	  cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+      }
+	
       utils::resource apply_end;
       
       if (debug)
@@ -445,26 +500,32 @@ int main(int argc, char ** argv)
 		  << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
 		  << std::endl;
       
+      if (output_directory_mode) {
+	const path_type path = path_type(output_file) / (boost::lexical_cast<std::string>(id) + ".gz");
+	
+	os.reset(new utils::compress_ostream(path, 1024 * 1024));
+      }
+      
       if (output_forest_mode)
-	os << hypergraph_applied << '\n';
+	*os << id << " ||| " << hypergraph_applied << '\n';
       else {
 	// extract k-best ...
 	
 	if (feature_weights_one) {
 	  if (kbest_unique)
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
 	  else
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
 	} else {
 	  if (kbest_unique)
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
 	  else
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
 	}
       }
       
       ++ id;
-      os << std::flush;
+      *os << std::flush;
     }
 
   }
@@ -515,9 +576,13 @@ void options(int argc, char** argv)
     ("feature-weights-one",   po::bool_switch(&feature_weights_one),                       "one initialized feature weights")
     ("feature-function-list", po::bool_switch(&feature_list),                              "list of available feature function(s)")
 
+    // binarization
+    ("binarize",      po::bool_switch(&binarize_graph),                             "perform hypergraph binarization")
+    ("binarize-size", po::value<int>(&binarize_size)->default_value(binarize_size), "binarization size (<=2 for all binzarization)")
+    
     // permutation...
-    ("permute",      po::bool_switch(&permute_graph), "perform hypergraph permutation")
-    ("permute-size", po::value<int>(&permute_size),   "permutation size (zero for one, negative for all permutation)")
+    ("permute",      po::bool_switch(&permute_graph),                            "perform hypergraph permutation")
+    ("permute-size", po::value<int>(&permute_size)->default_value(permute_size), "permutation size (zero for no-permutation, negative for all permutation)")
     
     // intersection strategy
     ("intersection-cube", po::bool_switch(&intersection_cube),                  "intersetion by cube-pruning")

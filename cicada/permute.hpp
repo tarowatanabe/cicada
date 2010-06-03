@@ -3,12 +3,14 @@
 #ifndef __CICADA__PERMUTE__HPP__
 #define __CICADA__PERMUTE__HPP__ 1
 
+#include <stdexcept>
 #include <algorithm>
 #include <vector>
 
 #include <cicada/hypergraph.hpp>
 
 #include <utils/bithack.hpp>
+#include <utils/bit_vector.hpp>
 
 #include <boost/lexical_cast.hpp>
 
@@ -31,17 +33,17 @@ namespace cicada
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > phrase_type;
     
+    typedef utils::bit_vector<1024> coverage_type;
+
+    Permute(const int __permute_size)
+      : permute_size(__permute_size) {}
+    
             
-    void operator()(const hypergraph_type& source, hypergraph_type& target, const int permute_size)
+    void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       target.clear();
       
       permutation_type permutation;
-
-      tails_type tails;
-
-      phrase_type source_phrase;
-      phrase_type source_non_terminals;
       
       hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
@@ -53,8 +55,11 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	
+	  if (! edge_source.rule->target.empty())
+	    throw std::runtime_error("we do not suppor synchronous-permutation");
+	  
 	  hypergraph_type::edge_type& edge = target.add_edge(edge_source.tails.begin(), edge_source.tails.end());
-
+	  
 	  permutation.clear();
 	  for (int i = 0; i < edge_source.tails.size(); ++ i)
 	    permutation.push_back(i);
@@ -85,41 +90,20 @@ namespace cicada
 	    // zero for no-permutation
 	    if (permute_size < 0 || permute_size >= 1) {
 	      
-	      if (permute_size < 0 || permutation.size() <= 6) {
+	      if (permute_size < 0 || permutation.size() <= permute_size + 2) {
 		while (std::next_permutation(permutation.begin(), permutation.end())) {
 		  
-		  if (! is_valid_permutation(permutation, permute_size)) continue;
+		  if (! is_valid_permutation(permutation)) continue;
 		  
-		  // permute nodes...
-		  for (int i = 0; i < tails.size(); ++ i)
-		    tails[i] = edge_source.tails[permutation[i]];
-		  
-		  // permute source-phrase
-		  int non_terminal_pos = 0;
-		  phrase_type::iterator siter_end = source_phrase.end();
-		  for (phrase_type::iterator siter = source_phrase.begin(); siter != siter_end; ++ siter)
-		    if (siter->is_non_terminal()) {
-		      *siter = source_non_terminals[permutation[non_terminal_pos]];
-		      
-		      ++ non_terminal_pos;
-		    }
-		  
-		  hypergraph_type::edge_type& edge = target.add_edge(tails.begin(), tails.end());
-		  
-		  edge.rule.reset(new rule_type(*edge_source.rule));
-		  edge.rule->source = rule_type::symbol_set_type(source_phrase.begin(), source_phrase.end());
-		  
-		  edge.features = edge_source.features;
-		  edge.features[rule_feature(*edge_source.rule, permutation)] = 1.0;
-		  
-		  target.connect_edge(edge.id, node.id);
+		  make_permuted_edge(node, edge_source, target, permutation);
 		}
 	      } else {
 		// we will permute by traversing via transducer... actually, it is almost the same as word-based permutation with "skip"
 		
+		coverage_type coverage;
+		permutation.clear();
 		
-		
-		
+		permute_recursive(node, edge_source, target, permutation, coverage);
 	      }
 	    }
 	  }
@@ -131,14 +115,83 @@ namespace cicada
     
 
   private:
-    bool is_valid_permutation(const permutation_type& permutation, const int permute_size)
+
+    void permute_recursive(const hypergraph_type::node_type& node,
+			   const hypergraph_type::edge_type& edge_source,
+			   hypergraph_type& graph,
+			   const permutation_type& __permutation,
+			   const coverage_type& __coverage)
+    {
+      const int arity = edge_source.tails.size();
+
+      if (__permutation.size() < arity) {
+	permutation_type permutation(__permutation);
+	coverage_type    coverage(__coverage);
+
+	const int index = permutation.size();
+	
+	permutation.push_back(0);
+	for (int pos = utils::bithack::max(index - permute_size, 0); pos != utils::bithack::min(index + permute_size + 1, arity); ++ pos)
+	  if (! coverage[pos]) {
+	    permutation.back() = pos;
+	    coverage.set(pos, true);
+	    
+	    permute_recursive(node, edge_source, graph, permutation, coverage);
+	    
+	    coverage.set(pos, false);
+	  }
+	
+      } else {
+	const permutation_type& permutation = __permutation;
+
+	if (! is_valid_permutation(permutation)) return;
+	
+	make_permuted_edge(node, edge_source, graph, permutation);
+      }
+    }
+      
+    void make_permuted_edge(const hypergraph_type::node_type& node,
+			    const hypergraph_type::edge_type& edge_source,
+			    hypergraph_type& graph,
+			    const permutation_type& permutation)
+    {
+      // permute nodes...
+      for (int i = 0; i < tails.size(); ++ i)
+	tails[i] = edge_source.tails[permutation[i]];
+      
+      // permute source-phrase
+      int non_terminal_pos = 0;
+      phrase_type::iterator siter_end = source_phrase.end();
+      for (phrase_type::iterator siter = source_phrase.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  *siter = source_non_terminals[permutation[non_terminal_pos]];
+	  
+	  ++ non_terminal_pos;
+	}
+      
+      hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
+      
+      edge.rule.reset(new rule_type(*edge_source.rule));
+      edge.rule->source = rule_type::symbol_set_type(source_phrase.begin(), source_phrase.end());
+      
+      edge.features = edge_source.features;
+      edge.features[rule_feature(*edge_source.rule, permutation)] = 1.0;
+      
+      graph.connect_edge(edge.id, node.id);
+    }
+
+    bool is_valid_permutation(const permutation_type& permutation)
     {
       if (permute_size < 0) return true;
       
-      for (int index = 0; index < permutation.size(); ++ index)
-	if (utils::bithack::abs(index - permutation[index]) > permute_size)
+      int differences = 0;
+      for (int index = 0; index < permutation.size(); ++ index) {
+	const int abs = utils::bithack::abs(index - permutation[index]);
+	if (abs > permute_size)
 	  return false;
-      return true;
+	differences += abs;
+      }
+      return differences > 0;
     }
 
     feature_type rule_feature(const rule_type& rule, const permutation_type& permutation)
@@ -167,13 +220,22 @@ namespace cicada
       return rule_string;
     }
 
+    int permute_size;
+
+    phrase_type source_phrase;
+    phrase_type source_non_terminals;
+    
+    tails_type tails;
+
     std::vector<std::string, std::allocator<std::string> > non_terminal_symbols;
   };
   
   inline
   void permute(const HyperGraph& source, HyperGraph& target, const int permute_size)
   {
-    Permute()(source, target, permute_size);
+    Permute permutation(permute_size);
+    
+    permutation(source, target);
   }
   
   inline

@@ -165,7 +165,7 @@ namespace cicada
       D.resize(graph_in.nodes.size());
       
       node_states.clear();
-      node_states.reserve(graph_in.nodes.size());
+      node_states.reserve(graph_in.nodes.size() * cube_size_max * 100);
       
       graph_out.clear();
       for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)

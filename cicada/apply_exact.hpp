@@ -80,7 +80,7 @@ namespace cicada
       node_map.resize(graph_in.nodes.size());
       
       node_states.clear();
-      node_states.reserve(graph_in.nodes.size());
+      node_states.reserve(graph_in.nodes.size() * 10000);
       
       graph_out.clear();
       for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
@@ -142,7 +142,7 @@ namespace cicada
 	    
 	    node_map[edge.head].push_back(node_new.id);
 	    
-	    biter = buf.insert(std::make_pair(state, node_new.id));
+	    biter = buf.insert(std::make_pair(state, node_new.id)).first;
 	  }
 	  
 	  graph_out.connect_edge(edge_new.id, biter->second);
@@ -174,7 +174,7 @@ namespace cicada
   inline
   void apply_exact(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
   {
-    ApplyExact<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+    ApplyExact<typename Function::value_type, Function>(model, func)(source, target);
   }
 
 };

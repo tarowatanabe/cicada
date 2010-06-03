@@ -169,7 +169,7 @@ namespace cicada
     typedef Edge edge_type;
 
 
-    typedef utils::chunk_vector<edge_type, 4096 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
+    typedef utils::chunk_vector<edge_type, 1024 * 16 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
     typedef std::deque<const edge_type*, std::allocator<const edge_type*> > agenda_type;
     
     
@@ -663,6 +663,12 @@ namespace cicada
 					 rule_type::symbol_set_type(1, vocab_type::EPSILON),
 					 rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       
+      if (! rule_goal)
+	rule_goal.reset(new rule_type(vocab_type::GOAL,
+				      rule_type::symbol_set_type(1, vocab_type::X1),
+				      rule_type::symbol_set_type(1, vocab_type::X1),
+				      1));
+      
       if (! rule_x1)
 	rule_x1.reset(new rule_type(vocab_type::X,
 				    rule_type::symbol_set_type(1, vocab_type::X1),
@@ -690,10 +696,7 @@ namespace cicada
       // assign goal-symbol!
       goal_symbol = non_terminals[source.goal];
       
-      rule_goal.reset(new rule_type(vocab_type::GOAL,
-				    rule_type::symbol_set_type(1, goal_symbol.non_terminal(1)),
-				    rule_type::symbol_set_type(1, goal_symbol.non_terminal(1)),
-				    1));
+      
       
       grammar_nodes.clear();
       grammar_nodes.resize(1);
@@ -765,95 +768,104 @@ namespace cicada
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
       typedef std::vector<edge_set_type, std::allocator<edge_set_type> > node_map_type;
 
+      hypergraph_type graph_removed;
+
       removed_type removed(graph.edges.size(), false);
       node_map_type out_edges(graph.nodes.size());
       
-      // compute out-edges...
-      {
-	hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-	for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const hypergraph_type::edge_type& edge = *eiter;
-	  
-	  hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
-	    out_edges[*niter].push_back(edge.id);
-	}
-      }
-      
-      // then, iterate again... and mark removed for epsilon rules...
-      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
-	if (eiter->tails.empty() && eiter->rule == rule_epsilon) {
-	  const hypergraph_type::edge_type& edge = *eiter;
-	  
-	  removed[edge.id] = true;
-	  
-	  if (! edge.features.empty()) {
-	    if (graph.nodes[edge.head].edges.size() != 1) {
-	      // cannot propagate features...
-	      // or, do we evenly distribute this...?
-	    } else {
-	      edge_set_type::const_iterator eiter_end = out_edges[edge.head].end();
-	      for (edge_set_type::const_iterator eiter = out_edges[edge.head].begin(); eiter != eiter_end; ++ eiter)
-		graph.edges[*eiter].features += edge.features;
-	    }
-	  }
-	}
-      
-      {
-	hypergraph_type graph_removed;
-	topologically_sort(graph, graph_removed, filter_epsilon(removed));
-	graph.swap(graph_removed);
-      }
-      
-      // re-compute out-edges
-      {
-	out_edges.clear();
-	out_edges.resize(graph.nodes.size());
-	hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-	for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const hypergraph_type::edge_type& edge = *eiter;
-	  
-	  hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
-	    out_edges[*niter].push_back(edge.id);
-	}
-      }
-      
-      // fix no-edge nodes...
-      
       bool new_epsilon = false;
       
-      hypergraph_type::node_set_type::iterator niter_end = graph.nodes.end();
-      for (hypergraph_type::node_set_type::iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) 
-	if (niter->edges.empty()) {
-	  const hypergraph_type::node_type& node = *niter;
-	  
-	  edge_set_type::const_iterator eiter_end = out_edges[node.id].end();
-	  for (edge_set_type::const_iterator eiter = out_edges[node.id].begin(); eiter != eiter_end; ++ eiter) {
-	    hypergraph_type::edge_type& edge = graph.edges[*eiter];
+      do {
+	removed.clear();
+	removed.resize(graph.edges.size(), false);
+
+	// compute out-edges...
+	{
+	  out_edges.clear();
+	  out_edges.resize(graph.nodes.size());
+
+	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+	  for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const hypergraph_type::edge_type& edge = *eiter;
 	    
-	    if (edge.tails.size() == 2) {
-	      edge.rule = rule_x1;
-	      
-	      hypergraph_type::edge_type::node_set_type tails(1, edge.tails.front() == node.id ? edge.tails.back() : edge.tails.front());
-	      
-	      edge.tails = tails;
-	      
-	    } else {
-	      edge.rule = rule_epsilon;
-	      edge.tails = hypergraph_type::edge_type::node_set_type();
-	      
-	      new_epsilon = true;
-	    }
+	    hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	    for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	      out_edges[*niter].push_back(edge.id);
 	  }
 	}
+	
+	// then, iterate again... and mark removed for epsilon rules...
+	hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+	for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
+	  if (eiter->tails.empty() && eiter->rule == rule_epsilon) {
+	    const hypergraph_type::edge_type& edge = *eiter;
+	    
+	    removed[edge.id] = true;
+	    
+	    if (! edge.features.empty()) {
+	      if (graph.nodes[edge.head].edges.size() != 1) {
+		// cannot propagate features...
+		// or, do we evenly distribute this...?
+	      } else {
+		edge_set_type::const_iterator eiter_end = out_edges[edge.head].end();
+		for (edge_set_type::const_iterator eiter = out_edges[edge.head].begin(); eiter != eiter_end; ++ eiter)
+		  graph.edges[*eiter].features += edge.features;
+	      }
+	    }
+	  }
+	
+	// removed epsilon edges...
+	graph_removed.clear();
+	topologically_sort(graph, graph_removed, filter_epsilon(removed));
+	graph.swap(graph_removed);
+	
+	// re-compute out-edges
+	{
+	  out_edges.clear();
+	  out_edges.resize(graph.nodes.size());
+	  
+	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+	  for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    const hypergraph_type::edge_type& edge = *eiter;
+	    
+	    hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	    for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	      out_edges[*niter].push_back(edge.id);
+	  }
+	}
+
+	new_epsilon = false;
+	
+	// fix no-edge nodes...
+	hypergraph_type::node_set_type::iterator niter_end = graph.nodes.end();
+	for (hypergraph_type::node_set_type::iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) 
+	  if (niter->edges.empty()) {
+	    const hypergraph_type::node_type& node = *niter;
+	    
+	    edge_set_type::const_iterator eiter_end = out_edges[node.id].end();
+	    for (edge_set_type::const_iterator eiter = out_edges[node.id].begin(); eiter != eiter_end; ++ eiter) {
+	      hypergraph_type::edge_type& edge = graph.edges[*eiter];
+	      
+	      if (edge.tails.size() == 2) {
+		edge.rule = rule_x1;
+		
+		hypergraph_type::edge_type::node_set_type tails(1, edge.tails.front() == node.id ? edge.tails.back() : edge.tails.front());
+		
+		edge.tails = tails;
+		
+	      } else {
+		edge.rule = rule_epsilon;
+		edge.tails = hypergraph_type::edge_type::node_set_type();
+		
+		new_epsilon = true;
+	      }
+	    }
+	  }
+	
+      } while (new_epsilon);
       
-      // if we found new epsilon rules, then, remove again...
-      if (new_epsilon)
-	remove_epsilon(graph);
-      else
-	graph.topologically_sort();
+      // final sort...
+      graph.topologically_sort();
     }
     
     

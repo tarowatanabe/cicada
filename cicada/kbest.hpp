@@ -286,11 +286,13 @@ namespace cicada
 	state.cand.push_back(derivation);
       }
       
+#if 0
       // top k elements
       const size_type size = utils::bithack::min(k_prime, state.cand.size());
       
       std::nth_element(state.cand.begin(), state.cand.begin() + size, state.cand.end(), compare_derivation_type());
       state.cand.resize(size);
+#endif
       
       // heapify
       std::make_heap(state.cand.begin(), state.cand.end(), compare_heap_type());

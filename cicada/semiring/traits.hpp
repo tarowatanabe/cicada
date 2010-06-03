@@ -3,6 +3,8 @@
 #ifndef __CICADA__SEMIRING__TRAITS__HPP__
 #define __CICADA__SEMIRING__TRAITS__HPP__ 1
 
+#include <cmath>
+
 #include <boost/numeric/conversion/bounds.hpp>
 
 namespace cicada
