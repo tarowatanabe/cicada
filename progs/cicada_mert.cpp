@@ -72,7 +72,6 @@ path_type     output_file = "-";
 path_type bound_lower_file;
 path_type bound_upper_file;
 
-bool input_directory_mode = false;
 
 path_set_type feature_weights_files;
 
@@ -293,6 +292,9 @@ int main(int argc, char ** argv)
 	is >> bound_upper;
       } else
 	throw std::runtime_error("no upper-bound file?" + bound_upper_file.file_string());
+
+
+    cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     
     double          optimum_objective = std::numeric_limits<double>::infinity();
     weight_set_type optimum_weights;
@@ -486,6 +488,8 @@ struct EnvelopeTask
     while (1) {
       queue.pop(seg);
       if (seg < 0) break;
+
+      
       
       envelopes.clear();
       envelopes.resize(graphs[seg].nodes.size());
@@ -502,6 +506,9 @@ struct EnvelopeTask
 	line->yield(yield);
 	
 	scorer_type::score_ptr_type score = scorers[seg]->score(yield);
+	
+	if (debug >= 3)
+	  std::cerr << "segment: " << seg << " x: " << line->x << std::endl;
 	
 	segments[seg].push_back(std::make_pair(line->x, score));
       }
@@ -541,6 +548,9 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     queue.push(-1);
   
   workers.join_all();
+
+  if (debug >= 2)
+    std::cerr << "computed envelopes" << std::endl;
 }
 
 
@@ -640,12 +650,14 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   typedef task_type::reducer_type reducer_type;
   
   queue_mapper_type  queue_mapper(graphs.size());
-  queue_reducer_type queue_reducer(graphs.size());
+  queue_reducer_type queue_reducer;
 
   boost::thread_group workers;
   for (int i = 0; i < threads; ++ i)
     workers.add_thread(new boost::thread(task_type(weights, queue_mapper, queue_reducer)));
   
+  std::cerr << "start viterbi" << std::endl;
+
   int mapped_size = 0;
   for (int seg = 0; seg < graphs.size(); ++ seg)
     if (graphs[seg].goal != hypergraph_type::invalid) {
@@ -669,6 +681,10 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   }
   
   workers.join_all();
+
+  if (debug >= 2)
+    std::cerr << "computed score: " << score->score().first << std::endl;
+  
   
   return score->score().first;
 }
@@ -677,24 +693,55 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 {
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
-    utils::compress_istream is(*titer, 1024 * 1024);
     
-    int id;
-    std::string sep;
-    hypergraph_type hypergraph;
-    
-    weight_set_type origin;
-    weight_set_type direction;
-    
-    while (is >> id >> sep >> hypergraph) {
+    if (boost::filesystem::is_directory(*titer)) {
+
+      for (int i = 0; /**/; ++ i) {
+	const path_type path = (*titer) / (boost::lexical_cast<std::string>(i) + ".gz");
+
+	if (! boost::filesystem::exists(path)) break;
+	
+	utils::compress_istream is(path, 1024 * 1024);
+	
+	int id;
+	std::string sep;
+	hypergraph_type hypergraph;
       
-      if (sep != "|||")
-	throw std::runtime_error("format error?");
+	weight_set_type origin;
+	weight_set_type direction;
       
-      if (id >= graphs.size())
-	throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
+	while (is >> id >> sep >> hypergraph) {
+	
+	  if (sep != "|||")
+	    throw std::runtime_error("format error?");
+	
+	  if (id >= graphs.size())
+	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
+	
+	  graphs[id].unite(hypergraph);
+	}
+      }
+    } else {
       
-      graphs[id].unite(hypergraph);
+      utils::compress_istream is(*titer, 1024 * 1024);
+      
+      int id;
+      std::string sep;
+      hypergraph_type hypergraph;
+      
+      weight_set_type origin;
+      weight_set_type direction;
+      
+      while (is >> id >> sep >> hypergraph) {
+	
+	if (sep != "|||")
+	  throw std::runtime_error("format error?");
+	
+	if (id >= graphs.size())
+	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
+	
+	graphs[id].unite(hypergraph);
+      }
     }
   }
 }
@@ -747,9 +794,6 @@ void options(int argc, char** argv)
 
     ("bound-lower", po::value<path_type>(&bound_lower_file),                    "lower bounds definition for feature weights")
     ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
-    
-    // options for input format
-    ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
     
     // feature weight files
     ("feature-weights",  po::value<path_set_type>(&feature_weights_files), "feature weights file(s)")

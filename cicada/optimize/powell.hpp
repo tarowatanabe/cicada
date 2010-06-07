@@ -59,7 +59,7 @@ namespace cicada
 	  tolerance(__tolerance),
 	  samples(__samples),
 	  minimize(__minimize)
-      { initialize_bound(); }
+      { line_search_type::initialize_bound(bound_lower, bound_upper); }
       
       bool operator()(double& optimum_objective, weight_set_type& optimum_weights)
       {
@@ -168,25 +168,6 @@ namespace cicada
       }
 
     private:
-      void initialize_bound()
-      {
-	if (bound_lower.empty())
-	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	    bound_lower[feature_type(id)] = line_search_type::value_min;
-	
-	if (bound_upper.empty())
-	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	    bound_upper[feature_type(id)] = line_search_type::value_max;
-	
-	// make sure we have enough space...
-	const_cast<weight_set_type&>(bound_lower).operator[](feature_type(feature_type::allocated() - 1));
-	const_cast<weight_set_type&>(bound_upper).operator[](feature_type(feature_type::allocated() - 1));
-	
-	// checking...
-	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	  if (bound_upper[feature_type(id)] < bound_lower[feature_type(id)])
-	    throw std::runtime_error("invalid lower-upper bound for feature: " + static_cast<const std::string&>(feature_type(id)));
-      }
       
       template <typename Iterator>
       void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper)
@@ -216,7 +197,7 @@ namespace cicada
 	
 	weight_set_type direction;
 	
-	const_cast<weight_set_type&>(direction).operator[](feature_type::allocated() - 1);
+	direction.allocate();
 	
 	weight_set_type::iterator diter_begin = direction.begin();
 	weight_set_type::iterator diter_end = direction.end();

@@ -55,6 +55,12 @@ namespace cicada
     void clear() { __values.clear(); }
     
     void swap(WeightVector& x) { __values.swap(x.__values); }
+
+    void allocate()
+    {
+      __values.reserve(feature_type::allocated() - 1);
+      __values.resize(feature_type::allocated() - 1, Tp());
+    }
     
     Tp operator[](const key_type& x) const
     {

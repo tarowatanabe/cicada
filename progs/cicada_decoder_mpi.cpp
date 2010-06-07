@@ -1207,7 +1207,7 @@ void cicada_process(const grammar_type& grammar,
 	os << id << " ||| " << line;
 	++ id;
 	
-	queue.push_swap(line);
+	queue.push(os.str());
 	
 	found = true;
       }

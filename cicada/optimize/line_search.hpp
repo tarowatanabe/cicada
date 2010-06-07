@@ -224,14 +224,14 @@ namespace cicada
       LineSearch(const int __debug = 0)
 	: bound_lower(),
  	  bound_upper(),
-	  debug(__debug) { initialize_bound(); }
+	  debug(__debug) { initialize_bound(bound_lower, bound_upper); }
       
       LineSearch(const weight_set_type& __bound_lower,
 		 const weight_set_type& __bound_upper,
 		 const int __debug = 0)
 	: bound_lower(__bound_lower),
 	  bound_upper(__bound_upper),
-	  debug(__debug) { initialize_bound(); }
+	  debug(__debug) { initialize_bound(bound_lower, bound_upper); }
 
       template <typename Regularizer>
       value_type operator()(segment_document_type& segments,
@@ -359,6 +359,27 @@ namespace cicada
 	}
       }
 
+      static void initialize_bound(weight_set_type& bound_lower,
+				   weight_set_type& bound_upper)
+      {
+	
+	if (bound_lower.empty())
+	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	    bound_lower[feature_type(id)] = value_min;
+	
+	if (bound_upper.empty())
+	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	    bound_upper[feature_type(id)] = value_max;
+
+	bound_lower.allocate();
+	bound_upper.allocate();
+	
+	// checking...
+	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	  if (bound_upper[feature_type(id)] < bound_lower[feature_type(id)])
+	    throw std::runtime_error("invalid lower-upper bound for feature: " + static_cast<const std::string&>(feature_type(id)));
+      }
+
     private:
       
       std::pair<double, double> valid_range(const weight_set_type& origin,
@@ -380,7 +401,7 @@ namespace cicada
 	      maximum = std::min(maximum, (upp - ori) / dir);
 	      minimum = std::max(minimum, (low - ori) / dir);
 	    } else {
-	      maximum = std::min(maximum, (low  - ori) / dir);
+	      maximum = std::min(maximum, (low - ori) / dir);
 	      minimum = std::max(minimum, (upp - ori) / dir);
 	    }
 	  }
@@ -398,26 +419,6 @@ namespace cicada
 	return (point >= bound ? point + interval_offset_upper : std::min(bound, point + interval_offset_upper));
       }
       
-
-      void initialize_bound()
-      {
-	if (bound_lower.empty())
-	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	    bound_lower[feature_type(id)] = value_min;
-	
-	if (bound_upper.empty())
-	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	    bound_upper[feature_type(id)] = value_max;
-	
-	// make sure we have enough space...
-	const_cast<weight_set_type&>(bound_lower).operator[](feature_type(feature_type::allocated() - 1));
-	const_cast<weight_set_type&>(bound_upper).operator[](feature_type(feature_type::allocated() - 1));
-	
-	// checking...
-	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	  if (bound_upper[feature_type(id)] < bound_lower[feature_type(id)])
-	    throw std::runtime_error("invalid lower-upper bound for feature: " + static_cast<const std::string&>(feature_type(id)));
-      }
       
     private:
       weight_set_type bound_lower;

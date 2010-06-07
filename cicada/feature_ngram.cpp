@@ -48,6 +48,8 @@ namespace cicada
 
       struct CacheContext
       {
+	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+
 	phrase_type context;
 	phrase_type ngram;
 	double logprob;
@@ -57,6 +59,8 @@ namespace cicada
       
       struct CacheNGram
       {
+	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+	
 	phrase_type ngram;
 	double logprob;
 	
@@ -99,9 +103,7 @@ namespace cicada
       inline
       size_t hash_phrase(Iterator first, Iterator last, size_t seed=0) const
       {
-	for (/**/; first != last; ++ first)
-	  seed = hasher_type::operator()(first->id(), seed);
-	return seed;
+	return hasher_type::operator()(first, last, seed);
       }
       
       template <typename Iterator, typename __Phrase>
