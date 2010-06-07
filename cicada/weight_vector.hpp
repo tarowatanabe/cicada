@@ -142,6 +142,44 @@ namespace cicada
       
       std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::divides<Tp>());
     }
+
+  public:
+    //comparison...
+    friend
+    bool operator==(const WeightVector& x, const WeightVector& y)
+    {
+      return x.__values == y.__values;
+    }
+
+    friend
+    bool operator!=(const WeightVector& x, const WeightVector& y)
+    {
+      return x.__values != y.__values;
+    }
+
+    friend
+    bool operator<(const WeightVector& x, const WeightVector& y)
+    {
+      return x.__values < y.__values;
+    }
+
+    friend
+    bool operator<=(const WeightVector& x, const WeightVector& y)
+    {
+      return x.__values <= y.__values;
+    }
+
+    friend
+    bool operator>(const WeightVector& x, const WeightVector& y)
+    {
+      return x.__values > y.__values;
+    }
+
+    friend
+    bool operator>=(const WeightVector& x, const WeightVector& y)
+    {
+      return x.__values >= y.__values;
+    }
     
   public:
     
@@ -170,6 +208,8 @@ namespace cicada
     {
       typedef boost::tokenizer<utils::space_separator> tokenizer_type;
       
+      x.clear();
+
       std::string feature;
       T value;
       while ((is >> feature) && (is >> value))

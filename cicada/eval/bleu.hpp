@@ -115,9 +115,14 @@ namespace cicada
 	length_hypothesis /= scale;
       }
       
-      score_type* zero() const
+      score_ptr_type zero() const
       {
-	return new Bleu(ngrams_hypothesis.size());
+	return score_ptr_type(new Bleu(ngrams_hypothesis.size()));
+      }
+
+      score_ptr_type clone() const
+      {
+	return score_ptr_type(new Bleu(*this));
       }
 
 
@@ -177,7 +182,7 @@ namespace cicada
 	std::sort(sizes.begin(), sizes.end());
       }
 
-      score_type* score(const sentence_type& sentence) const
+      score_ptr_type score(const sentence_type& sentence) const
       {
 	typedef ngram_set_type::id_type id_type;
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
@@ -233,7 +238,7 @@ namespace cicada
 	    bleu->ngrams_hypothesis[n] += std::min(citer->second, ngrams[citer->first]);
 	}
 	
-	return bleu.release();
+	return score_ptr_type(bleu.release());
       }
 
     private:

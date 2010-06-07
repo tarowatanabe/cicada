@@ -326,18 +326,18 @@ namespace cicada
       insert_edge(edge_type(goal_symbol, dot_goal, transducer_id_type(-1, 0)));
       
       // forever...
-      while (! agenda_next.empty() || ! agenda.empty()) {
+      while (! agenda_exploration.empty() || ! agenda_finishing.empty()) {
 	
 	// connect all the newly created edges at previous step.
-	agenda_type::const_iterator aiter_end = agenda_next.end();
-	for (agenda_type::const_iterator aiter = agenda_next.begin(); aiter != aiter_end; ++ aiter)
+	agenda_type::const_iterator aiter_end = agenda_exploration.end();
+	for (agenda_type::const_iterator aiter = agenda_exploration.begin(); aiter != aiter_end; ++ aiter)
 	  connect_edge(*(*aiter), source, target);
 	
-	agenda_next.clear();
+	agenda_exploration.clear();
 	
-	if (! agenda.empty()) {
-	  const edge_type* edge = agenda.front();
-	  agenda.pop_front();
+	if (! agenda_finishing.empty()) {
+	  const edge_type* edge = agenda_finishing.front();
+	  agenda_finishing.pop_front();
 	  
 	  if (edge->is_active()) {
 	    if (! edge->dot->terminals.empty())
@@ -531,7 +531,7 @@ namespace cicada
       
       edges.push_back(edge);
       
-      agenda_next.push_back(&edges.back());
+      agenda_exploration.push_back(&edges.back());
     }
     
     void connect_edge(const edge_type& edge, const hypergraph_type& source, hypergraph_type& target)
@@ -544,7 +544,7 @@ namespace cicada
 	else
 	  edges_active.insert(&edge);
 	
-	agenda.push_back(&edge);
+	agenda_finishing.push_back(&edge);
       }
       
       // add into hypergraph...
@@ -649,8 +649,8 @@ namespace cicada
       terminal_nodes.clear();
       non_terminal_nodes.clear();
 
-      agenda.clear();
-      agenda_next.clear();
+      agenda_finishing.clear();
+      agenda_exploration.clear();
       
       edges_unique.clear();
       edges_active.clear();
@@ -886,8 +886,8 @@ namespace cicada
     terminal_node_set_type     terminal_nodes;
     non_terminal_node_set_type non_terminal_nodes;
 
-    agenda_type agenda;
-    agenda_type agenda_next;
+    agenda_type agenda_finishing;
+    agenda_type agenda_exploration;
     
     edge_set_unique_type  edges_unique;
     edge_set_active_type  edges_active;

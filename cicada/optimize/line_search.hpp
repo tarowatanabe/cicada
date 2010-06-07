@@ -29,13 +29,13 @@ namespace cicada
       
       typedef envelope_type::line_type line_type;
       typedef eval::Score              score_type;
-
+      
       typedef boost::shared_ptr<line_type>  line_ptr_type;
       typedef boost::shared_ptr<score_type> score_ptr_type;
 
       typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> >   score_set_type;
       
-      typedef std::pair<line_ptr_type, score_ptr_type>                        segment_type;
+      typedef std::pair<double, score_ptr_type>                               segment_type;
       typedef std::vector<segment_type, std::allocator<segment_type> >        segment_set_type;
       typedef std::deque<segment_set_type, std::allocator<segment_set_type> > segment_document_type;
       
@@ -46,9 +46,114 @@ namespace cicada
       static const double value_max =  100.0;
       
     public:
+      struct RegularizeNone
+      {
+	RegularizeNone(const double& __scale)
+	{}
+	
+	double operator()(const weight_set_type& weights) const
+	{
+	  return 0.0;
+	}
+	
+	double operator()(const weight_set_type& origin,
+			  const weight_set_type& direction,
+			  const double& lower,
+			  const double& upper) const
+	{
+	  return 0.0;
+	}
+      };
+      
+      struct RegularizeL1
+      {
+	const double scale;
+	
+	RegularizeL1(const double& __scale)
+	  : scale(__scale) {}
+	
+	double operator()(const weight_set_type& weights) const
+	{
+	  double total = 0.0;
+	  weight_set_type::const_iterator witer_end = weights.end();
+	  for (weight_set_type::const_iterator witer = weights.begin(); witer != witer_end; ++ witer)
+	    total += std::fabs(*witer);
+	  
+	  return total * scale;
+	}
+  
+      double operator()(const weight_set_type& origin,
+			const weight_set_type& direction,
+			const double& lower,
+			const double& upper) const
+      {
+	double total = 0.0;
+	
+	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	  if (! feature_type(id).empty()) {
+	    const feature_type feature(id);
+	    
+	    const double ori = origin[feature];
+	    const double dir = direction[feature];
+	    
+	    const double low = ori + lower * dir;
+	    const double upp = ori + upper * dir;
+	    
+	    const double weight = (ori + (low + upp) * 0.5 * dir) * double(! (low * upp < 0.0));
+	    
+	    total += std::fabs(weight);
+	  }
+	
+	return total * scale;
+      }
+    };
+
+    struct RegularizeL2
+    {
+      const double scale;
+  
+      RegularizeL2(const double& __scale)
+	: scale(__scale) {}
+
+      double operator()(const weight_set_type& weights) const
+      {
+	double total = 0.0;
+	weight_set_type::const_iterator witer_end = weights.end();
+	for (weight_set_type::const_iterator witer = weights.begin(); witer != witer_end; ++ witer)
+	  total += (*witer) * (*witer);
+	
+	return total * scale;
+      }
+  
+      double operator()(const weight_set_type& origin,
+			const weight_set_type& direction,
+			const double& lower,
+			const double& upper) const
+      {
+	double total = 0.0;
+	
+	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	  if (! feature_type(id).empty()) {
+	    const feature_type feature(id);
+	    
+	    const double ori = origin[feature];
+	    const double dir = direction[feature];
+	    
+	    const double low = ori + lower * dir;
+	    const double upp = ori + upper * dir;
+	    
+	    const double weight = (ori + (low + upp) * 0.5 * dir) * double(! (low * upp < 0.0));
+	    
+	    total += weight * weight;
+	  }
+	
+	return total * 0.5 * scale;
+      }
+    };
+
       struct Result
       {
-	double error;
+	double objective;
 	double score;
 	double lower;
 	double upper;
@@ -78,13 +183,13 @@ namespace cicada
 	}
 	
 	
-	Result() : error(std::numeric_limits<double>::infinity()), score(), lower(), upper() {}
+	Result() : objective(std::numeric_limits<double>::infinity()), score(), lower(), upper() {}
 	
-	Result(const double& _error,
+	Result(const double& _objective,
 	       const double& _score,
 	       const double& _lower,
 	       const double& _upper)
-	  : error(_error), score(_score), lower(_lower), upper(_upper) {}
+	  : objective(_objective), score(_score), lower(_lower), upper(_upper) {}
       };
       typedef Result value_type;
 
@@ -108,7 +213,7 @@ namespace cicada
       {
 	bool operator()(const item_type& x, const item_type& y) const
 	{
-	  return x.first->first->x > y.first->first->x;
+	  return x.first->first > y.first->first;
 	}
       };
       
@@ -116,52 +221,46 @@ namespace cicada
 
       
     public:
-      LineSearch(const weight_set_type& __origin,
-		 const weight_set_type& __direction,
-		 const int __debug = 0)
-	: origin(__origin),
-	  direction(__direction),
-	  bound_lower(),
+      LineSearch(const int __debug = 0)
+	: bound_lower(),
  	  bound_upper(),
 	  debug(__debug) { initialize_bound(); }
       
-      LineSearch(const weight_set_type& __origin,
-		 const weight_set_type& __direction,
-		 const weight_set_type& __bound_lower,
+      LineSearch(const weight_set_type& __bound_lower,
 		 const weight_set_type& __bound_upper,
 		 const int __debug = 0)
-	: origin(__origin),
-	  direction(__direction),
-	  bound_lower(__bound_lower),
+	: bound_lower(__bound_lower),
 	  bound_upper(__bound_upper),
 	  debug(__debug) { initialize_bound(); }
 
       template <typename Regularizer>
       value_type operator()(segment_document_type& segments,
+			    const weight_set_type& origin,
+			    const weight_set_type& direction,
 			    Regularizer regularizer,
 			    const bool minimize)
       {
 	// we assume a set of line_ptr and score_ptr pair...
 	
-	const double error_factor = (minimize ? 1.0 : - 1.0);
-	const std::pair<double, double> range = valid_range();
+	const double score_factor = (minimize ? 1.0 : - 1.0);
+	const std::pair<double, double> range = valid_range(origin, direction);
 
 	heap_type heap;
 	
 	if (debug >= 4)
 	  std::cerr << "minimum: " << range.first << " maximum: " << range.second << std::endl;
 	
-	score_ptr_type score;
+	score_ptr_type stat;
 	score_set_type scores(segments.size());
 	
 	for (int seg = 0; seg < segments.size(); ++ seg)
 	  if (! segments[seg].empty()) {
 	    
-	    if (! score)
-	      score.reset(segments[seg].front().second->zero());
+	    if (! stat)
+	      stat = segments[seg].front().second->zero();
 	    
 	    scores[seg] = segments[seg].front().second;
-	    *score += *segments[seg].front().second;
+	    *stat += *segments[seg].front().second;
 	    
 	    if (segments[seg].size() > 1)
 	      heap.push_back(item_type(seg, segments[seg].begin() + 1, segments[seg].end()));
@@ -173,36 +272,36 @@ namespace cicada
 	// priority queue...
 	std::make_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	
-	const double error = error_factor * score->score().first;
+	const double score = score_factor * stat->score().first;
 	
-	double best_lower = lower_bound(heap.front().first->first->x, range.first);
-	double best_upper = heap.front().first->first->x;
+	double optimum_lower = lower_bound(heap.front().first->first, range.first);
+	double optimum_upper = heap.front().first->first;
 	
-	double best_error = error + regularizer(origin, direction, best_lower, best_upper);
-	double best_score = error;
+	double optimum_objective = score + regularizer(origin, direction, optimum_lower, optimum_upper);
+	double optimum_score = score;
 	
-	double segment_prev = best_lower;
-	double score_prev   = error;
+	double segment_prev = optimum_lower;
+	double score_prev   = score;
 
 	if (debug >= 4)
-	  std::cerr << "lower: " << best_lower
-		    << " upper: " << best_upper
-		    << " error: " << error
-		    << " regularized: " << best_error
+	  std::cerr << "lower: " << optimum_lower
+		    << " upper: " << optimum_upper
+		    << " score: " << score
+		    << " objective: " << optimum_objective
 		    << std::endl;
 
 	
 	while (! heap.empty()) {
 	  // next at heap...
 	  
-	  const double segment_curr = heap.front().first->first->x;
+	  const double segment_curr = heap.front().first->first;
 	  
-	  while (! heap.empty() && heap.front().first->first->x == segment_curr) { 
+	  while (! heap.empty() && heap.front().first->first == segment_curr) { 
 	    
 	    std::pop_heap(heap.begin(), heap.end(), item_heap_compare_type());
 	    
-	    *score -= *scores[heap.back().seg];
-	    *score += *heap.back().first->second;
+	    *stat -= *scores[heap.back().seg];
+	    *stat += *heap.back().first->second;
 	    scores[heap.back().seg] = heap.back().first->second;
 	    
 	    // pop and push heap...
@@ -213,13 +312,13 @@ namespace cicada
 	      heap.pop_back();
 	  }
 	
-	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->first->x);
+	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->first);
 	  
 	  // we perform merging of ranges if error counts are equal...
-	  const double error = error_factor * score->score().first;
-	  if (error != score_prev) {
+	  const double score = score_factor * stat->score().first;
+	  if (score != score_prev) {
 	    segment_prev = segment_curr;
-	    score_prev = error;
+	    score_prev = score;
 	  }
 	  
 	  const double lower = segment_prev;
@@ -230,39 +329,40 @@ namespace cicada
 	  if (point < range.first) continue; // out of range for lower-bound...
 	  if (std::fabs(point) < interval_min) continue; // interval is very small
 	  
-	  const double error_regularized = error + regularizer(origin, direction, lower, upper);
+	  const double objective = score + regularizer(origin, direction, lower, upper);
 	  
 	  if (debug >= 4)
 	    std::cerr << "lower: " << lower
 		      << " upper: " << upper
-		      << " error: " << error
-		      << " regularized: " << error_regularized
+		      << " score: " << score
+		      << " objective: " << objective
 		      << std::endl;
 	  
-	  if (error_regularized < best_error) {
-	    best_error = error_regularized;
-	    best_score = error;
-	    best_lower = lower;
-	    best_upper = upper;
+	  if (objective < optimum_objective) {
+	    optimum_objective = objective;
+	    optimum_score = score;
+	    optimum_lower = lower;
+	    optimum_upper = upper;
 	  }
 	}
 	
-	const double point = (best_lower + best_upper) * 0.5;
+	const double point = (optimum_lower + optimum_upper) * 0.5;
 	if (point < range.first || range.second < point)
 	  return value_type();
 	else {
 	  if (debug >= 2)
-	    std::cerr << "minimum error: " << best_error
-		      << " score: " << best_score
-		      << " lower: " << best_lower
-		      << " upper: " << best_upper << std::endl;
-	  return value_type(best_error, best_score, best_lower, best_upper);
+	    std::cerr << "minimum objective: " << optimum_objective
+		      << " score: " << optimum_score
+		      << " lower: " << optimum_lower
+		      << " upper: " << optimum_upper << std::endl;
+	  return value_type(optimum_objective, optimum_score, optimum_lower, optimum_upper);
 	}
       }
 
     private:
       
-      std::pair<double, double> valid_range() const
+      std::pair<double, double> valid_range(const weight_set_type& origin,
+					    const weight_set_type& direction) const
       {
 	double minimum = - std::numeric_limits<double>::infinity();
 	double maximum =   std::numeric_limits<double>::infinity();
@@ -310,8 +410,8 @@ namespace cicada
 	    bound_upper[feature_type(id)] = value_max;
 	
 	// make sure we have enough space...
-	bound_lower[feature_type(feature_type::allocated() - 1)];
-	bound_upper[feature_type(feature_type::allocated() - 1)];
+	const_cast<weight_set_type&>(bound_lower).operator[](feature_type(feature_type::allocated() - 1));
+	const_cast<weight_set_type&>(bound_upper).operator[](feature_type(feature_type::allocated() - 1));
 	
 	// checking...
 	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
@@ -320,9 +420,6 @@ namespace cicada
       }
       
     private:
-      const weight_set_type&      origin;
-      const weight_set_type&      direction;
-
       weight_set_type bound_lower;
       weight_set_type bound_upper;
 

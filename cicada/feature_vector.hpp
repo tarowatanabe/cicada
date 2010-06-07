@@ -155,6 +155,45 @@ namespace cicada
     }
 
   public:
+    // comparison
+    friend
+    bool operator==(const FeatureVector& x, const FeatureVector& y)
+    {
+      return x.__values == y.__values;
+    }
+
+    friend
+    bool operator!=(const FeatureVector& x, const FeatureVector& y)
+    {
+      return x.__values != y.__values;
+    }
+
+    friend
+    bool operator<(const FeatureVector& x, const FeatureVector& y)
+    {
+      return x.__values < y.__values;
+    }
+
+    friend
+    bool operator<=(const FeatureVector& x, const FeatureVector& y)
+    {
+      return x.__values <= y.__values;
+    }
+
+    friend
+    bool operator>(const FeatureVector& x, const FeatureVector& y)
+    {
+      return x.__values > y.__values;
+    }
+
+    friend
+    bool operator>=(const FeatureVector& x, const FeatureVector& y)
+    {
+      return x.__values >= y.__values;
+    }
+
+
+  public:
     
     template <typename T, typename A>
     friend

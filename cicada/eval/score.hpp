@@ -19,6 +19,7 @@ namespace cicada
     {
     public:
       typedef Score score_type;
+      typedef boost::shared_ptr<score_type>  score_ptr_type;
       
     public:
       virtual ~Score() {}
@@ -33,7 +34,8 @@ namespace cicada
       virtual void multiplies_equal(const double& scale) = 0;
       virtual void divides_equal(const double& scale) = 0;
 
-      virtual score_type* zero() const = 0;
+      virtual score_ptr_type zero() const = 0;
+      virtual score_ptr_type clone() const = 0;
       
     public:
       
@@ -83,6 +85,7 @@ namespace cicada
       typedef Score score_type;
       typedef Scorer scorer_type;
       
+      typedef boost::shared_ptr<score_type>  score_ptr_type;
       typedef boost::shared_ptr<scorer_type> scorer_ptr_type;
       
     public:
@@ -91,7 +94,7 @@ namespace cicada
       // insert a sentence for scoring
       virtual void clear() = 0;
       virtual void insert(const sentence_type& sentence) = 0;
-      virtual score_type* score(const sentence_type& sentence) const = 0;
+      virtual score_ptr_type score(const sentence_type& sentence) const = 0;
       virtual bool error_metric() const = 0;
       
       static std::string lists();
@@ -108,10 +111,11 @@ namespace cicada
       typedef cicada::Symbol   word_type;
 
       typedef Scorer scorer_type;
-      
-      typedef scorer_type score_type;
 
+      typedef scorer_type::score_type      score_type;
+      typedef scorer_type::score_ptr_type  score_ptr_type;
       typedef scorer_type::scorer_ptr_type scorer_ptr_type;
+
       
     private:
       typedef std::vector<scorer_ptr_type, std::allocator<scorer_ptr_type> > scorer_set_type;
