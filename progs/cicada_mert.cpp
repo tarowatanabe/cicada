@@ -76,6 +76,7 @@ path_type bound_upper_file;
 path_set_type feature_weights_files;
 
 std::string scorer_name = "bleu";
+bool scorer_list = false;
 
 int iteration = 10;
 int samples_restarts   = 4;
@@ -190,7 +191,8 @@ bool powell(const scorer_document_type& scorers,
 										     bound_upper,
 										     tolerance,
 										     samples,
-										     scorers.error_metric());
+										     scorers.error_metric(),
+										     debug);
   
   return optimizer(score, weights);
 }
@@ -199,6 +201,11 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
+
+    if (scorer_list) {
+      std::cout << cicada::eval::Scorer::lists();
+      return 0;
+    }
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
@@ -441,6 +448,7 @@ int main(int argc, char ** argv)
       normalize_l2(optimum_weights.begin(), optimum_weights.end(), std::sqrt(feature_type::allocated()));
     
     utils::compress_ostream os(output_file);
+    os.precision(10);
     os << optimum_weights;
   }
   catch (const std::exception& err) {
@@ -507,7 +515,7 @@ struct EnvelopeTask
 	
 	scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	
-	if (debug >= 3)
+	if (debug >= 4)
 	  std::cerr << "segment: " << seg << " x: " << line->x << std::endl;
 	
 	segments[seg].push_back(std::make_pair(line->x, score));
@@ -548,9 +556,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     queue.push(-1);
   
   workers.join_all();
-
-  if (debug >= 2)
-    std::cerr << "computed envelopes" << std::endl;
 }
 
 
@@ -655,8 +660,6 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   boost::thread_group workers;
   for (int i = 0; i < threads; ++ i)
     workers.add_thread(new boost::thread(task_type(weights, queue_mapper, queue_reducer)));
-  
-  std::cerr << "start viterbi" << std::endl;
 
   int mapped_size = 0;
   for (int seg = 0; seg < graphs.size(); ++ seg)
@@ -682,11 +685,9 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   
   workers.join_all();
 
-  if (debug >= 2)
-    std::cerr << "computed score: " << score->score().first << std::endl;
+  const double score_factor = (scorers.error_metric() ? 1.0 : - 1.0);
   
-  
-  return score->score().first;
+  return score->score().first * score_factor;
 }
 
 void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
@@ -694,6 +695,9 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
     
+    if (debug)
+      std::cerr << "file: " << *titer << std::endl;
+      
     if (boost::filesystem::is_directory(*titer)) {
 
       for (int i = 0; /**/; ++ i) {
@@ -744,6 +748,10 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
       }
     }
   }
+  
+  for (int id = 0; id < graphs.size(); ++ id)
+    if (graphs[id].goal == hypergraph_type::invalid)
+      std::cerr << "invalid graph at: " << id << std::endl;
 }
 
 void read_refset(const path_type& file, scorer_document_type& scorers)
@@ -798,7 +806,8 @@ void options(int argc, char** argv)
     // feature weight files
     ("feature-weights",  po::value<path_set_type>(&feature_weights_files), "feature weights file(s)")
 
-    ("scorer", po::value<std::string>(&scorer_name), "error metric")
+    ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
     
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
     ("samples-restarts",   po::value<int>(&samples_restarts),   "# of random sampling for initial starting point")

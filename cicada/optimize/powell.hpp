@@ -50,7 +50,8 @@ namespace cicada
 	     const weight_set_type&        __bound_upper,
 	     const double __tolerance,
 	     const int __samples,
-	     const bool __minimize)
+	     const bool __minimize,
+	     const int __debug=0)
 	: envelopes(__envelopes),
 	  viterbi(__viterbi),
 	  regularizer(__regularizer),
@@ -58,7 +59,8 @@ namespace cicada
 	  bound_upper(__bound_upper),
 	  tolerance(__tolerance),
 	  samples(__samples),
-	  minimize(__minimize)
+	  minimize(__minimize),
+	  debug(__debug)
       { line_search_type::initialize_bound(bound_lower, bound_upper); }
       
       bool operator()(double& optimum_objective, weight_set_type& optimum_weights)
@@ -69,7 +71,7 @@ namespace cicada
 
 	optimum_objective = viterbi(optimum_weights) + regularizer(optimum_weights);
 	
-	line_search_type line_search(bound_lower, bound_upper);
+	line_search_type line_search(bound_lower, bound_upper, debug);
 	
 	direction_set_type directions;
 	
@@ -99,12 +101,15 @@ namespace cicada
 	  
 	  optimums[0] = line_search(segments, optimum_weights, directions[0], regularizer, minimize);
 	  
-	  if (optimums[0].lower != optimums[0].upper)
+	  if (optimums[0].lower != optimums[0].upper && optimums[0].objective < optimum_objective)
 	    points[0] = optimums[0](optimum_weights, directions[0]); // move point...
 	  else {
 	    optimums[0].objective = optimum_objective;
 	    points[0] = optimum_weights;
 	  }
+
+	  if (debug >= 2)
+	    std::cerr << "objective: " << optimums[0].objective << std::endl;
 	  
 	  int    optimum_pos = 0;
 	  double optimum_move = optimums[0].objective - optimum_objective;
@@ -114,17 +119,20 @@ namespace cicada
 	    // randomize direction...
 	    if (dir >= directions_size && dir != replaced_pos)
 	      directions[dir] = randomized_direction(points[dir - 1]);
-
+	    
 	    envelopes(segments, points[dir - 1], directions[dir]);
 	    
 	    optimums[dir] = line_search(segments, points[dir - 1], directions[dir], regularizer, minimize);
 	    
-	    if (optimums[dir].lower != optimums[dir].upper)
+	    if (optimums[dir].lower != optimums[dir].upper && optimums[dir].objective < optimums[dir - 1].objective)
 	      points[dir] = optimums[dir](points[dir - 1], directions[dir]); // move point...
 	    else {
 	      optimums[dir].objective = optimums[dir - 1].objective;
 	      points[dir] = points[dir - 1];
 	    }
+
+	    if (debug >= 2)
+	      std::cerr << "objective: " << optimums[dir].objective << std::endl;
 	    
 	    if (optimums[dir].objective - optimums[dir - 1].objective < optimum_move) {
 	      optimum_pos = dir;
@@ -198,6 +206,8 @@ namespace cicada
 	weight_set_type direction;
 	
 	direction.allocate();
+		
+	direction[feature_none] = 0.0;
 	
 	weight_set_type::iterator diter_begin = direction.begin();
 	weight_set_type::iterator diter_end = direction.end();
@@ -240,6 +250,7 @@ namespace cicada
       double tolerance;
       int samples;
       const bool minimize;
+      const int  debug;
     };
   };
 };

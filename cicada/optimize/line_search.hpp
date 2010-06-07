@@ -362,17 +362,25 @@ namespace cicada
       static void initialize_bound(weight_set_type& bound_lower,
 				   weight_set_type& bound_upper)
       {
+	static const feature_type feature_none;
 	
-	if (bound_lower.empty())
+	if (bound_lower.empty()) {
+	  bound_lower.allocate();
 	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
 	    bound_lower[feature_type(id)] = value_min;
+	}
 	
-	if (bound_upper.empty())
+	if (bound_upper.empty()) {
+	  bound_upper.allocate();
 	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
 	    bound_upper[feature_type(id)] = value_max;
-
+	}
+	
 	bound_lower.allocate();
 	bound_upper.allocate();
+	
+	bound_lower[feature_none] = 0.0;
+	bound_upper[feature_none] = 0.0;
 	
 	// checking...
 	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
@@ -400,7 +408,7 @@ namespace cicada
 	    if (dir > 0.0) {
 	      maximum = std::min(maximum, (upp - ori) / dir);
 	      minimum = std::max(minimum, (low - ori) / dir);
-	    } else {
+	    } else if (dir < 0.0) {
 	      maximum = std::min(maximum, (low - ori) / dir);
 	      minimum = std::max(minimum, (upp - ori) / dir);
 	    }
