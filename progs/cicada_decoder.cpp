@@ -525,6 +525,7 @@ int main(int argc, char ** argv)
       }
       
       ++ id;
+
       *os << std::flush;
     }
 
