@@ -79,12 +79,14 @@ namespace cicada
       
       inside_outside(source, inside, posterior, weight_function(scale, weights), weight_function(scale, weights));
       
-      const weight_type& Z = inside[source.goal];
+      // compute max...
+      weight_type posterior_max;
+      for (id_type id = 0; id != source.edges.size(); ++ id)
+	posterior_max = std::max(posterior_max, posterior[id]);
+      
+      const weight_type cutoff(posterior_max * weight_type(threshold));
       
       removed_type removed(source.edges.size(), false);
-      
-      const weight_type cutoff(weight_type(threshold) * Z);
-      
       for (id_type id = 0; id != source.edges.size(); ++ id)
 	removed[id] = (posterior[id] < cutoff);
       

@@ -804,7 +804,7 @@ void options(int argc, char** argv)
     ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
     
     // feature weight files
-    ("feature-weights",  po::value<path_set_type>(&feature_weights_files), "feature weights file(s)")
+    ("feature-weights",  po::value<path_set_type>(&feature_weights_files)->multitoken(), "feature weights file(s)")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
