@@ -14,11 +14,15 @@ LIBCICADA = $(top_builddir)/cicada/libcicada.la
 LIBUTILS   = $(top_builddir)/utils/libutils.la
 
 bin_PROGRAMS = \
+	cicada \
 	cicada_decoder \
 	cicada_decoder_mpi \
 	cicada_mert \
 	filter_penntreebank \
 	grammar_index
+
+cicada_SOURCES = cicada.cpp
+cicada_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_decoder_SOURCES = cicada_decoder.cpp
 cicada_decoder_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

@@ -87,8 +87,11 @@ namespace cicada
       const weight_type cutoff(posterior_max * weight_type(threshold));
       
       removed_type removed(source.edges.size(), false);
-      for (id_type id = 0; id != source.edges.size(); ++ id)
+      size_t num_removed = 0;
+      for (id_type id = 0; id != source.edges.size(); ++ id) {
 	removed[id] = (posterior[id] < cutoff);
+	num_removed += (posterior[id] < cutoff);
+      }
       
       topologically_sort(source, target, filter_pruned(removed));
     }
