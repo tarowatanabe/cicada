@@ -342,6 +342,11 @@ int main(int argc, char ** argv)
 	first.second->unite(*second.second);
 	
 	stack.push_back(first);
+      } else if (param.name() == "pop") {
+	if (stack.empty())
+	  throw std::runtime_error("no graph?");
+	
+	stack.pop_back();
       }
     } 
   }
