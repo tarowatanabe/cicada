@@ -59,9 +59,9 @@ namespace cicada
     }
   };
   
-  template <typename WeightSet, typename Function>
+  template <typename WeightSet, typename WeightSetOutside, typename Function>
   inline
-  void outside(const HyperGraph& graph, const WeightSet& weights_inside, WeightSet& weights_outside, Function function)
+  void outside(const HyperGraph& graph, const WeightSet& weights_inside, WeightSetOutside& weights_outside, Function function)
   {
     typedef typename WeightSet::value_type weight_type;
     
@@ -70,7 +70,6 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
     
-
     weights_outside[graph.nodes.size() - 1] = semiring::traits<weight_type>::one();
 
     if (weights_inside.size() != weights_outside.size())
@@ -106,12 +105,12 @@ namespace cicada
     }
   }
 
-  template <typename KWeight,   typename XWeight,
+  template <typename KWeightSet,   typename XWeightSet,
 	    typename KFunction, typename XFunction>
   inline
   void inside_outside(const HyperGraph& graph,
-		      KWeight& k,
-		      XWeight& x,
+		      KWeightSet& inside_k,
+		      XWeightSet& x,
 		      KFunction function_k,
 		      XFunction function_x)
   {
@@ -120,16 +119,15 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
 
-    typedef std::vector<KWeight, std::allocator<KWeight> > k_weight_set_type;
+    typedef typename KWeightSet::value_type KWeight;
+    typedef typename XWeightSet::value_type XWeight;
 
-    k_weight_set_type inside_k(graph.nodes.size());
+    typedef std::vector<KWeight, std::allocator<KWeight> > k_weight_set_type;
+    
     k_weight_set_type outside_k(graph.nodes.size());
     
-    inside<k_weight_set_type, KFunction>(graph, inside_k, function_k);
-    outside<k_weight_set_type, KFunction>(graph, inside_k, outside_k, function_k);
-    
-    k = inside_k[graph.goal];
-    x = XWeight();
+    inside(graph, inside_k, function_k);
+    outside(graph, inside_k, outside_k, function_k);
     
     hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
@@ -145,7 +143,7 @@ namespace cicada
 	for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	  score_k *= inside_k[*niter];
 	
-	x += function_x(edge) * score_k;
+	x[edge.id] += function_x(edge) * score_k;
       }
     }
   }

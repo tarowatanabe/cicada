@@ -52,6 +52,7 @@ ngram_index.hpp \
 optimize.hpp \
 parameter.hpp \
 permute.hpp \
+prune.hpp \
 quantizer.hpp \
 rule.hpp \
 semiring.hpp \

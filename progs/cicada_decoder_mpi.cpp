@@ -21,6 +21,7 @@
 #include "cicada/binarize.hpp"
 #include "cicada/permute.hpp"
 #include "cicada/sort.hpp"
+#include "cicada/prune.hpp"
 
 #include "cicada/feature_function.hpp"
 #include "cicada/weight_vector.hpp"
@@ -264,6 +265,8 @@ int  permute_size = 3;
 bool intersection_cube = false;
 bool intersection_full = false;
 int  cube_size = 200;
+
+double prune_beam = 0.0;
 
 int debug = 0;
 
@@ -603,6 +606,30 @@ struct TaskStdout
 		  << " # of edges: " << hypergraph_applied.edges.size()
 		  << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
 		  << std::endl;
+
+      if (0.0 < prune_beam && prune_beam < 1.0) {
+
+	hypergraph_type hypergraph_pruned;
+	
+	utils::resource prune_start;
+	
+	beam_prune(hypergraph_applied, hypergraph_pruned, weights, 1.0, prune_beam);
+	
+	utils::resource prune_end;
+	
+	if (debug)
+	std::cerr << "prune cpu time: " << (prune_end.cpu_time() - prune_start.cpu_time())
+		  << " user time: " << (prune_end.user_time() - prune_start.user_time())
+		  << std::endl;
+
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_pruned.nodes.size()
+		    << " # of edges: " << hypergraph_pruned.edges.size()
+		    << " valid? " << (hypergraph_pruned.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+
+	hypergraph_applied.swap(hypergraph_pruned);
+      }
 
       std::string os_line;
       boost::iostreams::filtering_ostream os;
@@ -1078,6 +1105,30 @@ struct Task
 		  << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
 		  << std::endl;
       
+      if (0.0 < prune_beam && prune_beam < 1.0) {
+
+	hypergraph_type hypergraph_pruned;
+	
+	utils::resource prune_start;
+	
+	beam_prune(hypergraph_applied, hypergraph_pruned, weights, 1.0, prune_beam);
+	
+	utils::resource prune_end;
+	
+	if (debug)
+	std::cerr << "prune cpu time: " << (prune_end.cpu_time() - prune_start.cpu_time())
+		  << " user time: " << (prune_end.user_time() - prune_start.user_time())
+		  << std::endl;
+
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_pruned.nodes.size()
+		    << " # of edges: " << hypergraph_pruned.edges.size()
+		    << " valid? " << (hypergraph_pruned.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+
+	hypergraph_applied.swap(hypergraph_pruned);
+      }
+
       if (output_directory_mode) {
 	const path_type path = path_type(output_file) / (boost::lexical_cast<std::string>(id) + ".gz");
 	
@@ -1310,7 +1361,11 @@ void options(int argc, char** argv)
     // intersection strategy
     ("intersection-cube", po::bool_switch(&intersection_cube),                  "intersetion by cube-pruning")
     ("intersection-full", po::bool_switch(&intersection_full),                  "full intersection")
-    ("cube-size",         po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning");
+    ("cube-size",         po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning")
+    
+    // beam pruning
+    ("prune-beam", po::value<double>(&prune_beam),  "beam pruning (0.0 < threshold < 1.0)")
+    ;
 
   po::options_description opts_command("command line options");
   opts_command.add_options()
