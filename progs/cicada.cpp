@@ -269,7 +269,7 @@ int main(int argc, char ** argv)
 	
 	utils::compress_ostream os(path, 1024 * 1024);
 
-	if (id_graph.first < 0)
+	if (id_graph.first >= 0)
 	  os << id_graph.first << " ||| " << *id_graph.second << std::endl;
 	else
 	  os << *id_graph.second << std::endl;
