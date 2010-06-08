@@ -149,6 +149,7 @@ namespace cicada
 	  cache.logprob = 0.0;
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
+	  buffer_id.clear();
 	  buffer_id.reserve(last - first);
 	  
 	  for (/**/; first != iter; ++ first)
@@ -174,6 +175,7 @@ namespace cicada
 	  cache.logprob = 0.0;
 	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
+	  buffer_id.clear();
 
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
@@ -329,6 +331,7 @@ namespace cicada
 	const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
 	
 	buffer_type&    buffer    = const_cast<buffer_type&>(buffer_impl);
+	buffer.clear();
 	
 	buffer.push_back(vocab_type::BOS);
 	buffer.insert(buffer.end(), context, context_star);
