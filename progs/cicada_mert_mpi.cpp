@@ -574,7 +574,6 @@ int main(int argc, char ** argv)
 	    envelope(segments, origin, direction);
 	    break;
 	  case ENVELOPE_TERMINATION:
-	    requests[ENVELOPE_NOTIFY].Cancel();
 	    envelope_terminated = true;
 	    break;
 	    
@@ -583,7 +582,6 @@ int main(int argc, char ** argv)
 	    viterbi(weights);
 	    break;
 	  case VITERBI_TERMINATION:
-	    requests[VITERBI_NOTIFY].Cancel();
 	    viterbi_terminated = true;
 	    break;
 	  }
@@ -597,7 +595,6 @@ int main(int argc, char ** argv)
 	    envelope(segments, origin, direction);
 	    break;
 	  case ENVELOPE_TERMINATION:
-	    requests[ENVELOPE_NOTIFY].Cancel();
 	    envelope_terminated = true;
 	    break;
 	    
@@ -606,7 +603,6 @@ int main(int argc, char ** argv)
 	    viterbi(weights);
 	    break;
 	  case VITERBI_TERMINATION:
-	    requests[VITERBI_NOTIFY].Cancel();
 	    viterbi_terminated = true;
 	    break;
 	  }
@@ -614,6 +610,12 @@ int main(int argc, char ** argv)
 	  non_found_iter = loop_sleep(false, non_found_iter);
 #endif
       }
+      
+      if (requests[ENVELOPE_NOTIFY].Test())
+	requests[ENVELOPE_NOTIFY].Cancel();
+
+      if (requests[VITERBI_NOTIFY].Test())
+	requests[VITERBI_NOTIFY].Cancel();
     }
   }
   catch (const std::exception& err) {
