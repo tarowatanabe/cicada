@@ -7,15 +7,15 @@ Based on the generic framework, we can
 
 Remark: cicada is 蝉, (or セミ) in Japanese, pronounsed "SEMI"
 
-Basically we have three distinct structures:
+Basically, we have three distinct structures:
    - lattice: a representation of graph implemented as a two-dimentional array.
    - grammar: a collection of WFST implemented as a trie structure.
    - hypergraph: a compact representation of forest.
 
 Translation can be carried out by:
-   - A lattice is composed with a grammar by generating a hypergraph [2].
+   - A lattice (or sentence) is composed with a grammar by generating a hypergraph [2].
    or
-   - A hypergraph is composed with a grammar by generating another hypergraph [3].
+   - A hypergraph (or parse-tree) is composed with a grammar by generating another hypergraph [3].
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
@@ -25,6 +25,8 @@ Learning consists of two framework:
   - Large feature set from input lattice/hypergraph learnt via MaxEnt [3] (TODO)
   - Large feature set during model application [6] (TODO)
   - Small feature set learned by hypergraph-MERT [7]
+
+References:
 
 [1]
 @InProceedings{li-eisner:2009:EMNLP,
