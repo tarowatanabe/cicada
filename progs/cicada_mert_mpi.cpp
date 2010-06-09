@@ -171,12 +171,12 @@ int loop_sleep(bool found, int non_found_iter)
   } else
     non_found_iter = 0;
     
-  if (non_found_iter >= 50) {
+  if (non_found_iter >= 64) {
     struct timespec tm;
     tm.tv_sec = 0;
-    tm.tv_nsec = 2000001;
+    tm.tv_nsec = 2000001; // above 2ms
     nanosleep(&tm, NULL);
-      
+    
     non_found_iter = 0;
   }
   return non_found_iter;
@@ -531,18 +531,25 @@ int main(int argc, char ** argv)
       os.precision(10);
       os << optimum_weights;
     } else {
+      
+      enum {
+	ENVELOPE_NOTIFY = 0,
+	ENVELOPE_TERMINATION,
+	VITERBI_NOTIFY,
+	VITERBI_TERMINATION,
+      };
 
-      MPI::Prequest envelope_notify = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_notify_tag);
-      MPI::Prequest envelope_termination = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_termination_tag);
+      MPI::Prequest requests[4];
+      
 
-      MPI::Prequest viterbi_notify = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, viterbi_notify_tag);
-      MPI::Prequest viterbi_termination = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, viterbi_termination_tag);
+      requests[ENVELOPE_NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_notify_tag);
+      requests[ENVELOPE_TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_termination_tag);
 
-      envelope_notify.Start();
-      envelope_termination.Start();
+      requests[VITERBI_NOTIFY]       = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, viterbi_notify_tag);
+      requests[VITERBI_TERMINATION]  = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, viterbi_termination_tag);
 
-      viterbi_notify.Start();
-      viterbi_termination.Start();
+      for (int i = 0; i < 4; ++ i)
+	requests[i].Start();
       
       // we are idle... when notified, perform computation!
       
@@ -559,40 +566,31 @@ int main(int argc, char ** argv)
       bool viterbi_terminated = false;
 
       int non_found_iter = 0;
-      while (1) {
-	bool found = false;
+      while (! envelope_terminated || ! viterbi_terminated) {
 	
-	if (envelope_notify.Test()) {
-	  envelope_notify.Start();
-	  envelope(segments, origin, direction);
-	  
-	  found = true;
-	}
-
-	if (viterbi_notify.Test()) {
-	  viterbi_notify.Start();
-	  viterbi(weights);
-	  
-	  found = true;
-	}
-	
-	if (envelope_termination.Test()) {
-	  envelope_notify.Cancel();
-	  envelope_terminated = true;
-	  
-	  found = true;
-	}
-	
-	if (viterbi_termination.Test()) {
-	  viterbi_notify.Cancel();
-	  viterbi_terminated = true;
-	  
-	  found = true;
-	}
-
-	if (envelope_terminated && viterbi_terminated) break;
-	
-	non_found_iter = loop_sleep(found, non_found_iter);
+	int index = 0;
+	if (MPI::Request::Testany(4, requests, index)) {
+	  switch (index) {
+	  case ENVELOPE_NOTIFY:
+	    requests[ENVELOPE_NOTIFY].Start();
+	    envelope(segments, origin, direction);
+	    break;
+	  case ENVELOPE_TERMINATION:
+	    requests[ENVELOPE_NOTIFY].Cancel();
+	    envelope_terminated = true;
+	    break;
+	    
+	  case VITERBI_NOTIFY:
+	    requests[VITERBI_NOTIFY].Start();
+	    viterbi(weights);
+	    break;
+	  case VITERBI_TERMINATION:
+	    requests[VITERBI_NOTIFY].Cancel();
+	    viterbi_terminated = true;
+	    break;
+	  }
+	} else
+	  non_found_iter = loop_sleep(false, non_found_iter);
       }
     }
   }
