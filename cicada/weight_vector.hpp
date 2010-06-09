@@ -58,8 +58,8 @@ namespace cicada
 
     void allocate()
     {
-      __values.reserve(feature_type::allocated() - 1);
-      __values.resize(feature_type::allocated() - 1, Tp());
+      __values.reserve(feature_type::allocated());
+      __values.resize(feature_type::allocated(), Tp());
     }
     
     Tp operator[](const key_type& x) const

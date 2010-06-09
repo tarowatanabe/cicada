@@ -49,6 +49,10 @@
 
 #include <boost/thread.hpp>
 
+#include <boost/archive/iterators/binary_from_base64.hpp>
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
+
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
@@ -100,6 +104,41 @@ bool weight_normalize_l2 = false;
 
 int debug = 0;
 
+template <typename Tp>
+inline
+std::string encode_base64(const Tp& x)
+{
+  using namespace boost::archive::iterators;
+
+  typedef base64_from_binary<transform_width<const char*, 6, 8> > encoder_type;
+
+  std::string encoded;
+  std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(x)), std::back_inserter(encoded));
+  
+  return encoded;
+}
+
+template <typename Tp>
+inline
+Tp decode_base64(const std::string& x)
+{
+  using namespace boost::archive::iterators;
+  
+  typedef transform_width<binary_from_base64<std::string::const_iterator>, 8, 6> decoder_type;
+  
+  Tp value;
+  
+  char* iter = (char*) &value;
+  char* iter_end = iter + sizeof(Tp);
+
+  decoder_type decoder(x.begin());
+  for (/**/; iter != iter_end; ++ iter, ++ decoder)
+    *iter = *decoder;
+  
+  return value;
+}
+
+
 template <typename Iterator>
 inline
 void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper)
@@ -145,7 +184,7 @@ void read_refset(const path_type& file, scorer_document_type& scorers);
 
 void options(int argc, char** argv);
 
-void bcast_weights(weight_set_type& weights);
+void bcast_weights(const int rank, weight_set_type& weights);
 
 enum {
   envelope_tag = 1000,
@@ -244,10 +283,10 @@ int main(int argc, char ** argv)
 
   try {
     
-    if (mpi_rank < 2)
-      throw std::runtime_error("you should run at least two ranks!");
-
     options(argc, argv);
+
+    if (mpi_size < 2)
+      throw std::runtime_error("you should run at least two ranks!");
 
     if (scorer_list) {
       if (mpi_rank == 0)
@@ -270,6 +309,9 @@ int main(int argc, char ** argv)
     if (weight_normalize_l1 && weight_normalize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2 for weight normalization...");
 
+    // random seed...
+    srandom(time(0) * getpid());
+
     // read reference set
     scorer_document_type scorers(scorer_name);
     
@@ -287,6 +329,19 @@ int main(int argc, char ** argv)
     
     if (mpi_rank != 0)
       read_tstset(tstset_files, graphs);
+
+    // collect and share feature names!
+    for (int rank = 0; rank < mpi_size; ++ rank) {
+      weight_set_type weights;
+      weights.allocate();
+      
+      for (int id = 0; id < feature_type::allocated(); ++ id)
+	if (! feature_type(feature_type::id_type(id)).empty())
+	  weights[feature_type(id)] = 1.0;
+      
+      bcast_weights(rank, weights);
+    }
+
     
     // collect initial weights
     weight_set_collection_type weights;
@@ -352,6 +407,8 @@ int main(int argc, char ** argv)
       
       cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     }
+    
+    
     
     if (mpi_rank == 0) {
 
@@ -542,16 +599,16 @@ int main(int argc, char ** argv)
 	bool found = false;
 	
 	if (envelope_notify.Test()) {
-	  envelope(segments, origin, direction);
 	  envelope_notify.Start();
+	  envelope(segments, origin, direction);
 	  
 	  found = true;
 	}
 
 	if (viterbi_notify.Test()) {
-	  viterbi(weights);
 	  viterbi_notify.Start();
-
+	  viterbi(weights);
+	  
 	  found = true;
 	}
 	
@@ -603,6 +660,8 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
   typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
 
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -616,8 +675,9 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, envelope_notify_tag);
     
-    bcast_weights(origin);
-    bcast_weights(direction);
+    bcast_weights(0, origin);
+
+    bcast_weights(0, direction);
 
     segments.clear();
     segments.resize(scorers.size());
@@ -628,14 +688,12 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       dev[rank].reset(new idevice_type(rank, envelope_tag, 1024 * 1024));
       
       is[rank].reset(new istream_type());
-      is[rank]->push(boost::iostreams::gzip_decompressor());
       is[rank]->push(*dev[rank]);
     }
 
+    std::string line;
     int id;
-    std::string sep1;
     double x;
-    std::string sep2;
     sentence_type sentence;
     
     int non_found_iter = 0;
@@ -643,11 +701,27 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       bool found = false;
       
       for (int rank = 1; rank < mpi_size; ++ rank) 
-	if (is[rank] && dev[rank] && dev[rank]->test()) {
-	  if (*is[rank] >> id >> sep1 >> x >> sep2 >> sentence) {
+	while (is[rank] && dev[rank] && dev[rank]->test()) {
+	  if (std::getline(*is[rank], line)) {
+	    tokenizer_type tokenizer(line);
 	    
-	    if (sep1 != "|||" || sep2 != "|||")
-	      throw std::runtime_error("invalid separator...");
+	    tokenizer_type::iterator iter = tokenizer.begin();
+	    if (iter == tokenizer.end()) continue;
+	    std::string id_str = *iter;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    if (*iter != "|||") continue;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    std::string x_str = *iter;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    if (*iter != "|||") continue;
+	    ++ iter;
+
+	    id = boost::lexical_cast<int>(id_str.c_str());
+	    x = decode_base64<double>(x_str.c_str());
+	    sentence.assign(iter, tokenizer.end());
 	    
 	    if (id >= segments.size())
 	      segments.resize(id + 1);
@@ -670,14 +744,14 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     typedef cicada::semiring::Envelope envelope_type;
     typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
 
-    bcast_weights(origin);
-    bcast_weights(direction);
+    bcast_weights(0, origin);
+    
+    bcast_weights(0, direction);
 
     envelope_set_type envelopes;
     sentence_type     yield;
     
     ostream_type os;
-    os.push(boost::iostreams::gzip_compressor());
     os.push(odevice_type(0, envelope_tag, 1024 * 1024));
     os.precision(20);
     
@@ -698,7 +772,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	
 	line->yield(yield);
 	
-	os << id << " ||| " << line->x << " ||| " << yield << '\n';
+	os << id << " ||| " << encode_base64(line->x) << " ||| " << yield << '\n';
       }
     }
   }
@@ -777,15 +851,14 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, viterbi_notify_tag);
 
-    bcast_weights(weights);
+    bcast_weights(0, weights);
 
     istream_ptr_set_type is(mpi_size);
     idevice_ptr_set_type dev(mpi_size);
     for (int rank = 1; rank < mpi_size; ++ rank) {
-      dev[rank].reset(new idevice_type(rank, envelope_tag, 1024 * 1024));
+      dev[rank].reset(new idevice_type(rank, viterbi_tag, 1024 * 1024));
       
       is[rank].reset(new istream_type());
-      is[rank]->push(boost::iostreams::gzip_decompressor());
       is[rank]->push(*dev[rank]);
     }
 
@@ -800,7 +873,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       bool found = false;
       
       for (int rank = 1; rank < mpi_size; ++ rank) 
-	if (is[rank] && dev[rank] && dev[rank]->test()) {
+	while (is[rank] && dev[rank] && dev[rank]->test()) {
 	  if (*is[rank] >> id >> sep >> sentence) {
 	    
 	    if (sep != "|||")
@@ -828,16 +901,12 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     
     return score->score().first * score_factor;
   } else {
-    typedef cicada::semiring::Envelope envelope_type;
-    typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
-
-    bcast_weights(weights);
+    bcast_weights(0, weights);
 
     sentence_type yield;
     
     ostream_type os;
-    os.push(boost::iostreams::gzip_compressor());
-    os.push(odevice_type(0, envelope_tag, 1024 * 1024));
+    os.push(odevice_type(0, viterbi_tag, 1024 * 1024));
     os.precision(20);
     
     for (int mpi_id = 0; mpi_id < graphs.size(); ++ mpi_id) {
@@ -890,10 +959,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?");
-	
-	  if (id >= graphs.size())
-	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
-
+	  
 	  const int mpi_id = id / (mpi_size - 1);
 	  
 	  if (mpi_id >= graphs.size())
@@ -920,9 +986,6 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	if (sep != "|||")
 	  throw std::runtime_error("format error?");
 	
-	if (id >= graphs.size())
-	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
-
 	const int mpi_id = id / (mpi_size - 1);
 	
 	if (mpi_id >= graphs.size())
@@ -972,25 +1035,40 @@ void read_refset(const path_type& file, scorer_document_type& scorers)
   
 }
 
-void bcast_weights(weight_set_type& weights)
+void bcast_weights(const int rank, weight_set_type& weights)
 {
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  if (mpi_rank == 0) {
+  if (mpi_rank == rank) {
     boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
-    os.push(utils::mpi_device_bcast_sink(0, 4096));
-
-    os << weights;
+    os.push(utils::mpi_device_bcast_sink(rank, 1024));
+    
+    static const weight_set_type::feature_type __empty;
+    
+    weight_set_type::const_iterator witer_begin = weights.begin();
+    weight_set_type::const_iterator witer_end = weights.end();
+    
+    for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
+      if (*witer != 0.0) {
+	const weight_set_type::feature_type feature(witer - witer_begin);
+	if (feature != __empty)
+	  os << feature << ' ' << encode_base64(*witer) << '\n';
+      }
   } else {
     weights.clear();
-
-    boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
-    is.push(utils::mpi_device_bcast_source(0, 4096));
+    weights.allocate();
     
-    is >> weights;
+    boost::iostreams::filtering_istream is;
+    is.push(utils::mpi_device_bcast_source(rank, 1024));
+    
+    std::string feature;
+    std::string value;
+    
+    while ((is >> feature) && (is >> value))
+      weights[feature] = decode_base64<double>(value);
   }
 }
 

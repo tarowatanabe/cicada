@@ -33,6 +33,7 @@ allocinfo_allocator.hpp \
 arc_list.hpp \
 array_power2.hpp \
 atomicop.hpp \
+base64.hpp \
 bithack.hpp \
 bitpack.hpp \
 bit_vector.hpp \

@@ -221,6 +221,9 @@ int main(int argc, char ** argv)
     if (weight_normalize_l1 && weight_normalize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2 for weight normalization...");
 
+    // random seed...
+    srandom(time(0) * getpid());
+
     threads = utils::bithack::max(threads, 1);
     
     // read reference set

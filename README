@@ -1,10 +1,11 @@
 cicada
 
-A statistical machine translation toolkit based on a semiring parsing framework.
+A statistical machine translation toolkit based on a semiring parsing framework[1].
 Based on the generic framework, we can
-   - learn grammar
-   - align bitext
+   - learn model
    - translate sentence
+
+Remark: cicada is 蝉, (or セミ) in Japanese, pronounsed "SEMI"
 
 Basically we have three distinct structures:
    - lattice: a representation of graph implemented as a two-dimentional array.
@@ -12,12 +13,107 @@ Basically we have three distinct structures:
    - hypergraph: a compact representation of forest.
 
 Translation can be carried out by:
-   - A lattice is composed with a grammar by generating a hypergraph.
+   - A lattice is composed with a grammar by generating a hypergraph [2].
    or
-   - A hypergraph is composed with a grammar by generating another hypergraph.
+   - A hypergraph is composed with a grammar by generating another hypergraph [3].
 
 After the hypergraph generation, you can:
-   - Additional features are evaluated to generate another hypergraph.
-   - K-bests sentences are generated from hypergraph.
+   - Additional features are evaluated to generate another hypergraph [4].
+   - K-bests sentences are generated from hypergraph [5].
 
-Remark: cicada is 蝉, (or セミ) in Japanese, pronounsed "SEMI"
+Learning consists of two framework:
+  - Large feature set from input lattice/hypergraph learnt via MaxEnt [3] (TODO)
+  - Large feature set during model application [6] (TODO)
+  - Small feature set learned by hypergraph-MERT [7]
+
+[1]
+@InProceedings{li-eisner:2009:EMNLP,
+  author    = {Li, Zhifei  and  Eisner, Jason},
+  title     = {First- and Second-Order Expectation Semirings with Applications to Minimum-Risk Training on Translation Forests},
+  booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
+  month     = {August},
+  year      = {2009},
+  address   = {Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {40--51},
+  url       = {http://www.aclweb.org/anthology/D/D09/D09-1005}
+}
+
+[2]
+@InProceedings{dyer-muresan-resnik:2008:ACLMain,
+  author    = {Dyer, Christopher  and  Muresan, Smaranda  and  Resnik, Philip},
+  title     = {Generalizing Word Lattice Translation},
+  booktitle = {Proceedings of ACL-08: HLT},
+  month     = {June},
+  year      = {2008},
+  address   = {Columbus, Ohio},
+  publisher = {Association for Computational Linguistics},
+  pages     = {1012--1020},
+  url       = {http://www.aclweb.org/anthology/P/P08/P08-1115}
+}
+
+[3]
+@InProceedings{dyer-resnik:2010:NAACLHLT,
+  author    = {Dyer, Chris  and  Resnik, Philip},
+  title     = {Context-free reordering, finite-state translation},
+  booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+  month     = {June},
+  year      = {2010},
+  address   = {Los Angeles, California},
+  publisher = {Association for Computational Linguistics},
+  pages     = {858--866},
+  url       = {http://www.aclweb.org/anthology/N10-1128}
+}
+
+[4]
+@InProceedings{huang-chiang:2007:ACLMain,
+  author    = {Huang, Liang  and  Chiang, David},
+  title     = {Forest Rescoring: Faster Decoding with Integrated Language Models},
+  booktitle = {Proceedings of the 45th Annual Meeting of the Association of Computational Linguistics},
+  month     = {June},
+  year      = {2007},
+  address   = {Prague, Czech Republic},
+  publisher = {Association for Computational Linguistics},
+  pages     = {144--151},
+  url       = {http://www.aclweb.org/anthology/P07-1019}
+}
+
+[5]
+@InProceedings{huang-chiang:2005:IWPT,
+  author    = {Huang, Liang  and  Chiang, David},
+  title     = {Better k-best Parsing},
+  booktitle = {Proceedings of the Ninth International Workshop on Parsing Technology},
+  month     = {October},
+  year      = {2005},
+  address   = {Vancouver, British Columbia},
+  publisher = {Association for Computational Linguistics},
+  pages     = {53--64},
+  url       = {http://www.aclweb.org/anthology/W/W05/W05-1506}
+}
+
+[6]
+@InProceedings{chiang-knight-wang:2009:NAACLHLT09,
+  author    = {Chiang, David  and  Knight, Kevin  and  Wang, Wei},
+  title     = {11,001 New Features for Statistical Machine Translation},
+  booktitle = {Proceedings of Human Language Technologies: The 2009 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+  month     = {June},
+  year      = {2009},
+  address   = {Boulder, Colorado},
+  publisher = {Association for Computational Linguistics},
+  pages     = {218--226},
+  url       = {http://www.aclweb.org/anthology/N/N09/N09-1025}
+}
+
+
+[7]
+@InProceedings{kumar-EtAl:2009:ACLIJCNLP,
+  author    = {Kumar, Shankar  and  Macherey, Wolfgang  and  Dyer, Chris  and  Och, Franz},
+  title     = {Efficient Minimum Error Rate Training and Minimum Bayes-Risk Decoding for Translation Hypergraphs and Lattices},
+  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+  month     = {August},
+  year      = {2009},
+  address   = {Suntec, Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {163--171},
+  url       = {http://www.aclweb.org/anthology/P/P09/P09-1019}
+}
