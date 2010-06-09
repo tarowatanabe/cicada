@@ -40,6 +40,7 @@
 #include "utils/bithack.hpp"
 
 #include "utils/space_separator.hpp"
+#include "utils/base64.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -48,10 +49,6 @@
 #include <boost/lexical_cast.hpp>
 
 #include <boost/thread.hpp>
-
-#include <boost/archive/iterators/binary_from_base64.hpp>
-#include <boost/archive/iterators/base64_from_binary.hpp>
-#include <boost/archive/iterators/transform_width.hpp>
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -104,39 +101,6 @@ bool weight_normalize_l2 = false;
 
 int debug = 0;
 
-template <typename Tp>
-inline
-std::string encode_base64(const Tp& x)
-{
-  using namespace boost::archive::iterators;
-
-  typedef base64_from_binary<transform_width<const char*, 6, 8> > encoder_type;
-
-  std::string encoded;
-  std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(x)), std::back_inserter(encoded));
-  
-  return encoded;
-}
-
-template <typename Tp>
-inline
-Tp decode_base64(const std::string& x)
-{
-  using namespace boost::archive::iterators;
-  
-  typedef transform_width<binary_from_base64<std::string::const_iterator>, 8, 6> decoder_type;
-  
-  Tp value;
-  
-  char* iter = (char*) &value;
-  char* iter_end = iter + sizeof(Tp);
-
-  decoder_type decoder(x.begin());
-  for (/**/; iter != iter_end; ++ iter, ++ decoder)
-    *iter = *decoder;
-  
-  return value;
-}
 
 
 template <typename Iterator>
@@ -720,7 +684,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	    ++ iter;
 
 	    id = boost::lexical_cast<int>(id_str.c_str());
-	    x = decode_base64<double>(x_str.c_str());
+	    x = utils::decode_base64<double>(x_str.c_str());
 	    sentence.assign(iter, tokenizer.end());
 	    
 	    if (id >= segments.size())
@@ -772,7 +736,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	
 	line->yield(yield);
 	
-	os << id << " ||| " << encode_base64(line->x) << " ||| " << yield << '\n';
+	os << id << " ||| " << utils::encode_base64(line->x) << " ||| " << yield << '\n';
       }
     }
   }
@@ -1055,7 +1019,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
       if (*witer != 0.0) {
 	const weight_set_type::feature_type feature(witer - witer_begin);
 	if (feature != __empty)
-	  os << feature << ' ' << encode_base64(*witer) << '\n';
+	  os << feature << ' ' << utils::encode_base64(*witer) << '\n';
       }
   } else {
     weights.clear();
@@ -1068,7 +1032,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
     std::string value;
     
     while ((is >> feature) && (is >> value))
-      weights[feature] = decode_base64<double>(value);
+      weights[feature] = utils::decode_base64<double>(value);
   }
 }
 
