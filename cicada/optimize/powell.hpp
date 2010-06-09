@@ -101,7 +101,7 @@ namespace cicada
 	  
 	  optimums[0] = line_search(segments, optimum_weights, directions[0], regularizer, minimize);
 	  
-	  if (optimums[0].lower != optimums[0].upper)
+	  if (optimums[0].lower != optimums[0].upper && optimums[0].objective < optimum_objective)
 	    points[0] = optimums[0](optimum_weights, directions[0]); // move point...
 	  else {
 	    optimums[0].objective = optimum_objective;
@@ -124,7 +124,7 @@ namespace cicada
 	    
 	    optimums[dir] = line_search(segments, points[dir - 1], directions[dir], regularizer, minimize);
 	    
-	    if (optimums[dir].lower != optimums[dir].upper)
+	    if (optimums[dir].lower != optimums[dir].upper && optimums[dir].objective < optimums[dir - 1].objective)
 	      points[dir] = optimums[dir](points[dir - 1], directions[dir]); // move point...
 	    else {
 	      optimums[dir].objective = optimums[dir - 1].objective;
