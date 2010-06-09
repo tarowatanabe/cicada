@@ -541,7 +541,6 @@ int main(int argc, char ** argv)
 
       MPI::Prequest requests[4];
       
-
       requests[ENVELOPE_NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_notify_tag);
       requests[ENVELOPE_TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, envelope_termination_tag);
 
@@ -567,48 +566,22 @@ int main(int argc, char ** argv)
 
       int non_found_iter = 0;
       while (! envelope_terminated || ! viterbi_terminated) {
-	
 	switch (MPI::Request::Waitany(4, requests)) {
-	  case ENVELOPE_NOTIFY:
-	    requests[ENVELOPE_NOTIFY].Start();
-	    envelope(segments, origin, direction);
-	    break;
-	  case ENVELOPE_TERMINATION:
-	    envelope_terminated = true;
-	    break;
-	    
-	  case VITERBI_NOTIFY:
-	    requests[VITERBI_NOTIFY].Start();
-	    viterbi(weights);
-	    break;
-	  case VITERBI_TERMINATION:
-	    viterbi_terminated = true;
-	    break;
-	  }
-
-#if 0
-	int index = 0;
-	if (MPI::Request::Testany(4, requests, index)) {
-	  switch (index) {
-	  case ENVELOPE_NOTIFY:
-	    requests[ENVELOPE_NOTIFY].Start();
-	    envelope(segments, origin, direction);
-	    break;
-	  case ENVELOPE_TERMINATION:
-	    envelope_terminated = true;
-	    break;
-	    
-	  case VITERBI_NOTIFY:
-	    requests[VITERBI_NOTIFY].Start();
-	    viterbi(weights);
-	    break;
-	  case VITERBI_TERMINATION:
-	    viterbi_terminated = true;
-	    break;
-	  }
-	} else
-	  non_found_iter = loop_sleep(false, non_found_iter);
-#endif
+	case ENVELOPE_NOTIFY:
+	  requests[ENVELOPE_NOTIFY].Start();
+	  envelope(segments, origin, direction);
+	  break;
+	case ENVELOPE_TERMINATION:
+	  envelope_terminated = true;
+	  break;
+	case VITERBI_NOTIFY:
+	  requests[VITERBI_NOTIFY].Start();
+	  viterbi(weights);
+	  break;
+	case VITERBI_TERMINATION:
+	  viterbi_terminated = true;
+	  break;
+	}
       }
       
       if (requests[ENVELOPE_NOTIFY].Test())

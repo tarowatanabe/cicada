@@ -347,8 +347,9 @@ int main(int argc, char ** argv)
 	  throw std::runtime_error("no graph?");
 	
 	stack.pop_back();
-      }
-    } 
+      } else
+	throw std::runtime_error("not supported operation: " + param.name());
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
