@@ -1099,6 +1099,8 @@ void options(int argc, char** argv)
     if (mpi_rank == 0)
       std::cout << argv[0] << " [options]\n"
 		<< desc_command << std::endl;
+
+    MPI::Finalize();
     exit(0);
   }
 }

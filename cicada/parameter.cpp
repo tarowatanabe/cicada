@@ -31,9 +31,10 @@ namespace cicada
     
     typedef std::string::const_iterator iter_type;
     
-    qi::rule<iter_type, attribute_type(), standard::space_type> rule_param     = (lexeme[+(char_ - space - ',')]);
-    qi::rule<iter_type, key_type(), standard::space_type>       rule_key       = (lexeme[+(char_ - space - ',' - '=')]);
-    qi::rule<iter_type, value_type(), standard::space_type>     rule_key_value = (rule_key >> '=' >> rule_key);
+    qi::rule<iter_type, attribute_type(), standard::space_type> rule_param     = (lexeme[+(char_ - space - ':')]);
+    qi::rule<iter_type, key_type(), standard::space_type>       rule_key       = (lexeme[+(char_ - space - '=')]);
+    qi::rule<iter_type, key_type(), standard::space_type>       rule_value     = (lexeme[+(char_ - space - ',')]);
+    qi::rule<iter_type, value_type(), standard::space_type>     rule_key_value = (rule_key >> '=' >> rule_value);
     
     __attr.clear();
     __values.clear();
@@ -44,7 +45,7 @@ namespace cicada
     const bool result = phrase_parse(iter, iter_end,
 				     (
 				      rule_param[ref(__attr) = _1]
-				      >> *(',' >> rule_key_value[push_back(ref(__values), _1)])
+				      >> -(':' >> (rule_key_value % ',') [ref(__values) = _1])
 				      ),
 				     space);
     if (! result || iter != iter_end)

@@ -11,7 +11,7 @@ namespace cicada
   std::string FeatureFunction::lists()
   {
     static const char* desc = "\
-ngram,file=<file>,order=<order>,name=feature-name(default: ngram)\n\
+ngram:file=<file>,order=<order>,name=feature-name(default: ngram)\n\
 target-word-penalty\n\
 soruce-word-penalty\n\
 rule-penalty\n\

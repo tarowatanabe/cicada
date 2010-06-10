@@ -11,6 +11,7 @@
 
 #include <utils/bithack.hpp>
 #include <utils/bit_vector.hpp>
+#include <utils/sgi_hash_set.hpp>
 
 #include <boost/lexical_cast.hpp>
 
@@ -34,6 +35,7 @@ namespace cicada
     typedef std::vector<symbol_type, std::allocator<symbol_type> > phrase_type;
     
     typedef utils::bit_vector<1024> coverage_type;
+
 
     Permute(const int __permute_size)
       : permute_size(__permute_size) {}
@@ -173,6 +175,9 @@ namespace cicada
       
       edge.rule.reset(new rule_type(*edge_source.rule));
       edge.rule->source = rule_type::symbol_set_type(source_phrase.begin(), source_phrase.end());
+      
+      if (*edge.rule == *edge_source.rule)
+	edge.rule = edge_source.rule;
       
       edge.features = edge_source.features;
       edge.features[rule_feature(*edge_source.rule, permutation)] = 1.0;

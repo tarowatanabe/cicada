@@ -21,7 +21,6 @@
 #include "cicada/permute.hpp"
 #include "cicada/sort.hpp"
 #include "cicada/prune.hpp"
-#include "cicada/parameter.hpp"
 
 #include "cicada/feature_function.hpp"
 #include "cicada/weight_vector.hpp"
@@ -50,16 +49,39 @@ typedef cicada::HyperGraph      hypergraph_type;
 typedef cicada::Grammar         grammar_type;
 typedef cicada::Model           model_type;
 typedef cicada::FeatureFunction feature_function_type;
-typedef cicada::Parameter       parameter_type;
 
 typedef cicada::WeightVector<double> weight_set_type;
 
-typedef std::string operation_type;
-typedef std::vector<operation_type, std::allocator<operation_type> > operation_set_type;
+struct weight_set_function
+{
+  typedef cicada::semiring::Logprob<double> value_type;
 
-typedef boost::shared_ptr<hypergraph_type> hypergraph_ptr_type;
-typedef std::pair<int, hypergraph_ptr_type> id_hypergraph_type;
-typedef std::deque<id_hypergraph_type, std::allocator<id_hypergraph_type> > stack_type;
+  weight_set_function(const weight_set_type& __weights)
+    : weights(__weights) {}
+
+  const weight_set_type& weights;
+  
+  template <typename FeatureSet>
+  value_type operator()(const FeatureSet& x) const
+  {
+    return cicada::semiring::traits<value_type>::log(x.dot(weights));
+  }
+};
+
+
+struct weight_set_function_one
+{
+  typedef cicada::semiring::Logprob<double> value_type;
+
+  weight_set_function_one(const weight_set_type& __weights) {}
+  
+  template <typename FeatureSet>
+  value_type operator()(const FeatureSet& x) const
+  {
+    return cicada::semiring::traits<value_type>::log(x.dot());
+  }
+};
+
 
 struct kbest_function
 {
@@ -172,9 +194,10 @@ struct kbest_filter_unique
   unique_set_type uniques;
 };
 
+
 template <typename Traversal, typename Function, typename Filter>
 void kbest_derivations(std::ostream& os,
-		       const int id,
+		       const size_t id,
 		       const hypergraph_type& graph,
 		       const int kbest_size,
 		       const Traversal& traversal, 
@@ -188,12 +211,8 @@ void kbest_derivations(std::ostream& os,
   for (int k = 0; k < kbest_size; ++ k) {
     if (! derivations(k, derivation))
       break;
-
-    if (id >= 0)
-      os << id << " ||| " << boost::get<0>(derivation) << " |||";
-    else
-      os << boost::get<0>(derivation) << " |||";
     
+    os << id << " ||| " << boost::get<0>(derivation) << " |||";
     rule_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
     for (rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
       os << ' ' << fiter->first << '=' << fiter->second;
@@ -203,20 +222,48 @@ void kbest_derivations(std::ostream& os,
   }
 }
 
-inline
-bool true_false(const std::string& token)
-{
-  if (strcasecmp(token.c_str(), "true") == 0)
-    return true;
-  if (strcasecmp(token.c_str(), "yes") == 0)
-    return true;
-  if (atoi(token.c_str()) > 0)
-    return true;
-  return false;
-}
+path_type input_file = "-";
+path_type output_file = "-";
 
-operation_set_type operations;
+bool input_lattice_mode = false;
+bool input_forest_mode = false;
+bool input_directory_mode = false;
+bool output_forest_mode = false;
+bool output_directory_mode = false;
+
+int kbest_size = 1;
+bool kbest_unique = false;
+
+std::string symbol_goal         = vocab_type::S;
+std::string symbol_non_terminal = vocab_type::X;
+
+grammar_file_set_type grammar_mutable_files;
+grammar_file_set_type grammar_static_files;
+
+bool grammar_glue_straight = false;
+bool grammar_glue_inverted = false;
+bool grammar_insertion = false;
+bool grammar_deletion = false;
+
+feature_parameter_set_type feature_parameters;
+path_type                  feature_weights_file;
+bool feature_weights_one = false;
+bool feature_list = false;
+
+bool binarize_graph = false;
+int  binarize_size = 2;
+
+bool permute_graph = false;
+int  permute_size = 3;
+
+bool intersection_cube = false;
+bool intersection_full = false;
+int  cube_size = 200;
+
+double prune_beam = 0.0;
+
 int debug = 0;
+
 
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
@@ -226,130 +273,294 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    stack_type stack;
+    if (input_lattice_mode && input_forest_mode)
+      throw std::runtime_error("input can be sentence, lattice or forest");
     
-    for (operation_set_type::const_iterator iter = operations.begin(); iter != operations.end(); ++ iter) {
-      parameter_type param(*iter);
-      
-      if (param.name() == "input") {
-	bool input_id_mode = (param.find("id") != param.end() ? true_false(param.find("id")->second) : true);
-	const std::string path = (param.find("file") != param.end() ? param.find("file")->second : std::string("-"));
+    if (intersection_cube && intersection_full)
+      throw std::runtime_error("intersection can be either cube or full (default dube)");
 
-	utils::compress_istream is(path, 1024 * 1024);
-	
-	if (input_id_mode) {
-	  int id;
-	  std::string sep;
-	  hypergraph_ptr_type graph(new hypergraph_type());
-	  
-	  is >> id >> sep >> *graph;
-	  
-	  if (! is)
-	    throw std::runtime_error("no graph");
-	  if (sep != "|||")
-	    throw std::runtime_error("hypergraph format error");
-	  
-	  stack.push_back(std::make_pair(id, graph));
-	} else {
-	  hypergraph_ptr_type graph(new hypergraph_type());
-	  is >> *graph;
-	  if (! is)
-	    throw std::runtime_error("no graph");
-	  
-	  stack.push_back(std::make_pair(-1, graph));
-	}
-
-      } else if (param.name() == "output") {
-	const std::string path = (param.find("file") != param.end() ? param.find("file")->second : std::string("-"));
-	
-	if (stack.empty())
-	  throw std::runtime_error("no graph in the stack!");
-
-	const id_hypergraph_type id_graph = stack.back();
-	
-	utils::compress_ostream os(path, 1024 * 1024);
-
-	if (id_graph.first >= 0)
-	  os << id_graph.first << " ||| " << *id_graph.second << std::endl;
-	else
-	  os << *id_graph.second << std::endl;
-	
-      } else if (param.name() == "kbest") {
-	const int kbest_size = (param.find("size") != param.end() ? boost::lexical_cast<int>(param.find("size")->second) : 1);
-	const std::string path = (param.find("file") != param.end() ? param.find("file")->second : std::string("-"));
-	const std::string path_weights = (param.find("weights") != param.end() ? param.find("weights")->second : std::string());
-	const bool unique = (param.find("unique") != param.end() ? true_false(param.find("unique")->second) : false);
-	
-	if (stack.empty())
-	  throw std::runtime_error("no graph in the stack!");
-	
-	const id_hypergraph_type id_graph = stack.back();
-	
-	weight_set_type weights;
-
-	utils::compress_ostream os(path, 1024 * 1024);
-
-	if (path_weights.empty()) {
-
-	  if (unique)
-	    kbest_derivations(os, id_graph.first, *id_graph.second, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(*id_graph.second));
-	  else
-	    kbest_derivations(os, id_graph.first, *id_graph.second, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(*id_graph.second));
-
-	} else {
-	  utils::compress_istream is(path_weights);
-	  is >> weights;
-	  
-	  if (unique)
-	    kbest_derivations(os, id_graph.first, *id_graph.second, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(*id_graph.second));
-	  else
-	    kbest_derivations(os, id_graph.first, *id_graph.second, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(*id_graph.second));
-	}
-	
-	os << std::flush;
-      } else if (param.name() == "beam-prune") {
-	const double threshold = (param.find("threshold") != param.end() ? boost::lexical_cast<double>(param.find("threshold")->second) : 0.0);
-	const std::string path_weights = (param.find("weights") != param.end() ? param.find("weights")->second : std::string());
-	
-	if (threshold <= 0.0 || 1.0 <= threshold)
-	  throw std::runtime_error("pruning is not in a valid range of 0.0 < threshold < 1.0");
-	
-	if (stack.empty())
-	  throw std::runtime_error("no hypergraph in our stack");
-	
-	weight_set_type weights;
-	
-	if (path_weights.empty()) {
-	  weights.allocate();
-	  std::fill(weights.begin(), weights.end(), 1.0);
-	} else {
-	  utils::compress_istream is(path_weights);
-	  is >> weights;
-	}
-	
-	beam_prune(*stack.back().second, weights, 1.0, threshold);
-      } else if (param.name() == "unite") {
-      
-	if (stack.size() < 2)
-	  throw std::runtime_error("we need at least two graphs in our stack");
-	
-	id_hypergraph_type second = stack.back();
-	stack.pop_back();
-	
-	id_hypergraph_type first = stack.back();
-	stack.pop_back();
-	
-	first.second->unite(*second.second);
-	
-	stack.push_back(first);
-      } else if (param.name() == "pop") {
-	if (stack.empty())
-	  throw std::runtime_error("no graph?");
-	
-	stack.pop_back();
-      } else
-	throw std::runtime_error("not supported operation: " + param.name());
+    if (feature_list) {
+      std::cout << cicada::FeatureFunction::lists();
+      return 0;
     }
+
+    // read grammars...
+    grammar_type grammar;
+    for (grammar_file_set_type::const_iterator fiter = grammar_static_files.begin(); fiter != grammar_static_files.end(); ++ fiter)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarStatic(*fiter)));
+
+    if (debug)
+      std::cerr << "loaded mutable grammar: " << grammar.size() << std::endl;
+    
+    for (grammar_file_set_type::const_iterator fiter = grammar_mutable_files.begin(); fiter != grammar_mutable_files.end(); ++ fiter)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarMutable(*fiter)));
+
+    if (debug)
+      std::cerr << "loaded static grammar: " << grammar.size() << std::endl;
+    
+    if (grammar_glue_straight || grammar_glue_inverted)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
+										  symbol_non_terminal,
+										  grammar_glue_straight,
+										  grammar_glue_inverted)));
+
+    if (debug)
+      std::cerr << "grammar: " << grammar.size() << std::endl;
+    
+    // read features...
+    model_type model;
+    for (feature_parameter_set_type::const_iterator piter = feature_parameters.begin(); piter != feature_parameters.end(); ++ piter)
+      model.push_back(feature_function_type::create(*piter));
+
+    if (debug)
+      std::cerr << "feature functions: " << model.size() << std::endl;
+
+    // read parameters...
+    weight_set_type weights;
+    if (! feature_weights_file.empty()) {
+      if (feature_weights_file != "-" && ! boost::filesystem::exists(feature_weights_file))
+	throw std::runtime_error("no feture weights?" + feature_weights_file.file_string());
+      
+      if (feature_weights_one)
+	throw std::runtime_error("feature weights file supplied but you have enabled one-initialized weights");
+      
+      utils::compress_istream is(feature_weights_file);
+      is >> weights;
+    }
+    
+    // we will force non directory-input-mode....
+    input_directory_mode = false;
+    
+    boost::shared_ptr<utils::compress_istream> is(! input_directory_mode  ? new utils::compress_istream(input_file) : 0);
+    boost::shared_ptr<utils::compress_ostream> os(! output_directory_mode ? new utils::compress_ostream(output_file, 1024 * 1024) : 0);
+
+    if (output_directory_mode) {
+      
+      if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
+	boost::filesystem::remove_all(output_file);
+      
+      boost::filesystem::create_directories(output_file);
+      
+      // remove all the files..
+      boost::filesystem::directory_iterator iter_end;
+      for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
+	boost::filesystem::remove_all(*iter);
+    }
+    
+    std::string     line;
+    lattice_type    lattice;
+    hypergraph_type hypergraph;
+    hypergraph_type hypergraph_composed;
+    hypergraph_type hypergraph_applied;
+    
+    
+    size_t id = 0;
+    while (1) {
+      if (input_lattice_mode)
+	*is >> lattice;
+      else if (input_forest_mode)
+	*is >> hypergraph;
+      else {
+	sentence_type sentence;
+	*is >> sentence;
+	if (*is)
+	  lattice = lattice_type(sentence);
+      }
+      
+      if (! *is) break;
+      
+      grammar_type grammar_translation(grammar);
+
+      if (input_forest_mode) {
+	if (grammar_insertion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(hypergraph, symbol_non_terminal)));
+	if (grammar_deletion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(hypergraph, symbol_non_terminal)));
+      } else {
+	if (grammar_insertion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, symbol_non_terminal)));
+	if (grammar_deletion)
+	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, symbol_non_terminal)));
+      }
+
+      if (debug)
+	if (input_forest_mode)
+	  std::cerr << "# of nodes: " << hypergraph.nodes.size()
+		    << " # of edges: " << hypergraph.edges.size()
+		    << " valid? " << (hypergraph.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+
+      if (input_forest_mode && binarize_graph) {
+	hypergraph_type hypergraph_binarized;
+
+	if (debug)
+	  std::cerr << "binarization" << std::endl;
+	
+	utils::resource binarize_start;
+	
+	cicada::binarize(hypergraph, hypergraph_binarized, binarize_size);
+	
+	utils::resource binarize_end;
+	
+	if (debug)
+	  std::cerr << "binarize cpu time: " << (binarize_end.cpu_time() - binarize_start.cpu_time())
+		    << " user time: " << (binarize_end.user_time() - binarize_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_binarized.nodes.size()
+		    << " # of edges: " << hypergraph_binarized.edges.size()
+		    << " valid? " << (hypergraph_binarized.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph.swap(hypergraph_binarized);
+      }
+      
+      if (input_forest_mode && permute_graph) {
+	
+	hypergraph_type hypergraph_permuted;
+
+	if (debug)
+	  std::cerr << "permutation" << std::endl;
+	
+	utils::resource permute_start;
+	
+	cicada::permute(hypergraph, hypergraph_permuted, permute_size);
+	
+	utils::resource permute_end;
+	
+	if (debug)
+	  std::cerr << "permute cpu time: " << (permute_end.cpu_time() - permute_start.cpu_time())
+		    << " user time: " << (permute_end.user_time() - permute_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_permuted.nodes.size()
+		    << " # of edges: " << hypergraph_permuted.edges.size()
+		    << " valid? " << (hypergraph_permuted.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph.swap(hypergraph_permuted);
+      }
+
+
+      if (debug)
+	std::cerr << "composition" << std::endl;
+
+      utils::resource compose_start;
+      
+      if (input_forest_mode) {
+	// we assume cfg-fst composition
+	
+	cicada::compose_earley(grammar_translation, hypergraph, hypergraph_composed);
+      } else {
+	// we assume synchronous-cfg composition
+	
+	cicada::compose_cky(symbol_goal, grammar_translation, lattice, hypergraph_composed);
+      }
+
+      utils::resource compose_end;
+      
+      if (debug)
+	std::cerr << "compose cpu time: " << (compose_end.cpu_time() - compose_start.cpu_time())
+		  << " user time: " << (compose_end.user_time() - compose_start.user_time())
+		  << std::endl;
+
+      if (debug)
+	std::cerr << "# of nodes: " << hypergraph_composed.nodes.size()
+		  << " # of edges: " << hypergraph_composed.edges.size()
+		  << " valid? " << (hypergraph_composed.goal != hypergraph_type::invalid ? "true" : "false")
+		  << std::endl;
+      
+      if (! model.empty()) {
+
+	if (debug)
+	  std::cerr << "apply features" << std::endl;
+	
+	utils::resource apply_start;
+	
+	if (intersection_full) {
+	  if (feature_weights_one)
+	    cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_exact<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	} else {
+	  if (feature_weights_one)
+	    cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	}
+	
+	utils::resource apply_end;
+	
+	if (debug)
+	  std::cerr << "apply cpu time: " << (apply_end.cpu_time() - apply_start.cpu_time())
+		    << " user time: " << (apply_end.user_time() - apply_start.user_time())
+		    << std::endl;
+
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
+		    << " # of edges: " << hypergraph_applied.edges.size()
+		    << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+      } else
+	hypergraph_applied = hypergraph_composed;
+
+      
+      if (0.0 < prune_beam && prune_beam < 1.0) {
+
+	hypergraph_type hypergraph_pruned;
+	
+	utils::resource prune_start;
+	
+	beam_prune(hypergraph_applied, hypergraph_pruned, weights, 1.0, prune_beam);
+	
+	utils::resource prune_end;
+	
+	if (debug)
+	std::cerr << "prune cpu time: " << (prune_end.cpu_time() - prune_start.cpu_time())
+		  << " user time: " << (prune_end.user_time() - prune_start.user_time())
+		  << std::endl;
+
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_pruned.nodes.size()
+		    << " # of edges: " << hypergraph_pruned.edges.size()
+		    << " valid? " << (hypergraph_pruned.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+
+	hypergraph_applied.swap(hypergraph_pruned);
+      }
+      
+      
+      if (output_directory_mode) {
+	const path_type path = path_type(output_file) / (boost::lexical_cast<std::string>(id) + ".gz");
+	
+	os.reset(new utils::compress_ostream(path, 1024 * 1024));
+      }
+      
+      if (output_forest_mode)
+	*os << id << " ||| " << hypergraph_applied << '\n';
+      else {
+	// extract k-best ...
+	
+	if (feature_weights_one) {
+	  if (kbest_unique)
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
+	  else
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
+	} else {
+	  if (kbest_unique)
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
+	  else
+	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
+	}
+      }
+      
+      ++ id;
+
+      *os << std::flush;
+    }
+
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -363,31 +574,86 @@ void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
 
-  po::options_description opts_hidden;
-  opts_hidden.add_options()
-    ("operation", po::value<operation_set_type>(&operations), "operations");
+  po::options_description opts_config("configuration options");
   
-  po::positional_options_description opts_pos;
-  opts_pos.add("operation", -1);
+  opts_config.add_options()
+    ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
+    
+    // options for input/output format
+    ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")
+    ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
+    ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
+    ("output-forest",    po::bool_switch(&output_forest_mode),    "forest output")
+    ("output-directory", po::bool_switch(&output_directory_mode), "output in directory")
+    
+    // k-best derivation output
+    ("kbest",        po::value<int>(&kbest_size),    "k-best derivation")
+    ("kbest-unique", po::bool_switch(&kbest_unique), "unique k-best")
+    
+    // grammar
+    ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")
+    ("non-terminal",   po::value<std::string>(&symbol_non_terminal)->default_value(symbol_non_terminal), "default non-terminal symbol")
+    ("grammar",        po::value<grammar_file_set_type >(&grammar_mutable_files),                        "grammar file(s)")
+    ("grammar-static", po::value<grammar_file_set_type >(&grammar_static_files),                         "static binary grammar file(s)")
+    
+    // special handling
+    ("grammar-glue-straight", po::bool_switch(&grammar_glue_straight), "add straight hiero glue rule")
+    ("grammar-glue-inverted", po::bool_switch(&grammar_glue_inverted), "add inverted hiero glue rule")
+    ("grammar-insertion",     po::bool_switch(&grammar_insertion),     "source-to-target transfer grammar")
+    ("grammar-deletion",      po::bool_switch(&grammar_deletion),      "source-to-<epsilon> transfer grammar")
+    
+    // models...
+    ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters), "feature function(s)")
+    ("feature-weights",       po::value<path_type>(&feature_weights_file),                 "feature weights")
+    ("feature-weights-one",   po::bool_switch(&feature_weights_one),                       "one initialized feature weights")
+    ("feature-function-list", po::bool_switch(&feature_list),                              "list of available feature function(s)")
+
+    // binarization
+    ("binarize",      po::bool_switch(&binarize_graph),                             "perform hypergraph binarization")
+    ("binarize-size", po::value<int>(&binarize_size)->default_value(binarize_size), "binarization size (<=2 for all binzarization)")
+    
+    // permutation...
+    ("permute",      po::bool_switch(&permute_graph),                            "perform hypergraph permutation")
+    ("permute-size", po::value<int>(&permute_size)->default_value(permute_size), "permutation size (zero for no-permutation, negative for all permutation)")
+    
+    // intersection strategy
+    ("intersection-cube", po::bool_switch(&intersection_cube),                  "intersetion by cube-pruning")
+    ("intersection-full", po::bool_switch(&intersection_full),                  "full intersection")
+    ("cube-size",         po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning")
+    
+    // beam pruning
+    ("prune-beam", po::value<double>(&prune_beam),  "beam pruning (0.0 < threshold < 1.0)")
+    
+    ;
+
   
+
   po::options_description opts_command("command line options");
   opts_command.add_options()
+    ("config", po::value<path_type>(), "configuration file")
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   
+  po::options_description desc_config;
   po::options_description desc_command;
   
-  desc_command.add(opts_command).add(opts_hidden);
+  desc_config.add(opts_config);
+  desc_command.add(opts_config).add(opts_command);
   
   po::variables_map variables;
-  
-  po::store(po::command_line_parser(argc, argv).options(desc_command).positional(opts_pos).run(), variables);
+
+  po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
+  if (variables.count("config")) {
+    utils::compress_istream is(variables["config"].as<path_type>());
+    po::store(po::parse_config_file(is, desc_config), variables);
+  }
   
   po::notify(variables);
 
   if (variables.count("help")) {
-    std::cout << argv[0] << " [options] [operations]\n"
-	      << opts_command << std::endl;
+    std::cout << argv[0] << " [options]\n"
+	      << desc_command << std::endl;
     exit(0);
   }
 }

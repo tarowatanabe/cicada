@@ -15,22 +15,23 @@ LIBUTILS   = $(top_builddir)/utils/libutils.la
 
 bin_PROGRAMS = \
 	cicada \
-	cicada_decoder \
-	cicada_decoder_mpi \
+	cicada_mpi \
+	cicada_tool \
 	cicada_mert \
 	cicada_mert_mpi \
 	filter_penntreebank \
+	filter_cabocha \
 	grammar_index
 
 cicada_SOURCES = cicada.cpp
 cicada_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_decoder_SOURCES = cicada_decoder.cpp
-cicada_decoder_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_mpi_SOURCES  = cicada_mpi.cpp
+cicada_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_decoder_mpi_SOURCES  = cicada_decoder_mpi.cpp
-cicada_decoder_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_decoder_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_tool_SOURCES = cicada_tool.cpp
+cicada_tool_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -44,3 +45,6 @@ grammar_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDAD
 
 filter_penntreebank_SOURCES = filter_penntreebank.cpp
 filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+filter_cabocha_SOURCES = filter_cabocha.cpp
+filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

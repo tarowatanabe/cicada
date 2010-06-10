@@ -66,6 +66,49 @@ namespace cicada
     feature_set_type features;
     int              arity;
   };
+
+  inline
+  bool operator==(const Rule& x, const Rule& y)
+  {
+    return x.lhs == y.lhs && x.source == y.source && x.target == y.target && x.features == y.features;
+  }
+
+  inline
+  bool operator!=(const Rule& x, const Rule& y)
+  {
+    return x.lhs != y.lhs || x.source != y.source || x.target != y.target || x.features != y.features;
+  }
+
+  inline
+  bool operator<(const Rule& x, const Rule& y)
+  {
+    return (x.lhs < y.lhs
+	    || (!(y.lhs < x.lhs)
+		&& (x.source < y.source
+		    || (! (y.source < x.source)
+			&& (x.target < y.target
+			    || (!(y.target < x.target)
+				&& x.features < y.features))))));
+  }
+  
+  inline
+  bool operator>(const Rule& x, const Rule& y)
+  {
+    return y < x;
+  }
+
+  inline
+  bool operator<=(const Rule& x, const Rule& y)
+  {
+    return ! (y < x);
+  }
+  
+  inline
+  bool operator>=(const Rule& x, const Rule& y)
+  {
+    return ! (x < y);
+  }
+  
 };
 
 #endif

@@ -34,9 +34,9 @@ namespace cicada
       typedef NGramImpl       impl_type;
       
     public:
-      // parameter = key[,key=value]*
+      // parameter = key:[key=value (delimited by ',')]*
       
-      // ngram parameter = ngram[file=file-name,name=feature-name,order=5]
+      // ngram parameter = ngram:file=file-name,name=feature-name,order=5
       // "ngram" is the key for this ngram-feature
       // file: file name
       // name: name of this feature function. default to ngram

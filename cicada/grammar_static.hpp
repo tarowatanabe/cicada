@@ -29,7 +29,7 @@ namespace cicada
     // [x] ||| [x,1] ... ||| [x,1] ... ||| score1 score2
     //
     // The parameter must be of form:
-    // parameter = file-name[,key=value]
+    // parameter = file-name:[key=value delimited by ',']*
     // where:
     // file-name: file name for the grammar, "-" for stdin
     // key,value: key, value pair... valid pairs are:

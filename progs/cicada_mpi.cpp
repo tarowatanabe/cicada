@@ -576,36 +576,38 @@ struct TaskStdout
 		  << " valid? " << (hypergraph_composed.goal != hypergraph_type::invalid ? "true" : "false")
 		  << std::endl;
       
-
-      if (debug)
-	std::cerr << "apply features" << std::endl;
-      
-      utils::resource apply_start;
-      
-      if (intersection_full) {
-	if (feature_weights_one)
-	  cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
-	else
-	  cicada::apply_exact<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
-      } else {
-	if (feature_weights_one)
-	  cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
-	else
-	  cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
-      }
+      if (! model.empty()) {
+	if (debug)
+	  std::cerr << "apply features" << std::endl;
 	
-      utils::resource apply_end;
+	utils::resource apply_start;
+	
+	if (intersection_full) {
+	  if (feature_weights_one)
+	    cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_exact<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	} else {
+	  if (feature_weights_one)
+	    cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	}
+	
+	utils::resource apply_end;
       
-      if (debug)
-	std::cerr << "apply cpu time: " << (apply_end.cpu_time() - apply_start.cpu_time())
-		  << " user time: " << (apply_end.user_time() - apply_start.user_time())
-		  << std::endl;
-
-      if (debug)
-	std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
-		  << " # of edges: " << hypergraph_applied.edges.size()
-		  << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
-		  << std::endl;
+	if (debug)
+	  std::cerr << "apply cpu time: " << (apply_end.cpu_time() - apply_start.cpu_time())
+		    << " user time: " << (apply_end.user_time() - apply_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
+		    << " # of edges: " << hypergraph_applied.edges.size()
+		    << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+      } else
+	hypergraph_applied = hypergraph_composed;
 
       if (0.0 < prune_beam && prune_beam < 1.0) {
 
@@ -1074,36 +1076,39 @@ struct Task
 		  << " valid? " << (hypergraph_composed.goal != hypergraph_type::invalid ? "true" : "false")
 		  << std::endl;
       
+      if (! model.empty()) {
 
-      if (debug)
-	std::cerr << "apply features" << std::endl;
-      
-      utils::resource apply_start;
-      
-      if (intersection_full) {
-	if (feature_weights_one)
-	  cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
-	else
-	  cicada::apply_exact<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
-      } else {
-	if (feature_weights_one)
-	  cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
-	else
-	  cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
-      }
+	if (debug)
+	  std::cerr << "apply features" << std::endl;
 	
-      utils::resource apply_end;
-      
-      if (debug)
-	std::cerr << "apply cpu time: " << (apply_end.cpu_time() - apply_start.cpu_time())
-		  << " user time: " << (apply_end.user_time() - apply_start.user_time())
-		  << std::endl;
-
-      if (debug)
-	std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
-		  << " # of edges: " << hypergraph_applied.edges.size()
-		  << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
-		  << std::endl;
+	utils::resource apply_start;
+	
+	if (intersection_full) {
+	  if (feature_weights_one)
+	    cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_exact<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	} else {
+	  if (feature_weights_one)
+	    cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	}
+	
+	utils::resource apply_end;
+	
+	if (debug)
+	  std::cerr << "apply cpu time: " << (apply_end.cpu_time() - apply_start.cpu_time())
+		    << " user time: " << (apply_end.user_time() - apply_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
+		    << " # of edges: " << hypergraph_applied.edges.size()
+		    << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+      } else
+	hypergraph_applied = hypergraph_composed;
       
       if (0.0 < prune_beam && prune_beam < 1.0) {
 
@@ -1394,6 +1399,8 @@ void options(int argc, char** argv)
     if (mpi_rank == 0)
       std::cout << argv[0] << " [options]\n"
 		<< desc_command << std::endl;
+
+    MPI::Finalize();
     exit(0);
   }
 }
