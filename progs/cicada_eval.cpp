@@ -63,13 +63,20 @@ int main(int argc, char** argv)
     int id;
     std::string sep;
     sentence_type sentence;
+
+    if (tstset_files.empty())
+      tstset_files.push_back("-");
   
     for (path_set_type::const_iterator fiter = tstset_files.begin(); fiter != tstset_files.end(); ++ fiter) {
+      
+      if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+	throw std::runtime_error("no test set file: " + fiter->file_string());
+      
       utils::compress_istream is(*fiter, 1024 * 1024);
-    
+      
       while (is >> id >> sep >> sentence) {
 	if (sep != "|||") throw std::runtime_error("invalid tstset format...");
-
+	
 	if (id >= finished.size())
 	  throw std::runtime_error("id exceeds our reference set...");
       
