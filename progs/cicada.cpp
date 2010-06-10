@@ -226,6 +226,7 @@ path_type input_file = "-";
 path_type output_file = "-";
 
 bool input_id_mode = false;
+bool input_bitext_mode = false;
 bool input_lattice_mode = false;
 bool input_forest_mode = false;
 bool input_directory_mode = false;
@@ -349,6 +350,9 @@ int main(int argc, char ** argv)
     }
     
     std::string     line;
+    sentence_type   target_sentence;
+    lattice_type    target;
+    sentence_type   sentence;
     lattice_type    lattice;
     hypergraph_type hypergraph;
     hypergraph_type hypergraph_composed;
@@ -366,12 +370,24 @@ int main(int argc, char ** argv)
 	  throw std::runtime_error("invalid id-prefixed format");
       }
       
+      if (input_bitext_mode) {
+	target_sentence.clear();
+	
+	while (*is >> sep) {
+	  if (sep == "|||")
+	    break;
+	  else
+	    target_sentence.push_back(sep);
+	}
+	
+	target = lattice_type(target_sentence);
+      }
+      
       if (input_lattice_mode)
 	*is >> lattice;
       else if (input_forest_mode)
 	*is >> hypergraph;
       else {
-	sentence_type sentence;
 	*is >> sentence;
 	if (*is)
 	  lattice = lattice_type(sentence);
@@ -541,6 +557,31 @@ int main(int argc, char ** argv)
 	hypergraph_applied.swap(hypergraph_pruned);
       }
       
+      if (input_bitext_mode) {
+	
+	hypergraph_type hypergraph_intersected;
+	
+	utils::resource intersect_start;
+	
+	intersect(hypergraph_applied, target, hypergraph_intersected);
+	
+	utils::resource intersect_end;
+	
+	if (debug)
+	  std::cerr << "intersect cpu time: " << (intersect_end.cpu_time() - intersect_start.cpu_time())
+		    << " user time: " << (intersect_end.user_time() - intersect_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_intersected.nodes.size()
+		    << " # of edges: " << hypergraph_intersected.edges.size()
+		    << " valid? " << (hypergraph_intersected.goal != hypergraph_type::invalid ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph_applied.swap(hypergraph_intersected);
+      }
+
+      
       
       if (output_directory_mode) {
 	const path_type path = path_type(output_file) / (boost::lexical_cast<std::string>(id) + ".gz");
@@ -592,6 +633,7 @@ void options(int argc, char** argv)
     
     // options for input/output format
     ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")
+    ("input-bitext",     po::bool_switch(&input_bitext_mode),     "target sentence prefixed input")
     ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")
     ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
     ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
