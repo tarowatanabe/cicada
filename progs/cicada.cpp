@@ -225,6 +225,7 @@ void kbest_derivations(std::ostream& os,
 path_type input_file = "-";
 path_type output_file = "-";
 
+bool input_id_mode = false;
 bool input_lattice_mode = false;
 bool input_forest_mode = false;
 bool input_directory_mode = false;
@@ -353,9 +354,18 @@ int main(int argc, char ** argv)
     hypergraph_type hypergraph_composed;
     hypergraph_type hypergraph_applied;
     
+    std::string sep;
     
     size_t id = 0;
     while (1) {
+
+      if (input_id_mode) {
+	*is >> id >> sep;
+	
+	if (sep != "|||")
+	  throw std::runtime_error("invalid id-prefixed format");
+      }
+      
       if (input_lattice_mode)
 	*is >> lattice;
       else if (input_forest_mode)
@@ -581,6 +591,7 @@ void options(int argc, char** argv)
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
     // options for input/output format
+    ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")
     ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")
     ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
     ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")

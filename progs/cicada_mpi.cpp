@@ -231,6 +231,7 @@ void kbest_derivations(std::ostream& os,
 path_type input_file = "-";
 path_type output_file = "-";
 
+bool input_id_mode = false;
 bool input_lattice_mode = false;
 bool input_forest_mode = false;
 bool input_directory_mode = false;
@@ -803,21 +804,25 @@ void cicada_stdout(const grammar_type& grammar,
       
       for (int rank = 1; rank < mpi_size && ! line_input.second; ++ rank)
 	if (ostream[rank]->test() && queue_input.pop(line_input, true) && ! line_input.second) {
-	  std::ostringstream os;
-	  os << id << " ||| " << line_input.first;
-	  ++ id;
 	  
-	  ostream[rank]->write(os.str());
+	  if (input_id_mode)
+	    ostream[rank]->write(line_input.first);
+	  else
+	    ostream[rank]->write(boost::lexical_cast<std::string>(id) + " ||| " + line_input.first);
+	  
+	  ++ id;
 	  
 	  found = true;
 	}
       
       if (queue_is.empty() && queue_input.pop(line_input, true) && ! line_input.second) {
-	std::ostringstream os;
-	os << id << " ||| " << line_input.first;
-	++ id;
 	
-	queue_is.push(os.str());
+	if (input_id_mode)
+	  queue_is.push(line_input.first);
+	else
+	  queue_is.push(boost::lexical_cast<std::string>(id) + " ||| " + line_input.first);
+	
+	++ id;
 	
 	found = true;
       }
@@ -1249,21 +1254,25 @@ void cicada_process(const grammar_type& grammar,
       
       for (int rank = 1; rank < mpi_size && is; ++ rank)
 	if (stream[rank]->test() && std::getline(is, line)) {
-	  std::ostringstream os;
-	  os << id << " ||| " << line;
-	  ++ id;
 	  
-	  stream[rank]->write(os.str());
+	  if (input_id_mode)
+	    stream[rank]->write(line);
+	  else
+	    stream[rank]->write(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	  
+	  ++ id;
 	  
 	  found = true;
 	}
       
       if (queue.empty() && std::getline(is, line)) {
-	std::ostringstream os;
-	os << id << " ||| " << line;
-	++ id;
 	
-	queue.push(os.str());
+	if (input_id_mode)
+	  queue.push(line);
+	else
+	  queue.push(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	
+	++ id;
 	
 	found = true;
       }
@@ -1327,6 +1336,7 @@ void options(int argc, char** argv)
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
     // options for input/output format
+    ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")
     ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")
     ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
     ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
