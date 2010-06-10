@@ -24,7 +24,8 @@ namespace cicada
 	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
 	  count -= (titer->is_terminal() && *titer != vocab_type::EPSILON);
 	
-	features[feature_name()] = count;
+	if (count)
+	  features[feature_name()] = count;
       }
     };
 
@@ -44,7 +45,8 @@ namespace cicada
 	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->source.begin(); titer != titer_end; ++ titer)
 	  count -= (titer->is_terminal() && *titer != vocab_type::EPSILON);
 	
-	features[feature_name()] = count;
+	if (count)
+	  features[feature_name()] = count;
       }
     };
     
