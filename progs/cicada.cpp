@@ -395,6 +395,12 @@ int main(int argc, char ** argv)
       
       if (! *is) break;
       
+      if (lattice.empty() || hypergraph.goal == hypergraph_type::invalid) {
+	++ id;
+	continue;
+      }
+
+      
       grammar_type grammar_translation(grammar);
 
       if (input_forest_mode) {

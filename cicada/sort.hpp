@@ -46,6 +46,11 @@ namespace cicada
     template <typename Filter>
     void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter)
     {
+      sorted.clear();
+      
+      if (x.goal == hypergraph_type::invalid)
+	return;
+
       reloc_set_type reloc_node(x.nodes.size(), -1);
       reloc_set_type reloc_edge(x.edges.size(), -1);
       color_set_type color(x.nodes.size(), white);

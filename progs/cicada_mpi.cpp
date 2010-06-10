@@ -488,8 +488,10 @@ struct TaskStdout
       }
       
       if (! is) continue;
+
+      if (lattice.empty() || hypergraph.goal == hypergraph_type::invalid) continue;
       
-            grammar_type grammar_translation(grammar);
+      grammar_type grammar_translation(grammar);
 
       if (input_forest_mode) {
 	if (grammar_insertion)
@@ -1031,8 +1033,10 @@ struct Task
       }
       
       if (! is) continue;
+
+      if (lattice.empty() || hypergraph.goal == hypergraph_type::invalid) continue;
       
-            grammar_type grammar_translation(grammar);
+      grammar_type grammar_translation(grammar);
 
       if (input_forest_mode) {
 	if (grammar_insertion)
