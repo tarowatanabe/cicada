@@ -38,7 +38,6 @@
 #include "utils/mpi_stream_simple.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
-
 #include "utils/space_separator.hpp"
 #include "utils/base64.hpp"
 
@@ -72,7 +71,7 @@ typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
 path_set_type tstset_files;
-path_type     refset_file = "-";
+path_set_type refset_files;
 path_type     output_file = "-";
 
 path_type bound_lower_file;
@@ -81,7 +80,7 @@ path_type bound_upper_file;
 
 path_set_type feature_weights_files;
 
-std::string scorer_name = "bleu";
+std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
 
 int iteration = 10;
@@ -144,7 +143,7 @@ bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundItera
 
 
 void read_tstset(const path_set_type& files, hypergraph_set_type& graphs);
-void read_refset(const path_type& file, scorer_document_type& scorers);
+void read_refset(const path_set_type& file, scorer_document_type& scorers);
 
 void options(int argc, char** argv);
 
@@ -280,7 +279,7 @@ int main(int argc, char ** argv)
     scorer_document_type scorers(scorer_name);
     
     if (mpi_rank == 0)
-      read_refset(refset_file, scorers);
+      read_refset(refset_files, scorers);
     
     if (debug && mpi_rank == 0)
       std::cerr << "# of references: " << scorers.size() << std::endl;
@@ -960,38 +959,46 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
       std::cerr << "invalid graph at: " << id << std::endl;
 }
 
-void read_refset(const path_type& file, scorer_document_type& scorers)
+void read_refset(const path_set_type& files, scorer_document_type& scorers)
 {
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+
+  if (files.empty())
+    throw std::runtime_error("no reference files?");
     
   scorers.clear();
-  
-  utils::compress_istream is(file);
 
-  std::string line;
-  
-  while (std::getline(is, line)) {
-    tokenizer_type tokenizer(line);
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
-    tokenizer_type::iterator iter = tokenizer.begin();
-    if (iter == tokenizer.end()) continue;
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no reference file: " + fiter->file_string());
+
+    utils::compress_istream is(*fiter, 1024 * 1024);
     
-    const int id = boost::lexical_cast<int>(*iter);
-    ++ iter;
+    std::string line;
     
-    if (iter == tokenizer.end()) continue;
-    if (*iter != "|||") continue;
-    ++ iter;
+    while (std::getline(is, line)) {
+      tokenizer_type tokenizer(line);
     
-    if (id >= scorers.size())
-      scorers.resize(id + 1);
+      tokenizer_type::iterator iter = tokenizer.begin();
+      if (iter == tokenizer.end()) continue;
     
-    if (! scorers[id])
-      scorers[id] = scorers.create();
+      const int id = boost::lexical_cast<int>(*iter);
+      ++ iter;
     
-    scorers[id]->insert(sentence_type(iter, tokenizer.end()));
-  }
-  
+      if (iter == tokenizer.end()) continue;
+      if (*iter != "|||") continue;
+      ++ iter;
+    
+      if (id >= scorers.size())
+	scorers.resize(id + 1);
+    
+      if (! scorers[id])
+	scorers[id] = scorers.create();
+    
+      scorers[id]->insert(sentence_type(iter, tokenizer.end()));
+    }
+  }  
 }
 
 void bcast_weights(const int rank, weight_set_type& weights)
@@ -1042,8 +1049,8 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("tstset",  po::value<path_set_type>(&tstset_files)->multitoken(),          "test set file(s) (in hypergraph format)")
-    ("refset",  po::value<path_type>(&refset_file)->default_value(refset_file), "reference set file")
+    ("tstset",  po::value<path_set_type>(&tstset_files)->multitoken(), "test set file(s) (in hypergraph format)")
+    ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
