@@ -81,7 +81,10 @@ int main(int argc, char** argv)
 	  throw std::runtime_error("id exceeds our reference set...");
       
 	if (finished[id]) continue;
-      
+	
+	// erase |||
+	sentence.erase(std::find(sentence.begin(), sentence.end(), "|||"), sentence.end());
+	
 	if (! score)
 	  score = scorers[id]->score(sentence);
 	else
