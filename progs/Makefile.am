@@ -18,6 +18,7 @@ bin_PROGRAMS = \
 	cicada_mpi \
 	cicada_tool \
 	cicada_eval \
+	cicada_learn \
 	cicada_mert \
 	cicada_mert_mpi \
 	filter_penntreebank \
@@ -38,6 +39,9 @@ cicada_tool_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_eval_SOURCES = cicada_eval.cpp
 cicada_eval_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_learn_SOURCES = cicada_learn.cpp lbfgs.c
+cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

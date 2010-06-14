@@ -219,6 +219,7 @@ namespace cicada
       using standard::char_;
       using qi::double_;
       using qi::int_;
+      using qi::uint_;
       
       using namespace qi::labels;
       
@@ -259,7 +260,7 @@ namespace cicada
       hypergraph = ('{'
 		    >> lit("\"rules\"") >> ':' >> rule_string_set >> ','
 		    >> lit("\"nodes\"") >> ':' >> node_set >> ','
-		    >> lit("\"goal\"") >> ':' >> int_ [finish_graph(graph)]
+		    >> lit("\"goal\"") >> ':' >> uint_ [finish_graph(graph)]
 		    >> '}');
     }
     

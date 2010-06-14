@@ -357,8 +357,6 @@ int main(int argc, char ** argv)
     sentence_type   sentence;
     lattice_type    lattice;
     hypergraph_type hypergraph;
-    hypergraph_type hypergraph_composed;
-    hypergraph_type hypergraph_applied;
     
     size_t id = 0;
     while (std::getline(*is, line)) {
@@ -450,7 +448,6 @@ int main(int argc, char ** argv)
       }
       
       if (input_forest_mode && permute_graph) {
-	
 	hypergraph_type hypergraph_permuted;
 
 	if (debug)
@@ -477,35 +474,42 @@ int main(int argc, char ** argv)
       }
 
 
-      if (debug)
-	std::cerr << "composition" << std::endl;
-
-      utils::resource compose_start;
+      {
+	hypergraph_type hypergraph_composed;
+	
+	if (debug)
+	  std::cerr << "composition" << std::endl;
       
-      if (input_forest_mode) {
-	// we assume cfg-fst composition
+	utils::resource compose_start;
+      
+	if (input_forest_mode) {
+	  // we assume cfg-fst composition
 	
-	cicada::compose_earley(grammar_translation, hypergraph, hypergraph_composed);
-      } else {
-	// we assume synchronous-cfg composition
+	  cicada::compose_earley(grammar_translation, hypergraph, hypergraph_composed);
+	} else {
+	  // we assume synchronous-cfg composition
 	
-	cicada::compose_cky(symbol_goal, grammar_translation, lattice, hypergraph_composed);
+	  cicada::compose_cky(symbol_goal, grammar_translation, lattice, hypergraph_composed);
+	}
+
+	utils::resource compose_end;
+      
+	if (debug)
+	  std::cerr << "compose cpu time: " << (compose_end.cpu_time() - compose_start.cpu_time())
+		    << " user time: " << (compose_end.user_time() - compose_start.user_time())
+		    << std::endl;
+
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_composed.nodes.size()
+		    << " # of edges: " << hypergraph_composed.edges.size()
+		    << " valid? " << (hypergraph_composed.is_valid() ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph.swap(hypergraph_composed);
       }
-
-      utils::resource compose_end;
-      
-      if (debug)
-	std::cerr << "compose cpu time: " << (compose_end.cpu_time() - compose_start.cpu_time())
-		  << " user time: " << (compose_end.user_time() - compose_start.user_time())
-		  << std::endl;
-
-      if (debug)
-	std::cerr << "# of nodes: " << hypergraph_composed.nodes.size()
-		  << " # of edges: " << hypergraph_composed.edges.size()
-		  << " valid? " << (hypergraph_composed.is_valid() ? "true" : "false")
-		  << std::endl;
       
       if (! model.empty()) {
+	hypergraph_type hypergraph_applied;
 
 	if (debug)
 	  std::cerr << "apply features" << std::endl;
@@ -514,14 +518,14 @@ int main(int argc, char ** argv)
 	
 	if (apply_full) {
 	  if (feature_weights_one)
-	    cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	    cicada::apply_exact<weight_set_function_one>(model, hypergraph, hypergraph_applied, weight_set_function_one(weights), cube_size);
 	  else
-	    cicada::apply_exact<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	    cicada::apply_exact<weight_set_function>(model, hypergraph, hypergraph_applied, weight_set_function(weights), cube_size);
 	} else {
 	  if (feature_weights_one)
-	    cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
+	    cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph, hypergraph_applied, weight_set_function_one(weights), cube_size);
 	  else
-	    cicada::apply_cube_prune<weight_set_function>(model, hypergraph_composed, hypergraph_applied, weight_set_function(weights), cube_size);
+	    cicada::apply_cube_prune<weight_set_function>(model, hypergraph, hypergraph_applied, weight_set_function(weights), cube_size);
 	}
 	
 	utils::resource apply_end;
@@ -536,17 +540,17 @@ int main(int argc, char ** argv)
 		    << " # of edges: " << hypergraph_applied.edges.size()
 		    << " valid? " << (hypergraph_applied.is_valid() ? "true" : "false")
 		    << std::endl;
-      } else
-	hypergraph_applied = hypergraph_composed;
+	
+	hypergraph.swap(hypergraph_applied);
+      } 
 
       
       if (0.0 < prune_beam && prune_beam < 1.0) {
-
 	hypergraph_type hypergraph_pruned;
 	
 	utils::resource prune_start;
 	
-	beam_prune(hypergraph_applied, hypergraph_pruned, weights, 1.0, prune_beam);
+	beam_prune(hypergraph, hypergraph_pruned, weights, 1.0, prune_beam);
 	
 	utils::resource prune_end;
 	
@@ -561,16 +565,15 @@ int main(int argc, char ** argv)
 		    << " valid? " << (hypergraph_pruned.is_valid() ? "true" : "false")
 		    << std::endl;
 
-	hypergraph_applied.swap(hypergraph_pruned);
+	hypergraph.swap(hypergraph_pruned);
       }
       
       if (input_bitext_mode) {
-	
 	hypergraph_type hypergraph_intersected;
 	
 	utils::resource intersect_start;
 	
-	intersect(hypergraph_applied, target, hypergraph_intersected);
+	intersect(hypergraph, target, hypergraph_intersected);
 	
 	utils::resource intersect_end;
 	
@@ -585,10 +588,10 @@ int main(int argc, char ** argv)
 		    << " valid? " << (hypergraph_intersected.is_valid() ? "true" : "false")
 		    << std::endl;
 	
-	hypergraph_applied.swap(hypergraph_intersected);
+	hypergraph.swap(hypergraph_intersected);
       }
       
-      if (hypergraph_applied.is_valid()) {
+      if (hypergraph.is_valid()) {
 	
 	if (output_directory_mode) {
 	  const path_type path = path_type(output_file) / (boost::lexical_cast<std::string>(id) + ".gz");
@@ -597,20 +600,20 @@ int main(int argc, char ** argv)
 	}
 	
 	if (output_forest_mode)
-	  *os << id << " ||| " << hypergraph_applied << '\n';
+	  *os << id << " ||| " << hypergraph << '\n';
 	else {
 	  // extract k-best ...
 	  
 	  if (feature_weights_one) {
 	    if (kbest_unique)
-	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
+	      kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph));
 	    else
-	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
+	      kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph));
 	  } else {
 	    if (kbest_unique)
-	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
+	      kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph));
 	    else
-	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
+	      kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph));
 	  }
 	}
       }
