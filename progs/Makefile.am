@@ -22,7 +22,9 @@ bin_PROGRAMS = \
 	cicada_mert_mpi \
 	filter_penntreebank \
 	filter_cabocha \
-	grammar_index
+	grammar_index \
+	mpish \
+	mpipe
 
 cicada_SOURCES = cicada.cpp
 cicada_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -52,3 +54,12 @@ filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 
 filter_cabocha_SOURCES = filter_cabocha.cpp
 filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+
+mpish_SOURCES = mpish.cpp
+mpish_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+mpish_LDADD   = $(MPI_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
+
+mpipe_SOURCES = mpipe.cpp
+mpipe_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+mpipe_LDADD   = $(MPI_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)

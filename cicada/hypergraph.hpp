@@ -141,6 +141,11 @@ namespace cicada
       std::swap(goal, x.goal);
     }
 
+    bool is_valid() const
+    {
+      return goal != invalid;
+    }
+
   public:
     // algorithms...
     

@@ -28,7 +28,7 @@ struct Task
 
 int main(int argc, char** argv)
 {
-  utils::subprocess run("cat");
+  utils::subprocess run(boost::filesystem::path("cat"));
 
   boost::thread thread(Task(run.desc_write()));
   

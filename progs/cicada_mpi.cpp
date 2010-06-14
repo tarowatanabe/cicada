@@ -266,8 +266,8 @@ int  binarize_size = 2;
 bool permute_graph = false;
 int  permute_size = 3;
 
-bool intersection_cube = false;
-bool intersection_full = false;
+bool apply_cube = false;
+bool apply_full = false;
 int  cube_size = 200;
 
 double prune_beam = 0.0;
@@ -323,7 +323,7 @@ int main(int argc, char ** argv)
     if (input_lattice_mode && input_forest_mode)
       throw std::runtime_error("input can be sentence, lattice or forest");
     
-    if (intersection_cube && intersection_full)
+    if (apply_cube && apply_full)
       throw std::runtime_error("intersection can be either cube or full (default dube)");
 
     if (feature_list) {
@@ -488,7 +488,7 @@ struct TaskStdout
       if (iter != end)
 	throw std::runtime_error("invalid input format");
 
-      if (lattice.empty() && hypergraph.goal == hypergraph_type::invalid) continue;
+      if (lattice.empty() && ! hypergraph.is_valid()) continue;
       
       grammar_type grammar_translation(grammar);
 
@@ -508,7 +508,7 @@ struct TaskStdout
 	if (input_forest_mode)
 	  std::cerr << "# of nodes: " << hypergraph.nodes.size()
 		    << " # of edges: " << hypergraph.edges.size()
-		    << " valid? " << (hypergraph.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph.is_valid() ? "true" : "false")
 		    << std::endl;
 
       if (input_forest_mode && binarize_graph) {
@@ -531,7 +531,7 @@ struct TaskStdout
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_binarized.nodes.size()
 		    << " # of edges: " << hypergraph_binarized.edges.size()
-		    << " valid? " << (hypergraph_binarized.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_binarized.is_valid() ? "true" : "false")
 		    << std::endl;
 	
 	hypergraph.swap(hypergraph_binarized);
@@ -558,7 +558,7 @@ struct TaskStdout
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_permuted.nodes.size()
 		    << " # of edges: " << hypergraph_permuted.edges.size()
-		    << " valid? " << (hypergraph_permuted.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_permuted.is_valid() ? "true" : "false")
 		    << std::endl;
 	
 	hypergraph.swap(hypergraph_permuted);
@@ -590,7 +590,7 @@ struct TaskStdout
       if (debug)
 	std::cerr << "# of nodes: " << hypergraph_composed.nodes.size()
 		  << " # of edges: " << hypergraph_composed.edges.size()
-		  << " valid? " << (hypergraph_composed.goal != hypergraph_type::invalid ? "true" : "false")
+		  << " valid? " << (hypergraph_composed.is_valid() ? "true" : "false")
 		  << std::endl;
       
       if (! model.empty()) {
@@ -599,7 +599,7 @@ struct TaskStdout
 	
 	utils::resource apply_start;
 	
-	if (intersection_full) {
+	if (apply_full) {
 	  if (feature_weights_one)
 	    cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
 	  else
@@ -612,7 +612,7 @@ struct TaskStdout
 	}
 	
 	utils::resource apply_end;
-      
+	
 	if (debug)
 	  std::cerr << "apply cpu time: " << (apply_end.cpu_time() - apply_start.cpu_time())
 		    << " user time: " << (apply_end.user_time() - apply_start.user_time())
@@ -621,7 +621,7 @@ struct TaskStdout
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
 		    << " # of edges: " << hypergraph_applied.edges.size()
-		    << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_applied.is_valid() ? "true" : "false")
 		    << std::endl;
       } else
 	hypergraph_applied = hypergraph_composed;
@@ -644,7 +644,7 @@ struct TaskStdout
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_pruned.nodes.size()
 		    << " # of edges: " << hypergraph_pruned.edges.size()
-		    << " valid? " << (hypergraph_pruned.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_pruned.is_valid() ? "true" : "false")
 		    << std::endl;
 
 	hypergraph_applied.swap(hypergraph_pruned);
@@ -668,39 +668,42 @@ struct TaskStdout
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_intersected.nodes.size()
 		    << " # of edges: " << hypergraph_intersected.edges.size()
-		    << " valid? " << (hypergraph_intersected.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_intersected.is_valid() ? "true" : "false")
 		    << std::endl;
 	
 	hypergraph_applied.swap(hypergraph_intersected);
       }
 
-      std::string os_line;
-      boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::back_inserter(os_line));
-
-      // extra identifier..
-      os << id << " ||| ";
-      
-      if (output_forest_mode)
-	os << id << " ||| " << hypergraph_applied << '\n';
-      else {
-	// extract k-best ...
-	if (feature_weights_one) {
-	  if (kbest_unique)
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
-	  else
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
-	} else {
-	  if (kbest_unique)
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
-	  else
-	    kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
+      if (hypergraph_applied.is_valid()) {
+	
+	std::string os_line;
+	boost::iostreams::filtering_ostream os;
+	os.push(boost::iostreams::back_inserter(os_line));
+	
+	// extra identifier..
+	os << id << " ||| ";
+	
+	if (output_forest_mode)
+	  os << id << " ||| " << hypergraph_applied << '\n';
+	else {
+	  // extract k-best ...
+	  if (feature_weights_one) {
+	    if (kbest_unique)
+	      kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
+	    else
+	      kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
+	  } else {
+	    if (kbest_unique)
+	      kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
+	    else
+	      kbest_derivations(os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
+	  }
 	}
+	
+	os.pop();
+	
+	queue_os.push(os_line);
       }
-
-      os.pop();
-      
-      queue_os.push(os_line);
     }
   }
   
@@ -1030,7 +1033,7 @@ struct Task
       if (iter != end)
 	throw std::runtime_error("invalid input format");
 
-      if (lattice.empty() && hypergraph.goal == hypergraph_type::invalid) continue;
+      if (lattice.empty() && ! hypergraph.is_valid()) continue;
       
       grammar_type grammar_translation(grammar);
 
@@ -1050,7 +1053,7 @@ struct Task
 	if (input_forest_mode)
 	  std::cerr << "# of nodes: " << hypergraph.nodes.size()
 		    << " # of edges: " << hypergraph.edges.size()
-		    << " valid? " << (hypergraph.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph.is_valid() ? "true" : "false")
 		    << std::endl;
 
       if (input_forest_mode && binarize_graph) {
@@ -1073,7 +1076,7 @@ struct Task
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_binarized.nodes.size()
 		    << " # of edges: " << hypergraph_binarized.edges.size()
-		    << " valid? " << (hypergraph_binarized.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_binarized.is_valid() ? "true" : "false")
 		    << std::endl;
 	
 	hypergraph.swap(hypergraph_binarized);
@@ -1100,7 +1103,7 @@ struct Task
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_permuted.nodes.size()
 		    << " # of edges: " << hypergraph_permuted.edges.size()
-		    << " valid? " << (hypergraph_permuted.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_permuted.is_valid() ? "true" : "false")
 		    << std::endl;
 	
 	hypergraph.swap(hypergraph_permuted);
@@ -1132,7 +1135,7 @@ struct Task
       if (debug)
 	std::cerr << "# of nodes: " << hypergraph_composed.nodes.size()
 		  << " # of edges: " << hypergraph_composed.edges.size()
-		  << " valid? " << (hypergraph_composed.goal != hypergraph_type::invalid ? "true" : "false")
+		  << " valid? " << (hypergraph_composed.is_valid() ? "true" : "false")
 		  << std::endl;
       
       if (! model.empty()) {
@@ -1142,7 +1145,7 @@ struct Task
 	
 	utils::resource apply_start;
 	
-	if (intersection_full) {
+	if (apply_full) {
 	  if (feature_weights_one)
 	    cicada::apply_exact<weight_set_function_one>(model, hypergraph_composed, hypergraph_applied, weight_set_function_one(weights), cube_size);
 	  else
@@ -1164,7 +1167,7 @@ struct Task
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_applied.nodes.size()
 		    << " # of edges: " << hypergraph_applied.edges.size()
-		    << " valid? " << (hypergraph_applied.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_applied.is_valid() ? "true" : "false")
 		    << std::endl;
       } else
 	hypergraph_applied = hypergraph_composed;
@@ -1187,7 +1190,7 @@ struct Task
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_pruned.nodes.size()
 		    << " # of edges: " << hypergraph_pruned.edges.size()
-		    << " valid? " << (hypergraph_pruned.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_pruned.is_valid() ? "true" : "false")
 		    << std::endl;
 
 	hypergraph_applied.swap(hypergraph_pruned);
@@ -1211,37 +1214,40 @@ struct Task
 	if (debug)
 	  std::cerr << "# of nodes: " << hypergraph_intersected.nodes.size()
 		    << " # of edges: " << hypergraph_intersected.edges.size()
-		    << " valid? " << (hypergraph_intersected.goal != hypergraph_type::invalid ? "true" : "false")
+		    << " valid? " << (hypergraph_intersected.is_valid() ? "true" : "false")
 		    << std::endl;
 	
 	hypergraph_applied.swap(hypergraph_intersected);
       }
 
-      if (output_directory_mode) {
-	const path_type path = path_type(output_file) / (boost::lexical_cast<std::string>(id) + ".gz");
-	
-	os.reset(new utils::compress_ostream(path, 1024 * 1024));
-      }
-      
-      if (output_forest_mode)
-	*os << id << " ||| " << hypergraph_applied << '\n';
-      else {
-	// extract k-best ...
-	
-	if (feature_weights_one) {
-	  if (kbest_unique)
-	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
-	  else
-	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
-	} else {
-	  if (kbest_unique)
-	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
-	  else
-	    kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
+      if (hypergraph_applied.is_valid()) {
+
+	if (output_directory_mode) {
+	  const path_type path = path_type(output_file) / (boost::lexical_cast<std::string>(id) + ".gz");
+	  
+	  os.reset(new utils::compress_ostream(path, 1024 * 1024));
 	}
+	
+	if (output_forest_mode)
+	  *os << id << " ||| " << hypergraph_applied << '\n';
+	else {
+	  // extract k-best ...
+	  
+	  if (feature_weights_one) {
+	    if (kbest_unique)
+	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter_unique(hypergraph_applied));
+	    else
+	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function_one(weights), kbest_filter(hypergraph_applied));
+	  } else {
+	    if (kbest_unique)
+	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter_unique(hypergraph_applied));
+	    else
+	      kbest_derivations(*os, id, hypergraph_applied, kbest_size, kbest_traversal(), kbest_function(weights), kbest_filter(hypergraph_applied));
+	  }
+	}
+	
+	*os << std::flush;
       }
-      
-      *os << std::flush;
     }
   }
   
@@ -1452,10 +1458,11 @@ void options(int argc, char** argv)
     ("permute",      po::bool_switch(&permute_graph),                            "perform hypergraph permutation")
     ("permute-size", po::value<int>(&permute_size)->default_value(permute_size), "permutation size (zero for no-permutation, negative for all permutation)")
     
-    // intersection strategy
-    ("intersection-cube", po::bool_switch(&intersection_cube),                  "intersetion by cube-pruning")
-    ("intersection-full", po::bool_switch(&intersection_full),                  "full intersection")
-    ("cube-size",         po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning")
+    
+    // application strategy
+    ("apply-cube", po::bool_switch(&apply_cube),                         "feature application by cube-pruning")
+    ("apply-full", po::bool_switch(&apply_full),                         "full feature application")
+    ("cube-size",  po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning")
     
     // beam pruning
     ("prune-beam", po::value<double>(&prune_beam),  "beam pruning (0.0 < threshold < 1.0)")
