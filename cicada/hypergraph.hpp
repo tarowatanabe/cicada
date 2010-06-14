@@ -149,6 +149,9 @@ namespace cicada
     void unite(const HyperGraph& x);
 
   public:
+    void assign(const std::string& x);
+    bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+
     friend
     std::ostream& operator<<(std::ostream& os, const HyperGraph& x);
     friend

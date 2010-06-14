@@ -1,3 +1,14 @@
+#define BOOST_SPIRIT_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
 #include <iterator>
 
 #include "sentence.hpp"
@@ -8,6 +19,33 @@
 
 namespace cicada
 {
+
+  bool Sentence::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    typedef std::string::const_iterator iter_type;
+
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    namespace phoenix = boost::phoenix;
+    
+    using qi::phrase_parse;
+    using qi::lexeme;
+    using qi::_1;
+    using qi::attr_cast;
+    using standard::char_;
+    using standard::space;
+    
+    using phoenix::push_back;
+    using phoenix::ref;
+
+    qi::rule<iter_type, std::string(), standard::space_type> word = lexeme[+(char_ - space) - "|||"];
+    
+    clear();
+    
+    return phrase_parse(iter, end,
+			*(word[push_back(ref(__sent), _1)]),
+			space);
+  }
   
   void Sentence::assign(const std::string& x)
   {

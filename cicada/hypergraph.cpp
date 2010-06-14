@@ -366,8 +366,19 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, hypergraph_parsed_type(), space_type> hypergraph;
   };
 
-  
-  std::istream& operator>>(std::istream& is, HyperGraph& x)
+  void HyperGraph::assign(const std::string& x)
+  {
+    std::string::const_iterator iter = x.begin();
+    std::string::const_iterator end = x.end();
+    
+    const bool result = assign(iter, end);
+    
+    if (! result || iter != end)
+      throw std::runtime_error("hypergraph format error");
+  }
+
+
+  bool HyperGraph::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
     typedef hypergraph_parser<std::string::const_iterator> grammar_type;
     
@@ -389,25 +400,27 @@ namespace cicada
     grammar_type& grammar = *__grammar;
 #endif
     
+    clear();
+    
+    grammar.rules.clear();
+    grammar.rules.push_back(HyperGraph::rule_ptr_type());
+    grammar.graph.clear();
+    
+    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space);
+    
+    if (result)
+      grammar.graph.swap(*this);
+    
+    return result;
+  }
+  
+  std::istream& operator>>(std::istream& is, HyperGraph& x)
+  {
     std::string line;
     
-    
     x.clear();
-    if (std::getline(is, line)) {
-      grammar.rules.clear();
-      grammar.rules.push_back(HyperGraph::rule_ptr_type());
-      grammar.graph.clear();
-      
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-      
-      const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space);
-      if (result && iter == end)
-	grammar.graph.swap(x);
-      
-      grammar.rules.clear();
-      grammar.graph.clear();
-    }
+    if (std::getline(is, line))
+      x.assign(line);
     
     return is;
   }

@@ -142,40 +142,15 @@ namespace cicada
 
   void Lattice::assign(const std::string& x)
   {
-    typedef lattice_grammar_parser<std::string::const_iterator > grammar_type;
-    
-#ifdef HAVE_TLS
-    static __thread grammar_type* __grammar_tls = 0;
-    static boost::thread_specific_ptr<grammar_type > __grammar;
-    
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
-#else
-    static boost::thread_specific_ptr<grammar_type > __grammar;
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
-
-    clear();
-    if (x.empty()) return;
-    
     std::string::const_iterator iter = x.begin();
     std::string::const_iterator end = x.end();
-    
-    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, lattice);
+
+    const bool result = assign(iter, end);
     if (! result || iter != end)
       throw std::runtime_error("LATTICE format parsing failed...");
-    
-    initialize_distance();
   }
   
-  std::istream& operator>>(std::istream& is, Lattice& x)
+  bool Lattice::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
     typedef lattice_grammar_parser<std::string::const_iterator > grammar_type;
     
@@ -196,20 +171,25 @@ namespace cicada
     
     grammar_type& grammar = *__grammar;
 #endif
-
+    
+    clear();
+    if (iter == end) return true;
+    
+    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, lattice);
+    
+    if (result)
+      initialize_distance();
+    
+    return result;
+  }
+  
+  std::istream& operator>>(std::istream& is, Lattice& x)
+  {
     std::string line;
     
     x.clear();
-    if (std::getline(is, line) && ! line.empty()) {
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-      
-      const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, x.lattice);
-      if (result && iter == end)
-	x.initialize_distance();
-      else
-	x.clear();
-    }
+    if (std::getline(is, line) && ! line.empty())
+      x.assign(line);
     
     return is;
   }

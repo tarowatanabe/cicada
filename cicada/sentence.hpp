@@ -47,6 +47,9 @@ namespace cicada
     template <typename Iterator>
     void assign(Iterator first, Iterator last) { __sent.assign(first, last); }
     void assign(const std::string& x);
+
+
+    bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
     
     // insert/erase...
     iterator insert(iterator pos, const word_type& word) { return __sent.insert(pos, word); }

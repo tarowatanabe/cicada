@@ -107,6 +107,7 @@ hypergraph_main \
 lattice_main \
 parameter_main \
 rule_main \
+sentence_main \
 symbol_main
 
 grammar_mutable_main_SOURCES = grammar_mutable_main.cpp
@@ -126,6 +127,9 @@ parameter_main_LDADD = libcicada.la
 
 rule_main_SOURCES = rule_main.cpp
 rule_main_LDADD = libcicada.la
+
+sentence_main_SOURCES = sentence_main.cpp
+sentence_main_LDADD = libcicada.la
 
 symbol_main_SOURCES = symbol_main.cpp
 symbol_main_LDADD = libcicada.la

@@ -93,6 +93,7 @@ namespace cicada
     }
     
     void assign(const std::string& x);
+    bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
     
     size_type size() const { return lattice.size(); }
     bool empty() const { return lattice.empty(); }

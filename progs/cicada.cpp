@@ -30,6 +30,8 @@
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
 
+#include "cicada_impl.hpp"
+
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -358,44 +360,43 @@ int main(int argc, char ** argv)
     hypergraph_type hypergraph_composed;
     hypergraph_type hypergraph_applied;
     
-    std::string sep;
-    
     size_t id = 0;
-    while (1) {
-
-      if (input_id_mode) {
-	*is >> id >> sep;
-	
-	if (sep != "|||")
+    while (std::getline(*is, line)) {
+      
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+      
+      if (input_id_mode)
+	if (! parse_id(id, iter, end))
 	  throw std::runtime_error("invalid id-prefixed format");
+      
+      if (input_lattice_mode) {
+	if (! lattice.assign(iter, end))
+	  throw std::runtime_error("invalid lattive format");
+      } else if (input_forest_mode) {
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid hypergraph format");
+      } else {
+	if (! sentence.assign(iter, end))
+	  throw std::runtime_error("invalid sentence format");
+	
+	lattice = lattice_type(sentence);
       }
       
       if (input_bitext_mode) {
-	target_sentence.clear();
+	if (! parse_separator(iter, end))
+	  throw std::runtime_error("no separator?");
 	
-	while (*is >> sep) {
-	  if (sep == "|||")
-	    break;
-	  else
-	    target_sentence.push_back(sep);
-	}
+	if (! target_sentence.assign(iter, end))
+	  throw std::runtime_error("invalid sentence format");
 	
 	target = lattice_type(target_sentence);
       }
       
-      if (input_lattice_mode)
-	*is >> lattice;
-      else if (input_forest_mode)
-	*is >> hypergraph;
-      else {
-	*is >> sentence;
-	if (*is)
-	  lattice = lattice_type(sentence);
-      }
+      if (iter != end)
+	throw std::runtime_error("invalid input format");
       
-      if (! *is) break;
-      
-      if (lattice.empty() || hypergraph.goal == hypergraph_type::invalid) {
+      if (lattice.empty() && hypergraph.goal == hypergraph_type::invalid) {
 	++ id;
 	continue;
       }

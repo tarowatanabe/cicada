@@ -35,6 +35,8 @@
 #include "utils/mpi_stream_simple.hpp"
 #include "utils/lockfree_list_queue.hpp"
 
+#include "cicada_impl.hpp"
+
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -449,47 +451,44 @@ struct TaskStdout
     hypergraph_type hypergraph_applied;
     
     size_t id = 0;
-    std::string sep;
     
     while (1) {
       queue_is.pop_swap(line);
       if (line.empty()) break;
-      
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::array_source(line.c_str(), line.size()));
 
-      is >> id >> sep;
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+
+      if (! parse_id(id, iter, end))
+	throw std::runtime_error("invalid id-prefixed format");
       
-      // invalid !
-      if (sep != "|||")
-	throw std::runtime_error("invalid format...");
+      if (input_lattice_mode) {
+	if (! lattice.assign(iter, end))
+	  throw std::runtime_error("invalid lattive format");
+      } else if (input_forest_mode) {
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid hypergraph format");
+      } else {
+	if (! sentence.assign(iter, end))
+	  throw std::runtime_error("invalid sentence format");
+	
+	lattice = lattice_type(sentence);
+      }
       
       if (input_bitext_mode) {
-	target_sentence.clear();
+	if (! parse_separator(iter, end))
+	  throw std::runtime_error("no separator?");
 	
-	while (is >> sep) {
-	  if (sep == "|||")
-	    break;
-	  else
-	    target_sentence.push_back(sep);
-	}
+	if (! target_sentence.assign(iter, end))
+	  throw std::runtime_error("invalid sentence format");
+	
 	target = lattice_type(target_sentence);
       }
       
-      if (input_lattice_mode)
-	is >> lattice;
-      else if (input_forest_mode)
-	is >> hypergraph;
-      else {
-	
-	is >> sentence;
-	if (is)
-	  lattice = lattice_type(sentence);
-      }
-      
-      if (! is) continue;
+      if (iter != end)
+	throw std::runtime_error("invalid input format");
 
-      if (lattice.empty() || hypergraph.goal == hypergraph_type::invalid) continue;
+      if (lattice.empty() && hypergraph.goal == hypergraph_type::invalid) continue;
       
       grammar_type grammar_translation(grammar);
 
@@ -994,47 +993,44 @@ struct Task
     hypergraph_type hypergraph_applied;
     
     size_t id = 0;
-    std::string sep;
     
     while (1) {
       queue.pop_swap(line);
       if (line.empty()) break;
-      
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::array_source(line.c_str(), line.size()));
 
-      is >> id >> sep;
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+
+      if (! parse_id(id, iter, end))
+	throw std::runtime_error("invalid id-prefixed format");
       
-      // invalid !
-      if (sep != "|||")
-	throw std::runtime_error("invalid format...");
+      if (input_lattice_mode) {
+	if (! lattice.assign(iter, end))
+	  throw std::runtime_error("invalid lattive format");
+      } else if (input_forest_mode) {
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid hypergraph format");
+      } else {
+	if (! sentence.assign(iter, end))
+	  throw std::runtime_error("invalid sentence format");
+	
+	lattice = lattice_type(sentence);
+      }
       
       if (input_bitext_mode) {
-	target_sentence.clear();
+	if (! parse_separator(iter, end))
+	  throw std::runtime_error("no separator?");
 	
-	while (is >> sep) {
-	  if (sep == "|||")
-	    break;
-	  else
-	    target_sentence.push_back(sep);
-	}
+	if (! target_sentence.assign(iter, end))
+	  throw std::runtime_error("invalid sentence format");
 	
 	target = lattice_type(target_sentence);
       }
       
-      if (input_lattice_mode)
-	is >> lattice;
-      else if (input_forest_mode)
-	is >> hypergraph;
-      else {
-	is >> sentence;
-	if (is)
-	  lattice = lattice_type(sentence);
-      }
-      
-      if (! is) continue;
+      if (iter != end)
+	throw std::runtime_error("invalid input format");
 
-      if (lattice.empty() || hypergraph.goal == hypergraph_type::invalid) continue;
+      if (lattice.empty() && hypergraph.goal == hypergraph_type::invalid) continue;
       
       grammar_type grammar_translation(grammar);
 
