@@ -92,7 +92,7 @@ int main(int argc, char ** argv)
       std::cerr << "objective: " << objective << std::endl;
     
     utils::compress_ostream os(output_path, 1024 * 1024);
-    os.presicion(20);
+    os.precision(20);
     os << weights;
   }
   catch (const std::exception& err) {
