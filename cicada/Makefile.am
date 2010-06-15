@@ -34,6 +34,7 @@ compose.hpp \
 compose_cky.hpp \
 eval.hpp \
 feature.hpp \
+feature_bleu.hpp \
 feature_function.hpp \
 feature_ngram.hpp \
 feature_penalty.hpp \
@@ -68,6 +69,7 @@ weight_vector.hpp
 libcicada_la_SOURCES = \
 eval.cpp \
 feature.cpp \
+feature_bleu.cpp \
 feature_function.cpp \
 feature_ngram.cpp \
 grammar_mutable.cpp \

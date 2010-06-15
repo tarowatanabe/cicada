@@ -414,7 +414,7 @@ namespace cicada
       if (niter != param.end())
 	base_type::__feature_name = niter->second;
       else
-	base_type::__feature_name = std::string("ngram");
+	base_type::__feature_name = "ngram";
       
       pimpl = ngram_impl.release();
     }
