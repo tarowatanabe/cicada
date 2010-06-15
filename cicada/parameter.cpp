@@ -1,7 +1,7 @@
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
 
 #include "parameter.hpp"
-
-#define BOOST_SPIRIT_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>

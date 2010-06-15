@@ -1,3 +1,6 @@
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
 #include <memory>
 
 #include "grammar_mutable.hpp"
@@ -7,8 +10,6 @@
 #include "utils/compress_stream.hpp"
 
 #include <boost/lexical_cast.hpp>
-
-#define BOOST_SPIRIT_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>

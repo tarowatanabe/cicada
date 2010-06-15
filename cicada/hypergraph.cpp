@@ -1,8 +1,8 @@
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
 
 #include "hypergraph.hpp"
 #include "sort.hpp"
-
-#define BOOST_SPIRIT_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>

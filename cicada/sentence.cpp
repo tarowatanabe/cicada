@@ -1,4 +1,5 @@
 #define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>

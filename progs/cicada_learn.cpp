@@ -8,6 +8,8 @@
 #include <string>
 #include <stdexcept>
 
+#include "cicada_impl.hpp"
+
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
 #include "cicada/hypergraph.hpp"
@@ -22,8 +24,6 @@
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
-
-#include "cicada_impl.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -83,6 +83,8 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no intersected forest?");
     
     threads = utils::bithack::max(1, threads);
+
+    enumerate_forest(forest_path);
 
     weight_set_type weights;
     
@@ -210,11 +212,11 @@ struct OptimizeLBFGS
     {
       path_pair_type paths;
 
-      int id_forest;
-      int id_intersected;
+      size_t id_forest;
+      size_t id_intersected;
       hypergraph_type hypergraph;
       
-      std::string sep;
+      std::string line;
 
       gradients_type gradients;
       gradients_type gradients_intersected;
@@ -235,13 +237,30 @@ struct OptimizeLBFGS
 	
 	inside.clear();
 	inside_intersected.clear();
-	
+
+	bool valid_forest = true;
+	bool valid_intersected = true;
+
 	{
 	  utils::compress_istream is(paths.first);
-	  is >> id_forest >> sep >> hypergraph;
-	  
-	  // inside/outside algorithm to compute potentials...
+	  std::getline(is, line);
 
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  if (! parse_id(id_forest, iter, end))
+	    throw std::runtime_error("invalid id input");
+	  
+	  if (! hypergraph.assign(iter, end))
+	    throw std::runtime_error("invalid graph format");
+	  
+	  if (iter != end)
+	    throw std::runtime_error("invalid id ||| graph format");
+	  
+	  valid_forest = hypergraph.is_valid();
+	}
+	
+	if (valid_forest) {
 	  inside.reserve(hypergraph.nodes.size());
 	  inside.resize(hypergraph.nodes.size(), weight_type());
 	  
@@ -249,30 +268,49 @@ struct OptimizeLBFGS
 	}
 	
 	{
-	  utils::compress_istream is(paths.second);
-	  is >> id_intersected >> sep >> hypergraph;
+	  utils::compress_istream is(paths.first);
+	  std::getline(is, line);
+
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
 	  
-	  // inside/outside algorithm to compute potentials...
+	  if (! parse_id(id_intersected, iter, end))
+	    throw std::runtime_error("invalid id input");
 	  
+	  if (! hypergraph.assign(iter, end))
+	    throw std::runtime_error("invalid graph format");
+	  
+	  if (iter != end)
+	    throw std::runtime_error("invalid id ||| graph format");
+	  
+	  valid_intersected = hypergraph.is_valid();
+	}
+	
+	if (valid_intersected) {
 	  inside_intersected.reserve(hypergraph.nodes.size());
 	  inside_intersected.resize(hypergraph.nodes.size(), weight_type());
 	  
 	  inside_outside(hypergraph, inside_intersected, gradients_intersected, weight_function(weights), feature_function(weights));
 	}
-	
-	gradient_type& gradient = gradients.gradient;
-	weight_type& Z = inside.back();
-	
-	gradient_type& gradient_intersected = gradients_intersected.gradient;
-	weight_type& Z_intersected = inside_intersected.back();
-	
-	gradient /= Z;
-	gradient_intersected /= Z_intersected;
-	
-	feature_expectations += gradient_intersected;
-	feature_expectations -= gradient;
-	
-	objective -= log(Z_intersected) - log(Z);
+
+	if (id_forest != id_intersected)
+	  throw std::runtime_error("different segment id?");
+	  
+	if (valid_forest && valid_intersected) {
+	  gradient_type& gradient = gradients.gradient;
+	  weight_type& Z = inside.back();
+	  
+	  gradient_type& gradient_intersected = gradients_intersected.gradient;
+	  weight_type& Z_intersected = inside_intersected.back();
+	  
+	  gradient /= Z;
+	  gradient_intersected /= Z_intersected;
+	  
+	  feature_expectations += gradient_intersected;
+	  feature_expectations -= gradient;
+	  
+	  objective -= log(Z_intersected) - log(Z);
+	}
       }
       
       // transform feature_expectations into g...
@@ -378,19 +416,33 @@ struct TaskEnumerate
   {
     path_type       path;
     
-    int             id_graph;
-    std::string     sep;
+    size_t          id;
     hypergraph_type graph;
+
+    std::string line;
     
     while (1) {
       queue.pop_swap(path);
       if (path.empty()) break;
       
-      utils::compress_istream is(path);
+      std::cerr << path.file_string() << std::endl;
       
-      is >> id_graph >> sep >> graph;
-      if (sep != "|||")
-	throw std::runtime_error("invalid format");
+      utils::compress_istream is(path);
+      std::getline(is, line);
+
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+
+      if (! parse_id(id, iter, end))
+	throw std::runtime_error("invalid id input");
+
+      std::cerr << "id: " << id << std::endl;
+	  
+      if (! graph.assign(iter, end))
+	throw std::runtime_error("invalid graph format");
+
+      if (iter != end)
+	throw std::runtime_error("invalid id ||| graph format");
     }
   }
 

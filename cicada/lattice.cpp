@@ -1,7 +1,7 @@
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
 
 #include "lattice.hpp"
-
-#define BOOST_SPIRIT_THREADSAFE
 
 #include <boost/numeric/conversion/bounds.hpp>
 

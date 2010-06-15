@@ -1,4 +1,7 @@
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
 #include <memory>
 
 #include "grammar_static.hpp"
@@ -22,8 +25,6 @@
 #include <boost/lexical_cast.hpp>
 
 #include <boost/filesystem.hpp>
-
-#define BOOST_SPIRIT_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
