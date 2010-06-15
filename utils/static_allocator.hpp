@@ -76,7 +76,7 @@ namespace utils
       if (! p) return;
       
       pool_type& pool = local_pool();
-      if (pool.size < 1024 * 8) {
+      if (pool.size < 256) {
 	*((pointer*) p) = pool.pool;
 	pool.pool = p;
 	++ pool.size;

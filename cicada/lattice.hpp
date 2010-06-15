@@ -101,6 +101,12 @@ namespace cicada
     const_reference operator[](size_type x) const { return lattice[x]; }
     reference operator[](size_type x) { return lattice[x]; }
     
+    difference_type shortest_distance() const
+    {
+      // shortest distance from begining to end of lattice..
+      return shortest_distance(0, size());
+    }
+    
     difference_type shortest_distance(difference_type begin, difference_type end) const 
     {
       return (dist.empty() ? end - begin : dist(begin, end));
