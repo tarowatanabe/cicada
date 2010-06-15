@@ -40,6 +40,7 @@ namespace cicada
       : lhs(x_lhs), source(x_source), target(x_target), arity(x_arity) {}
 
     void assign(const std::string& x);
+    bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
 
     void clear()
     {

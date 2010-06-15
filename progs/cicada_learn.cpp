@@ -425,8 +425,6 @@ struct TaskEnumerate
       queue.pop_swap(path);
       if (path.empty()) break;
       
-      std::cerr << path.file_string() << std::endl;
-      
       utils::compress_istream is(path);
       std::getline(is, line);
 
@@ -435,8 +433,6 @@ struct TaskEnumerate
 
       if (! parse_id(id, iter, end))
 	throw std::runtime_error("invalid id input");
-
-      std::cerr << "id: " << id << std::endl;
 	  
       if (! graph.assign(iter, end))
 	throw std::runtime_error("invalid graph format");

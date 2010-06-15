@@ -1,5 +1,5 @@
-#define BOOST_SPIRIT_THREADSAFE
-#define PHOENIX_THREADSAFE
+#define BOOST_SPIRIT_THREADSAFE 1
+#define PHOENIX_THREADSAFE 1
 
 #include "lattice.hpp"
 

@@ -129,18 +129,14 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), boost::spirit::standard::space_type> rule_grammar;
   };
 
-  void Rule::assign(const std::string& x)
+  bool Rule::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
-    clear();
-    
-    if (x.empty()) return;
-    
     typedef rule_grammar_parser<std::string::const_iterator> grammar_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
-    
+
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -154,28 +150,41 @@ namespace cicada
     
     grammar_type& grammar = *__grammar;
 #endif
-    
+
+    clear();
       
     rule_parsed_type rule_parsed;
+        
+    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, rule_parsed);
+    if (result) {
+      lhs = boost::fusion::get<0>(rule_parsed);
+      if (lhs.empty())
+	lhs = vocab_type::X;
+      
+      source = Rule::symbol_set_type(boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end());
+      target = Rule::symbol_set_type(boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end());
+      features = Rule::feature_set_type(boost::fusion::get<3>(rule_parsed).begin(), boost::fusion::get<3>(rule_parsed).end());
+      arity = source.arity();
+      
+      if (! target.empty() && arity != target.arity())
+	throw std::runtime_error("rule parsing failed because of different arity...");
+    }
+
+    return result;
+  }
+
+  void Rule::assign(const std::string& x)
+  {
+    clear();
     
+    if (x.empty()) return;
+
     std::string::const_iterator iter = x.begin();
-    std::string::const_iterator iter_end = x.end();
+    std::string::const_iterator end = x.end();
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, rule_parsed);
-    if (! result || iter != iter_end)
-      throw std::runtime_error("rule parsing failed...");
-    
-    lhs = boost::fusion::get<0>(rule_parsed);
-    if (lhs.empty())
-      lhs = vocab_type::X;
-    
-    source = Rule::symbol_set_type(boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end());
-    target = Rule::symbol_set_type(boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end());
-    features = Rule::feature_set_type(boost::fusion::get<3>(rule_parsed).begin(), boost::fusion::get<3>(rule_parsed).end());
-    arity = source.arity();
-    
-    if (! target.empty() && arity != target.arity())
-      throw std::runtime_error("rule parsing failed because of different arity...");
+    const bool result = assign(iter, end);
+    if (! result || iter != end)
+      throw std::runtime_error("rule format parsing failed...");
   }
   
   std::istream& operator>>(std::istream& is, Rule& x)
@@ -183,49 +192,9 @@ namespace cicada
     x.clear();
     
     std::string line;
-    if (std::getline(is, line) && ! line.empty()) {
-      
-      typedef rule_grammar_parser<std::string::const_iterator> grammar_type;
-      
-#ifdef HAVE_TLS
-      static __thread grammar_type* __grammar_tls = 0;
-      static boost::thread_specific_ptr<grammar_type > __grammar;
-      
-      if (! __grammar_tls) {
-	__grammar.reset(new grammar_type());
-	__grammar_tls = __grammar.get();
-      }
-      
-      grammar_type& grammar = *__grammar_tls;
-#else
-      static boost::thread_specific_ptr<grammar_type > __grammar;
-      if (! __grammar.get())
-	__grammar.reset(new grammar_type());
-      
-      grammar_type& grammar = *__grammar;
-#endif
-      
-      rule_parsed_type rule_parsed;
-      
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator iter_end = line.end();
-      
-      const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, rule_parsed);
-      if (! result || iter != iter_end)
-	throw std::runtime_error("rule parsing failed...");
-      
-      x.lhs = boost::fusion::get<0>(rule_parsed);
-      if (x.lhs.empty())
-	x.lhs = Rule::vocab_type::X;
-      
-      x.source = Rule::symbol_set_type(boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end());
-      x.target = Rule::symbol_set_type(boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end());
-      x.features = Rule::feature_set_type(boost::fusion::get<3>(rule_parsed).begin(), boost::fusion::get<3>(rule_parsed).end());
-      x.arity = x.source.arity();
-      
-      if (! x.target.empty() && x.arity != x.target.arity())
-	throw std::runtime_error("rule parsing failed because of different arity...");
-    }
+    if (std::getline(is, line) && ! line.empty())
+      x.assign(line);
+    
     return is;
   }
   

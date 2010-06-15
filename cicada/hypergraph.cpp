@@ -290,7 +290,7 @@ namespace cicada
 	hypergraph_type& graph   = const_cast<hypergraph_type&>(*_graph);
 	graph.add_node();
 
-	//std::cerr << "node: " << graph.nodes.back().id << std::endl; 
+	//std::cerr << "node: " << graph.nodes.back().id << std::endl;
       }
       
       hypergraph_type* _graph;
@@ -382,11 +382,10 @@ namespace cicada
   bool HyperGraph::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
     typedef hypergraph_parser<std::string::const_iterator> grammar_type;
-    
+
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
-    
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -411,6 +410,9 @@ namespace cicada
     
     if (result)
       grammar.graph.swap(*this);
+
+    grammar.rules.clear();
+    grammar.graph.clear();
     
     return result;
   }
