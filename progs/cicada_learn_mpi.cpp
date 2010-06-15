@@ -274,7 +274,7 @@ struct OptimizeLBFGS
       g.clear();
       objective = 0.0;
       
-      for (int i = 0;/**/; i += mpi_size) {
+      for (int i = mpi_rank;/**/; i += mpi_size) {
 	const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
 	
 	const path_type path_forest      = dir_forest / file_name;
@@ -500,7 +500,7 @@ void enumerate_forest(const path_type& dir)
   
   std::string line;
   
-  for (int i = 0; /**/; i += mpi_size) {
+  for (int i = mpi_rank; /**/; i += mpi_size) {
     path_type path = dir / (boost::lexical_cast<std::string>(i) + ".gz");
     if (! boost::filesystem::exists(path)) break;
     
