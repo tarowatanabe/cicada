@@ -86,6 +86,9 @@ int main(int argc, char ** argv)
 
     enumerate_forest(forest_path);
 
+    if (debug)
+      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
+
     weight_set_type weights;
     
     const double objective = optimize(forest_path, intersected_path, weights);
