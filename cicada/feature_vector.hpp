@@ -10,8 +10,6 @@
 #include <iostream>
 
 #include <cicada/feature.hpp>
-#include <cicada/weight_vector.hpp>
-
 #include <utils/space_separator.hpp>
 
 #include <boost/fusion/tuple.hpp>
@@ -19,6 +17,10 @@
 
 namespace cicada
 {
+  
+  // forward declaration...
+  template <typename Tp, typename Alloc >
+  class WeightVector;
 
   template <typename Tp, typename Alloc=std::allocator<Tp> >
   class FeatureVector
@@ -102,6 +104,12 @@ namespace cicada
     iterator begin() { return __values.begin(); }
     const_iterator end() const { return __values.end(); }
     iterator end() { return __values.end(); }
+    
+    const_reference front() const { return *__values.begin(); }
+    reference front() { return *__values.begin(); }
+    
+    const_reference back() const { return *(-- __values.end());}
+    reference back() { return *(-- __values.end());}
     
     void swap(FeatureVector& x) { __values.swap(x.__values); }
     
@@ -197,30 +205,11 @@ namespace cicada
     
     template <typename T, typename A>
     friend
-    std::ostream& operator<<(std::ostream& os, const FeatureVector<T,A>& x)
-    {
-      typename FeatureVector<T,A>::const_iterator iter_end = x.end();
-      for (typename FeatureVector<T,A>::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-	os << iter->first << ' ' << iter->second << '\n';
-      
-      return os;
-    }
+    std::ostream& operator<<(std::ostream& os, const FeatureVector<T,A>& x);
     
     template <typename T, typename A>
     friend
-    std::istream& operator>>(std::istream& is, FeatureVector<T,A>& x)
-    {
-      typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-      
-      x.clear();
-      
-      std::string feature;
-      T value;
-      while ((is >> feature) && (is >> value))
-	x[feature] = value;
-      
-      return is;
-    }
+    std::istream& operator>>(std::istream& is, FeatureVector<T,A>& x);
 
   private:
     template <typename O, typename T>
@@ -472,6 +461,35 @@ namespace cicada
     return features;
   }
 
+
+  template <typename T, typename A>
+  inline
+  std::ostream& operator<<(std::ostream& os, const FeatureVector<T,A>& x)
+  {
+    typename FeatureVector<T,A>::const_iterator iter_end = x.end();
+    for (typename FeatureVector<T,A>::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+      os << iter->first << ' ' << iter->second << '\n';
+    
+    return os;
+  }
+
+  template <typename T, typename A>
+  inline
+  std::istream& operator>>(std::istream& is, FeatureVector<T,A>& x)
+  {
+    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+    
+    x.clear();
+    
+    std::string feature;
+    T value;
+    while ((is >> feature) && (is >> value))
+      x[feature] = value;
+    
+    return is;
+  }
+  
+
 };
 
 namespace std
@@ -484,4 +502,7 @@ namespace std
   }
 };
 
+#include <cicada/weight_vector.hpp>
+
 #endif
+

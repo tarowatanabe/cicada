@@ -56,10 +56,14 @@ namespace cicada
       Logprob(const weight_type& x) : __value(std::log(x)) {}
       explicit Logprob(const proxy_type& x) : __value(x.__value) {}
 
-      inline const weight_type& value() const { return __value; }
-      inline       weight_type& value()       { return __value; }
+
+      operator Tp() const { return std::exp(__value); }
       
     public:
+      template <typename T>
+      friend
+      T log(const Logprob<T>& x);
+
       Logprob& operator+=(const Logprob& x)
       {
 	if (*this == zero()) {
@@ -75,10 +79,29 @@ namespace cicada
 	
 	return *this;
       }
+
+      Logprob& operator-=(const Logprob& x)
+      {
+	if (x > *this)
+	  throw std::runtime_error("invalid minus");
+	
+	if (*this == x)
+	  *this = zero();
+	else
+	  __value = __value + boost::math::log1p(- std::exp(x.__value - __value));
+	
+	return *this;
+      }
       
       Logprob& operator*=(const Logprob& x)
       {
 	__value += x.__value;
+	return *this;
+      }
+
+      Logprob& operator/=(const Logprob& x)
+      {
+	__value -= x.__value;
 	return *this;
       }
       
@@ -112,6 +135,13 @@ namespace cicada
     private:
       weight_type __value;
     };
+
+    template <typename Tp>
+    inline
+    Tp log(const Logprob<Tp>& x)
+    {
+      return x.__value;
+    }
     
     template <typename Tp>
     inline
@@ -124,10 +154,28 @@ namespace cicada
 
     template <typename Tp>
     inline
+    Logprob<Tp> operator-(const Logprob<Tp>& x, const Logprob<Tp>& y)
+    {
+      Logprob<Tp> __value(x);
+      __value -= y;
+      return __value;
+    }
+
+    template <typename Tp>
+    inline
     Logprob<Tp> operator*(const Logprob<Tp>& x, const Logprob<Tp>& y)
     {
       Logprob<Tp> __value(x);
       __value *= y;
+      return __value;
+    }
+
+    template <typename Tp>
+    inline
+    Logprob<Tp> operator/(const Logprob<Tp>& x, const Logprob<Tp>& y)
+    {
+      Logprob<Tp> __value(x);
+      __value /= y;
       return __value;
     }
     

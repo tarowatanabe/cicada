@@ -59,11 +59,15 @@ namespace cicada
       operator Tp() const { return  __sign ? - std::exp(__value) : std::exp(__value); }
       
     public:
+      template <typename T>
+      friend
+      T log(const Log<T>& x);
+      
       Log& operator+=(const Log& x)
       {
-	if (x.__value == - std::numeric_limits<Tp>::inifinity())
+	if (x.__value == - std::numeric_limits<Tp>::infinity())
 	  return *this;
-	else if (__value == - std::numeric_limits<Tp>::inifinity()) {
+	else if (__value == - std::numeric_limits<Tp>::infinity()) {
 	  *this = x;
 	  return *this;
 	}
@@ -86,10 +90,23 @@ namespace cicada
 	return *this;
       }
       
+      Log& operator-=(const Log& x)
+      {
+	*this += Log(proxy_type(x.__value, ! x.__sign));
+	return *this;
+      }
+      
       Log& operator*=(const Log& x)
       {
 	__sign = (__sign != x.__sign);
 	__value += x.__value;
+	return *this;
+      }
+
+      Log& operator/=(const Log& x)
+      {
+	__sign = (__sign != x.__sign);
+	__value -= x.__value;
 	return *this;
       }
       
@@ -111,10 +128,29 @@ namespace cicada
       weight_type __value;
       char        __sign;
     };
+
+    template <typename Tp>
+    inline
+    Tp log(const Log<Tp>& x)
+    {
+      if (x.__sign)
+	throw std::runtime_error("no negative log");
+      
+      return x.__value;
+    }
     
     template <typename Tp>
     inline
     Log<Tp> operator+(const Log<Tp>& x, const Log<Tp>& y)
+    {
+      Log<Tp> __value(x);
+      __value += y;
+      return __value;
+    }
+
+    template <typename Tp>
+    inline
+    Log<Tp> operator-(const Log<Tp>& x, const Log<Tp>& y)
     {
       Log<Tp> __value(x);
       __value += y;
@@ -129,12 +165,22 @@ namespace cicada
       __value *= y;
       return __value;
     }
+
+    template <typename Tp>
+    inline
+    Log<Tp> operator/(const Log<Tp>& x, const Log<Tp>& y)
+    {
+      Log<Tp> __value(x);
+      __value /= y;
+      return __value;
+    }
     
     template <typename Tp>
     struct traits<Log<Tp> >
     {
-      static inline Tp zero() { return Log<Tp>::zero();  }
-      static inline Tp one()  { return Log<Tp>::one(); }
+      static inline Log<Tp> log(const Tp& x) { return Log<Tp>::log(x, false); }
+      static inline Log<Tp> zero() { return Log<Tp>::zero();  }
+      static inline Log<Tp> one()  { return Log<Tp>::one(); }
     };
 
   };

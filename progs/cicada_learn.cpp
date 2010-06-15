@@ -63,9 +63,9 @@ int debug = 0;
 
 
 void options(int argc, char** argv);
-void optimize(const path_type& forest_path,
-	      const path_type& intersected_path,
-	      weight_set_type& weights);
+double optimize(const path_type& forest_path,
+		const path_type& intersected_path,
+		weight_set_type& weights);
 void enumerate_forest(const path_type& path);
 
 int main(int argc, char ** argv)
@@ -86,9 +86,13 @@ int main(int argc, char ** argv)
 
     weight_set_type weights;
     
-    optimize(forest_path, intersected_path, weights);
+    const double objective = optimize(forest_path, intersected_path, weights);
+
+    if (debug)
+      std::cerr << "objective: " << objective << std::endl;
     
     utils::compress_ostream os(output_path, 1024 * 1024);
+    os.presicion(20);
     os << weights;
   }
   catch (const std::exception& err) {
@@ -108,7 +112,7 @@ struct OptimizeLBFGS
       intersected_path(__intersected_path),
       weights(__weights) {}
 
-  void operator()()
+  double operator()()
   {
     lbfgs_parameter_t param;
     lbfgs_parameter_init(&param);
@@ -126,19 +130,163 @@ struct OptimizeLBFGS
     weights.allocate();
     
     lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
+    
+    return objective;
   }
 
   
   struct Task
   {
+    typedef std::pair<path_type, path_type> path_pair_type;
+    typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
+
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_static_type;
+
+    typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
+
+    Task(queue_type&            __queue,
+	 const weight_set_type& __weights)
+      : queue(__queue), weights(__weights) {}
+    
+    struct gradients_type
+    {
+      typedef gradient_type value_type;
+
+      template <typename Index>
+      gradient_type& operator[](Index)
+      {
+	return gradient;
+      }
+
+      void clear() { gradient.clear(); }
+      
+      gradient_type gradient;
+    };
+    
+    struct weight_function
+    {
+      typedef weight_type value_type;
+
+      weight_function(const weight_set_type& __weights) : weights(__weights) {}
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	// p_e
+	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+      }
+      
+      const weight_set_type& weights;
+    };
+
+    struct feature_function
+    {
+      typedef gradient_type value_type;
+
+      feature_function(const weight_set_type& __weights) : weights(__weights) {}
+      
+
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	// p_e r_e
+	gradient_type grad;
+	
+	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	
+	feature_set_type::const_iterator fiter_end = edge.features.end();
+	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	  grad[fiter->first] = weight_type(fiter->second) * weight;
+	
+	return grad;
+      }
+      
+      const weight_set_type& weights;
+    };
     
     void operator()()
     {
+      path_pair_type paths;
+
+      int id_forest;
+      int id_intersected;
+      hypergraph_type hypergraph;
       
+      std::string sep;
+
+      gradients_type gradients;
+      gradients_type gradients_intersected;
+      weights_type   inside;
+      weights_type   inside_intersected;
       
+      gradient_static_type  feature_expectations;
+
+      g.clear();
+      objective = 0.0;
       
+      while (1) {
+	queue.pop(paths);
+	if (paths.first.empty()) break;
+	
+	gradients.clear();
+	gradients_intersected.clear();
+	
+	inside.clear();
+	inside_intersected.clear();
+	
+	{
+	  utils::compress_istream is(paths.first);
+	  is >> id_forest >> sep >> hypergraph;
+	  
+	  // inside/outside algorithm to compute potentials...
+
+	  inside.reserve(hypergraph.nodes.size());
+	  inside.resize(hypergraph.nodes.size(), weight_type());
+	  
+	  inside_outside(hypergraph, inside, gradients, weight_function(weights), feature_function(weights));
+	}
+	
+	{
+	  utils::compress_istream is(paths.second);
+	  is >> id_intersected >> sep >> hypergraph;
+	  
+	  // inside/outside algorithm to compute potentials...
+	  
+	  inside_intersected.reserve(hypergraph.nodes.size());
+	  inside_intersected.resize(hypergraph.nodes.size(), weight_type());
+	  
+	  inside_outside(hypergraph, inside_intersected, gradients_intersected, weight_function(weights), feature_function(weights));
+	}
+	
+	gradient_type& gradient = gradients.gradient;
+	weight_type& Z = inside.back();
+	
+	gradient_type& gradient_intersected = gradients_intersected.gradient;
+	weight_type& Z_intersected = inside_intersected.back();
+	
+	gradient /= Z;
+	gradient_intersected /= Z_intersected;
+	
+	feature_expectations += gradient_intersected;
+	feature_expectations -= gradient;
+	
+	objective -= log(Z_intersected) - log(Z);
+      }
+      
+      // transform feature_expectations into g...
+      g.allocate();
+      
+      std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
     }
+
+    queue_type&            queue;
     
+    const weight_set_type& weights;
+    
+    double          objective;
+    weight_set_type g;
   };
 
   
@@ -148,15 +296,61 @@ struct OptimizeLBFGS
 				  const int n,
 				  const lbfgsfloatval_t step)
   {
-    OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
+    typedef Task                  task_type;
+    typedef task_type::queue_type queue_type;
     
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+
+    OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
+        
+    queue_type queue(1024 * threads);
+
+    task_set_type tasks(threads, task_type(queue, optimizer.weights));
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    for (int sample = 0; /**/; ++ sample) {
+      const std::string file_name = boost::lexical_cast<std::string>(sample) + ".gz";
+      
+      const path_type path_forest      = optimizer.forest_path / file_name;
+      const path_type path_intersected = optimizer.intersected_path / file_name;
+      
+      if (! boost::filesystem::exists(path_forest)) break;
+      if (! boost::filesystem::exists(path_intersected)) continue;
+      
+      queue.push(std::make_pair(path_forest, path_intersected));
+    }
+    
+    for (int i = 0; i < threads; ++ i)
+      queue.push(std::make_pair(path_type(), path_type()));
+    
+    workers.join_all();
+    
+    // collect all the objective and gradients...
     double objective = 0.0;
     std::fill(g, g + n, 0.0);
+
+    for (int i = 0; i < threads; ++ i) {
+      objective += tasks[i].objective;
+      std::transform(tasks[i].g.begin(), tasks[i].g.end(), g, g, std::plus<double>());
+    }
     
-    static const feature_type featuer_none;
+    // L2...
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (int i = 0; i < n; ++ i) {
+	g[i] += C * x[i];
+	norm += x[i] * x[i];
+      }
+      objective += 0.5 * C * norm;
+    }
     
+    if (debug >= 2)
+      std::cerr << "objective: " << objective << std::endl;
     
-    
+    return objective;
   }
   
   path_type forest_path;
@@ -164,11 +358,11 @@ struct OptimizeLBFGS
   weight_set_type& weights;
 };
 
-void optimize(const path_type& forest_path,
-	      const path_type& intersected_path,
-	      weight_set_type& weights)
+double optimize(const path_type& forest_path,
+		const path_type& intersected_path,
+		weight_set_type& weights)
 {
-  OptimizeLBFGS(forest_path, intersected_path, weights)();
+  return OptimizeLBFGS(forest_path, intersected_path, weights)();
 }
 
 // I know, it is very stupid...

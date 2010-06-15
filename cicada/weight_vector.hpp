@@ -21,6 +21,10 @@
 namespace cicada
 {
   
+  // forward declaration...
+  template <typename Tp, typename Alloc >
+  class FeatureVector;
+
   template <typename Tp, typename Alloc=std::allocator<Tp> >
   class WeightVector
   {
@@ -78,6 +82,12 @@ namespace cicada
     iterator begin() { return __values.begin(); }
     const_iterator end() const { return __values.end(); }
     iterator end() { return __values.end(); }
+
+    const_reference front() const { return __values.front(); }
+    reference front() { return __values.front(); }
+    
+    const_reference back() const { return __values.back(); }
+    reference back() { return __values.back(); }
     
   public:
     // operators...
@@ -149,6 +159,72 @@ namespace cicada
       std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::divides<Tp>());
     }
 
+
+    template <typename T, typename A>
+    self_type& operator+=(const FeatureVector<T, A>& x)
+    {
+      typedef typename FeatureVector<T, A>::const_iterator iter_type;
+
+      if (! x.empty())
+	if (x.back().first.id() >= __values.size()) {
+	  __values.reserve(x.back().first.id() + 1);
+	  __values.resize(x.back().first.id() + 1);
+	}
+      
+      iter_type iter_end = x.end();
+      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
+	operator[](iter->first) += iter->second;
+    }
+    
+    template <typename T, typename A>
+    self_type& operator-=(const FeatureVector<T, A>& x)
+    {
+      typedef typename FeatureVector<T, A>::const_iterator iter_type;
+      
+      if (! x.empty())
+	if (x.back().first.id() >= __values.size()) {
+	  __values.reserve(x.back().first.id() + 1);
+	  __values.resize(x.back().first.id() + 1);
+	}
+
+      iter_type iter_end = x.end();
+      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
+	operator[](iter->first) -= iter->second;
+    }
+    
+    template <typename T, typename A>
+    self_type& operator*=(const FeatureVector<T, A>& x)
+    {
+      typedef typename FeatureVector<T, A>::const_iterator iter_type;
+      
+      if (! x.empty())
+	if (x.back().first.id() >= __values.size()) {
+	  __values.reserve(x.back().first.id() + 1);
+	  __values.resize(x.back().first.id() + 1);
+	}
+
+      iter_type iter_end = x.end();
+      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
+	operator[](iter->first) *= iter->second;
+    }
+
+    template <typename T, typename A>
+    self_type& operator/=(const FeatureVector<T, A>& x)
+    {
+      typedef typename FeatureVector<T, A>::const_iterator iter_type;
+      
+      if (! x.empty())
+	if (x.back().first.id() >= __values.size()) {
+	  __values.reserve(x.back().first.id() + 1);
+	  __values.resize(x.back().first.id() + 1);
+	}
+      
+      iter_type iter_end = x.end();
+      for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
+	operator[](iter->first) /= iter->second;
+    }
+
+
   public:
     //comparison...
     friend
@@ -191,41 +267,49 @@ namespace cicada
     
     template <typename T, typename A>
     friend
-    std::ostream& operator<<(std::ostream& os, const WeightVector<T, A>& x)
-    {
-      typename WeightVector<T,A>::const_iterator iter_begin = x.begin();
-      typename WeightVector<T,A>::const_iterator iter_end   = x.end();
-
-      static const cicada::Feature __empty;
-      
-      for (typename WeightVector<T,A>::const_iterator iter = iter_begin; iter != iter_end; ++ iter)
-	if (*iter != 0.0) {
-	  cicada::Feature feature(iter - iter_begin);
-	  if (feature != __empty)
-	    os << feature << ' ' << *iter << '\n';
-	}
-      
-      return os;
-    }
+    std::ostream& operator<<(std::ostream& os, const WeightVector<T, A>& x);
     
     template <typename T, typename A>
     friend
-    std::istream& operator>>(std::istream& is, WeightVector<T,A>& x)
-    {
-      typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-      
-      x.clear();
-
-      std::string feature;
-      T value;
-      while ((is >> feature) && (is >> value))
-	x[cicada::Feature(feature).id()] = value;
-    }
+    std::istream& operator>>(std::istream& is, WeightVector<T,A>& x);
     
   private:
     weight_vector_type __values;
   };
     
+
+  template <typename T, typename A>
+  inline
+  std::ostream& operator<<(std::ostream& os, const WeightVector<T, A>& x)
+  {
+    typename WeightVector<T,A>::const_iterator iter_begin = x.begin();
+    typename WeightVector<T,A>::const_iterator iter_end   = x.end();
+
+    static const cicada::Feature __empty;
+      
+    for (typename WeightVector<T,A>::const_iterator iter = iter_begin; iter != iter_end; ++ iter)
+      if (*iter != 0.0) {
+	cicada::Feature feature(iter - iter_begin);
+	if (feature != __empty)
+	  os << feature << ' ' << *iter << '\n';
+      }
+      
+    return os;
+  }
+    
+  template <typename T, typename A>
+  inline
+  std::istream& operator>>(std::istream& is, WeightVector<T,A>& x)
+  {
+    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+      
+    x.clear();
+
+    std::string feature;
+    T value;
+    while ((is >> feature) && (is >> value))
+      x[cicada::Feature(feature).id()] = value;
+  }
 
 };
 
@@ -240,5 +324,7 @@ namespace std
   }
   
 };
+
+#include <cicada/feature_vector.hpp>
 
 #endif
