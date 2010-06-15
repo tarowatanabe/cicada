@@ -325,7 +325,6 @@ struct OptimizeLBFGS
       g.allocate();
       
       std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
-      
     }
 
     queue_type&            queue;

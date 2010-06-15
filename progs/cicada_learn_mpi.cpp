@@ -125,7 +125,7 @@ int main(int argc, char ** argv)
     
     enumerate_forest(forest_path);
 
-    if (debug)
+    if (debug && mpi_rank == 0)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
     weight_set_type weights;
@@ -357,10 +357,15 @@ struct OptimizeLBFGS
 	  gradient /= Z;
 	  gradient_intersected /= Z_intersected;
 	  
-	  feature_expectations += gradient_intersected;
-	  feature_expectations -= gradient;
+	  feature_expectations -= gradient_intersected;
+	  feature_expectations += gradient;
 	  
-	  objective -= log(Z_intersected) - log(Z);
+	  const double margin = log(Z_intersected) - log(Z);
+	  
+	  objective -= margin;
+	  
+	  if (debug >= 3)
+	    std::cerr << "id: " << id_forest << " margin: " << margin << std::endl;
 	}
       }
       
