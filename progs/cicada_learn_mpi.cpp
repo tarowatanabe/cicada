@@ -24,6 +24,12 @@
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
+#include "utils/base64.hpp"
+#include "utils/mpi.hpp"
+#include "utils/mpi_device.hpp"
+#include "utils/mpi_device_bcast.hpp"
+#include "utils/mpi_stream.hpp"
+#include "utils/mpi_stream_simple.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -57,8 +63,6 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 
-int threads = 1;
-
 int debug = 0;
 
 
@@ -68,8 +72,45 @@ double optimize(const path_type& forest_path,
 		weight_set_type& weights);
 void enumerate_forest(const path_type& path);
 
+
+void bcast_weights(const int rank, weight_set_type& weights);
+void send_weights(const weight_set_type& weights);
+void reduce_weights(weight_set_type& weights);
+
+enum {
+  weights_tag = 1000,
+  gradients_tag,
+  notify_tag,
+  termination_tag,
+};
+
+inline
+int loop_sleep(bool found, int non_found_iter)
+{
+  if (! found) {
+    boost::thread::yield();
+    ++ non_found_iter;
+  } else
+    non_found_iter = 0;
+    
+  if (non_found_iter >= 64) {
+    struct timespec tm;
+    tm.tv_sec = 0;
+    tm.tv_nsec = 2000001; // above 2ms
+    nanosleep(&tm, NULL);
+    
+    non_found_iter = 0;
+  }
+  return non_found_iter;
+}
+
 int main(int argc, char ** argv)
 {
+  utils::mpi_world mpi_world(argc, argv);
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
   try {
     options(argc, argv);
     
@@ -82,8 +123,6 @@ int main(int argc, char ** argv)
     if (! boost::filesystem::exists(intersected_path) || ! boost::filesystem::is_directory(intersected_path))
       throw std::runtime_error("no intersected forest?");
     
-    threads = utils::bithack::max(1, threads);
-
     enumerate_forest(forest_path);
 
     if (debug)
@@ -93,12 +132,14 @@ int main(int argc, char ** argv)
     
     const double objective = optimize(forest_path, intersected_path, weights);
 
-    if (debug)
+    if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
     
-    utils::compress_ostream os(output_path, 1024 * 1024);
-    os.precision(20);
-    os << weights;
+    if (mpi_rank == 0) {
+      utils::compress_ostream os(output_path, 1024 * 1024);
+      os.precision(20);
+      os << weights;
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -142,18 +183,18 @@ struct OptimizeLBFGS
   
   struct Task
   {
-    typedef std::pair<path_type, path_type> path_pair_type;
-    typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
-
     typedef cicada::semiring::Log<double> weight_type;
     typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
     typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_static_type;
 
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
 
-    Task(queue_type&            __queue,
-	 const weight_set_type& __weights)
-      : queue(__queue), weights(__weights) {}
+    Task(const weight_set_type& __weights,
+	 const path_type& __dir_forest,
+	 const path_type& __dir_intersected)
+      : weights(__weights),
+	dir_forest(__dir_forest),
+	dir_intersected(__dir_intersected) {}
     
     struct gradients_type
     {
@@ -191,6 +232,7 @@ struct OptimizeLBFGS
       typedef gradient_type value_type;
 
       feature_function(const weight_set_type& __weights) : weights(__weights) {}
+      
 
       template <typename Edge>
       value_type operator()(const Edge& edge) const
@@ -213,14 +255,15 @@ struct OptimizeLBFGS
     
     void operator()()
     {
-      path_pair_type paths;
+      const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+      const int mpi_size = MPI::COMM_WORLD.Get_size();
 
       size_t id_forest;
       size_t id_intersected;
       hypergraph_type hypergraph;
       
       std::string line;
-
+      
       gradients_type gradients;
       gradients_type gradients_intersected;
       weights_type   inside;
@@ -231,9 +274,14 @@ struct OptimizeLBFGS
       g.clear();
       objective = 0.0;
       
-      while (1) {
-	queue.pop(paths);
-	if (paths.first.empty()) break;
+      for (int i = 0;/**/; i += mpi_size) {
+	const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_forest      = dir_forest / file_name;
+	const path_type path_intersected = dir_intersected / file_name;
+	
+	if (! boost::filesystem::exists(path_forest)) break;
+	if (! boost::filesystem::exists(path_intersected)) continue;
 	
 	gradients.clear();
 	gradients_intersected.clear();
@@ -245,7 +293,7 @@ struct OptimizeLBFGS
 	bool valid_intersected = true;
 
 	{
-	  utils::compress_istream is(paths.first);
+	  utils::compress_istream is(path_forest);
 	  std::getline(is, line);
 
 	  std::string::const_iterator iter = line.begin();
@@ -271,7 +319,7 @@ struct OptimizeLBFGS
 	}
 	
 	{
-	  utils::compress_istream is(paths.second);
+	  utils::compress_istream is(path_intersected);
 	  std::getline(is, line);
 
 	  std::string::const_iterator iter = line.begin();
@@ -309,15 +357,10 @@ struct OptimizeLBFGS
 	  gradient /= Z;
 	  gradient_intersected /= Z_intersected;
 	  
-	  feature_expectations -= gradient_intersected;
-	  feature_expectations += gradient;
-
-	  const double margin = log(Z_intersected) - log(Z);
+	  feature_expectations += gradient_intersected;
+	  feature_expectations -= gradient;
 	  
-	  objective -= margin;
-
-	  if (debug >= 3)
-	    std::cerr << "id: " << id_forest << " margin: " << margin << std::endl;
+	  objective -= log(Z_intersected) - log(Z);
 	}
       }
       
@@ -325,12 +368,11 @@ struct OptimizeLBFGS
       g.allocate();
       
       std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
-      
     }
-
-    queue_type&            queue;
     
     const weight_set_type& weights;
+    const path_type        dir_forest;
+    const path_type        dir_intersected;
     
     double          objective;
     weight_set_type g;
@@ -344,54 +386,31 @@ struct OptimizeLBFGS
 				  const lbfgsfloatval_t step)
   {
     typedef Task                  task_type;
-    typedef task_type::queue_type queue_type;
-    
-    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+
+    const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+    const int mpi_size = MPI::COMM_WORLD.Get_size();
 
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
-        
-    queue_type queue(1024 * threads);
-
-#if 0
-    for (feature_type::id_type id = 0; id < optimizer.weights.size(); ++ id)
-      if (! feature_type(id).empty() && optimizer.weights[id] != 0.0)
-	std::cerr << feature_type(id) << ": " << optimizer.weights[id] << std::endl;
-#endif
-
-
-    task_set_type tasks(threads, task_type(queue, optimizer.weights));
     
-    boost::thread_group workers;
-    for (int i = 0; i < threads; ++ i)
-      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    // send notification!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
     
-    for (int sample = 0; /**/; ++ sample) {
-      const std::string file_name = boost::lexical_cast<std::string>(sample) + ".gz";
-      
-      const path_type path_forest      = optimizer.forest_path / file_name;
-      const path_type path_intersected = optimizer.intersected_path / file_name;
-      
-      if (! boost::filesystem::exists(path_forest)) break;
-      if (! boost::filesystem::exists(path_intersected)) continue;
-      
-      queue.push(std::make_pair(path_forest, path_intersected));
-    }
+    bcast_weights(0, optimizer.weights);
+    
+    task_type task(optimizer.weights, optimizer.forest_path, optimizer.intersected_path);
+    task();
     
     // collect all the objective and gradients...
-    double objective = 0.0;
+    
+    reduce_weights(task.g);
+    
     std::fill(g, g + n, 0.0);
+    std::transform(task.g.begin(), task.g.end(), g, g, std::plus<double>());
     
-    for (int i = 0; i < threads; ++ i)
-      queue.push(std::make_pair(path_type(), path_type()));
-    
-    workers.join_all();
-    
-    
-    for (int i = 0; i < threads; ++ i) {
-      objective += tasks[i].objective;
-      std::transform(tasks[i].g.begin(), tasks[i].g.end(), g, g, std::plus<double>());
-    }
-    
+    double objective = task.objective;
+    MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+
     // L2...
     if (regularize_l2) {
       double norm = 0.0;
@@ -417,80 +436,216 @@ double optimize(const path_type& forest_path,
 		const path_type& intersected_path,
 		weight_set_type& weights)
 {
-  return OptimizeLBFGS(forest_path, intersected_path, weights)();
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0)
+    return OptimizeLBFGS(forest_path, intersected_path, weights)();
+  else {
+
+    enum {
+      NOTIFY = 0,
+      TERMINATION,
+    };
+    
+    MPI::Prequest requests[2];
+
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    
+    for (int i = 0; i < 2; ++ i)
+      requests[i].Start();
+
+    while (1) {
+      if (MPI::Request::Waitany(2, requests))
+	break;
+      else {
+	typedef OptimizeLBFGS::Task task_type;
+
+	requests[NOTIFY].Start();
+
+	bcast_weights(0, weights);
+	
+	task_type task(weights, forest_path, intersected_path);
+	task();
+	
+	send_weights(task.g);
+	
+	double objective = 0.0;
+	MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+      }
+    }
+    
+    if (requests[NOTIFY].Test())
+      requests[NOTIFY].Cancel();
+    
+    return 0.0;
+  }
 }
 
 // I know, it is very stupid...
 
-struct TaskEnumerate
-{
-  typedef utils::lockfree_list_queue<path_type, std::allocator<path_type> > queue_type;
-  
-  TaskEnumerate(queue_type& __queue)
-    : queue(__queue) {}
-  
-  void operator()()
-  {
-    path_type       path;
-    
-    size_t          id;
-    hypergraph_type graph;
-
-    std::string line;
-    
-    while (1) {
-      queue.pop_swap(path);
-      if (path.empty()) break;
-      
-      utils::compress_istream is(path);
-      std::getline(is, line);
-
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-
-      if (! parse_id(id, iter, end))
-	throw std::runtime_error("invalid id input");
-	  
-      if (! graph.assign(iter, end))
-	throw std::runtime_error("invalid graph format");
-
-      if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format");
-    }
-  }
-
-  queue_type& queue;
-};
-
-
 void enumerate_forest(const path_type& dir)
 {
-  typedef TaskEnumerate task_type;
-  typedef task_type::queue_type queue_type;
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  queue_type queue;
+  size_t          id;
+  hypergraph_type graph;
   
-  boost::thread_group workers;
-  for (int i = 0; i < threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(queue)));
+  std::string line;
   
-  for (int i = 0; /**/; ++ i) {
+  for (int i = 0; /**/; i += mpi_size) {
     path_type path = dir / (boost::lexical_cast<std::string>(i) + ".gz");
     if (! boost::filesystem::exists(path)) break;
     
-    queue.push_swap(path);
+    utils::compress_istream is(path);
+    std::getline(is, line);
+    
+    std::string::const_iterator iter = line.begin();
+    std::string::const_iterator end = line.end();
+    
+    if (! parse_id(id, iter, end))
+      throw std::runtime_error("invalid id input");
+    
+    if (! graph.assign(iter, end))
+      throw std::runtime_error("invalid graph format");
+    
+    if (iter != end)
+      throw std::runtime_error("invalid id ||| graph format");
   }
   
-  for (int i = 0; i < threads; ++ i)
-    queue.push(path_type());
-  
-  workers.join_all();
+  // collect features...
+  for (int rank = 0; rank < mpi_size; ++ rank) {
+    weight_set_type weights;
+    weights.allocate();
+    
+    for (int id = 0; id < feature_type::allocated(); ++ id)
+      if (! feature_type(feature_type::id_type(id)).empty())
+	weights[feature_type(id)] = 1.0;
+    
+    bcast_weights(rank, weights);
+  }
 }
 
+void reduce_weights(weight_set_type& weights)
+{
+  typedef utils::mpi_device_source            device_type;
+  typedef boost::iostreams::filtering_istream stream_type;
+
+  typedef boost::shared_ptr<device_type> device_ptr_type;
+  typedef boost::shared_ptr<stream_type> stream_ptr_type;
+
+  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  device_ptr_set_type device(mpi_size);
+  stream_ptr_set_type stream(mpi_size);
+
+  for (int rank = 1; rank < mpi_size; ++ rank) {
+    device[rank].reset(new device_type(rank, weights_tag, 1024 * 1024));
+    stream[rank].reset(new stream_type());
+    
+    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(*device[rank]);
+  }
+
+  std::string line;
+  
+  int non_found_iter = 0;
+  while (1) {
+    bool found = false;
+    
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      while (stream[rank] && device[rank] && device[rank]->test()) {
+	if (std::getline(*stream[rank], line)) {
+	  tokenizer_type tokenizer(line);
+	  
+	  tokenizer_type::iterator iter = tokenizer.begin();
+	  if (iter == tokenizer.end()) continue;
+	  std::string feature = *iter;
+	  ++ iter;
+	  if (iter == tokenizer.end()) continue;
+	  std::string value = *iter;
+	  
+	  weights[feature] += utils::decode_base64<double>(value);
+	} else {
+	  stream[rank].reset();
+	  device[rank].reset();
+	}
+	found = true;
+      }
+    
+    if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+  
+}
+
+
+void send_weights(const weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::gzip_compressor());
+  os.push(utils::mpi_device_sink(0, weights_tag, 1024 * 1024));
+  
+  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
+    if (! feature_type(id).empty() && weights[id] != 0.0)
+      os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
+}
+
+void bcast_weights(const int rank, weight_set_type& weights)
+{
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == rank) {
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_bcast_sink(rank, 1024));
+    
+    static const weight_set_type::feature_type __empty;
+    
+    weight_set_type::const_iterator witer_begin = weights.begin();
+    weight_set_type::const_iterator witer_end = weights.end();
+    
+    for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
+      if (*witer != 0.0) {
+	const weight_set_type::feature_type feature(witer - witer_begin);
+	if (feature != __empty)
+	  os << feature << ' ' << utils::encode_base64(*witer) << '\n';
+      }
+  } else {
+    weights.clear();
+    weights.allocate();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(utils::mpi_device_bcast_source(rank, 1024));
+    
+    std::string feature;
+    std::string value;
+    
+    while ((is >> feature) && (is >> value))
+      weights[feature] = utils::decode_base64<double>(value);
+  }
+}
 
 
 void options(int argc, char** argv)
 {
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
   namespace po = boost::program_options;
   
   po::options_description opts_command("command line options");
@@ -504,8 +659,6 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C"            , po::value<double>(&C),           "regularization constant")
-
-    ("threads", po::value<int>(&threads), "# of threads")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
@@ -519,8 +672,12 @@ void options(int argc, char** argv)
   po::notify(variables);
 
   if (variables.count("help")) {
-    std::cout << argv[0] << " [options] [operations]\n"
-	      << opts_command << std::endl;
+
+    if (mpi_rank == 0)
+      std::cout << argv[0] << " [options] [operations]\n"
+		<< opts_command << std::endl;
+
+    MPI::Finalize();
     exit(0);
   }
 }

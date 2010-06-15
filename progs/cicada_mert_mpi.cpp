@@ -677,8 +677,8 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	    if (*iter != "|||") continue;
 	    ++ iter;
 
-	    id = boost::lexical_cast<int>(id_str.c_str());
-	    x = utils::decode_base64<double>(x_str.c_str());
+	    id = boost::lexical_cast<int>(id_str);
+	    x = utils::decode_base64<double>(x_str);
 	    sentence.assign(iter, tokenizer.end());
 	    
 	    if (id >= segments.size())

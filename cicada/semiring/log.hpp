@@ -65,13 +65,21 @@ namespace cicada
       
       Log& operator+=(const Log& x)
       {
+	using namespace boost::math::policies;
+	typedef policy<domain_error<errno_on_error>,
+	  pole_error<errno_on_error>,
+	  overflow_error<errno_on_error>,
+	  rounding_error<errno_on_error>,
+	  evaluation_error<errno_on_error>
+	  > policy_type;
+
 	if (x.__value == - std::numeric_limits<Tp>::infinity())
 	  return *this;
 	else if (__value == - std::numeric_limits<Tp>::infinity()) {
 	  *this = x;
 	  return *this;
 	}
-	
+
 	if (__sign == x.__sign) {
 	  if (x.__value < __value)
 	    __value = __value + boost::math::log1p(std::exp(x.__value - __value));
@@ -79,11 +87,22 @@ namespace cicada
 	    __value = x.__value + boost::math::log1p(std::exp(__value - x.__value));
 	  
 	} else {
-	  if (x.__value < __value)
-	    __value = __value + boost::math::log1p(- std::exp(x.__value - __value));
-	  else {
-	    __value = x.__value + boost::math::log1p(- std::exp(__value - x.__value));
-	    __sign = ! __sign;
+	  if (x.__value == __value)
+	    *this = zero();
+	  else if (x.__value < __value) {
+	    const Tp exp_value = std::exp(x.__value - __value);
+	    if (exp_value == 1.0)
+	      *this = zero();
+	    else
+	      __value = __value + boost::math::log1p(- exp_value);
+	  } else {
+	    const Tp exp_value = std::exp(__value - x.__value);
+	    if (exp_value == 1.0)
+	      *this = zero();
+	    else {
+	      __value = x.__value + boost::math::log1p(- exp_value);
+	      __sign = ! __sign;
+	    }
 	  }
 	}
 	
@@ -92,8 +111,7 @@ namespace cicada
       
       Log& operator-=(const Log& x)
       {
-	*this += Log(proxy_type(x.__value, ! x.__sign));
-	return *this;
+	return *this += Log(proxy_type(x.__value, ! x.__sign));
       }
       
       Log& operator*=(const Log& x)
@@ -115,7 +133,7 @@ namespace cicada
       friend
       bool operator!=(const self_type& x, const self_type& y) { return x.__value != y.__value || x.__sign != y.__sign; }
       friend
-      bool operator<(const self_type& x, const self_type& y) { return x.__sign > y.__sign || (x.__sign == y.__sign && x.__value < y.__value); }
+      bool operator<(const self_type& x, const self_type& y) { return (x.__sign > y.__sign) || (x.__sign && x.__value > y.__value) || (x.__value < y.__value); }
       friend
       bool operator>(const self_type& x, const self_type& y) { return y < x; }
       friend
@@ -153,7 +171,7 @@ namespace cicada
     Log<Tp> operator-(const Log<Tp>& x, const Log<Tp>& y)
     {
       Log<Tp> __value(x);
-      __value += y;
+      __value -= y;
       return __value;
     }
 
@@ -182,7 +200,6 @@ namespace cicada
       static inline Log<Tp> zero() { return Log<Tp>::zero();  }
       static inline Log<Tp> one()  { return Log<Tp>::one(); }
     };
-
   };
 };
 
