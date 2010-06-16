@@ -141,6 +141,29 @@ namespace cicada
       friend
       bool operator>=(const self_type& x, const self_type& y) { return ! (x < y); }
       
+      friend
+      std::ostream& operator<<(std::ostream& os, const self_type& x)
+      {
+	os << (x.__sign ? '-' : '+') << x.__value;
+	return os;
+      }
+      
+      friend
+      std::istream& operator>>(std::istream& is, self_type& x)
+      {
+	char __char;
+
+	is >> __char >> x.__value;
+
+	switch (__char) {
+	case '+': x.__sign = false; break;
+	case '-': x.__sign = true;  break;
+	default: 
+	  throw std::runtime_error("invlaid sign");
+	}
+	return is;
+      }
+
       
     private:
       weight_type __value;

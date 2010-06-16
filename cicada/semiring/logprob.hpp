@@ -87,8 +87,13 @@ namespace cicada
 	
 	if (*this == x)
 	  *this = zero();
-	else
-	  __value = __value + boost::math::log1p(- std::exp(x.__value - __value));
+	else {
+	  const Tp exp_value = std::exp(x.__value - __value);
+	  if (exp_value == 1.0)
+	    *this = zero();
+	  else
+	    __value = __value + boost::math::log1p(- exp_value);
+	}
 	
 	return *this;
       }
