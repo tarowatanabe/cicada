@@ -7,6 +7,9 @@
 #include "utils/hashmurmur.hpp"
 #include "utils/compact_trie.hpp"
 #include "utils/indexed_set.hpp"
+#include "utils/bithack.hpp"
+
+#include <boost/numeric/conversion/bounds.hpp>
 
 namespace cicada
 {
@@ -29,6 +32,10 @@ namespace cicada
       
       typedef feature_function_type::rule_type rule_type;
       
+      typedef rule_type::symbol_set_type phrase_type;
+
+      typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
+            
       // this implementation specific...
       typedef uint32_t id_type;
       typedef uint32_t count_type;
@@ -69,6 +76,63 @@ namespace cicada
       BleuImpl(const int __order,
 	       const bool __exact)
 	: order(__order), exact(__exact) {}
+
+      double bleu_score(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge) const
+      {
+	const rule_type& rule = *edge.rule;
+	const phrase_type& target = rule.target;
+	const phrase_type& source = rule.source;
+	
+	count_set_type counts;
+
+	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
+	symbol_type* context_last  = context_first + order * 2;
+	
+	int*     context_parsed     = reinterpret_cast<int*>(context_last);
+	int*     context_hypothesis = context_parsed + 1;
+	id_type* context_count       = reinterpret_cast<id_type*>(context_hypothesis + 1);
+
+	const int context_size = order - 1;
+	
+	if (states.empty()) {
+	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	  buffer.clear();
+	  
+	  phrase_type::const_iterator titer_end = target.end();
+	  for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	    if (*titer != vocab_type::EPSILON)
+	      buffer.push_back(*titer);
+	  
+	  collect_counts(buffer.begin(), buffer.end(), counts);
+	  
+	  std::fill(context_first, context_last, vocab_type::EMPTY);
+	  
+	  if (buffer.size() <= context_size)
+	    std::copy(buffer.begin(), buffer.end(), context_first);
+	  else {
+	    std::copy(buffer.begin(), buffer.begin() + context_size, context_first);
+	    context_first[context_size] = vocab_type::STAR;
+	    std::copy(buffer.end() - context_size, buffer.end(), context_first + order);
+	  }
+	  
+	  
+	  *context_parsed = 0;
+	  phrase_type::const_iterator siter_end = source.end();
+	  for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
+	    *context_parsed += (*siter != vocab_type::EPSILON);
+	  
+	  *context_hypothesis = buffer.size();
+	  
+	} else {
+	  
+	  
+	  
+	}
+	
+	return 0.0;
+      }
       
       void clear()
       {
@@ -120,8 +184,105 @@ namespace cicada
 	sizes.push_back(sentence.size());
 	std::sort(sizes.begin(), sizes.end());
       }
+
+    private:
+      template <typename Iterator>
+      void collect_counts(Iterator first, Iterator last, count_set_type& counts) const
+      {
+	if (exact)
+	  counts.resize(nodes.size(), count_type(0));
+	else
+	  counts.resize(order, count_type(0));
+	
+	// we will collect counts at [first, last)
+	for (/**/; first != last; ++ first) {
+	  ngram_set_type::id_type id = ngrams.root();
+	  for (Iterator iter = first; iter != std::min(first + order, last); ++ iter) {
+	    id = ngrams.find(id, *iter);
+	    
+	    if (ngrams.is_root(id)) break;
+	    
+	    if (exact)
+	      ++ counts[id];
+	    else
+	      ++ counts[nodes[id].order - 1];
+	  }
+	}
+      }
+      
+
+      double brevity_penalty(const double hypothesis_size, const double reference_size) const
+      {
+	if (hypothesis_size == 0 || reference_size == 0)
+	  return 0.0;
+	else
+	  return std::min(1.0 - reference_size / hypothesis_size, 0.0);
+      }
+      
+      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int parsed_size, const int source_size) const
+      {
+	count_set_type counts_bleu(order, count_type(0));
+	if (exact)
+	  for (ngram_set_type::id_type id = 0; id < __counts.size();++ id)
+	    counts_bleu[nodes[id].order - 1] += utils::bithack::min(int(__counts[id]), int(ngrams[id]));
+	
+	const count_set_type& counts = (exact ? counts_bleu : __counts);
+	
+	if (hypothesis_size == 0 || counts.empty()) return 0.0;
+	
+	const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size);
+	const double reference_length  = ref_size(hypothesis_length);
+	
+	double smooth = 0.5;
+	double bleu = brevity_penalty(hypothesis_length, reference_length);
+	
+	const int ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
+	
+	const double factor = 1.0 / order;
+	for (int n = 1; n <= ngram_size; ++ n) {
+	  const int count = counts[n - 1];
+	  
+	  bleu += std::log((count ? double(count) : smooth) / (hypothesis_size + 1 - n)) * factor;
+	  smooth *= 0.5;
+	}
+	
+	return std::exp(bleu);
+      }
+
+      double tst_size(int length, int parsed, int source_size) const
+      {
+	if (length == 0 || parsed == 0) return 0.0;
+	
+	// we will scale hypothesis length by the # of parsed words
+	
+	return (parsed < source_size
+		? (double(source_size) / parsed) * length
+		: double(length));
+      }
+      
+      double ref_size(const double hypothesis_size) const
+      {
+	if (hypothesis_size == 0) return 0;
+	
+	int reference_size = 0;
+	double min_diff = boost::numeric::bounds<double>::highest();
+	for (size_set_type::const_iterator siter = sizes.begin(); siter != sizes.end(); ++ siter) {
+	  const double diff = std::fabs(hypothesis_size - *siter);
+
+	  if (diff < min_diff) {
+	    min_diff = diff;
+	    reference_size = *siter;
+	  } else if (diff == min_diff)
+	    reference_size = utils::bithack::min(reference_size, *siter);
+	}
+	
+	return reference_size;
+      }
       
     private:
+      
+      buffer_type buffer_impl;
+
       ngram_set_type ngrams;
       node_set_type  nodes;
       size_set_type  sizes;
@@ -176,24 +337,26 @@ namespace cicada
 			  feature_set_type& features,
 			  feature_set_type& estimates) const
     {
+      const double score = pimpl->bleu_score(state, states, edge);
       
+      if (score != 0.0)
+	features[base_type::feature_name()] = score;
     }
     
     void Bleu::operator()(state_ptr_type& state,
 			  feature_set_type& features) const
     {
-      
+      // we do nothing...
     }
     
     void Bleu::clear()
     {
-      
+      pimpl->clear();
     }
     
     void Bleu::insert(const int source_size, const sentence_type& sentence)
     {
-      
-      
+      pimpl->insert(source_size, sentence);
     }
 
   };

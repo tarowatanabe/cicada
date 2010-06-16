@@ -17,6 +17,26 @@
 namespace cicada
 {
   
+  struct BinarizeNoFeature
+  {
+    template <typename Features, typename Rule>
+    void operator()(Features& features, const Rule& rule, const Rule& binarized)
+    {
+      
+    }
+  };
+
+  struct BinarizeFeature
+  {
+    template <typename Features, typename Rule>
+    void operator()(Features& features, const Rule& rule, const Rule& binarized)
+    {
+      // we know the parent of binarized constituent...
+      features["binarize:" + static_cast<const std::string&>(rule.lhs) + static_cast<const std::string&>(binarized.lhs)] = 1.0;
+    }
+  };
+
+  template <typename FeatureFunction>
   struct Binarize
   {
     typedef HyperGraph hypergraph_type;
@@ -43,8 +63,8 @@ namespace cicada
       }
     };
     
-    Binarize(int __binarize_size)
-      : binarize_size(__binarize_size) {}
+    Binarize(FeatureFunction __function, int __binarize_size)
+      : function(__function), binarize_size(__binarize_size) {}
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -77,7 +97,7 @@ namespace cicada
 	    
 	    hypergraph_type::id_type head = edge_source.head;
 	    symbol_type non_terminal_head = edge_source.rule->lhs;
-
+	    
 	    const int arity = edge_source.tails.size();
 	    
 	    for (int i = 0; i < arity - 2; ++ i) {
@@ -99,6 +119,8 @@ namespace cicada
 						2));
 	      
 	      target.connect_edge(edge_new.id, head);
+
+	      function(edge_new.features, *edge_source.rule, *edge_new.rule);
 	      
 	      head = node_new.id;
 	      non_terminal_head = non_terminal_new;
@@ -115,6 +137,8 @@ namespace cicada
 					      2));
 	    // assign features here...
 	    edge_new.features = edge_source.features;
+	    
+	    function(edge_new.features, *edge_source.rule, *edge_new.rule);
 	    
 	    target.connect_edge(edge_new.id, head);
 	  } 
@@ -158,14 +182,24 @@ namespace cicada
     }
 
   private:
+    FeatureFunction function;
     
     int binarize_size;
   };
   
+  template <typename Function>
+  inline
+  void binarize(const HyperGraph& source, HyperGraph& target, Function function, const int binarize_size=0)
+  {
+    Binarize<Function> binarizer(function, binarize_size);
+    
+    binarizer(source, target);
+  }
+  
   inline
   void binarize(const HyperGraph& source, HyperGraph& target, const int binarize_size=0)
   {
-    Binarize binarizer(binarize_size);
+    Binarize<BinarizeNoFeature> binarizer(BinarizeNoFeature(), binarize_size);
     
     binarizer(source, target);
   }
@@ -175,7 +209,7 @@ namespace cicada
   {
     HyperGraph target;
 
-    Binarize binarizer(binarize_size);
+    Binarize<BinarizeNoFeature> binarizer(BinarizeNoFeature(), binarize_size);
     
     binarizer(source, target);
     

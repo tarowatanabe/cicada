@@ -20,6 +20,52 @@
 
 namespace cicada
 {
+
+  struct PermuteNoFeature
+  {
+    template <typename Features, typename Rule, typename Permutation>
+    void operator()(Features& features, const Rule& rule, const Permutation& permutation)
+    {
+      
+    }
+  };
+
+  struct PermuteFeature
+  {
+    
+    std::vector<std::string, std::allocator<std::string> > non_terminal_symbols;
+    
+    template <typename Features, typename Rule, typename Permutation>
+    void operator()(Features& features, const Rule& rule, const Permutation& permutation)
+    {
+      typedef Rule rule_type;
+      
+      non_terminal_symbols.clear();
+      
+      int non_terminal_pos = 0;
+      typename rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  non_terminal_symbols.push_back('[' + static_cast<const std::string&>(*siter).substr(1, siter->size() - 2) + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
+	  ++ non_terminal_pos;
+	}
+      
+      std::string rule_string("permute:");
+      rule_string += static_cast<const std::string&>(rule.lhs) + "->";
+      
+      int permutation_pos = 0;
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  rule_string += non_terminal_symbols[permutation[permutation_pos]];
+	  ++ permutation_pos;
+	} else
+	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
+      
+      features[rule_string] = 1.0;
+    }
+  };
+
+  template <typename FeatureFunction>
   struct Permute
   {
     typedef HyperGraph hypergraph_type;
@@ -35,12 +81,14 @@ namespace cicada
     typedef std::vector<symbol_type, std::allocator<symbol_type> > phrase_type;
     
     typedef utils::bit_vector<1024> coverage_type;
-
-
-    Permute(const int __permute_size)
-      : permute_size(__permute_size) {}
     
-            
+    Permute(FeatureFunction __function,
+	    const int __permute_size)
+      : function(__function),
+	permute_size(__permute_size) {}
+    
+    
+    
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       target.clear();
@@ -69,7 +117,8 @@ namespace cicada
 	  edge.rule = edge_source.rule;
 	  
 	  edge.features = edge_source.features;
-	  edge.features[rule_feature(*edge_source.rule, permutation)] = 1.0;
+
+	  function(edge.features, *edge_source.rule, permutation);
 	  
 	  target.connect_edge(edge.id, node.id);
 	  
@@ -180,7 +229,8 @@ namespace cicada
 	edge.rule = edge_source.rule;
       
       edge.features = edge_source.features;
-      edge.features[rule_feature(*edge_source.rule, permutation)] = 1.0;
+      
+      function(edge.features, *edge_source.rule, permutation);
       
       graph.connect_edge(edge.id, node.id);
     }
@@ -199,31 +249,8 @@ namespace cicada
       return differences > 0;
     }
 
-    feature_type rule_feature(const rule_type& rule, const permutation_type& permutation)
-    {
-      non_terminal_symbols.clear();
-      
-      int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
-      for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
-	if (siter->is_non_terminal()) {
-	  non_terminal_symbols.push_back('[' + static_cast<const std::string&>(*siter).substr(1, siter->size() - 2) + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
-	  ++ non_terminal_pos;
-	}
-    
-      std::string rule_string("rule:");
-      rule_string += static_cast<const std::string&>(rule.lhs) + "->";
-      
-      int permutation_pos = 0;
-      for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
-	if (siter->is_non_terminal()) {
-	  rule_string += non_terminal_symbols[permutation[permutation_pos]];
-	  ++ permutation_pos;
-	} else
-	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
-      
-      return rule_string;
-    }
+
+    FeatureFunction function;
 
     int permute_size;
 
@@ -231,14 +258,21 @@ namespace cicada
     phrase_type source_non_terminals;
     
     tails_type tails;
-
-    std::vector<std::string, std::allocator<std::string> > non_terminal_symbols;
   };
+
+  template <typename Function>
+  inline
+  void permute(const HyperGraph& source, HyperGraph& target, Function function, const int permute_size)
+  {
+    Permute<Function> permutation(function, permute_size);
+    
+    permutation(source, target);
+  }
   
   inline
   void permute(const HyperGraph& source, HyperGraph& target, const int permute_size)
   {
-    Permute permutation(permute_size);
+    Permute<PermuteFeature> permutation(PermuteFeature(), permute_size);
     
     permutation(source, target);
   }

@@ -89,6 +89,30 @@ namespace cicada
     size_type size() const { return __impl.size(); }
     bool empty() const { return __impl.empty(); }
     
+    
+    template <typename ResultIterator>
+    void terminals(ResultIterator riter) const
+    {
+      const_iterator first = begin();
+      const_iterator last = end();
+      const_iterator iter = first;
+      for (/**/; iter != last && iter->is_terminal(); ++ iter);
+      *riter = std::make_pair(first, iter);
+      ++ riter;
+      first = iter;
+      
+      while (first != last) {
+	++ first;
+	
+	const_iterator iter = first;
+	for (/**/; iter != last && iter->is_terminal(); ++ iter);
+	*riter = std::make_pair(first, iter);
+	++ riter;
+	first = iter;
+      }
+    }
+
+
   public:
     friend
     size_t hash_value(SymbolVector const& x);

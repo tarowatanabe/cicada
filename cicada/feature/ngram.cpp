@@ -113,27 +113,6 @@ namespace cicada
 	return x.size() == std::distance(first, last) && std::equal(first, last, x.begin());
       }
       
-      template <typename Iterator, typename Spans>
-      void terminals(Iterator first, Iterator last, Spans& spans) const
-      {
-	spans.clear();
-	
-	Iterator iter = first;
-	
-	for (/**/; iter != last && iter->is_terminal(); ++ iter);
-	spans.push_back(std::make_pair(first, iter));
-	first = iter;
-	
-	while (first != last) {
-	  ++ first;
-	  
-	  Iterator iter = first;
-	  for (/**/; iter != last && iter->is_terminal(); ++ iter);
-	  spans.push_back(std::make_pair(first, iter));
-	  first = iter;
-	}
-      }
-
       template <typename Iterator>
       double ngram_score(Iterator first, Iterator iter, Iterator last) const
       {
@@ -226,7 +205,7 @@ namespace cicada
 	    const double score = ngram_score(buffer.begin(), buffer.begin() + context_size, buffer.end());
 	    
 	    std::copy(buffer.begin(), buffer.begin() + context_size, context);
-	    context[order] = vocab_type::STAR;
+	    context[context_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - context_size, buffer.end(), context + order);
 	    
 	    return score;
@@ -234,7 +213,8 @@ namespace cicada
 	}
 	
 	phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
-	terminals(titer_begin, titer_end, phrase_spans);
+	phrase_spans.clear();
+	target.terminals(std::back_inserter(phrase_spans));
 	
 	double score = 0.0;
 	
@@ -315,7 +295,7 @@ namespace cicada
 	    std::copy(buffer.begin(), buffer.end(), context);
 	  else {
 	    std::copy(buffer.begin(), buffer.begin() + context_size, context);
-	    context[order] = vocab_type::STAR;
+	    context[context_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - context_size, buffer.end(), context + order);
 	  }
 	}
