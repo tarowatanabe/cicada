@@ -35,7 +35,7 @@ namespace cicada
   // semiring,
   // yield, requires operator=(const yield&) (assignment) and  yield::yield() (constructor)
   // traversal function operator()(const HyperGraph::Edge&, const yield*, Iterator first, Iterator last);
-  //                    where Iterator's value (*first etc.) is const yield*
+  //                    where Iterator's value (*first etc.) is const yield&
   // semiring function
   
   
@@ -161,11 +161,36 @@ namespace cicada
     }
     
   private:
+    typedef std::vector<const yield_type*, std::allocator<const yield_type*> > yield_set_type;
+
+  public:
+    class yield_iterator : public yield_set_type::const_iterator
+    {
+    public:
+      typedef typename yield_set_type::const_iterator base_type;
+      
+      yield_iterator(const base_type& x) : base_type(x) {}
+      
+      const yield_type& operator*()  { return *(base_type::operator*()); }
+      const yield_type* operator->() { return base_type::operator*(); }
+      
+      friend
+      yield_iterator operator+(const yield_iterator& x, ptrdiff_t diff)
+      {
+	return yield_iterator(base_type(x) + diff);
+      }
+
+      friend
+      yield_iterator operator-(const yield_iterator& x, ptrdiff_t diff)
+      {
+	return yield_iterator(base_type(x) - diff);
+      }
+
+    };
     
+  private:
     const derivation_type* lazy_kth_best(int v, int k)
     {
-      typedef std::vector<const yield_type*, std::allocator<const yield_type*> > yield_set_type;
-
       //std::cerr << "lazy-kth-best: node: " <<  v << " kbest: " << k << std::endl;
 
       state_type & state = get_candidate(v);
@@ -200,7 +225,7 @@ namespace cicada
 	    yields.push_back(&(antecedent->yield));
 	  }
 	  
-	  traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yields.begin(), yields.end());
+	  traversal(*(derivation->edge), const_cast<yield_type&>(derivation->yield), yield_iterator(yields.begin()), yield_iterator(yields.end()));
 	  
 	  // perform filtering here...!
 	  // if we have duplicates, do not insert...

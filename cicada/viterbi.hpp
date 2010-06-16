@@ -14,6 +14,40 @@ namespace cicada
   // I tried semiring based implementation, but ended-up with specific function...
 
   template <typename Traversal, typename Function>
+  struct Viterbi
+  {
+    typedef HyperGraph hypergraph_type;
+    
+    typedef typename Traversal::value_type yield_type;
+    typedef typename Function::value_type  weight_type;
+    
+    typedef std::vector<const yield_type*, std::allocator<const yield_type*> > yield_set_type;
+    
+    class yield_iterator : public yield_set_type::const_iterator
+    {
+    public:
+      typedef typename yield_set_type::const_iterator base_type;
+      
+      yield_iterator(const base_type& x) : base_type(x) {}
+      
+      const yield_type& operator*()  { return *(base_type::operator*()); }
+      const yield_type* operator->() { return base_type::operator*(); }
+      
+      friend
+      yield_iterator operator+(const yield_iterator& x, ptrdiff_t diff)
+      {
+	return yield_iterator(base_type(x) + diff);
+      }
+
+      friend
+      yield_iterator operator-(const yield_iterator& x, ptrdiff_t diff)
+      {
+	return yield_iterator(base_type(x) - diff);
+      }
+    };
+  };
+
+  template <typename Traversal, typename Function>
   inline
   void viterbi(const HyperGraph& graph,
 	       typename Traversal::value_type& yield,
@@ -54,11 +88,13 @@ namespace cicada
 	  score *= weights[*niter];
 	  antecedents.push_back(&yields[*niter]);
 	}
+
+	typedef typename Viterbi<Traversal, Function>::yield_iterator yield_iterator;
 	
 	// +=
 	if (score > weights[node.id]) {
 	  weights[node.id] = score;
-	  traversal(edge, yields[node.id], antecedents.begin(), antecedents.end());
+	  traversal(edge, yields[node.id], yield_iterator(antecedents.begin()), yield_iterator(antecedents.end()));
 	}
       }
     }

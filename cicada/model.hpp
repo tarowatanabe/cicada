@@ -39,6 +39,13 @@ namespace cicada
 
   private:
     typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type > > model_set_type;
+
+  public:
+    typedef model_set_type::reference       reference;
+    typedef model_set_type::const_reference const_reference;
+
+    typedef model_set_type::const_iterator iterator;
+    typedef model_set_type::const_iterator const_iterator;
     
   public:
     Model() {}
@@ -52,6 +59,15 @@ namespace cicada
     
     void operator()(const state_type& state,
 		    edge_type& edge) const;
+    
+    const_reference operator[](size_type pos) const { return models[pos]; }
+    reference operator[](size_type pos) { return models[pos]; }
+
+    const_iterator begin() const { return models.begin(); }
+    iterator begin() { return models.begin(); }
+
+    const_iterator end() const { return models.end(); }
+    iterator end() { return models.end(); }
     
     // you should call this at least once, when you are going to use this model.
     void initialize();

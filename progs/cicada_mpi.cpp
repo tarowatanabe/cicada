@@ -156,13 +156,13 @@ struct kbest_traversal
     for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
       if (titer->is_non_terminal()) {
 	const int pos = titer->non_terminal_index() - 1;
-	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(*(first + pos))).begin(), boost::get<0>(*(*(first + pos))).end());
+	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
       } else if (*titer != vocab_type::EPSILON)
 	boost::get<0>(yield).push_back(*titer);
     
     // collect features...
     for (/**/; first != last; ++ first)
-      boost::get<1>(yield) += boost::get<1>(*(*first));
+      boost::get<1>(yield) += boost::get<1>(*first);
   }
 };
 
@@ -272,6 +272,8 @@ bool apply_cube = false;
 bool apply_full = false;
 int  cube_size = 200;
 
+bool intersect = false;
+
 double prune_beam = 0.0;
 
 int debug = 0;
@@ -326,7 +328,10 @@ int main(int argc, char ** argv)
       throw std::runtime_error("input can be sentence, lattice or forest");
     
     if (apply_cube && apply_full)
-      throw std::runtime_error("intersection can be either cube or full (default dube)");
+      throw std::runtime_error("application can be either cube or full (default dube)");
+
+    if (intersect && ! input_bitext_mode)
+      throw std::runtime_error("when intersecting, input must contains bitext");
 
     if (feature_list) {
 
@@ -645,7 +650,7 @@ struct TaskStdout
 	
 	utils::resource prune_start;
 	
-	beam_prune(hypergraph, hypergraph_pruned, weights, 1.0, prune_beam);
+	cicada::beam_prune(hypergraph, hypergraph_pruned, weights, 1.0, prune_beam);
 	
 	utils::resource prune_end;
 	
@@ -663,12 +668,12 @@ struct TaskStdout
 	hypergraph.swap(hypergraph_pruned);
       }
       
-      if (input_bitext_mode) {
+      if (input_bitext_mode && intersect) {
 	hypergraph_type hypergraph_intersected;
 	
 	utils::resource intersect_start;
 	
-	intersect(hypergraph, target, hypergraph_intersected);
+	cicada::intersect(hypergraph, target, hypergraph_intersected);
 	
 	utils::resource intersect_end;
 	
@@ -1199,7 +1204,7 @@ struct Task
 	
 	utils::resource prune_start;
 	
-	beam_prune(hypergraph, hypergraph_pruned, weights, 1.0, prune_beam);
+	cicada::beam_prune(hypergraph, hypergraph_pruned, weights, 1.0, prune_beam);
 	
 	utils::resource prune_end;
 	
@@ -1217,12 +1222,12 @@ struct Task
 	hypergraph.swap(hypergraph_pruned);
       }
 
-      if (input_bitext_mode) {
+      if (input_bitext_mode && intersect) {
 	hypergraph_type hypergraph_intersected;
 	
 	utils::resource intersect_start;
 	
-	intersect(hypergraph, target, hypergraph_intersected);
+	cicada::intersect(hypergraph, target, hypergraph_intersected);
 	
 	utils::resource intersect_end;
 	
@@ -1483,6 +1488,9 @@ void options(int argc, char** argv)
     ("apply-cube", po::bool_switch(&apply_cube),                         "feature application by cube-pruning")
     ("apply-full", po::bool_switch(&apply_full),                         "full feature application")
     ("cube-size",  po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning")
+
+    // intersection
+    ("intersect", po::bool_switch(&intersect), "intersec with target")
     
     // beam pruning
     ("prune-beam", po::value<double>(&prune_beam),  "beam pruning (0.0 < threshold < 1.0)")

@@ -119,13 +119,13 @@ struct kbest_traversal
     for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
       if (titer->is_non_terminal()) {
 	const int pos = titer->non_terminal_index() - 1;
-	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(*(first + pos))).begin(), boost::get<0>(*(*(first + pos))).end());
+	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
       } else if (*titer != vocab_type::EPSILON)
 	boost::get<0>(yield).push_back(*titer);
     
     // collect features...
     for (/**/; first != last; ++ first)
-      boost::get<1>(yield) += boost::get<1>(*(*first));
+      boost::get<1>(yield) += boost::get<1>(*first);
   }
 };
 
@@ -147,14 +147,14 @@ struct kbest_source_traversal
     rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
     for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
       if (siter->is_non_terminal()) {
-	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(*(first + pos))).begin(), boost::get<0>(*(*(first + pos))).end());
+	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
 	++ pos;
       } else if (*siter != vocab_type::EPSILON)
 	boost::get<0>(yield).push_back(*siter);
     
     // collect features...
     for (/**/; first != last; ++ first)
-      boost::get<1>(yield) += boost::get<1>(*(*first));
+      boost::get<1>(yield) += boost::get<1>(*first);
   }
 };
 

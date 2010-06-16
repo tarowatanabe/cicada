@@ -105,6 +105,12 @@ namespace cicada
 	const rule_type& rule = *(edge.rule);
 	const phrase_type& target = rule.target;
 
+	if (ngrams.empty()) {
+	  char* buf = reinterpret_cast<char*>(state);
+	  std::fill(buf, buf + sizeof(symbol_type) * order * 2, 0);
+	  return;
+	}
+
 	phrase_type::const_iterator titer_begin = target.begin();
 	phrase_type::const_iterator titer_end   = target.end();
 	
@@ -216,6 +222,9 @@ namespace cicada
       void ngram_score(const state_ptr_type& state,
 		       feature_set_type& features) const
       {
+	if (ngrams.empty())
+	  return;
+
 	const symbol_type* context      = reinterpret_cast<const symbol_type*>(state);
 	const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
 	const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
@@ -255,6 +264,8 @@ namespace cicada
       phrase_span_set_type phrase_spans_impl;
 
       feature_name_set_type feature_names;
+      
+    public:
       int order;
     };
     
@@ -295,6 +306,11 @@ namespace cicada
 				 feature_set_type& features) const
     {
       pimpl->ngram_score(state, features);
+    }
+
+    int Variational::order() const
+    {
+      return pimpl->order;
     }
     
     void Variational::clear()

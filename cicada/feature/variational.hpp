@@ -49,6 +49,8 @@ namespace cicada
 			      feature_set_type& estimates) const;
       virtual void operator()(const state_ptr_type& state,
 			      feature_set_type& features) const;
+
+      int order() const;
       
       void clear();
 

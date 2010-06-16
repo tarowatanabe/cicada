@@ -84,6 +84,12 @@ namespace cicada
 			const state_ptr_set_type& states,
 			const edge_type& edge) const
       {
+	if (ngrams.empty()) {
+	  char* buf = reinterpret_cast<char*>(state);
+	  std::fill(buf, buf + sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(id_type) * 2, 0);
+	  return 0.0;
+	}
+
 	const rule_type& rule = *edge.rule;
 	const phrase_type& target = rule.target;
 	const phrase_type& source = rule.source;

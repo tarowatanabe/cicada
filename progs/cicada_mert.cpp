@@ -598,7 +598,7 @@ struct ViterbiTask
       for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
 	if (titer->is_non_terminal()) {
 	  const int pos = titer->non_terminal_index() - 1;
-	  yield.insert(yield.end(), (*(*(first + pos))).begin(), (*(*(first + pos))).end());
+	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
 	} else if (*titer != vocab_type::EPSILON)
 	  yield.push_back(*titer);
     }
