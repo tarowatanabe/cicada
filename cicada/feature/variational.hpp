@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__FEATURE__BLEU__HPP__
-#define __CICADA__FEATURE__BLEU__HPP__ 1
+#ifndef __CICADA__FEATURE__VARIATIONAL__HPP__
+#define __CICADA__FEATURE__VARIATIONAL__HPP__ 1
 
 #include <string>
 
@@ -14,10 +14,9 @@ namespace cicada
 {
   namespace feature
   {
-    
-    class BleuImpl;
-    
-    class Bleu : public FeatureFunction
+    class VariationalImpl;
+
+    class Variational : public FeatureFunction
     {
     public:
       typedef size_t    size_type;
@@ -26,19 +25,21 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+
+      typedef sentence_type ngram_type;
       
     private:
       typedef FeatureFunction base_type;
-      typedef BleuImpl        impl_type;
+      typedef VariationalImpl impl_type;
       
     public:
-      Bleu(const std::string& parameter);
-      ~Bleu();
+      Variational(const std::string& parameter);
+      ~Variational();
       
     private:
-      Bleu() {}
-      Bleu(const Bleu&) {}
-      Bleu& operator=(const Bleu&) { return *this; }
+      Variational() {}
+      Variational(const Variational&) {}
+      Variational& operator=(const Variational&) { return *this; }
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -50,7 +51,14 @@ namespace cicada
 			      feature_set_type& features) const;
       
       void clear();
-      void insert(const int source_size, const sentence_type& sentence);
+
+      template <typename Iterator>
+      void insert(Iterator first, Iterator last, const double& logprob)
+      {
+	insert(ngram_type(first, last), logprob);
+      }
+      
+      void insert(const ngram_type& ngram, const double& logprob);
       
     private:
       impl_type* pimpl;

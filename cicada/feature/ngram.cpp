@@ -305,7 +305,7 @@ namespace cicada
       }
 
       
-      double ngram_final_score(state_ptr_type& state) const
+      double ngram_final_score(const state_ptr_type& state) const
       {
 	const symbol_type* context      = reinterpret_cast<const symbol_type*>(state);
 	const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
@@ -330,7 +330,7 @@ namespace cicada
 	return score;
       }
       
-      double ngram_estimate(state_ptr_type& state) const
+      double ngram_estimate(const state_ptr_type& state) const
       {
 	const symbol_type* context = reinterpret_cast<const symbol_type*>(state);
 	const symbol_type* context_end = context + order - 1;
@@ -412,7 +412,7 @@ namespace cicada
       estimates[base_type::feature_name()] = pimpl->ngram_estimate(state);
     }
     
-    void NGram::operator()(state_ptr_type& state,
+    void NGram::operator()(const state_ptr_type& state,
 			   feature_set_type& features) const
     {
       features[base_type::feature_name()] = pimpl->ngram_final_score(state);

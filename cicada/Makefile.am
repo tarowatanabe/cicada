@@ -42,11 +42,13 @@ optimize/powell.hpp
 dist_feature_HEADERS = \
 feature/bleu.hpp \
 feature/ngram.hpp \
-feature/penalty.hpp
+feature/penalty.hpp \
+feature/variational.hpp
 
 libcicada_feature_la_SOURCES = \
 feature/bleu.cpp \
-feature/ngram.cpp
+feature/ngram.cpp \
+feature/variational.cpp
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 libcicadainclude_HEADERS = \

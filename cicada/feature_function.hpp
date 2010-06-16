@@ -61,7 +61,7 @@ namespace cicada
 			    const edge_type& edge,
 			    feature_set_type& features,
 			    feature_set_type& estimates) const {}
-    virtual void operator()(state_ptr_type& state,
+    virtual void operator()(const state_ptr_type& state,
 			    feature_set_type& features) const {}
     
         

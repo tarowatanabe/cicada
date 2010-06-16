@@ -287,21 +287,19 @@ namespace cicada
 	else
 	  counts.resize(order, count_type(0));
 	
-	// we will collect counts at [first, last)
-	for (/**/; first != last; ++ first) {
+	// we will collect counts at [iter, last) with context from [first, iter)
+	for (/**/; first != iter; ++ first) {
 	  ngram_set_type::id_type id = ngrams.root();
 	  for (Iterator iter2 = first; iter2 != std::min(first + order, last); ++ iter2) {
 	    id = ngrams.find(id, *iter2);
 	    
 	    if (ngrams.is_root(id)) break;
+	    if (iter2 < iter) continue;
 	    
-	    // additional constraint: iter2 must be greater or equal to iter for count collection
-	    if (iter2 >= iter) {
-	      if (exact)
-		++ counts[id];
-	      else
-		++ counts[nodes[id].order - 1];
-	    }
+	    if (exact)
+	      ++ counts[id];
+	    else
+	      ++ counts[nodes[id].order - 1];
 	  }
 	}
       }
@@ -464,7 +462,7 @@ namespace cicada
 	features[base_type::feature_name()] = score;
     }
     
-    void Bleu::operator()(state_ptr_type& state,
+    void Bleu::operator()(const state_ptr_type& state,
 			  feature_set_type& features) const
     {
       // we do nothing...
