@@ -34,6 +34,9 @@ namespace cicada
       
       typedef rule_type::symbol_set_type phrase_type;
 
+      typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
+      typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
+
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
             
       // this implementation specific...
@@ -117,7 +120,6 @@ namespace cicada
 	    std::copy(buffer.end() - context_size, buffer.end(), context_first + order);
 	  }
 	  
-	  
 	  *context_parsed = 0;
 	  phrase_type::const_iterator siter_end = source.end();
 	  for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
@@ -125,13 +127,104 @@ namespace cicada
 	  
 	  *context_hypothesis = buffer.size();
 	  
+	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
+	  
+	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
+	  
+	  return bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
+
 	} else {
+	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	  buffer.clear();
+	  buffer.reserve(target.size() + (order * 2) * states.size());
 	  
+	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
+	  phrase_spans.clear();
+	  target.terminals(std::back_inserter(phrase_spans));
 	  
+	  int star_first = -1;
+	  int star_last  = -1;
 	  
+	  *context_parsed = 0;
+	  for (phrase_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter)
+	    *context_parsed += (*siter != vocab_type::EPSILON && siter->is_terminal());
+	  
+	  for (phrase_type::const_iterator iter = phrase_spans.front().first; iter != phrase_spans.front().second; ++ iter)
+	    if (*iter != vocab_type::EPSILON)
+	      buffer.push_back(*iter);
+	  
+	  *context_hypothesis = buffer.size();
+	  
+	  collect_counts(buffer.begin(), buffer.end(), counts);
+	  
+	  double score = 1.0;
+
+	  buffer_type::const_iterator biter_first = buffer.begin();
+	  
+	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
+	  for (phrase_span_set_type::const_iterator siter = phrase_spans.begin() + 1; siter != siter_end; ++ siter) {
+	    const phrase_span_type& span = *siter;
+	    
+	    const int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
+	    if (antecedent_index < 0)
+	      throw std::runtime_error("this is a non-terminal, but no index!");
+	    
+	    const symbol_type* antecedent_first = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
+	    const symbol_type* antecedent_last  = antecedent_first + order * 2;
+	    
+	    const symbol_type* antecedent_end  = std::find(antecedent_first, antecedent_last, vocab_type::EMPTY);
+	    const symbol_type* antecedent_star = std::find(antecedent_first, antecedent_end, vocab_type::STAR);
+	    
+	    const int*     antecedent_parsed     = reinterpret_cast<const int*>(antecedent_last);
+	    const int*     antecedent_hypothesis = antecedent_parsed + 1;
+	    const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
+	    
+	    *context_parsed     += *antecedent_parsed;
+	    *context_hypothesis += *antecedent_hypothesis;
+
+	    score /= bleu_score(states_counts[*antecedent_count], *antecedent_hypothesis, *antecedent_parsed, source_size);
+	    
+	    buffer_type::const_iterator biter = buffer.end();
+	    
+	    buffer.insert(buffer.end(), antecedent_first, antecedent_star);
+	    
+	    buffer_type::const_iterator biter_end = buffer.end();
+	    
+	    collect_counts(std::max(biter_first, biter - context_size), biter, biter_end, counts);
+	    
+	    // insert context after star
+	    if (antecedent_star != antecedent_end) {
+	      biter_first = buffer.end() + 1;
+
+	      star_last = buffer.size() + 1;
+	      if (star_first < 0)
+		star_first = buffer.size() + 1;
+	      
+	      buffer.insert(buffer.end(), antecedent_star, antecedent_end);
+	    }
+	    
+	    // collect counts from edge's terminals
+	    {
+	      buffer_type::const_iterator biter = buffer.end();
+	      
+	      for (phrase_type::const_iterator iter = span.first; iter != span.second; ++ iter)
+		if (*iter != vocab_type::EPSILON)
+		  buffer.push_back(*iter);
+	      
+	      buffer_type::const_iterator biter_end = buffer.end();
+	      
+	      collect_counts(std::max(biter_first, biter - context_size), biter, biter_end, counts);
+	      
+	      *context_hypothesis += biter_end - biter;
+	    }
+	  }
+	  
+	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
+	  
+	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
+	  
+	  return bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
 	}
-	
-	return 0.0;
       }
       
       void clear()
@@ -186,6 +279,33 @@ namespace cicada
       }
 
     private:
+      template <typename Iterator>
+      void collect_counts(Iterator first, Iterator iter, Iterator last, count_set_type& counts) const
+      {
+	if (exact)
+	  counts.resize(nodes.size(), count_type(0));
+	else
+	  counts.resize(order, count_type(0));
+	
+	// we will collect counts at [first, last)
+	for (/**/; first != last; ++ first) {
+	  ngram_set_type::id_type id = ngrams.root();
+	  for (Iterator iter2 = first; iter2 != std::min(first + order, last); ++ iter2) {
+	    id = ngrams.find(id, *iter2);
+	    
+	    if (ngrams.is_root(id)) break;
+	    
+	    // additional constraint: iter2 must be greater or equal to iter for count collection
+	    if (iter2 >= iter) {
+	      if (exact)
+		++ counts[id];
+	      else
+		++ counts[nodes[id].order - 1];
+	    }
+	  }
+	}
+      }
+      
       template <typename Iterator>
       void collect_counts(Iterator first, Iterator last, count_set_type& counts) const
       {
@@ -281,7 +401,8 @@ namespace cicada
       
     private:
       
-      buffer_type buffer_impl;
+      buffer_type          buffer_impl;
+      phrase_span_set_type phrase_spans_impl;
 
       ngram_set_type ngrams;
       node_set_type  nodes;

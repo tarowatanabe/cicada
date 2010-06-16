@@ -32,7 +32,6 @@ namespace cicada
 
   struct PermuteFeature
   {
-    
     std::vector<std::string, std::allocator<std::string> > non_terminal_symbols;
     
     template <typename Features, typename Rule, typename Permutation>
@@ -62,6 +61,47 @@ namespace cicada
 	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
       
       features[rule_string] = 1.0;
+    }
+  };
+
+  template <typename Weights>
+  struct PermuteFeatureCollapsed
+  {
+    std::vector<std::string, std::allocator<std::string> > non_terminal_symbols;
+    
+    const Weights& weights;
+    const typename Weights::feature_type feature_name;
+
+    PermuteFeatureCollapsed(const Weights& __weights)
+      : weights(__weights), feature_name("permute:collapsed") {}
+    
+    template <typename Features, typename Rule, typename Permutation>
+    void operator()(Features& features, const Rule& rule, const Permutation& permutation)
+    {
+      typedef Rule rule_type;
+      
+      non_terminal_symbols.clear();
+      
+      int non_terminal_pos = 0;
+      typename rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  non_terminal_symbols.push_back('[' + static_cast<const std::string&>(*siter).substr(1, siter->size() - 2) + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
+	  ++ non_terminal_pos;
+	}
+      
+      std::string rule_string("permute:");
+      rule_string += static_cast<const std::string&>(rule.lhs) + "->";
+      
+      int permutation_pos = 0;
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  rule_string += non_terminal_symbols[permutation[permutation_pos]];
+	  ++ permutation_pos;
+	} else
+	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
+      
+      features[feature_name] += weights[rule_string];
     }
   };
 

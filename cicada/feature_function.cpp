@@ -13,7 +13,7 @@ namespace cicada
   {
     static const char* desc = "\
 ngram:file=<file>,order=<order>,name=feature-name(default: ngram)\n\
-bleu:order=<order>\n\
+bleu:order=<order>,exact=true|false\n\
 target-word-penalty\n\
 soruce-word-penalty\n\
 rule-penalty\n\
