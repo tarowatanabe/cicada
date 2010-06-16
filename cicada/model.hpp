@@ -70,7 +70,8 @@ namespace cicada
       offsets.clear();
       states_size = 0;
     }
-    
+
+    bool is_stateless() const { return states_size == 0; }
     
   private:
     typedef std::vector<size_type, std::allocator<size_type> > offset_set_type;

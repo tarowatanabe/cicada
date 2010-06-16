@@ -60,6 +60,8 @@ typedef cicada::FeatureFunction feature_function_type;
 
 typedef cicada::WeightVector<double> weight_set_type;
 
+typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
+
 struct weight_set_function
 {
   typedef cicada::semiring::Logprob<double> value_type;
@@ -361,6 +363,7 @@ int main(int argc, char ** argv)
     model_type model;
     for (feature_parameter_set_type::const_iterator piter = feature_parameters.begin(); piter != feature_parameters.end(); ++ piter)
       model.push_back(feature_function_type::create(*piter));
+    model.initialize();
 
     if (debug && mpi_rank == 0)
       std::cerr << "feature functions: " << model.size() << std::endl;
@@ -441,12 +444,12 @@ struct TaskStdout
 
   void operator()()
   {
-    std::string     line;
-    sentence_type   target_sentence;
-    lattice_type    target;
-    sentence_type   sentence;
-    lattice_type    lattice;
-    hypergraph_type hypergraph;
+    std::string       line;
+    sentence_set_type target_sentences;
+    lattice_type      target;
+    sentence_type     sentence;
+    lattice_type      lattice;
+    hypergraph_type   hypergraph;
     
     size_t id = 0;
     
@@ -474,13 +477,19 @@ struct TaskStdout
       }
       
       if (input_bitext_mode) {
-	if (! parse_separator(iter, end))
-	  throw std::runtime_error("no separator?");
+	target_sentences.clear();
 	
-	if (! target_sentence.assign(iter, end))
-	  throw std::runtime_error("invalid sentence format");
+	while (parse_separator(iter, end)) {
+	  target_sentences.push_back(sentence_type());
+	  
+	  if (! target_sentences.back().assign(iter, end))
+	    throw std::runtime_error("invalid sentence format");
+	}
 	
-	target = lattice_type(target_sentence);
+	if (target_sentences.empty())
+	  throw std::runtime_error("no bitext?");
+	
+	target = lattice_type(target_sentences.front());
       }
       
       if (iter != end)
@@ -603,7 +612,7 @@ struct TaskStdout
 	
 	utils::resource apply_start;
 	
-	if (apply_full) {
+	if (apply_full || model.is_stateless()) {
 	  if (feature_weights_one)
 	    cicada::apply_exact<weight_set_function_one>(model, hypergraph, hypergraph_applied, weight_set_function_one(weights), cube_size);
 	  else
@@ -989,12 +998,12 @@ struct Task
 
   void operator()()
   {
-    std::string line;
-    sentence_type   target_sentence;
-    lattice_type    target;
-    sentence_type   sentence;
-    lattice_type    lattice;
-    hypergraph_type hypergraph;
+    std::string       line;
+    sentence_set_type target_sentences;
+    lattice_type      target;
+    sentence_type     sentence;
+    lattice_type      lattice;
+    hypergraph_type   hypergraph;
     
     size_t id = 0;
     
@@ -1022,13 +1031,19 @@ struct Task
       }
       
       if (input_bitext_mode) {
-	if (! parse_separator(iter, end))
-	  throw std::runtime_error("no separator?");
+	target_sentences.clear();
 	
-	if (! target_sentence.assign(iter, end))
-	  throw std::runtime_error("invalid sentence format");
+	while (parse_separator(iter, end)) {
+	  target_sentences.push_back(sentence_type());
+	  
+	  if (! target_sentences.back().assign(iter, end))
+	    throw std::runtime_error("invalid sentence format");
+	}
 	
-	target = lattice_type(target_sentence);
+	if (target_sentences.empty())
+	  throw std::runtime_error("no bitext?");
+	
+	target = lattice_type(target_sentences.front());
       }
       
       if (iter != end)
@@ -1151,7 +1166,7 @@ struct Task
 	
 	utils::resource apply_start;
 	
-	if (apply_full) {
+	if (apply_full || model.is_stateless()) {
 	  if (feature_weights_one)
 	    cicada::apply_exact<weight_set_function_one>(model, hypergraph, hypergraph_applied, weight_set_function_one(weights), cube_size);
 	  else

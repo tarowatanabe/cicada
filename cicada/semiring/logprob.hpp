@@ -10,6 +10,7 @@
 #include <limits>
 #include <algorithm>
 #include <iostream>
+#include <stdexcept>
 
 #include <boost/math/special_functions/log1p.hpp>
 #include <boost/numeric/conversion/bounds.hpp>
