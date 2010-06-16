@@ -444,9 +444,15 @@ double optimize(const path_type& forest_path,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  if (mpi_rank == 0)
-    return OptimizeLBFGS(forest_path, intersected_path, weights)();
-  else {
+  if (mpi_rank == 0) {
+    const double objective = OptimizeLBFGS(forest_path, intersected_path, weights)();
+    
+    // send termination!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+    
+    return objective;
+  } else {
 
     enum {
       NOTIFY = 0,
