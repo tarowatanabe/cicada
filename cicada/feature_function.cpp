@@ -2,8 +2,8 @@
 #include "feature_function.hpp"
 #include "parameter.hpp"
 
-#include "feature_ngram.hpp"
-#include "feature_penalty.hpp"
+#include "feature/ngram.hpp"
+#include "feature/penalty.hpp"
 
 namespace cicada
 {

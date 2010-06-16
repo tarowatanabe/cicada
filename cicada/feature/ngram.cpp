@@ -2,7 +2,7 @@
 #include <memory>
 
 #include "cicada/ngram.hpp"
-#include "cicada/feature_ngram.hpp"
+#include "cicada/feature/ngram.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
 

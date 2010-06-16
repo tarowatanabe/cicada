@@ -4,11 +4,17 @@ LIBUTILS=$(top_builddir)/utils/libutils.la
 
 lib_LTLIBRARIES = libcicada.la
 
+noinst_LTLIBRARIES = \
+libcicada-feature.la \
+libcicada-semiring.la \
+libcicada-eval.la
+
 libcicadaincludedir= $(pkgincludedir)/cicada
 
 semiringdir = $(pkgincludedir)/cicada/semiring
 evaldir     = $(pkgincludedir)/cicada/eval
-optimizedir     = $(pkgincludedir)/cicada/optimize
+optimizedir = $(pkgincludedir)/cicada/optimize
+featuredir  = $(pkgincludedir)/cicada/feature
 
 dist_semiring_HEADERS = \
 semiring/envelope.hpp \
@@ -17,13 +23,31 @@ semiring/log.hpp \
 semiring/logprob.hpp \
 semiring/traits.hpp
 
+libcicada_semiring_la_SOURCES = \
+semiring/envelope.cpp
+libcicada_semiring_la_CPPFLAGS = $(AM_CPPFLAGS)
+
 dist_eval_HEADERS = \
 eval/bleu.hpp \
 eval/score.hpp 
 
+libcicada_eval_la_SOURCES = \
+eval/score.cpp
+libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
+
 dist_optimize_HEADERS = \
 optimize/line_search.hpp \
 optimize/powell.hpp
+
+dist_feature_HEADERS = \
+feature/bleu.hpp \
+feature/ngram.hpp \
+feature/penalty.hpp
+
+libcicada_feature_la_SOURCES = \
+feature/bleu.cpp \
+feature/ngram.cpp
+libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 libcicadainclude_HEADERS = \
 apply.hpp \
@@ -34,10 +58,7 @@ compose.hpp \
 compose_cky.hpp \
 eval.hpp \
 feature.hpp \
-feature_bleu.hpp \
 feature_function.hpp \
-feature_ngram.hpp \
-feature_penalty.hpp \
 feature_vector.hpp \
 ngram.hpp \
 grammar.hpp \
@@ -67,11 +88,8 @@ vocab.hpp \
 weight_vector.hpp
 
 libcicada_la_SOURCES = \
-eval.cpp \
 feature.cpp \
-feature_bleu.cpp \
 feature_function.cpp \
-feature_ngram.cpp \
 grammar_mutable.cpp \
 grammar_static.cpp \
 hypergraph.cpp \
@@ -82,7 +100,6 @@ model.cpp \
 parameter.cpp \
 rule.cpp \
 sentence.cpp \
-semiring.cpp \
 symbol.cpp \
 symbol_vector.cpp \
 vocab.cpp
@@ -95,6 +112,10 @@ libcicada_la_LDFLAGS = \
 	$(BOOST_SYSTEM_LDFLAGS)
 
 libcicada_la_LIBADD = \
+	libcicada-eval.la \
+	libcicada-feature.la \
+	libcicada-semiring.la \
+	\
 	$(LIBUTILS) \
 	$(BOOST_THREAD_LIBS) \
 	$(BOOST_FILESYSTEM_LIBS) \

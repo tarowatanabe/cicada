@@ -1,7 +1,7 @@
 
 #include <map>
 
-#include "cicada/feature_bleu.hpp"
+#include "cicada/feature/bleu.hpp"
 #include "cicada/parameter.hpp"
 
 #include "utils/hashmurmur.hpp"
