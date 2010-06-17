@@ -11,6 +11,33 @@ namespace cicada
 {
   namespace semiring
   {
+    namespace impl
+    {
+      template <typename Tp, bool has_infinity>
+      struct __traits_infinity {};
+      
+      template <typename Tp>
+      struct __traits_infinity<Tp, true>
+      {
+	static const Tp plus()  { return std::numeric_limits<Tp>::infinity(); }
+	static const Tp minus() { return - std::numeric_limits<Tp>::infinity(); }
+      };
+      
+      template <typename Tp>
+      struct __traits_infinity<Tp, false>
+      {
+	static const Tp plus()  { return std::numeric_limits<Tp>::max(); }
+	static const Tp minus() { return std::numeric_limits<Tp>::min(); }
+      };
+
+      template <typename Tp>
+      struct traits_infinity : public __traits_infinity<Tp, std::numeric_limits<Tp>::has_infinity>
+      {
+	
+	
+      };
+    };
+
     template <typename Tp>
     struct traits
     {

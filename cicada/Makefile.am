@@ -21,6 +21,7 @@ semiring/envelope.hpp \
 semiring/expectation.hpp \
 semiring/log.hpp \
 semiring/logprob.hpp \
+semiring/tropical.hpp \
 semiring/traits.hpp
 
 libcicada_semiring_la_SOURCES = \

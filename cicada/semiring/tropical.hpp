@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__SEMIRING__LOGPROB__HPP__
-#define __CICADA__SEMIRING__LOGPROB__HPP__ 1
+#ifndef __CICADA__SEMIRING__TROPICAL__HPP__
+#define __CICADA__SEMIRING__TROPICAL__HPP__ 1
 
 #include <cmath>
 #include <cfloat>
@@ -23,21 +23,21 @@ namespace cicada
   {
 
     template <typename Tp>
-    class Logprob
+    class Tropical
     {
     public:
       typedef Tp weight_type;
       typedef Tp value_type;
-      typedef Logprob<Tp> self_type;
+      typedef Tropical<Tp> self_type;
 
     public:
       struct proxy_type
       {
-	friend struct Logprob;
+	friend struct Tropical;
 	
 	proxy_type(const weight_type& x) : __value(x) {}
 	
-	operator Logprob() const { return Logprob(*this); }
+	operator Tropical() const { return Tropical(*this); }
 	
       private:
 	weight_type __value;
@@ -53,9 +53,9 @@ namespace cicada
       
     public:
       // any better wayt to make an assignment...?
-      Logprob() : __value(impl::traits_infinity<value_type>::minus()) {}
-      Logprob(const weight_type& x) : __value(std::log(x)) {}
-      explicit Logprob(const proxy_type& x) : __value(x.__value) {}
+      Tropical() : __value(impl::traits_infinity<value_type>::minus()) {}
+      Tropical(const weight_type& x) : __value(std::log(x)) {}
+      explicit Tropical(const proxy_type& x) : __value(x.__value) {}
 
 
       operator Tp() const { return std::exp(__value); }
@@ -63,49 +63,22 @@ namespace cicada
     public:
       template <typename T>
       friend
-      T log(const Logprob<T>& x);
+      T log(const Tropical<T>& x);
 
-      Logprob& operator+=(const Logprob& x)
+      Tropical& operator+=(const Tropical& x)
       {
-	if (*this == zero()) {
-	  __value = x.__value;
-	  return *this;
-	} else if (x == zero())
-	  return *this;
-	
-	if (__value <= x.__value) 
-	  __value = x.__value + boost::math::log1p(std::exp(__value - x.__value));
-	else
-	  __value = __value + boost::math::log1p(std::exp(x.__value - __value));
-	
-	return *this;
-      }
-
-      Logprob& operator-=(const Logprob& x)
-      {
-	if (x > *this)
-	  throw std::runtime_error("invalid minus");
-	
-	if (*this == x)
-	  *this = zero();
-	else {
-	  const Tp exp_value = std::exp(x.__value - __value);
-	  if (exp_value == 1.0)
-	    *this = zero();
-	  else
-	    __value = __value + boost::math::log1p(- exp_value);
-	}
+	__value = std::max(__value, x.__value);
 	
 	return *this;
       }
       
-      Logprob& operator*=(const Logprob& x)
+      Tropical& operator*=(const Tropical& x)
       {
 	__value += x.__value;
 	return *this;
       }
 
-      Logprob& operator/=(const Logprob& x)
+      Tropical& operator/=(const Tropical& x)
       {
 	__value -= x.__value;
 	return *this;
@@ -144,53 +117,44 @@ namespace cicada
 
     template <typename Tp>
     inline
-    Tp log(const Logprob<Tp>& x)
+    Tp log(const Tropical<Tp>& x)
     {
       return x.__value;
     }
     
     template <typename Tp>
     inline
-    Logprob<Tp> operator+(const Logprob<Tp>& x, const Logprob<Tp>& y)
+    Tropical<Tp> operator+(const Tropical<Tp>& x, const Tropical<Tp>& y)
     {
-      Logprob<Tp> __value(x);
+      Tropical<Tp> __value(x);
       __value += y;
       return __value;
     }
 
     template <typename Tp>
     inline
-    Logprob<Tp> operator-(const Logprob<Tp>& x, const Logprob<Tp>& y)
+    Tropical<Tp> operator*(const Tropical<Tp>& x, const Tropical<Tp>& y)
     {
-      Logprob<Tp> __value(x);
-      __value -= y;
-      return __value;
-    }
-
-    template <typename Tp>
-    inline
-    Logprob<Tp> operator*(const Logprob<Tp>& x, const Logprob<Tp>& y)
-    {
-      Logprob<Tp> __value(x);
+      Tropical<Tp> __value(x);
       __value *= y;
       return __value;
     }
 
     template <typename Tp>
     inline
-    Logprob<Tp> operator/(const Logprob<Tp>& x, const Logprob<Tp>& y)
+    Tropical<Tp> operator/(const Tropical<Tp>& x, const Tropical<Tp>& y)
     {
-      Logprob<Tp> __value(x);
+      Tropical<Tp> __value(x);
       __value /= y;
       return __value;
     }
     
     template <typename Tp>
-    struct traits<Logprob<Tp> >
+    struct traits<Tropical<Tp> >
     {
-      static inline Logprob<Tp> log(const Tp& x) { return Logprob<Tp>::log(x); }
-      static inline Logprob<Tp> zero() { return Logprob<Tp>::zero();  }
-      static inline Logprob<Tp> one()  { return Logprob<Tp>::one(); }
+      static inline Tropical<Tp> log(const Tp& x) { return Tropical<Tp>::log(x); }
+      static inline Tropical<Tp> zero() { return Tropical<Tp>::zero();  }
+      static inline Tropical<Tp> one()  { return Tropical<Tp>::one(); }
     };
 
   };

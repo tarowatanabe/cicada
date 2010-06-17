@@ -65,6 +65,23 @@ typedef cicada::WeightVector<double> weight_set_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 
+struct source_length_function
+{
+  typedef cicada::semiring::Tropical<int> value_type;
+  
+  template <typename Edge>
+  value_type operator()(const Edge& edge) const
+  {
+    int length = 0;
+    rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
+    for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+      length += (*siter != vocab_type::EPSILON && siter->is_terminal());
+    
+    // since we will "max" at operator+, we will collect negative length
+    return cicada::semiring::traits<value_type>::log(- length);
+  }
+};
+
 struct weight_set_function
 {
   typedef cicada::semiring::Logprob<double> value_type;
@@ -458,6 +475,8 @@ struct TaskStdout
 	bleu_feature.reset(__bleu);
     }
 
+    if (bleu_feature && ! input_bitext_mode)
+      throw std::runtime_error("when scoring with Bleu, we need bitexts");
     
     weight_set_type weights;
     weight_set_type weights_binarize;
@@ -521,6 +540,19 @@ struct TaskStdout
 	throw std::runtime_error("invalid input format");
 
       if (lattice.empty() && ! hypergraph.is_valid()) continue;
+      
+      int source_length = lattice.shortest_distance();
+      if (input_forest_mode) {
+	// we will enumerate forest structure... and collect min-size...
+	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(hypergraph.nodes.size());
+	
+	cicada::inside(hypergraph, lengths, source_length_function());
+	
+	source_length = - log(lengths.back());
+      }
+
+      if (debug)
+	std::cerr << "source length: " << source_length << std::endl;
       
       grammar_type grammar_translation(grammar);
 
@@ -663,6 +695,52 @@ struct TaskStdout
 		    << std::endl;
 	
 	hypergraph.swap(hypergraph_applied);
+      }
+      
+      if (bleu_feature) {
+	hypergraph_type hypergraph_bleu;
+
+	bleu_feature->clear();
+	sentence_set_type::const_iterator titer_end = target_sentences.end();
+	for (sentence_set_type::const_iterator titer = target_sentences.begin(); titer != titer_end; ++ titer)
+	  bleu_feature->insert(source_length, *titer);
+	
+	model_type model;
+	model.push_back(bleu_feature);
+	
+	if (debug)
+	  std::cerr << "bleu features" << std::endl;
+	
+	utils::resource bleu_start;
+	
+	if (apply_full) {
+	  if (feature_weights_one)
+	    cicada::apply_exact<weight_set_function_one>(model, hypergraph, hypergraph_bleu, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_exact<weight_set_function>(model, hypergraph, hypergraph_bleu, weight_set_function(weights), cube_size);
+	} else {
+	  if (feature_weights_one)
+	    cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph, hypergraph_bleu, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_cube_prune<weight_set_function>(model, hypergraph, hypergraph_bleu, weight_set_function(weights), cube_size);
+	}
+	
+	utils::resource bleu_end;
+	
+	if (debug)
+	  std::cerr << "bleu cpu time: " << (bleu_end.cpu_time() - bleu_start.cpu_time())
+		    << " user time: " << (bleu_end.user_time() - bleu_start.user_time())
+		    << std::endl;
+
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_bleu.nodes.size()
+		    << " # of edges: " << hypergraph_bleu.edges.size()
+		    << " valid? " << (hypergraph_bleu.is_valid() ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph.swap(hypergraph_bleu);
+	
+	bleu_feature->clear();
       }
 
       if (variational_feature) {
@@ -1077,6 +1155,9 @@ struct Task
       if (__bleu)
 	bleu_feature.reset(__bleu);
     }
+    
+    if (bleu_feature && ! input_bitext_mode)
+      throw std::runtime_error("when scoring with Bleu, we need bitexts");
 
     weight_set_type weights;
     weight_set_type weights_binarize;
@@ -1140,6 +1221,19 @@ struct Task
 	throw std::runtime_error("invalid input format");
 
       if (lattice.empty() && ! hypergraph.is_valid()) continue;
+
+      int source_length = lattice.shortest_distance();
+      if (input_forest_mode) {
+	// we will enumerate forest structure... and collect min-size...
+	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(hypergraph.nodes.size());
+	
+	cicada::inside(hypergraph, lengths, source_length_function());
+	
+	source_length = - log(lengths.back());
+      }
+
+      if (debug)
+	std::cerr << "source length: " << source_length << std::endl;
       
       grammar_type grammar_translation(grammar);
 
@@ -1284,6 +1378,52 @@ struct Task
 	hypergraph.swap(hypergraph_applied);
       } 
       
+      if (bleu_feature) {
+	hypergraph_type hypergraph_bleu;
+
+	bleu_feature->clear();
+	sentence_set_type::const_iterator titer_end = target_sentences.end();
+	for (sentence_set_type::const_iterator titer = target_sentences.begin(); titer != titer_end; ++ titer)
+	  bleu_feature->insert(source_length, *titer);
+	
+	model_type model;
+	model.push_back(bleu_feature);
+	
+	if (debug)
+	  std::cerr << "bleu features" << std::endl;
+	
+	utils::resource bleu_start;
+	
+	if (apply_full) {
+	  if (feature_weights_one)
+	    cicada::apply_exact<weight_set_function_one>(model, hypergraph, hypergraph_bleu, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_exact<weight_set_function>(model, hypergraph, hypergraph_bleu, weight_set_function(weights), cube_size);
+	} else {
+	  if (feature_weights_one)
+	    cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph, hypergraph_bleu, weight_set_function_one(weights), cube_size);
+	  else
+	    cicada::apply_cube_prune<weight_set_function>(model, hypergraph, hypergraph_bleu, weight_set_function(weights), cube_size);
+	}
+	
+	utils::resource bleu_end;
+	
+	if (debug)
+	  std::cerr << "bleu cpu time: " << (bleu_end.cpu_time() - bleu_start.cpu_time())
+		    << " user time: " << (bleu_end.user_time() - bleu_start.user_time())
+		    << std::endl;
+
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_bleu.nodes.size()
+		    << " # of edges: " << hypergraph_bleu.edges.size()
+		    << " valid? " << (hypergraph_bleu.is_valid() ? "true" : "false")
+		    << std::endl;
+	
+	hypergraph.swap(hypergraph_bleu);
+	
+	bleu_feature->clear();
+      }
+
       if (variational_feature) {
 	hypergraph_type hypergraph_variational;
 
@@ -1588,8 +1728,8 @@ void options(int argc, char** argv)
     // grammar
     ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")
     ("non-terminal",   po::value<std::string>(&symbol_non_terminal)->default_value(symbol_non_terminal), "default non-terminal symbol")
-    ("grammar",        po::value<grammar_file_set_type >(&grammar_mutable_files),                        "grammar file(s)")
-    ("grammar-static", po::value<grammar_file_set_type >(&grammar_static_files),                         "static binary grammar file(s)")
+    ("grammar",        po::value<grammar_file_set_type >(&grammar_mutable_files)->composing(),           "grammar file(s)")
+    ("grammar-static", po::value<grammar_file_set_type >(&grammar_static_files)->composing(),            "static binary grammar file(s)")
     
     // special handling
     ("grammar-glue-straight", po::bool_switch(&grammar_glue_straight), "add straight hiero glue rule")
@@ -1598,10 +1738,10 @@ void options(int argc, char** argv)
     ("grammar-deletion",      po::bool_switch(&grammar_deletion),      "source-to-<epsilon> transfer grammar")
     
     // models...
-    ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters), "feature function(s)")
-    ("feature-weights",       po::value<path_type>(&feature_weights_file),                 "feature weights")
-    ("feature-weights-one",   po::bool_switch(&feature_weights_one),                       "one initialized feature weights")
-    ("feature-function-list", po::bool_switch(&feature_list),                              "list of available feature function(s)")
+    ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")
+    ("feature-weights",       po::value<path_type>(&feature_weights_file),                              "feature weights")
+    ("feature-weights-one",   po::bool_switch(&feature_weights_one),                                    "one initialized feature weights")
+    ("feature-function-list", po::bool_switch(&feature_list),                                           "list of available feature function(s)")
 
     // binarization
     ("binarize",         po::bool_switch(&binarize_graph),                             "perform hypergraph binarization")

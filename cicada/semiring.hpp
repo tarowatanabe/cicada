@@ -10,5 +10,6 @@
 #include <cicada/semiring/expectation.hpp>
 #include <cicada/semiring/logprob.hpp>
 #include <cicada/semiring/log.hpp>
+#include <cicada/semiring/tropical.hpp>
 
 #endif

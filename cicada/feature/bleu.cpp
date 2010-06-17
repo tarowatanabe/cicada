@@ -134,10 +134,15 @@ namespace cicada
 	  *context_hypothesis = buffer.size();
 	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
-	  
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
+
+	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
+
+	  //std::cerr << "bleu: " << bleu << ' ';
+	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	  //std::cerr << std::endl;
 	  
-	  return bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
+	  return bleu;
 
 	} else {
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
@@ -163,7 +168,7 @@ namespace cicada
 	  
 	  collect_counts(buffer.begin(), buffer.end(), counts);
 	  
-	  double score = 1.0;
+	  double bleu_antecedent = 0.0;
 
 	  buffer_type::const_iterator biter_first = buffer.begin();
 	  
@@ -184,11 +189,23 @@ namespace cicada
 	    const int*     antecedent_parsed     = reinterpret_cast<const int*>(antecedent_last);
 	    const int*     antecedent_hypothesis = antecedent_parsed + 1;
 	    const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
+
+	    const count_set_type& counts_antecedent = states_counts[*antecedent_count];
+	    
+	    const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, source_size);
+	    
+	    //std::cerr << "bleu antecedent: " << bleu_ant << ' ';
+	    //std::copy(antecedent_first, antecedent_end, std::ostream_iterator<symbol_type>(std::cerr, " "));
+	    //std::cerr << std::endl;
+	    
+	    bleu_antecedent += bleu_ant;
+	    
+	    // merge statistics...
+	    counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
+	    std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
 	    
 	    *context_parsed     += *antecedent_parsed;
 	    *context_hypothesis += *antecedent_hypothesis;
-
-	    score /= bleu_score(states_counts[*antecedent_count], *antecedent_hypothesis, *antecedent_parsed, source_size);
 	    
 	    buffer_type::const_iterator biter = buffer.end();
 	    
@@ -196,12 +213,12 @@ namespace cicada
 	    
 	    buffer_type::const_iterator biter_end = buffer.end();
 	    
-	    collect_counts(std::max(biter_first, biter - context_size), biter, biter_end, counts);
+	    collect_counts(biter_first, biter, biter_end, counts);
 	    
 	    // insert context after star
 	    if (antecedent_star != antecedent_end) {
 	      biter_first = buffer.end() + 1;
-
+	      
 	      star_last = buffer.size() + 1;
 	      if (star_first < 0)
 		star_first = buffer.size() + 1;
@@ -219,7 +236,7 @@ namespace cicada
 	      
 	      buffer_type::const_iterator biter_end = buffer.end();
 	      
-	      collect_counts(std::max(biter_first, biter - context_size), biter, biter_end, counts);
+	      collect_counts(biter_first, biter, biter_end, counts);
 	      
 	      *context_hypothesis += biter_end - biter;
 	    }
@@ -243,12 +260,17 @@ namespace cicada
 	    }
 	  }
 	  
-	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
-	  
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
+
+	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
 	  
-	  return bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
+	  //std::cerr << "bleu: " << bleu;
+	  //std::cerr << " antecedent: " << bleu_antecedent << ' ';
+	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	  //std::cerr << std::endl;
+	  
+	  return  bleu - bleu_antecedent;
 	}
       }
       
@@ -307,6 +329,10 @@ namespace cicada
       template <typename Iterator>
       void collect_counts(Iterator first, Iterator iter, Iterator last, count_set_type& counts) const
       {
+	const int context_size = order - 1;
+	
+	first = std::max(first, iter - context_size);
+	
 	if (exact)
 	  counts.resize(nodes.size(), count_type(0));
 	else

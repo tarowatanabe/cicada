@@ -47,13 +47,13 @@ namespace cicada
     public:
       static inline self_type log(const weight_type& x, const bool& s) { return proxy_type(x, s); }
       
-      static inline self_type zero() { return proxy_type(- std::numeric_limits<value_type>::infinity(), false); }
-      static inline self_type one()  { return proxy_type(0.0, false); }
-      static inline self_type max()  { return proxy_type(std::numeric_limits<value_type>::infinity(), false); }
-      static inline self_type min()  { return proxy_type(std::numeric_limits<value_type>::infinity(), true); }
+      static inline self_type zero() { return proxy_type(impl::traits_infinity<value_type>::minus(), false); }
+      static inline self_type one()  { return proxy_type(0, false); }
+      static inline self_type max()  { return proxy_type(impl::traits_infinity<value_type>::plus(), false); }
+      static inline self_type min()  { return proxy_type(impl::traits_infinity<value_type>::plus(), true); }
       
     public:
-      Log() : __value(- std::numeric_limits<value_type>::infinity()), __sign(false) {}
+      Log() : __value(impl::traits_infinity<value_type>::minus()), __sign(false) {}
       Log(const weight_type& x) : __value(std::signbit(x) ? std::log(-x) : std::log(x)), __sign(std::signbit(x)) {}
       explicit Log(const proxy_type& x) : __value(x.__value), __sign(x.__sign) {}
 
@@ -74,9 +74,9 @@ namespace cicada
 	  evaluation_error<errno_on_error>
 	  > policy_type;
 
-	if (x.__value == - std::numeric_limits<Tp>::infinity())
+	if (x.__value == impl::traits_infinity<value_type>::minus())
 	  return *this;
-	else if (__value == - std::numeric_limits<Tp>::infinity()) {
+	else if (__value == impl::traits_infinity<value_type>::minus()) {
 	  *this = x;
 	  return *this;
 	}
