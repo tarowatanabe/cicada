@@ -297,6 +297,9 @@ namespace cicada
 	    for (int feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];
 	      
+	      // ignore zero score...
+	      if (score == 0.0) continue;
+	      
 	      // when zero, we will use inifinity...
 	      rule->features[feature_names[feature]] = (score <= boost::numeric::bounds<score_type>::lowest()
 							? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
