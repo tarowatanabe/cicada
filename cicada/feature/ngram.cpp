@@ -408,14 +408,21 @@ namespace cicada
 			   feature_set_type& features,
 			   feature_set_type& estimates) const
     {
-      features[base_type::feature_name()] = pimpl->ngram_score(state, states, edge);
-      estimates[base_type::feature_name()] = pimpl->ngram_estimate(state);
+      const double score    = pimpl->ngram_score(state, states, edge);
+      const double estimate = pimpl->ngram_estimate(state);
+      
+      if (score != 0.0)
+	features[base_type::feature_name()] = score;
+      if (estimate != 0.0)
+	estimates[base_type::feature_name()] = estimate;
     }
     
     void NGram::operator()(const state_ptr_type& state,
 			   feature_set_type& features) const
     {
-      features[base_type::feature_name()] += pimpl->ngram_final_score(state);
+      const double score = pimpl->ngram_final_score(state);
+      if (score != 0.0)
+	features[base_type::feature_name()] += score;
     }
   };
 };
