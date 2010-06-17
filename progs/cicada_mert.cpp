@@ -362,7 +362,7 @@ int main(int argc, char ** argv)
 	std::cerr << "sample: " << (sample + 1) << " objective: " << sample_objective << std::endl
 		  << sample_weights;
       
-      if ((moved && sample_objective < optimum_objective) || optimum_objective = std::numeric_limits<double>::infinity()) {
+      if ((moved && sample_objective < optimum_objective) || optimum_objective == std::numeric_limits<double>::infinity()) {
 	optimum_objective = sample_objective;
 	optimum_weights = sample_weights;
       }
@@ -435,7 +435,7 @@ int main(int argc, char ** argv)
 	std::cerr << "sample: " << (sample + 1) << " objective: " << sample_objective << std::endl
 		  << sample_weights;
       
-      if ((moved && sample_objective < optimum_objective) || optimum_objective = std::numeric_limits<double>::infinity()) {
+      if ((moved && sample_objective < optimum_objective) || optimum_objective == std::numeric_limits<double>::infinity()) {
 	optimum_objective = sample_objective;
 	optimum_weights = sample_weights;
       }
