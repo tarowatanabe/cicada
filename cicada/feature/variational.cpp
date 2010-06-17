@@ -3,8 +3,11 @@
 
 #include "cicada/feature/variational.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/inside_outside.hpp"
+#include "cicada/semiring.hpp"
 
 #include "utils/compact_trie.hpp"
+#include "utils/sgi_hash_map.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -105,12 +108,6 @@ namespace cicada
 	const rule_type& rule = *(edge.rule);
 	const phrase_type& target = rule.target;
 
-	if (ngrams.empty()) {
-	  char* buf = reinterpret_cast<char*>(state);
-	  std::fill(buf, buf + sizeof(symbol_type) * order * 2, 0);
-	  return;
-	}
-
 	phrase_type::const_iterator titer_begin = target.begin();
 	phrase_type::const_iterator titer_end   = target.end();
 	
@@ -127,7 +124,8 @@ namespace cicada
 	    if (*titer != vocab_type::EPSILON)
 	      buffer.push_back(*titer);
 	  
-	  ngram_score(buffer.begin(), buffer.end(), features);
+	  if (! ngrams.empty())
+	    ngram_score(buffer.begin(), buffer.end(), features);
 	  
 	  if (buffer.size() <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context);
@@ -148,7 +146,8 @@ namespace cicada
 	    if (*titer != vocab_type::EPSILON)
 	      buffer.push_back(*titer);
 	  
-	  ngram_score(buffer.begin(), buffer.end(), features);
+	  if (! ngrams.empty())
+	    ngram_score(buffer.begin(), buffer.end(), features);
 	  
 	  buffer_type::const_iterator biter_first = buffer.begin();
 	  
@@ -169,8 +168,9 @@ namespace cicada
 	    buffer.insert(buffer.end(), context, context_star);
 	    
 	    buffer_type::const_iterator biter_end = buffer.end();
-
-	    ngram_score(biter_first, biter, biter_end, features);
+	    
+	    if (! ngrams.empty())
+	      ngram_score(biter_first, biter, biter_end, features);
 	    
 	    // insert star!
 	    if (context_star != context_end) {
@@ -192,7 +192,8 @@ namespace cicada
 	      
 	      buffer_type::const_iterator biter_end = buffer.end();
 	      
-	      ngram_score(biter_first, biter, biter_end, features);
+	      if (! ngrams.empty())
+		ngram_score(biter_first, biter, biter_end, features);
 	    }
 	  }
 	  
@@ -208,7 +209,7 @@ namespace cicada
 	    context[prefix_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - suffix_size, buffer.end(), context + prefix_size + 1);
 	  } else {
-	    if (buffer.size() <= order - 1)
+	    if (buffer.size() <= context_size)
 	      std::copy(buffer.begin(), buffer.end(), context);
 	    else {
 	      std::copy(buffer.begin(), buffer.begin() + context_size, context);
@@ -318,10 +319,237 @@ namespace cicada
       pimpl->clear();
     }
 
-      
-    void Variational::insert(const ngram_type& ngram, const double& logprob)
+    struct variational_function
     {
-      pimpl->insert(ngram.begin(), ngram.end(), logprob);
+      typedef cicada::semiring::Logprob<double> weight_type;
+      typedef weight_type value_type;
+
+      typedef Variational::weight_set_type weight_set_type;
+
+      const weight_set_type& weights;
+
+      variational_function(const weight_set_type& __weights)
+	: weights(__weights) {}
+
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+      }
+    };
+
+    template <typename Iterator, typename Counts>
+    void collect_counts(Iterator first, Iterator iter, Iterator last, const double& weight, Counts& counts, const int order)
+    {
+      const int context_size = order - 1;
+      
+      first = std::max(iter - context_size, first);
+	
+      for (/**/; first != iter; ++ first)
+	for (Iterator iter2 = iter; iter2 != std::min(first + order, last); ++ iter2)
+	  counts[typename Counts::key_type(first, iter2 + 1)] += weight;
+    }
+
+    template <typename Iterator, typename Counts>
+    void collect_counts(Iterator first, Iterator last, const double& weight, Counts& counts, const int order)
+    {
+      for (/**/; first != last; ++ first)
+	for (Iterator iter = first; iter != std::min(first + order, last); ++ iter)
+	  counts[typename Counts::key_type(first, iter + 1)] += weight;
+    }
+    
+      
+    void Variational::insert(const hypergraph_type& graph, const weight_set_type& weights)
+    {
+      typedef variational_function::weight_type weight_type;
+      
+      typedef rule_type::symbol_set_type ngram_type;
+      typedef rule_type::symbol_set_type phrase_type;
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+      typedef std::tr1::unordered_map<ngram_type, double, boost::hash<ngram_type>, std::equal_to<ngram_type>,
+	std::allocator<std::pair<ngram_type, double> > > ngram_set_type;
+#else
+      typedef sgi::hash_map<ngram_type, double, boost::hash<ngram_type>, std::equal_to<ngram_type>,
+	std::allocator<std::pair<ngram_type, double> > > ngram_set_type;
+#endif
+
+      typedef std::pair<ngram_type, ngram_type> context_type;
+
+      typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
+      typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
+
+      typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
+
+      pimpl->clear();
+      if (! graph.is_valid())
+	return;
+      
+      const int order = pimpl->order;
+      const int context_size = order - 1;
+
+      ngram_set_type ngrams;
+
+      phrase_span_set_type phrase_spans;
+      buffer_type buffer;
+      
+      std::vector<weight_type, std::allocator<weight_type> > inside(graph.nodes.size());
+      std::vector<weight_type, std::allocator<weight_type> > outside(graph.nodes.size());
+      std::vector<context_type, std::allocator<context_type> > contexts(graph.nodes.size());
+      
+      cicada::inside(graph, inside, variational_function(weights));
+      cicada::outside(graph, inside, outside, variational_function(weights));
+      
+      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+	const node_type& node = *niter;
+
+	const bool is_goal = (node.id == graph.goal);
+	
+	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const edge_type& edge = graph.edges[*eiter];
+	  
+	  weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights)) * inside[node.id] / inside[graph.goal];
+	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	    weight *= outside[*niter];
+	  
+	  // we will construct ngram....
+	  const phrase_type& target = edge.rule->target;
+
+	  buffer.clear();
+	  
+	  if (edge.tails.empty()) {
+	    phrase_type::const_iterator titer_end = target.end();
+	    for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+	      if (*titer != vocab_type::EPSILON)
+		buffer.push_back(*titer);
+
+	    collect_counts(buffer.begin(), buffer.end(), weight, ngrams, order);
+	    
+	    if (contexts[node.id].first.empty()) {
+	      if (buffer.size() <= context_size)
+		contexts[node.id] = std::make_pair(ngram_type(buffer.begin(), buffer.end()), ngram_type());
+	      else
+		contexts[node.id] = std::make_pair(ngram_type(buffer.begin(), buffer.begin() + context_size),
+						   ngram_type(buffer.end() - context_size, buffer.end()));
+	    }
+
+	    if (is_goal) {
+	      buffer.insert(buffer.begin(), vocab_type::BOS);
+	      buffer.insert(buffer.end(), vocab_type::EOS);
+	      
+	      collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end(), weight, ngrams, order);
+	      collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, ngrams, order);
+	    }
+
+	  } else {
+	    buffer.reserve(target.size() + edge.tails.size() * order * 2);
+
+	    phrase_spans.clear();
+	    target.terminals(std::back_inserter(phrase_spans));	    
+	    
+	    int star_first = -1;
+	    int star_last  = -1;
+	    
+	    for (phrase_type::const_iterator titer = phrase_spans.front().first; titer != phrase_spans.front().second; ++ titer)
+	      if (*titer != vocab_type::EPSILON)
+		buffer.push_back(*titer);
+	    
+	    collect_counts(buffer.begin(), buffer.end(), weight, ngrams, order);
+	    
+	    buffer_type::const_iterator biter_first = buffer.begin();
+	    
+	    phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
+	    for (phrase_span_set_type::const_iterator siter = phrase_spans.begin() + 1; siter != siter_end; ++ siter) {
+	      const phrase_span_type& span = *siter;
+	      
+	      const int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
+	      if (antecedent_index < 0)
+		throw std::runtime_error("this is a non-terminal, but no index!");
+
+	      const context_type& context = contexts[edge.tails[antecedent_index]];
+	      
+	      buffer_type::const_iterator biter = buffer.end();
+	      
+	      buffer.insert(buffer.end(), context.first.begin(), context.first.end());
+	      
+	      buffer_type::const_iterator biter_end = buffer.end();
+	      
+	      collect_counts(biter_first, biter, biter_end, weight, ngrams, order);
+	      
+	      if (! context.second.empty()) {
+		biter_first = buffer.end();
+		
+		star_last = buffer.size();
+		if (star_first < 0)
+		  star_first = buffer.size();
+		
+		buffer.insert(buffer.end(), context.second.begin(), context.second.end());
+	      }
+	      
+	      {
+		buffer_type::const_iterator biter = buffer.end();
+	      
+		buffer.insert(buffer.end(), span.first, span.second);
+		
+		buffer_type::const_iterator biter_end = buffer.end();
+		
+		collect_counts(biter_first, biter, biter_end, weight, ngrams, order);
+	      }
+	    }
+	    
+	    // setup history..
+	    if (contexts[node.id].first.empty()) {
+	      
+	      if (star_first >= 0) {
+		const int prefix_size = utils::bithack::min(star_first, context_size);
+		const int suffix_size = utils::bithack::min(int(buffer.size() - star_last), context_size);
+		
+		contexts[node.id]= std::make_pair(ngram_type(buffer.begin(), buffer.begin() + prefix_size),
+						  ngram_type(buffer.end() - suffix_size, buffer.end()));
+		
+	      } else {
+		if (buffer.size() <= context_size)
+		  contexts[node.id] = std::make_pair(ngram_type(buffer.begin(), buffer.end()), ngram_type());
+		else
+		  contexts[node.id] = std::make_pair(ngram_type(buffer.begin(), buffer.begin() + context_size),
+						     ngram_type(buffer.end() - context_size, buffer.end()));
+	      }
+	    }
+	    
+	    if (is_goal) {
+	      if (star_first >= 0) {
+		const int prefix_size = utils::bithack::min(star_first, context_size);
+		const int suffix_size = utils::bithack::min(int(buffer.size() - star_last), context_size);
+		
+		buffer.insert(buffer.begin(), vocab_type::BOS);
+		buffer.insert(buffer.end(), vocab_type::EOS);
+
+		collect_counts(buffer.begin(), buffer.begin() + 1, buffer.begin() + 1 + prefix_size, weight, ngrams, order);
+		collect_counts(buffer.end() - suffix_size - 1, buffer.end() - 1, buffer.end(), weight, ngrams, order);
+	      } else {
+		buffer.insert(buffer.begin(), vocab_type::BOS);
+		buffer.insert(buffer.end(), vocab_type::EOS);
+
+		collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end(), weight, ngrams, order);
+		collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, ngrams, order);
+	      }
+	    }
+	  }
+	}
+      }
+
+      ngram_set_type ngrams_history;
+      {
+	ngram_set_type::const_iterator niter_end = ngrams.end();
+	for (ngram_set_type::const_iterator niter = ngrams.begin(); niter != niter_end; ++ niter)
+	  ngrams_history[ngram_type(niter->first.begin(), niter->first.end() - 1)] += niter->second;
+	
+	for (ngram_set_type::const_iterator niter = ngrams.begin(); niter != niter_end; ++ niter)
+	  pimpl->insert(niter->first.begin(), niter->first.end(), std::log(niter->second / ngrams_history[ngram_type(niter->first.begin(), niter->first.end() - 1)]));
+      }
     }
     
   };

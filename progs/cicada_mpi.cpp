@@ -27,6 +27,8 @@
 #include "cicada/weight_vector.hpp"
 #include "cicada/semiring.hpp"
 
+#include "cicada/feature/variational.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -262,15 +264,20 @@ path_type                  feature_weights_file;
 bool feature_weights_one = false;
 bool feature_list = false;
 
-bool binarize_graph = false;
-int  binarize_size = 2;
+bool      binarize_graph = false;
+int       binarize_size = 2;
+path_type binarize_weights_file;
 
-bool permute_graph = false;
-int  permute_size = 3;
+bool      permute_graph = false;
+int       permute_size = 3;
+path_type permute_weights_file;
 
 bool apply_cube = false;
 bool apply_full = false;
 int  cube_size = 200;
+
+bool      variational = false;
+path_type variational_weights_file;
 
 bool intersect = false;
 
@@ -282,11 +289,9 @@ int debug = 0;
 void options(int argc, char** argv);
 
 void cicada_stdout(const grammar_type& grammar,
-		   const model_type& model,
-		   const weight_set_type& weights);
+		   const model_type& model);
 void cicada_process(const grammar_type& grammar,
-		    const model_type& model,
-		    const weight_set_type& weights);
+		    const model_type& model);
 
 enum {
   sample_tag = 1000,
@@ -372,19 +377,12 @@ int main(int argc, char ** argv)
 
     if (debug && mpi_rank == 0)
       std::cerr << "feature functions: " << model.size() << std::endl;
-
+    
     // read parameters...
-    weight_set_type weights;
-    if (! feature_weights_file.empty()) {
-      if (feature_weights_file != "-" && ! boost::filesystem::exists(feature_weights_file))
-	throw std::runtime_error("no feture weights?" + feature_weights_file.file_string());
-      
+    if (feature_weights_file == "-" || boost::filesystem::exists(feature_weights_file))
       if (feature_weights_one)
 	throw std::runtime_error("feature weights file supplied but you have enabled one-initialized weights");
-      
-      utils::compress_istream is(feature_weights_file);
-      is >> weights;
-    }
+    
     
     // we will force non directory-input-mode....
     input_directory_mode = false;
@@ -398,9 +396,9 @@ int main(int argc, char ** argv)
     }
     
     if (output_stdout)
-      cicada_stdout(grammar, model, weights);
+      cicada_stdout(grammar, model);
     else
-      cicada_process(grammar, model, weights);
+      cicada_process(grammar, model);
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -439,16 +437,40 @@ struct TaskStdout
   TaskStdout(queue_type&                     __queue_is,
 	     queue_type&                     __queue_os,
 	     const grammar_type&             __grammar,
-	     const model_type&               __model,
-	     const weight_set_type&          __weights)
+	     const model_type&               __model)
     : queue_is(__queue_is),
       queue_os(__queue_os),
       grammar(__grammar),
-      model(__model),
-      weights(__weights) {}
+      model(__model) {}
 
   void operator()()
   {
+    
+    boost::shared_ptr<cicada::feature::Variational> variational_feature;
+    
+    if (variational) {
+      for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter) {
+	cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
+	if (__variational) {
+	  variational_feature.reset(__variational);
+	  break;
+	}
+      }
+
+      if (! variational_feature)
+	throw std::runtime_error("when performing variational decoding, you should specify variational feature function");
+    }
+    
+    weight_set_type weights;
+    weight_set_type weights_binarize;
+    weight_set_type weights_permute;
+    weight_set_type weights_variational;
+    
+    read_weights(feature_weights_file, weights);
+    read_weights(binarize_weights_file, weights_binarize);
+    read_weights(permute_weights_file, weights_permute);
+    read_weights(variational_weights_file, weights_variational);
+    
     std::string       line;
     sentence_set_type target_sentences;
     lattice_type      target;
@@ -645,6 +667,51 @@ struct TaskStdout
 	hypergraph.swap(hypergraph_applied);
       }
 
+      if (variational) {
+	hypergraph_type hypergraph_variational;
+
+	// clear weights to one if feature-weights-one...
+	if (feature_weights_one) {
+	  weights.allocate();
+	  for (weight_set_type::feature_type::id_type id = 0; id < weights.size(); ++ id)
+	    if (! weight_set_type::feature_type(id).empty())
+	      weights[weight_set_type::feature_type(id)] = 1.0;
+	}
+	
+	if (debug)
+	  std::cerr << "variational decoding" << std::endl;
+	
+	utils::resource variational_start;
+	
+	variational_feature->insert(hypergraph, weights);
+	
+	model_type model;
+	model.push_back(variational_feature);
+	
+	// second, apply again...
+	
+	cicada::apply_exact<weight_set_function>(model, hypergraph, hypergraph_variational, weight_set_function(weights_variational), cube_size);
+	
+	utils::resource variational_end;
+
+	if (debug)
+	  std::cerr << "variational cpu time: " << (variational_end.cpu_time() - variational_start.cpu_time())
+		    << " user time: " << (variational_end.user_time() - variational_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_variational.nodes.size()
+		    << " # of edges: " << hypergraph_variational.edges.size()
+		    << " valid? " << (hypergraph_variational.is_valid() ? "true" : "false")
+		    << std::endl;
+
+
+	hypergraph.swap(hypergraph_variational);
+	
+	// finally, cleanup...
+	variational_feature->clear();
+      }
+
       if (0.0 < prune_beam && prune_beam < 1.0) {
 	hypergraph_type hypergraph_pruned;
 	
@@ -729,7 +796,6 @@ struct TaskStdout
   queue_type&                     queue_os;
   const grammar_type&             grammar;
   const model_type&               model;
-  const weight_set_type&          weights;
 };
 
 struct ReduceStdout
@@ -809,8 +875,7 @@ struct ReduceStdout
 };
 
 void cicada_stdout(const grammar_type& grammar,
-		   const model_type& model,
-		   const weight_set_type& weights)
+		   const model_type& model)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -823,7 +888,7 @@ void cicada_stdout(const grammar_type& grammar,
   queue_type queue_is(1);
   queue_type queue_os;
   
-  boost::thread task(task_type(queue_is, queue_os, grammar, model, weights));
+  boost::thread task(task_type(queue_is, queue_os, grammar, model));
   
   if (mpi_rank == 0) {
     typedef MapStdout    map_type;
@@ -993,16 +1058,41 @@ struct Task
   Task(queue_type&                     __queue,
        boost::shared_ptr<std::ostream> __os,
        const grammar_type&             __grammar,
-       const model_type&               __model,
-       const weight_set_type&          __weights)
+       const model_type&               __model)
     : queue(__queue),
       os(__os),
       grammar(__grammar),
-      model(__model),
-      weights(__weights) {}
+      model(__model) {}
+  
 
   void operator()()
   {
+
+    boost::shared_ptr<cicada::feature::Variational> variational_feature;
+    
+    if (variational) {
+      for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter) {
+	cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
+	if (__variational) {
+	  variational_feature.reset(__variational);
+	  break;
+	}
+      }
+
+      if (! variational_feature)
+	throw std::runtime_error("when performing variational decoding, you should specify variational feature function");
+    }
+
+    weight_set_type weights;
+    weight_set_type weights_binarize;
+    weight_set_type weights_permute;
+    weight_set_type weights_variational;
+    
+    read_weights(feature_weights_file, weights);
+    read_weights(binarize_weights_file, weights_binarize);
+    read_weights(permute_weights_file, weights_permute);
+    read_weights(variational_weights_file, weights_variational);
+
     std::string       line;
     sentence_set_type target_sentences;
     lattice_type      target;
@@ -1199,6 +1289,51 @@ struct Task
 	hypergraph.swap(hypergraph_applied);
       } 
       
+      if (variational) {
+	hypergraph_type hypergraph_variational;
+
+	// clear weights to one if feature-weights-one...
+	if (feature_weights_one) {
+	  weights.allocate();
+	  for (weight_set_type::feature_type::id_type id = 0; id < weights.size(); ++ id)
+	    if (! weight_set_type::feature_type(id).empty())
+	      weights[weight_set_type::feature_type(id)] = 1.0;
+	}
+	
+	if (debug)
+	  std::cerr << "variational decoding" << std::endl;
+	
+	utils::resource variational_start;
+	
+	variational_feature->insert(hypergraph, weights);
+	
+	model_type model;
+	model.push_back(variational_feature);
+	
+	// second, apply again...
+	
+	cicada::apply_exact<weight_set_function>(model, hypergraph, hypergraph_variational, weight_set_function(weights_variational), cube_size);
+	
+	utils::resource variational_end;
+
+	if (debug)
+	  std::cerr << "variational cpu time: " << (variational_end.cpu_time() - variational_start.cpu_time())
+		    << " user time: " << (variational_end.user_time() - variational_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "# of nodes: " << hypergraph_variational.nodes.size()
+		    << " # of edges: " << hypergraph_variational.edges.size()
+		    << " valid? " << (hypergraph_variational.is_valid() ? "true" : "false")
+		    << std::endl;
+
+
+	hypergraph.swap(hypergraph_variational);
+	
+	// finally, cleanup...
+	variational_feature->clear();
+      }
+      
       if (0.0 < prune_beam && prune_beam < 1.0) {
 	hypergraph_type hypergraph_pruned;
 	
@@ -1280,12 +1415,10 @@ struct Task
   boost::shared_ptr<std::ostream> os;
   const grammar_type&             grammar;
   const model_type&               model;
-  const weight_set_type&          weights;
 };
 
 void cicada_process(const grammar_type& grammar,
-		    const model_type& model,
-		    const weight_set_type& weights)
+		    const model_type& model)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -1341,7 +1474,7 @@ void cicada_process(const grammar_type& grammar,
 
   queue_type queue(1);
   
-  boost::thread thread(task_type(queue, os, grammar, model, weights));
+  boost::thread thread(task_type(queue, os, grammar, model));
   
   if (mpi_rank == 0) {
     typedef utils::mpi_ostream ostream_type;
@@ -1476,19 +1609,24 @@ void options(int argc, char** argv)
     ("feature-function-list", po::bool_switch(&feature_list),                              "list of available feature function(s)")
 
     // binarization
-    ("binarize",      po::bool_switch(&binarize_graph),                             "perform hypergraph binarization")
-    ("binarize-size", po::value<int>(&binarize_size)->default_value(binarize_size), "binarization size (<=2 for all binzarization)")
+    ("binarize",         po::bool_switch(&binarize_graph),                             "perform hypergraph binarization")
+    ("binarize-size",    po::value<int>(&binarize_size)->default_value(binarize_size), "binarization size (<=2 for all binzarization)")
+    ("binarize-weights", po::value<path_type>(&binarize_weights_file),                 "weights for binarization")
     
     // permutation...
-    ("permute",      po::bool_switch(&permute_graph),                            "perform hypergraph permutation")
-    ("permute-size", po::value<int>(&permute_size)->default_value(permute_size), "permutation size (zero for no-permutation, negative for all permutation)")
-    
+    ("permute",         po::bool_switch(&permute_graph),                            "perform hypergraph permutation")
+    ("permute-size",    po::value<int>(&permute_size)->default_value(permute_size), "permutation size (zero for no-permutation, negative for all permutation)")
+    ("permute-weights", po::value<path_type>(&permute_weights_file),                "weights for permutation")
     
     // application strategy
     ("apply-cube", po::bool_switch(&apply_cube),                         "feature application by cube-pruning")
     ("apply-full", po::bool_switch(&apply_full),                         "full feature application")
     ("cube-size",  po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning")
 
+    // variational
+    ("variational",         po::bool_switch(&variational),                   "variational decoding (you should add variational feature...)")
+    ("variational-weights", po::value<path_type>(&variational_weights_file), "weights for variational decoding")
+    
     // intersection
     ("intersect", po::bool_switch(&intersect), "intersec with target")
     

@@ -85,10 +85,7 @@ namespace cicada
       graph_out.clear();
       for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
 	process(node_id, graph_in, graph_out);
-      
-      if (! graph_out.nodes.empty())
-	graph_out.goal = graph_out.nodes.size() - 1;
-      
+            
       // topologically sort...
       graph_out.topologically_sort();
     };
@@ -124,28 +121,34 @@ namespace cicada
 	  edge_new.rule = edge.rule;
 	  edge_new.features = edge.features;
 
-	  state_type state;
+	  feature_set_type estimates;
+	  const state_type state = model(graph_out, node_states, edge_new, estimates);
 	  if (is_goal)
-	    model(node_states[tails.front()], edge_new);
-	  else {
-	    feature_set_type estimates;
-	    state = model(graph_out, node_states, edge_new, estimates);
-	  }
+	    model(state, edge_new);
 	  
 	  // hypothesis recombination
-	  
-	  typename state_node_map_type::iterator biter = buf.find(state);
-	  if (biter == buf.end()) {
-	    const node_type& node_new = graph_out.add_node();
+
+	  if (is_goal) {
+	    if (graph_out.goal == hypergraph_type::invalid)
+	      graph_out.goal = graph_out.add_node().id;
 	    
-	    node_states.push_back(state);
+	    node_type& node = graph_out.nodes[graph_out.goal];
 	    
-	    node_map[edge.head].push_back(node_new.id);
+	    graph_out.connect_edge(edge_new.id, node.id);
+	  } else {
+	    typename state_node_map_type::iterator biter = buf.find(state);
+	    if (biter == buf.end()) {
+	      const node_type& node_new = graph_out.add_node();
+	      
+	      node_states.push_back(state);
+	      
+	      node_map[edge.head].push_back(node_new.id);
+	      
+	      biter = buf.insert(std::make_pair(state, node_new.id)).first;
+	    }
 	    
-	    biter = buf.insert(std::make_pair(state, node_new.id)).first;
+	    graph_out.connect_edge(edge_new.id, biter->second);
 	  }
-	  
-	  graph_out.connect_edge(edge_new.id, biter->second);
 	  
 	  // proceed to the next id...
 

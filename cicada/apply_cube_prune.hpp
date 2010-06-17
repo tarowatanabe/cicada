@@ -170,9 +170,6 @@ namespace cicada
       graph_out.clear();
       for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
 	kbest(node_id, graph_in, graph_out);
-
-      if (! graph_out.nodes.empty())
-	graph_out.goal = graph_out.nodes.size() - 1;
       
       // topologically sort...
       graph_out.topologically_sort();
@@ -218,7 +215,7 @@ namespace cicada
 	cand.pop_back();
 	
 	push_succ(*item, is_goal, cand, cand_unique, graph_out);
-	append_item(*item, buf, graph_out);
+	append_item(*item, is_goal, buf, graph_out);
       }
 
       //std::cerr << "finished" << std::endl;
@@ -235,6 +232,7 @@ namespace cicada
     
     // append item to buf
     void append_item(const candidate_type& item,
+		     const bool is_goal,
 		     state_node_map_type& buf,
 		     hypergraph_type& graph)
     {
@@ -245,33 +243,45 @@ namespace cicada
 		<< " head: " << edge_new.head
 		<< std::endl;
 #endif
-
-      // hypothesis re-combination...
-      typename state_node_map_type::iterator biter = buf.find(item.state);
-      if (biter == buf.end()) {
-	//std::cerr << "added node!" << std::endl;
-
-	biter = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item))).first;
+      
+      if (is_goal) {
+	// perform hypothesis re-combination toward goal-node...
 	
-	const node_type& node_new = graph.add_node();
-	biter->second->node = node_new.id;
+	if (graph.goal == hypergraph_type::invalid)
+	  graph.goal = graph.add_node().id;
 	
-	node_states.push_back(item.state);
-      }
-      
-      //std::cerr << "node: " << biter->second->node << std::endl;
-      
-      candidate_type& item_graph = *(biter->second);
-      
-      node_type& node = graph.nodes[item_graph.node];
-      
-      graph.connect_edge(edge_new.id, node.id);
-      
-      // check if we found better derivation.. 
-      // it may happen due to insufficient contextual information during parsing...
-      if (item.score > item_graph.score) {
-	item_graph.score  = item.score;
-	item_graph.estimate = item.estimate;
+	node_type& node = graph.nodes[graph.goal];
+	
+	graph.connect_edge(edge_new.id, node.id);
+	
+      } else {
+	// hypothesis re-combination...
+	typename state_node_map_type::iterator biter = buf.find(item.state);
+	if (biter == buf.end()) {
+	  //std::cerr << "added node!" << std::endl;
+	  
+	  biter = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item))).first;
+	  
+	  const node_type& node_new = graph.add_node();
+	  biter->second->node = node_new.id;
+	  
+	  node_states.push_back(item.state);
+	}
+	
+	//std::cerr << "node: " << biter->second->node << std::endl;
+	
+	candidate_type& item_graph = *(biter->second);
+	
+	node_type& node = graph.nodes[item_graph.node];
+	
+	graph.connect_edge(edge_new.id, node.id);
+	
+	// check if we found better derivation.. 
+	// it may happen due to insufficient contextual information during parsing...
+	if (item.score > item_graph.score) {
+	  item_graph.score  = item.score;
+	  item_graph.estimate = item.estimate;
+	}
       }
       
       //std::cerr << "finished append-item" << std::endl;
@@ -350,13 +360,12 @@ namespace cicada
       
       // perform actual model application...
 
+      feature_set_type estimates;
+      candidate.state = model(graph, node_states, candidate.out_edge, estimates);
       if (is_goal)
-	model(node_states[candidate.out_edge.tails.front()], candidate.out_edge);
-      else {
-	feature_set_type estimates;
-	candidate.state = model(graph, node_states, candidate.out_edge, estimates);
-	candidate.estimate *= function(estimates);
-      }
+	model(candidate.state, candidate.out_edge);
+      
+      candidate.estimate *= function(estimates);
       
       candidate.score *= function(candidate.out_edge.features);
       candidate.estimate *= candidate.score;

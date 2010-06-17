@@ -225,6 +225,25 @@ namespace cicada
 	    }
 	  }
 	  
+	  if (star_first >= 0) {
+	    const int prefix_size = utils::bithack::min(star_first, context_size);
+	    const int suffix_size = utils::bithack::min(int(buffer.size() - star_last), context_size);
+	    
+	    std::copy(buffer.begin(), buffer.begin() + prefix_size, context_first);
+	    context_first[prefix_size] = vocab_type::STAR;
+	    std::copy(buffer.end() - suffix_size, buffer.end(), context_first + prefix_size + 1);
+	    
+	  } else {
+	    if (buffer.size() <= context_size)
+	      std::copy(buffer.begin(), buffer.end(), context_first);
+	    else {
+	      std::copy(buffer.begin(), buffer.begin() + context_size, context_first);
+	      context_first[context_size] = vocab_type::STAR;
+	      std::copy(buffer.end() - context_size, buffer.end(), context_first + order);
+	    }
+	  }
+	  
+	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();

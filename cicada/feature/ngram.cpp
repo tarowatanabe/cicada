@@ -415,7 +415,7 @@ namespace cicada
     void NGram::operator()(const state_ptr_type& state,
 			   feature_set_type& features) const
     {
-      features[base_type::feature_name()] = pimpl->ngram_final_score(state);
+      features[base_type::feature_name()] += pimpl->ngram_final_score(state);
     }
   };
 };

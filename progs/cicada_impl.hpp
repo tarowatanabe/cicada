@@ -8,6 +8,22 @@
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_stl.hpp>
 
+#include <boost/filesystem.hpp>
+#include <utils/compress_stream.hpp>
+
+template <typename Path, typename Weights>
+void read_weights(const Path& path, Weights& weights)
+{
+  if (! path.empty()) return;
+  
+  if (path != "-" && ! boost::filesystem::exists(path))
+    throw std::runtime_error("no feture weights?" + path.file_string());
+      
+  utils::compress_istream is(path);
+  is >> weights;
+}
+		  
+
 template <typename Iterator>
 inline
 bool parse_id(size_t& id, Iterator& iter, Iterator end)

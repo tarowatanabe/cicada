@@ -9,6 +9,7 @@
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
+#include <cicada/weight_vector.hpp>
 
 namespace cicada
 {
@@ -26,7 +27,7 @@ namespace cicada
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
 
-      typedef sentence_type ngram_type;
+      typedef cicada::WeightVector<double> weight_set_type;
       
     private:
       typedef FeatureFunction base_type;
@@ -49,18 +50,12 @@ namespace cicada
 			      feature_set_type& estimates) const;
       virtual void operator()(const state_ptr_type& state,
 			      feature_set_type& features) const;
-
+      
       int order() const;
       
       void clear();
-
-      template <typename Iterator>
-      void insert(Iterator first, Iterator last, const double& logprob)
-      {
-	insert(ngram_type(first, last), logprob);
-      }
       
-      void insert(const ngram_type& ngram, const double& logprob);
+      void insert(const hypergraph_type& graph, const weight_set_type& weights);
       
     private:
       impl_type* pimpl;
