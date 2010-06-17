@@ -14,7 +14,7 @@
 template <typename Path, typename Weights>
 void read_weights(const Path& path, Weights& weights)
 {
-  if (! path.empty()) return;
+  if (path.empty()) return;
   
   if (path != "-" && ! boost::filesystem::exists(path))
     throw std::runtime_error("no feture weights?" + path.file_string());
