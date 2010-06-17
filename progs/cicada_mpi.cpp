@@ -28,6 +28,7 @@
 #include "cicada/semiring.hpp"
 
 #include "cicada/feature/variational.hpp"
+#include "cicada/feature/bleu.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -276,7 +277,6 @@ bool apply_cube = false;
 bool apply_full = false;
 int  cube_size = 200;
 
-bool      variational = false;
 path_type variational_weights_file;
 
 bool intersect = false;
@@ -445,21 +445,19 @@ struct TaskStdout
 
   void operator()()
   {
-    
     boost::shared_ptr<cicada::feature::Variational> variational_feature;
+    boost::shared_ptr<cicada::feature::Bleu>        bleu_feature;
     
-    if (variational) {
-      for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter) {
-	cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
-	if (__variational) {
-	  variational_feature.reset(__variational);
-	  break;
-	}
-      }
-
-      if (! variational_feature)
-	throw std::runtime_error("when performing variational decoding, you should specify variational feature function");
+    for (model_type::iterator iter = model.begin(); iter != model.end(); ++ iter) {
+      cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
+      if (__variational)
+	variational_feature.reset(__variational);
+      
+      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(iter->get());
+      if (__bleu)
+	bleu_feature.reset(__bleu);
     }
+
     
     weight_set_type weights;
     weight_set_type weights_binarize;
@@ -667,7 +665,7 @@ struct TaskStdout
 	hypergraph.swap(hypergraph_applied);
       }
 
-      if (variational) {
+      if (variational_feature) {
 	hypergraph_type hypergraph_variational;
 
 	// clear weights to one if feature-weights-one...
@@ -1067,20 +1065,17 @@ struct Task
 
   void operator()()
   {
-
     boost::shared_ptr<cicada::feature::Variational> variational_feature;
+    boost::shared_ptr<cicada::feature::Bleu>        bleu_feature;
     
-    if (variational) {
-      for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter) {
-	cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
-	if (__variational) {
-	  variational_feature.reset(__variational);
-	  break;
-	}
-      }
-
-      if (! variational_feature)
-	throw std::runtime_error("when performing variational decoding, you should specify variational feature function");
+    for (model_type::iterator iter = model.begin(); iter != model.end(); ++ iter) {
+      cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
+      if (__variational)
+	variational_feature.reset(__variational);
+      
+      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(iter->get());
+      if (__bleu)
+	bleu_feature.reset(__bleu);
     }
 
     weight_set_type weights;
@@ -1289,7 +1284,7 @@ struct Task
 	hypergraph.swap(hypergraph_applied);
       } 
       
-      if (variational) {
+      if (variational_feature) {
 	hypergraph_type hypergraph_variational;
 
 	// clear weights to one if feature-weights-one...
@@ -1624,7 +1619,6 @@ void options(int argc, char** argv)
     ("cube-size",  po::value<int>(&cube_size)->default_value(cube_size), "cube-size for cube prunning")
 
     // variational
-    ("variational",         po::bool_switch(&variational),                   "variational decoding (you should add variational feature...)")
     ("variational-weights", po::value<path_type>(&variational_weights_file), "weights for variational decoding")
     
     // intersection
