@@ -412,44 +412,9 @@ int main(int argc, char ** argv)
     
     size_t id = 0;
     while (std::getline(*is, line)) {
-      
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-      
-      if (input_id_mode)
-	if (! parse_id(id, iter, end))
-	  throw std::runtime_error("invalid id-prefixed format");
-      
-      if (input_lattice_mode) {
-	if (! lattice.assign(iter, end))
-	  throw std::runtime_error("invalid lattive format");
-      } else if (input_forest_mode) {
-	if (! hypergraph.assign(iter, end))
-	  throw std::runtime_error("invalid hypergraph format");
-      } else {
-	if (! sentence.assign(iter, end))
-	  throw std::runtime_error("invalid sentence format");
-	
-	lattice = lattice_type(sentence);
-      }
-      
-      if (input_bitext_mode) {
-	target_sentences.clear();
-	
-	while (parse_separator(iter, end)) {
-	  target_sentences.push_back(sentence_type());
-	  
-	  if (! target_sentences.back().assign(iter, end))
-	    throw std::runtime_error("invalid sentence format");
-	}
-	
-	if (target_sentences.empty())
-	  throw std::runtime_error("no bitext?");
-	
-	target = lattice_type(target_sentences.front());
-      }
-      
-      if (iter != end)
+
+      if (! parse_line(line, id, hypergraph, lattice, target, target_sentences, sentence,
+		       input_id_mode, input_lattice_mode, input_forest_mode, input_bitext_mode))
 	throw std::runtime_error("invalid input format");
       
       if (lattice.empty() && ! hypergraph.is_valid()) {

@@ -84,9 +84,6 @@ int main(int argc, char ** argv)
     
     threads = utils::bithack::max(1, threads);
 
-    // special handing for bleu feature
-    static const feature_type bleu("bleu");
-
     enumerate_forest(forest_path);
 
     if (debug)
@@ -359,11 +356,6 @@ struct OptimizeLBFGS
       if (! feature_type(id).empty() && optimizer.weights[id] != 0.0)
 	std::cerr << feature_type(id) << ": " << optimizer.weights[id] << std::endl;
 #endif
-
-    static const feature_type bleu("bleu");
-    
-    // bleu-score to bleu-penalty
-    const_cast<weight_set_type&>(optimizer.weights).operator[](bleu) = - 1.0;
     
     task_set_type tasks(threads, task_type(queue, optimizer.weights));
     
@@ -396,10 +388,7 @@ struct OptimizeLBFGS
       objective += tasks[i].objective;
       std::transform(tasks[i].g.begin(), tasks[i].g.end(), g, g, std::plus<double>());
     }
-    
-    // zero gradient for bleu...
-    g[bleu.id()] = 0.0;
-    
+        
     // L2...
     if (regularize_l2) {
       double norm = 0.0;

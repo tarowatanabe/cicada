@@ -1,3 +1,4 @@
+#include <stdexcept>
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
@@ -54,4 +55,57 @@ bool parse_separator(Iterator& iter, Iterator end)
   using standard::space;
   
   return phrase_parse(iter, end, "|||", space);
+}
+
+template <typename HyperGraph, typename Lattice, typename SentenceSet, typename Sentence>
+inline
+bool parse_line(const std::string& line,
+		size_t& id,
+		HyperGraph& hypergraph,
+		Lattice& lattice,
+		Lattice& target,
+		SentenceSet& target_sentences,
+		Sentence& sentence,
+		const bool input_id,
+		const bool input_lattice,
+		const bool input_forest, 
+		const bool input_bitext)
+{
+  std::string::const_iterator iter = line.begin();
+  std::string::const_iterator end = line.end();
+  
+  if (input_id)
+    if (! parse_id(id, iter, end))
+      throw std::runtime_error("invalid id-prefixed format");
+  
+  if (input_lattice) {
+    if (! lattice.assign(iter, end))
+      throw std::runtime_error("invalid lattive format");
+  } else if (input_forest) {
+    if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid hypergraph format");
+  } else {
+    if (! sentence.assign(iter, end))
+      throw std::runtime_error("invalid sentence format");
+    
+    lattice = Lattice(sentence);
+  }
+  
+  if (input_bitext) {
+    target_sentences.clear();
+    
+    while (parse_separator(iter, end)) {
+      target_sentences.push_back(Sentence());
+      
+      if (! target_sentences.back().assign(iter, end))
+	throw std::runtime_error("invalid sentence format");
+    }
+    
+    if (target_sentences.empty())
+      throw std::runtime_error("no bitext?");
+    
+    target = Lattice(target_sentences.front());
+  }
+  
+  return iter == end;
 }

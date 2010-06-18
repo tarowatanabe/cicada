@@ -122,10 +122,7 @@ int main(int argc, char ** argv)
 
     if (! boost::filesystem::exists(intersected_path) || ! boost::filesystem::is_directory(intersected_path))
       throw std::runtime_error("no intersected forest?");
-    
-    // special handing for bleu feature
-    static const feature_type bleu("bleu");
-    
+        
     enumerate_forest(forest_path);
 
     if (debug && mpi_rank == 0)
@@ -403,12 +400,7 @@ struct OptimizeLBFGS
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
-    
-    static const feature_type bleu("bleu");
-    
-    // bleu-score to bleu-penalty
-    const_cast<weight_set_type&>(optimizer.weights).operator[](bleu) = - 1.0;
-    
+        
     bcast_weights(0, optimizer.weights);
     
     task_type task(optimizer.weights, optimizer.forest_path, optimizer.intersected_path);
@@ -423,9 +415,6 @@ struct OptimizeLBFGS
     
     double objective = task.objective;
     MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
-
-    // zero gradient for bleu...
-    g[bleu.id()] = 0.0;
 
     // L2...
     if (regularize_l2) {

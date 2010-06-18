@@ -35,6 +35,28 @@ namespace cicada
       features["binarize:" + static_cast<const std::string&>(rule.lhs) + static_cast<const std::string&>(binarized.lhs)] = 1.0;
     }
   };
+  
+  template <typename Weights>
+  struct BinarizeFeatureCollapsed
+  {
+    const Weights& weights;
+    const typename Weights::feature_type feature_name;
+    
+    BinarizeFeatureCollapsed(const Weights& __weights)
+      : weights(__weights), feature_name("binarize:collapsed") {}
+
+    template <typename Features, typename Rule>
+    void operator()(Features& features, const Rule& rule, const Rule& binarized)
+    {
+      // we know the parent of binarized constituent...
+      const std::string feature = "binarize:" + static_cast<const std::string&>(rule.lhs) + static_cast<const std::string&>(binarized.lhs);
+      
+      if (Weights::feature_type::exists(feature))
+	features[feature_name] = weights[feature];
+    }
+  };
+
+  
 
   template <typename FeatureFunction>
   struct Binarize
@@ -199,7 +221,7 @@ namespace cicada
   inline
   void binarize(const HyperGraph& source, HyperGraph& target, const int binarize_size=0)
   {
-    Binarize<BinarizeNoFeature> binarizer(BinarizeNoFeature(), binarize_size);
+    Binarize<BinarizeFeature> binarizer(BinarizeFeature(), binarize_size);
     
     binarizer(source, target);
   }
@@ -209,7 +231,7 @@ namespace cicada
   {
     HyperGraph target;
 
-    Binarize<BinarizeNoFeature> binarizer(BinarizeNoFeature(), binarize_size);
+    Binarize<BinarizeFeature> binarizer(BinarizeFeature(), binarize_size);
     
     binarizer(source, target);
     
