@@ -599,18 +599,18 @@ void enumerate_forest(const path_type& forest_path,
       std::string::const_iterator end = line.end();
       
       if (! parse_id(id_forest, iter, end))
-	throw std::runtime_error("invalid id input");
+	throw std::runtime_error("invalid id input: " + path_forst.file_string());
       
       graphs_forest.push_back(hypergraph_type());
       
       if (! graphs_forest.back().assign(iter, end))
-	throw std::runtime_error("invalid graph format");
+	throw std::runtime_error("invalid graph format" + path_forst.file_string());
       
       if (! load)
 	graphs_forest.clear();
       
       if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format");
+	throw std::runtime_error("invalid id ||| graph format" + path_forst.file_string());
     }
 
     {
@@ -621,19 +621,19 @@ void enumerate_forest(const path_type& forest_path,
       std::string::const_iterator end = line.end();
       
       if (! parse_id(id_intersected, iter, end))
-	throw std::runtime_error("invalid id input");
+	throw std::runtime_error("invalid id input" + path_intersedted.file_string());
       
       graphs_intersected.push_back(hypergraph_type());
       
       if (! graphs_intersected.back().assign(iter, end))
-	throw std::runtime_error("invalid graph format");
+	throw std::runtime_error("invalid graph format" + path_intersedted.file_string());
       
       if (! load)
 	graphs_intersected.clear();
 
       
       if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format");
+	throw std::runtime_error("invalid id ||| graph format" + path_intersedted.file_string());
     }
     
     if (id_forest != id_intersected)
