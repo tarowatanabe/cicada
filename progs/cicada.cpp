@@ -465,7 +465,10 @@ int main(int argc, char ** argv)
 	
 	utils::resource binarize_start;
 	
-	cicada::binarize(hypergraph, hypergraph_binarized, binarize_size);
+	if (! weights_binarize.empty())
+	  cicada::binarize(hypergraph, hypergraph_binarized, cicada::BinarizeFeatureCollapsed<weight_set_type>(weights_binarize), binarize_size);
+	else
+	  cicada::binarize(hypergraph, hypergraph_binarized, binarize_size);
 	
 	utils::resource binarize_end;
 	
@@ -491,7 +494,10 @@ int main(int argc, char ** argv)
 	
 	utils::resource permute_start;
 	
-	cicada::permute(hypergraph, hypergraph_permuted, permute_size);
+	if (! weights_permute.empty())
+	  cicada::permute(hypergraph, hypergraph_permuted, cicada::PermuteFeatureCollapsed<weight_set_type>(weights_permute), permute_size);
+	else
+	  cicada::permute(hypergraph, hypergraph_permuted, permute_size);
 	
 	utils::resource permute_end;
 	
