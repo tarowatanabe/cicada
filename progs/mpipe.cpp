@@ -246,6 +246,8 @@ typedef boost::filesystem::path path_type;
 path_type input_file = "-";
 path_type output_file = "-";
 std::string command;
+
+bool even = false;
 int debug = 0;
 
 int getoptions(int argc, char** argv);
@@ -321,18 +323,36 @@ int main(int argc, char** argv)
       
       while (value.first >= 0) {
 	bool found = false;
-	
-	for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank)
-	  if (ostream[rank]->test() && queue_is.pop(value, true) && value.first >= 0) {
-	    ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
+
+	if (even) {
+	  for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank) {
+	    queue_is.pop(value);
+	    
+	    if (value.first >= 0) {
+	      ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
+	      found = true;
+	    }
+	  }
+
+	  queue_is.pop(value);
+	  if (value.first >= 0) {
+	    queue_send.push(value);
+	    found = true;
+	  }
+	  
+	} else {
+	  for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank)
+	    if (ostream[rank]->test() && queue_is.pop(value, true) && value.first >= 0) {
+	      ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
+	      
+	      found = true;
+	    }
+	  
+	  if (queue_send.empty() && queue_is.pop(value, true) && value.first >= 0) {
+	    queue_send.push(value);
 	    
 	    found = true;
 	  }
-	
-	if (queue_send.empty() && queue_is.pop(value, true) && value.first >= 0) {
-	  queue_send.push(value);
-	  
-	  found = true;
 	}
 	
 	// reduce...
@@ -506,6 +526,7 @@ int getoptions(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     ("command", po::value<std::string>(&command),                              "command")
+    ("even",   po::bool_switch(&even),                                          "evenly split data")
     ("debug",  po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   
