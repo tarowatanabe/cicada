@@ -152,6 +152,9 @@ int main(int argc, char ** argv)
 			    false,
 			    debug);
     
+    // make sure to synchronize here... otherwise, badthink may happen...
+    MPI::COMM_WORLD.Barrier();
+    
     if (! operations.file.empty())
       cicada_stdout(operations);
     else
