@@ -99,7 +99,7 @@ int main(int argc, char ** argv)
 			    symbol_non_terminal,
 			    grammar_insertion,
 			    grammar_deletion,
-			    input_id_mode || input_dierctory_mode,
+			    input_id_mode || input_directory_mode,
 			    input_lattice_mode,
 			    input_forest_mode,
 			    input_bitext_mode,
