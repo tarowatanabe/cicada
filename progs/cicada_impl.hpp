@@ -1183,6 +1183,7 @@ public:
     if (! directory.empty() && ! file.empty())
       throw std::runtime_error("you cannot output both in directory and file");
 
+#if 0
     if (! directory.empty()) {
       if (boost::filesystem::exists(directory) && ! boost::filesystem::is_directory(directory))
 	boost::filesystem::remove_all(directory);
@@ -1193,6 +1194,7 @@ public:
       for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
 	boost::filesystem::remove_all(*iter);
     }
+#endif
   }
   
   void clear()

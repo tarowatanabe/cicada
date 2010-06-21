@@ -91,23 +91,34 @@ int main(int argc, char ** argv)
     for (feature_parameter_set_type::const_iterator piter = feature_parameters.begin(); piter != feature_parameters.end(); ++ piter)
       model.push_back(feature_function_type::create(*piter));
     model.initialize();
+
+    OperationSet operations(ops.begin(), ops.end(),
+			    grammar,
+			    model,
+			    symbol_goal,
+			    symbol_non_terminal,
+			    grammar_insertion,
+			    grammar_deletion,
+			    input_id_mode || input_dierctory_mode,
+			    input_lattice_mode,
+			    input_forest_mode,
+			    input_bitext_mode,
+			    false,
+			    debug);
+
+    if (! operations.directory.empty()) {
+      if (boost::filesystem::exists(operations.directory) && ! boost::filesystem::is_directory(operations.directory))
+	boost::filesystem::remove_all(operations.directory);
+      
+      boost::filesystem::create_directories(operations.directory);
+      
+      boost::filesystem::directory_iterator iter_end;
+      for (boost::filesystem::directory_iterator iter(operations.directory); iter != iter_end; ++ iter)
+	boost::filesystem::remove_all(*iter);
+    }
     
     // we will force non directory-input-mode....
     if (input_directory_mode) {
-      OperationSet operations(ops.begin(), ops.end(),
-			      grammar,
-			      model,
-			      symbol_goal,
-			      symbol_non_terminal,
-			      grammar_insertion,
-			      grammar_deletion,
-			      true,
-			      input_lattice_mode,
-			      input_forest_mode,
-			      input_bitext_mode,
-			      false,
-			      debug);
-      
       std::string line;
       
       boost::filesystem::directory_iterator iter_end;
@@ -119,20 +130,6 @@ int main(int argc, char ** argv)
       }
       
     } else {
-      OperationSet operations(ops.begin(), ops.end(),
-			      grammar,
-			      model,
-			      symbol_goal,
-			      symbol_non_terminal,
-			      grammar_insertion,
-			      grammar_deletion,
-			      input_id_mode,
-			      input_lattice_mode,
-			      input_forest_mode,
-			      input_bitext_mode,
-			      false,
-			      debug);
-
       utils::compress_istream is(input_file, 1024 * 1024);
       
       std::string line;
