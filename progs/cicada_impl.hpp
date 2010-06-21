@@ -1110,10 +1110,10 @@ public:
   
   void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
-    if (! hypergrah.is_valid()) return;
+    if (! hypergraph.is_valid()) return;
     
     boost::iostreams::filtering_ostream os;
-    s.push(boost::iostreams::back_inserter(const_cast<std::string&>(buffer)));
+    os.push(boost::iostreams::back_inserter(const_cast<std::string&>(buffer)));
     
     if (kbest_size <= 0)
       os << id << " ||| " << hypergraph << '\n';
@@ -1207,7 +1207,7 @@ public:
   
   void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
-    if (! hypergrah.is_valid()) return;
+    if (! hypergraph.is_valid()) return;
 
     if (! os) {
       const path_type path = (! file.empty() ? file  : directory / (boost::lexical_cast<std::string>(id) + ".gz"));
