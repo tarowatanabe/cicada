@@ -556,10 +556,7 @@ void cicada_process(OperationSet& operations)
 	    ++ iter;
 	    
 	    if (std::getline(is, line)) {
-	      if (input_id_mode)
-		stream[rank]->write(line);
-	      else
-		stream[rank]->write(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	      stream[rank]->write(line);
 	      
 	      ++ id;
 	    }
@@ -572,10 +569,7 @@ void cicada_process(OperationSet& operations)
 	  ++ iter;
 	  
 	  if (std::getline(is, line)) {
-	    if (input_id_mode)
-	      queue.push(line);
-	    else
-	      queue.push(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	    queue.push(line);
 	    
 	    ++ id;
 	  }
