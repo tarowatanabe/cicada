@@ -440,7 +440,7 @@ void cicada_stdout(OperationSet& operations)
       non_found_iter = loop_sleep(found, non_found_iter);
     }
     
-    queue_is.push(std::string(), true)
+    queue_is.push(std::string());
     
     thread_map.join();
     thread_reduce.join();
