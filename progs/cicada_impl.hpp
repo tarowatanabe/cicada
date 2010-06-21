@@ -1101,6 +1101,9 @@ public:
    
     if (param.find("weights-one") != param.end())
       weights_one = true_false(param.find("weights-one")->second);
+
+    if (weights && weights_one)
+      throw std::runtime_error("you have weights, but specified all-one parameter");
   }
 
   void clear()
@@ -1169,6 +1172,9 @@ public:
    
     if (param.find("weights-one") != param.end())
       weights_one = true_false(param.find("weights-one")->second);
+
+    if (weights && weights_one)
+      throw std::runtime_error("you have weights, but specified all-one parameter");
     
     if (param.find("directory") != param.end())
       directory = param.find("directory")->second;
