@@ -435,11 +435,12 @@ void cicada_stdout(OperationSet& operations)
       
       // termination condition!
       if (std::count(istream.begin(), istream.end(), istream_ptr_type()) == mpi_size
-	  && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size
-	  && queue_is.push(std::string(), true)) break;
+	  && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
+    
+    queue_is.push(std::string(), true)
     
     thread_map.join();
     thread_reduce.join();
