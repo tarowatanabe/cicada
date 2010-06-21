@@ -153,6 +153,17 @@ int main(int argc, char ** argv)
 			    debug);
     
     // make sure to synchronize here... otherwise, badthink may happen...
+    if (mpi_rank == 0 && ! operations.directory.empty()) {
+      if (boost::filesystem::exists(operations.directory) && ! boost::filesystem::is_directory(operations.directory))
+	boost::filesystem::remove_all(operations.directory);
+      
+      boost::filesystem::create_directories(operations.directory);
+      
+      boost::filesystem::directory_iterator iter_end;
+      for (boost::filesystem::directory_iterator iter(operations.directory); iter != iter_end; ++ iter)
+	boost::filesystem::remove_all(*iter);
+    }
+
     MPI::COMM_WORLD.Barrier();
     
     if (! operations.file.empty())
