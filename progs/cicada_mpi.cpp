@@ -543,7 +543,6 @@ void cicada_process(OperationSet& operations)
       boost::filesystem::directory_iterator iter_end;
       boost::filesystem::directory_iterator iter(input_file);
       
-      size_t id = 0;
       std::string line;
       
       int non_found_iter = 0;
@@ -555,11 +554,8 @@ void cicada_process(OperationSet& operations)
 	    utils::compress_istream is(*iter, 1024 * 1024);
 	    ++ iter;
 	    
-	    if (std::getline(is, line)) {
+	    if (std::getline(is, line))
 	      stream[rank]->write(line);
-	      
-	      ++ id;
-	    }
 	    
 	    found = true;
 	  }
@@ -568,11 +564,8 @@ void cicada_process(OperationSet& operations)
 	  utils::compress_istream is(*iter, 1024 * 1024);
 	  ++ iter;
 	  
-	  if (std::getline(is, line)) {
+	  if (std::getline(is, line))
 	    queue.push(line);
-	    
-	    ++ id;
-	  }
 	  
 	  found = true;
 	}
