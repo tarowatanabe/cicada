@@ -101,8 +101,7 @@ namespace cicada
 	} else
 	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
 
-      if (Weights::feature_type::exists(rule_string))
-	features[feature_name] += weights[rule_string];
+      features[feature_name] += weights[rule_string];
     }
   };
 

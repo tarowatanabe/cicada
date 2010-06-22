@@ -522,7 +522,7 @@ public:
     hypergraph_type permuted;
     
     if (debug)
-      std::cerr << "binarization" << std::endl;
+      std::cerr << "permute" << std::endl;
     
     utils::resource start;
     
@@ -1345,7 +1345,7 @@ public:
   static std::string lists()
   {
     static const char* desc = "\
-binarize:direction=<binarization direction [left|right]>,size=<binarize size>\n	\
+binarize:direction=<binarization direction [left|right]>,size=<binarize size>\n\
 permute:feature=<apply-feature,[true|false]>, weights=<weight file for composed feature>, size=<permute size>\n\
 compose-earley\n\
 compose-cky\n\

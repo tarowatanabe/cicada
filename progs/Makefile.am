@@ -21,6 +21,7 @@ bin_PROGRAMS = \
 	cicada_learn_mpi \
 	cicada_mert \
 	cicada_mert_mpi \
+	cicada_maxlike \
 	filter_penntreebank \
 	filter_cabocha \
 	grammar_index \
@@ -50,6 +51,9 @@ cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 cicada_mert_mpi_SOURCES  = cicada_mert_mpi.cpp
 cicada_mert_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_mert_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_maxlike_SOURCES = cicada_maxlike.cpp lbfgs.c
+cicada_maxlike_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 grammar_index_SOURCES = grammar_index.cpp
 grammar_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
