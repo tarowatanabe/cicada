@@ -149,7 +149,7 @@ int main(int argc, char ** argv)
 			    input_lattice_mode,
 			    input_forest_mode,
 			    input_bitext_mode,
-			    false,
+			    true,
 			    debug);
     
     // make sure to synchronize here... otherwise, badthink may happen...
@@ -245,6 +245,8 @@ struct TaskStdout
       
       queue_os.push(operations.buffer);
     }
+
+    queue_os.push(std::string());
   }
   
   
@@ -259,70 +261,71 @@ struct ReduceStdout
   
   ReduceStdout(queue_type& __queue, const path_type& __path)
     : queue(__queue), path(__path) {}
-
-  void buffer_dump(std::ostream& os, const std::string& buffer)
-  {
-    typedef size_t id_type;
-
-    id_type     buffer_id;
-    std::string buffer_sep;
-
-    boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::array_source(buffer.c_str(), buffer.size()));
-
-    is >> buffer_id >> buffer_sep;
-    
-    std::string line;
-    while (std::getline(is, line))
-      os << line << '\n';
-    os.flush();
-  }
   
   void operator()()
   {
-    typedef size_t id_type;
-    typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
-    
-    buffer_map_type maps;
-    std::string buffer;
-    
-    id_type     id = 0;
-    id_type     buffer_id;
-    std::string buffer_sep;
-    
-    utils::compress_ostream os(path);
-    
-    for (;;) {
-      queue.pop_swap(buffer);
-      
-      if (buffer.empty()) break;
-      
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::array_source(buffer.c_str(), buffer.size()));
-      
-      is >> buffer_id >> buffer_sep;
+    if (input_directory_mode) {
+      std::string buffer;
 
-      if (buffer_sep != "|||") continue;
+      utils::compress_ostream os(path, 1024 * 1024);
+
+      for (;;) {
+	queue.pop_swap(buffer);
+	
+	if (buffer.empty()) break;
+	
+	os << buffer;
+	os << std::flush;
+      }
+
+    } else {
+      typedef size_t id_type;
+      typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
+    
+      buffer_map_type maps;
+      std::string buffer;
+    
+      id_type     id = 0;
+      id_type     buffer_id;
+      std::string buffer_sep;
+    
+      utils::compress_ostream os(path, 1024 * 1024);
       
-      if (buffer_id == id) {
-	buffer_dump(os, buffer);
-	++ id;
-      } else
-	maps[buffer_id].swap(buffer);
+      for (;;) {
+	queue.pop_swap(buffer);
+      
+	if (buffer.empty()) break;
+	
+	boost::iostreams::filtering_istream is;
+	is.push(boost::iostreams::array_source(buffer.c_str(), buffer.size()));
+	
+	is >> buffer_id >> buffer_sep;
+	
+	if (buffer_sep != "|||") continue;
+	
+	if (buffer_id == id) {
+	  os << buffer;
+	  os << std::flush;
+	  ++ id;
+	} else
+	  maps[buffer_id].swap(buffer);
+	
+	for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+	  os << iter->second;
+	  maps.erase(iter ++);
+	}
+	os << std::flush;
+      }
       
       for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
-        buffer_dump(os, iter->second);
-        maps.erase(iter ++);
+	os << iter->second;
+	maps.erase(iter ++);
       }
-    }
+      os << std::flush;
     
-    for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
-      buffer_dump(os, iter->second);
-      maps.erase(iter ++);
+      if (! maps.empty())
+	throw std::runtime_error("id mismatch!");
     }
-    
-    if (! maps.empty())
-      throw std::runtime_error("id mismatch!");
   }
   
   
@@ -406,8 +409,7 @@ void cicada_stdout(OperationSet& operations)
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
-    
-    bool terminated = false;
+
     for (;;) {
       bool found = false;
       
@@ -435,19 +437,11 @@ void cicada_stdout(OperationSet& operations)
       
       // termination condition!
       if (std::count(istream.begin(), istream.end(), istream_ptr_type()) == mpi_size
-	  && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size) {
-
-	if (! terminated && queue_is.push(std::string(), true))
-	  terminated = true;
-	
-	if (terminated)
-	  break;
-      }
+	  && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size
+	  && queue_is.push(std::string(), true)) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
-    
-    
     
     thread_map.join();
     thread_reduce.join();

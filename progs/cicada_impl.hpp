@@ -1082,7 +1082,7 @@ class OutputString : public Operation
 {
 public:
   OutputString(const std::string& parameter, std::string& __buffer, size_t& __id, const int __debug)
-    : buffer(__buffer), id(__id), debug(__debug)
+    : buffer(__buffer), id(__id), weights(0), weights_one(false), kbest_size(0), kbest_unique(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
 
@@ -1153,7 +1153,7 @@ class Output : public Operation
 {
 public:
   Output(const std::string& parameter, boost::shared_ptr<std::ostream>& __os, size_t& __id, const int __debug)
-    : os(__os), id(__id), file(), directory(), weights(0), weights_one(false), kbest_size(0), debug(__debug)
+    : os(__os), id(__id), file(), directory(), weights(0), weights_one(false), kbest_size(0), kbest_unique(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
