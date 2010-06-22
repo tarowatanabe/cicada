@@ -130,6 +130,15 @@ namespace cicada
       
       return maps[__id];
     }
+
+    std::string non_terminal_strip() const
+    {
+      if (! is_non_terminal())
+	return *this;
+      
+      const std::string& stripped = static_cast<const std::string&>(non_terminal());
+      return stripped.substr(1, stripped.size() - 2);
+    }
     
     Symbol non_terminal() const
     {

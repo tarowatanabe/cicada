@@ -429,7 +429,7 @@ class Binarize : public Operation
 {
 public:
   Binarize(const std::string& parameter, const int __debug)
-    : weights(0), size(0), feature(false), debug(__debug)
+    : size(0), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -439,12 +439,20 @@ public:
     
     if (param.find("size") != param.end())
       size = boost::lexical_cast<int>(param.find("size")->second);
-    
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
 
-    if (param.find("feature") != param.end())
-      feature = true_false(param.find("feature")->second);
+    if (param.find("direction") != param.end()) {
+      const std::string& dir = param.find("direction")->second;
+      
+      if (strcasecmp(dir.c_str(), "left") == 0)
+	left = true;
+      else if (strcasecmp(dir.c_str(), "right") == 0)
+	right = true;
+      else
+	throw std::runtime_error("unuspported direction: " + parameter);
+    }
+
+    if (! left && ! right)
+      left == true;
   }
   
   
@@ -457,12 +465,10 @@ public:
     
     utils::resource start;
     
-    if (weights)
-      cicada::binarize(hypergraph, binarized, cicada::BinarizeFeatureCollapsed<weight_set_type>(*weights), size);
-    else if (feature)
-      cicada::binarize(hypergraph, binarized, cicada::BinarizeFeature(), size);
-    else
-      cicada::binarize(hypergraph, binarized, cicada::BinarizeNoFeature(), size);
+    if (left)
+      cicada::binarize_left(hypergraph, binarized, size);
+    else if (right)
+      cicada::binarize_right(hypergraph, binarized, size);
     
     utils::resource end;
     
@@ -480,10 +486,11 @@ public:
     hypergraph.swap(binarized);
   }
   
-  const weight_set_type* weights;
   int size;
-  bool feature;
-
+  
+  bool left;
+  bool right;
+  
   int debug;
 };
 
@@ -1338,7 +1345,7 @@ public:
   static std::string lists()
   {
     static const char* desc = "\
-binarize:feature=<apply-feature,[true|false]>, weights=<weight file for composed feature>, size=<binarize size>\n\
+binarize:direction=<binarization direction [left|right]>,size=<binarize size>\n	\
 permute:feature=<apply-feature,[true|false]>, weights=<weight file for composed feature>, size=<permute size>\n\
 compose-earley\n\
 compose-cky\n\
