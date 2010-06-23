@@ -685,12 +685,12 @@ void read_tstset(const path_set_type& files,
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
     
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "file: " << *titer << std::endl;
       
     if (boost::filesystem::is_directory(*titer)) {
 
-      for (int i = 0; /**/; ++ i) {
+      for (int i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*titer) / (boost::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
@@ -704,17 +704,19 @@ void read_tstset(const path_set_type& files,
 	weight_set_type origin;
 	weight_set_type direction;
       
-	while (is >> id >> sep >> hypergraph) {
-	
+	if (is >> id >> sep >> hypergraph) {
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?");
 	
 	  if (id >= graphs.size())
 	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
 	  
-	  if (id % mpi_size == mpi_rank)
-	    graphs[id].unite(hypergraph);
-	}
+	  if (id % mpi_size != mpi_rank)
+	    throw std::runtime_error("difference it?");
+	  
+	  graphs[id].unite(hypergraph);
+	} else
+	  throw std::runtime_error("format error?");
       }
     } else {
       
