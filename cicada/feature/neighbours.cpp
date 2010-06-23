@@ -5,6 +5,10 @@
 #include "cicada/feature/neighbours.hpp"
 #include "cicada/parameter.hpp"
 
+#include "utils/indexed_set.hpp"
+
+#include <boost/tuple/tuple.hpp>
+
 namespace cicada
 {
   namespace feature
@@ -33,6 +37,43 @@ namespace cicada
       typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
       typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
 
+      struct state_type
+      {
+	symbol_type node;
+	symbol_type prefix;
+	symbol_type suffix;
+	int         span;
+
+	state_type()
+	  : node(), prefix(), suffix(), span() {}
+
+	state_type(const symbol_type& __node,
+		   const symbol_type& __prefix,
+		   const symbol_type& __suffix,
+		   const int&         __span)
+	  : node(__node), prefix(__prefix), suffix(__suffix), span(__span) {}
+
+	friend
+	bool operator==(const state_type& x, const state_type& y)
+	{
+	  return x.node == y.node && x.prefix == y.prefix && x.suffix == y.suffix && x.span == y.span;
+	}
+      };
+      
+      struct state_hash_type : public utils::hashmurmur<size_t>
+      {
+	typedef utils::hashmurmur<size_t> hasher_type;
+	
+	size_t operator()(const state_type& state) const
+	{
+	  return hasher_type::operator()(state, 0);
+	}
+      };
+      
+      typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_set_type;
+      
+      typedef uint32_t id_type;
+      
       virtual ~NeighboursImpl() {}
       
       virtual void neighbours_score(state_ptr_type& state,
@@ -41,7 +82,15 @@ namespace cicada
 				    feature_set_type& features) const = 0;
       virtual void neighbours_final_score(const state_ptr_type& state,
 					  feature_set_type& features) const = 0;
-
+      
+      void clear()
+      {
+	
+	
+      }
+      
+      state_set_type states_id;
+      
       phrase_span_set_type phrase_spans_impl;
     };
     
