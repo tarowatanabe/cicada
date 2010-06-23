@@ -45,9 +45,9 @@ namespace cicada
 
   };
 
-  struct BinarizeLeft : public __BinarizeBase
+  struct BinarizeRight : public __BinarizeBase
   {
-    BinarizeLeft(const int __binarize_size)
+    BinarizeRight(const int __binarize_size)
       : binarize_size(__binarize_size) {}
 
     void operator()(const hypergraph_type& source, hypergraph_type& target)
@@ -80,7 +80,7 @@ namespace cicada
 	  
 	  removed[edge_source.id] = true;
 	  
-	  // left to right binarization...
+	  // right most antecedents binarization...
 	  
 	  hypergraph_type::id_type head = edge_source.head;
 	  std::string non_terminal_head = edge_source.rule->lhs.non_terminal_strip();
@@ -143,9 +143,9 @@ namespace cicada
   };
 
 
-  struct BinarizeRight : public __BinarizeBase
+  struct BinarizeLeft : public __BinarizeBase
   {
-    BinarizeRight(const int __binarize_size)
+    BinarizeLeft(const int __binarize_size)
       : binarize_size(__binarize_size) {}
 
     void operator()(const hypergraph_type& source, hypergraph_type& target)
@@ -178,7 +178,7 @@ namespace cicada
 	  
 	  removed[edge_source.id] = true;
 	  
-	  // right to left binarization...
+	  // left most antecedents binarization...
 	  
 	  hypergraph_type::id_type head = edge_source.head;
 	  std::string non_terminal_head = edge_source.rule->lhs.non_terminal_strip();
@@ -242,26 +242,6 @@ namespace cicada
   
   
   inline
-  void binarize_left(const HyperGraph& source, HyperGraph& target, const int binarize_size=0)
-  {
-    BinarizeLeft binarizer(binarize_size);
-    
-    binarizer(source, target);
-  }
-
-  inline
-  void binarize_left(HyperGraph& source, const int binarize_size=0)
-  {
-    HyperGraph target;
-
-    BinarizeLeft binarizer(binarize_size);
-    
-    binarizer(source, target);
-    
-    source.swap(target);
-  }
-
-  inline
   void binarize_right(const HyperGraph& source, HyperGraph& target, const int binarize_size=0)
   {
     BinarizeRight binarizer(binarize_size);
@@ -275,6 +255,26 @@ namespace cicada
     HyperGraph target;
 
     BinarizeRight binarizer(binarize_size);
+    
+    binarizer(source, target);
+    
+    source.swap(target);
+  }
+
+  inline
+  void binarize_left(const HyperGraph& source, HyperGraph& target, const int binarize_size=0)
+  {
+    BinarizeLeft binarizer(binarize_size);
+    
+    binarizer(source, target);
+  }
+
+  inline
+  void binarize_left(HyperGraph& source, const int binarize_size=0)
+  {
+    HyperGraph target;
+
+    BinarizeLeft binarizer(binarize_size);
     
     binarizer(source, target);
     

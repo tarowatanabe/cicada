@@ -12,6 +12,7 @@
 #include <string>
 #include <stdexcept>
 #include <numeric>
+#include <algorithm>
 
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
@@ -23,7 +24,12 @@
 #include "cicada/semiring.hpp"
 #include "cicada/viterbi.hpp"
 
+#include "cicada/apply.hpp"
+#include "cicada/model.hpp"
+
 #include "cicada/feature/bleu.hpp"
+#include "cicada/parameter.hpp"
+
 
 #include "cicada/eval.hpp"
 
@@ -54,18 +60,22 @@ typedef cicada::Sentence sentence_type;
 typedef cicada::HyperGraph hypergraph_type;
 typedef cicada::Rule       rule_type;
 
+typedef cicada::Model model_type;
+
 typedef rule_type::feature_set_type    feature_set_type;
 typedef cicada::WeightVector<double>   weight_set_type;
 typedef feature_set_type::feature_type feature_type;
+
+typedef cicada::FeatureFunction feature_function_type;
+typedef feature_function_type::feature_function_ptr_type feature_function_ptr_type;
 
 typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
-typedef cicada::feature::Bleu bleu_feature_type;
-typedef boost::shared_ptr<bleu_feature_type> bleu_feature_ptr_type;
-typedef std::vector<bleu_feature_ptr_type, std::allocator<bleu_feature_ptr_type> > bleu_feature_ptr_set_type;
+
+typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
@@ -99,6 +109,9 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 
+int cube_size = 200;
+bool softmax_margin = false;
+
 int threads = 4;
 
 int debug = 0;
@@ -106,13 +119,13 @@ int debug = 0;
 void read_tstset(const path_set_type& files,
 		 hypergraph_set_type& graphs,
 		 const sentence_document_type& sentences,
-		 bleu_feature_ptr_set_type& features);
+		 feature_function_ptr_set_type& features);
 void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
-double optimize(const scorer_document_type& scorers,
-		const hypergraph_set_type& graphs,
-		const bleu_feature_ptr_set_type& features,
+double optimize(const hypergraph_set_type& graphs,
+		const scorer_document_type& scorers,
+		const feature_function_ptr_set_type& features,
 		weight_set_type& weights);
 
 void options(int argc, char** argv);
@@ -150,7 +163,7 @@ int main(int argc, char ** argv)
       std::cerr << "reading hypergraphs" << std::endl;
 
     hypergraph_set_type       graphs(scorers.size());
-    bleu_feature_ptr_set_type features(scorers.size());
+    feature_function_ptr_set_type features(scorers.size());
     
     read_tstset(tstset_files, graphs, sentences, features);
 
@@ -159,7 +172,7 @@ int main(int argc, char ** argv)
     
     weight_set_type weights;
     
-    const double objective = optimize(scorers, graphs, features, weights);
+    const double objective = optimize(graphs, scorers, features, weights);
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -177,19 +190,423 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+struct OptimizeLBFGS
+{
 
-double optimize(const scorer_document_type& scorers,
-		const hypergraph_set_type& graphs,
-		const bleu_feature_ptr_set_type& features,
+  OptimizeLBFGS(const hypergraph_set_type&           __graphs,
+		const scorer_document_type&          __scorers,
+		const feature_function_ptr_set_type& __features,
+		weight_set_type&                      __weights)
+    : graphs(__graphs),
+      scorers(__scorers),
+      features(__features),
+      weights(__weights) {}
+
+  double operator()()
+  {
+    lbfgs_parameter_t param;
+    lbfgs_parameter_init(&param);
+    
+    if (regularize_l1) {
+      param.orthantwise_c = C;
+      param.linesearch = LBFGS_LINESEARCH_BACKTRACKING;
+    } else
+      param.orthantwise_c = 0.0;
+    
+    param.max_iterations = iteration;
+    
+    double objective = 0.0;
+    weights.clear();
+    weights.allocate();
+    
+    lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
+    
+    return objective;
+  }
+
+  
+  struct Task
+  {
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+        
+    Task(queue_type&            __queue,
+	 const hypergraph_set_type&           __graphs,
+	 const scorer_document_type&          __scorers,
+	 const feature_function_ptr_set_type& __features,
+	 const weight_set_type&               __weights)
+      : queue(__queue),
+	graphs(__graphs),
+	scorers(__scorers),
+	features(__features),
+	weights(__weights) {}
+    
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
+    typedef cicada::WeightVector<weight_type, std::allocator<weight_type> >  expectation_type;
+    
+    typedef std::vector<weight_type, std::allocator<weight_type> > inside_set_type;
+
+    typedef cicada::semiring::Tropical<double> bleu_weight_type;
+    typedef std::vector<bleu_weight_type, std::allocator<bleu_weight_type> > bleu_weight_set_type;
+        
+    struct gradient_set_type
+    {
+      typedef gradient_type value_type;
+      
+      template <typename Index>
+      gradient_type& operator[](Index)
+      {
+	return gradient;
+      }
+
+      void clear() { gradient.clear(); }
+      
+      gradient_type gradient;
+    };
+
+    struct bleu_weight_function
+    {
+      typedef cicada::semiring::Tropical<double> value_type;
+      
+      bleu_weight_function(const weight_set_type& __weights) : weights(__weights) {}
+
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+      }
+      
+      const weight_set_type& weights;
+    };
+
+    struct weight_set_function
+    {
+      typedef cicada::semiring::Logprob<double> value_type;
+
+      weight_set_function(const weight_set_type& __weights)
+	: weights(__weights) {}
+
+      const weight_set_type& weights;
+      
+      value_type operator()(const feature_set_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(x.dot(weights));
+      }
+    };
+
+    struct weight_function
+    {
+      typedef weight_type value_type;
+
+      weight_function(const weight_set_type& __weights)
+	: weights(__weights) {}
+
+      const weight_set_type& weights;
+
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	// p_e
+	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+      }
+    };
+
+    struct weight_max_function
+    {
+      typedef weight_type value_type;
+
+      weight_max_function(const weight_set_type& __weights, const bleu_weight_set_type& __bleus, const bleu_weight_type& __max_bleu)
+	: weights(__weights), bleus(__bleus), max_bleu(__max_bleu) {}
+
+      const weight_set_type&      weights;
+      const bleu_weight_set_type& bleus;
+      const bleu_weight_type      max_bleu;
+
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	// p_e
+	if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
+	  return value_type();
+	else
+	  return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+      }
+    };
+
+    struct feature_function
+    {
+      typedef gradient_type value_type;
+
+      feature_function(const weight_set_type& __weights) : weights(__weights) {}
+
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	// p_e r_e
+	gradient_type grad;
+	
+	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	
+	feature_set_type::const_iterator fiter_end = edge.features.end();
+	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	  if (fiter->second != 0.0)
+	    grad[fiter->first] = weight_type(fiter->second) * weight;
+	
+	return grad;
+      }
+      
+      const weight_set_type& weights;
+    };
+
+    struct feature_max_function
+    {
+      typedef gradient_type value_type;
+
+      feature_max_function(const weight_set_type& __weights, const bleu_weight_set_type& __bleus, const bleu_weight_type& __max_bleu)
+	: weights(__weights), bleus(__bleus), max_bleu(__max_bleu) {}
+
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	// p_e r_e
+	if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
+	  return gradient_type();
+
+	gradient_type grad;
+	
+	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	
+	feature_set_type::const_iterator fiter_end = edge.features.end();
+	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	  if (fiter->second != 0.0)
+	    grad[fiter->first] = weight_type(fiter->second) * weight;
+	
+	return grad;
+      }
+      
+      const weight_set_type&      weights;
+      const bleu_weight_set_type& bleus;
+      const bleu_weight_type      max_bleu;
+    };
+
+
+    void operator()()
+    {
+      g.clear();
+      objective = 0.0;
+
+      weight_set_type weights_reward(weights);
+      weight_set_type weights_penalty(weights);
+      weight_set_type weights_bleu;
+
+      weight_set_type::feature_type feature_bleu;
+      for (int i = 0; i < features.size(); ++ i)
+	if (features[i]) {
+	  feature_bleu = features[i]->feature_name();
+	  break;
+	}
+      
+      weights_reward[feature_bleu]  =  1.0;
+      weights_penalty[feature_bleu] = -1.0;
+      weights_bleu[feature_bleu]    =  1.0;
+      
+      hypergraph_type graph_reward;
+      hypergraph_type graph_penalty;
+
+      bleu_weight_set_type bleus_inside;
+      bleu_weight_set_type bleus_inside_outside;
+
+      inside_set_type   inside;
+      gradient_set_type gradients;
+
+      inside_set_type   inside_correct;
+      gradient_set_type gradients_correct;
+
+      expectation_type  feature_expectations;
+      
+      int id = 0;
+      while (1) {
+	queue.pop(id);
+	if (id < 0) break;
+	
+	if (! graphs[id].is_valid()) continue;
+	
+	model_type model;
+	model.push_back(features[id]);
+	
+	cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights_reward), cube_size);
+	cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights_penalty), cube_size);
+	
+	graph_reward.unite(graph_penalty);
+	graph_penalty.clear();
+	
+	const hypergraph_type& graph = graph_reward;
+	
+	// compute inside/outside by bleu using tropical semiring...
+	bleus_inside.clear();
+	bleus_inside_outside.clear();
+	
+	bleus_inside.resize(graph.nodes.size());
+	bleus_inside_outside.resize(graph.edges.size());
+
+	cicada::inside_outside(graph, bleus_inside, bleus_inside_outside, bleu_weight_function(weights_bleu), bleu_weight_function(weights_bleu));
+	
+	const bleu_weight_type bleu_max = *std::max_element(bleus_inside_outside.begin(), bleus_inside_outside.end());
+	
+	// then, inside/outside to collect potentials...
+
+	inside.clear();
+	inside_correct.clear();
+	
+	gradients.clear();
+	gradients_correct.clear();
+	
+	inside.resize(graph.nodes.size());
+	inside_correct.resize(graph.nodes.size());
+	
+	if (softmax_margin) {
+	  cicada::inside_outside(graph, inside, gradients, weight_function(weights_penalty), feature_function(weights_penalty));
+	  
+	  cicada::inside_outside(graph, inside_correct, gradients_correct,
+				 weight_max_function(weights_penalty, bleus_inside_outside, bleu_max),
+				 feature_max_function(weights_penalty, bleus_inside_outside, bleu_max));
+	} else {
+	  cicada::inside_outside(graph, inside, gradients, weight_function(weights), feature_function(weights));
+	  
+	  cicada::inside_outside(graph, inside_correct, gradients_correct,
+				 weight_max_function(weights, bleus_inside_outside, bleu_max),
+				 feature_max_function(weights, bleus_inside_outside, bleu_max));
+	}
+	  
+	
+	gradient_type& gradient = gradients.gradient;
+	weight_type& Z = inside.back();
+	
+	gradient_type& gradient_correct = gradients_correct.gradient;
+	weight_type& Z_correct = inside_correct.back();
+	
+	gradient /= Z;
+	gradient_correct /= Z_correct;
+	  
+	feature_expectations -= gradient_correct;
+	feature_expectations += gradient;
+	
+	const double margin = log(Z_correct) - log(Z);
+	
+	objective -= margin;
+	
+	if (debug >= 3)
+	  std::cerr << "id: " << id
+		    << " bleu: " << log(bleu_max)
+		    << " correct: " << log(Z_correct)
+		    << " partition: " << log(Z)
+		    << " margin: " << margin
+		    << std::endl;
+      }
+      
+      // transform feature_expectations into g...
+      g.allocate();
+      
+      std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
+
+      g[feature_bleu] = 0.0;
+    }
+    
+    queue_type&            queue;
+    
+    const hypergraph_set_type&           graphs;
+    const scorer_document_type&          scorers;
+    const feature_function_ptr_set_type& features;
+    const weight_set_type&               weights;
+    
+    double          objective;
+    weight_set_type g;
+  };
+
+  
+  static lbfgsfloatval_t evaluate(void *instance,
+				  const lbfgsfloatval_t *x,
+				  lbfgsfloatval_t *g,
+				  const int n,
+				  const lbfgsfloatval_t step)
+  {
+    typedef Task                  task_type;
+    typedef task_type::queue_type queue_type;
+    
+    typedef boost::shared_ptr<task_type> task_ptr_type;
+    typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_set_type;
+
+    OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
+    
+    weight_set_type::feature_type feature_bleu;
+    for (int i = 0; i < optimizer.features.size(); ++ i)
+      if (optimizer.features[i]) {
+	feature_bleu = optimizer.features[i]->feature_name();
+	break;
+      }
+    optimizer.weights[feature_bleu] = 0.0;
+        
+    queue_type queue(optimizer.graphs.size());
+    
+    task_set_type tasks(threads);
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i) {
+      tasks[i].reset(new task_type(queue, optimizer.graphs, optimizer.scorers, optimizer.features, optimizer.weights));
+      workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
+    }
+    
+    for (int sample = 0; sample < optimizer.graphs.size(); ++ sample)
+      queue.push(sample);
+    
+    // collect all the objective and gradients...
+    double objective = 0.0;
+    std::fill(g, g + n, 0.0);
+    
+    for (int i = 0; i < threads; ++ i)
+      queue.push(-1);
+    
+    workers.join_all();
+    
+    for (int i = 0; i < threads; ++ i) {
+      objective += tasks[i]->objective;
+      std::transform(tasks[i]->g.begin(), tasks[i]->g.end(), g, g, std::plus<double>());
+    }
+        
+    // L2...
+    if (regularize_l2) {
+      double norm = 0.0;
+      for (int i = 0; i < n; ++ i) {
+	g[i] += C * x[i];
+	norm += x[i] * x[i];
+      }
+      objective += 0.5 * C * norm;
+    }
+    
+    if (debug >= 2)
+      std::cerr << "objective: " << objective << std::endl;
+    
+    return objective;
+  }
+  
+  const hypergraph_set_type&           graphs;
+  const scorer_document_type&          scorers;
+  const feature_function_ptr_set_type& features;
+  weight_set_type&                     weights;
+};
+
+double optimize(const hypergraph_set_type& graphs,
+		const scorer_document_type& scorers,
+		const feature_function_ptr_set_type& features,
 		weight_set_type& weights)
 {
-  
+  return OptimizeLBFGS(graphs, scorers, features, weights)();
 }
 
 void read_tstset(const path_set_type& files,
 		 hypergraph_set_type& graphs,
 		 const sentence_document_type& sentences,
-		 bleu_feature_ptr_set_type& features)
+		 feature_function_ptr_set_type& features)
 {
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
@@ -248,6 +665,19 @@ void read_tstset(const path_set_type& files,
     }
   }
   
+  typedef cicada::Parameter parameter_type;
+  
+  parameter_type param(scorer_name);
+  std::string order_string;
+  if (param.find("order") != param.end())
+    order_string = "order=" + param.find("order")->second;
+
+  std::string feature_function_param = "bleu";
+  if (! order_string.empty())
+    feature_function_param += ':' + order_string + ",exact=true";
+  else
+    feature_function_param += ":exact=true";
+  
   for (int id = 0; id < graphs.size(); ++ id) {
     if (graphs[id].goal == hypergraph_type::invalid)
       std::cerr << "invalid graph at: " << id << std::endl;
@@ -256,20 +686,19 @@ void read_tstset(const path_set_type& files,
       std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(graphs[id].nodes.size());
       
       cicada::inside(graphs[id], lengths, source_length_function());
+      
+      features[id] = feature_function_type::create(feature_function_param);
 
-      cicada::FeatureFunction::feature_function_ptr_type __feature = cicada::FeatureFunction::create(scorer_name + ",exact=true");
+      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
       
-      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(__feature.get());
       if (! __bleu)
-	throw std::runtime_error("invalid bleu feature... with invalid scorer");
-      
-      features[id].reset(__bleu);
+	throw std::runtime_error("invalid bleu feature function...");
       
       const int source_length = - log(lengths.back());
-      
+
       sentence_set_type::const_iterator siter_end = sentences[id].end();
       for (sentence_set_type::const_iterator siter = sentences[id].begin(); siter != siter_end; ++ siter)
-	features[id]->insert(source_length, *siter);
+	__bleu->insert(source_length, *siter);
     }
   }
 
@@ -346,6 +775,10 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
+
+    ("cube-size", po::value<int>(&cube_size), "cube-pruning size")
+
+    ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     
     ("threads", po::value<int>(&threads), "# of threads")
     ;

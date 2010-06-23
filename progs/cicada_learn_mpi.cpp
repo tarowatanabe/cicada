@@ -356,7 +356,7 @@ struct OptimizeLBFGS
     // send notification!
     for (int rank = 1; rank < mpi_size; ++ rank)
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
-        
+    
     bcast_weights(0, optimizer.weights);
     
     task_type task(optimizer.weights, optimizer.graphs_forest, optimizer.graphs_intersected);

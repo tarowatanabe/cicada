@@ -452,7 +452,7 @@ public:
     }
 
     if (! left && ! right)
-      left == true;
+      right == true;
   }
   
   
@@ -789,7 +789,7 @@ public:
     for (model_type::iterator iter = model.begin(); iter != model.end(); ++ iter) {
       cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(iter->get());
       if (__bleu)
-	feature.reset(__bleu);
+	feature = *iter;
     }
     
     if (! feature)
@@ -810,15 +810,16 @@ public:
     
     if (debug)
       std::cerr << "source length: " << source_length << std::endl;
-
     
     hypergraph_type applied;
+    
+    cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(feature.get());
 
-    feature->clear();
+    __bleu->clear();
     sentence_set_type::const_iterator titer_end = targets.end();
     for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
-      feature->insert(source_length, *titer);
-	
+      __bleu->insert(source_length, *titer);
+    
     model_type model;
     model.push_back(feature);
 
@@ -848,7 +849,7 @@ public:
       std::cerr << "bleu cpu time: " << (end.cpu_time() - start.cpu_time())
 		<< " user time: " << (end.user_time() - start.user_time())
 		<< std::endl;
-
+    
     if (debug)
       std::cerr << "# of nodes: " << applied.nodes.size()
 		<< " # of edges: " << applied.edges.size()
@@ -860,11 +861,10 @@ public:
   
   void clear()
   {
-    feature->clear();
+    dynamic_cast<cicada::feature::Bleu*>(feature.get())->clear();
   }
   
-  
-  boost::shared_ptr<cicada::feature::Bleu> feature;
+  feature_function_type::feature_function_ptr_type feature;
   
   const weight_set_type* weights;
   int size;
@@ -902,7 +902,7 @@ public:
     for (model_type::iterator iter = model.begin(); iter != model.end(); ++ iter) {
       cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
       if (__variational)
-	feature.reset(__variational);
+	feature = *iter;
     }
     
     if (! feature)
@@ -927,10 +927,12 @@ public:
     
     if (debug)
       std::cerr << "variational decoding" << std::endl;
+
+    cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(feature.get());
     
     utils::resource start;
     
-    feature->insert(hypergraph, *weights_orig);
+    __variational->insert(hypergraph, *weights_orig);
     
     model_type model;
     model.push_back(feature);
@@ -954,18 +956,15 @@ public:
 		<< " valid? " << (variational.is_valid() ? "true" : "false")
 		<< std::endl;
     
-    
     hypergraph.swap(variational);
-	
-    
   }
 
   void clear()
   {
-    feature->clear();
+    dynamic_cast<cicada::feature::Variational*>(feature.get())->clear();
   }
   
-  boost::shared_ptr<cicada::feature::Variational> feature;
+  feature_function_type::feature_function_ptr_type feature;
   
   const weight_set_type* weights;
   const weight_set_type* weights_variational;
