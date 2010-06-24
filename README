@@ -2,8 +2,8 @@ cicada
 
 A statistical machine translation toolkit based on a semiring parsing framework[1].
 Based on the generic framework, we can
-   - learn model
-   - translate sentence
+   - learn model(s): tree-to-string, string-to-tree, string-to-string (with latent tree)
+   - translate sentence, lattice and/or parse tree
 
 Remark: cicada is 蝉, (or セミ) in Japanese, pronounsed "SEMI"
 
@@ -21,10 +21,11 @@ After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
    - K-bests sentences are generated from hypergraph [5].
 
-Learning consists of two framework:
-  - Large feature set from input lattice/hypergraph learnt via MaxEnt [3] (TODO)
-  - Large feature set during model application [6] (TODO)
-  - Small feature set learned by hypergraph-MERT [7]
+Various learning components are implemented:
+  - Large feature set from input lattice/hypergraph on large training data via MaxEnt [3]
+  - Large feature set on small devset with MIRA [6,7] (TODO), but with hypergraph (New! But still open problems!)
+  - Small feature set on small devset learned by hypergraph-MERT [8]
+  - Small/Large feature set on small devset learned by hypergraph-MaxEnt (New! But still open problems!) + softmax-margin [9]
 
 References:
 
@@ -106,8 +107,20 @@ References:
   url       = {http://www.aclweb.org/anthology/N/N09/N09-1025}
 }
 
-
 [7]
+@InProceedings{watanabe-EtAl:2007:EMNLP-CoNLL2007,
+  author    = {Watanabe, Taro  and  Suzuki, Jun  and  Tsukada, Hajime  and  Isozaki, Hideki},
+  title     = {Online Large-Margin Training for Statistical Machine Translation},
+  booktitle = {Proceedings of the 2007 Joint Conference on Empirical Methods in Natural Language Processing and Computational Natural Language Learning (EMNLP-CoNLL)},
+  month     = {June},
+  year      = {2007},
+  address   = {Prague, Czech Republic},
+  publisher = {Association for Computational Linguistics},
+  pages     = {764--773},
+  url       = {http://www.aclweb.org/anthology/D/D07/D07-1080}
+}
+
+[8]
 @InProceedings{kumar-EtAl:2009:ACLIJCNLP,
   author    = {Kumar, Shankar  and  Macherey, Wolfgang  and  Dyer, Chris  and  Och, Franz},
   title     = {Efficient Minimum Error Rate Training and Minimum Bayes-Risk Decoding for Translation Hypergraphs and Lattices},
@@ -119,3 +132,17 @@ References:
   pages     = {163--171},
   url       = {http://www.aclweb.org/anthology/P/P09/P09-1019}
 }
+
+[9]
+@InProceedings{gimpel-smith:2010:NAACLHLT,
+  author    = {Gimpel, Kevin  and  Smith, Noah A.},
+  title     = {Softmax-Margin CRFs: Training Log-Linear Models with Cost Functions},
+  booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+  month     = {June},
+  year      = {2010},
+  address   = {Los Angeles, California},
+  publisher = {Association for Computational Linguistics},
+  pages     = {733--736},
+  url       = {http://www.aclweb.org/anthology/N10-1112}
+}
+

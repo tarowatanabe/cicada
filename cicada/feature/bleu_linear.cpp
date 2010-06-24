@@ -1,7 +1,7 @@
 
 #include <map>
 
-#include "cicada/feature/bleu.hpp"
+#include "cicada/feature/bleu_linear.hpp"
 #include "cicada/parameter.hpp"
 
 #include "utils/hashmurmur.hpp"
@@ -16,7 +16,7 @@ namespace cicada
   namespace feature
   {
 
-    class BleuImpl
+    class BleuLinearImpl
     {
     public:
       typedef cicada::Symbol   symbol_type;
@@ -62,47 +62,37 @@ namespace cicada
     
       typedef utils::simple_vector<count_type, std::allocator<count_type> > count_set_type;
       
-      struct count_set_hash : public utils::hashmurmur<size_t>
-      {
-	typedef utils::hashmurmur<size_t> hasher_type;
-	
-	size_t operator()(const count_set_type& x) const
-	{
-	  return hasher_type::operator()(x.begin(), x.end(), 0);
-	}
-      };
-      
-      typedef utils::indexed_set<count_set_type, count_set_hash, std::equal_to<count_set_type>, std::allocator<count_set_type> > states_count_set_type;
-
+      typedef std::vector<double, std::allocator<double> > ngram_factor_type;
 
     public:
-      BleuImpl(const int __order,
-	       const bool __exact)
-	: order(__order), exact(__exact) {}
+      BleuLinearImpl(const int __order,
+		     const double __precision,
+		     const double __ratio)
+	: order(__order), precision(__precision), ratio(__ratio)
+      {
+	factors.clear();
+	factors.resize(order + 1, 0.0);
+	
+	factors[0] = - 1.0 / 1.0;
+	
+	double ratio_factor = 1.0;
+	for (int n = 1; n <= order; ++ n) {
+	  factors[n] = 1.0 / (4.0 * precision * ratio_factor);
+	  ratio_factor *= ratio;
+	}
+      }
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
 			const edge_type& edge) const
       {
-	if (ngrams.empty()) {
-	  char* buf = reinterpret_cast<char*>(state);
-	  std::fill(buf, buf + sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(id_type) * 2, 0);
-	  return 0.0;
-	}
-
 	const rule_type& rule = *edge.rule;
 	const phrase_type& target = rule.target;
 	const phrase_type& source = rule.source;
-	
-	count_set_type counts;
 
 	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
 	symbol_type* context_last  = context_first + order * 2;
 	
-	int*     context_parsed     = reinterpret_cast<int*>(context_last);
-	int*     context_hypothesis = context_parsed + 1;
-	id_type* context_count       = reinterpret_cast<id_type*>(context_hypothesis + 1);
-
 	const int context_size = order - 1;
 	
 	if (states.empty()) {
@@ -114,7 +104,7 @@ namespace cicada
 	    if (*titer != vocab_type::EPSILON)
 	      buffer.push_back(*titer);
 	  
-	  collect_counts(buffer.begin(), buffer.end(), counts);
+	  const double bleu = bleu_score(buffer.begin(), buffer.end());
 	  
 	  std::fill(context_first, context_last, vocab_type::EMPTY);
 	  
@@ -125,22 +115,6 @@ namespace cicada
 	    context_first[context_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - context_size, buffer.end(), context_first + order);
 	  }
-	  
-	  *context_parsed = 0;
-	  phrase_type::const_iterator siter_end = source.end();
-	  for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	    *context_parsed += (*siter != vocab_type::EPSILON);
-	  
-	  *context_hypothesis = buffer.size();
-	  
-	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
-	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
-
-	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
-
-	  //std::cerr << "bleu: " << bleu << ' ';
-	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
-	  //std::cerr << std::endl;
 	  
 	  return bleu;
 
@@ -156,19 +130,11 @@ namespace cicada
 	  int star_first = -1;
 	  int star_last  = -1;
 	  
-	  *context_parsed = 0;
-	  for (phrase_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter)
-	    *context_parsed += (*siter != vocab_type::EPSILON && siter->is_terminal());
-	  
 	  for (phrase_type::const_iterator iter = phrase_spans.front().first; iter != phrase_spans.front().second; ++ iter)
 	    if (*iter != vocab_type::EPSILON)
 	      buffer.push_back(*iter);
 	  
-	  *context_hypothesis = buffer.size();
-	  
-	  collect_counts(buffer.begin(), buffer.end(), counts);
-	  
-	  double bleu_antecedent = 0.0;
+	  double bleu = bleu_score(buffer.begin(), buffer.end());
 
 	  buffer_type::const_iterator biter_first = buffer.begin();
 	  
@@ -186,34 +152,13 @@ namespace cicada
 	    const symbol_type* antecedent_end  = std::find(antecedent_first, antecedent_last, vocab_type::EMPTY);
 	    const symbol_type* antecedent_star = std::find(antecedent_first, antecedent_end, vocab_type::STAR);
 	    
-	    const int*     antecedent_parsed     = reinterpret_cast<const int*>(antecedent_last);
-	    const int*     antecedent_hypothesis = antecedent_parsed + 1;
-	    const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
-
-	    const count_set_type& counts_antecedent = states_counts[*antecedent_count];
-	    
-	    const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, source_size);
-	    
-	    //std::cerr << "bleu antecedent: " << bleu_ant << ' ';
-	    //std::copy(antecedent_first, antecedent_end, std::ostream_iterator<symbol_type>(std::cerr, " "));
-	    //std::cerr << std::endl;
-	    
-	    bleu_antecedent += bleu_ant;
-	    
-	    // merge statistics...
-	    counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
-	    std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
-	    
-	    *context_parsed     += *antecedent_parsed;
-	    *context_hypothesis += *antecedent_hypothesis;
-	    
 	    buffer_type::const_iterator biter = buffer.end();
 	    
 	    buffer.insert(buffer.end(), antecedent_first, antecedent_star);
 	    
 	    buffer_type::const_iterator biter_end = buffer.end();
 	    
-	    collect_counts(biter_first, biter, biter_end, counts);
+	    bleu += bleu_score(biter_first, biter, biter_end);
 	    
 	    // insert context after star
 	    if (antecedent_star != antecedent_end) {
@@ -236,9 +181,7 @@ namespace cicada
 	      
 	      buffer_type::const_iterator biter_end = buffer.end();
 	      
-	      collect_counts(biter_first, biter, biter_end, counts);
-	      
-	      *context_hypothesis += biter_end - biter;
+	      bleu += bleu_score(biter_first, biter, biter_end);
 	    }
 	  }
 	  
@@ -249,7 +192,6 @@ namespace cicada
 	    std::copy(buffer.begin(), buffer.begin() + prefix_size, context_first);
 	    context_first[prefix_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - suffix_size, buffer.end(), context_first + prefix_size + 1);
-	    
 	  } else {
 	    if (buffer.size() <= context_size)
 	      std::copy(buffer.begin(), buffer.end(), context_first);
@@ -260,23 +202,13 @@ namespace cicada
 	    }
 	  }
 	  
-	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
-	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
-
-	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
-	  
-	  //std::cerr << "bleu: " << bleu;
-	  //std::cerr << " antecedent: " << bleu_antecedent << ' ';
-	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
-	  //std::cerr << std::endl;
-	  
-	  return  bleu - bleu_antecedent;
+	  return  bleu;
 	}
       }
 
       void initialize()
       {
-	states_counts.clear();
+	
       }
       
       void clear()
@@ -285,9 +217,6 @@ namespace cicada
 	ngrams.clear();
 	nodes.clear();
 	sizes.clear();
-	
-	// for count set representation
-	states_counts.clear();
 	
 	source_size = 0;
       }
@@ -332,17 +261,14 @@ namespace cicada
 
     private:
       template <typename Iterator>
-      void collect_counts(Iterator first, Iterator iter, Iterator last, count_set_type& counts) const
+      double bleu_score(Iterator first, Iterator iter, Iterator last) const
       {
+	double bleu = factors[0] * (last - iter);
+	
 	const int context_size = order - 1;
 	
 	first = std::max(first, iter - context_size);
-	
-	if (exact)
-	  counts.resize(nodes.size(), count_type(0));
-	else
-	  counts.resize(order, count_type(0));
-	
+		
 	// we will collect counts at [iter, last) with context from [first, iter)
 	for (/**/; first != iter; ++ first) {
 	  ngram_set_type::id_type id = ngrams.root();
@@ -352,21 +278,17 @@ namespace cicada
 	    if (ngrams.is_root(id)) break;
 	    if (iter2 < iter) continue;
 	    
-	    if (exact)
-	      ++ counts[id];
-	    else
-	      ++ counts[nodes[id].order - 1];
+	    bleu += factors[nodes[id].order];
 	  }
 	}
+	
+	return bleu;
       }
       
       template <typename Iterator>
-      void collect_counts(Iterator first, Iterator last, count_set_type& counts) const
+      double bleu_score(Iterator first, Iterator last) const
       {
-	if (exact)
-	  counts.resize(nodes.size(), count_type(0));
-	else
-	  counts.resize(order, count_type(0));
+	double bleu = factors[0] * (last - first);
 	
 	// we will collect counts at [first, last)
 	for (/**/; first != last; ++ first) {
@@ -376,82 +298,12 @@ namespace cicada
 	    
 	    if (ngrams.is_root(id)) break;
 	    
-	    if (exact)
-	      ++ counts[id];
-	    else
-	      ++ counts[nodes[id].order - 1];
+	    bleu += factors[nodes[id].order];
 	  }
 	}
+	return bleu;
       }
       
-
-      double brevity_penalty(const double hypothesis_size, const double reference_size) const
-      {
-	if (hypothesis_size == 0 || reference_size == 0)
-	  return 0.0;
-	else
-	  return std::min(1.0 - reference_size / hypothesis_size, 0.0);
-      }
-      
-      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int parsed_size, const int source_size) const
-      {
-	count_set_type counts_bleu(order, count_type(0));
-	if (exact)
-	  for (ngram_set_type::id_type id = 0; id < __counts.size();++ id)
-	    counts_bleu[nodes[id].order - 1] += utils::bithack::min(int(__counts[id]), int(ngrams[id]));
-	
-	const count_set_type& counts = (exact ? counts_bleu : __counts);
-	
-	if (hypothesis_size == 0 || counts.empty()) return 0.0;
-	
-	const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size);
-	const double reference_length  = ref_size(hypothesis_length);
-	
-	double smooth = 0.5;
-	double bleu = brevity_penalty(hypothesis_length, reference_length);
-	
-	const int ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
-	
-	const double factor = 1.0 / order;
-	for (int n = 1; n <= ngram_size; ++ n) {
-	  const int count = counts[n - 1];
-	  
-	  bleu += std::log((count ? double(count) : smooth) / (hypothesis_size + 1 - n)) * factor;
-	  smooth *= 0.5;
-	}
-	
-	return std::exp(bleu);
-      }
-
-      double tst_size(int length, int parsed, int source_size) const
-      {
-	if (length == 0 || parsed == 0) return 0.0;
-	
-	// we will scale hypothesis length by the # of parsed words
-	
-	return (parsed < source_size
-		? (double(source_size) / parsed) * length
-		: double(length));
-      }
-      
-      double ref_size(const double hypothesis_size) const
-      {
-	if (hypothesis_size == 0) return 0;
-	
-	int reference_size = 0;
-	double min_diff = boost::numeric::bounds<double>::highest();
-	for (size_set_type::const_iterator siter = sizes.begin(); siter != sizes.end(); ++ siter) {
-	  const double diff = std::fabs(hypothesis_size - *siter);
-
-	  if (diff < min_diff) {
-	    min_diff = diff;
-	    reference_size = *siter;
-	  } else if (diff == min_diff)
-	    reference_size = utils::bithack::min(reference_size, *siter);
-	}
-	
-	return reference_size;
-      }
       
     private:
       
@@ -462,55 +314,45 @@ namespace cicada
       node_set_type  nodes;
       size_set_type  sizes;
       
-      states_count_set_type states_counts;
-      
       int source_size;
 
+      ngram_factor_type factors;
+
       int order;
-      bool exact;
+      double precision;
+      double ratio;
     };
     
-    inline
-    bool true_false(const std::string& token)
-    {
-      if (strcasecmp(token.c_str(), "true") == 0)
-	return true;
-      if (strcasecmp(token.c_str(), "yes") == 0)
-	return true;
-      if (atoi(token.c_str()) > 0)
-	return true;
-      return false;
-    }
-    
-    Bleu::Bleu(const std::string& parameter)
+    BleuLinear::BleuLinear(const std::string& parameter)
       : pimpl(0)
     {
       typedef cicada::Parameter parameter_type;
       
       const parameter_type param(parameter);
       
-      if (param.name() != "bleu")
-	throw std::runtime_error("this is not Bleu feature: " + parameter);
+      if (param.name() != "bleu-linear")
+	throw std::runtime_error("this is not BleuLinear feature: " + parameter);
       
-      const int order = (param.find("order") != param.end() ? boost::lexical_cast<int>(param.find("order")->second) : 4);
-      const bool exact = (param.find("exact") != param.end() ? true_false(param.find("exact")->second) : false);
+      const int order         = (param.find("order") != param.end() ? boost::lexical_cast<int>(param.find("order")->second) : 4);
+      const double precision  = (param.find("precision") != param.end() ? boost::lexical_cast<double>(param.find("precision")->second) : 0.8);
+      const double ratio      = (param.find("ratio") != param.end() ? boost::lexical_cast<double>(param.find("ratio")->second) : 0.6);
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
-      base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
-      base_type::__feature_name = "bleu";
+      base_type::__state_size = sizeof(symbol_type) * order * 2;
+      base_type::__feature_name = "bleu-linear";
       
       pimpl = bleu_impl.release();
     }
     
-    Bleu::~Bleu() { std::auto_ptr<impl_type> tmp(pimpl); }
+    BleuLinear::~BleuLinear() { std::auto_ptr<impl_type> tmp(pimpl); }
     
-    void Bleu::operator()(state_ptr_type& state,
-			  const state_ptr_set_type& states,
-			  const edge_type& edge,
-			  feature_set_type& features,
-			  feature_set_type& estimates) const
+    void BleuLinear::operator()(state_ptr_type& state,
+				const state_ptr_set_type& states,
+				const edge_type& edge,
+				feature_set_type& features,
+				feature_set_type& estimates) const
     {
       const double score = pimpl->bleu_score(state, states, edge);
       
@@ -518,23 +360,23 @@ namespace cicada
 	features[base_type::feature_name()] = score;
     }
     
-    void Bleu::operator()(const state_ptr_type& state,
+    void BleuLinear::operator()(const state_ptr_type& state,
 			  feature_set_type& features) const
     {
       // we do nothing...
     }
 
-    void Bleu::initialize()
+    void BleuLinear::initialize()
     {
       pimpl->initialize();
     }
     
-    void Bleu::clear()
+    void BleuLinear::clear()
     {
       pimpl->clear();
     }
     
-    void Bleu::insert(const int source_size, const sentence_type& sentence)
+    void BleuLinear::insert(const int source_size, const sentence_type& sentence)
     {
       pimpl->insert(source_size, sentence);
     }

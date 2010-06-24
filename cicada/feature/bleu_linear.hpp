@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__FEATURE__NEIGHBOURS__HPP__
-#define __CICADA__FEATURE__NEIGHBOURS__HPP__ 1
+#ifndef __CICADA__FEATURE__BLEU_LINEAR__HPP__
+#define __CICADA__FEATURE__BLEU_LINEAR__HPP__ 1
 
 #include <string>
 
@@ -15,9 +15,9 @@ namespace cicada
   namespace feature
   {
     
-    class NeighboursImpl;
+    class BleuLinearImpl;
     
-    class Neighbours : public FeatureFunction
+    class BleuLinear : public FeatureFunction
     {
     public:
       typedef size_t    size_type;
@@ -29,16 +29,16 @@ namespace cicada
       
     private:
       typedef FeatureFunction base_type;
-      typedef NeighboursImpl        impl_type;
+      typedef BleuLinearImpl        impl_type;
       
     public:
-      Neighbours(const std::string& parameter);
-      ~Neighbours();
+      BleuLinear(const std::string& parameter);
+      ~BleuLinear();
       
     private:
-      Neighbours() {}
-      Neighbours(const Neighbours&) {}
-      Neighbours& operator=(const Neighbours&) { return *this; }
+      BleuLinear() {}
+      BleuLinear(const BleuLinear&) {}
+      BleuLinear& operator=(const BleuLinear&) { return *this; }
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -50,10 +50,12 @@ namespace cicada
 			      feature_set_type& features) const;
       virtual void initialize();
       
+      void clear();
+      void insert(const int source_size, const sentence_type& sentence);
+      
     private:
       impl_type* pimpl;
     };
-
     
   };
 };

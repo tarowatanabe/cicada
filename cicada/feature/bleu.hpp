@@ -48,6 +48,7 @@ namespace cicada
 			      feature_set_type& estimates) const;
       virtual void operator()(const state_ptr_type& state,
 			      feature_set_type& features) const;
+      virtual void initialize();
       
       void clear();
       void insert(const int source_size, const sentence_type& sentence);

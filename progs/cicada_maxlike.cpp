@@ -28,6 +28,7 @@
 #include "cicada/model.hpp"
 
 #include "cicada/feature/bleu.hpp"
+#include "cicada/feature/bleu_linear.hpp"
 #include "cicada/parameter.hpp"
 
 
@@ -71,9 +72,6 @@ typedef feature_function_type::feature_function_ptr_type feature_function_ptr_ty
 
 typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
-typedef cicada::eval::Scorer         scorer_type;
-typedef cicada::eval::ScorerDocument scorer_document_type;
-
 
 typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 
@@ -101,14 +99,13 @@ path_set_type tstset_files;
 path_set_type refset_files;
 path_type     output_file = "-";
 
-std::string scorer_name = "bleu:order=4";
-bool scorer_list = false;
-
+std::string scorer_name = "bleu:order=4,exact=true";
 int iteration = 100;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 
+bool apply_exact = false;
 int cube_size = 200;
 bool softmax_margin = false;
 
@@ -121,10 +118,8 @@ void read_tstset(const path_set_type& files,
 		 const sentence_document_type& sentences,
 		 feature_function_ptr_set_type& features);
 void read_refset(const path_set_type& file,
-		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
 double optimize(const hypergraph_set_type& graphs,
-		const scorer_document_type& scorers,
 		const feature_function_ptr_set_type& features,
 		weight_set_type& weights);
 
@@ -134,11 +129,6 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
-
-    if (scorer_list) {
-      std::cout << cicada::eval::Scorer::lists();
-      return 0;
-    }
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
@@ -146,14 +136,12 @@ int main(int argc, char ** argv)
     threads = utils::bithack::max(threads, 1);
     
     // read reference set
-    scorer_document_type      scorers(scorer_name);
     sentence_document_type    sentences;
     
-    
-    read_refset(refset_files, scorers, sentences);
+    read_refset(refset_files, sentences);
     
     if (debug)
-      std::cerr << "# of references: " << scorers.size() << std::endl;
+      std::cerr << "# of references: " << sentences.size() << std::endl;
 
     // read test set
     if (tstset_files.empty())
@@ -162,8 +150,8 @@ int main(int argc, char ** argv)
     if (debug)
       std::cerr << "reading hypergraphs" << std::endl;
 
-    hypergraph_set_type       graphs(scorers.size());
-    feature_function_ptr_set_type features(scorers.size());
+    hypergraph_set_type       graphs(sentences.size());
+    feature_function_ptr_set_type features(sentences.size());
     
     read_tstset(tstset_files, graphs, sentences, features);
 
@@ -172,7 +160,7 @@ int main(int argc, char ** argv)
     
     weight_set_type weights;
     
-    const double objective = optimize(graphs, scorers, features, weights);
+    const double objective = optimize(graphs, features, weights);
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -194,11 +182,9 @@ struct OptimizeLBFGS
 {
 
   OptimizeLBFGS(const hypergraph_set_type&           __graphs,
-		const scorer_document_type&          __scorers,
 		const feature_function_ptr_set_type& __features,
 		weight_set_type&                      __weights)
     : graphs(__graphs),
-      scorers(__scorers),
       features(__features),
       weights(__weights) {}
 
@@ -231,12 +217,10 @@ struct OptimizeLBFGS
         
     Task(queue_type&            __queue,
 	 const hypergraph_set_type&           __graphs,
-	 const scorer_document_type&          __scorers,
 	 const feature_function_ptr_set_type& __features,
 	 const weight_set_type&               __weights)
       : queue(__queue),
 	graphs(__graphs),
-	scorers(__scorers),
 	features(__features),
 	weights(__weights) {}
     
@@ -434,12 +418,16 @@ struct OptimizeLBFGS
 	model_type model;
 	model.push_back(features[id]);
 	
-	cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights_reward), cube_size);
-	cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights_penalty), cube_size);
-	
-	graph_reward.unite(graph_penalty);
-	graph_penalty.clear();
-	
+	if (apply_exact)
+	  cicada::apply_exact(model, graphs[id], graph_reward, weight_set_function(weights_reward), cube_size);
+	else {
+	  cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights_reward), cube_size);
+	  cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights_penalty), cube_size);
+	  
+	  graph_reward.unite(graph_penalty);
+	  graph_penalty.clear();
+	}
+	  
 	const hypergraph_type& graph = graph_reward;
 	
 	// compute inside/outside by bleu using tropical semiring...
@@ -448,13 +436,13 @@ struct OptimizeLBFGS
 	
 	bleus_inside.resize(graph.nodes.size());
 	bleus_inside_outside.resize(graph.edges.size());
-
+	
 	cicada::inside_outside(graph, bleus_inside, bleus_inside_outside, bleu_weight_function(weights_bleu), bleu_weight_function(weights_bleu));
 	
 	const bleu_weight_type bleu_max = *std::max_element(bleus_inside_outside.begin(), bleus_inside_outside.end());
 	
 	// then, inside/outside to collect potentials...
-
+	
 	inside.clear();
 	inside_correct.clear();
 	
@@ -477,7 +465,7 @@ struct OptimizeLBFGS
 				 weight_max_function(weights, bleus_inside_outside, bleu_max),
 				 feature_max_function(weights, bleus_inside_outside, bleu_max));
 	}
-	  
+	
 	
 	gradient_type& gradient = gradients.gradient;
 	weight_type& Z = inside.back();
@@ -487,7 +475,7 @@ struct OptimizeLBFGS
 	
 	gradient /= Z;
 	gradient_correct /= Z_correct;
-	  
+	
 	feature_expectations -= gradient_correct;
 	feature_expectations += gradient;
 	
@@ -515,7 +503,6 @@ struct OptimizeLBFGS
     queue_type&            queue;
     
     const hypergraph_set_type&           graphs;
-    const scorer_document_type&          scorers;
     const feature_function_ptr_set_type& features;
     const weight_set_type&               weights;
     
@@ -552,7 +539,7 @@ struct OptimizeLBFGS
     
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i) {
-      tasks[i].reset(new task_type(queue, optimizer.graphs, optimizer.scorers, optimizer.features, optimizer.weights));
+      tasks[i].reset(new task_type(queue, optimizer.graphs, optimizer.features, optimizer.weights));
       workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
     }
     
@@ -590,17 +577,15 @@ struct OptimizeLBFGS
   }
   
   const hypergraph_set_type&           graphs;
-  const scorer_document_type&          scorers;
   const feature_function_ptr_set_type& features;
   weight_set_type&                     weights;
 };
 
 double optimize(const hypergraph_set_type& graphs,
-		const scorer_document_type& scorers,
 		const feature_function_ptr_set_type& features,
 		weight_set_type& weights)
 {
-  return OptimizeLBFGS(graphs, scorers, features, weights)();
+  return OptimizeLBFGS(graphs, features, weights)();
 }
 
 void read_tstset(const path_set_type& files,
@@ -666,18 +651,7 @@ void read_tstset(const path_set_type& files,
   }
   
   typedef cicada::Parameter parameter_type;
-  
-  parameter_type param(scorer_name);
-  std::string order_string;
-  if (param.find("order") != param.end())
-    order_string = "order=" + param.find("order")->second;
-
-  std::string feature_function_param = "bleu";
-  if (! order_string.empty())
-    feature_function_param += ':' + order_string + ",exact=true";
-  else
-    feature_function_param += ":exact=true";
-  
+    
   for (int id = 0; id < graphs.size(); ++ id) {
     if (graphs[id].goal == hypergraph_type::invalid)
       std::cerr << "invalid graph at: " << id << std::endl;
@@ -687,18 +661,25 @@ void read_tstset(const path_set_type& files,
       
       cicada::inside(graphs[id], lengths, source_length_function());
       
-      features[id] = feature_function_type::create(feature_function_param);
+      features[id] = feature_function_type::create(scorer_name);
 
-      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
+      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
+      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
       
-      if (! __bleu)
+      if (! __bleu && ! __bleu_linear)
 	throw std::runtime_error("invalid bleu feature function...");
       
       const int source_length = - log(lengths.back());
-
-      sentence_set_type::const_iterator siter_end = sentences[id].end();
-      for (sentence_set_type::const_iterator siter = sentences[id].begin(); siter != siter_end; ++ siter)
-	__bleu->insert(source_length, *siter);
+      
+      if (__bleu) {
+	sentence_set_type::const_iterator siter_end = sentences[id].end();
+	for (sentence_set_type::const_iterator siter = sentences[id].begin(); siter != siter_end; ++ siter)
+	  __bleu->insert(source_length, *siter);
+      } else {
+	sentence_set_type::const_iterator siter_end = sentences[id].end();
+	for (sentence_set_type::const_iterator siter = sentences[id].begin(); siter != siter_end; ++ siter)
+	  __bleu_linear->insert(source_length, *siter);
+      }
     }
   }
 
@@ -706,7 +687,6 @@ void read_tstset(const path_set_type& files,
 }
 
 void read_refset(const path_set_type& files,
-		 scorer_document_type& scorers,
 		 sentence_document_type& sentences)
 {
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
@@ -714,7 +694,6 @@ void read_refset(const path_set_type& files,
   if (files.empty())
     throw std::runtime_error("no reference files?");
   
-  scorers.clear();
   sentences.clear();
 
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
@@ -739,17 +718,11 @@ void read_refset(const path_set_type& files,
       if (*iter != "|||") continue;
       ++ iter;
       
-      if (id >= scorers.size())
-	scorers.resize(id + 1);
       
       if (id >= sentences.size())
 	sentences.resize(id + 1);
       
-      if (! scorers[id])
-	scorers[id] = scorers.create();
-      
       sentences[id].push_back(sentence_type(iter, tokenizer.end()));
-      scorers[id]->insert(sentences[id].back());
     }
   }  
 }
@@ -766,9 +739,7 @@ void options(int argc, char** argv)
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
-    ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
     
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
     
@@ -776,7 +747,8 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
 
-    ("cube-size", po::value<int>(&cube_size), "cube-pruning size")
+    ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
+    ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")
 
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     

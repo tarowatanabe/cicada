@@ -173,6 +173,9 @@ namespace cicada
       
       // topologically sort...
       graph_out.topologically_sort();
+      
+      // re-initialize again...
+      const_cast<model_type&>(model).initialize();
     };
     
   private:

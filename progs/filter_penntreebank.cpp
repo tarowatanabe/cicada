@@ -196,9 +196,12 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    typedef std::string::const_iterator iter_type;
-							
+
+    typedef boost::spirit::istream_iterator iter_type;
+    
     utils::compress_istream is(input_file, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+
     utils::compress_ostream os(output_file);
     
     penntreebank_grammar<iter_type>         grammar;
@@ -208,23 +211,19 @@ int main(int argc, char** argv)
     hypergraph_type graph;
     sentence_type   sent;
 
-    std::string line;
+    iter_type iter(is);
+    iter_type iter_end;
     
-    while (std::getline(is, line)) {
+    while (iter != iter_end) {
       parsed.clear();
-      
-      iter_type iter = line.begin();
-      iter_type iter_end = line.end();
       
       if (escaped) {
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar_escaped, boost::spirit::standard::space, parsed))
-	  continue;
+	  throw std::runtime_error("parsing failed");
       } else {
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed))
-	  continue;
+	  throw std::runtime_error("parsing failed");
       }
-      
-      if (iter != iter_end) continue;
       
       if (leaf) {
 	sent.clear();

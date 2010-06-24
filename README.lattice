@@ -1,0 +1,19 @@
+
+The native lattice format is JLF (JSON Lattice Format) devised in cicada,
+but we can read PLF (Python Lattice Format) used in Moses.
+
+PLF:
+((('ein\\"en',1.0,1),),(('wettbewerbsbedingten',0.5,2),('wettbewerbs',0.25,1), ('wettbewerb',0.25, 1),),(('bedingten',1.0,1),),(('preissturz',0.5,2), ('preis',0.5,1),),(('sturz',1.0,1),),)
+
+
+JLF:
+[[["ein'\"en", {"lattice-cost": 1.0}, 1]], [["wettbewerbsbedingten", {"lattice-cost": 0.5}, 2], ["wettbewerbs", {"lattice-cost": 0.25}, 1], ["wettbewerb", {"lattice-cost": 0.25}, 1]], [["bedingten", {"lattice-cost": 1.0}, 1]], [["preissturz", {"lattice-cost": 0.5}, 2], ["preis", {"lattice-cost": 0.5}, 1]], [["sturz", {"lattice-cost": 1.0}, 1]]]
+
+
+For detail on PLF, see Moses web pages. In JLF, we can easily add extra features encoded in the lattice,
+by inserting new one in {}, such as
+
+{"lattice-cost": 0.5, "accoustic": -5000.9}
+
+Remark, the costs are interpreted as logarithmic value so that we can compute score by "weight \cdot feature-function".
+

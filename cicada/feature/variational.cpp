@@ -288,6 +288,7 @@ namespace cicada
 	throw std::runtime_error("invalid ngram order");
       
       base_type::__state_size = sizeof(symbol_type) * order * 2;
+      base_type::__feature_name = "variational";
       
       pimpl = new impl_type(order);
     }

@@ -71,6 +71,8 @@ namespace cicada
       if (feature_names.find(models[i]->feature_name()) != feature_names.end())
 	throw std::runtime_error("you have already registered feature: " + static_cast<const std::string&>(models[i]->feature_name()));
       feature_names.insert(models[i]->feature_name());
+
+      models[i]->initialize();
     }
   }
   

@@ -1,0 +1,26 @@
+
+The hypergraph format is a-bit complicated, and most people will not want to
+edit by yourself (including me).
+A convenience tool exists, 
+
+filter_penntreebank and filter_cabocha to convert from penn-treebank or cabocha output into hypergraph format.
+
+PennTreebank filter was tested on output from stanford parser, thus, may not work on raw treebank file.
+If you need support contact me.
+
+filter_penntreebank [options]
+options:
+  --input arg (=-)      input file
+  --output arg (=-)     output
+  --escape              escape English penntreebank
+  --leaf                collect leaf nodes only
+  --help                help message
+
+Cabocha supports only the latest version, 0.60pre4 (probably)
+
+filter_cabocha [options]
+options:
+  --input arg (=-)      input file
+  --output arg (=-)     output
+  --leaf                collect leaf nodes only
+  --help                help message
