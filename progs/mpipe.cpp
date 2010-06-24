@@ -321,62 +321,89 @@ int main(int argc, char** argv)
       
       int non_found_iter = 0;
       
-      while (value.first >= 0) {
-	bool found = false;
+      if (even) {
+	
+	int id = 0;
 
-	if (even) {
-	  for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank) {
-	    queue_is.pop(value);
+	while (value.first >= 0) {
+	  bool found = false;
+
+	  if ((id % mpi_size == 0 ? queue_send.empty() : ostream[id % mpi_size]->test()) && queue_is.pop(value, true) && value.first >= 0) {
+	    const int rank = value.first % mpi_size;
 	    
-	    if (value.first >= 0) {
+	    if (rank == 0)
+	      queue_send.push(value);
+	    else
 	      ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
-	      found = true;
-	    }
-	  }
-
-	  queue_is.pop(value);
-	  if (value.first >= 0) {
-	    queue_send.push(value);
+	    
+	    ++ id;
+	    
 	    found = true;
 	  }
 	  
-	} else {
+	  // reduce...
+	  for (int rank = 1; rank < mpi_size; ++ rank)
+	    if (istream[rank] && istream[rank]->test()) {
+	      if (istream[rank]->read(line)) {
+		boost::iostreams::filtering_istream is_buffer;
+		is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
+		
+		value_recv.second.clear();
+		is_buffer >> value_recv.first;
+		std::getline(is_buffer, value_recv.second);
+		
+		//std::cerr << "rank: " << rank << " id: " << value_recv.first << " " << value_recv.second << std::endl;
+		
+		queue_recv.push_swap(value_recv);
+	      } else
+		istream[rank].reset();
+	      
+	      found = true;
+	    }
+	  
+	  non_found_iter = loop_sleep(found, non_found_iter);
+	}
+	
+      } else {
+	while (value.first >= 0) {
+	  bool found = false;
+	
 	  for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank)
 	    if (ostream[rank]->test() && queue_is.pop(value, true) && value.first >= 0) {
 	      ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
+	    
+	      found = true;
+	    }
+	
+	  if (queue_send.empty() && queue_is.pop(value, true) && value.first >= 0) {
+	    queue_send.push(value);
+	  
+	    found = true;
+	  }
+	
+	  // reduce...
+	  for (int rank = 1; rank < mpi_size; ++ rank)
+	    if (istream[rank] && istream[rank]->test()) {
+	      if (istream[rank]->read(line)) {
+		boost::iostreams::filtering_istream is_buffer;
+		is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
 	      
+		value_recv.second.clear();
+		is_buffer >> value_recv.first;
+		std::getline(is_buffer, value_recv.second);
+
+
+		//std::cerr << "rank: " << rank << " id: " << value_recv.first << " " << value_recv.second << std::endl;
+	      
+		queue_recv.push_swap(value_recv);
+	      } else
+		istream[rank].reset();
+	    
 	      found = true;
 	    }
 	  
-	  if (queue_send.empty() && queue_is.pop(value, true) && value.first >= 0) {
-	    queue_send.push(value);
-	    
-	    found = true;
-	  }
+	  non_found_iter = loop_sleep(found, non_found_iter);
 	}
-	
-	// reduce...
-	for (int rank = 1; rank < mpi_size; ++ rank)
-	  if (istream[rank] && istream[rank]->test()) {
-	    if (istream[rank]->read(line)) {
-	      boost::iostreams::filtering_istream is_buffer;
-	      is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
-	      
-	      value_recv.second.clear();
-	      is_buffer >> value_recv.first;
-	      std::getline(is_buffer, value_recv.second);
-
-
-	      //std::cerr << "rank: " << rank << " id: " << value_recv.first << " " << value_recv.second << std::endl;
-	      
-	      queue_recv.push_swap(value_recv);
-	    } else
-	      istream[rank].reset();
-	    
-	    found = true;
-	  }
-	
-	non_found_iter = loop_sleep(found, non_found_iter);
       }
       
       for (;;) {
