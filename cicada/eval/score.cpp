@@ -20,7 +20,7 @@ namespace cicada
 
       const parameter_type param(parameter);
       
-      if (param.name() == "bleu") {
+      if (param.name() == "bleu" || param.name() == "bleu-linear") {
 	int order = 4;
 	parameter_type::const_iterator iter = param.find("order");
 	if (iter != param.end())

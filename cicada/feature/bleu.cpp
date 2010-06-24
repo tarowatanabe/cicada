@@ -9,6 +9,8 @@
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 
+#include "cicada/eval/bleu.hpp"
+
 #include <boost/numeric/conversion/bounds.hpp>
 
 namespace cicada
@@ -22,6 +24,9 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+
+      typedef cicada::eval::Score score_type;
+      typedef score_type::score_ptr_type score_ptr_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -290,6 +295,16 @@ namespace cicada
 	states_counts.clear();
 	
 	source_size = 0;
+
+	score.reset();
+      }
+
+      void insert(const score_ptr_type& __score)
+      {
+	score = __score;
+	
+	if (score && ! dynamic_cast<const cicada::eval::Bleu*>(score.get()))
+	  throw std::runtime_error("this is not a bleu-score!");
       }
       
       void insert(const int __source_size, const sentence_type& sentence)
@@ -401,26 +416,54 @@ namespace cicada
 	    counts_bleu[nodes[id].order - 1] += utils::bithack::min(int(__counts[id]), int(ngrams[id]));
 	
 	const count_set_type& counts = (exact ? counts_bleu : __counts);
+
+	const cicada::eval::Bleu* __bleu = dynamic_cast<const cicada::eval::Bleu*>(score.get());
 	
-	if (hypothesis_size == 0 || counts.empty()) return 0.0;
-	
-	const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size);
-	const double reference_length  = ref_size(hypothesis_length);
-	
-	double smooth = 0.5;
-	double bleu = brevity_penalty(hypothesis_length, reference_length);
-	
-	const int ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
-	
-	const double factor = 1.0 / order;
-	for (int n = 1; n <= ngram_size; ++ n) {
-	  const int count = counts[n - 1];
+	if (__bleu && __bleu->length_reference > 0) {
 	  
-	  bleu += std::log((count ? double(count) : smooth) / (hypothesis_size + 1 - n)) * factor;
-	  smooth *= 0.5;
+	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size);
+	  const double reference_length  = ref_size(hypothesis_length);
+	  
+	  double smooth = 0.5;
+	  double bleu = brevity_penalty(hypothesis_length + __bleu->length_hypothesis, reference_length + __bleu->length_reference);
+	  
+	  const int ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
+	  const int bleu_order = utils::bithack::max(counts.size(), __bleu->ngrams_hypothesis.size());
+	  
+	  const double factor = 1.0 / order;
+	  for (int n = 1; n <= bleu_order; ++ n) {
+	    const double count = (double(n <= ngram_size ? double(counts[n - 1]) : 0.0)
+				  + (n <= __bleu->ngrams_hypothesis.size() ? double(__bleu->ngrams_hypothesis[n - 1]) : 0.0));
+	    const double norm  = (double(n <= ngram_size ? double(hypothesis_size + 1 - n) : 0.0)
+				  + (n <= __bleu->ngrams_reference.size() ? double(__bleu->ngrams_reference[n - 1]) : 0.0));
+	    const double p = (norm > 0.0 ? ((count > 0.0 ? count : smooth) / norm) : 0.0);
+	    
+	    bleu += (p > 0.0 ? std::log(p) : 0.0) * factor;
+	    smooth *= 0.5;
+	  }
+	  
+	  return std::exp(bleu);
+	} else {
+	  if (hypothesis_size == 0 || counts.empty()) return 0.0;
+	  
+	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size);
+	  const double reference_length  = ref_size(hypothesis_length);
+	  
+	  double smooth = 0.5;
+	  double bleu = brevity_penalty(hypothesis_length, reference_length);
+	  
+	  const int ngram_size = utils::bithack::min(int(counts.size()), hypothesis_size);
+	  
+	  const double factor = 1.0 / order;
+	  for (int n = 1; n <= ngram_size; ++ n) {
+	    const int count = counts[n - 1];
+	    
+	    bleu += std::log((count ? double(count) : smooth) / (hypothesis_size + 1 - n)) * factor;
+	    smooth *= 0.5;
+	  }
+	  
+	  return std::exp(bleu);
 	}
-	
-	return std::exp(bleu);
       }
 
       double tst_size(int length, int parsed, int source_size) const
@@ -465,6 +508,8 @@ namespace cicada
       states_count_set_type states_counts;
       
       int source_size;
+
+      score_ptr_type score;
 
       int order;
       bool exact;
@@ -537,6 +582,11 @@ namespace cicada
     void Bleu::insert(const int source_size, const sentence_type& sentence)
     {
       pimpl->insert(source_size, sentence);
+    }
+
+    void Bleu::insert(const score_ptr_type& score)
+    {
+      pimpl->insert(score);
     }
 
   };

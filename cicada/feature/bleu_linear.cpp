@@ -380,6 +380,11 @@ namespace cicada
     {
       pimpl->insert(source_size, sentence);
     }
+    
+    void BleuLinear::insert(const score_ptr_type& score)
+    {
+      // do nothing...
+    }
 
   };
 };

@@ -31,7 +31,6 @@
 #include "cicada/feature/bleu_linear.hpp"
 #include "cicada/parameter.hpp"
 
-
 #include "cicada/eval.hpp"
 
 #include "utils/program_options.hpp"
@@ -78,6 +77,12 @@ typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_p
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
 
+typedef cicada::eval::Scorer         scorer_type;
+typedef cicada::eval::ScorerDocument scorer_document_type;
+
+typedef scorer_type::score_ptr_type  score_ptr_type;
+typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
+
 struct source_length_function
 {
   typedef cicada::semiring::Tropical<int> value_type;
@@ -105,6 +110,7 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 
+bool oracle_loss = false;
 bool apply_exact = false;
 int cube_size = 200;
 bool softmax_margin = false;
@@ -118,7 +124,11 @@ void read_tstset(const path_set_type& files,
 		 const sentence_document_type& sentences,
 		 feature_function_ptr_set_type& features);
 void read_refset(const path_set_type& file,
+		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
+void compute_oracles(const hypergraph_set_type& graphs,
+		     const feature_function_ptr_set_type& features,
+		     const scorer_document_type& scorers);
 double optimize(const hypergraph_set_type& graphs,
 		const feature_function_ptr_set_type& features,
 		weight_set_type& weights);
@@ -136,9 +146,10 @@ int main(int argc, char ** argv)
     threads = utils::bithack::max(threads, 1);
     
     // read reference set
-    sentence_document_type    sentences;
+    scorer_document_type   scorers(scorer_name);
+    sentence_document_type sentences;
     
-    read_refset(refset_files, sentences);
+    read_refset(refset_files, scorers, sentences);
     
     if (debug)
       std::cerr << "# of references: " << sentences.size() << std::endl;
@@ -157,6 +168,9 @@ int main(int argc, char ** argv)
 
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
+
+    if (oracle_loss)
+      compute_oracles(graphs, features, scorers);
     
     weight_set_type weights;
     
@@ -164,8 +178,6 @@ int main(int argc, char ** argv)
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
-
-    
     
     utils::compress_ostream os(output_file);
     os.precision(10);
@@ -588,6 +600,243 @@ double optimize(const hypergraph_set_type& graphs,
   return OptimizeLBFGS(graphs, features, weights)();
 }
 
+
+struct TaskOracle
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+  TaskOracle(queue_type&                          __queue,
+	     const hypergraph_set_type&           __graphs,
+	     const feature_function_ptr_set_type& __features,
+	     const scorer_document_type&          __scorers,
+	     score_ptr_set_type&                  __scores)
+    : queue(__queue),
+      graphs(__graphs),
+      features(__features),
+      scorers(__scorers),
+      scores(__scores)
+  {
+    score_optimum.reset();
+    
+    score_ptr_set_type::const_iterator siter_end = scores.end();
+    for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter) 
+      if (*siter) {
+	if (! score_optimum)
+	  score_optimum = (*siter)->clone();
+	else
+	  *score_optimum += *(*siter);
+      } 
+  }
+  
+  
+  struct bleu_function
+  {
+    typedef rule_type::feature_set_type feature_set_type;
+    
+    typedef cicada::semiring::Logprob<double> value_type;
+
+    bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
+      : name(__name), factor(__factor) {}
+
+    weight_set_type::feature_type name;
+    double factor;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& edge) const
+    {
+      return cicada::semiring::traits<value_type>::log(edge.features[name] * factor);
+    }
+    
+  };
+  
+  struct kbest_traversal
+  {
+    typedef sentence_type value_type;
+    
+    template <typename Edge, typename Iterator>
+    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+    {
+      // extract target-yield, features
+      
+      yield.clear();
+    
+      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
+      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
+	if (titer->is_non_terminal()) {
+	  const int pos = titer->non_terminal_index() - 1;
+	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
+	} else if (*titer != vocab_type::EPSILON)
+	  yield.push_back(*titer);
+    }
+  };
+
+  struct weight_bleu_function
+  {
+    typedef cicada::semiring::Logprob<double> value_type;
+    
+    weight_bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
+      : name(__name), factor(__factor) {}
+    
+    weight_set_type::feature_type name;
+    double factor;
+    
+    value_type operator()(const feature_set_type& x) const
+    {
+      return cicada::semiring::traits<value_type>::log(x[name] * factor);
+    }
+  };
+  
+  void operator()()
+  {
+    // we will try maximize    
+    const bool error_metric = scorers.error_metric();
+    const double score_factor = (error_metric ? - 1.0 : 1.0);
+    
+    weight_set_type::feature_type feature_bleu;
+    for (int i = 0; i < features.size(); ++ i)
+      if (features[i]) {
+	feature_bleu = features[i]->feature_name();
+	break;
+      }
+    
+    double objective_optimum = (score_optimum
+				? score_optimum->score().first * score_factor
+				: - std::numeric_limits<double>::infinity());
+
+    hypergraph_type graph_oracle;
+    
+    int id = 0;
+    while (1) {
+      queue.pop(id);
+      if (id < 0) break;
+      
+      if (! graphs[id].is_valid()) continue;
+
+      score_ptr_type score_curr;
+      if (score_optimum)
+	score_curr = score_optimum->clone();
+      
+      if (scores[id])
+	*score_curr -= *scores[id];
+      
+      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
+      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+      
+      if (__bleu)
+	__bleu->insert(score_curr);
+      else
+	__bleu_linear->insert(score_curr);
+      
+      model_type model;
+      model.push_back(features[id]);
+      
+      cicada::apply_cube_prune(model, graphs[id], graph_oracle, weight_bleu_function(feature_bleu, score_factor), cube_size);
+      
+      cicada::semiring::Logprob<double> weight;
+      sentence_type sentence;
+      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), bleu_function(feature_bleu, score_factor));
+      
+      score_ptr_type score_sample = scorers[id]->score(sentence);
+      if (score_curr)
+	*score_curr += *score_sample;
+      else
+	score_curr = score_sample;
+      
+      const double objective = score_curr->score().first * score_factor;
+      
+      if (objective > objective_optimum || ! scores[id]) {
+	score_optimum = score_curr;
+	objective_optimum = objective;
+	scores[id] = score_sample;
+      }
+    }
+  }
+  
+  score_ptr_type score_optimum;
+  
+  queue_type&                          queue;
+  const hypergraph_set_type&           graphs;
+  const feature_function_ptr_set_type& features;
+  const scorer_document_type&          scorers;
+  score_ptr_set_type&                  scores;
+};
+
+void compute_oracles(const hypergraph_set_type& graphs,
+		     const feature_function_ptr_set_type& features,
+		     const scorer_document_type& scorers)
+{
+  typedef TaskOracle            task_type;
+  typedef task_type::queue_type queue_type;
+
+  typedef boost::shared_ptr<task_type> task_ptr_type;
+  typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_set_type;
+  
+  score_ptr_set_type scores(graphs.size());
+
+  score_ptr_type score_optimum;
+  double objective_optimum = - std::numeric_limits<double>::infinity();
+  
+  const bool error_metric = scorers.error_metric();
+  const double score_factor = (error_metric ? - 1.0 : 1.0);
+  
+  for (int iter = 0; iter < 5; ++ iter) {
+    queue_type queue(graphs.size());
+    
+    task_set_type tasks(threads);
+    for (int i = 0; i < threads; ++ i)
+      tasks[i].reset(new task_type(queue, graphs, features, scorers, scores));
+    
+    boost::thread_group workers;
+    for (int i = 0; i < threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
+    
+    
+    for (int id = 0; id < graphs.size(); ++ id)
+      queue.push(id);
+    
+    for (int i = 0; i < threads; ++ i)
+      queue.push(-1);
+    
+    workers.join_all();
+    
+    score_optimum.reset();
+    score_ptr_set_type::const_iterator siter_end = scores.end();
+    for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter) 
+      if (*siter) {
+	if (! score_optimum)
+	  score_optimum = (*siter)->clone();
+	else
+	  *score_optimum += *(*siter);
+      } 
+    
+    const double objective = score_optimum->score().first * score_factor;
+    if (debug)
+      std::cerr << "oracle score: " << objective << std::endl;
+    
+    if (objective <= objective_optimum) break;
+    
+    objective_optimum = objective;
+  }
+  
+  for (int id = 0; id < graphs.size(); ++ id)
+    if (features[id]) {
+      if (! scores[id])
+	throw std::runtime_error("no scores?");
+      
+      score_ptr_type score_curr = score_optimum->clone();
+      *score_curr -= *scores[id];
+      
+      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
+      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+      
+      if (__bleu)
+	__bleu->insert(score_curr);
+      else
+	__bleu_linear->insert(score_curr);
+    }
+}
+
+
 void read_tstset(const path_set_type& files,
 		 hypergraph_set_type& graphs,
 		 const sentence_document_type& sentences,
@@ -598,9 +847,9 @@ void read_tstset(const path_set_type& files,
     
     if (debug)
       std::cerr << "file: " << *titer << std::endl;
-      
+    
     if (boost::filesystem::is_directory(*titer)) {
-
+      
       for (int i = 0; /**/; ++ i) {
 	const path_type path = (*titer) / (boost::lexical_cast<std::string>(i) + ".gz");
 
@@ -687,6 +936,7 @@ void read_tstset(const path_set_type& files,
 }
 
 void read_refset(const path_set_type& files,
+		 scorer_document_type& scorers,
 		 sentence_document_type& sentences)
 {
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
@@ -717,12 +967,18 @@ void read_refset(const path_set_type& files,
       if (iter == tokenizer.end()) continue;
       if (*iter != "|||") continue;
       ++ iter;
-      
+
+      if (id >= scorers.size())
+	scorers.resize(id + 1);
       
       if (id >= sentences.size())
 	sentences.resize(id + 1);
       
+      if (! scorers[id])
+	scorers[id] = scorers.create();
+      
       sentences[id].push_back(sentence_type(iter, tokenizer.end()));
+      scorers[id]->insert(sentences[id].back());
     }
   }  
 }
@@ -747,6 +1003,7 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
 
+    ("oracle-loss", po::bool_switch(&oracle_loss), "loss from oracle translations")
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")
 

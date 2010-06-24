@@ -10,6 +10,8 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
+#include <cicada/eval.hpp>
+
 namespace cicada
 {
   namespace feature
@@ -26,6 +28,9 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+      
+      typedef cicada::eval::Score score_type;
+      typedef score_type::score_ptr_type score_ptr_type;
       
     private:
       typedef FeatureFunction base_type;
@@ -52,6 +57,7 @@ namespace cicada
       
       void clear();
       void insert(const int source_size, const sentence_type& sentence);
+      void insert(const score_ptr_type& score);
       
     private:
       impl_type* pimpl;
