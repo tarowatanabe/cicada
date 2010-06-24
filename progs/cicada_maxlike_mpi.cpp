@@ -818,6 +818,7 @@ struct TaskOracle
       if (objective > objective_optimum || ! scores[id]) {
 	score_optimum = score_curr;
 	objective_optimum = objective;
+	sentences[id] = sentence;
 	scores[id] = score_sample;
       }
     }
