@@ -7,6 +7,7 @@
 #include "feature/bleu_linear.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
+#include "feature/ngram_tree.hpp"
 #include "feature/penalty.hpp"
 #include "feature/variational.hpp"
 
@@ -25,19 +26,20 @@ bleu-linear: linear corpus-BLEU\n\
 \tprecision=<default 0.8>,\n\
 \tratio=<default 0.6>\n\
 neighbours: neighbour words feature\n\
-\tyield=[source|target] \n\
+\tyield=[source|target]\n\
 ngram: ngram language model\n\
 \tfile=<file>,\n\
 \torder=<order>,\n\
 \tname=feature-name(default: ngram)\n\
+ngram-tree: ngram tree feature\n\
+\tyield=[source|target]\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 target-word-penalty: target word penalty feature\n\
 soruce-word-penalty: source word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 ";
-      return desc;
-    
+    return desc;
   }
 
   FeatureFunction::feature_function_ptr_type FeatureFunction::create(const std::string& parameter)
@@ -50,6 +52,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::NGram(parameter));
     if (param.name() == "neighbours" || param.name() == "neighbors")
       return feature_function_ptr_type(new feature::Neighbours(parameter));
+    if (param.name() == "ngram-tree")
+      return feature_function_ptr_type(new feature::NGramTree(parameter));
     else if (param.name() == "bleu")
       return feature_function_ptr_type(new feature::Bleu(parameter));
     else if (param.name() == "bleu-linear")

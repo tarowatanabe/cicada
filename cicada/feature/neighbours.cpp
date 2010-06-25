@@ -113,16 +113,7 @@ namespace cicada
 	  // we do not add feature here, since we know nothing abount surrounding context...
 	  symbol_type prefix = vocab_type::EPSILON;
 	  symbol_type suffix = vocab_type::EPSILON;
-	  int size = 0;
-	  
-	  rule_type::symbol_set_type::const_iterator piter_end = phrase.end();
-	  for (rule_type::symbol_set_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
-	    if (*piter != vocab_type::EPSILON) {
-	      if (size == 0)
-		prefix = *piter;
-	      suffix = *piter;
-	      ++ size;
-	    }
+	  int size = count_span(phrase.begin(), phrase.end(), prefix, suffix);
 	  
 	  state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, prefix, suffix, size)).first;
 

@@ -276,13 +276,6 @@ struct Task
 
       std::cerr << "id: " << id << std::endl;
 
-      // collect max-feature from hypergraph
-      yield_type  yield_viterbi;
-      weight_type weight_viterbi;
-      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, kbest_traversal(), weight_set_function(weights, 1.0));
-
-      std::cerr << "viterbi: " << boost::get<0>(yield_viterbi) << std::endl;
-      
       // compute source-length
       int source_length = lattice.shortest_distance();
       if (hypergraph.is_valid()) {
@@ -293,9 +286,16 @@ struct Task
 	
 	source_length = - log(lengths.back());
       }
-
-      std::cerr << "source length: " << source_length << std::endl;
       
+      std::cerr << "source length: " << source_length << std::endl;
+
+      // collect max-feature from hypergraph
+      yield_type  yield_viterbi;
+      weight_type weight_viterbi;
+      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, kbest_traversal(), weight_set_function(weights, 1.0));
+
+      std::cerr << "viterbi: " << boost::get<0>(yield_viterbi) << std::endl;
+            
       // update scores...
       if (id >= scores.size())
 	scores.resize(id + 1);
@@ -365,7 +365,7 @@ struct Task
       
       const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / norm));
       
-      if (alpha > 0.0) {
+      if (loss - margin > 0.0) {
 	std::cerr << "loss: " << loss << " margin: " << margin << " norm: " << norm << " alpha: " << alpha << std::endl;
 
 	// update...
