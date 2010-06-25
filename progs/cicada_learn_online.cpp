@@ -294,7 +294,7 @@ struct Task
       weight_type weight_viterbi;
       cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, kbest_traversal(), weight_set_function(weights, 1.0));
 
-      std::cerr << "viterbi: " << boost::get<0>(yield_viterbi) << std::endl;
+      
             
       // update scores...
       if (id >= scores.size())
@@ -321,8 +321,6 @@ struct Task
       weights[__bleu->feature_name()] =  loss_scale * source_length;
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_reward, weight_set_function(weights, 1.0), cube_size);
       cicada::viterbi(hypergraph_reward, yield_reward, weight_reward, kbest_traversal(), weight_set_function(weights, 1.0));
-
-      std::cerr << "reward: " << boost::get<0>(yield_reward) << std::endl;
       
       // compute bleu-penalty hypergraph
       yield_type  yield_penalty;
@@ -331,10 +329,11 @@ struct Task
       weights[__bleu->feature_name()] = - loss_scale * source_length;
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_penalty, weight_set_function(weights, 1.0), cube_size);
       cicada::viterbi(hypergraph_penalty, yield_penalty, weight_penalty, kbest_traversal(), weight_set_function(weights, 1.0));
-
-      std::cerr << "penalty: " << boost::get<0>(yield_penalty) << std::endl;
       
+      // reset bleu scores...
       weights[__bleu->feature_name()] = 0.0;
+      boost::get<1>(yield_reward)[__bleu->feature_name()] = 0.0;
+      boost::get<1>(yield_penalty)[__bleu->feature_name()] = 0.0;
       
       score_ptr_type score_reward  = scorer->score(boost::get<0>(yield_reward));
       score_ptr_type score_penalty = scorer->score(boost::get<0>(yield_penalty));
@@ -355,8 +354,11 @@ struct Task
       const std::pair<double, double> bleu_penalty = score_penalty->score();
       
       if (debug)
-	std::cerr << "viterbi score: "  << bleu_viterbi.first << " penalty: " << bleu_viterbi.second << std::endl
-		  << "oracle score: "   << bleu_reward.first  << " penalty: " << bleu_reward.second << std::endl
+	std::cerr << "viterbi:  " << boost::get<0>(yield_viterbi) << std::endl
+		  << "oracle:   " << boost::get<0>(yield_reward) << std::endl
+		  << "violated: " << boost::get<0>(yield_penalty) << std::endl
+		  << "viterbi score:  "  << bleu_viterbi.first << " penalty: " << bleu_viterbi.second << std::endl
+		  << "oracle score:   "   << bleu_reward.first  << " penalty: " << bleu_reward.second << std::endl
 		  << "violated score: " << bleu_penalty.first << " penalty: " << bleu_penalty.second << std::endl;
       
       const double loss   = loss_scale * source_length * (bleu_reward.first - bleu_penalty.first);
