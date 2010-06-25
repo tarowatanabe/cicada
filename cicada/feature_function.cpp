@@ -17,14 +17,24 @@ namespace cicada
   std::string FeatureFunction::lists()
   {
     static const char* desc = "\
-bleu:order=<order>,exact=true|false\n\
-bleu-linear:order=<order>,precision=<default 0.8>,ratio=<default 0.6>\n\
-neighbours:yield=[source|target] \n\
-ngram:file=<file>,order=<order>,name=feature-name(default: ngram)\n\
-variational:order=<order>\n\
-target-word-penalty\n\
-soruce-word-penalty\n\
-rule-penalty\n\
+bleu: BLEU\n\
+\torder=<order>,\n\
+\texact=[true|false] clipped ngram computation\n\
+bleu-linear: linear corpus-BLEU\n\
+\torder=<order>,\n\
+\tprecision=<default 0.8>,\n\
+\tratio=<default 0.6>\n\
+neighbours: neighbour words feature\n\
+\tyield=[source|target] \n\
+ngram: ngram language model\n\
+\tfile=<file>,\n\
+\torder=<order>,\n\
+\tname=feature-name(default: ngram)\n\
+variational: variational feature for variational decoding\n\
+\torder=<order>\n\
+target-word-penalty: target word penalty feature\n\
+soruce-word-penalty: source word penalty feature\n\
+rule-penalty: rule penalty feature\n\
 ";
       return desc;
     

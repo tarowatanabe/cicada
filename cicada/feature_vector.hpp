@@ -137,13 +137,19 @@ namespace cicada
     {
       return dot(x.begin(), x.end());
     }
+
+    template <typename T, typename A, typename BinaryOp>
+    Tp dot(const FeatureVector<T,A>& x, BinaryOp op) const
+    {
+      return dot(x.begin(), x.end(), op);
+    }
     
     template <typename Iterator>
     Tp dot(Iterator first, Iterator last) const
     {
       const_iterator iter1 = begin();
       const_iterator iter1_end = end();
-
+      
       Tp sum = Tp();
       
       while (iter1 != iter1_end && first != last) {
@@ -158,6 +164,39 @@ namespace cicada
 	  ++ first;
 	}
       }
+      
+      return sum;
+    }
+    
+    template <typename Iterator, typename BinaryOp>
+    Tp dot(Iterator first, Iterator last, BinaryOp op) const
+    {
+      typedef typename std::iterator_traits<Iterator>::value_type value2_type;
+
+      const_iterator iter1 = begin();
+      const_iterator iter1_end = end();
+
+      Tp sum = Tp();
+      
+      while (iter1 != iter1_end && first != last) {
+	if (iter1->first < first->first) {
+	  sum += op(iter1->second, typename value2_type::second_type());
+	  ++ iter1;
+	} else if (first->first < iter1->first) {
+	  sum += op(Tp(), first->second);
+	  ++ first;
+	} else {
+	  sum += op(iter1->second, first->second);
+	  
+	  ++ iter1;
+	  ++ first;
+	}
+      }
+      
+      for (/**/; iter1 != iter1_end; ++ iter1)
+	sum += op(iter1->second, typename value2_type::second_type());
+      for (/**/; first != last; ++ first)
+	sum += op(Tp(), first->second);
       
       return sum;
     }

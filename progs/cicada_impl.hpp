@@ -62,7 +62,11 @@ typedef cicada::Grammar         grammar_type;
 typedef cicada::Model           model_type;
 typedef cicada::FeatureFunction feature_function_type;
 
-typedef cicada::WeightVector<double> weight_set_type;
+typedef feature_function_type::feature_function_ptr_type feature_function_ptr_type;
+
+typedef rule_type::feature_set_type    feature_set_type;
+typedef feature_set_type::feature_type feature_type;
+typedef cicada::WeightVector<double>   weight_set_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 
@@ -264,20 +268,7 @@ bool true_false(const std::string& token)
   if (atoi(token.c_str()) > 0)
     return true;
   return false;
-}
-
-template <typename Path, typename Weights>
-void read_weights(const Path& path, Weights& weights)
-{
-  if (path.empty()) return;
-  
-  if (path != "-" && ! boost::filesystem::exists(path))
-    throw std::runtime_error("no feture weights?" + path.file_string());
-      
-  utils::compress_istream is(path);
-  is >> weights;
-}
-		  
+}		  
 
 template <typename Iterator>
 inline
@@ -375,6 +366,8 @@ public:
   
   virtual void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& graph) const = 0;
 
+  virtual void assign(const weight_set_type& weights) {}
+
   virtual void clear() {};
 
 private:
@@ -419,7 +412,14 @@ public:
     weight_map_type::iterator iter = weights_map.find(path.file_string());
     if (iter == weights_map.end()) {
       iter = weights_map.insert(std::make_pair(path.file_string(), weight_set_type())).first;
-      read_weights(path, iter->second);
+      
+      if (! path.empty()) {
+	if (path != "-" && ! boost::filesystem::exists(path))
+	  throw std::runtime_error("no feture weights? " + path.file_string());
+	
+	utils::compress_istream is(path);
+	is >> iter->second;
+      }
     }
     return iter->second;
   }
@@ -708,6 +708,7 @@ public:
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
   }
+
   
   void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
@@ -747,6 +748,11 @@ public:
 		<< std::endl;
 	
     hypergraph.swap(applied);
+  }
+
+  void assign(const weight_set_type& __weights)
+  {
+    weights = &__weights;
   }
 
   const model_type& model;
@@ -858,6 +864,11 @@ public:
     
     hypergraph.swap(applied);
   }
+
+  void assign(const weight_set_type& __weights)
+  {
+    weights = &__weights;
+  }
   
   void clear()
   {
@@ -959,6 +970,11 @@ public:
     hypergraph.swap(variational);
   }
 
+  void assign(const weight_set_type& __weights)
+  {
+    weights = &__weights;
+  }
+
   void clear()
   {
     dynamic_cast<cicada::feature::Variational*>(feature.get())->clear();
@@ -978,7 +994,9 @@ class Prune : public Operation
 {
 public:
   Prune(const std::string& parameter, const int __debug)
-    : weights(0), beam(0.0), weights_one(false), debug(__debug)
+    : weights(0), beam(0.0), scale(1.0), weights_one(false), 
+      semiring_tropical(false), semiring_logprob(false), semiring_log(false),
+      debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -989,14 +1007,35 @@ public:
     if (param.find("beam") != param.end())
       beam = boost::lexical_cast<double>(param.find("beam")->second);
     
-    if (beam <= 0.0 || beam >= 1.0)
-      throw std::runtime_error("beam threshold must be 0.0 < threshold < 1.0");
+    if (beam <= 0.0)
+      throw std::runtime_error("beam threshold must be 0.0 < threshold");
+
+    if (param.find("scale") != param.end())
+      scale = boost::lexical_cast<double>(param.find("scale")->second);
     
     if (param.find("weights") != param.end())
       weights = &base_type::weights(param.find("weights")->second);
     
     if (param.find("weights-one") != param.end())
       weights_one = true_false(param.find("weights-one")->second);
+    
+    if (param.find("semiring") != param.end()) {
+      const std::string& name = param.find("semiring")->second;
+
+      if (strcasecmp(name.c_str(), "tropical") == 0)
+	semiring_tropical = true;
+      else if (strcasecmp(name.c_str(), "logprob") == 0)
+	semiring_logprob = true;
+      else if (strcasecmp(name.c_str(), "log") == 0)
+	semiring_log = true;
+      else
+	throw std::runtime_error("unknown semiring: " + name);
+    }
+
+    
+    if (int(semiring_tropical) + semiring_logprob + semiring_log == 0)
+      semiring_tropical = true;
+    
 
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
@@ -1018,7 +1057,13 @@ public:
     
     utils::resource prune_start;
     
-    cicada::beam_prune(hypergraph, pruned, *weights_prune, 1.0, beam);
+    if (semiring_tropical)
+      cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph, pruned, *weights_prune, scale, beam);
+    else if (semiring_logprob)
+      cicada::beam_prune<cicada::semiring::Logprob<double>, weight_set_type>(hypergraph, pruned, *weights_prune, scale, beam);
+    else
+      cicada::beam_prune<cicada::semiring::Log<double>, weight_set_type>(hypergraph, pruned, *weights_prune, scale, beam);
+    
 	
     utils::resource prune_end;
     
@@ -1037,11 +1082,21 @@ public:
 
   }
 
+  void assign(const weight_set_type& __weights)
+  {
+    weights = &__weights;
+  }
+
   const weight_set_type* weights;
   
   double beam;
+  double scale;
   
   bool weights_one;
+
+  bool semiring_tropical;
+  bool semiring_logprob;
+  bool semiring_log;
   
   int debug;
 };
@@ -1116,6 +1171,11 @@ public:
   {
     buffer.clear();
   }
+
+  void assign(const weight_set_type& __weights)
+  {
+    weights = &__weights;
+  }
   
   void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
@@ -1187,26 +1247,18 @@ public:
 
     if (param.find("file") != param.end())
       file = param.find("file")->second;
-
+    
     // default to stdout
     if (directory.empty() && file.empty())
       file = "-";
     
     if (! directory.empty() && ! file.empty())
       throw std::runtime_error("you cannot output both in directory and file");
+  }
 
-#if 0
-    if (! directory.empty()) {
-      if (boost::filesystem::exists(directory) && ! boost::filesystem::is_directory(directory))
-	boost::filesystem::remove_all(directory);
-      
-      boost::filesystem::create_directories(directory);
-      
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
-	boost::filesystem::remove_all(*iter);
-    }
-#endif
+  void assign(const weight_set_type& __weights)
+  {
+    weights = &__weights;
   }
   
   void clear()
@@ -1344,18 +1396,52 @@ public:
   static std::string lists()
   {
     static const char* desc = "\
-binarize:direction=<binarization direction [left|right]>,size=<binarize size>\n\
-permute:feature=<apply-feature,[true|false]>, weights=<weight file for composed feature>, size=<permute size>\n\
-compose-earley\n\
-compose-cky\n\
-apply:size=<cube size>, exact=<non-prune,[true|false]>, weights=<weight file for feature>, weights-one=<one-weight,[true|false]>\n\
-bleu:size=<cube size>, exact=<non-prune,[true|false]>, weights=<weight file for feature>, weights-one=<one-weight,[true|false]>\n\
-variational:weights=<weight file for feature computation>, weights-variational=<weighs for variational decoding>, weights-one=<one-weight,[true|false]>\n\
-prune:beam=<beam threshold in 0.0 < threshold < 1.0 >, weights=<weight file for feature>, weights-one=<one-weight,[true|false]>\n\
-intersect\n\
-output:kbest=<kbest size>, unique=<unique translation, [true|false]>, weights=<weight file for feature>, weights-one=<one-weight,[true|false]>, directory=<dir>, file=<file>\n \
+binarize: perform binarization (monolingual tree)\n\
+\tdirection=[left|right] binarization direction,\n\
+\tsize=binarization size\n\
+permute: permute tree (monolingual tree only)\n\
+\tfeature=[true|false] apply feature,\n\
+\tweights=file weight file for composed feature,\n\
+\tsize=permute size\n\
+compose-earley: composition from tree with grammar\n\
+compose-cky: composition from lattice (or sentence) with grammar\n\
+apply: feature application\n\
+\tsize=<cube size>,\n\
+\texact=[true|false] no pruning feature application,\n\
+\tweights=weight file for feature,\n\
+\tweights-one=[true|false] one initialized weight\n\
+bleu: BLEU computation\n\
+\tsize=<cube size>\n\
+\texact=[true|false] no pruning feature application,\n\
+\tweights=weight file for feature,\n\
+\tweights-one=[true|false] one initialized weight\n\
+variational: variational decoding\n\
+\tweights=weight file for feature,\n\
+\tweights-variational=weighs for variational decoding feature,\n\
+\tweights-one=[true|false] one initialized weight\n\
+prune: beam pruning\n\
+\tbeam=beam threshold in 0.0 < threshold,\n\
+\tscale=scaling for score,\n\
+\tsemiring=[tropical|logprob|log] semiring to perform score computation,\n\
+\tweights=weight file for feature,\n\
+\tweights-one=[true|false] one initialzied weight\n\
+\tintersect\n\
+output: kbest or hypergraph output\n\
+\tkbest=<kbest size> zero for hypergraph output (default),\n\
+\tunique=[true|false] unique translation,\n\
+\tweights=weight file for feature,\n\
+\tweights-one=[true|false] one initialize weight,\n\
+\tdirectory=directory for output,\n\
+\tfile=file for output\n\
 ";
     return desc;
+  }
+
+  void assign(const weight_set_type& weights)
+  {
+    operation_ptr_set_type::iterator oiter_end = operations.end();
+    for (operation_ptr_set_type::iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
+      (*oiter)->assign(weights);
   }
   
   void operator()(const std::string& line) {

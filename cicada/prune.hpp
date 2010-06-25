@@ -10,7 +10,7 @@
 
 namespace cicada
 {
-  template <typename WeightSet>
+  template <typename Weight, typename WeightSet>
   struct BeamPrune
   {
     typedef HyperGraph hypergraph_type;
@@ -20,7 +20,7 @@ namespace cicada
     typedef hypergraph_type::edge_type edge_type;
     
     typedef WeightSet weight_set_type;
-    typedef cicada::semiring::Logprob<double> weight_type;
+    typedef Weight weight_type;
     
     struct weight_function
     {
@@ -33,7 +33,7 @@ namespace cicada
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	return weight_type::log(edge.features.dot(weights) * scale);
+	return cicada::semiring::traits<weight_type>::log(edge.features.dot(weights) * scale);
       }
       
       const double& scale;
@@ -84,7 +84,7 @@ namespace cicada
       for (id_type id = 0; id != source.edges.size(); ++ id)
 	posterior_max = std::max(posterior_max, posterior[id]);
       
-      const weight_type cutoff(posterior_max * weight_type(threshold));
+      const weight_type cutoff(posterior_max * cicada::semiring::traits<weight_type>::log(- threshold));
       
       removed_type removed(source.edges.size(), false);
       size_t num_removed = 0;
@@ -102,20 +102,20 @@ namespace cicada
   };
   
   
-  template <typename WeightSet>
+  template <typename Weight, typename WeightSet>
   inline
   void beam_prune(const HyperGraph& source, HyperGraph& target, const WeightSet& weights, const double scale, const double threshold)
   {
-    BeamPrune<WeightSet> __prune(weights, scale, threshold);
+    BeamPrune<Weight, WeightSet> __prune(weights, scale, threshold);
     
     __prune(source, target);
   }
   
-  template <typename WeightSet>
+  template <typename Weight, typename WeightSet>
   inline
   void beam_prune(HyperGraph& source, const WeightSet& weights, const double scale, const double threshold)
   {
-    BeamPrune<WeightSet> __prune(weights, scale, threshold);
+    BeamPrune<Weight, WeightSet> __prune(weights, scale, threshold);
 
     HyperGraph target;
     

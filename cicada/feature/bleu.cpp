@@ -417,7 +417,7 @@ namespace cicada
 	
 	const count_set_type& counts = (exact ? counts_bleu : __counts);
 
-	const cicada::eval::Bleu* __bleu = dynamic_cast<const cicada::eval::Bleu*>(score.get());
+	const cicada::eval::Bleu* __bleu = (score ? dynamic_cast<const cicada::eval::Bleu*>(score.get()) : 0);
 	
 	if (__bleu && __bleu->length_reference > 0) {
 	  

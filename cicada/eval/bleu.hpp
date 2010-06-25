@@ -152,7 +152,6 @@ namespace cicada
       {
 	ngrams.clear();
 	sizes.clear();
-	order = 0;
       }
       
       void insert(const sentence_type& sentence)
