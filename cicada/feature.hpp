@@ -124,7 +124,7 @@ namespace cicada
     static bool exists(const feature_type& x)
     {
       lock_type lock(__mutex);
-      return __features().find(x) == __features().end();
+      return __features().find(x) != __features().end();
     }
     static size_t allocated()
     {

@@ -77,6 +77,12 @@ namespace cicada
 	__values.resize(x.id() + 1, Tp());
       return __values[x.id()];
     }
+
+    void erase(const key_type& x)
+    {
+      if (x.id() < __values.size())
+	__values[x.id()] = Tp();
+    }
         
     const_iterator begin() const { return __values.begin(); }
     iterator begin() { return __values.begin(); }

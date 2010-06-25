@@ -1,4 +1,3 @@
-
 //
 // online learning using the margin between forest
 //
@@ -49,8 +48,6 @@
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-
-
 typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
@@ -93,7 +90,7 @@ op_set_type ops;
 bool op_list = false;
 
 std::string algorithm_name = "perceptron";
-std::string scorer_name    = "bleu:order=4,exact=true";
+std::string scorer_name    = "bleu:order=4,exact=false";
 
 int iteration = 100;
 bool regularize_l1 = false;
@@ -198,27 +195,6 @@ struct Task
 
   };
 
-  struct target_traversal
-  {
-    typedef sentence_type value_type;
-    
-    template <typename Edge, typename Iterator>
-    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-    {
-      // extract target-yield, features
-      
-      yield.clear();
-      
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  const int pos = titer->non_terminal_index() - 1;
-	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
-	} else if (*titer != vocab_type::EPSILON)
-	  yield.push_back(*titer);
-    }
-  };
-
   struct diff_norm
   {
     double operator()(const double& x, const double& y) const{
@@ -293,9 +269,7 @@ struct Task
       yield_type  yield_viterbi;
       weight_type weight_viterbi;
       cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, kbest_traversal(), weight_set_function(weights, 1.0));
-
       
-            
       // update scores...
       if (id >= scores.size())
 	scores.resize(id + 1);
@@ -331,9 +305,9 @@ struct Task
       cicada::viterbi(hypergraph_penalty, yield_penalty, weight_penalty, kbest_traversal(), weight_set_function(weights, 1.0));
       
       // reset bleu scores...
-      weights[__bleu->feature_name()] = 0.0;
-      boost::get<1>(yield_reward)[__bleu->feature_name()] = 0.0;
-      boost::get<1>(yield_penalty)[__bleu->feature_name()] = 0.0;
+      weights.erase(__bleu->feature_name());
+      boost::get<1>(yield_reward).erase(__bleu->feature_name());
+      boost::get<1>(yield_penalty).erase(__bleu->feature_name());
       
       score_ptr_type score_reward  = scorer->score(boost::get<0>(yield_reward));
       score_ptr_type score_penalty = scorer->score(boost::get<0>(yield_penalty));
@@ -357,8 +331,8 @@ struct Task
 	std::cerr << "viterbi:  " << boost::get<0>(yield_viterbi) << std::endl
 		  << "oracle:   " << boost::get<0>(yield_reward) << std::endl
 		  << "violated: " << boost::get<0>(yield_penalty) << std::endl
-		  << "viterbi score:  "  << bleu_viterbi.first << " penalty: " << bleu_viterbi.second << std::endl
-		  << "oracle score:   "   << bleu_reward.first  << " penalty: " << bleu_reward.second << std::endl
+		  << "viterbi score:  " << bleu_viterbi.first << " penalty: " << bleu_viterbi.second << std::endl
+		  << "oracle score:   " << bleu_reward.first  << " penalty: " << bleu_reward.second << std::endl
 		  << "violated score: " << bleu_penalty.first << " penalty: " << bleu_penalty.second << std::endl;
       
       const double loss   = loss_scale * source_length * (bleu_reward.first - bleu_penalty.first);
@@ -517,6 +491,12 @@ void optimize(weight_set_type& weights)
     
     // mixing...
     weights_mixed *= (1.0 / tasks.size());
+
+#if 0
+    if (debug >= 2)
+      std::cerr << "weights:" << std::endl
+		<< weights_mixed;
+#endif
     
     for (task_ptr_set_type::iterator titer = tasks.begin(); titer != titer_end; ++ titer) {
       (*titer)->weights = weights_mixed;

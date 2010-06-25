@@ -226,7 +226,7 @@ namespace cicada
     static bool exists(const symbol_type& x)
     {
       lock_type lock(__mutex);
-      return __symbols().find(x) == __symbols().end();
+      return __symbols().find(x) != __symbols().end();
     }
     static size_t allocated()
     {
