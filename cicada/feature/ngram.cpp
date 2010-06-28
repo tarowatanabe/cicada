@@ -203,13 +203,17 @@ namespace cicada
 	    std::copy(buffer.begin(), buffer.end(), context);
 	    return 0.0;
 	  } else {
-	    const double score = ngram_score(buffer.begin(), buffer.begin() + context_size, buffer.end());
+	    buffer_type::const_iterator biter_begin = buffer.begin();
+	    buffer_type::const_iterator biter_end   = buffer.end();
 	    
-	    std::copy(buffer.begin(), buffer.begin() + context_size, context);
-	    context[context_size] = vocab_type::STAR;
-	    std::copy(buffer.end() - context_size, buffer.end(), context + order);
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.ngram_prefix(biter_begin, biter_begin + context_size);
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> suffix = ngram.ngram_suffix(biter_end - context_size, biter_end);
 	    
-	    return score;
+	    std::copy(prefix.first, prefix.second, context);
+	    context[prefix.second - prefix.first] = vocab_type::STAR;
+	    std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1);
+	    
+	    return ngram_score(prefix.first, prefix.second, suffix.second);
 	  }
 	}
 	
@@ -246,20 +250,19 @@ namespace cicada
 	  buffer.insert(buffer.end(), context, context_star);
 	  
 	  buffer_type::const_iterator biter_end = buffer.end();
-	  
-	  if (biter - biter_first >= context_size)
+
+	  if (biter - biter_first >= context_size || star_first >= 0)
 	    score += ngram_score(biter_first, biter, biter_end);
 	  else
 	    score += ngram_score(biter_first, std::min(biter_first + context_size, biter_end), biter_end);
 	  
 	  // insert star!
 	  if (context_star != context_end) {
-	    
 	    biter_first = buffer.end() + 1;
-	    
-	    star_last = buffer.size() + 1;
+
 	    if (star_first < 0)
 	      star_first = buffer.size() + 1;
+	    star_last = buffer.size() + 1;
 	    
 	    buffer.insert(buffer.end(), context_star, context_end);
 	  }
@@ -272,13 +275,12 @@ namespace cicada
 	    
 	    buffer_type::const_iterator biter_end = buffer.end();
 	    
-	    if (biter - biter_first >= context_size)
+	    if (biter - biter_first >= context_size || star_first >= 0)
 	      score += ngram_score(biter_first, biter, biter_end);
 	    else
 	      score += ngram_score(biter_first, std::min(biter_first + context_size, biter_end), biter_end);
 	  }
 	}
-	
 	
 	// construct state vector..
 	symbol_type* context = reinterpret_cast<symbol_type*>(state);
@@ -288,16 +290,34 @@ namespace cicada
 	  const int prefix_size = utils::bithack::min(star_first, context_size);
 	  const int suffix_size = utils::bithack::min(int(buffer.size() - star_last), context_size);
 	  
-	  std::copy(buffer.begin(), buffer.begin() + prefix_size, context);
-	  context[prefix_size] = vocab_type::STAR;
-	  std::copy(buffer.end() - suffix_size, buffer.end(), context + prefix_size + 1);
+	  buffer_type::const_iterator biter_begin = buffer.begin();
+	  buffer_type::const_iterator biter_end   = buffer.end();
+	  
+	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.ngram_prefix(biter_begin, biter_begin + prefix_size);
+	  std::pair<buffer_type::const_iterator, buffer_type::const_iterator> suffix = ngram.ngram_suffix(biter_end - suffix_size, biter_end);
+	  
+	  std::copy(prefix.first, prefix.second, context);
+	  context[prefix.second - prefix.first] = vocab_type::STAR;
+	  std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1);
+	  
+	  // add score from prefix.second to biter_begin + context_size
+	  score += ngram_score(prerix.first, prefix.second, biter_begin + prefix_size);
 	} else {
-	  if (buffer.size() <= order - 1)
+	  if (buffer.size() <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context);
 	  else {
-	    std::copy(buffer.begin(), buffer.begin() + context_size, context);
-	    context[context_size] = vocab_type::STAR;
-	    std::copy(buffer.end() - context_size, buffer.end(), context + order);
+	    buffer_type::const_iterator biter_begin = buffer.begin();
+	    buffer_type::const_iterator biter_end   = buffer.end();
+	    
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram.ngram_prefix(biter_begin, biter_begin + context_size);
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> suffix = ngram.ngram_suffix(biter_end - context_size, biter_end);
+	    
+	    std::copy(prefix.first, prefix.second, context);
+	    context[prefix.second - prefix.first] = vocab_type::STAR;
+	    std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1);
+	    
+	    // add score from prefix.second to biter_begin + context_size
+	    score += ngram_score(prefix.first, prefix.second, biter_begin + context_size);
 	  }
 	}
 	
@@ -311,7 +331,7 @@ namespace cicada
 	const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
 	const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
 	
-	buffer_type&    buffer    = const_cast<buffer_type&>(buffer_impl);
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	buffer.clear();
 	
 	buffer.push_back(vocab_type::BOS);

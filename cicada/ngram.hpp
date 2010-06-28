@@ -94,6 +94,46 @@ namespace cicada
     
   public:
     template <typename Iterator>
+    std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const
+    {
+      if (first == last || first + 1 == last) return std::make_pair(first, last);
+      
+      const size_type shard_index = index.shard_index(first, last);
+      std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last);
+      
+      return std::make_pair(first, std::min(result.first + 1, last));
+    }
+
+    template <typename Iterator>
+    std::pair<Iterator, Iterator> ngram_suffix(Iterator first, Iterator last) const
+    {
+      if (first == last || first + 1 == last) return std::make_pair(first, last);
+      
+      first = std::max(first, last - index.order());
+      
+      int       shard_prev = -1;
+      size_type node_prev = size_type(-1);
+      
+      for (/**/; first != last - 1; ++ first) {
+	const size_type shard_index = index.shard_index(first, last);
+	
+	std::pair<Iterator, size_type> result = index.traverse(shard_index, first, last, shard_prev, node_prev);
+	
+	shard_prev = -1;
+	node_prev = size_type(-1);
+	
+	if (result.first == last)
+	  return std::make_pair(first, last);
+	else if (result.first == last - 1) {
+	  shard_prev = shard_index;
+	  node_prev = result.second;
+	}
+      }
+      
+      return std::make_pair(first, last);
+    }
+
+    template <typename Iterator>
     bool exists(Iterator first, Iterator last) const
     {
       if (first == last) return false;
