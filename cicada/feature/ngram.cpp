@@ -301,7 +301,7 @@ namespace cicada
 	  std::copy(suffix.first, suffix.second, context + (prefix.second - prefix.first) + 1);
 	  
 	  // add score from prefix.second to biter_begin + context_size
-	  score += ngram_score(prerix.first, prefix.second, biter_begin + prefix_size);
+	  score += ngram_score(prefix.first, prefix.second, biter_begin + prefix_size);
 	} else {
 	  if (buffer.size() <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context);
