@@ -88,6 +88,14 @@ namespace cicada
     }
 
     bool is_stateless() const { return states_size == 0; }
+
+    // a flag to control whether to apply feature already in feature set or not...
+    void apply_feature(const bool mode)
+    {
+      model_set_type::iterator iter_end = models.end();
+      for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
+	(*iter)->apply_feature() = mode;
+    }
     
   private:
     typedef std::vector<size_type, std::allocator<size_type> > offset_set_type;

@@ -1,6 +1,7 @@
 
 #include <utility>
 #include <memory>
+#include <algorithm>
 
 #include "cicada/feature/neighbours.hpp"
 #include "cicada/parameter.hpp"
@@ -94,6 +95,8 @@ namespace cicada
       state_map_type state_map;
       
       phrase_span_set_type phrase_spans_impl;
+
+      bool forced_feature;
     };
     
     template <typename Extract>
@@ -190,6 +193,13 @@ namespace cicada
 	}
       }
 
+      void apply_feature(feature_set_type& features, const std::string& node, const std::string& prev, const std::string& next, const int span) const
+      {
+	const std::string name = feature_name(node, prev, next, span);
+	if (forced_feature || feature_set_type::feature_type::exists(name))
+	  features[name] += 1.0;
+      }
+
       id_type apply_features(feature_set_type& features, id_type id_curr, id_type id, const std::string& prefix, const std::string& suffix) const
       {
 	typedef std::vector<state_type, std::allocator<state_type> > state_set_type;
@@ -223,7 +233,7 @@ namespace cicada
 	    else if (state.prefix == vocab_type::EPSILON)
 	      states.push_back(state_type(id_curr, state.node, prefix, state.suffix, state.span));
 	    else if (state.suffix == vocab_type::EPSILON)
-	      features[feature_name(state.node, state.prefix, suffix, state.span)] += 1.0;
+	      apply_feature(features, state.node, state.prefix, suffix, state.span);
 	    else
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
 	    
@@ -240,7 +250,7 @@ namespace cicada
 	    else if (state.suffix == vocab_type::EPSILON)
 	      states.push_back(state_type(id_curr, state.node, state.prefix, suffix, state.span));
 	    else if (state.prefix == vocab_type::EPSILON)
-	      features[feature_name(state.node, prefix, state.suffix, state.span)] += 1.0;
+	      apply_feature(features, state.node, prefix, state.suffix, state.span);
 	    else
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
 	    
@@ -251,13 +261,13 @@ namespace cicada
 	    const state_type& state = state_map[id];
 	  
 	    if (state.prefix == vocab_type::EPSILON && state.suffix == vocab_type::EPSILON)
-	      features[feature_name(state.node, prefix, suffix, state.span)] += 1.0;
+	      apply_feature(features, state.node, prefix, suffix, state.span);
 	    else if (state.prefix == vocab_type::EPSILON)
-	      features[feature_name(state.node, prefix, state.suffix, state.span)] += 1.0;
+	      apply_feature(features, state.node, prefix, state.suffix, state.span);
 	    else if (state.suffix == vocab_type::EPSILON)
-	      features[feature_name(state.node, state.prefix, suffix, state.span)] += 1.0;
+	      apply_feature(features, state.node, state.prefix, suffix, state.span);
 	    else
-	      features[feature_name(state.node, prefix, suffix, state.span)] += 1.0;
+	      apply_feature(features, state.node, prefix, suffix, state.span);
 	  
 	    id = state.parent;
 	  }
@@ -373,11 +383,21 @@ namespace cicada
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type);
       base_type::__feature_name = std::string("neighbours-") + (source ? "source" : "target");
+      base_type::__sparse_feature = true;
       
       pimpl = neighbours_impl.release();
     }
     
     Neighbours::~Neighbours() { std::auto_ptr<impl_type> tmp(pimpl); }
+
+    
+    template <typename FeaturePrefix, typename Feature>
+    inline
+    bool equal_prefix(const FeaturePrefix& prefix, const Feature& x)
+    {
+      return x.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin());
+    }
+
     
     void Neighbours::operator()(state_ptr_type& state,
 				const state_ptr_set_type& states,
@@ -385,12 +405,31 @@ namespace cicada
 				feature_set_type& features,
 				feature_set_type& estimates) const
     {
+      
+      const std::string& __feature_prefix = base_type::feature_name();
+      for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
+	if (equal_prefix(__feature_prefix, fiter->first))
+	  features.erase(fiter ++);
+	else
+	  ++ fiter;
+      
+      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+      
       pimpl->neighbours_score(state, states, edge, features);
     }
     
     void Neighbours::operator()(const state_ptr_type& state,
 				feature_set_type& features) const
     {
+      const std::string& __feature_prefix = base_type::feature_name();
+      for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
+	if (equal_prefix(__feature_prefix, fiter->first))
+	  features.erase(fiter ++);
+	else
+	  ++ fiter;
+      
+      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+
       pimpl->neighbours_final_score(state, features);
     }
 

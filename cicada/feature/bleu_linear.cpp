@@ -263,6 +263,8 @@ namespace cicada
       template <typename Iterator>
       double bleu_score(Iterator first, Iterator iter, Iterator last) const
       {
+	if (ngrams.empty()) return 0.0;
+
 	double bleu = factors[0] * (last - iter);
 	
 	const int context_size = order - 1;
@@ -288,6 +290,8 @@ namespace cicada
       template <typename Iterator>
       double bleu_score(Iterator first, Iterator last) const
       {
+	if (ngrams.empty()) return 0.0;
+
 	double bleu = factors[0] * (last - first);
 	
 	// we will collect counts at [first, last)

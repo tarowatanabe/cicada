@@ -99,6 +99,11 @@ namespace cicada
     {
       __values.erase(x);
     }
+
+    void erase(iterator x)
+    {
+      __values.erase(x);
+    }
     
     const_iterator begin() const { return __values.begin(); }
     iterator begin() { return __values.begin(); }

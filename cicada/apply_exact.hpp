@@ -183,6 +183,17 @@ namespace cicada
     ApplyExact<typename Function::value_type, Function>(model, func)(source, target);
   }
 
+  template <typename Function>
+  inline
+  void apply_exact(const Model& model, HyperGraph& source, const Function& func, const int cube_size)
+  {
+    HyperGraph target;
+    
+    ApplyExact<typename Function::value_type, Function>(model, func)(source, target);
+    
+    source.swap(target);
+  }
+
 };
 
 #endif

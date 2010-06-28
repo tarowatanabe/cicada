@@ -20,6 +20,7 @@ bin_PROGRAMS = \
 	cicada_learn \
 	cicada_learn_mpi \
 	cicada_learn_online \
+	cicada_learn_online_mpi \
 	cicada_mert \
 	cicada_mert_mpi \
 	cicada_maxlike \
@@ -47,8 +48,12 @@ cicada_learn_mpi_SOURCES  = cicada_learn_mpi.cpp lbfgs.c
 cicada_learn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_learn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_learn_online_SOURCES = cicada_learn_online.cpp lbfgs.c
+cicada_learn_online_SOURCES = cicada_learn_online.cpp
 cicada_learn_online_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_learn_online_mpi_SOURCES  = cicada_learn_online_mpi.cpp
+cicada_learn_online_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_learn_online_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

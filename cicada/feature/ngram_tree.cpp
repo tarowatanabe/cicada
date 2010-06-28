@@ -106,6 +106,8 @@ namespace cicada
       tree_map_type  tree_map;
       
       phrase_span_set_type phrase_spans_impl;
+
+      bool forced_feature;
     };
     
     template <typename Extract>
@@ -222,19 +224,26 @@ namespace cicada
 	return iter - tree_map.begin();
       }
 
+      void apply_feature(feature_set_type& features, const std::string& node, const std::string& prev, const std::string& next) const
+      {
+	const std::string name = feature_name(node, prev, next);
+	if (forced_feature || feature_set_type::feature_type::exists(name))
+	  features[name] += 1.0;
+      }
+
       template <typename Iterator>
       void apply_features(feature_set_type& features, const edge_type& edge, Iterator first, Iterator last, std::string& prefix, std::string& suffix) const
       {
 	const std::string& epsilon = static_cast<const std::string&>(vocab_type::EPSILON);
-
+	
 	bool is_front = true;
 	for (/**/; first != last; ++ first) 
 	  if (*first != epsilon) {
 	    if (is_front)
 	      prefix = *first;
-
+	    
 	    if (suffix != epsilon)
-	      features[feature_name(edge.rule->lhs, suffix, *first)] += 1.0;
+	      apply_feature(features, edge.rule->lhs, suffix, *first);
 	    
 	    suffix = *first;
 	    is_front = false;
@@ -280,7 +289,7 @@ namespace cicada
 	    else if (state.prefix == id_epsilon)
 	      states.push_back(state_type(id_curr, state.node, id_prefix, state.suffix));
 	    else if (state.suffix == id_epsilon)
-	      features[feature_name(state.node, tree_map[state.prefix], suffix)] += 1.0;
+	      apply_feature(features, state.node, tree_map[state.prefix], suffix);
 	    else
 	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
 	    
@@ -297,7 +306,7 @@ namespace cicada
 	    else if (state.suffix == id_epsilon)
 	      states.push_back(state_type(id_curr, state.node, state.prefix, id_suffix));
 	    else if (state.prefix == id_epsilon)
-	      features[feature_name(state.node, prefix, tree_map[state.suffix])] += 1.0;
+	      apply_feature(features, state.node, prefix, tree_map[state.suffix]);
 	    else
 	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
 	    
@@ -308,13 +317,13 @@ namespace cicada
 	    const state_type& state = state_map[id];
 	    
 	    if (state.prefix == id_epsilon && state.suffix == id_epsilon)
-	      features[feature_name(state.node, prefix, suffix)] += 1.0;
+	      apply_feature(features, state.node, prefix, suffix);
 	    else if (state.prefix == id_epsilon)
-	      features[feature_name(state.node, prefix, tree_map[state.suffix])] += 1.0;
+	      apply_feature(features, state.node, prefix, tree_map[state.suffix]);
 	    else if (state.suffix == id_epsilon)
-	      features[feature_name(state.node, tree_map[state.prefix], suffix)] += 1.0;
+	      apply_feature(features, state.node, tree_map[state.prefix], suffix);
 	    else
-	      features[feature_name(state.node, prefix, suffix)] += 1.0;
+	      apply_feature(features, state.node, prefix, suffix);
 	    
 	    id = state.parent;
 	  }
@@ -427,11 +436,19 @@ namespace cicada
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type);
       base_type::__feature_name = std::string("ngram-tree-") + (source ? "source" : "target");
+      base_type::__sparse_feature = true;
       
       pimpl = ngram_tree_impl.release();
     }
     
     NGramTree::~NGramTree() { std::auto_ptr<impl_type> tmp(pimpl); }
+
+    template <typename FeaturePrefix, typename Feature>
+    inline
+    bool equal_prefix(const FeaturePrefix& prefix, const Feature& x)
+    {
+      return x.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin());
+    }
     
     void NGramTree::operator()(state_ptr_type& state,
 			       const state_ptr_set_type& states,
@@ -439,12 +456,30 @@ namespace cicada
 			       feature_set_type& features,
 			       feature_set_type& estimates) const
     {
+      const std::string& __feature_prefix = base_type::feature_name();
+      for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
+	if (equal_prefix(__feature_prefix, fiter->first))
+	  features.erase(fiter ++);
+	else
+	  ++ fiter;
+      
+      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+
       pimpl->ngram_tree_score(state, states, edge, features);
     }
     
     void NGramTree::operator()(const state_ptr_type& state,
 			       feature_set_type& features) const
     {
+      const std::string& __feature_prefix = base_type::feature_name();
+      for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
+	if (equal_prefix(__feature_prefix, fiter->first))
+	  features.erase(fiter ++);
+	else
+	  ++ fiter;
+      
+      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+
       pimpl->ngram_tree_final_score(state, features);
     }
 

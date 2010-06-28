@@ -43,11 +43,11 @@ namespace cicada
     
   public:
     FeatureFunction()
-      : __state_size(0) {}
+      : __state_size(0), __sparse_feature(false), __apply_feature(false) {}
     FeatureFunction(int state_size)
-      : __state_size(state_size) {}
+      : __state_size(state_size), __sparse_feature(false), __apply_feature(false) {}
     FeatureFunction(int state_size, const feature_type& feature_name)
-      : __state_size(state_size), __feature_name(feature_name) {}
+      : __state_size(state_size), __feature_name(feature_name), __sparse_feature(false), __apply_feature(false) {}
     virtual ~FeatureFunction() {}
 
   public:
@@ -67,10 +67,17 @@ namespace cicada
     
     size_type state_size() const { return __state_size; }
     const feature_type& feature_name() const { return __feature_name; }
+    bool sparse_feature() const { return __sparse_feature; }
+    
+    bool& apply_feature() { return __apply_feature; }
+    bool  apply_feature() const { return __apply_feature; }
 
   protected:
     size_type    __state_size;
     feature_type __feature_name;
+    
+    bool         __sparse_feature;
+    bool         __apply_feature;
   };
   
 };

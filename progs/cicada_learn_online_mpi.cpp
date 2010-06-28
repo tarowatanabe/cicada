@@ -43,8 +43,15 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
+
 #include <boost/thread.hpp>
 
+#include "utils/base64.hpp"
+#include "utils/mpi.hpp"
+#include "utils/mpi_device.hpp"
+#include "utils/mpi_device_bcast.hpp"
+#include "utils/mpi_stream.hpp"
+#include "utils/mpi_stream_simple.hpp"
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
@@ -90,34 +97,65 @@ op_set_type ops;
 bool op_list = false;
 
 std::string algorithm_name = "perceptron";
-std::string scorer_name    = "bleu:order=4,exact=false";
+std::string scorer_name = "bleu:order=4,exact=false";
 
 int iteration = 100;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
-double loss_margin = 0.001;
-double score_margin = 0.001;
+double loss_margin = 0.01;
+double score_margin = 0.01;
 double loss_scale = 100;
 
 bool apply_exact = false;
-int  cube_size = 200;
-
-int threads = 4;
+int cube_size = 200;
 
 int debug = 0;
 
-void optimize(weight_set_type& weights);
+void optimize(OperationSet& operations, model_type& model, weight_set_type& weights);
 
+void bcast_weights(const int rank, weight_set_type& weights);
+void send_weights(const weight_set_type& weights);
+void reduce_weights(weight_set_type& weights);
 void options(int argc, char** argv);
+
+enum {
+  
+  weights_tag = 1000,
+  sample_tag,
+  notify_tag,
+  termination_tag,
+};
+
+inline
+int loop_sleep(bool found, int non_found_iter)
+{
+  if (! found) {
+    boost::thread::yield();
+    ++ non_found_iter;
+  } else
+    non_found_iter = 0;
+    
+  if (non_found_iter >= 64) {
+    struct timespec tm;
+    tm.tv_sec = 0;
+    tm.tv_nsec = 2000001; // above 2ms
+    nanosleep(&tm, NULL);
+    
+    non_found_iter = 0;
+  }
+  return non_found_iter;
+}
 
 int main(int argc, char ** argv)
 {
+  utils::mpi_world mpi_world(argc, argv);
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
   try {
     options(argc, argv);
-    
-    if (input_lattice_mode && input_forest_mode)
-      throw std::runtime_error("input can be sentence, lattice or forest");
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
@@ -134,41 +172,92 @@ int main(int argc, char ** argv)
 
     srandom(time(0) * getpid());
     
-    threads = utils::bithack::max(threads, 1);
+    // read grammars...
+    grammar_type grammar;
+    for (grammar_file_set_type::const_iterator fiter = grammar_static_files.begin(); fiter != grammar_static_files.end(); ++ fiter)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarStatic(*fiter)));
+
+    if (debug && mpi_rank == 0)
+      std::cerr << "loaded mutable grammar: " << grammar.size() << std::endl;
     
+    for (grammar_file_set_type::const_iterator fiter = grammar_mutable_files.begin(); fiter != grammar_mutable_files.end(); ++ fiter)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarMutable(*fiter)));
+
+    if (debug && mpi_rank == 0)
+      std::cerr << "loaded static grammar: " << grammar.size() << std::endl;
+    
+    if (grammar_glue_straight || grammar_glue_inverted)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
+										  symbol_non_terminal,
+										  grammar_glue_straight,
+										  grammar_glue_inverted)));
+
+    if (debug && mpi_rank == 0)
+      std::cerr << "grammar: " << grammar.size() << std::endl;
+    
+    // read features...
+    model_type model;
+    for (feature_parameter_set_type::const_iterator piter = feature_parameters.begin(); piter != feature_parameters.end(); ++ piter)
+      model.push_back(feature_function_type::create(*piter));
+    model.initialize();
+    
+    if (debug && mpi_rank == 0)
+      std::cerr << "feature functions: " << model.size() << std::endl;
+
+    OperationSet operations(ops.begin(), ops.end(),
+			    grammar,
+			    model,
+			    symbol_goal,
+			    symbol_non_terminal,
+			    grammar_insertion,
+			    grammar_deletion,
+			    true,
+			    input_lattice_mode,
+			    input_forest_mode,
+			    true,
+			    false,
+			    debug);
     
     weight_set_type weights;
     
-    optimize(weights);
+    optimize(operations, model, weights);
     
-    utils::compress_ostream os(output_file);
-    os.precision(20);
-    os << weights;
+    if (mpi_rank == 0) {
+      utils::compress_ostream os(output_file);
+      os.precision(20);
+      os << weights;
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
+    MPI::COMM_WORLD.Abort(1);
     return 1;
   }
   return 0;
 }
 
+
 struct Task
 {
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
 
-  Task(queue_type& __queue)
-    : queue(__queue), weights(), weights_accumulated(), updated(1) { initialize(); }
-  
+  Task(queue_type& __queue,
+       OperationSet& __operations,
+       model_type& __model)
+    : queue(__queue),
+      operations(__operations),
+      model(__model),
+      weights(), weights_accumulated(), updated(1) { }
+
   queue_type&        queue;
+  OperationSet&      operations;
+  model_type&        model;
   
   weight_set_type    weights;
   weight_set_type    weights_accumulated;
-  size_t             updated;
+  long               updated;
   score_ptr_type     score;
   score_ptr_set_type scores;
-  
-  grammar_type grammar;
-  model_type model;
   
   typedef cicada::semiring::Logprob<double> weight_type;
   
@@ -202,7 +291,7 @@ struct Task
     }
   };
   
-  
+
   void operator()()
   {
     typedef boost::tuple<sentence_type, feature_set_type> yield_type;
@@ -216,7 +305,7 @@ struct Task
     
     model_type model_bleu;
     model_bleu.push_back(feature_function);
-
+    
     model_type model_sparse;
     for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter)
       if ((*iter)->sparse_feature())
@@ -225,27 +314,13 @@ struct Task
     weight_set_type weights_bleu;
     weights_bleu[__bleu->feature_name()] = 1.0;
     
-    OperationSet operations(ops.begin(), ops.end(),
-			    grammar,
-			    model,
-			    symbol_goal,
-			    symbol_non_terminal,
-			    grammar_insertion,
-			    grammar_deletion,
-			    true,
-			    input_lattice_mode,
-			    input_forest_mode,
-			    true,
-			    false,
-			    debug);
-    
-    
     operations.assign(weights);
-
+    
     hypergraph_type hypergraph_reward;
     hypergraph_type hypergraph_penalty;      
     
     std::string line;
+    
     while (1) {
       queue.pop(line);
       if (line.empty()) break;
@@ -259,9 +334,9 @@ struct Task
       const lattice_type& lattice = operations.lattice;
       const hypergraph_type& hypergraph = operations.hypergraph;
       const sentence_set_type& targets = operations.targets;
-      
+
       std::cerr << "id: " << id << std::endl;
-      
+
       // compute source-length
       int source_length = lattice.shortest_distance();
       if (hypergraph.is_valid()) {
@@ -274,7 +349,7 @@ struct Task
       }
       
       std::cerr << "source length: " << source_length << std::endl;
-      
+
       // collect max-feature from hypergraph
       yield_type  yield_viterbi;
       weight_type weight_viterbi;
@@ -297,7 +372,7 @@ struct Task
 	__bleu->insert(source_length, *titer);
       }
       __bleu->insert(score);
-      
+
       // compute bleu-rewarded instance
       yield_type  yield_reward;
       weight_type weight_reward;
@@ -390,157 +465,285 @@ struct Task
 	  weights[piter->first] -= piter->second * alpha;
 	  weights_accumulated[piter->first] -= piter->second * alpha * updated;
 	}
-
+	
 	++ updated;
       }
     }
   }
   
-  void initialize()
-  {
-    // read grammars...
-    for (grammar_file_set_type::const_iterator fiter = grammar_static_files.begin(); fiter != grammar_static_files.end(); ++ fiter)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarStatic(*fiter)));
-
-    if (debug)
-      std::cerr << "loaded mutable grammar: " << grammar.size() << std::endl;
-    
-    for (grammar_file_set_type::const_iterator fiter = grammar_mutable_files.begin(); fiter != grammar_mutable_files.end(); ++ fiter)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarMutable(*fiter)));
-
-    if (debug)
-      std::cerr << "loaded static grammar: " << grammar.size() << std::endl;
-    
-    if (grammar_glue_straight || grammar_glue_inverted)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
-										  symbol_non_terminal,
-										  grammar_glue_straight,
-										  grammar_glue_inverted)));
-
-    if (debug)
-      std::cerr << "grammar: " << grammar.size() << std::endl;
-    
-    // read features...
-    for (feature_parameter_set_type::const_iterator piter = feature_parameters.begin(); piter != feature_parameters.end(); ++ piter)
-      model.push_back(feature_function_type::create(*piter));
-    model.initialize();
-  }  
+  
 };
 
-
-void optimize(weight_set_type& weights)
+void optimize(OperationSet& operations, model_type& model, weight_set_type& weights)
 {
-  typedef Task                         task_type;
-  typedef boost::shared_ptr<task_type> task_ptr_type;
-  typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_ptr_set_type;
-
+  typedef Task                  task_type;
   typedef task_type::queue_type queue_type;
-  
+
   typedef std::vector<std::string, std::allocator<std::string> > sample_set_type;
   
-  // read all the training data...
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
   sample_set_type samples;
-  if (input_directory_mode) {
-    std::string line;
-      
-    boost::filesystem::directory_iterator iter_end;
-    for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
-      utils::compress_istream is(*iter, 1024 * 1024);
-      
-      if (std::getline(is, line) && ! line.empty())
-	samples.push_back(line);
-    }
-  } else {
-    utils::compress_istream is(input_file, 1024 * 1024);
     
-    size_t id = 0;
-
-    std::string line;
-    while (std::getline(is, line))
-      if (! line.empty()) {
-	if (! input_id_mode)
-	  samples.push_back(boost::lexical_cast<std::string>(id) + " ||| " + line);
-	else
+  // read all the training data...
+  if (mpi_rank == 0) {
+    if (input_directory_mode) {
+      std::string line;
+      
+      boost::filesystem::directory_iterator iter_end;
+      for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
+	utils::compress_istream is(*iter, 1024 * 1024);
+      
+	if (std::getline(is, line) && ! line.empty())
 	  samples.push_back(line);
-	++ id;
       }
-  }
+    } else {
+      utils::compress_istream is(input_file, 1024 * 1024);
+    
+      size_t id = 0;
 
-  if (debug)
-    std::cerr << "# of samples: " << samples.size() << std::endl;
+      std::string line;
+      while (std::getline(is, line))
+	if (! line.empty()) {
+	  if (! input_id_mode)
+	    samples.push_back(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	  else
+	    samples.push_back(line);
+	  ++ id;
+	}
+    }
+    
+    if (debug)
+      std::cerr << "# of samples: " << samples.size() << std::endl;
+  }
   
-  queue_type queue(threads * 2);
-  
-  task_ptr_set_type tasks(threads);
-  for (int i = 0; i < threads; ++ i)
-    tasks[i].reset(new task_type(queue));
+  queue_type queue(1);
+  task_type task(queue, operations, model);
 
   weight_set_type weights_mixed;
   weight_set_type weights_accumulated;
   double norm_accumulated = 0;
   
   for (int iter = 0; iter < iteration; ++ iter) {
-    
-    if (debug)
-      std::cerr << "iteration: " << (iter + 1) << std::endl;
-    
-    boost::thread_group workers;
-    for (int i = 0; i < threads; ++ i)
-      workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
-    
-    sample_set_type::const_iterator siter_end = samples.end();
-    for (sample_set_type::const_iterator siter = samples.begin(); siter != siter_end; ++ siter)
-      queue.push(*siter);
-    
-    for (int i = 0; i < threads; ++ i)
-      queue.push(std::string());
-    
-    
-    workers.join_all();
-    
-    std::random_shuffle(samples.begin(), samples.end());
-    
-    // merge vector...
-    weights.clear();
-    weights_mixed.clear();
-    double norm = 0.0;
 
+    boost::thread thread(boost::ref(task));
     
-    task_ptr_set_type::iterator titer_end = tasks.end();
-    for (task_ptr_set_type::iterator titer = tasks.begin(); titer != titer_end; ++ titer) {
-      weight_set_type& weights_local = (*titer)->weights;
+    if (mpi_rank == 0) {
+      typedef utils::mpi_ostream ostream_type;
+      typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
       
-      // mixing weights...
-      weights_mixed += weights_local;
+      std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > stream(mpi_size);
       
-      weights_local *= (*titer)->updated;
-      weights_local -= (*titer)->weights_accumulated;
+      for (int rank = 1; rank < mpi_size; ++ rank)
+	stream[rank].reset(new ostream_type(rank, sample_tag, 4096));
       
-      weights += weights_local;
-      norm    += (*titer)->updated;
+      sample_set_type::const_iterator siter = samples.begin();
+      sample_set_type::const_iterator siter_end = samples.end();
+      
+      int non_found_iter = 0;
+      while (siter != siter_end) {
+	bool found = false;
+	
+	for (int rank = 1; rank < mpi_size && siter != siter_end; ++ rank)
+	  if (stream[rank]->test()) {
+	    stream[rank]->write(*siter);
+	    ++ siter;
+	    
+	    found = true;
+	  }
+	
+	if (queue.empty() && siter != siter_end) {
+	  queue.push(*siter);
+	  ++ siter;
+	  
+	  found = true;
+	}
+	
+	non_found_iter = loop_sleep(found, non_found_iter);
+      }
+
+      while (1) {
+	bool found = false;
+	
+	for (int rank = 1; rank < mpi_size; ++ rank) 
+	  if (stream[rank] && stream[rank]->test()) {
+	    if (! stream[rank]->terminated())
+	      stream[rank]->terminate();
+	    else
+	      stream[rank].reset();
+	    
+	    found = true;
+	  }
+	
+	if (std::count(stream.begin(), stream.end(), ostream_ptr_type()) == mpi_size
+	    && queue.push(std::string(), true))
+	  break;
+	
+	non_found_iter = loop_sleep(found, non_found_iter);
+      }
+      
+      std::random_shuffle(samples.begin(), samples.end());
+      
+    } else {
+      utils::mpi_istream is(0, sample_tag, 4096, true);
+      
+      std::string line;
+      while (is.read(line)) {
+	queue.push_swap(line);
+	queue.wait_empty();
+	is.ready();
+      }
+      queue.push(std::string());
     }
+    
+    thread.join();
+    
+    // merge weights...
+    
+    weights_mixed = task.weights;
+    if (mpi_rank == 0)
+      reduce_weights(weights_mixed);
+    else
+      send_weights(task.weights);
+    
+    task.weights *= task.updated;
+    task.weights -= task.weights_accumulated;
+    
+    weights = task.weights;
+    if (mpi_rank == 0)
+      reduce_weights(weights);
+    else
+      send_weights(task.weights);
+    
+    long updated_accumulated = 0;
+    MPI::COMM_WORLD.Reduce(&task.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM, 0);
     
     weights_accumulated += weights;
-    norm_accumulated += norm;
+    norm_accumulated += updated_accumulated;
     
-    // mixing...
-    weights_mixed *= (1.0 / tasks.size());
-
-#if 0
-    if (debug >= 2)
-      std::cerr << "weights:" << std::endl
-		<< weights_mixed;
-#endif
+    weights_mixed *= (1.0 / mpi_size);
     
-    for (task_ptr_set_type::iterator titer = tasks.begin(); titer != titer_end; ++ titer) {
-      (*titer)->weights = weights_mixed;
-      (*titer)->weights_accumulated.clear();
-      (*titer)->updated = 1;
-    }
+    bcast_weights(0, weights_mixed);
+    
+    task.weights = weights_mixed;
+    task.weights_accumulated.clear();
+    task.updated = 1;
   }
   
   weights = weights_accumulated;
   weights /= norm_accumulated;
+}
+
+
+void reduce_weights(weight_set_type& weights)
+{
+  typedef utils::mpi_device_source            device_type;
+  typedef boost::iostreams::filtering_istream stream_type;
+
+  typedef boost::shared_ptr<device_type> device_ptr_type;
+  typedef boost::shared_ptr<stream_type> stream_ptr_type;
+
+  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  device_ptr_set_type device(mpi_size);
+  stream_ptr_set_type stream(mpi_size);
+
+  for (int rank = 1; rank < mpi_size; ++ rank) {
+    device[rank].reset(new device_type(rank, weights_tag, 1024 * 1024));
+    stream[rank].reset(new stream_type());
+    
+    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(*device[rank]);
+  }
+
+  std::string line;
+  
+  int non_found_iter = 0;
+  while (1) {
+    bool found = false;
+    
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      while (stream[rank] && device[rank] && device[rank]->test()) {
+	if (std::getline(*stream[rank], line)) {
+	  tokenizer_type tokenizer(line);
+	  
+	  tokenizer_type::iterator iter = tokenizer.begin();
+	  if (iter == tokenizer.end()) continue;
+	  std::string feature = *iter;
+	  ++ iter;
+	  if (iter == tokenizer.end()) continue;
+	  std::string value = *iter;
+	  
+	  weights[feature] += utils::decode_base64<double>(value);
+	} else {
+	  stream[rank].reset();
+	  device[rank].reset();
+	}
+	found = true;
+      }
+    
+    if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+}
+
+void send_weights(const weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::gzip_compressor());
+  os.push(utils::mpi_device_sink(0, weights_tag, 1024 * 1024));
+  
+  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
+    if (! feature_type(id).empty() && weights[id] != 0.0)
+      os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
+}
+
+void bcast_weights(const int rank, weight_set_type& weights)
+{
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == rank) {
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_bcast_sink(rank, 1024));
+    
+    static const weight_set_type::feature_type __empty;
+    
+    weight_set_type::const_iterator witer_begin = weights.begin();
+    weight_set_type::const_iterator witer_end = weights.end();
+    
+    for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
+      if (*witer != 0.0) {
+	const weight_set_type::feature_type feature(witer - witer_begin);
+	if (feature != __empty)
+	  os << feature << ' ' << utils::encode_base64(*witer) << '\n';
+      }
+  } else {
+    weights.clear();
+    weights.allocate();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(utils::mpi_device_bcast_source(rank, 1024));
+    
+    std::string feature;
+    std::string value;
+    
+    while ((is >> feature) && (is >> value))
+      weights[feature] = utils::decode_base64<double>(value);
+  }
 }
 
 
@@ -579,7 +782,7 @@ void options(int argc, char** argv)
     //operatins...
     ("operation",      po::value<op_set_type>(&ops)->composing(), "operations")
     ("operation-list", po::bool_switch(&op_list),                 "list of available operation(s)")
-    
+
     // learning related..
     ("algorithm",   po::value<std::string>(&algorithm_name)->default_value(algorithm_name),     "learning algorithm")
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
@@ -596,8 +799,6 @@ void options(int argc, char** argv)
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")
-    
-    ("threads", po::value<int>(&threads), "# of threads")
     ;
   
   po::options_description opts_command("command line options");
@@ -613,7 +814,7 @@ void options(int argc, char** argv)
   desc_command.add(opts_config).add(opts_command);
   
   po::variables_map variables;
-  
+
   po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
   if (variables.count("config")) {
     utils::compress_istream is(variables["config"].as<path_type>());
