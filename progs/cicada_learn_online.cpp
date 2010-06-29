@@ -30,6 +30,7 @@
 #include "cicada/eval.hpp"
 
 #include "cicada_impl.hpp"
+#include "cicada_learn_online_impl.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -96,9 +97,12 @@ int iteration = 100;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+double loss_scale = 100;
+
+bool bundle = false;
 double loss_margin = 0.001;
 double score_margin = 0.001;
-double loss_scale = 100;
+
 
 bool apply_exact = false;
 int  cube_size = 200;
@@ -106,6 +110,8 @@ int  cube_size = 200;
 int threads = 4;
 
 int debug = 0;
+
+
 
 void optimize(weight_set_type& weights);
 
@@ -152,18 +158,20 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+
+
+template <typename Optimizer>
 struct Task
 {
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  typedef Optimizer optimizer_type;
 
-  Task(queue_type& __queue)
-    : queue(__queue), weights(), weights_accumulated(), updated(1) { initialize(); }
+  Task(queue_type& __queue, optimizer_type& __optimizer)
+    : queue(__queue), optimizer(__optimizer) { initialize(); }
   
   queue_type&        queue;
-  
-  weight_set_type    weights;
-  weight_set_type    weights_accumulated;
-  size_t             updated;
+  optimizer_type&    optimizer;
+
   score_ptr_type     score;
   score_ptr_set_type scores;
   
@@ -194,12 +202,53 @@ struct Task
     }
 
   };
-
-  struct diff_norm
+  
+  struct count_function
   {
-    double operator()(const double& x, const double& y) const{
-      return (x - y) * (x - y);
+    typedef int value_type;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& x) const
+    {
+      return 1;
     }
+  };
+
+  struct feature_count_function
+  {
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+    typedef accumulated_type value_type;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& edge) const
+    {
+      accumulated_type accumulated;
+      
+      feature_set_type::const_iterator fiter_end = edge.features.end();
+      for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	if (fiter->second != 0.0)
+	  accumulated[fiter->first] = weight_type(fiter->second);
+      
+      return accumulated;
+    }
+  };
+  
+  struct accumulated_set_type
+  {
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+    typedef accumulated_type value_type;
+    
+    template <typename Index>
+    accumulated_type& operator[](Index)
+    {
+      return accumulated;
+    }
+    
+    void clear() { accumulated.clear(); }
+    
+    accumulated_type accumulated;
   };
   
   
@@ -238,18 +287,28 @@ struct Task
 			    true,
 			    false,
 			    debug);
-    
-    
-    operations.assign(weights);
 
+    weight_set_type& weights = optimizer.weights;
+
+    operations.assign(weights);
+    
     hypergraph_type hypergraph_reward;
-    hypergraph_type hypergraph_penalty;      
+    hypergraph_type hypergraph_penalty;
+    
+    yield_type  yield_viterbi;
+    weight_type weight_viterbi;
+    
+    yield_type  yield_reward;
+    weight_type weight_reward;
+    
+    yield_type  yield_penalty;
+    weight_type weight_penalty;
     
     std::string line;
     while (1) {
       queue.pop(line);
       if (line.empty()) break;
-
+      
       model.apply_feature(false);
       
       operations(line);
@@ -260,7 +319,8 @@ struct Task
       const hypergraph_type& hypergraph = operations.hypergraph;
       const sentence_set_type& targets = operations.targets;
       
-      std::cerr << "id: " << id << std::endl;
+      if (debug)
+	std::cerr << "id: " << id << std::endl;
       
       // compute source-length
       int source_length = lattice.shortest_distance();
@@ -272,12 +332,8 @@ struct Task
 	
 	source_length = - log(lengths.back());
       }
-      
-      std::cerr << "source length: " << source_length << std::endl;
-      
+            
       // collect max-feature from hypergraph
-      yield_type  yield_viterbi;
-      weight_type weight_viterbi;
       cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, kbest_traversal(), weight_set_function(weights, 1.0));
       
       // update scores...
@@ -299,10 +355,8 @@ struct Task
       __bleu->insert(score);
       
       // compute bleu-rewarded instance
-      yield_type  yield_reward;
-      weight_type weight_reward;
-      
       weights[__bleu->feature_name()] =  loss_scale * source_length;
+      
       // cube-pruning for bleu computation
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_reward, weight_set_function(weights, 1.0), cube_size);
       
@@ -314,15 +368,21 @@ struct Task
 	model_sparse.apply_feature(true);
 	cicada::apply_exact(model_sparse, hypergraph_reward, weight_set_function(weights, 1.0), cube_size);
       }
-      
-      // compute viterbi
-      cicada::viterbi(hypergraph_reward, yield_reward, weight_reward, kbest_traversal(), weight_set_function(weights_bleu, 1.0));
+
+      if (bundle) {
+	std::vector<int, std::allocator<int> > counts(hypergraph_reward.nodes.size());
+	accumulated_set_type accumulated;
+	
+	cicada::inside_outside(hypergraph_reward, counts, accumulated, count_function(), feature_count_function());
+	
+	accumulated.accumulated /= counts.back();
+	boost::get<1>(yield_reward).assign(accumulated.accumulated.begin(), accumulated.accumulated.end());
+      } else
+	cicada::viterbi(hypergraph_reward, yield_reward, weight_reward, kbest_traversal(), weight_set_function(weights, 1.0));
       
       // compute bleu-penalty hypergraph
-      yield_type  yield_penalty;
-      weight_type weight_penalty;
-      
       weights[__bleu->feature_name()] = - loss_scale * source_length;
+      
       // cube-pruning for bleu computation
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_penalty, weight_set_function(weights, 1.0), cube_size);
       
@@ -335,65 +395,39 @@ struct Task
 	cicada::apply_exact(model_sparse, hypergraph_penalty, weight_set_function(weights, 1.0), cube_size);
       }
       
-      // compute biterbi
-      cicada::viterbi(hypergraph_penalty, yield_penalty, weight_penalty, kbest_traversal(), weight_set_function(weights, 1.0));
+      if (bundle) {
+	std::vector<int, std::allocator<int> > counts(hypergraph_penalty.nodes.size());
+	accumulated_set_type accumulated;
+	
+	cicada::inside_outside(hypergraph_penalty, counts, accumulated, count_function(), feature_count_function());
+	
+	accumulated.accumulated /= counts.back();
+	boost::get<1>(yield_penalty).assign(accumulated.accumulated.begin(), accumulated.accumulated.end());
+      } else
+	cicada::viterbi(hypergraph_penalty, yield_penalty, weight_penalty, kbest_traversal(), weight_set_function(weights, 1.0));
+      
+      const double bleu_loss =  (boost::get<1>(yield_reward)[__bleu->feature_name()] - boost::get<1>(yield_penalty)[__bleu->feature_name()]);
+      const double loss = loss_scale * source_length * bleu_loss;
+
+      if (debug)
+	std::cerr << "loss: " << loss << " blue loss: " << bleu_loss << std::endl;
       
       // reset bleu scores...
       weights.erase(__bleu->feature_name());
       boost::get<1>(yield_reward).erase(__bleu->feature_name());
       boost::get<1>(yield_penalty).erase(__bleu->feature_name());
       
-      score_ptr_type score_reward  = scorer->score(boost::get<0>(yield_reward));
-      score_ptr_type score_penalty = scorer->score(boost::get<0>(yield_penalty));
       scores[id] = scorer->score(boost::get<0>(yield_viterbi));
-      
-      if (score) {
-	*score_reward  += *score;
-	*score_penalty += *score;
-      }
-      
       if (! score)
 	score = scores[id]->clone();
       else
 	*score += *scores[id];
       
-      const std::pair<double, double> bleu_viterbi = score->score();
-      const std::pair<double, double> bleu_reward  = score_reward->score();
-      const std::pair<double, double> bleu_penalty = score_penalty->score();
-      
-      if (debug)
-	std::cerr << "viterbi:  " << boost::get<0>(yield_viterbi) << std::endl
-		  << "oracle:   " << boost::get<0>(yield_reward) << std::endl
-		  << "violated: " << boost::get<0>(yield_penalty) << std::endl
-		  << "viterbi score:  " << bleu_viterbi.first << " penalty: " << bleu_viterbi.second << std::endl
-		  << "oracle score:   " << bleu_reward.first  << " penalty: " << bleu_reward.second << std::endl
-		  << "violated score: " << bleu_penalty.first << " penalty: " << bleu_penalty.second << std::endl;
-      
-      const double loss   = loss_scale * source_length * (bleu_reward.first - bleu_penalty.first);
-      const double margin = boost::get<1>(yield_penalty).dot(weights) - boost::get<1>(yield_reward).dot(weights);
-      const double norm   = boost::get<1>(yield_penalty).dot(boost::get<1>(yield_reward), diff_norm());
-      
-      const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / norm));
-      
-      if (loss - margin > 0.0) {
-	std::cerr << "loss: " << loss << " margin: " << margin << " norm: " << norm << " alpha: " << alpha << std::endl;
-
-	// update...
-	feature_set_type::const_iterator riter_end = boost::get<1>(yield_reward).end();
-	for (feature_set_type::const_iterator riter = boost::get<1>(yield_reward).begin(); riter != riter_end; ++ riter) {
-	  weights[riter->first] += riter->second * alpha;
-	  weights_accumulated[riter->first] += riter->second * alpha * updated;
-	}
-	
-	feature_set_type::const_iterator piter_end = boost::get<1>(yield_penalty).end();
-	for (feature_set_type::const_iterator piter = boost::get<1>(yield_penalty).begin(); piter != piter_end; ++ piter) {
-	  weights[piter->first] -= piter->second * alpha;
-	  weights_accumulated[piter->first] -= piter->second * alpha * updated;
-	}
-
-	++ updated;
-      }
+      optimizer(loss, boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
     }
+    
+    // final function call...
+    optimizer.finalize();
   }
   
   void initialize()
@@ -430,7 +464,10 @@ struct Task
 
 void optimize(weight_set_type& weights)
 {
-  typedef Task                         task_type;
+  typedef OptimizeMIRA optimizer_type;
+  typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
+  
+  typedef Task<optimizer_type>         task_type;
   typedef boost::shared_ptr<task_type> task_ptr_type;
   typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_ptr_set_type;
 
@@ -470,10 +507,12 @@ void optimize(weight_set_type& weights)
     std::cerr << "# of samples: " << samples.size() << std::endl;
   
   queue_type queue(threads * 2);
+
+  optimizer_set_type optimizers(threads, optimizer_type(C, debug));
   
   task_ptr_set_type tasks(threads);
   for (int i = 0; i < threads; ++ i)
-    tasks[i].reset(new task_type(queue));
+    tasks[i].reset(new task_type(queue, optimizers[i]));
 
   weight_set_type weights_mixed;
   weight_set_type weights_accumulated;
@@ -495,7 +534,6 @@ void optimize(weight_set_type& weights)
     for (int i = 0; i < threads; ++ i)
       queue.push(std::string());
     
-    
     workers.join_all();
     
     std::random_shuffle(samples.begin(), samples.end());
@@ -506,18 +544,18 @@ void optimize(weight_set_type& weights)
     double norm = 0.0;
 
     
-    task_ptr_set_type::iterator titer_end = tasks.end();
-    for (task_ptr_set_type::iterator titer = tasks.begin(); titer != titer_end; ++ titer) {
-      weight_set_type& weights_local = (*titer)->weights;
+    optimizer_set_type::iterator oiter_end = optimizers.end();
+    for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
+      weight_set_type& weights_local = oiter->weights;
       
       // mixing weights...
       weights_mixed += weights_local;
       
-      weights_local *= (*titer)->updated;
-      weights_local -= (*titer)->weights_accumulated;
+      weights_local *= oiter->updated;
+      weights_local -= oiter->accumulated;
       
       weights += weights_local;
-      norm    += (*titer)->updated;
+      norm    += oiter->updated;
     }
     
     weights_accumulated += weights;
@@ -525,17 +563,11 @@ void optimize(weight_set_type& weights)
     
     // mixing...
     weights_mixed *= (1.0 / tasks.size());
-
-#if 0
-    if (debug >= 2)
-      std::cerr << "weights:" << std::endl
-		<< weights_mixed;
-#endif
     
-    for (task_ptr_set_type::iterator titer = tasks.begin(); titer != titer_end; ++ titer) {
-      (*titer)->weights = weights_mixed;
-      (*titer)->weights_accumulated.clear();
-      (*titer)->updated = 1;
+    for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
+      oiter->weights = weights_mixed;
+      oiter->accumulated.clear();
+      oiter->updated = 1;
     }
   }
   
@@ -589,10 +621,12 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
+
+    ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
     
+    ("bundle",        po::bool_switch(&bundle),                                      "bundle support vectors from hypergraphs")
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
-    ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")

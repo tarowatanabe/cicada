@@ -55,6 +55,13 @@ namespace cicada
 
   public:
     template <typename Iterator>
+    void assign(Iterator first, Iterator last)
+    {
+      __values.clear();
+      __values.insert(first, last);
+    }
+
+    template <typename Iterator>
     void insert(Iterator first, Iterator last)
     {
       __values.insert(first, last);
@@ -257,15 +264,17 @@ namespace cicada
 
   private:
     template <typename O, typename T>
-    struct __apply_unary : public O, public T
+    struct __apply_unary : public O
     {
-      __apply_unary(const T& x) : T(x) {}
+      __apply_unary(const T& x) : const_value(x) {}
       
       template <typename Value>
       void operator()(Value& value) const
       {
-	value.second = O::operator()(value.second, static_cast<const T&>(*this));
+	value.second = O::operator()(value.second, const_value);
       }
+
+      T const_value;
     };
     
   public:

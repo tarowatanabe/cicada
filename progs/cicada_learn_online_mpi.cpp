@@ -451,7 +451,8 @@ struct Task
       const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / norm));
       
       if (loss - margin > 0.0) {
-	std::cerr << "loss: " << loss << " margin: " << margin << " norm: " << norm << " alpha: " << alpha << std::endl;
+	if (debug)
+	  std::cerr << "loss: " << loss << " margin: " << margin << " norm: " << norm << " alpha: " << alpha << std::endl;
 
 	// update...
 	feature_set_type::const_iterator riter_end = boost::get<1>(yield_reward).end();
