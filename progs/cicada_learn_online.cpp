@@ -418,7 +418,7 @@ struct Task
       else
 	*score += *scores[id];
       
-      const std::pair<double, double> blue_viterbi = score->score();
+      const std::pair<double, double> bleu_viterbi = score->score();
       
       if (debug)
 	std::cerr << "bleu: " << bleu_viterbi.first
