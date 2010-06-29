@@ -108,7 +108,7 @@ namespace cicada
 	count_set_type counts;
 	
 	const int context_size = order - 1;
-
+	
 	int*     context_parsed     = reinterpret_cast<int*>(state);
         int*     context_hypothesis = context_parsed + 1;
         id_type* context_count      = reinterpret_cast<id_type*>(context_hypothesis + 1);
@@ -145,7 +145,6 @@ namespace cicada
 	} else {
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	  buffer.clear();
-	  buffer.reserve(target.size() + (order * 2) * states.size());
 	  
 	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
 	  phrase_spans.clear();
@@ -182,28 +181,35 @@ namespace cicada
 	    const id_type& antecedent_flag       = *(antecedent_count + 3);
 	    
 	    *context_parsed     += *antecedent_parsed;
-	    *context_hypothesis += *antecedent_hypothesis + (span.second - span.first);
+	    *context_hypothesis += *antecedent_hypothesis;
 	    
 	    const count_set_type& counts_antecedent = states_counts[*antecedent_count];
 	    
-	    collect_counts(span.first, span.second, counts);
+	    // merge counts
 	    counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
 	    std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
 	    
-	    const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, source_size);
+	    bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, source_size);
 	    
-	    //std::cerr << "bleu antecedent: " << bleu_ant << ' ';
-	    //std::copy(antecedent_first, antecedent_end, std::ostream_iterator<symbol_type>(std::cerr, " "));
-	    //std::cerr << std::endl;
+	    // start collect counts...
 	    
-	    bleu_antecedent += bleu_ant;
+	    buffer_type& buffer_span = const_cast<buffer_type&>(buffer_span_impl);
+	    buffer_span.clear();
+	    for (phrase_type::const_iterator titer = span.first; titer != span.second; ++ titer)
+	      if (*titer != vocab_type::EPSILON)
+		buffer_span.push_back(*titer);
+	    
+	    collect_counts(buffer_span.begin(), buffer_span.end(), counts);
+	    *context_hypothesis += buffer_span.size();
 	    
 	    if (antecedent_flag != PHRASE_LEFT) {
 	      const id_type suffix = (context_flag == PHRASE_LEFT ? context_prefix : context_suffix);
 	      
 	      collect_counts(suffix, antecedent_prefix, counts);
-	      if (! ngrams.is_root(antecedent_suffix) && span.first != span.second)
-		collect_counts(antecedent_suffix, longest_prefix(span.first, std::min(span.first + context_size, span.second)).first, counts);
+	      if (! ngrams.is_root(antecedent_suffix) && ! buffer_span.empty())
+		collect_counts(antecedent_suffix,
+			       longest_prefix(buffer_span.begin(), std::min(buffer_span.begin() + context_size, buffer_span.end())).first,
+			       counts);
 	      
 	      if (context_flag == PHRASE_LEFT) {
 		buffer.clear();
@@ -221,7 +227,8 @@ namespace cicada
 	      buffer.clear();
 	      extract_contexts(antecedent_suffix, std::back_inserter(buffer));
 	      std::reverse(buffer.begin(), buffer.end());
-	      buffer.insert(buffer.end(), span.first, span.second);
+	      
+	      buffer.insert(buffer.end(), buffer_span.begin(), buffer_span.end());
 	      
 	      if (! buffer.empty())
 		context_suffix = longest_suffix(std::max(buffer.begin(), buffer.end() - context_size), buffer.end()).first;
@@ -239,12 +246,13 @@ namespace cicada
 	      extract_contexts(suffix, std::back_inserter(buffer));
 	      std::reverse(buffer.begin(), buffer.end());
 	      
-	      if (span.first != span.second && ! buffer.empty())
+	      if (! buffer_span.empty() && ! buffer.empty())
 		collect_counts(longest_suffix(std::max(buffer.end() - context_size, buffer.begin()), buffer.end()).first,
-			       longest_prefix(span.first, std::min(span.first + context_size, span.second)).first,
+			       longest_prefix(buffer_span.begin(), std::min(buffer_span.begin() + context_size, buffer_span.end())).first,
 			       counts);
 	      
-	      buffer.insert(buffer.end(), span.first, span.second);
+	      buffer.insert(buffer.end(), buffer_span.begin(), buffer_span.end());
+	      
 	      
 	      if (context_flag == PHRASE_LEFT)
 		state_context(buffer.begin(), buffer.end(), context_prefix, context_suffix, context_flag);
@@ -417,40 +425,39 @@ namespace cicada
 
       void __collect_counts_dispatch(id_type id_prefix, id_type id_suffix, count_set_type& counts, boost::true_type) const
       {
-	typedef std::vector<word_type, std::allocator<word_type> > context_type;
-      
-	// we do not consider additonal contexts for id
-	if (ngrams.is_root(id_prefix) || ngrams.is_root(id_suffix)) return;
-      
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_counts_impl);
+	buffer.clear();
+
 	if (exact)
 	  counts.resize(nodes.size(), count_type(0));
 	else
 	  counts.resize(order, count_type(0));
-      
+	
+	// we do not consider additonal contexts for id
+	if (ngrams.is_root(id_prefix) || ngrams.is_root(id_suffix)) return;
+            
 	// traverse back id_prefix and id_suffix do we construct a phrase?
-      
-	context_type context;
-      
+	
 	// suffix to rescore with additional prefix...
 	while (! ngrams.is_root(id_suffix)) {
-	  context.push_back(nodes[id_suffix].word);
+	  buffer.push_back(nodes[id_suffix].word);
 	  id_suffix = nodes[id_suffix].parent;
 	}
-	const int size_suffix = context.size();
+	const int size_suffix = buffer.size();
       
 	// now try collect count using additional prefix
 	while (! ngrams.is_root(id_prefix)) {
-	  context.push_back(nodes[id_prefix].word);
+	  buffer.push_back(nodes[id_prefix].word);
 	  id_prefix = nodes[id_prefix].parent;
-	
-	  // we start from context.back(), and enumerate ngrams from context.size() - size_suffix to order...
-	  const int order_prefix = context.size() - size_suffix;
+	  
+	  // we start from buffer.back(), and enumerate ngrams from buffer.size() - size_suffix to order...
+	  const int order_prefix = buffer.size() - size_suffix;
 	  int n = 1;
 	  ngram_set_type::id_type id = ngrams.root();
-	  context_type::const_reverse_iterator citer_begin = context.rbegin();
-	  context_type::const_reverse_iterator citer_end = context.rend();
-	  context_type::const_reverse_iterator citer_last = std::min(citer_begin + order, citer_end);
-	  for (context_type::const_reverse_iterator citer = citer_begin; citer != citer_last; ++ citer, ++ n) {
+	  buffer_type::const_reverse_iterator citer_begin = buffer.rbegin();
+	  buffer_type::const_reverse_iterator citer_end = buffer.rend();
+	  buffer_type::const_reverse_iterator citer_last = std::min(citer_begin + order, citer_end);
+	  for (buffer_type::const_reverse_iterator citer = citer_begin; citer != citer_last; ++ citer, ++ n) {
 	    id = ngrams.find(id, *citer);
 	    if (ngrams.is_root(id)) break;
 	  
@@ -589,6 +596,8 @@ namespace cicada
     private:
       
       buffer_type          buffer_impl;
+      buffer_type          buffer_span_impl;
+      buffer_type          buffer_counts_impl;
       phrase_span_set_type phrase_spans_impl;
 
       ngram_set_type ngrams;
