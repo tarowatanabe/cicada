@@ -405,12 +405,20 @@ struct Task
 	boost::get<1>(yield_penalty).assign(accumulated.accumulated.begin(), accumulated.accumulated.end());
       } else
 	cicada::viterbi(hypergraph_penalty, yield_penalty, weight_penalty, kbest_traversal(), weight_set_function(weights, 1.0));
+
+      const double bleu_reward  = boost::get<1>(yield_reward)[__bleu->feature_name()]; 
+      const double bleu_penalty = boost::get<1>(yield_penalty)[__bleu->feature_name()];
       
-      const double bleu_loss =  (boost::get<1>(yield_reward)[__bleu->feature_name()] - boost::get<1>(yield_penalty)[__bleu->feature_name()]);
+      const double bleu_loss =  bleu_reward - bleu_penalty;
       const double loss = loss_scale * source_length * bleu_loss;
 
       if (debug)
-	std::cerr << "loss: " << loss << " blue loss: " << bleu_loss << std::endl;
+	std::cerr << "loss: " << bleu_loss
+		  << " oracle: " << bleu_reward
+		  << " penalty: " << bleu_penalty
+		  << " scaled: " << loss
+		  << std::endl;
+
       
       // reset bleu scores...
       weights.erase(__bleu->feature_name());
