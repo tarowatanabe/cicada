@@ -412,24 +412,28 @@ struct Task
       const double bleu_loss =  bleu_reward - bleu_penalty;
       const double loss = loss_scale * source_length * bleu_loss;
 
-      if (debug)
-	std::cerr << "loss: " << bleu_loss
-		  << " oracle: " << bleu_reward
-		  << " penalty: " << bleu_penalty
-		  << " scaled: " << loss
-		  << std::endl;
-
-      
-      // reset bleu scores...
-      weights.erase(__bleu->feature_name());
-      boost::get<1>(yield_reward).erase(__bleu->feature_name());
-      boost::get<1>(yield_penalty).erase(__bleu->feature_name());
-      
       scores[id] = scorer->score(boost::get<0>(yield_viterbi));
       if (! score)
 	score = scores[id]->clone();
       else
 	*score += *scores[id];
+      
+      const std::pair<double, double> blue_viterbi = score->score();
+      
+      if (debug)
+	std::cerr << "bleu: " << bleu_viterbi.first
+		  << " peanlty: " << bleu_viterbi.second
+		  << " loss: " << bleu_loss
+		  << " oracle: " << bleu_reward
+		  << " violated: " << bleu_penalty
+		  << " scaled: " << loss
+		  << std::endl;
+      
+      // reset bleu scores...
+      weights.erase(__bleu->feature_name());
+      boost::get<1>(yield_reward).erase(__bleu->feature_name());
+      boost::get<1>(yield_penalty).erase(__bleu->feature_name());
+
       
       optimizer(loss, boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
     }
