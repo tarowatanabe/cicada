@@ -1,6 +1,109 @@
+#include <iostream>
 #include <numeric>
+#include <stdexcept>
 
 #include <boost/tuple/tuple.hpp>
+#include <boost/tokenizer.hpp>
+
+#include <utils/space_separator.hpp>
+#include <utils/base64.hpp>
+
+inline
+void encode_feature_vectors(std::string& data, const size_t& id, const double& loss, const sentence_type& viterbi, const feature_set_type& oracle, const feature_set_type& violated)
+{
+  data.clear();
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::back_inserter(data));
+  
+  os << id << ' ' << utils::encode_base64(loss) << " |||";
+  
+  os << ' ' << viterbi << " |||";
+  
+  feature_set_type::const_iterator oiter_end = oracle.end();
+  for (feature_set_type::const_iterator oiter = oracle.begin(); oiter != oiter_end; ++ oiter)
+    if (! oiter->first.empty() && oiter->second != feature_set_type::mapped_type())
+      os << ' ' << oiter->first << ' ' << utils::encode_base64(oiter->second);
+  os << " |||";
+  
+  feature_set_type::const_iterator viter_end = violated.end();
+  for (feature_set_type::const_iterator viter = violated.begin(); viter != viter_end; ++ viter)
+    if (! viter->first.empty() && viter->second != feature_set_type::mapped_type())
+      os << ' ' << viter->first << ' ' << utils::encode_base64(viter->second);
+  os << " |||";
+
+  os.pop();
+}
+
+inline
+void decode_feature_vectors(const std::string& data, size_t& id, double& loss, sentence_type& viterbi, feature_set_type& oracle, feature_set_type& violated)
+{
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+  
+  viterbi.clear();
+  oracle.clear();
+  violated.clear();
+  
+  tokenizer_type tokenizer(data);
+  
+  tokenizer_type::iterator iter = tokenizer.begin();
+  tokenizer_type::iterator end = tokenizer.end();
+  
+  if (iter == end) return;
+
+  id = atoll((*iter).c_str());
+  ++ iter;
+
+  if (iter == end)
+    throw std::runtime_error("invalid format: invaild end...?");
+  
+  loss = utils::decode_base64<double>(*iter);
+  ++ iter;
+  
+  if (iter == end || *iter != "|||")
+    throw std::runtime_error("invalid format: expected separator");
+  ++ iter;
+  
+  while (iter != end) {
+    const std::string token = *iter;
+    if (token == "|||") break;
+    
+    viterbi.push_back(token);
+    ++ iter;
+  }
+  
+  if (iter == end || *iter != "|||")
+    throw std::runtime_error("invalid format: expected separator after sentence");
+  ++ iter;
+  
+  while (iter != end) {
+    const std::string token = *iter;
+    if (token == "|||") break;
+    
+    ++ iter;
+    if (iter == end)
+      throw std::runtime_error("invalid format: expected base64 encoded data");
+    
+    oracle[token] = utils::decode_base64<feature_set_type::mapped_type>(*iter);
+    ++ iter;
+  }
+
+  if (iter == end || *iter != "|||")
+    throw std::runtime_error("invalid format: expected separator");
+  ++ iter;
+  
+  while (iter != end) {
+    const std::string token = *iter;
+    if (token == "|||") break;
+    
+    ++ iter;
+    if (iter == end)
+      throw std::runtime_error("invalid format: expected base64 encoded data");
+    
+    violated[token] = utils::decode_base64<feature_set_type::mapped_type>(*iter);
+    ++ iter;
+  }
+  
+}
 
 struct OptimizeSGDL2
 {

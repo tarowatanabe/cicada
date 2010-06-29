@@ -382,7 +382,7 @@ struct Task
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_reward, weight_set_function(weights, 1.0), cube_size);
       
       // prune by bleu-score
-      cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph_reward, weights_bleu, 1.0, loss_margin);
+      //cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph_reward, weights_bleu, 1.0, loss_margin);
       
       // apply sparce features again
       if (! model_sparse.empty()) {
@@ -402,7 +402,7 @@ struct Task
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_penalty, weight_set_function(weights, 1.0), cube_size);
       
       // prune...
-      cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph_penalty, weights, 1.0, score_margin);
+      //cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph_penalty, weights, 1.0, score_margin);
       
       // apply sparce features again
       if (! model_sparse.empty()) {

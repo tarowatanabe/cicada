@@ -87,6 +87,25 @@ struct source_length_function
   }
 };
 
+template <typename Weight>
+struct weight_set_scaled_function
+{
+  typedef Weight value_type;
+  
+  weight_set_scaled_function(const weight_set_type& __weights, const double& __scale)
+    : weights(__weights), scale(__scale) {}
+  
+  const weight_set_type& weights;
+  const double scale;
+  
+  template <typename Edge>
+  value_type operator()(const Edge& edge) const
+  {
+    return cicada::semiring::traits<value_type>::log(edge.features.dot(weights) * scale);
+  }
+  
+};
+
 struct weight_set_function
 {
   typedef cicada::semiring::Logprob<double> value_type;
@@ -498,7 +517,7 @@ class Permute : public Operation
 {
 public:
   Permute(const std::string& parameter, const int __debug)
-    : weights(0), size(0), feature(false), debug(__debug)
+    : weights(0), size(0), feature(false), collapse(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -514,8 +533,13 @@ public:
 
     if (param.find("feature") != param.end())
       feature = true_false(param.find("feature")->second);
+
+    if (param.find("collapse") != param.end())
+      collapse = true_false(param.find("collapse")->second);
+
+    if (collapse && ! weights)
+      throw std::runtime_error("collapsing but no weights...");
   }
-  
   
   void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
@@ -526,7 +550,7 @@ public:
     
     utils::resource start;
     
-    if (weights)
+    if (collapse)
       cicada::permute(hypergraph, permuted, cicada::PermuteFeatureCollapsed<weight_set_type>(*weights), size);
     else if (feature)
       cicada::permute(hypergraph, permuted, cicada::PermuteFeature(), size);
@@ -552,6 +576,7 @@ public:
   const weight_set_type* weights;
   int size;
   bool feature;
+  bool collapse;
   
   int debug;
 };
@@ -1058,11 +1083,11 @@ public:
     utils::resource prune_start;
     
     if (semiring_tropical)
-      cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph, pruned, *weights_prune, scale, beam);
+      cicada::beam_prune(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
     else if (semiring_logprob)
-      cicada::beam_prune<cicada::semiring::Logprob<double>, weight_set_type>(hypergraph, pruned, *weights_prune, scale, beam);
+      cicada::beam_prune(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
     else
-      cicada::beam_prune<cicada::semiring::Log<double>, weight_set_type>(hypergraph, pruned, *weights_prune, scale, beam);
+      cicada::beam_prune(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
     
 	
     utils::resource prune_end;
@@ -1403,6 +1428,7 @@ permute: permute tree (monolingual tree only)\n\
 \tfeature=[true|false] apply feature,\n\
 \tweights=file weight file for composed feature,\n\
 \tsize=permute size\n\
+\tcollapse=[true|false] collapse sparse features\n\
 compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
 apply: feature application\n\

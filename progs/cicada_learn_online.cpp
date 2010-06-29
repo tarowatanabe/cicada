@@ -103,6 +103,8 @@ bool bundle = false;
 double loss_margin = 0.001;
 double score_margin = 0.001;
 
+bool average_vectors = false;
+bool mix_vectors = false;
 
 bool apply_exact = false;
 int  cube_size = 200;
@@ -165,11 +167,18 @@ struct Task
 {
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
   typedef Optimizer optimizer_type;
-
-  Task(queue_type& __queue, optimizer_type& __optimizer)
-    : queue(__queue), optimizer(__optimizer) { initialize(); }
   
-  queue_type&        queue;
+  Task(queue_type& __queue,
+       queue_type& __queue_send,
+       queue_type& __queue_recv,
+       optimizer_type& __optimizer)
+    : queue(__queue), queue_send(__queue_send), queue_recv(__queue_recv),
+      optimizer(__optimizer) { initialize(); }
+  
+  queue_type&         queue;
+  queue_type&         queue_send;
+  queue_type&         queue_recv;
+
   optimizer_type&    optimizer;
 
   score_ptr_type     score;
@@ -270,9 +279,6 @@ struct Task
     for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter)
       if ((*iter)->sparse_feature())
 	model_sparse.push_back(*iter);
-
-    weight_set_type weights_bleu;
-    weights_bleu[__bleu->feature_name()] = 1.0;
     
     OperationSet operations(ops.begin(), ops.end(),
 			    grammar,
@@ -303,15 +309,59 @@ struct Task
     
     yield_type  yield_penalty;
     weight_type weight_penalty;
+
+    bool terminated_merge = false;
+    bool terminated_sample = false;
     
-    std::string line;
-    while (1) {
-      queue.pop(line);
-      if (line.empty()) break;
+    std::string buffer;
+    while (! terminated_merge || ! terminated_sample) {
+      
+      while (! terminated_merge && queue_recv.pop_swap(buffer, true)) {
+	if (buffer.empty()) {
+	  terminated_merge = true;
+	  boost::thread::yield();
+	  break;
+	} else {
+	  size_t id = size_t(-1);
+	  double loss;
+	  decode_feature_vectors(buffer, id, loss, boost::get<0>(yield_viterbi), boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
+
+	  if (id == size_t(-1))
+	    throw std::runtime_error("invalid encoded feature vector");
+	  
+	  optimizer(loss, boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
+	  
+	  if (id >= scores.size())
+	    scores.resize(id + 1);
+	  
+	  // remove "this" score
+	  if (score && scores[id])
+	    *score -= *scores[id];
+	  
+	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
+	  if (! score)
+	    score = scores[id]->clone();
+	  else
+	    *score += *scores[id];
+	}
+      }
+      
+      if (terminated_sample) continue;
+      if (! queue.pop_swap(buffer, true)) {
+	boost::thread::yield();
+	continue;
+      }
+      
+      if (buffer.empty()) {
+	terminated_sample = true;
+	queue_send.push(std::string());
+	boost::thread::yield();
+	continue;
+      }
       
       model.apply_feature(false);
       
-      operations(line);
+      operations(buffer);
       
       // operations.hypergraph contains result...
       const size_t& id = operations.id;
@@ -355,20 +405,21 @@ struct Task
       __bleu->insert(score);
       
       // compute bleu-rewarded instance
-      weights[__bleu->feature_name()] =  loss_scale * source_length;
+      weights[__bleu->feature_name()] =  loss_scale * source_length * scores.size();
       
       // cube-pruning for bleu computation
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_reward, weight_set_function(weights, 1.0), cube_size);
       
       // prune by bleu-score
-      cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph_reward, weights_bleu, 1.0, loss_margin);
+      cicada::beam_prune(hypergraph_reward, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights, 1.0), loss_margin);
       
       // apply sparce features again
       if (! model_sparse.empty()) {
 	model_sparse.apply_feature(true);
 	cicada::apply_exact(model_sparse, hypergraph_reward, weight_set_function(weights, 1.0), cube_size);
       }
-
+      
+      cicada::viterbi(hypergraph_reward, yield_reward, weight_reward, kbest_traversal(), weight_set_function(weights, 1.0));
       if (bundle) {
 	std::vector<int, std::allocator<int> > counts(hypergraph_reward.nodes.size());
 	accumulated_set_type accumulated;
@@ -377,17 +428,16 @@ struct Task
 	
 	accumulated.accumulated /= counts.back();
 	boost::get<1>(yield_reward).assign(accumulated.accumulated.begin(), accumulated.accumulated.end());
-      } else
-	cicada::viterbi(hypergraph_reward, yield_reward, weight_reward, kbest_traversal(), weight_set_function(weights, 1.0));
+      }
       
       // compute bleu-penalty hypergraph
-      weights[__bleu->feature_name()] = - loss_scale * source_length;
+      weights[__bleu->feature_name()] = - loss_scale * source_length * scores.size();
       
       // cube-pruning for bleu computation
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_penalty, weight_set_function(weights, 1.0), cube_size);
       
       // prune...
-      cicada::beam_prune<cicada::semiring::Tropical<double>, weight_set_type>(hypergraph_penalty, weights, 1.0, score_margin);
+      cicada::beam_prune(hypergraph_penalty, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights, 1.0), score_margin);
       
       // apply sparce features again
       if (! model_sparse.empty()) {
@@ -395,6 +445,7 @@ struct Task
 	cicada::apply_exact(model_sparse, hypergraph_penalty, weight_set_function(weights, 1.0), cube_size);
       }
       
+      cicada::viterbi(hypergraph_penalty, yield_penalty, weight_penalty, kbest_traversal(), weight_set_function(weights, 1.0));
       if (bundle) {
 	std::vector<int, std::allocator<int> > counts(hypergraph_penalty.nodes.size());
 	accumulated_set_type accumulated;
@@ -403,14 +454,13 @@ struct Task
 	
 	accumulated.accumulated /= counts.back();
 	boost::get<1>(yield_penalty).assign(accumulated.accumulated.begin(), accumulated.accumulated.end());
-      } else
-	cicada::viterbi(hypergraph_penalty, yield_penalty, weight_penalty, kbest_traversal(), weight_set_function(weights, 1.0));
+      }
 
       const double bleu_reward  = boost::get<1>(yield_reward)[__bleu->feature_name()]; 
       const double bleu_penalty = boost::get<1>(yield_penalty)[__bleu->feature_name()];
       
       const double bleu_loss =  bleu_reward - bleu_penalty;
-      const double loss = loss_scale * source_length * bleu_loss;
+      const double loss = loss_scale * source_length * bleu_loss * scores.size();
 
       scores[id] = scorer->score(boost::get<0>(yield_viterbi));
       if (! score)
@@ -420,7 +470,16 @@ struct Task
       
       const std::pair<double, double> bleu_viterbi = score->score();
       
-      if (debug)
+      if (debug) {
+	std::cerr << "viterbi:  " << boost::get<0>(yield_viterbi) << std::endl
+		  << "oracle:   " << boost::get<0>(yield_reward) << std::endl
+		  << "violated: " << boost::get<0>(yield_penalty) << std::endl;
+	
+	std::cerr << "hypergraph density:"
+		  << " oracle: " << (double(hypergraph_reward.edges.size()) / hypergraph_reward.nodes.size())
+		  << " violated: " << (double(hypergraph_penalty.edges.size()) / hypergraph_penalty.nodes.size())
+		  << std::endl;
+	
 	std::cerr << "bleu: " << bleu_viterbi.first
 		  << " peanlty: " << bleu_viterbi.second
 		  << " loss: " << bleu_loss
@@ -428,14 +487,17 @@ struct Task
 		  << " violated: " << bleu_penalty
 		  << " scaled: " << loss
 		  << std::endl;
+      }
       
       // reset bleu scores...
       weights.erase(__bleu->feature_name());
       boost::get<1>(yield_reward).erase(__bleu->feature_name());
       boost::get<1>(yield_penalty).erase(__bleu->feature_name());
-
       
       optimizer(loss, boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
+      
+      encode_feature_vectors(buffer, id, loss, boost::get<0>(yield_viterbi), boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
+      queue_send.push_swap(buffer);
     }
     
     // final function call...
@@ -447,7 +509,7 @@ struct Task
     // read grammars...
     for (grammar_file_set_type::const_iterator fiter = grammar_static_files.begin(); fiter != grammar_static_files.end(); ++ fiter)
       grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarStatic(*fiter)));
-
+    
     if (debug)
       std::cerr << "loaded mutable grammar: " << grammar.size() << std::endl;
     
@@ -473,6 +535,25 @@ struct Task
   }  
 };
 
+inline
+int loop_sleep(bool found, int non_found_iter)
+{
+  if (! found) {
+    boost::thread::yield();
+    ++ non_found_iter;
+  } else
+    non_found_iter = 0;
+    
+  if (non_found_iter >= 64) {
+    struct timespec tm;
+    tm.tv_sec = 0;
+    tm.tv_nsec = 2000001; // above 2ms
+    nanosleep(&tm, NULL);
+    
+    non_found_iter = 0;
+  }
+  return non_found_iter;
+}
 
 void optimize(weight_set_type& weights)
 {
@@ -484,6 +565,8 @@ void optimize(weight_set_type& weights)
   typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_ptr_set_type;
 
   typedef task_type::queue_type queue_type;
+  typedef boost::shared_ptr<queue_type> queue_ptr_type;
+  typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
   
   typedef std::vector<std::string, std::allocator<std::string> > sample_set_type;
   
@@ -518,14 +601,21 @@ void optimize(weight_set_type& weights)
   if (debug)
     std::cerr << "# of samples: " << samples.size() << std::endl;
   
-  queue_type queue(threads * 2);
+  queue_type queue(samples.size() + threads);
+  queue_ptr_set_type queue_reduce(threads);
+  queue_ptr_set_type queue_bcast(threads);
+  
+  for (int i = 0; i < threads; ++ i) {
+    queue_reduce[i].reset(new queue_type());
+    queue_bcast[i].reset(new queue_type());
+  }
 
   optimizer_set_type optimizers(threads, optimizer_type(C, debug));
   
   task_ptr_set_type tasks(threads);
   for (int i = 0; i < threads; ++ i)
-    tasks[i].reset(new task_type(queue, optimizers[i]));
-
+    tasks[i].reset(new task_type(queue, *queue_reduce[i], *queue_bcast[i], optimizers[i]));
+  
   weight_set_type weights_mixed;
   weight_set_type weights_accumulated;
   double norm_accumulated = 0;
@@ -545,6 +635,35 @@ void optimize(weight_set_type& weights)
     
     for (int i = 0; i < threads; ++ i)
       queue.push(std::string());
+
+    std::vector<bool, std::allocator<bool> > terminated(threads, false);
+    
+    std::string buffer;
+    int non_found_iter = 0;
+    while (1) {
+      bool found = false;
+      
+      for (int i = 0; i < threads; ++ i)
+	if (! terminated[i] && queue_reduce[i]->pop_swap(buffer, true)) {
+	  if (buffer.empty())
+	    terminated[i] = true;
+	  else {
+	    for (int j = 0; j < threads; ++ j)
+	      if (j != i)
+		queue_bcast[i]->push(buffer);
+	  }
+	  
+	  found = true;
+	}
+      
+      if (std::count(terminated.begin(), terminated.end(), true) == threads)
+	break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
+    
+    for (int i = 0; i < threads; ++ i)
+      queue_bcast[i]->push(std::string());
     
     workers.join_all();
     
@@ -554,7 +673,6 @@ void optimize(weight_set_type& weights)
     weights.clear();
     weights_mixed.clear();
     double norm = 0.0;
-
     
     optimizer_set_type::iterator oiter_end = optimizers.end();
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
@@ -639,6 +757,9 @@ void options(int argc, char** argv)
     ("bundle",        po::bool_switch(&bundle),                                      "bundle support vectors from hypergraphs")
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
+    
+    ("average-vectors", po::bool_switch(&average_vectors), "average vectors")
+    ("mix-vectors",     po::bool_switch(&mix_vectors),     "mixing at every epoch")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")
