@@ -9,13 +9,13 @@
 #include <utils/base64.hpp>
 
 inline
-void encode_feature_vectors(std::string& data, const size_t& id, const double& loss, const sentence_type& viterbi, const feature_set_type& oracle, const feature_set_type& violated)
+void encode_feature_vectors(std::string& data, const size_t& id, const int& source_length, const double& loss, const sentence_type& viterbi, const feature_set_type& oracle, const feature_set_type& violated)
 {
   data.clear();
   boost::iostreams::filtering_ostream os;
   os.push(boost::iostreams::back_inserter(data));
   
-  os << id << ' ' << utils::encode_base64(loss) << " |||";
+  os << id << ' ' << source_length << ' ' << utils::encode_base64(loss) << " |||";
   
   os << ' ' << viterbi << " |||";
   
@@ -35,7 +35,7 @@ void encode_feature_vectors(std::string& data, const size_t& id, const double& l
 }
 
 inline
-void decode_feature_vectors(const std::string& data, size_t& id, double& loss, sentence_type& viterbi, feature_set_type& oracle, feature_set_type& violated)
+void decode_feature_vectors(const std::string& data, size_t& id, int& source_length, double& loss, sentence_type& viterbi, feature_set_type& oracle, feature_set_type& violated)
 {
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
   
@@ -53,6 +53,12 @@ void decode_feature_vectors(const std::string& data, size_t& id, double& loss, s
   id = atoll((*iter).c_str());
   ++ iter;
 
+  if (iter == end)
+    throw std::runtime_error("invalid format: invaild end...?");
+  
+  source_length = atoi((*iter).c_str());
+  ++ iter;
+  
   if (iter == end)
     throw std::runtime_error("invalid format: invaild end...?");
   

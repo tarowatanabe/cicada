@@ -173,7 +173,8 @@ struct Task
        queue_type& __queue_recv,
        optimizer_type& __optimizer)
     : queue(__queue), queue_send(__queue_send), queue_recv(__queue_recv),
-      optimizer(__optimizer) { initialize(); }
+      optimizer(__optimizer),
+      score(), scores(), norm(0.0) { initialize(); }
   
   queue_type&         queue;
   queue_type&         queue_send;
@@ -183,6 +184,7 @@ struct Task
 
   score_ptr_type     score;
   score_ptr_set_type scores;
+  double norm;
   
   grammar_type grammar;
   model_type model;
@@ -323,8 +325,9 @@ struct Task
 	  break;
 	} else {
 	  size_t id = size_t(-1);
+	  int source_length;
 	  double loss;
-	  decode_feature_vectors(buffer, id, loss, boost::get<0>(yield_viterbi), boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
+	  decode_feature_vectors(buffer, id, source_length, loss, boost::get<0>(yield_viterbi), boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
 
 	  if (id == size_t(-1))
 	    throw std::runtime_error("invalid encoded feature vector");
@@ -335,8 +338,13 @@ struct Task
 	    scores.resize(id + 1);
 	  
 	  // remove "this" score
-	  if (score && scores[id])
-	    *score -= *scores[id];
+	  //if (score && scores[id])
+	  //  *score -= *scores[id];
+	  
+	  norm *= 0.9;
+	  if (score)
+	    *score *= 0.9;
+	  norm += source_length;
 	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
@@ -391,8 +399,12 @@ struct Task
 	scores.resize(id + 1);
       
       // remove "this" score
-      if (score && scores[id])
-	*score -= *scores[id];
+      //if (score && scores[id])
+      //  *score -= *scores[id];
+      norm *= 0.9;
+      if (score)
+	*score *= 0.9;
+      norm += source_length;
       
       // create scorers...
       scorer->clear();
@@ -405,7 +417,7 @@ struct Task
       __bleu->insert(score);
       
       // compute bleu-rewarded instance
-      weights[__bleu->feature_name()] =  loss_scale * source_length * scores.size();
+      weights[__bleu->feature_name()] =  loss_scale * norm;
       
       // cube-pruning for bleu computation
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_reward, weight_set_function(weights, 1.0), cube_size);
@@ -431,7 +443,7 @@ struct Task
       }
       
       // compute bleu-penalty hypergraph
-      weights[__bleu->feature_name()] = - loss_scale * source_length * scores.size();
+      weights[__bleu->feature_name()] = - loss_scale * norm;
       
       // cube-pruning for bleu computation
       cicada::apply_cube_prune(model_bleu, hypergraph, hypergraph_penalty, weight_set_function(weights, 1.0), cube_size);
@@ -460,7 +472,7 @@ struct Task
       const double bleu_penalty = boost::get<1>(yield_penalty)[__bleu->feature_name()];
       
       const double bleu_loss =  bleu_reward - bleu_penalty;
-      const double loss = loss_scale * source_length * bleu_loss * scores.size();
+      const double loss = bleu_loss * loss_scale * norm;
 
       scores[id] = scorer->score(boost::get<0>(yield_viterbi));
       if (! score)
@@ -496,7 +508,7 @@ struct Task
       
       optimizer(loss, boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
       
-      encode_feature_vectors(buffer, id, loss, boost::get<0>(yield_viterbi), boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
+      encode_feature_vectors(buffer, id, source_length, loss, boost::get<0>(yield_viterbi), boost::get<1>(yield_reward), boost::get<1>(yield_penalty));
       queue_send.push_swap(buffer);
     }
     

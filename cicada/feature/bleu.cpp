@@ -78,13 +78,7 @@ namespace cicada
       };
       
       typedef utils::indexed_set<count_set_type, count_set_hash, std::equal_to<count_set_type>, std::allocator<count_set_type> > states_count_set_type;
-      
-      enum {
-	NON_TERMINAL = 0,
-	PHRASE_LEFT = 1,
-	PHRASE_LEFT_RIGHT = 2,
-      };
-      
+
 
     public:
       BleuImpl(const int __order,
@@ -97,7 +91,7 @@ namespace cicada
       {
 	if (ngrams.empty()) {
 	  char* buf = reinterpret_cast<char*>(state);
-	  std::fill(buf, buf + sizeof(int) * 2 + sizeof(id_type) * 4, 0);
+	  std::fill(buf, buf + sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(id_type) * 2, 0);
 	  return 0.0;
 	}
 
@@ -106,15 +100,15 @@ namespace cicada
 	const phrase_type& source = rule.source;
 	
 	count_set_type counts;
+
+	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
+	symbol_type* context_last  = context_first + order * 2;
 	
+	int*     context_parsed     = reinterpret_cast<int*>(context_last);
+	int*     context_hypothesis = context_parsed + 1;
+	id_type* context_count       = reinterpret_cast<id_type*>(context_hypothesis + 1);
+
 	const int context_size = order - 1;
-	
-	int*     context_parsed     = reinterpret_cast<int*>(state);
-        int*     context_hypothesis = context_parsed + 1;
-        id_type* context_count      = reinterpret_cast<id_type*>(context_hypothesis + 1);
-	id_type& context_prefix     = *(context_count + 1);
-	id_type& context_suffix     = *(context_count + 2);
-	id_type& context_flag       = *(context_count + 3);
 	
 	if (states.empty()) {
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
@@ -126,7 +120,22 @@ namespace cicada
 	      buffer.push_back(*titer);
 	  
 	  collect_counts(buffer.begin(), buffer.end(), counts);
-	  state_context(buffer.begin(), buffer.end(), context_prefix, context_suffix, context_flag);
+	  
+	  std::fill(context_first, context_last, vocab_type::EMPTY);
+	  
+	  if (buffer.size() <= context_size)
+	    std::copy(buffer.begin(), buffer.end(), context_first);
+	  else {
+	    buffer_type::const_iterator biter_begin = buffer.begin();
+	    buffer_type::const_iterator biter_end   = buffer.end();
+	    
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter_begin + context_size);
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> suffix = ngram_suffix(biter_end - context_size, biter_end);
+	    
+	    std::copy(prefix.first, prefix.second, context_first);
+	    context_first[prefix.second - prefix.first] = vocab_type::STAR;
+	    std::copy(suffix.first, suffix.second, context_first + (prefix.second - prefix.first) + 1);
+	  }
 	  
 	  *context_parsed = 0;
 	  phrase_type::const_iterator siter_end = source.end();
@@ -140,30 +149,39 @@ namespace cicada
 
 	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
 	  
+	  //std::cerr << "bleu: " << bleu << ' ';
+	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	  //std::cerr << std::endl;
+	  
 	  return bleu;
 
 	} else {
 	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	  buffer.clear();
+	  buffer.reserve(target.size() + (order * 2) * states.size());
 	  
 	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
 	  phrase_spans.clear();
 	  target.terminals(std::back_inserter(phrase_spans));
 	  
-	  for (phrase_type::const_iterator iter = phrase_spans.front().first; iter != phrase_spans.front().second; ++ iter)
-	    if (*iter != vocab_type::EPSILON)
-	      buffer.push_back(*iter);
+	  int star_first = -1;
+	  int star_last  = -1;
 	  
 	  *context_parsed = 0;
 	  for (phrase_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter)
 	    *context_parsed += (*siter != vocab_type::EPSILON && siter->is_terminal());
 	  
+	  for (phrase_type::const_iterator iter = phrase_spans.front().first; iter != phrase_spans.front().second; ++ iter)
+	    if (*iter != vocab_type::EPSILON)
+	      buffer.push_back(*iter);
+	  
 	  *context_hypothesis = buffer.size();
 	  
 	  collect_counts(buffer.begin(), buffer.end(), counts);
-	  state_context(buffer.begin(), buffer.end(), context_prefix, context_suffix, context_flag);
 	  
 	  double bleu_antecedent = 0.0;
+
+	  buffer_type::const_iterator biter_first = buffer.begin();
 	  
 	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
 	  for (phrase_span_set_type::const_iterator siter = phrase_spans.begin() + 1; siter != siter_end; ++ siter) {
@@ -173,103 +191,107 @@ namespace cicada
 	    if (antecedent_index < 0)
 	      throw std::runtime_error("this is a non-terminal, but no index!");
 	    
-	    const int*     antecedent_parsed     = reinterpret_cast<const int*>(states[antecedent_index]);
+	    const symbol_type* antecedent_first = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
+	    const symbol_type* antecedent_last  = antecedent_first + order * 2;
+	    
+	    const symbol_type* antecedent_end  = std::find(antecedent_first, antecedent_last, vocab_type::EMPTY);
+	    const symbol_type* antecedent_star = std::find(antecedent_first, antecedent_end, vocab_type::STAR);
+	    
+	    const int*     antecedent_parsed     = reinterpret_cast<const int*>(antecedent_last);
 	    const int*     antecedent_hypothesis = antecedent_parsed + 1;
-	    const id_type* antecedent_count      = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
-	    const id_type& antecedent_prefix     = *(antecedent_count + 1);
-	    const id_type& antecedent_suffix     = *(antecedent_count + 2);
-	    const id_type& antecedent_flag       = *(antecedent_count + 3);
+	    const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
+
+	    const count_set_type& counts_antecedent = states_counts[*antecedent_count];
+	    
+	    const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, source_size);
+	    
+	    //std::cerr << "bleu antecedent: " << bleu_ant << ' ';
+	    //std::copy(antecedent_first, antecedent_end, std::ostream_iterator<symbol_type>(std::cerr, " "));
+	    //std::cerr << std::endl;
+	    
+	    bleu_antecedent += bleu_ant;
+	    
+	    // merge statistics...
+	    counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
+	    std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
 	    
 	    *context_parsed     += *antecedent_parsed;
 	    *context_hypothesis += *antecedent_hypothesis;
 	    
-	    const count_set_type& counts_antecedent = states_counts[*antecedent_count];
+	    buffer_type::const_iterator biter = buffer.end();
 	    
-	    // merge counts
-	    counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
-	    std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
+	    buffer.insert(buffer.end(), antecedent_first, antecedent_star);
 	    
-	    bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, source_size);
+	    buffer_type::const_iterator biter_end = buffer.end();
 	    
-	    // start collect counts...
+	    collect_counts(biter_first, biter, biter_end, counts);
 	    
-	    buffer_type& buffer_span = const_cast<buffer_type&>(buffer_span_impl);
-	    buffer_span.clear();
-	    for (phrase_type::const_iterator titer = span.first; titer != span.second; ++ titer)
-	      if (*titer != vocab_type::EPSILON)
-		buffer_span.push_back(*titer);
+	    // insert context after star
+	    if (antecedent_star != antecedent_end) {
+	      biter_first = buffer.end() + 1;
+	      
+	      star_last = buffer.size() + 1;
+	      if (star_first < 0)
+		star_first = buffer.size() + 1;
+	      
+	      buffer.insert(buffer.end(), antecedent_star, antecedent_end);
+	    }
 	    
-	    collect_counts(buffer_span.begin(), buffer_span.end(), counts);
-	    *context_hypothesis += buffer_span.size();
+	    // collect counts from edge's terminals
+	    {
+	      buffer_type::const_iterator biter = buffer.end();
+	      
+	      for (phrase_type::const_iterator iter = span.first; iter != span.second; ++ iter)
+		if (*iter != vocab_type::EPSILON)
+		  buffer.push_back(*iter);
+	      
+	      buffer_type::const_iterator biter_end = buffer.end();
+	      
+	      collect_counts(biter_first, biter, biter_end, counts);
+	      
+	      *context_hypothesis += biter_end - biter;
+	    }
+	  }
+	  
+	  if (star_first >= 0) {
+	    const int prefix_size = utils::bithack::min(star_first, context_size);
+	    const int suffix_size = utils::bithack::min(int(buffer.size() - star_last), context_size);
 	    
-	    if (antecedent_flag != PHRASE_LEFT) {
-	      const id_type suffix = (context_flag == PHRASE_LEFT ? context_prefix : context_suffix);
+	    buffer_type::const_iterator biter_begin = buffer.begin();
+	    buffer_type::const_iterator biter_end   = buffer.end();
+	    
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter_begin + prefix_size);
+	    std::pair<buffer_type::const_iterator, buffer_type::const_iterator> suffix = ngram_suffix(biter_end - suffix_size, biter_end);
+	    
+	    std::copy(prefix.first, prefix.second, context_first);
+	    context_first[prefix.second - prefix.first] = vocab_type::STAR;
+	    std::copy(suffix.first, suffix.second, context_first + (prefix.second - prefix.first) + 1);
+	  } else {
+	    if (buffer.size() <= context_size)
+	      std::copy(buffer.begin(), buffer.end(), context_first);
+	    else {
+	      buffer_type::const_iterator biter_begin = buffer.begin();
+	      buffer_type::const_iterator biter_end   = buffer.end();
 	      
-	      collect_counts(suffix, antecedent_prefix, counts);
-	      if (! ngrams.is_root(antecedent_suffix) && ! buffer_span.empty())
-		collect_counts(antecedent_suffix,
-			       longest_prefix(buffer_span.begin(), std::min(buffer_span.begin() + context_size, buffer_span.end())).first,
-			       counts);
+	      std::pair<buffer_type::const_iterator, buffer_type::const_iterator> prefix = ngram_prefix(biter_begin, biter_begin + context_size);
+	      std::pair<buffer_type::const_iterator, buffer_type::const_iterator> suffix = ngram_suffix(biter_end - context_size, biter_end);
 	      
-	      if (context_flag == PHRASE_LEFT) {
-		buffer.clear();
-		
-		extract_contexts(antecedent_prefix, std::back_inserter(buffer));
-		extract_contexts(suffix, std::back_inserter(buffer));
-		std::reverse(buffer.begin(), buffer.end());
-		
-		if (! buffer.empty())
-		  context_prefix = longest_prefix(buffer.begin(), std::min(buffer.begin() + context_size, buffer.end())).first;
-		else
-		  context_prefix = id_type(-1);
-	      }
-	      
-	      buffer.clear();
-	      extract_contexts(antecedent_suffix, std::back_inserter(buffer));
-	      std::reverse(buffer.begin(), buffer.end());
-	      
-	      buffer.insert(buffer.end(), buffer_span.begin(), buffer_span.end());
-	      
-	      if (! buffer.empty())
-		context_suffix = longest_suffix(std::max(buffer.begin(), buffer.end() - context_size), buffer.end()).first;
-	      else
-		context_suffix = id_type(-1);
-	      
-	      context_flag = PHRASE_LEFT_RIGHT;
-	    } else {
-	      const id_type suffix = (context_flag == PHRASE_LEFT ? context_prefix : context_suffix);
-	      
-	      collect_counts(suffix, antecedent_prefix, counts);
-	      
-	      buffer.clear();
-	      extract_contexts(antecedent_prefix, std::back_inserter(buffer));
-	      extract_contexts(suffix, std::back_inserter(buffer));
-	      std::reverse(buffer.begin(), buffer.end());
-	      
-	      if (! buffer_span.empty() && ! buffer.empty())
-		collect_counts(longest_suffix(std::max(buffer.end() - context_size, buffer.begin()), buffer.end()).first,
-			       longest_prefix(buffer_span.begin(), std::min(buffer_span.begin() + context_size, buffer_span.end())).first,
-			       counts);
-	      
-	      buffer.insert(buffer.end(), buffer_span.begin(), buffer_span.end());
-	      
-	      
-	      if (context_flag == PHRASE_LEFT)
-		state_context(buffer.begin(), buffer.end(), context_prefix, context_suffix, context_flag);
-	      else {
-		if (! buffer.empty())
-		  context_suffix = longest_suffix(std::max(buffer.begin(), buffer.end() - context_size), buffer.end()).first;
-		else
-		  context_suffix = id_type(-1);
-	      }
+	      std::copy(prefix.first, prefix.second, context_first);
+	      context_first[prefix.second - prefix.first] = vocab_type::STAR;
+	      std::copy(suffix.first, suffix.second, context_first + (prefix.second - prefix.first) + 1);
 	    }
 	  }
 	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
-	  
+
 	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
-	  	  
+	  
+	  //std::cerr << "bleu: " << bleu;
+	  //std::cerr << " antecedent: " << bleu_antecedent << ' ';
+	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	  //std::cerr << std::endl;
+	  
 	  return  bleu - bleu_antecedent;
 	}
       }
@@ -339,155 +361,87 @@ namespace cicada
 	sizes.push_back(sentence.size());
 	std::sort(sizes.begin(), sizes.end());
       }
-      
+
     private:
       template <typename Iterator>
-      void state_context(Iterator first, Iterator last, id_type& prefix, id_type& suffix, id_type& flag) const
+      std::pair<Iterator, Iterator> ngram_prefix(Iterator first, Iterator last) const
       {
-	const int context_size = order - 1;
+	if (first == last || first + 1 == last) return std::make_pair(first, last);
 	
-	if (first == last) {
-	  prefix = id_type(-1);
-	  suffix = id_type(-1);
-	  flag   = PHRASE_LEFT;
-	} else if (last - first > context_size) {
-	  prefix = longest_prefix(first, first + context_size).first;
-	  suffix = longest_suffix(last - context_size, last).first;
-	  flag   = PHRASE_LEFT_RIGHT;
-	} else {
-	  const std::pair<id_type, bool> result = longest_prefix(first, last);
-	  if (result.second) {
-	    prefix = result.first;
-	    suffix = id_type(-1);
-	    flag = PHRASE_LEFT;
-	  } else {
-	    prefix = result.first;
-	    suffix = longest_suffix(first, last).first;
-	    flag = PHRASE_LEFT_RIGHT;
-	  }
+	Iterator iter = first;
+	ngram_set_type::id_type id = ngrams.root();
+	for (/**/; iter != last; ++ iter) {
+	  const ngram_set_type::id_type id_next = ngrams.find(id, *iter);
+	  if (ngrams.is_root(id)) break;
 	}
+	return std::make_pair(first, std::max(first + 1, iter));
       }
       
       template <typename Iterator>
-      void extract_contexts(id_type id, Iterator result) const
+      std::pair<Iterator, Iterator> ngram_suffix(Iterator first, Iterator last) const
       {
-	while (! ngrams.is_root(id)) {
-	  *result = nodes[id].word;
-	  ++ result;
-	  id = nodes[id].parent;
-	}
-      }
-
-      
-      // compute longest suffix/prefix...
-      template <typename Iterator>
-      std::pair<id_type, bool> longest_suffix(Iterator first, Iterator last) const
-      {
-	// longest suffix of [first, last) where ngram matches..
-	// we use this to supply additional conetxt for the future ngrams.
-	bool complete = true;
-	for (/**/; first != last; ++ first) {
+	if (first == last || first + 1 == last) return std::make_pair(first, last);
+	
+	first = std::max(first, last - order);
+	
+	for (/**/; first != last - 1; ++ first) {
 	  ngram_set_type::id_type id = ngrams.root();
 	  for (Iterator iter = first; iter != last; ++ iter) {
 	    id = ngrams.find(id, *iter);
 	    if (ngrams.is_root(id)) break;
 	  }
 	  if (! ngrams.is_root(id))
-	    return std::make_pair(id, complete);
-	  
-	  complete = false;
+	    return std::make_pair(first, last);
 	}
-	return std::make_pair(ngrams.root(), complete);
+	
+	return std::make_pair(first, last);
       }
       
       template <typename Iterator>
-      std::pair<id_type, bool> longest_prefix(Iterator first, Iterator last) const
+      void collect_counts(Iterator first, Iterator iter, Iterator last, count_set_type& counts) const
       {
-	// longest prefix of [first, last) where ngram matches...
-	// we use this to compute the ngram ranges where we need to rescore...
-	ngram_set_type::id_type id = ngrams.root();
-	for (/**/; first != last; ++ first) {
-	  const ngram_set_type::id_type id_next = ngrams.find(id, *first);
-	  if (ngrams.is_root(id_next))
-	    return std::make_pair(id, false);
-	  id = id_next;
+	const int context_size = order - 1;
+	
+	first = std::max(first, iter - context_size);
+	
+	if (exact)
+	  counts.resize(nodes.size(), count_type(0));
+	else
+	  counts.resize(order, count_type(0));
+	
+	// we will collect counts at [iter, last) with context from [first, iter)
+	for (/**/; first != iter; ++ first) {
+	  ngram_set_type::id_type id = ngrams.root();
+	  for (Iterator iter2 = first; iter2 != std::min(first + order, last); ++ iter2) {
+	    id = ngrams.find(id, *iter2);
+	    
+	    if (ngrams.is_root(id)) break;
+	    if (iter2 < iter) continue;
+	    
+	    if (exact)
+	      ++ counts[id];
+	    else
+	      ++ counts[nodes[id].order - 1];
+	  }
 	}
-	return std::make_pair(id, true);
       }
       
       template <typename Iterator>
       void collect_counts(Iterator first, Iterator last, count_set_type& counts) const
       {
-	typedef typename boost::is_integral<Iterator>::type __integral;
-	
-	__collect_counts_dispatch(first, last, counts, __integral());
-      }
-
-      void __collect_counts_dispatch(id_type id_prefix, id_type id_suffix, count_set_type& counts, boost::true_type) const
-      {
-	buffer_type& buffer = const_cast<buffer_type&>(buffer_counts_impl);
-	buffer.clear();
-
 	if (exact)
 	  counts.resize(nodes.size(), count_type(0));
 	else
 	  counts.resize(order, count_type(0));
 	
-	// we do not consider additonal contexts for id
-	if (ngrams.is_root(id_prefix) || ngrams.is_root(id_suffix)) return;
-            
-	// traverse back id_prefix and id_suffix do we construct a phrase?
-	
-	// suffix to rescore with additional prefix...
-	while (! ngrams.is_root(id_suffix)) {
-	  buffer.push_back(nodes[id_suffix].word);
-	  id_suffix = nodes[id_suffix].parent;
-	}
-	const int size_suffix = buffer.size();
-      
-	// now try collect count using additional prefix
-	while (! ngrams.is_root(id_prefix)) {
-	  buffer.push_back(nodes[id_prefix].word);
-	  id_prefix = nodes[id_prefix].parent;
-	  
-	  // we start from buffer.back(), and enumerate ngrams from buffer.size() - size_suffix to order...
-	  const int order_prefix = buffer.size() - size_suffix;
-	  int n = 1;
-	  ngram_set_type::id_type id = ngrams.root();
-	  buffer_type::const_reverse_iterator citer_begin = buffer.rbegin();
-	  buffer_type::const_reverse_iterator citer_end = buffer.rend();
-	  buffer_type::const_reverse_iterator citer_last = std::min(citer_begin + order, citer_end);
-	  for (buffer_type::const_reverse_iterator citer = citer_begin; citer != citer_last; ++ citer, ++ n) {
-	    id = ngrams.find(id, *citer);
-	    if (ngrams.is_root(id)) break;
-	  
-	    if (n > order_prefix) {
-
-	      if (exact)
-		++ counts[id];
-	      else
-		++ counts[nodes[id].order - 1];
-	    }
-	  }
-	}
-      }
-    
-      template <typename Iterator>
-      void __collect_counts_dispatch(Iterator first, Iterator last, count_set_type& counts, boost::false_type) const
-      {
-	if (exact)
-	  counts.resize(nodes.size(), count_type(0));
-	else
-	  counts.resize(order, count_type(0));
-      
 	// we will collect counts at [first, last)
 	for (/**/; first != last; ++ first) {
 	  ngram_set_type::id_type id = ngrams.root();
 	  for (Iterator iter = first; iter != std::min(first + order, last); ++ iter) {
 	    id = ngrams.find(id, *iter);
-	  
+	    
 	    if (ngrams.is_root(id)) break;
-	  
+	    
 	    if (exact)
 	      ++ counts[id];
 	    else
@@ -596,8 +550,6 @@ namespace cicada
     private:
       
       buffer_type          buffer_impl;
-      buffer_type          buffer_span_impl;
-      buffer_type          buffer_counts_impl;
       phrase_span_set_type phrase_spans_impl;
 
       ngram_set_type ngrams;
@@ -641,8 +593,8 @@ namespace cicada
       
       std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact));
       
-      // two-side context + counts-id (prefix/suffix/hypothesis) + flag
-      base_type::__state_size = sizeof(int) * 2 + sizeof(impl_type::id_type) * 4;
+      // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
+      base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
       base_type::__feature_name = "bleu";
       
       pimpl = bleu_impl.release();
