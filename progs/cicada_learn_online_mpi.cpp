@@ -578,14 +578,18 @@ struct Task
 
     bool terminated_merge = false;
     bool terminated_sample = false;
+
+    int non_found_iter = 0;
     
     std::string buffer;
     while (! terminated_merge || ! terminated_sample) {
+      bool found = false;
       
       while (! terminated_merge && queue_recv.pop_swap(buffer, true)) {
+	found = true;
+
 	if (buffer.empty()) {
 	  terminated_merge = true;
-	  boost::thread::yield();
 	  break;
 	} else {
 	  
@@ -655,14 +659,17 @@ struct Task
       
       if (terminated_sample) continue;
       if (! queue.pop_swap(buffer, true)) {
-	boost::thread::yield();
+	
+	non_found_iter = loop_sleep(found, non_found_iter);
+	
 	continue;
       }
+      
+      found = true;
       
       if (buffer.empty()) {
 	terminated_sample = true;
 	queue_send.push(std::string());
-	boost::thread::yield();
 	continue;
       }
       
