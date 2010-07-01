@@ -997,8 +997,13 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
 
+      bool terminated = false;
+
       while (1) {
 	bool found = false;
+	
+	if (! terminated)
+	  terminated = queue.push(std::string(), true);
 
 	found |= reduce_vectors(istreams.begin(), istreams.end(), queue_bcast);
 	
@@ -1017,7 +1022,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
 	if (std::count(stream.begin(), stream.end(), stream_ptr_type()) == mpi_size
 	    && std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size
 	    && std::count(ostreams.begin(), ostreams.end(), ostream_ptr_type()) == mpi_size
-	    && queue.push(std::string(), true))
+	    && terminated)
 	  break;
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
@@ -1071,12 +1076,13 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
 	found |= bcast_vectors(ostreams.begin(), ostreams.end(), buffers.begin(), queue_reduce);
 	
 	if (std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size
-	    && std::count(ostreams.begin(), ostreams.end(), ostream_ptr_type()) == mpi_size
-	    && queue_bcast.push(std::string(), true)) break;
+	    && std::count(ostreams.begin(), ostreams.end(), ostream_ptr_type()) == mpi_size) break;
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
     }
+
+    queue_bcast.push(std::string());
     
     thread.join();
     
@@ -1230,6 +1236,9 @@ void bcast_weights(const int rank, weight_set_type& weights)
 
 void options(int argc, char** argv)
 {
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
   namespace po = boost::program_options;
 
   po::options_description opts_config("configuration options");
@@ -1316,8 +1325,11 @@ void options(int argc, char** argv)
   po::notify(variables);
 
   if (variables.count("help")) {
-    std::cout << argv[0] << " [options]\n"
-	      << desc_command << std::endl;
+    if (mpi_rank == 0)
+      std::cout << argv[0] << " [options]\n"
+		<< desc_command << std::endl;
+
+    MPI::Finalize();
     exit(0);
   }
 }
