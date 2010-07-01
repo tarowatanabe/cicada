@@ -1268,6 +1268,10 @@ void options(int argc, char** argv)
 
     // learning related..
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+
+    ("learn-regression", po::bool_switch(&learn_regression), "learn by regression")
+    ("learn-merged",     po::bool_switch(&learn_merged),     "learn by linear classification with merged vector")
+    ("learn-factored",   po::bool_switch(&learn_factored),   "learn by edge-factored linear classification")
     
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
     
