@@ -34,9 +34,14 @@ namespace cicada
     
     // 64-bit id type!
     typedef uint64_t id_type;
+
+    typedef Transducer transducer_type;
+    typedef boost::shared_ptr<transducer_type> transducer_ptr_type;
     
   public:
     virtual ~Transducer() {}
+    virtual transducer_ptr_type clone() const = 0;
+
     virtual bool valid_span(int first, int last, int distance) const = 0;
     virtual id_type root() const = 0;
     virtual id_type next(const id_type& node, const symbol_type& symbol) const = 0;

@@ -45,9 +45,14 @@ namespace cicada
     GrammarMutable();
     GrammarMutable(const std::string& parameter);
     ~GrammarMutable();
+
+    GrammarMutable(const GrammarMutable& x);
+    GrammarMutable& operator=(const GrammarMutable& x);
     
   public:
     // virtual members
+    transducer_ptr_type clone() const;
+
     bool valid_span(int first, int last, int distance) const { return true; }
     id_type root() const;
     id_type next(const id_type& node, const symbol_type& symbol) const;

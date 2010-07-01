@@ -387,6 +387,21 @@ namespace cicada
   }
   GrammarMutable::~GrammarMutable() { std::auto_ptr<impl_type>(tmp); }
   
+  GrammarMutable::GrammarMutable(const GrammarMutable& x)
+    : pimpl(new impl_type(*x.pimpl)) {}
+  
+  GrammarMutable& GrammarMutable::operator=(const GrammarMutable& x)
+  {
+    *pimpl = *x.pimpl;
+    return *this;
+  }
+  
+  GrammarMutable::transducer_ptr_type GrammarMutable::clone() const
+  {
+    return transducer_ptr_type(new GrammarMutable(*this));
+  }
+  
+  
   GrammarMutable::id_type GrammarMutable::root() const
   {
     return pimpl->root();

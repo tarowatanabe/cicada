@@ -1,3 +1,14 @@
+#include <stdexcept>
+
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+
 #include <iostream>
 #include <numeric>
 #include <stdexcept>
@@ -7,6 +18,72 @@
 
 #include <utils/space_separator.hpp>
 #include <utils/base64.hpp>
+
+inline
+void encode_support_vectors(std::string& data,
+			    const size_t& id,
+			    const int& source_length,
+			    const sentence_type& viterbi,
+			    const hypergraph_type& oracle,
+			    const hypergraph_type& violated)
+{
+  data.clear();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::back_inserter(data));
+  
+  os << id << ' ' << source_length << " |||";
+  os << ' ' << viterbi << " |||";
+  os << ' ' << oracle << " |||";
+  os << ' ' << violated;
+  
+  os.pop();
+}
+
+inline
+void decode_support_vectors(const std::string& data,
+			    size_t& id,
+			    int& source_length,
+			    sentence_type& viterbi,
+			    hypergraph_type& oracle,
+			    hypergraph_type& violated)
+{
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  namespace phoenix = boost::phoenix;
+  
+  using qi::phrase_parse;
+  using qi::_1;
+  using qi::ulong_;
+  using qi::int_;
+  using standard::space;
+  
+  using phoenix::ref;
+  
+  std::string::const_iterator iter = data.begin();
+  std::string::const_iterator end = data.end();
+  
+  if (! phrase_parse(iter, end, ulong_ [ref(id) = _1] >> int_ [ref(source_length) = _1] >> "|||", space))
+    throw std::runtime_error("invalid id and source-length");
+  
+  if (! viterbi.assign(iter, end))
+    throw std::runtime_error("invalid sentence");
+  
+  if (! phrase_parse(iter, end, "|||", space))
+    throw std::runtime_error("expected separator");
+  
+  if (! oracle.assign(iter, end))
+    throw std::runtime_error("invalid oracle hypergraph");
+  
+  if (! phrase_parse(iter, end, "|||", space))
+    throw std::runtime_error("expected separator");
+  
+  if (! violated.assign(iter, end))
+    throw std::runtime_error("invalid violated hypergraph");
+  
+  if (iter != end)
+    throw std::runtime_error("still data remain?");
+}
 
 inline
 void encode_feature_vectors(std::string& data, const size_t& id, const int& source_length, const double& loss, const sentence_type& viterbi, const feature_set_type& oracle, const feature_set_type& violated)
@@ -110,6 +187,232 @@ void decode_feature_vectors(const std::string& data, size_t& id, int& source_len
   }
   
 }
+
+struct OptimizeSMO
+{
+  OptimizeSMO(const weight_set_type& __weights, const double& __lambda, const int __debug=0)
+    : lambda(__lambda),
+      C(1.0 / __lambda),
+      weights(__weights),
+      accumulated(),
+      updated(1),
+      debug(__debug) {}
+
+  typedef utils::vector2<double, std::allocator<double> > hessian_type;
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    gradient_type;
+  typedef std::vector<double, std::allocator<double> >    kkt_type;
+
+  void finalize()
+  {
+    accumulated *= - 1.0 / updated;
+    accumulated += weights;
+    accumulated *= updated;
+  }
+  
+  
+  template <typename LabelSet, typename MarginSet, typename FeatureSet>
+  void operator()(const LabelSet&   labels,
+		  const MarginSet&  margins,
+		  const FeatureSet& features)
+  {
+    
+    // QP solver used on OCAS
+    hessian.clear();
+    alpha.clear();
+    gradient.clear();
+    
+    hessian.resize(labels.size(), labels.size(), 0.0);
+    alpha.resize(labels.size(), 0.0);
+    gradient.resize(labels.size(), 0.0);
+    
+    double alpha_neq = C;
+    
+    for (int i = 0; i < labels.size(); ++ i) {
+      gradient[i] = margins[i] - labels[i] * features[i].dot(weights);
+      for (int j = 0; j < labels.size(); ++ j)
+	hessian(i, j) = labels[i] * labels[j] * features[i].dot(features[j]);
+    }
+    
+    if (debug) {
+      double obj_primal = 0.0;
+      double obj_dual = 0.0;
+      for (int i = 0; i < labels.size(); ++ i) {
+	obj_primal += (std::max(gradient[i], 0.0) * C) / labels.size();
+	obj_dual += gradient[i] * alpha[i];
+      }
+      
+      std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl; 
+    }
+    
+    
+    for (int iter = 0; iter != 1000; ++ iter) {
+      
+      // eq (23) and (26) to compute u and delta
+      int u = -1;
+      double max_obj = - std::numeric_limits<double>::infinity();
+      double delta = 0.0;
+      
+      for (int i = 0; i < labels.size(); ++ i) {
+	delta -= alpha[i] * gradient[i];
+	
+	if (gradient[i] > max_obj)  {
+	  max_obj = gradient[i];
+	  u = i;
+	}
+      }
+
+      // if we relax the summation constraints, we select different u...
+      // is this correct?
+      //if (gradient[u] < 0.0)
+      //  u = -1;
+      //else
+      delta += C * gradient[u];
+      
+      // tolerance
+      if (delta <= 1e-4) break;
+      
+      // select v (26)
+      if (u >= 0) {
+	int v = -1;
+	double max_improvement = - std::numeric_limits<double>::infinity();;
+	double tau = 1.0;
+	
+	for (int i = 0; i < labels.size(); ++ i)
+	  if (i != u && alpha[i] > 0.0) {
+	    // compute (25)
+	    const double numer = alpha[i] * (gradient[u] - gradient[i]);
+	    const double denom = alpha[i] * alpha[i] * (hessian(u, u) - 2.0 * hessian(u, i) + hessian(i, i));
+	    
+	    if (denom > 0.0) {
+	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+	      
+	      if (improvement > max_improvement) {
+		max_improvement = improvement;
+		tau = std::max(0.0, std::min(1.0, numer / denom));
+		v = i;
+	      }
+	    }
+	  }
+	
+	// check if virtual variable can be used for update...
+#if 0
+	if (alpha_neq > 0.0) {
+	  const double numer = alpha_neq * gradient[u];
+	  const double denom = alpha_neq * alpha_neq * hessian(u, u);
+	  
+	  if (denom > 0.0) {
+	    const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+	    
+	    if (improvement > max_improvement) {
+	      max_improvement = improvement;
+	      tau = std::max(0.0, std::min(1.0, numer / denom));
+	      v = -1;
+	    }
+	  }
+	}
+#endif
+	
+	if (v >= 0) {
+	  // maximize objective, u and v
+	  double update = alpha[v] * tau;
+	  if (alpha[u] + update < 0.0)
+	    update = - alpha[u];
+	  
+	  // clipping...
+	  alpha[u] += update;
+	  alpha[v] -= update;
+	  
+	  // update g...
+	  for (int i = 0; i < labels.size(); ++ i)
+	    gradient[i] += update * (hessian(i, v) - hessian(i, u));
+	  
+	} else if (alpha_neq > 0.0) {
+	  double update = alpha_neq * tau;
+	  if (alpha[u] + update < 0.0)
+	    update = - alpha[u];
+	  
+	  alpha[u] += update;
+	  alpha_neq -= update;
+	  
+	  // update g..
+	  for (int i = 0; i < labels.size(); ++ i)
+	    gradient[i] -= update * hessian(i, u);
+	}
+	
+      } else {
+	int v = -1;
+	double max_improvement = - std::numeric_limits<double>::infinity();;
+	double tau = 1.0;
+	
+	for (int i = 0; i < labels.size(); ++ i) 
+	  if (alpha[i] > 0.0) {
+	    
+	    const double numer = alpha[i] * gradient[i];
+	    const double denom = alpha[i] * alpha[i] * hessian(i, i);
+	    
+	    if (denom > 0.0) {
+	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+	      
+	      if (improvement > max_improvement) {
+		max_improvement = improvement;
+		tau = std::max(0.0, std::min(1.0, numer / denom));
+		v = i;
+	      }
+	    }
+	  }
+	
+	// safe to check this...
+	if (v >= 0) {
+	  double update = alpha[v] * tau;
+	  if (alpha_neq + update < 0.0)
+	    update = - alpha_neq;
+	  
+	  alpha_neq += update;
+	  alpha[v] -= update;
+	  
+	  for (int i = 0; i < labels.size(); ++ i)
+	    gradient[i] += update * hessian(i, v);
+	}
+      }
+    }
+    
+    for (int i = 0; i < labels.size(); ++ i) 
+      if (alpha[i] > 0.0) {
+	typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
+	for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	  weights[fiter->first] += alpha[i] * labels[i] * fiter->second;
+	  accumulated[fiter->first] += alpha[i] * labels[i] * fiter->second * updated;
+	}
+      }
+    ++ updated;
+    
+    if (debug) {
+      double obj_primal = 0.0;
+      double obj_dual = 0.0;
+      for (int i = 0; i < labels.size(); ++ i) {
+	obj_primal += (std::max(gradient[i], 0.0) * C) / labels.size();
+	obj_dual += gradient[i] * alpha[i];
+      }
+      
+      std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
+    }
+  }
+  
+  hessian_type  hessian;
+  alpha_type    alpha;
+  gradient_type gradient;
+  kkt_type      kkt;
+  
+  double lambda;
+  double C;
+  
+  weight_set_type weights;
+  weight_set_type accumulated;
+  size_t          updated;
+  
+  int debug;
+};
 
 struct OptimizeSGDL2
 {
@@ -226,7 +529,9 @@ struct OptimizeMIRA
 
   void finalize()
   {
-    
+    accumulated *= - 1.0 / updated;
+    accumulated += weights;
+    accumulated *= updated;
   }
 
   double C;

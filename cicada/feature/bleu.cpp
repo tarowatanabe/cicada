@@ -103,6 +103,8 @@ namespace cicada
 
 	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
 	symbol_type* context_last  = context_first + order * 2;
+
+	std::fill(context_first, context_last, vocab_type::EMPTY);
 	
 	int*     context_parsed     = reinterpret_cast<int*>(context_last);
 	int*     context_hypothesis = context_parsed + 1;
@@ -120,8 +122,6 @@ namespace cicada
 	      buffer.push_back(*titer);
 	  
 	  collect_counts(buffer.begin(), buffer.end(), counts);
-	  
-	  std::fill(context_first, context_last, vocab_type::EMPTY);
 	  
 	  if (buffer.size() <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context_first);
@@ -374,7 +374,7 @@ namespace cicada
 	  const ngram_set_type::id_type id_next = ngrams.find(id, *iter);
 	  if (ngrams.is_root(id)) break;
 	}
-	return std::make_pair(first, std::max(first + 1, iter));
+	return std::make_pair(first, std::min(std::max(first + 1, iter), last));
       }
       
       template <typename Iterator>

@@ -45,12 +45,14 @@ namespace cicada
     GrammarStatic(const std::string& parameter);
     ~GrammarStatic();
 
+    GrammarStatic(const GrammarStatic& x);
+    GrammarStatic& operator=(const GrammarStatic& x);
+
   private:
     GrammarStatic() {}
-    GrammarStatic(const GrammarStatic& x) {}
-    GrammarStatic& operator=(const GrammarStatic& x) { return *this; }
   public:
     // virtual members
+    transducer_ptr_type clone() const;
     bool valid_span(int first, int last, int distance) const;
     id_type root() const;
     id_type next(const id_type& node, const symbol_type& symbol) const;

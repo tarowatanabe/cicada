@@ -84,8 +84,9 @@ namespace cicada
 
     typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
 
-    struct ScoreSet
+    class ScoreSet
     {
+    public:
       typedef utils::map_file<score_type, std::allocator<score_type> >                     score_set_type;
       typedef utils::packed_vector_mapped<quantized_type, std::allocator<quantized_type> > quantized_set_type;
       typedef boost::array<score_type, 256>                                                score_map_type;
@@ -173,8 +174,50 @@ namespace cicada
 
   public:
     GrammarStaticImpl(const std::string& parameter) : max_span(15) { read(parameter); }
+
+    GrammarStaticImpl(const GrammarStaticImpl& x)
+      : rule_db(x.rule_db),
+	source_db(x.source_db),
+	target_db(x.target_db),
+	score_db(x.score_db),
+	vocab(x.vocab),
+	feature_names(x.feature_names),
+	max_span(x.max_span) {}
+
+    GrammarStaticImpl& operator=(const GrammarStaticImpl& x)
+    {
+      clear();
+      
+      rule_db       = x.rule_db;
+      source_db     = x.source_db;
+      target_db     = x.target_db;
+      score_db      = x.score_db;
+      vocab         = x.vocab;
+      feature_names = x.feature_names;
+      max_span      = x.max_span;
+      
+      return *this;
+    }
     
   public:
+
+    void clear()
+    {
+      rule_db.clear();
+      source_db.clear();
+      target_db.clear();
+      score_db.clear();
+      vocab.clear();
+      feature_names.clear();
+
+      cache_rule_sets.clear();
+      cache_sources.clear();
+      cache_targets.clear();
+      cache_find_root.clear();
+      cache_find.clear();
+
+      max_span = 15;
+    }
     
     size_type find(const word_type& word) const
     {
@@ -997,11 +1040,23 @@ namespace cicada
   
   
   GrammarStatic::GrammarStatic(const std::string& parameter)
-    : pimpl(new impl_type(parameter))
-  {
-  }
+    : pimpl(new impl_type(parameter)) {}
 
   GrammarStatic::~GrammarStatic() { std::auto_ptr<impl_type> tmp(pimpl); }
+
+  GrammarStatic::GrammarStatic(const GrammarStatic& x)
+    : pimpl(new impl_type(*x.pimpl)) {}
+
+  GrammarStatic& GrammarStatic::operator=(const GrammarStatic& x)
+  {
+    *pimpl = *x.pimpl;
+    return *this;
+  }
+
+  GrammarStatic::transducer_ptr_type GrammarStatic::clone() const
+  {
+    return transducer_ptr_type(new GrammarStatic(*this));
+  }
 
   bool GrammarStatic::valid_span(int first, int last, int distance) const
   {

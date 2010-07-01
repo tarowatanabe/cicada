@@ -34,8 +34,8 @@ namespace cicada
     
     typedef transducer_ptr_set_type::reference       reference;
     typedef transducer_ptr_set_type::const_reference const_reference;
-    typedef transducer_ptr_set_type::iterator       iterator;
-    typedef transducer_ptr_set_type::const_iterator const_iterator;
+    typedef transducer_ptr_set_type::iterator        iterator;
+    typedef transducer_ptr_set_type::const_iterator  const_iterator;
     
   public:
     Grammar() : transducers() {}
