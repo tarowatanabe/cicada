@@ -280,7 +280,7 @@ struct Task
       model(__model),
       optimizer(__optimizer),
       batch_current(0),
-      score(), scores(), norm(0.0) {}
+      score_1best(), score(), scores(), norm(0.0) {}
 
   queue_type&        queue;
   queue_type&        queue_send;
@@ -293,6 +293,7 @@ struct Task
   
   int batch_current;
   
+  score_ptr_type     score_1best;
   score_ptr_type     score;
   score_ptr_set_type scores;
   double norm;
@@ -657,16 +658,28 @@ struct Task
 	    *score *= 0.9;
 	  norm += source_length;
 	  
+	  if (score_1best)
+	    *score_1best -= *scores[id];
+	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
 	    score = scores[id]->clone();
 	  else
 	    *score += *scores[id];
 	  
+	  if (! score_1best)
+	    score_1best = scores[id]->clone();
+	  else
+	    *score_1best += *scores[id];
+	  
 	  if (debug) {
+	    const std::pair<double, double> bleu_1best = score_1best->score();
 	    const std::pair<double, double> bleu_viterbi = score->score();
-	    std::cerr << "bleu: " << bleu_viterbi.first
-		      << " peanlty: " << bleu_viterbi.second
+	    
+	    std::cerr << "bleu: " << bleu_1best.first
+		      << " peanlty: " << bleu_1best.second
+		      << " viterbi: " << bleu_viterbi.first
+		      << " penalty: " << bleu_viterbi.second
 		      << std::endl;
 	  }
 
@@ -787,15 +800,24 @@ struct Task
 	*score_penalty += *score;
       }
       
+      if (score_1best)
+	*score_1best -= *scores[id];
+      
       scores[id] = scorer->score(boost::get<0>(yield_viterbi));
       if (! score)
 	score = scores[id]->clone();
       else
 	*score += *scores[id];
-      
-      const std::pair<double, double> bleu_viterbi = score->score();
+
+      if (! score_1best)
+	score_1best = scores[id]->clone();
+      else
+	*score_1best += *scores[id];
       
       if (debug) {
+	const std::pair<double, double> bleu_1best = score_1best->score();
+	const std::pair<double, double> bleu_viterbi = score->score();
+	
 	std::cerr << "viterbi: " << boost::get<0>(yield_viterbi) << std::endl;
 	
 	std::cerr << "hypergraph density:"
@@ -803,8 +825,10 @@ struct Task
 		  << " violated: " << (double(hypergraph_penalty.edges.size()) / hypergraph_penalty.nodes.size())
 		  << std::endl;
 	
-	std::cerr << "bleu: " << bleu_viterbi.first
-		  << " peanlty: " << bleu_viterbi.second
+	std::cerr << "bleu: " << bleu_1best.first
+		  << " peanlty: " << bleu_1best.second
+		  << " viterbi: " << bleu_viterbi.first
+		  << " penalty: " << bleu_viterbi.second
 		  << " oracle: " << score_reward->score().first
 		  << " violated: " << score_penalty->score().first
 		  << std::endl;
