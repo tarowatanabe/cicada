@@ -383,7 +383,7 @@ struct OptimizeSMO
 	
       } else {
 	int v = -1;
-	double max_improvement = - std::numeric_limits<double>::infinity();;
+	double max_improvement = - std::numeric_limits<double>::infinity();
 	double tau = 1.0;
 	
 	for (int i = 0; i < labels.size(); ++ i) 

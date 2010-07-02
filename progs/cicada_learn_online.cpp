@@ -407,7 +407,7 @@ struct Task
 				  feature_collection_type& features)
   {
     typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
-
+    
     count_set_type counts_reward(hypergraph_reward.nodes.size());
     count_set_type counts_penalty(hypergraph_penalty.nodes.size());
     
@@ -432,7 +432,8 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(1.0);
-    margins.push_back(bleu_reward.back() * norm * loss_scale);
+    //margins.push_back(bleu_reward.back() * norm * loss_scale);
+    margins.push_back(1.0);
     
     features.push_back(feature_set_type());
     features.back().assign(accumulated_penalty_unique.accumulated.begin(), accumulated_penalty_unique.accumulated.end());
@@ -442,7 +443,8 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(-1.0);
-    margins.push_back(bleu_penalty.back() * norm * loss_scale);
+    //margins.push_back(bleu_penalty.back() * norm * loss_scale);
+    margins.push_back(1.0);
   }
 
   void add_support_vectors_factored(const hypergraph_type& hypergraph_reward,
@@ -482,7 +484,8 @@ struct Task
       features.back().erase(feature_name);
       
       labels.push_back(1.0);
-      margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
+      //margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
+      margins.push_back(1.0);
     }
     
     for (int i = 0; i < accumulated_penalty.size(); ++ i) {
@@ -495,7 +498,8 @@ struct Task
       features.back().erase(feature_name);
       
       labels.push_back(- 1.0);
-      margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
+      //margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
+      margins.push_back(1.0);
     }
   }
   
@@ -532,7 +536,7 @@ struct Task
 
     weight_set_type& weights = optimizer.weights;
 
-    operations.assign(weights);
+    //operations.assign(weights);
     
     hypergraph_type hypergraph_reward;
     hypergraph_type hypergraph_penalty;
@@ -778,7 +782,7 @@ struct Task
       if (batch_current >= batch_size) {
 	if (debug)
 	  std::cerr << "# of support vectors: " << labels.size() << std::endl;
-
+	
 	optimizer(labels, margins, features);
 	
 	batch_current = 0;
