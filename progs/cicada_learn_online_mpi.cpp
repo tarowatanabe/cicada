@@ -81,8 +81,6 @@ bool input_forest_mode = false;
 bool input_directory_mode = false;
 
 path_type weights_file;
-path_type bound_lower_file;
-path_type bound_upper_file;
 
 std::string symbol_goal         = vocab_type::S;
 std::string symbol_non_terminal = vocab_type::X;
@@ -117,6 +115,7 @@ double loss_margin = 0.01;
 double score_margin = 0.01;
 
 int batch_size = 1;
+bool reranking = false;
 bool asynchronous_vectors = false;
 bool mix_weights = false;
 bool average_weights = false;
@@ -126,7 +125,7 @@ int cube_size = 200;
 
 int debug = 0;
 
-void optimize(OperationSet& operations, model_type& model, weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper);
+void optimize(OperationSet& operations, model_type& model, weight_set_type& weights);
 
 void bcast_weights(const int rank, weight_set_type& weights);
 void send_weights(const weight_set_type& weights);
@@ -248,20 +247,7 @@ int main(int argc, char ** argv)
       is >> weights;
     }
     
-        feature_set_type bound_lower;
-    feature_set_type bound_upper;
-    
-    if (boost::filesystem::exists(bound_lower_file)) {
-      utils::compress_istream is(bound_lower_file);
-      is >> bound_lower;
-    }
-    if (boost::filesystem::exists(bound_upper_file)) {
-      utils::compress_istream is(bound_upper_file);
-      is >> bound_upper;
-    }
-
-    
-    optimize(operations, model, weights, bound_lower, bound_upper);
+    optimize(operations, model, weights);
     
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_file);
@@ -614,7 +600,8 @@ struct Task
 
     weight_set_type& weights = optimizer.weights;
     
-    //operations.assign(weights);
+    if (! reranking)
+      operations.assign(weights);
     
     hypergraph_type hypergraph_reward;
     hypergraph_type hypergraph_penalty;
@@ -963,9 +950,9 @@ bool bcast_vectors(Iterator first, Iterator last, BufferIterator bfirst, Queue& 
   return found;
 }
 
-void optimize(OperationSet& operations, model_type& model, weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper)
+void optimize(OperationSet& operations, model_type& model, weight_set_type& weights)
 {
-  typedef OptimizeSMO optimizer_type;
+  typedef OptimizeMIRA optimizer_type;
   typedef Task<optimizer_type>  task_type;
   typedef task_type::queue_type queue_type;
 
@@ -1022,7 +1009,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   queue_type queue_reduce;
   queue_type queue_bcast;
 
-  optimizer_type optimizer(weights, bound_lower, bound_upper, C, debug);
+  optimizer_type optimizer(weights, C, debug);
   
   task_type task(queue, queue_reduce, queue_bcast, operations, model, optimizer);
 
@@ -1344,9 +1331,6 @@ void options(int argc, char** argv)
 
     ("weights", po::value<path_type>(&weights_file), "initial weights")
     
-    ("bound-lower", po::value<path_type>(&bound_lower_file),                    "lower bounds definition for feature weights")
-    ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
-    
     // grammar
     ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")
     ("non-terminal",   po::value<std::string>(&symbol_non_terminal)->default_value(symbol_non_terminal), "default non-terminal symbol")
@@ -1386,6 +1370,7 @@ void options(int argc, char** argv)
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
     
     ("batch-size",           po::value<int>(&batch_size)->default_value(batch_size), "batch size")
+    ("reranking",            po::bool_switch(&reranking),                            "learn by forest reranking")
     ("asynchronous-vectors", po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
     ("average-weights",      po::bool_switch(&average_weights),                      "average weight vectors")
     ("mix-weights",          po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")

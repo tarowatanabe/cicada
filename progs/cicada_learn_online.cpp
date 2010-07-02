@@ -74,8 +74,6 @@ bool input_forest_mode = false;
 bool input_directory_mode = false;
 
 path_type weights_file;
-path_type bound_lower_file;
-path_type bound_upper_file;
 
 std::string symbol_goal         = vocab_type::S;
 std::string symbol_non_terminal = vocab_type::X;
@@ -110,6 +108,7 @@ double loss_margin = 0.001;
 double score_margin = 0.001;
 
 int batch_size = 1;
+bool reranking = false;
 bool asynchronous_vectors = false;
 bool mix_weights = false;
 bool average_weights = false;
@@ -123,7 +122,7 @@ int debug = 0;
 
 
 
-void optimize(weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper);
+void optimize(weight_set_type& weights);
 
 void options(int argc, char** argv);
 
@@ -163,20 +162,8 @@ int main(int argc, char ** argv)
       utils::compress_istream is(weights_file);
       is >> weights;
     }
-
-    feature_set_type bound_lower;
-    feature_set_type bound_upper;
     
-    if (boost::filesystem::exists(bound_lower_file)) {
-      utils::compress_istream is(bound_lower_file);
-      is >> bound_lower;
-    }
-    if (boost::filesystem::exists(bound_upper_file)) {
-      utils::compress_istream is(bound_upper_file);
-      is >> bound_upper;
-    }
-    
-    optimize(weights, bound_lower, bound_upper);
+    optimize(weights);
     
     utils::compress_ostream os(output_file);
     os.precision(20);
@@ -536,7 +523,8 @@ struct Task
 
     weight_set_type& weights = optimizer.weights;
 
-    //operations.assign(weights);
+    if (! reranking)
+      operations.assign(weights);
     
     hypergraph_type hypergraph_reward;
     hypergraph_type hypergraph_penalty;
@@ -866,9 +854,9 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
-void optimize(weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper)
+void optimize(weight_set_type& weights)
 {
-  typedef OptimizeSMO optimizer_type;
+  typedef OptimizeMIRA optimizer_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
   
   typedef Task<optimizer_type>         task_type;
@@ -921,7 +909,7 @@ void optimize(weight_set_type& weights, const feature_set_type& bound_lower, con
     queue_bcast[i].reset(new queue_type());
   }
 
-  optimizer_set_type optimizers(threads, optimizer_type(weights, bound_lower, bound_upper, C, debug));
+  optimizer_set_type optimizers(threads, optimizer_type(weights, C, debug));
   
   task_ptr_set_type tasks(threads);
   for (int i = 0; i < threads; ++ i)
@@ -1028,9 +1016,6 @@ void options(int argc, char** argv)
 
     ("weights", po::value<path_type>(&weights_file), "initial weights")
     
-    ("bound-lower", po::value<path_type>(&bound_lower_file),                    "lower bounds definition for feature weights")
-    ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
-    
     // grammar
     ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")
     ("non-terminal",   po::value<std::string>(&symbol_non_terminal)->default_value(symbol_non_terminal), "default non-terminal symbol")
@@ -1070,6 +1055,7 @@ void options(int argc, char** argv)
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
     
     ("batch-size",           po::value<int>(&batch_size)->default_value(batch_size), "batch size")
+    ("reranking",            po::bool_switch(&reranking),                            "learn by forest reranking")
     ("asynchronous-vectors", po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
     ("average-weights",      po::bool_switch(&average_weights),                      "average weight vectors")
     ("mix-weights",          po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")
