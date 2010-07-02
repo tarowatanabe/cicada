@@ -578,7 +578,7 @@ struct Task
 	    *score *= 0.9;
 	  norm += source_length;
 
-	  if (score_1best)
+	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
 	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
@@ -718,7 +718,7 @@ struct Task
 	*score_penalty += *score;
       }
 
-      if (score_1best)
+      if (score_1best && scores[id])
 	*score_1best -= *scores[id];
       
       scores[id] = scorer->score(boost::get<0>(yield_viterbi));
