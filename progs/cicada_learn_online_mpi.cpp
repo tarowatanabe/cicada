@@ -395,6 +395,23 @@ struct Task
     value_set_type accumulated;
   };
 
+  struct bleu_function
+  {
+    typedef cicada::semiring::Tropical<double> value_type;
+    
+    bleu_function(const feature_type& __feature_name, const double __scale)
+      : feature_name(__feature_name), scale(__scale) {}
+    
+    const feature_type feature_name;
+    const double scale;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& x) const
+    {
+      return cicada::semiring::traits<value_type>::log(x.features[feature_name] * scale);
+    }
+  };
+
   typedef std::vector<double, std::allocator<double> > label_collection_type;
   typedef std::vector<double, std::allocator<double> > margin_collection_type;
   typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_collection_type;
@@ -455,7 +472,7 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(1.0);
-    margins.push_back(bleu_score * norm);
+    margins.push_back(bleu_score * norm * loss_scale);
   }
   
   void add_support_vectors_merged(const hypergraph_type& hypergraph_reward,
@@ -465,6 +482,8 @@ struct Task
 				  margin_collection_type& margins,
 				  feature_collection_type& features)
   {
+    typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+    
     count_set_type counts_reward(hypergraph_reward.nodes.size());
     count_set_type counts_penalty(hypergraph_penalty.nodes.size());
     
@@ -473,6 +492,12 @@ struct Task
     
     cicada::inside_outside(hypergraph_reward,  counts_reward,  accumulated_reward_unique,  count_function(), feature_count_function());
     cicada::inside_outside(hypergraph_penalty, counts_penalty, accumulated_penalty_unique, count_function(), feature_count_function());
+
+    bleu_set_type bleu_reward(hypergraph_reward.nodes.size());
+    bleu_set_type bleu_penalty(hypergraph_penalty.nodes.size());
+    
+    cicada::inside(hypergraph_reward, bleu_reward, bleu_function(feature_name, 1.0));
+    cicada::inside(hypergraph_penalty, bleu_penalty, bleu_function(feature_name, - 1.0));
 	  
     features.push_back(feature_set_type());
     features.back().assign(accumulated_reward_unique.accumulated.begin(), accumulated_reward_unique.accumulated.end());
@@ -482,7 +507,7 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(1.0);
-    margins.push_back(1.0);
+    margins.push_back(bleu_reward.back() * norm * loss_scale);
     
     features.push_back(feature_set_type());
     features.back().assign(accumulated_penalty_unique.accumulated.begin(), accumulated_penalty_unique.accumulated.end());
@@ -492,7 +517,7 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(-1.0);
-    margins.push_back(1.0);
+    margins.push_back(bleu_penalty.back() * norm * loss_scale);
   }
 
   void add_support_vectors_factored(const hypergraph_type& hypergraph_reward,
@@ -502,6 +527,8 @@ struct Task
 				    margin_collection_type& margins,
 				    feature_collection_type& features)
   {
+    typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+
     count_set_type counts_reward(hypergraph_reward.nodes.size());
     count_set_type counts_penalty(hypergraph_penalty.nodes.size());
 
@@ -510,6 +537,15 @@ struct Task
 	  
     cicada::inside_outside(hypergraph_reward,  counts_reward,  accumulated_reward,  count_function(), feature_count_function());
     cicada::inside_outside(hypergraph_penalty, counts_penalty, accumulated_penalty, count_function(), feature_count_function());
+
+    bleu_set_type bleu_reward(hypergraph_reward.nodes.size());
+    bleu_set_type bleu_penalty(hypergraph_penalty.nodes.size());
+    
+    bleu_set_type bleu_edge_reward(hypergraph_reward.edges.size());
+    bleu_set_type bleu_edge_penalty(hypergraph_penalty.edges.size());
+    
+    cicada::inside_outside(hypergraph_reward,  bleu_reward,  bleu_edge_reward,  bleu_function(feature_name,   1.0), bleu_function(feature_name,   1.0));
+    cicada::inside_outside(hypergraph_penalty, bleu_penalty, bleu_edge_penalty, bleu_function(feature_name, - 1.0), bleu_function(feature_name, - 1.0));
     
     for (int i = 0; i < accumulated_reward.size(); ++ i) {
       features.push_back(feature_set_type());
@@ -521,20 +557,20 @@ struct Task
       features.back().erase(feature_name);
 	    
       labels.push_back(1.0);
-      margins.push_back(1.0);
+      margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
     }
 	  
     for (int i = 0; i < accumulated_penalty.size(); ++ i) {
       features.push_back(feature_set_type());
       features.back().assign(accumulated_penalty[i].begin(), accumulated_penalty[i].end());
-	    
+      
       features.back() *= (1.0 / counts_penalty.back());
       features.back()["bias"] = 1.0;
 	    
       features.back().erase(feature_name);
 	    
       labels.push_back(-1.0);
-      margins.push_back(1.0);
+      margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
     }
   }
 
@@ -953,6 +989,9 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   
   for (int iter = 0; iter < iteration; ++ iter) {
 
+    if (mpi_rank == 0 && debug)
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
+
     boost::thread thread(boost::ref(task));
     
     if (mpi_rank == 0) {
@@ -1114,11 +1153,11 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     bcast_weights(0, weights_mixed);
     
-    if (mix_weights) {
+    if (mix_weights)
       optimizer.weights = weights_mixed;
-      optimizer.accumulated.clear();
-      optimizer.updated = 1;
-    }
+    
+    optimizer.accumulated.clear();
+    optimizer.updated = 1;
   }
   
   weights = weights_mixed;
