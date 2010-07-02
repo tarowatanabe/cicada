@@ -612,6 +612,8 @@ namespace cicada
       
       if (score != 0.0)
 	features[base_type::feature_name()] = score;
+      else
+	features.erase(base_type::feature_name());
     }
     
     void Bleu::operator()(const state_ptr_type& state,

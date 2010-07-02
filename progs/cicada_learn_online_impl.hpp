@@ -19,6 +19,8 @@
 #include <utils/space_separator.hpp>
 #include <utils/base64.hpp>
 
+#include <utils/arc_list.hpp>
+
 inline
 void encode_support_vectors(std::string& data,
 			    const size_t& id,
@@ -190,18 +192,22 @@ void decode_feature_vectors(const std::string& data, size_t& id, int& source_len
 
 struct OptimizeSMO
 {
-  OptimizeSMO(const weight_set_type& __weights, const double& __lambda, const int __debug=0)
+  OptimizeSMO(const weight_set_type& __weights,
+	      const feature_set_type& __bound_lower,
+	      const feature_set_type& __bound_upper,
+	      const double& __lambda,
+	      const int __debug=0)
     : lambda(__lambda),
       C(1.0 / __lambda),
       weights(__weights),
+      bound_lower(__bound_lower),
+      bound_upper(__bound_upper),
       accumulated(),
       updated(1),
       debug(__debug) {}
 
-  typedef utils::vector2<double, std::allocator<double> > hessian_type;
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    gradient_type;
-  typedef std::vector<double, std::allocator<double> >    kkt_type;
 
   void finalize()
   {
@@ -210,29 +216,64 @@ struct OptimizeSMO
     accumulated *= updated;
   }
   
+
+  template <typename LabelSet, typename FeatureSet>
+  struct h_matrix : public utils::hashmurmur<size_t>
+  {
+    h_matrix(const LabelSet& __labels, const FeatureSet& __features)
+      : labels(__labels), features(__features) {}
+    
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    double operator()(int i, int j) const
+    {
+#if 0
+      std::pair<typename cache_type::iterator, bool> result = const_cast<cache_type&>(cache).find(i);
+      if (! result.second) {
+	value_set_type& values = result.first->second;
+	values.reserve(labels.size());
+	values.resize(labels.size(), 0.0);
+	
+	for (int k = 0; k < labels.size(); ++ k)
+	  values[k] = labels[i] * labels[k] * features[i].dot(features[k]);
+      }
+      
+      return result.first->second[j];
+#endif
+      return labels[i] * labels[j] * features[i].dot(features[j]);
+    }
+    
+    typedef std::vector<double, std::allocator<double> > value_set_type;
+    
+    typedef utils::arc_list<int, value_set_type, 16, std::equal_to<int>, std::allocator<std::pair<int, value_set_type> > > cache_type;
+    
+    const LabelSet& labels;
+    const FeatureSet& features;
+
+    //cache_type cache;
+  };
   
   template <typename LabelSet, typename MarginSet, typename FeatureSet>
   void operator()(const LabelSet&   labels,
 		  const MarginSet&  margins,
 		  const FeatureSet& features)
   {
-    
     // QP solver used on OCAS
-    hessian.clear();
+    h_matrix<LabelSet, FeatureSet>  H(labels, features);
+
     alpha.clear();
     gradient.clear();
+
+    alpha.reserve(labels.size());
+    gradient.reserve(labels.size());
     
-    hessian.resize(labels.size(), labels.size(), 0.0);
     alpha.resize(labels.size(), 0.0);
     gradient.resize(labels.size(), 0.0);
     
     double alpha_neq = C;
     
-    for (int i = 0; i < labels.size(); ++ i) {
+    for (int i = 0; i < labels.size(); ++ i)
       gradient[i] = margins[i] - labels[i] * features[i].dot(weights);
-      for (int j = 0; j < labels.size(); ++ j)
-	hessian(i, j) = labels[i] * labels[j] * features[i].dot(features[j]);
-    }
     
     if (debug) {
       double obj_primal = 0.0;
@@ -282,7 +323,7 @@ struct OptimizeSMO
 	  if (i != u && alpha[i] > 0.0) {
 	    // compute (25)
 	    const double numer = alpha[i] * (gradient[u] - gradient[i]);
-	    const double denom = alpha[i] * alpha[i] * (hessian(u, u) - 2.0 * hessian(u, i) + hessian(i, i));
+	    const double denom = alpha[i] * alpha[i] * (H(u, u) - 2.0 * H(u, i) + H(i, i));
 	    
 	    if (denom > 0.0) {
 	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
@@ -295,11 +336,11 @@ struct OptimizeSMO
 	    }
 	  }
 	
-	// check if virtual variable can be used for update...
 #if 0
+	// check if virtual variable can be used for update...
 	if (alpha_neq > 0.0) {
 	  const double numer = alpha_neq * gradient[u];
-	  const double denom = alpha_neq * alpha_neq * hessian(u, u);
+	  const double denom = alpha_neq * alpha_neq * H(u, u);
 	  
 	  if (denom > 0.0) {
 	    const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
@@ -325,7 +366,7 @@ struct OptimizeSMO
 	  
 	  // update g...
 	  for (int i = 0; i < labels.size(); ++ i)
-	    gradient[i] += update * (hessian(i, v) - hessian(i, u));
+	    gradient[i] += update * (H(i, v) - H(i, u));
 	  
 	} else if (alpha_neq > 0.0) {
 	  double update = alpha_neq * tau;
@@ -337,7 +378,7 @@ struct OptimizeSMO
 	  
 	  // update g..
 	  for (int i = 0; i < labels.size(); ++ i)
-	    gradient[i] -= update * hessian(i, u);
+	    gradient[i] -= update * H(i, u);
 	}
 	
       } else {
@@ -349,7 +390,7 @@ struct OptimizeSMO
 	  if (alpha[i] > 0.0) {
 	    
 	    const double numer = alpha[i] * gradient[i];
-	    const double denom = alpha[i] * alpha[i] * hessian(i, i);
+	    const double denom = alpha[i] * alpha[i] * H(i, i);
 	    
 	    if (denom > 0.0) {
 	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
@@ -372,7 +413,7 @@ struct OptimizeSMO
 	  alpha[v] -= update;
 	  
 	  for (int i = 0; i < labels.size(); ++ i)
-	    gradient[i] += update * hessian(i, v);
+	    gradient[i] += update * H(i, v);
 	}
       }
     }
@@ -398,11 +439,9 @@ struct OptimizeSMO
       std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
     }
   }
-  
-  hessian_type  hessian;
+
   alpha_type    alpha;
   gradient_type gradient;
-  kkt_type      kkt;
   
   double lambda;
   double C;
@@ -410,6 +449,9 @@ struct OptimizeSMO
   weight_set_type weights;
   weight_set_type accumulated;
   size_t          updated;
+
+  feature_set_type bound_lower;
+  feature_set_type bound_upper;
   
   int debug;
 };

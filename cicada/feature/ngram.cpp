@@ -433,8 +433,13 @@ namespace cicada
       
       if (score != 0.0)
 	features[base_type::feature_name()] = score;
+      else
+	features.erase(base_type::feature_name());
+      
       if (estimate != 0.0)
 	estimates[base_type::feature_name()] = estimate;
+      else
+	estimates.erase(base_type::feature_name());
     }
     
     void NGram::operator()(const state_ptr_type& state,
@@ -443,6 +448,8 @@ namespace cicada
       const double score = pimpl->ngram_final_score(state);
       if (score != 0.0)
 	features[base_type::feature_name()] += score;
+      else
+	features.erase(base_type::feature_name());
     }
   };
 };

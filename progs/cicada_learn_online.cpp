@@ -74,6 +74,8 @@ bool input_forest_mode = false;
 bool input_directory_mode = false;
 
 path_type weights_file;
+path_type bound_lower_file;
+path_type bound_upper_file;
 
 std::string symbol_goal         = vocab_type::S;
 std::string symbol_non_terminal = vocab_type::X;
@@ -121,7 +123,7 @@ int debug = 0;
 
 
 
-void optimize(weight_set_type& weights);
+void optimize(weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper);
 
 void options(int argc, char** argv);
 
@@ -161,8 +163,20 @@ int main(int argc, char ** argv)
       utils::compress_istream is(weights_file);
       is >> weights;
     }
+
+    feature_set_type bound_lower;
+    feature_set_type bound_upper;
     
-    optimize(weights);
+    if (boost::filesystem::exists(bound_lower_file)) {
+      utils::compress_istream is(bound_lower_file);
+      is >> bound_lower;
+    }
+    if (boost::filesystem::exists(bound_upper_file)) {
+      utils::compress_istream is(bound_upper_file);
+      is >> bound_upper;
+    }
+    
+    optimize(weights, bound_lower, bound_upper);
     
     utils::compress_ostream os(output_file);
     os.precision(20);
@@ -577,7 +591,7 @@ struct Task
 	  if (score)
 	    *score *= 0.9;
 	  norm += source_length;
-
+	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
 	  
@@ -616,7 +630,7 @@ struct Task
 	  if (batch_current >= batch_size) {
 	    if (debug)
 	      std::cerr << "# of support vectors: " << labels.size() << std::endl;
-
+	    
 	    optimizer(labels, margins, features);
 	    
 	    batch_current = 0;
@@ -785,7 +799,7 @@ struct Task
 	std::cerr << "# of support vectors: " << labels.size() << std::endl;
       
       optimizer(labels, margins, features);
-      
+
       batch_current = 0;
       labels.clear();
       margins.clear();
@@ -848,7 +862,7 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
-void optimize(weight_set_type& weights)
+void optimize(weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper)
 {
   typedef OptimizeSMO optimizer_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
@@ -903,7 +917,7 @@ void optimize(weight_set_type& weights)
     queue_bcast[i].reset(new queue_type());
   }
 
-  optimizer_set_type optimizers(threads, optimizer_type(weights, C, debug));
+  optimizer_set_type optimizers(threads, optimizer_type(weights, bound_lower, bound_upper, C, debug));
   
   task_ptr_set_type tasks(threads);
   for (int i = 0; i < threads; ++ i)
@@ -1009,6 +1023,9 @@ void options(int argc, char** argv)
     ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
 
     ("weights", po::value<path_type>(&weights_file), "initial weights")
+    
+    ("bound-lower", po::value<path_type>(&bound_lower_file),                    "lower bounds definition for feature weights")
+    ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
     
     // grammar
     ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")

@@ -81,6 +81,8 @@ bool input_forest_mode = false;
 bool input_directory_mode = false;
 
 path_type weights_file;
+path_type bound_lower_file;
+path_type bound_upper_file;
 
 std::string symbol_goal         = vocab_type::S;
 std::string symbol_non_terminal = vocab_type::X;
@@ -124,7 +126,7 @@ int cube_size = 200;
 
 int debug = 0;
 
-void optimize(OperationSet& operations, model_type& model, weight_set_type& weights);
+void optimize(OperationSet& operations, model_type& model, weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper);
 
 void bcast_weights(const int rank, weight_set_type& weights);
 void send_weights(const weight_set_type& weights);
@@ -246,7 +248,20 @@ int main(int argc, char ** argv)
       is >> weights;
     }
     
-    optimize(operations, model, weights);
+        feature_set_type bound_lower;
+    feature_set_type bound_upper;
+    
+    if (boost::filesystem::exists(bound_lower_file)) {
+      utils::compress_istream is(bound_lower_file);
+      is >> bound_lower;
+    }
+    if (boost::filesystem::exists(bound_upper_file)) {
+      utils::compress_istream is(bound_upper_file);
+      is >> bound_upper;
+    }
+
+    
+    optimize(operations, model, weights, bound_lower, bound_upper);
     
     if (mpi_rank == 0) {
       utils::compress_ostream os(output_file);
@@ -944,7 +959,7 @@ bool bcast_vectors(Iterator first, Iterator last, BufferIterator bfirst, Queue& 
   return found;
 }
 
-void optimize(OperationSet& operations, model_type& model, weight_set_type& weights)
+void optimize(OperationSet& operations, model_type& model, weight_set_type& weights, const feature_set_type& bound_lower, const feature_set_type& bound_upper)
 {
   typedef OptimizeSMO optimizer_type;
   typedef Task<optimizer_type>  task_type;
@@ -1003,7 +1018,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   queue_type queue_reduce;
   queue_type queue_bcast;
 
-  optimizer_type optimizer(weights, C, debug);
+  optimizer_type optimizer(weights, bound_lower, bound_upper, C, debug);
   
   task_type task(queue, queue_reduce, queue_bcast, operations, model, optimizer);
 
@@ -1324,6 +1339,9 @@ void options(int argc, char** argv)
     ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
 
     ("weights", po::value<path_type>(&weights_file), "initial weights")
+    
+    ("bound-lower", po::value<path_type>(&bound_lower_file),                    "lower bounds definition for feature weights")
+    ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
     
     // grammar
     ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")
