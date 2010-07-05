@@ -436,7 +436,7 @@ struct Task
     
     if (! model_sparse.empty()) {
       model_sparse.apply_feature(true);
-      cicada::apply_exact(model_sparse, modified, weight_set_function(weights, 1.0), cube_size);
+      cicada::apply_exact(model_sparse, modified);
     }
     
     weight_type weight;

@@ -749,14 +749,14 @@ public:
     
     if (exact || model.is_stateless()) {
       if (weights_one)
-	cicada::apply_exact<weight_set_function_one>(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
+	cicada::apply_exact(model, hypergraph, applied);
       else
-	cicada::apply_exact<weight_set_function>(model, hypergraph, applied, weight_set_function(*weights_apply), size);
+	cicada::apply_exact(model, hypergraph, applied);
     } else {
       if (weights_one)
-	cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
+	cicada::apply_cube_prune(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
       else
-	cicada::apply_cube_prune<weight_set_function>(model, hypergraph, applied, weight_set_function(*weights_apply), size);
+	cicada::apply_cube_prune(model, hypergraph, applied, weight_set_function(*weights_apply), size);
     }
     
     utils::resource end;
@@ -864,14 +864,14 @@ public:
     
     if (exact) {
       if (weights_one)
-	cicada::apply_exact<weight_set_function_one>(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
+	cicada::apply_exact(model, hypergraph, applied);
       else
-	cicada::apply_exact<weight_set_function>(model, hypergraph, applied, weight_set_function(*weights_apply), size);
+	cicada::apply_exact(model, hypergraph, applied);
     } else {
       if (weights_one)
-	cicada::apply_cube_prune<weight_set_function_one>(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
+	cicada::apply_cube_prune(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
       else
-	cicada::apply_cube_prune<weight_set_function>(model, hypergraph, applied, weight_set_function(*weights_apply), size);
+	cicada::apply_cube_prune(model, hypergraph, applied, weight_set_function(*weights_apply), size);
     }
     
     utils::resource end;
@@ -977,7 +977,7 @@ public:
     
     // second, apply again...
     
-    cicada::apply_exact<weight_set_function>(model, hypergraph, variational, weight_set_function(*weights_apply), size);
+    cicada::apply_exact(model, hypergraph, variational);
 	
     utils::resource end;
 

@@ -19,7 +19,6 @@ namespace cicada
   // a naive algorithm...
 
 
-  template <typename Semiring, typename Function>
   struct ApplyExact
   {
     typedef size_t    size_type;
@@ -37,12 +36,7 @@ namespace cicada
     
     typedef model_type::state_type     state_type;
     typedef model_type::state_set_type state_set_type;
-    
-    typedef Semiring semiring_type;
-    typedef Semiring score_type;
-    
-    typedef Function function_type;
-    
+        
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
     
     typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
@@ -66,10 +60,8 @@ namespace cicada
 #endif
     
     
-    ApplyExact(const model_type& _model,
-	       const function_type& _function)
-      : model(_model),
-	function(_function)
+    ApplyExact(const model_type& _model)
+      : model(_model)
     { const_cast<model_type&>(model).initialize(); }
     
     void operator()(const hypergraph_type& graph_in,
@@ -139,7 +131,7 @@ namespace cicada
 	    
 	    graph_out.connect_edge(edge_new.id, node.id);
 	  } else {
-	    typename state_node_map_type::iterator biter = buf.find(state);
+	    state_node_map_type::iterator biter = buf.find(state);
 	    if (biter == buf.end()) {
 	      const node_type& node_new = graph_out.add_node();
 	      
@@ -172,24 +164,25 @@ namespace cicada
     state_set_type      node_states;
     
     const model_type& model;
-    const function_type& function;
   };
 
 
-  template <typename Function>
   inline
-  void apply_exact(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
+  void apply_exact(const Model& model, const HyperGraph& source, HyperGraph& target)
   {
-    ApplyExact<typename Function::value_type, Function>(model, func)(source, target);
-  }
+    ApplyExact __apply(model);
 
-  template <typename Function>
+    __apply(source, target);
+  }
+  
   inline
-  void apply_exact(const Model& model, HyperGraph& source, const Function& func, const int cube_size)
+  void apply_exact(const Model& model, HyperGraph& source)
   {
     HyperGraph target;
     
-    ApplyExact<typename Function::value_type, Function>(model, func)(source, target);
+    ApplyExact __apply(model);
+    
+    __apply(source, target);
     
     source.swap(target);
   }

@@ -431,7 +431,7 @@ struct OptimizeLBFGS
 	model.push_back(features[id]);
 	
 	if (apply_exact)
-	  cicada::apply_exact(model, graphs[id], graph_reward, weight_set_function(weights_reward), cube_size);
+	  cicada::apply_exact(model, graphs[id], graph_reward);
 	else {
 	  cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights_reward), cube_size);
 	  cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights_penalty), cube_size);
