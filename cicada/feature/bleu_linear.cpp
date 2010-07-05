@@ -364,12 +364,6 @@ namespace cicada
 	features[base_type::feature_name()] = score;
     }
     
-    void BleuLinear::operator()(const state_ptr_type& state,
-			  feature_set_type& features) const
-    {
-      // we do nothing...
-    }
-
     void BleuLinear::initialize()
     {
       pimpl->initialize();

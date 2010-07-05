@@ -58,7 +58,8 @@ namespace cicada
 			  feature_set_type& estimates) const;
     
     void operator()(const state_type& state,
-		    edge_type& edge) const;
+		    edge_type& edge,
+		    feature_set_type& estimates) const;
     
     const_reference operator[](size_type pos) const { return models[pos]; }
     reference operator[](size_type pos) { return models[pos]; }

@@ -305,7 +305,8 @@ namespace cicada
     }
     
     void Variational::operator()(const state_ptr_type& state,
-				 feature_set_type& features) const
+				 feature_set_type& features,
+				 feature_set_type& estimates) const
     {
       pimpl->ngram_score(state, features);
     }

@@ -616,12 +616,6 @@ namespace cicada
 	features.erase(base_type::feature_name());
     }
     
-    void Bleu::operator()(const state_ptr_type& state,
-			  feature_set_type& features) const
-    {
-      // we do nothing...
-    }
-
     void Bleu::initialize()
     {
       pimpl->initialize();

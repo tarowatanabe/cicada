@@ -406,8 +406,14 @@ int main(int argc, char** argv)
 	}
       }
       
+      bool terminated = false;
       for (;;) {
 	bool found = false;
+	
+	if (! terminated && queue_send.push(std::make_pair(-1, std::string()), true)) {
+	  terminated = true;
+	  found = true;
+	}
 	
 	// termination...
 	for (int rank = 1; rank < mpi_size; ++ rank)
@@ -441,13 +447,12 @@ int main(int argc, char** argv)
 	
 	// termination condition!
 	if (std::count(istream.begin(), istream.end(), istream_ptr_type()) == mpi_size
-	    && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size) break;
+	    && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size
+	    && terminated) break;
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
       
-      // final termination!
-      queue_send.push(std::make_pair(-1, std::string()));
       
       mapper.join();
       reducer.join();

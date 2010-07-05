@@ -36,7 +36,8 @@ namespace cicada
   
   
   void Model::operator()(const state_type& state,
-			 edge_type& edge) const
+			 edge_type& edge,
+			 feature_set_type& estimates) const
   {
     const state_type& state_impl(state);
     
@@ -45,7 +46,7 @@ namespace cicada
       
       feature_function_type::state_ptr_type antecedent_state = (feature_function.state_size() ? const_cast<char*>(&(state_impl[offsets[i]])) : 0);
       
-      feature_function(antecedent_state, edge.features);
+      feature_function(antecedent_state, edge.features, estimates);
     }
   }
   

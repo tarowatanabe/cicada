@@ -419,15 +419,9 @@ namespace cicada
     }
     
     void Neighbours::operator()(const state_ptr_type& state,
-				feature_set_type& features) const
+				feature_set_type& features,
+				feature_set_type& estimates) const
     {
-      const std::string& __feature_prefix = base_type::feature_name();
-      for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
-	if (equal_prefix(__feature_prefix, fiter->first))
-	  features.erase(fiter ++);
-	else
-	  ++ fiter;
-      
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
 
       pimpl->neighbours_final_score(state, features);

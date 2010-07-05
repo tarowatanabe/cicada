@@ -127,7 +127,7 @@ namespace cicada
 	  feature_set_type estimates;
 	  const state_type state = model(graph_out, node_states, edge_new, estimates);
 	  if (is_goal)
-	    model(state, edge_new);
+	    model(state, edge_new, estimates);
 	  
 	  // hypothesis recombination
 

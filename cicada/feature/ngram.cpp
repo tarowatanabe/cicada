@@ -443,13 +443,14 @@ namespace cicada
     }
     
     void NGram::operator()(const state_ptr_type& state,
-			   feature_set_type& features) const
+			   feature_set_type& features,
+			   feature_set_type& estimates) const
     {
       const double score = pimpl->ngram_final_score(state);
       if (score != 0.0)
 	features[base_type::feature_name()] += score;
-      else
-	features.erase(base_type::feature_name());
+      
+      estimates.erase(base_type::feature_name());
     }
   };
 };

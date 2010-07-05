@@ -366,7 +366,7 @@ namespace cicada
       feature_set_type estimates;
       candidate.state = model(graph, node_states, candidate.out_edge, estimates);
       if (is_goal)
-	model(candidate.state, candidate.out_edge);
+	model(candidate.state, candidate.out_edge, estimates);
       
       candidate.estimate *= function(estimates);
       
