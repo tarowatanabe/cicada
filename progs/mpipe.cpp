@@ -75,9 +75,9 @@ struct Mapper
       queue.pop_swap(value);
       if (value.first < 0) break;
       
-      os << value.second << '\n';
-      
       queue_id.push(value.first);
+      
+      os << value.second << '\n';
     }
     
     queue_id.push(-1);
@@ -203,8 +203,9 @@ struct Dumper
       }
     }
     
-    if (! values.empty() && curr != values.begin()->first)
-      throw std::runtime_error("invalud id");
+    if (! values.empty() && curr != values.begin()->first) {
+      throw std::runtime_error("invalid id: expected: " + boost::lexical_cast<std::string>(curr) + " current: " + boost::lexical_cast<std::string>(values.begin()->first));
+    }
     
     value_set_type::const_iterator viter_end = values.end();
     for (value_set_type::const_iterator viter = values.begin(); viter != viter_end; ++ viter)
@@ -219,6 +220,25 @@ struct Dumper
 enum {
   line_tag = 1000,
 };
+
+inline
+void tokenize(const std::string& buffer, MapReduce::value_type& value)
+{
+#if 0
+  boost::iostreams::filtering_istream is_buffer;
+  is_buffer.push(boost::iostreams::array_source(buffer.c_str(), buffer.size()));
+  
+  is_buffer >> value.first;
+  std::getline(is_buffer, value.second);
+#endif
+  
+  std::string::const_iterator iter = buffer.begin();
+
+  for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
+  
+  value.first = boost::lexical_cast<int>(buffer.substr(0, iter - buffer.begin()));
+  value.second = buffer.substr(iter + 1 - buffer.begin());
+}
 
 
 inline
@@ -289,7 +309,7 @@ int main(int argc, char** argv)
       queue_type    queue_recv;
 
       utils::compress_istream is(input_file, 1024 * 1024);
-      utils::compress_ostream os(output_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, output_file == "-" ? 4096 : 1024 * 1024);
 
       boost::thread consumer(consumer_type(queue_is, is));
       boost::thread dumper(dumper_type(queue_recv, os));
@@ -345,15 +365,7 @@ int main(int argc, char** argv)
 	  for (int rank = 1; rank < mpi_size; ++ rank)
 	    if (istream[rank] && istream[rank]->test()) {
 	      if (istream[rank]->read(line)) {
-		boost::iostreams::filtering_istream is_buffer;
-		is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
-		
-		value_recv.second.clear();
-		
-		is_buffer >> value_recv.first;
-		std::getline(is_buffer, value_recv.second);
-		
-		//std::cerr << "rank: " << rank << " id: " << value_recv.first << " " << value_recv.second << std::endl;
+		tokenize(line, value_recv);
 		
 		queue_recv.push_swap(value_recv);
 	      } else
@@ -368,7 +380,7 @@ int main(int argc, char** argv)
       } else {
 	while (value.first >= 0) {
 	  bool found = false;
-	
+	  
 	  for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank)
 	    if (ostream[rank]->test() && queue_is.pop(value, true) && value.first >= 0) {
 	      ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
@@ -386,15 +398,7 @@ int main(int argc, char** argv)
 	  for (int rank = 1; rank < mpi_size; ++ rank)
 	    if (istream[rank] && istream[rank]->test()) {
 	      if (istream[rank]->read(line)) {
-		boost::iostreams::filtering_istream is_buffer;
-		is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
-	      
-		value_recv.second.clear();
-		is_buffer >> value_recv.first;
-		std::getline(is_buffer, value_recv.second);
-
-
-		//std::cerr << "rank: " << rank << " id: " << value_recv.first << " " << value_recv.second << std::endl;
+		tokenize(line, value_recv);
 	      
 		queue_recv.push_swap(value_recv);
 	      } else
@@ -407,14 +411,8 @@ int main(int argc, char** argv)
 	}
       }
       
-      bool terminated = false;
       for (;;) {
 	bool found = false;
-	
-	if (! terminated && queue_send.push(std::make_pair(-1, std::string()), true)) {
-	  terminated = true;
-	  found = true;
-	}
 	
 	// termination...
 	for (int rank = 1; rank < mpi_size; ++ rank)
@@ -432,12 +430,7 @@ int main(int argc, char** argv)
 	for (int rank = 1; rank < mpi_size; ++ rank)
 	  if (istream[rank] && istream[rank]->test()) {
 	    if (istream[rank]->read(line)) {
-	      boost::iostreams::filtering_istream is_buffer;
-	      is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
-	      
-	      value_recv.second.clear();
-	      is_buffer >> value_recv.first;
-	      std::getline(is_buffer, value_recv.second);
+	      tokenize(line, value_recv);
 	      
 	      queue_recv.push_swap(value_recv);
 	    } else
@@ -449,7 +442,7 @@ int main(int argc, char** argv)
 	// termination condition!
 	if (std::count(istream.begin(), istream.end(), istream_ptr_type()) == mpi_size
 	    && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size
-	    && terminated) break;
+	    && queue_send.push(std::make_pair(-1, std::string()), true)) break;
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
@@ -485,18 +478,9 @@ int main(int argc, char** argv)
 	bool found = false;
 	
 	if (is && is->test() && queue_send.empty()) {
-	  if (is->read(line)) {
-	    boost::iostreams::filtering_istream is_buffer;
-	    is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
-	    
-	    value.second.clear();
-	    
-	    is_buffer >> value.first;
-	    std::getline(is_buffer, value.second);
-	    
-	    //std::cerr << "rank: " << mpi_rank << " #: " << value.first << " " << value.second << std::endl;
-
-	  } else {
+	  if (is->read(line))
+	    tokenize(line, value);
+	  else {
 	    value.first = -1;
 	    value.second = std::string();
 	    
@@ -512,12 +496,8 @@ int main(int argc, char** argv)
 	  if (os && os->test() && queue_recv.pop_swap(value, true)) {
 	    if (value.first < 0)
 	      terminated = true;
-	    else {
-	      
-	      //std::cerr << "rank: " << mpi_rank << " #: " << value.first << " " << value.second << std::endl;
-
+	    else
 	      os->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
-	    }
 	    
 	    found = true;
 	  }
