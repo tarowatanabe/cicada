@@ -11,9 +11,12 @@
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
 
 namespace cicada
 {
+  
   void Parameter::parse(const std::string& parameter)
   {
     namespace qi = boost::spirit::qi;
@@ -30,7 +33,22 @@ namespace cicada
     using phoenix::ref;
     
     typedef std::string::const_iterator iter_type;
+
+#if 0
+    boost::spirit::qi::symbols<char, char> escape_char;
     
+    escape_char.add
+      ("\\\"", '\"')
+      ("\\\\", '\\')
+      ("\\a", '\a')
+      ("\\b", '\b')
+      ("\\f", '\f')
+      ("\\n", '\n')
+      ("\\r", '\r')
+      ("\\t", '\t')
+      ("\\v", '\v');
+#endif
+
     qi::rule<iter_type, attribute_type(), standard::space_type> rule_param     = (lexeme[+(char_ - space - ':')]);
     qi::rule<iter_type, key_type(), standard::space_type>       rule_key       = (lexeme[+(char_ - space - '=')]);
     qi::rule<iter_type, key_type(), standard::space_type>       rule_value     = (lexeme[+(char_ - space - ',')]);

@@ -46,6 +46,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
 #include "utils/sgi_hash_map.hpp"
+#include "utils/sgi_hash_set.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -515,9 +516,15 @@ public:
 
 class Permute : public Operation
 {
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > exclude_set_type;
+#else
+  typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > exclude_set_type;
+#endif
+
 public:
   Permute(const std::string& parameter, const int __debug)
-    : weights(0), size(0), feature(false), collapse(false), debug(__debug)
+    : excludes(), weights(0), size(0), feature(false), collapse(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -539,7 +546,27 @@ public:
 
     if (collapse && ! weights)
       throw std::runtime_error("collapsing but no weights...");
+    
+    if (param.find("exclude") != param.end())
+      for (param_type::const_iterator piter = param.find("exclude"); piter != param.end(); ++ piter)
+	if (piter->first == "exclude")
+	  excludes.insert(piter->second);
   }
+  
+  struct Filter
+  {
+    Filter(const exclude_set_type& __excludes)
+      : excludes(__excludes) {}
+    
+    const exclude_set_type& excludes;
+    
+    template <typename Cat>
+    bool operator()(const Cat& x) const
+    {
+      return ! excludes.empty() && excludes.find(x) != excludes.end();
+    }
+  };
+
   
   void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
@@ -551,11 +578,11 @@ public:
     utils::resource start;
     
     if (collapse)
-      cicada::permute(hypergraph, permuted, cicada::PermuteFeatureCollapsed<weight_set_type>(*weights), size);
+      cicada::permute(hypergraph, permuted, cicada::PermuteFeatureCollapsed<weight_set_type>(*weights), Filter(excludes), size);
     else if (feature)
-      cicada::permute(hypergraph, permuted, cicada::PermuteFeature(), size);
+      cicada::permute(hypergraph, permuted, cicada::PermuteFeature(), Filter(excludes), size);
     else
-      cicada::permute(hypergraph, permuted, cicada::PermuteNoFeature(), size);
+      cicada::permute(hypergraph, permuted, cicada::PermuteNoFeature(), Filter(excludes), size);
     
     utils::resource end;
 	
@@ -572,8 +599,11 @@ public:
     
     hypergraph.swap(permuted);
   }
+
+  exclude_set_type excludes;
   
   const weight_set_type* weights;
+  
   int size;
   bool feature;
   bool collapse;
@@ -1429,6 +1459,7 @@ permute: permute tree (monolingual tree only)\n\
 \tweights=file weight file for composed feature,\n\
 \tsize=permute size\n\
 \tcollapse=[true|false] collapse sparse features\n\
+\texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
 apply: feature application\n\

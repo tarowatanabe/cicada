@@ -27,6 +27,10 @@ namespace cicada
 	if (count)
 	  features[feature_name()] = count;
       }
+
+      void operator()(const state_ptr_type& state,
+		      feature_set_type& features,
+		      feature_set_type& estimates) const {}
     };
 
     class SourceWordPenalty : public FeatureFunction
@@ -48,6 +52,10 @@ namespace cicada
 	if (count)
 	  features[feature_name()] = count;
       }
+
+      void operator()(const state_ptr_type& state,
+		      feature_set_type& features,
+		      feature_set_type& estimates) const {}
     };
     
     class RulePenalty : public FeatureFunction
@@ -64,6 +72,9 @@ namespace cicada
 	features[feature_name()] = -1;
       }
       
+      void operator()(const state_ptr_type& state,
+		      feature_set_type& features,
+		      feature_set_type& estimates) const {}
     };
     
   };
