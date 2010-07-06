@@ -349,6 +349,7 @@ int main(int argc, char** argv)
 		is_buffer.push(boost::iostreams::array_source(line.c_str(), line.size()));
 		
 		value_recv.second.clear();
+		
 		is_buffer >> value_recv.first;
 		std::getline(is_buffer, value_recv.second);
 		
