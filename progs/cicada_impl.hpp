@@ -182,6 +182,40 @@ struct kbest_function_one
   }
 };
 
+struct kbest_traversal_source
+{
+  typedef rule_type::feature_set_type feature_set_type;
+  
+  typedef boost::tuple<sentence_type, feature_set_type> value_type;
+  
+  template <typename Edge, typename Iterator>
+  void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+  {
+    // extract source-yield, features
+
+    boost::get<0>(yield).clear();
+    boost::get<1>(yield) = edge.features;
+    
+    int non_terminal_pos = 0;
+    rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
+    for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+      if (siter->is_non_terminal()) {
+	const int pos = siter->non_terminal_index() - 1;
+	
+	if (pos < 0)
+	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + non_terminal_pos)).begin(), boost::get<0>(*(first + non_terminal_pos)).end());
+	else
+	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
+
+	++ non_terminal_pos;
+      } else if (*siter != vocab_type::EPSILON)
+	boost::get<0>(yield).push_back(*siter);
+    
+    // collect features...
+    for (/**/; first != last; ++ first)
+      boost::get<1>(yield) += boost::get<1>(*first);
+  }
+};
 
 struct kbest_traversal
 {
@@ -197,11 +231,18 @@ struct kbest_traversal
     boost::get<0>(yield).clear();
     boost::get<1>(yield) = edge.features;
     
+    int non_terminal_pos = 0;
     rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
     for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
       if (titer->is_non_terminal()) {
 	const int pos = titer->non_terminal_index() - 1;
-	boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
+	
+	if (pos < 0)
+	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + non_terminal_pos)).begin(), boost::get<0>(*(first + non_terminal_pos)).end());
+	else
+	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
+
+	++ non_terminal_pos;
       } else if (*titer != vocab_type::EPSILON)
 	boost::get<0>(yield).push_back(*titer);
     
@@ -1198,7 +1239,10 @@ class OutputString : public Operation
 {
 public:
   OutputString(const std::string& parameter, std::string& __buffer, size_t& __id, const int __debug)
-    : buffer(__buffer), id(__id), weights(0), weights_one(false), kbest_size(0), kbest_unique(false), debug(__debug)
+    : buffer(__buffer), id(__id), weights(0), weights_one(false),
+      kbest_size(0), kbest_unique(false),
+      yield_source(false), yield_target(false),
+      debug(__debug)
   {
     typedef cicada::Parameter param_type;
 
@@ -1220,6 +1264,22 @@ public:
 
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
+
+    if (param.find("yield") != param.end()) {
+      const std::string& value = param.find("yield")->second;
+      if (strcasecmp(value.c_str(), "source") == 0)
+	yield_source = true;
+      else if (strcasecmp(value.c_str(), "target") == 0)
+	yield_target = true;
+      else
+	throw std::runtime_error("unknown yield: " + value);
+    }
+
+    if (yield_source && yield_target)
+      throw std::runtime_error("only source or target yield for kbest");
+    
+    if (! yield_source && ! yield_target)
+      yield_target = true;
   }
 
   void clear()
@@ -1244,17 +1304,31 @@ public:
     else {
       weight_set_type weights_zero;
       const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
-      
+
       if (weights_one) {
-	if (kbest_unique)
-	  kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
-	else
-	  kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	if (kbest_unique) {
+	  if (yield_source)
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
+	} else {
+	  if (yield_source)
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	}
       } else {
-	if (kbest_unique)
-	  kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
-	else
-	  kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	if (kbest_unique) {
+	  if (yield_source)
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
+	} else {
+	  if (yield_source)
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	}
       }
     }    
   }
@@ -1267,6 +1341,9 @@ public:
   int  kbest_size;
   bool kbest_unique;
 
+  bool yield_source;
+  bool yield_target;
+
   int debug;
 };
 
@@ -1274,7 +1351,10 @@ class Output : public Operation
 {
 public:
   Output(const std::string& parameter, boost::shared_ptr<std::ostream>& __os, size_t& __id, const int __debug)
-    : os(__os), id(__id), file(), directory(), weights(0), weights_one(false), kbest_size(0), kbest_unique(false), debug(__debug)
+    : os(__os), id(__id), file(), directory(), weights(0), weights_one(false),
+      kbest_size(0), kbest_unique(false),
+      yield_source(false), yield_target(false),
+      debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -1309,6 +1389,23 @@ public:
     
     if (! directory.empty() && ! file.empty())
       throw std::runtime_error("you cannot output both in directory and file");
+    
+    if (param.find("yield") != param.end()) {
+      const std::string& value = param.find("yield")->second;
+      if (strcasecmp(value.c_str(), "source") == 0)
+	yield_source = true;
+      else if (strcasecmp(value.c_str(), "target") == 0)
+	yield_target = true;
+      else
+	throw std::runtime_error("unknown yield: " + value);
+    }
+
+    if (yield_source && yield_target)
+      throw std::runtime_error("only source or target yield for kbest");
+    
+    if (! yield_source && ! yield_target)
+      yield_target = true;
+
   }
 
   void assign(const weight_set_type& __weights)
@@ -1343,15 +1440,29 @@ public:
       const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
       
       if (weights_one) {
-	if (kbest_unique)
-	  kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
-	else
-	  kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	if (kbest_unique) {
+	  if (yield_source)
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
+	} else {
+	  if (yield_source)	  
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	}
       } else {
-	if (kbest_unique)
-	  kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
-	else
-	  kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	if (kbest_unique) {
+	  if (yield_source)
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
+	} else {
+	  if (yield_source)
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	}
       }
     }    
   }
@@ -1367,6 +1478,9 @@ public:
   int  kbest_size;
   bool kbest_unique;
 
+  bool yield_source;
+  bool yield_target;
+  
   int debug;
 };
 
@@ -1452,43 +1566,44 @@ public:
   {
     static const char* desc = "\
 binarize: perform binarization (monolingual tree)\n\
-\tdirection=[left|right] binarization direction,\n\
+\tdirection=[left|right] binarization direction\n\
 \tsize=binarization size\n\
 permute: permute tree (monolingual tree only)\n\
-\tfeature=[true|false] apply feature,\n\
-\tweights=file weight file for composed feature,\n\
+\tfeature=[true|false] apply feature\n\
+\tweights=file weight file for composed feature\n\
 \tsize=permute size\n\
 \tcollapse=[true|false] collapse sparse features\n\
 \texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
 apply: feature application\n\
-\tsize=<cube size>,\n\
-\texact=[true|false] no pruning feature application,\n\
-\tweights=weight file for feature,\n\
+\tsize=<cube size>\n\
+\texact=[true|false] no pruning feature application\n\
+\tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 bleu: BLEU computation\n\
 \tsize=<cube size>\n\
-\texact=[true|false] no pruning feature application,\n\
-\tweights=weight file for feature,\n\
+\texact=[true|false] no pruning feature application\n\
+\tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 variational: variational decoding\n\
-\tweights=weight file for feature,\n\
-\tweights-variational=weighs for variational decoding feature,\n\
+\tweights=weight file for feature\n\
+\tweights-variational=weighs for variational decoding feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 prune: beam pruning\n\
-\tbeam=beam threshold in 0.0 < threshold,\n\
-\tscale=scaling for score,\n\
-\tsemiring=[tropical|logprob|log] semiring to perform score computation,\n\
-\tweights=weight file for feature,\n\
+\tbeam=beam threshold in 0.0 < threshold\n\
+\tscale=scaling for score\n\
+\tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
+\tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
 \tintersect\n\
 output: kbest or hypergraph output\n\
-\tkbest=<kbest size> zero for hypergraph output (default),\n\
-\tunique=[true|false] unique translation,\n\
-\tweights=weight file for feature,\n\
-\tweights-one=[true|false] one initialize weight,\n\
-\tdirectory=directory for output,\n\
+\tkbest=<kbest size> zero for hypergraph output (default)\n\
+\tunique=[true|false] unique translation\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialize weight\n\
+\tyield=[source|target] yield for kbest\n\
+\tdirectory=directory for output\n\
 \tfile=file for output\n\
 ";
     return desc;
