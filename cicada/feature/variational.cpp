@@ -295,12 +295,26 @@ namespace cicada
     
     Variational::~Variational() { std::auto_ptr<impl_type> tmp(pimpl); }
     
+    template <typename FeaturePrefix, typename Feature>
+    inline
+    bool equal_prefix(const FeaturePrefix& prefix, const Feature& x)
+    {
+      return x.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin());
+    }
+
     void Variational::operator()(state_ptr_type& state,
 				 const state_ptr_set_type& states,
 				 const edge_type& edge,
 				 feature_set_type& features,
 				 feature_set_type& estimates) const
     {
+      const std::string& __feature_prefix = base_type::feature_name();
+      for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
+	if (equal_prefix(__feature_prefix, fiter->first))
+	  features.erase(fiter ++);
+	else
+	  ++ fiter;
+
       pimpl->ngram_score(state, states, edge, features);
     }
     
