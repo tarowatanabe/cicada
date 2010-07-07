@@ -21,7 +21,7 @@ namespace cicada
   //
   // @InProceedings{huang-chiang:2007:ACLMain,
   //  author    = {Huang, Liang  and  Chiang, David},
-  //  title     = {Forest Rescoring: Faster Decoding with Integrated Language Models},
+ //  title     = {Forest Rescoring: Faster Decoding with Integrated Language Models},
   //  booktitle = {Proceedings of the 45th Annual Meeting of the Association of Computational Linguistics},
   //  month     = {June},
   //  year      = {2007},
@@ -63,8 +63,8 @@ namespace cicada
     
     struct Candidate
     {
-      int node;
-
+      id_type node;
+      
       const edge_type* in_edge;
       edge_type        out_edge;
       
@@ -86,8 +86,21 @@ namespace cicada
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
-    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_list_type;
-    typedef std::vector<candidate_list_type, std::allocator<candidate_list_type> > candidate_node_type;
+    
+    struct node_score_type
+    {
+      id_type node;
+      score_type score;
+      score_type estimate;
+
+      node_score_type() : node(), score(), estimate() {}
+
+      node_score_type(const id_type __node, const score_type& __score, const score_type& __estimate)
+	: node(__node), score(__score), estimate(__estimate) {}
+    };
+    
+    typedef std::vector<node_score_type, std::allocator<node_score_type> > node_score_list_type;
+    typedef std::vector<node_score_list_type, std::allocator<node_score_list_type> > node_score_set_type;
     
     struct state_hash_type : public utils::hashmurmur<size_t>
     {
@@ -144,6 +157,11 @@ namespace cicada
       {
 	return x->estimate > y->estimate;
       }
+
+      bool operator()(const node_score_type& x, const node_score_type& y) const
+      {
+	return x.estimate > y.estimate;
+      }
     };
 
     
@@ -183,6 +201,9 @@ namespace cicada
     void kbest(id_type v, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       //std::cerr << "kbest node: " << v << std::endl;
+      
+      // clear candidates!
+      candidates.clear();
 
       const node_type& node = graph_in.nodes[v];
       const bool is_goal(v == graph_in.goal);
@@ -228,7 +249,7 @@ namespace cicada
       
       typename state_node_map_type::const_iterator biter_end = buf.end();
       for (typename state_node_map_type::const_iterator biter = buf.begin(); biter != biter_end; ++ biter)
-	D[v].push_back(biter->second);
+	D[v].push_back(node_score_type(biter->second->node, biter->second->score, biter->second->estimate));
       
       std::sort(D[v].begin(), D[v].end(), compare_estimate_type());
     }
@@ -355,7 +376,7 @@ namespace cicada
       candidate.score = semiring::traits<score_type>::one();
       candidate.estimate = semiring::traits<score_type>::one();
       for (int i = 0; i < j.size(); ++ i) {
-	const candidate_type& antecedent = *D[edge.tails[i]][j[i]];
+	const node_score_type& antecedent = D[edge.tails[i]][j[i]];
 	
 	candidate.out_edge.tails[i] = antecedent.node;
 	candidate.score *= antecedent.score;
@@ -379,8 +400,8 @@ namespace cicada
     };
     
   private:
-    candidate_set_type candidates;
-    candidate_node_type D;
+    candidate_set_type  candidates;
+    node_score_set_type D;
     state_set_type      node_states;
 
     const model_type& model;
