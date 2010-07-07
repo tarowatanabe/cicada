@@ -32,13 +32,13 @@ namespace cicada
 {
   
   template <typename Iterator>
-  struct rule_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule()>
+  struct graphviz_rule_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule()>
   {
     typedef cicada::Rule                 rule_type;
     typedef rule_type::symbol_type       symbol_type;
     typedef rule_type::symbol_set_type   symbol_set_type;
     
-    rule_generator() : rule_generator::base_type(rule)
+    graphviz_rule_generator() : graphviz_rule_generator::base_type(rule)
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
@@ -83,7 +83,7 @@ namespace cicada
   };
 
   template <typename Iterator>
-  struct feature_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule::feature_set_type()>
+  struct graphviz_feature_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule::feature_set_type()>
   {
     typedef cicada::Rule                 rule_type;
     typedef rule_type::symbol_type       symbol_type;
@@ -92,7 +92,7 @@ namespace cicada
     typedef rule_type::feature_set_type  feature_set_type;
     typedef feature_set_type::value_type value_type;
     
-    feature_generator() : feature_generator::base_type(features)
+    graphviz_feature_generator() : graphviz_feature_generator::base_type(features)
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
@@ -143,8 +143,8 @@ namespace cicada
 
     typedef std::back_insert_iterator<std::string> iterator_type;
     
-    typedef rule_generator<iterator_type>    rule_grammar_type;
-    typedef feature_generator<iterator_type> feature_grammar_type;
+    typedef graphviz_rule_generator<iterator_type>    rule_grammar_type;
+    typedef graphviz_feature_generator<iterator_type> feature_grammar_type;
 
 #ifdef HAVE_TLS
     static __thread rule_grammar_type* __rule_grammar_tls = 0;
