@@ -243,7 +243,7 @@ struct TaskStdout
       
       operations(line);
       
-      queue_os.push(operations.buffer);
+      queue_os.push(boost::lexical_cast<std::string>(operations.id) + ' ' + operations.buffer);
     }
 
     queue_os.push(std::string());
@@ -264,6 +264,7 @@ struct ReduceStdout
   
   void operator()()
   {
+#if 0
     if (input_directory_mode) {
       std::string buffer;
 
@@ -273,42 +274,46 @@ struct ReduceStdout
 	queue.pop_swap(buffer);
 	
 	if (buffer.empty()) break;
+
+	std::string::const_iterator iter = buffer.begin();
+	for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
 	
-	os << buffer;
+	os << buffer.substr(iter - buffer.begin() + 1);
 	os << std::flush;
       }
 
     } else {
+#endif
       typedef size_t id_type;
       typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
     
       buffer_map_type maps;
       std::string buffer;
+      std::string buffer_tokenized;
     
       id_type     id = 0;
       id_type     buffer_id;
-      std::string buffer_sep;
-    
+      
       utils::compress_ostream os(path, 1024 * 1024);
       
       for (;;) {
 	queue.pop_swap(buffer);
-      
+	
 	if (buffer.empty()) break;
 	
-	boost::iostreams::filtering_istream is;
-	is.push(boost::iostreams::array_source(buffer.c_str(), buffer.size()));
+	std::string::const_iterator iter = buffer.begin();
+	for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
 	
-	is >> buffer_id >> buffer_sep;
-	
-	if (buffer_sep != "|||") continue;
-	
+	// tokenize here...
+	buffer_id = boost::lexical_cast<size_t>(buffer.substr(0, iter - buffer.begin()));
+	buffer_tokenized    = buffer.substr(iter + 1 - buffer.begin());
+
 	if (buffer_id == id) {
-	  os << buffer;
+	  os << buffer_tokenized;
 	  os << std::flush;
 	  ++ id;
 	} else
-	  maps[buffer_id].swap(buffer);
+	  maps[buffer_id].swap(buffer_tokenized);
 	
 	for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
 	  os << iter->second;
@@ -325,7 +330,9 @@ struct ReduceStdout
     
       if (! maps.empty())
 	throw std::runtime_error("id mismatch!");
+#if 0
     }
+#endif
   }
   
   

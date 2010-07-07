@@ -73,6 +73,7 @@ ngram.hpp \
 grammar.hpp \
 grammar_mutable.hpp \
 grammar_static.hpp \
+graphviz.hpp \
 hypergraph.hpp \
 inside_outside.hpp \
 kbest.hpp \
@@ -101,6 +102,7 @@ feature.cpp \
 feature_function.cpp \
 grammar_mutable.cpp \
 grammar_static.cpp \
+graphviz.cpp \
 hypergraph.cpp \
 lattice.cpp \
 ngram.cpp \

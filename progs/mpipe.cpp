@@ -173,9 +173,11 @@ struct Dumper
   typedef map_reduce_type::queue_type      queue_type;
   
   Dumper(queue_type& __queue,
-	 std::ostream& __os)
+	 std::ostream& __os,
+	 const int __mpi_size)
     : queue(__queue),
-      os(__os) {}
+      os(__os),
+      mpi_size(__mpi_size) {}
 
   void operator()()
   {
@@ -185,10 +187,18 @@ struct Dumper
     value_set_type values;
     
     int curr = 0;
+
+    int consumed_size = 0;
     
     while (1) {
       queue.pop_swap(value);
-      if (value.first < 0) break;
+      if (value.first < 0) {
+	++ consumed_size;
+	if (consumed_size == mpi_size)
+	  break;
+	else
+	  continue;
+      }
       
       if (curr == value.first) {
 	os << value.second << '\n';
@@ -214,7 +224,7 @@ struct Dumper
   
   queue_type&   queue;
   std::ostream& os;
-  
+  int mpi_size;
 };
 
 enum {
@@ -312,7 +322,7 @@ int main(int argc, char** argv)
       utils::compress_ostream os(output_file, output_file == "-" ? 4096 : 1024 * 1024);
 
       boost::thread consumer(consumer_type(queue_is, is));
-      boost::thread dumper(dumper_type(queue_recv, os));
+      boost::thread dumper(dumper_type(queue_recv, os, mpi_size));
       
       boost::thread mapper(mapper_type(queue_send, queue_id, subprocess));
       boost::thread reducer(reducer_type(queue_recv, queue_id, subprocess));
@@ -401,8 +411,10 @@ int main(int argc, char** argv)
 		tokenize(line, value_recv);
 	      
 		queue_recv.push_swap(value_recv);
-	      } else
+	      } else {
+		queue_recv.push(std::make_pair(-1, std::string()));
 		istream[rank].reset();
+	      }
 	    
 	      found = true;
 	    }
@@ -411,8 +423,15 @@ int main(int argc, char** argv)
 	}
       }
       
+      bool terminated = false;
+
       for (;;) {
 	bool found = false;
+
+	if (! terminated && queue_send.push(std::make_pair(-1, std::string()), true)) {
+	  terminated = true;
+	  found = true;
+	}
 	
 	// termination...
 	for (int rank = 1; rank < mpi_size; ++ rank)
@@ -433,16 +452,18 @@ int main(int argc, char** argv)
 	      tokenize(line, value_recv);
 	      
 	      queue_recv.push_swap(value_recv);
-	    } else
+	    } else {
+	      queue_recv.push(std::make_pair(-1, std::string()));
 	      istream[rank].reset();
-	    
+	    }
+		
 	    found = true;
 	  }
 	
 	// termination condition!
 	if (std::count(istream.begin(), istream.end(), istream_ptr_type()) == mpi_size
 	    && std::count(ostream.begin(), ostream.end(), ostream_ptr_type()) == mpi_size
-	    && queue_send.push(std::make_pair(-1, std::string()), true)) break;
+	    && terminated) break;
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
       }

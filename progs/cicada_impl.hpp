@@ -23,6 +23,7 @@
 
 #include "cicada/kbest.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/graphviz.hpp"
 
 #include "cicada/model.hpp"
 #include "cicada/grammar.hpp"
@@ -1242,6 +1243,7 @@ public:
     : buffer(__buffer), id(__id), weights(0), weights_one(false),
       kbest_size(0), kbest_unique(false),
       yield_source(false), yield_target(false),
+      graphviz(false),
       debug(__debug)
   {
     typedef cicada::Parameter param_type;
@@ -1280,6 +1282,9 @@ public:
     
     if (! yield_source && ! yield_target)
       yield_target = true;
+
+    if (param.find("graphviz") != param.end())
+      graphviz = true_false(param.find("graphviz")->second);
   }
 
   void clear()
@@ -1299,9 +1304,12 @@ public:
     boost::iostreams::filtering_ostream os;
     os.push(boost::iostreams::back_inserter(const_cast<std::string&>(buffer)));
     
-    if (kbest_size <= 0)
-      os << id << " ||| " << hypergraph << '\n';
-    else {
+    if (kbest_size <= 0) {
+      if (graphviz)
+	cicada::graphviz(os, hypergraph);
+      else
+	os << id << " ||| " << hypergraph << '\n';
+    } else {
       weight_set_type weights_zero;
       const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
 
@@ -1344,6 +1352,8 @@ public:
   bool yield_source;
   bool yield_target;
 
+  bool graphviz;
+
   int debug;
 };
 
@@ -1354,6 +1364,7 @@ public:
     : os(__os), id(__id), file(), directory(), weights(0), weights_one(false),
       kbest_size(0), kbest_unique(false),
       yield_source(false), yield_target(false),
+      graphviz(false),
       debug(__debug)
   {
     typedef cicada::Parameter param_type;
@@ -1370,16 +1381,16 @@ public:
     
     if (param.find("weights") != param.end())
       weights = &base_type::weights(param.find("weights")->second);
-   
+    
     if (param.find("weights-one") != param.end())
       weights_one = true_false(param.find("weights-one")->second);
-
+    
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
     
     if (param.find("directory") != param.end())
       directory = param.find("directory")->second;
-
+    
     if (param.find("file") != param.end())
       file = param.find("file")->second;
     
@@ -1399,13 +1410,15 @@ public:
       else
 	throw std::runtime_error("unknown yield: " + value);
     }
-
+    
     if (yield_source && yield_target)
       throw std::runtime_error("only source or target yield for kbest");
     
     if (! yield_source && ! yield_target)
       yield_target = true;
-
+    
+    if (param.find("graphviz") != param.end())
+      graphviz = true_false(param.find("graphviz")->second);
   }
 
   void assign(const weight_set_type& __weights)
@@ -1433,9 +1446,12 @@ public:
       const_cast<boost::shared_ptr<std::ostream>&>(os).reset(new utils::compress_ostream(path, 1024 * 1024));
     }
     
-    if (kbest_size <= 0)
-      *os << id << " ||| " << hypergraph << '\n';
-    else {
+    if (kbest_size <= 0) {
+      if (graphviz)
+	cicada::graphviz(*os, hypergraph);
+      else
+	*os << id << " ||| " << hypergraph << '\n';
+    } else {
       weight_set_type weights_zero;
       const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
       
@@ -1480,6 +1496,8 @@ public:
 
   bool yield_source;
   bool yield_target;
+
+  bool graphviz;
   
   int debug;
 };
@@ -1506,7 +1524,7 @@ public:
 	       const bool __input_bitext,
 	       const bool __input_mpi,
 	       const int debug)
-    : id(0), 
+    : id(size_t(-1)), 
       input_id(__input_id),
       input_lattice(__input_lattice),
       input_forest(__input_forest),
@@ -1603,6 +1621,7 @@ output: kbest or hypergraph output\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialize weight\n\
 \tyield=[source|target] yield for kbest\n\
+\tgraphviz=[true|false] dump in graphviz format\n\
 \tdirectory=directory for output\n\
 \tfile=file for output\n\
 ";
@@ -1628,9 +1647,11 @@ output: kbest or hypergraph output\n\
     std::string::const_iterator iter = line.begin();
     std::string::const_iterator end = line.end();
     
-    if (input_id)
+    if (input_id) {
       if (! parse_id(id, iter, end))
 	throw std::runtime_error("invalid id-prefixed format");
+    } else
+      ++ id;
     
     if (input_lattice) {
       if (! lattice.assign(iter, end))
@@ -1662,14 +1683,12 @@ output: kbest or hypergraph output\n\
     if (iter != end)
       throw std::runtime_error("invalid input format");
     
-    if (lattice.empty() && ! hypergraph.is_valid())
-      ++ id;
-    else {
+    if (lattice.empty() && ! hypergraph.is_valid()) {
+      
+    } else {
       operation_ptr_set_type::const_iterator oiter_end = operations.end();
       for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
 	(*oiter)->operator()(lattice, targets, hypergraph);
-      
-      ++ id;
     }
   }
   
