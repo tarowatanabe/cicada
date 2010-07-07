@@ -509,8 +509,8 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(1.0);
-    //margins.push_back(bleu_reward.back() * norm * loss_scale);
-    margins.push_back(1.0);
+    margins.push_back(bleu_reward.back() * norm * loss_scale);
+    //margins.push_back(1.0);
     
     features.push_back(feature_set_type());
     features.back().assign(accumulated_penalty_unique.accumulated.begin(), accumulated_penalty_unique.accumulated.end());
@@ -520,8 +520,8 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(-1.0);
-    //margins.push_back(bleu_penalty.back() * norm * loss_scale);
-    margins.push_back(1.0);
+    margins.push_back(bleu_penalty.back() * norm * loss_scale);
+    //margins.push_back(1.0);
   }
 
   void add_support_vectors_factored(const hypergraph_type& hypergraph_reward,
@@ -557,14 +557,14 @@ struct Task
       
       features.back() *= (1.0 / counts_reward.back());
       features.back()["bias"] = 1.0;
-	    
+      
       features.back().erase(feature_name);
-	    
+      
       labels.push_back(1.0);
-      //margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
-      margins.push_back(1.0);
+      margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
+      //margins.push_back(1.0);
     }
-	  
+    
     for (int i = 0; i < accumulated_penalty.size(); ++ i) {
       features.push_back(feature_set_type());
       features.back().assign(accumulated_penalty[i].begin(), accumulated_penalty[i].end());
@@ -573,10 +573,10 @@ struct Task
       features.back()["bias"] = 1.0;
 	    
       features.back().erase(feature_name);
-	    
+      
       labels.push_back(-1.0);
-      //margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
-      margins.push_back(1.0);
+      margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
+      //margins.push_back(1.0);
     }
   }
 
