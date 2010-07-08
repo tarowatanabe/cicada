@@ -126,12 +126,12 @@ namespace cicada
 	  
 	  phrase_spans.clear();
 	  phrase.terminals(std::back_inserter(phrase_spans));
-
+	  
 	  if (phrase_spans.size() != states.size() + 1)
 	    throw std::runtime_error("# of states does not match...");
-
-	  symbol_type prefix = vocab_type::EPSILON;
-	  symbol_type suffix = vocab_type::EPSILON;
+	  
+	  symbol_type prefix = vocab_type::EMPTY;
+	  symbol_type suffix = vocab_type::EMPTY;
 	  int size = count_span(phrase_spans.front().first, phrase_spans.front().second, prefix, suffix);
 
 	  id_type state_id(id_type(-1));
@@ -148,26 +148,28 @@ namespace cicada
 	    
 	    const id_type antecedent_id = *reinterpret_cast<const id_type*>(states[antecedent_index]);
 
-	    symbol_type prefix_next = vocab_type::EPSILON;
-	    symbol_type suffix_next = vocab_type::EPSILON;
-	    int size_next = count_span(span.first, span.second, prefix_next, suffix_next);
-
-	    if (prefix == vocab_type::EPSILON)
-	      prefix = state_map[antecedent_id].prefix;
-	    	    
-	    if (prefix == vocab_type::EPSILON && prefix_next != vocab_type::EPSILON)
-	      prefix = prefix_next;
+	    const symbol_type prefix_antecedent = state_map[antecedent_id].prefix;
+	    const symbol_type suffix_antecedent = state_map[antecedent_id].suffix;
 	    
-	    if (prefix_next != vocab_type::EPSILON) {
+	    symbol_type prefix_next = vocab_type::EMPTY;
+	    symbol_type suffix_next = vocab_type::EMPTY;
+	    const int size_next = count_span(span.first, span.second, prefix_next, suffix_next);
+
+	    size  += size_next + state_map[antecedent_id].span;
+	    
+	    if (prefix == vocab_type::EMPTY)
+	      prefix = prefix_antecedent;
+	    
+	    if (prefix_next != vocab_type::EMPTY) {
 	      state_id = apply_features(features, state_id, antecedent_id, suffix, prefix_next);
 	      
 	      suffix = suffix_next;
-	      size  += size_next + state_map[antecedent_id].span;
 	    } else if (siter + 1 != siter_end) {
 	      // we have no prefix for this span, but prefix from next antecedent node...
+	      //thus, use next antecedent's prefix as our suffix
 	      
 	      int antecedent_index_next = (span.second)->non_terminal_index() - 1;
-	      if (antecedent_index < 0)
+	      if (antecedent_index_next < 0)
 		antecedent_index_next = siter + 1 - (siter_begin + 1);
 	      
 	      const id_type antecedent_id_next = *reinterpret_cast<const id_type*>(states[antecedent_index_next]);
@@ -175,18 +177,16 @@ namespace cicada
 	      
 	      state_id = apply_features(features, state_id, antecedent_id, suffix, state_map[antecedent_id_next].prefix);
 	      
-	      suffix = state_map[antecedent_id].suffix;
-	      size  += state_map[antecedent_id].span;
+	      suffix = suffix_antecedent;
 	    } else {
-	      // we have nothing...
-	      state_id = apply_features(features, state_id, antecedent_id, suffix, vocab_type::EPSILON);
+	      // we have nothing as our suffix
+	      state_id = apply_features(features, state_id, antecedent_id, suffix, vocab_type::EMPTY);
 	      
-	      suffix = state_map[antecedent_id].suffix;
-	      size  += state_map[antecedent_id].span;
+	      suffix = suffix_antecedent;
 	    } 
 	  }
 	  
-	  // construct state...
+	  // construct state is used as supplier for the next state...
 	  state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(state_id, edge.rule->lhs, prefix, suffix, size)).first;
 	  
 	  *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
@@ -206,15 +206,15 @@ namespace cicada
 
 	state_set_type states;
 
-	if (prefix == vocab_type::EPSILON && suffix == vocab_type::EPSILON) {
+	if (prefix == vocab_type::EMPTY && suffix == vocab_type::EMPTY) {
 	  while (id != id_type(-1)) {
 	    const state_type& state = state_map[id];
 	    
-	    if (state.prefix == vocab_type::EPSILON && state.suffix == vocab_type::EPSILON)
+	    if (state.prefix == vocab_type::EMPTY && state.suffix == vocab_type::EMPTY)
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
-	    else if (state.prefix == vocab_type::EPSILON)
+	    else if (state.prefix == vocab_type::EMPTY)
 	      states.push_back(state_type(id_curr, state.node, prefix, state.suffix, state.span));
-	    else if (state.suffix == vocab_type::EPSILON)
+	    else if (state.suffix == vocab_type::EMPTY)
 	      states.push_back(state_type(id_curr, state.node, state.prefix, suffix, state.span));
 	    else
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
@@ -222,34 +222,34 @@ namespace cicada
 	    id = state.parent;
 	  }
 	  
-	} else if (prefix == vocab_type::EPSILON) {
+	} else if (prefix == vocab_type::EMPTY) {
 	  // we have at least suffix context...
 	  
 	  while (id != id_type(-1)) {
 	    const state_type& state = state_map[id];
 	    
-	    if (state.prefix == vocab_type::EPSILON && state.suffix == vocab_type::EPSILON)
+	    if (state.prefix == vocab_type::EMPTY && state.suffix == vocab_type::EMPTY)
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
-	    else if (state.prefix == vocab_type::EPSILON)
+	    else if (state.prefix == vocab_type::EMPTY)
 	      states.push_back(state_type(id_curr, state.node, prefix, state.suffix, state.span));
-	    else if (state.suffix == vocab_type::EPSILON)
+	    else if (state.suffix == vocab_type::EMPTY)
 	      apply_feature(features, state.node, state.prefix, suffix, state.span);
 	    else
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
 	    
 	    id = state.parent;
 	  }
-	} else if (suffix == vocab_type::EPSILON) {
+	} else if (suffix == vocab_type::EMPTY) {
 	  // we have at least prefix context...
 	  
 	  while (id != id_type(-1)) {
 	    const state_type& state = state_map[id];
 	    
-	    if (state.prefix == vocab_type::EPSILON && state.suffix == vocab_type::EPSILON)
+	    if (state.prefix == vocab_type::EMPTY && state.suffix == vocab_type::EMPTY)
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
-	    else if (state.suffix == vocab_type::EPSILON)
+	    else if (state.suffix == vocab_type::EMPTY)
 	      states.push_back(state_type(id_curr, state.node, state.prefix, suffix, state.span));
-	    else if (state.prefix == vocab_type::EPSILON)
+	    else if (state.prefix == vocab_type::EMPTY)
 	      apply_feature(features, state.node, prefix, state.suffix, state.span);
 	    else
 	      states.push_back(state_type(id_curr, state.node, prefix, suffix, state.span));
@@ -260,11 +260,11 @@ namespace cicada
 	  while (id != id_type(-1)) {
 	    const state_type& state = state_map[id];
 	  
-	    if (state.prefix == vocab_type::EPSILON && state.suffix == vocab_type::EPSILON)
+	    if (state.prefix == vocab_type::EMPTY && state.suffix == vocab_type::EMPTY)
 	      apply_feature(features, state.node, prefix, suffix, state.span);
-	    else if (state.prefix == vocab_type::EPSILON)
+	    else if (state.prefix == vocab_type::EMPTY)
 	      apply_feature(features, state.node, prefix, state.suffix, state.span);
-	    else if (state.suffix == vocab_type::EPSILON)
+	    else if (state.suffix == vocab_type::EMPTY)
 	      apply_feature(features, state.node, state.prefix, suffix, state.span);
 	    else
 	      apply_feature(features, state.node, prefix, suffix, state.span);
