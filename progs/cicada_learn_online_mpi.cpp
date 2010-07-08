@@ -599,7 +599,7 @@ struct Task
     model_bleu.push_back(feature_function);
 
     weight_set_type weights_bleu;
-    weights_blue[__bleu->feature_name()] = 1.0;
+    weights_bleu[__bleu->feature_name()] = 1.0;
     
     model_type model_sparse;
     for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter)
