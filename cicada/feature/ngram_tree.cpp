@@ -130,7 +130,7 @@ namespace cicada
 	  std::string prefix = epsilon;
 	  std::string suffix = epsilon;
 	  
-	  apply_features(features, edge, phrase.begin(), phrase.end(), prefix, suffix);
+	  compute_bound(features, edge, phrase.begin(), phrase.end(), prefix, suffix);
 	  
 	  if (prefix != epsilon) {
 	    const id_type id_prefix = tree_id(prefix);
@@ -156,7 +156,7 @@ namespace cicada
 	  std::string prefix = epsilon;
 	  std::string suffix = epsilon;
 	  
-	  apply_features(features, edge, phrase_spans.front().first, phrase_spans.front().second, prefix, suffix);
+	  compute_bound(features, edge, phrase_spans.front().first, phrase_spans.front().second, prefix, suffix);
 	  
 	  id_type state_id(id_type(-1));
 	  
@@ -177,7 +177,7 @@ namespace cicada
 	    
 	    std::string prefix_next = epsilon;
 	    std::string suffix_next = epsilon;
-	    apply_features(features, edge, span.first, span.second, prefix_next, suffix_next);
+	    compute_bound(features, edge, span.first, span.second, prefix_next, suffix_next);
 	    
 	    if (prefix == epsilon && prefix_next != epsilon)
 	      prefix = prefix_next;
@@ -232,7 +232,7 @@ namespace cicada
       }
 
       template <typename Iterator>
-      void apply_features(feature_set_type& features, const edge_type& edge, Iterator first, Iterator last, std::string& prefix, std::string& suffix) const
+      void compute_bound(feature_set_type& features, const edge_type& edge, Iterator first, Iterator last, std::string& prefix, std::string& suffix) const
       {
 	const std::string& epsilon = static_cast<const std::string&>(vocab_type::EPSILON);
 	
@@ -242,8 +242,9 @@ namespace cicada
 	    if (is_front)
 	      prefix = *first;
 	    
-	    if (suffix != epsilon)
-	      apply_feature(features, edge.rule->lhs, suffix, *first);
+	    // we will count only the boundary...
+	    //if (suffix != epsilon)
+	    //  apply_feature(features, edge.rule->lhs, suffix, *first);
 	    
 	    suffix = *first;
 	    is_front = false;

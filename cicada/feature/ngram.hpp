@@ -43,12 +43,10 @@ namespace cicada
       // order: ngram's order
       
       NGram(const std::string& parameter);
+      NGram(const NGram&);
       ~NGram();
       
-    private:
-      NGram() {}
-      NGram(const NGram&) {}
-      NGram& operator=(const NGram&) { return *this; }
+      NGram& operator=(const NGram&);
       
     public:
       virtual void operator()(state_ptr_type& state,

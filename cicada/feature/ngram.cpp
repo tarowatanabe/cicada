@@ -88,6 +88,28 @@ namespace cicada
 	initialize_decay();
       }
 
+      NGramImpl(const NGramImpl& x)
+	: ngram(x.ngram), order(x.order)
+      {
+	cache_logprob.clear();
+	cache_estimate.clear();
+	
+	initialize_decay();
+      }
+
+      NGramImpl& operator=(const NGramImpl& x)
+      {
+	ngram = x.ngram;
+	order = x.order;
+	
+	cache_logprob.clear();
+	cache_estimate.clear();
+	
+	initialize_decay();
+	
+	return *this;
+      }
+
       void initialize_decay()
       {
 	decays.clear();
@@ -421,6 +443,28 @@ namespace cicada
     }
     
     NGram::~NGram() { std::auto_ptr<impl_type> tmp(pimpl); }
+    
+    NGram::NGram(const NGram& x)
+      : pimpl(new impl_type(*x.pimpl))
+    {
+      __state_size     = x.__state_size;
+      __feature_name   = x.__feature_name;
+      __sparse_feature = x.__sparse_feature;
+      __apply_feature  = x.__apply_feature;
+    }
+    
+    NGram& NGram::operator=(const NGram& x)
+    {
+      *pimpl = *x.pimpl;
+
+      __state_size     = x.__state_size;
+      __feature_name   = x.__feature_name;
+      __sparse_feature = x.__sparse_feature;
+      __apply_feature  = x.__apply_feature;
+      
+      return *this;
+    }
+    
     
     void NGram::operator()(state_ptr_type& state,
 			   const state_ptr_set_type& states,

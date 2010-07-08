@@ -212,7 +212,7 @@ namespace cicada
       
       // for each incoming e, cand \leftarrow { <e, 1>}
       candidate_heap_type cand;
-      cand.reserve(node.edges.size());
+      cand.reserve(node.edges.size() * cube_size_max);
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
