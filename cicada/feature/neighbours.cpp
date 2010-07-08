@@ -148,23 +148,23 @@ namespace cicada
 	    
 	    const id_type antecedent_id = *reinterpret_cast<const id_type*>(states[antecedent_index]);
 
-	    if (prefix == vocab_type::EPSILON)
-	      prefix = state_map[antecedent_id].prefix;
-	    
 	    symbol_type prefix_next = vocab_type::EPSILON;
 	    symbol_type suffix_next = vocab_type::EPSILON;
 	    int size_next = count_span(span.first, span.second, prefix_next, suffix_next);
-	    
+
+	    if (prefix == vocab_type::EPSILON)
+	      prefix = state_map[antecedent_id].prefix;
+	    	    
 	    if (prefix == vocab_type::EPSILON && prefix_next != vocab_type::EPSILON)
 	      prefix = prefix_next;
 	    
 	    if (prefix_next != vocab_type::EPSILON) {
 	      state_id = apply_features(features, state_id, antecedent_id, suffix, prefix_next);
-
+	      
 	      suffix = suffix_next;
 	      size  += size_next + state_map[antecedent_id].span;
 	    } else if (siter + 1 != siter_end) {
-	      // we have no prefix but suffix from next antecedent node...
+	      // we have no prefix for this span, but prefix from next antecedent node...
 	      
 	      int antecedent_index_next = (span.second)->non_terminal_index() - 1;
 	      if (antecedent_index < 0)

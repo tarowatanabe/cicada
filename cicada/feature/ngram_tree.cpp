@@ -37,44 +37,9 @@ namespace cicada
       
       typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
       typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
-
+      
       typedef uint32_t id_type;
-
-      struct state_type
-      {
-	id_type     parent;
-	symbol_type node;
-	id_type prefix;
-	id_type suffix;
-	
-	state_type()
-	  : parent(id_type(-1)), node(), prefix(id_type(-1)), suffix(id_type(-1)) {}
-	
-	state_type(const id_type&     __parent,
-		   const symbol_type& __node,
-		   const id_type& __prefix,
-		   const id_type& __suffix)
-	  : parent(__parent), node(__node), prefix(__prefix), suffix(__suffix) {}
-	
-	friend
-	bool operator==(const state_type& x, const state_type& y)
-	{
-	  return x.parent == y.parent && x.node == y.node && x.prefix == y.prefix && x.suffix == y.suffix;
-	}
-      };
       
-      struct state_hash_type : public utils::hashmurmur<size_t>
-      {
-	typedef utils::hashmurmur<size_t> hasher_type;
-	
-	size_t operator()(const state_type& state) const
-	{
-	  return hasher_type::operator()(state, 0);
-	}
-      };
-      
-      typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
-
       struct string_hash_type : public utils::hashmurmur<size_t>
       {
 	typedef utils::hashmurmur<size_t> hasher_type;
@@ -84,7 +49,7 @@ namespace cicada
 	  return hasher_type::operator()(x.begin(), x.end(), 0);
 	}
       };
-
+      
       typedef utils::indexed_set<std::string, string_hash_type, std::equal_to<std::string>, std::allocator<std::string> > tree_map_type;
       
       virtual ~NGramTreeImpl() {}
@@ -98,11 +63,9 @@ namespace cicada
       
       void clear()
       {
-	state_map.clear();
 	tree_map.clear();
       }
       
-      state_map_type state_map;
       tree_map_type  tree_map;
       
       phrase_span_set_type phrase_spans_impl;
@@ -132,18 +95,9 @@ namespace cicada
 	  
 	  compute_bound(features, edge, phrase.begin(), phrase.end(), prefix, suffix);
 	  
-	  if (prefix != epsilon) {
-	    const id_type id_prefix = tree_id(prefix);
-	    const id_type id_suffix = tree_id(suffix);
-	    
-	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, id_prefix, id_suffix)).first;
-	    *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
-	  } else {
-	    const id_type id_epsilon = tree_id(epsilon);
-	    
-	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, id_epsilon, id_epsilon)).first;
-	    *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
-	  }
+	  id_type* context = reinterpret_cast<id_type*>(state);
+	  context[0] = tree_id(compose_path(edge.rule->lhs, prefix));
+	  context[1] = tree_id(compose_path(edge.rule->lhs, suffix));
 	} else {
 	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
 	  
@@ -153,12 +107,10 @@ namespace cicada
 	  if (phrase_spans.size() != states.size() + 1)
 	    throw std::runtime_error("# of states does not match...");
 	  
-	  std::string prefix = epsilon;
-	  std::string suffix = epsilon;
+	  std::string prefix;
+	  std::string suffix;
 	  
 	  compute_bound(features, edge, phrase_spans.front().first, phrase_spans.front().second, prefix, suffix);
-	  
-	  id_type state_id(id_type(-1));
 	  
 	  phrase_span_set_type::const_iterator siter_begin = phrase_spans.begin();
 	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
@@ -170,51 +122,32 @@ namespace cicada
 	    if (antecedent_index < 0)
 	      antecedent_index = siter - (siter_begin + 1);
 	    
-	    const id_type antecedent_id = *reinterpret_cast<const id_type*>(states[antecedent_index]);
+	    const id_type* antecedent_context = reinterpret_cast<const id_type*>(states[antecedent_index]);
 	    
-	    if (prefix == epsilon)
-	      prefix = tree_map[state_map[antecedent_id].prefix];
+	    const std::string prefix_antecedent = tree_map[antecedent_context[0]];
+	    const std::string suffix_antecedent = tree_map[antecedent_context[1]];
 	    
-	    std::string prefix_next = epsilon;
-	    std::string suffix_next = epsilon;
+	    std::string prefix_next;
+	    std::string suffix_next;
 	    compute_bound(features, edge, span.first, span.second, prefix_next, suffix_next);
 	    
-	    if (prefix == epsilon && prefix_next != epsilon)
-	      prefix = prefix_next;
+	    if (! suffix.empty())
+	      apply_feature(features, edge.rule->lhs, suffix, prefix_antecedent);
 	    
-	    if (prefix_next != epsilon) {
-	      state_id = apply_features(features, state_id, antecedent_id, suffix, prefix_next);
-
+	    if (prefix.empty())
+	      prefix = prefix_antecedent;
+	    
+	    if (! prefix_next.empty()) {
+	      apply_feature(features, edge.rule->lhs, suffix_antecedent, prefix_next);
 	      suffix = suffix_next;
-	    } else if (siter + 1 != siter_end) {
-	      // we have no prefix but suffix from next antecedent node...
-	      
-	      int antecedent_index_next = (span.second)->non_terminal_index() - 1;
-	      if (antecedent_index < 0)
-		antecedent_index_next = siter + 1 - (siter_begin + 1);
-	      
-	      const id_type antecedent_id_next = *reinterpret_cast<const id_type*>(states[antecedent_index_next]);
-	      const state_type& state_next = state_map[antecedent_id_next];
-	      
-	      state_id = apply_features(features, state_id, antecedent_id, suffix, tree_map[state_map[antecedent_id_next].prefix]);
-	      
-	      suffix = tree_map[state_map[antecedent_id].suffix];
-	    } else {
-	      // we have nothing...
-	      state_id = apply_features(features, state_id, antecedent_id, suffix, epsilon);
-	      
-	      suffix = tree_map[state_map[antecedent_id].suffix];
-	    } 
+	    } else
+	      suffix = suffix_antecedent;
 	  }
 	  
 	  // construct state...
-	  
-	  const id_type id_prefix  = tree_id(prefix == epsilon ? epsilon : compose_path(edge.rule->lhs, prefix));
-	  const id_type id_suffix  = tree_id(suffix == epsilon ? epsilon : compose_path(edge.rule->lhs, suffix));
-	  
-	  state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(state_id, edge.rule->lhs, id_prefix, id_suffix)).first;
-	  
-	  *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
+	  id_type* context = reinterpret_cast<id_type*>(state);
+	  context[0] = tree_id(compose_path(edge.rule->lhs, prefix.empty() ? epsilon : prefix));
+	  context[1] = tree_id(compose_path(edge.rule->lhs, suffix.empty() ? epsilon : suffix));
 	}
       }
 
@@ -234,11 +167,9 @@ namespace cicada
       template <typename Iterator>
       void compute_bound(feature_set_type& features, const edge_type& edge, Iterator first, Iterator last, std::string& prefix, std::string& suffix) const
       {
-	const std::string& epsilon = static_cast<const std::string&>(vocab_type::EPSILON);
-	
 	bool is_front = true;
 	for (/**/; first != last; ++ first) 
-	  if (*first != epsilon) {
+	  if (*first != vocab_type::EPSILON) {
 	    if (is_front)
 	      prefix = *first;
 	    
@@ -250,94 +181,7 @@ namespace cicada
 	    is_front = false;
 	  }
       }
-
-      id_type apply_features(feature_set_type& features, id_type id_curr, id_type id, const std::string& prefix, const std::string& suffix) const
-      {
-	typedef std::vector<state_type, std::allocator<state_type> > state_set_type;
-
-	const std::string& epsilon = static_cast<const std::string&>(vocab_type::EPSILON);
-	  
-	const id_type id_prefix  = tree_id(prefix);
-	const id_type id_suffix  = tree_id(suffix);
-	const id_type id_epsilon = tree_id(epsilon);
-	
-	state_set_type states;
-
-	if (prefix == epsilon && suffix == epsilon) {
-	  while (id != id_type(-1)) {
-	    const state_type& state = state_map[id];
-	    
-	    if (state.prefix == id_epsilon && state.suffix == id_epsilon)
-	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
-	    else if (state.prefix == id_epsilon)
-	      states.push_back(state_type(id_curr, state.node, id_prefix, state.suffix));
-	    else if (state.suffix == id_epsilon)
-	      states.push_back(state_type(id_curr, state.node, state.prefix, id_suffix));
-	    else
-	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
-	    
-	    id = state.parent;
-	  }
-	  
-	} else if (prefix == epsilon) {
-	  // we have at least suffix context...
-	  
-	  while (id != id_type(-1)) {
-	    const state_type& state = state_map[id];
-	    
-	    if (state.prefix == id_epsilon && state.suffix == id_epsilon)
-	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
-	    else if (state.prefix == id_epsilon)
-	      states.push_back(state_type(id_curr, state.node, id_prefix, state.suffix));
-	    else if (state.suffix == id_epsilon)
-	      apply_feature(features, state.node, tree_map[state.prefix], suffix);
-	    else
-	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
-	    
-	    id = state.parent;
-	  }
-	} else if (suffix == epsilon) {
-	  // we have at least prefix context...
-	  
-	  while (id != id_type(-1)) {
-	    const state_type& state = state_map[id];
-	    
-	    if (state.prefix == id_epsilon && state.suffix == id_epsilon)
-	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
-	    else if (state.suffix == id_epsilon)
-	      states.push_back(state_type(id_curr, state.node, state.prefix, id_suffix));
-	    else if (state.prefix == id_epsilon)
-	      apply_feature(features, state.node, prefix, tree_map[state.suffix]);
-	    else
-	      states.push_back(state_type(id_curr, state.node, id_prefix, id_suffix));
-	    
-	    id = state.parent;
-	  }
-	} else {
-	  while (id != id_type(-1)) {
-	    const state_type& state = state_map[id];
-	    
-	    if (state.prefix == id_epsilon && state.suffix == id_epsilon)
-	      apply_feature(features, state.node, prefix, suffix);
-	    else if (state.prefix == id_epsilon)
-	      apply_feature(features, state.node, prefix, tree_map[state.suffix]);
-	    else if (state.suffix == id_epsilon)
-	      apply_feature(features, state.node, tree_map[state.prefix], suffix);
-	    else
-	      apply_feature(features, state.node, prefix, suffix);
-	    
-	    id = state.parent;
-	  }
-	}
-	
-	state_set_type::const_reverse_iterator siter_end = states.rend();
-	for (state_set_type::const_reverse_iterator siter = states.rbegin(); siter != siter_end; ++ siter) {
-	  state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_curr, siter->node, siter->prefix, siter->suffix)).first;
-	  id_curr = iter - state_map.begin();
-	}
-	
-	return id_curr;
-      }
+      
       
       const std::string compose_path(const std::string& node, const std::string& antecedent) const
       {
@@ -355,10 +199,16 @@ namespace cicada
       }
 
       
-      virtual void ngram_tree_final_score(const state_ptr_type& __state,
+      virtual void ngram_tree_final_score(const state_ptr_type& state,
 					  feature_set_type& features) const
       {
-	apply_features(features, id_type(-1), *reinterpret_cast<const id_type*>(__state), vocab_type::BOS, vocab_type::EOS);
+	const id_type* antecedent_context = reinterpret_cast<const id_type*>(state);
+	
+	const std::string prefix_antecedent = tree_map[antecedent_context[0]];
+	const std::string suffix_antecedent = tree_map[antecedent_context[1]];
+	
+	apply_feature(features, vocab_type::GOAL, vocab_type::BOS, prefix_antecedent);
+	apply_feature(features, vocab_type::GOAL, vocab_type::EOS, suffix_antecedent);
       }
 	  
 
@@ -435,7 +285,7 @@ namespace cicada
 
       
       // non-terminal + two neighbouring symbols + span-size
-      base_type::__state_size = sizeof(impl_type::id_type);
+      base_type::__state_size = sizeof(impl_type::id_type) * 2;
       base_type::__feature_name = std::string("ngram-tree-") + (source ? "source" : "target");
       base_type::__sparse_feature = true;
       
