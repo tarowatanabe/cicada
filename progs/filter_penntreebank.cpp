@@ -31,146 +31,6 @@
 #include "utils/space_separator.hpp"
 
 
-#include <unicode/uchar.h>
-#include <unicode/unistr.h>
-#include <unicode/schriter.h>
-#include <unicode/bytestream.h>
-#include <unicode/translit.h>
-#include <unicode/regex.h>
-
-struct TransLit
-{
-  TransLit(const std::string& name, 
-	   const std::string& pattern) { initialize(name, pattern); }
-  
-  TransLit(const std::string& name) { initialize(name); }
-  
-  void operator()(UnicodeString& data) { trans->transliterate(data); }
-  
-  void initialize(const std::string& name)
-  {
-    UErrorCode status = U_ZERO_ERROR;
-    trans.reset(Transliterator::createInstance(UnicodeString::fromUTF8(name),
-					       UTRANS_FORWARD, status));
-    
-    if (U_FAILURE(status))
-      throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
-  }
-  
-  void initialize(const std::string& name, const std::string& pattern)
-  {
-    UErrorCode status = U_ZERO_ERROR;
-    UParseError status_parse;
-    trans.reset(Transliterator::createFromRules(UnicodeString::fromUTF8(name), UnicodeString::fromUTF8(pattern),
-						UTRANS_FORWARD, status_parse, status));
-    
-    if (U_FAILURE(status))
-      throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
-  }
-  
-  boost::shared_ptr<Transliterator> trans;
-};
-
-class Replace
-{
-  
-public:
-  Replace(const char* pattern, const char* subst) : matcher() { initialize(pattern, subst); }
-  Replace(const UnicodeString& pattern, const UnicodeString& subst) : matcher() { initialize(pattern, subst); }
-  ~Replace() { clear(); }
-
-
-  const UnicodeString& operator()(UnicodeString& uline)
-  {
-    UErrorCode status = U_ZERO_ERROR;
-    matcher->reset(uline);
-    uline = matcher->replaceAll(substitute, status);
-    if (U_FAILURE(status))
-      throw std::runtime_error(std::string("RegexMatcher::replaceAll(): ") + u_errorName(status));
-    return uline;
-  }
-
-  void clear()
-  {
-    if (matcher) delete matcher;
-    matcher = 0;
-  }
-  
-  void initialize(const char* pattern, const char* subst)
-  {
-    initialize(UnicodeString(pattern, "utf-8"), UnicodeString(subst, "utf-8"));
-  }
-  
-  
-  void initialize(const UnicodeString& pattern, const UnicodeString& subst)
-  {
-    clear();
-    
-    UErrorCode status = U_ZERO_ERROR;
-    matcher = new RegexMatcher(pattern, 0, status);
-    if (U_FAILURE(status))
-      throw std::runtime_error(std::string("RegexMatcher: ") + u_errorName(status));
-    substitute = subst;
-  }
-  
-
-private:
-  RegexMatcher* matcher;
-  UnicodeString substitute;
-};
-
-class ReplaceAll
-{
-  
-public:
-  ReplaceAll(const char* pattern, const char* subst) : matcher() { initialize(pattern, subst); }
-  ReplaceAll(const UnicodeString& pattern, const UnicodeString& subst) : matcher() { initialize(pattern, subst); }
-  ~ReplaceAll() { clear(); }
-
-
-  const UnicodeString& operator()(UnicodeString& uline)
-  {
-    
-    while (1) {
-      matcher->reset(uline);
-      if (! matcher->find()) break;
-      
-      UErrorCode status = U_ZERO_ERROR;
-      uline = matcher->replaceAll(substitute, status);
-      if (U_FAILURE(status))
-	throw std::runtime_error(std::string("RegexMatcher::replaceAll(): ") + u_errorName(status));
-    }
-    return uline;
-  }
-
-  void clear()
-  {
-    if (matcher) delete matcher;
-    matcher = 0;
-  }
-  
-  void initialize(const char* pattern, const char* subst)
-  {
-    initialize(UnicodeString(pattern, "utf-8"), UnicodeString(subst, "utf-8"));
-  }
-  
-  
-  void initialize(const UnicodeString& pattern, const UnicodeString& subst)
-  {
-    clear();
-    
-    UErrorCode status = U_ZERO_ERROR;
-    matcher = new RegexMatcher(pattern, 0, status);
-    if (U_FAILURE(status))
-      throw std::runtime_error(std::string("RegexMatcher: ") + u_errorName(status));
-    substitute = subst;
-  }
-  
-
-private:
-  RegexMatcher* matcher;
-  UnicodeString substitute;
-};
 
 typedef boost::filesystem::path path_type;
 
@@ -328,56 +188,6 @@ void transform(const treebank_type& treebank, sentence_type& sent)
       transform(*aiter, sent);
 }
 
-void transform(treebank_type& treebank)
-{
-  if (treebank.antecedents.empty()) {
-    
-    
-    
-  } else {
-    treebank_type::antecedents_type antecedents;
-  
-    for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
-      if (aiter->antecedents.empty()) {
-	UnicodeString ucat = UnicodeString::fromUTF8(aiter->cat);
-    
-	ucat = ' ' + ucat + ' ';
-	
-	static ReplaceAll replace("(?<=[[:White_Space:]])([[:^Numeric_Type=None:][\\u4E07][\\u842C][\\u4EBF][\\u5104][\\u5146]])(?=[[:^Numeric_Type=None:][\\u4E07][\\u842C][\\u4EBF][\\u5104][\\u5146]]+[[:White_Space:]])", "$1 ");
-	
-	replace(ucat);
-	ucat.trim();
-	
-	std::string categories;
-	StringByteSink<std::string> sink(&categories);
-	ucat.toUTF8(sink);
-	
-	typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-	typedef std::vector<std::string> tokens_type;
-	
-	tokenizer_type tokenizer(categories);
-	tokens_type tokens(tokenizer.begin(), tokenizer.end());
-	
-	if (tokens.size() == 1) {
-	  antecedents.push_back(*aiter);
-	  antecedents.back().cat = tokens.front();
-	} else {
-	  for (tokens_type::iterator titer = tokens.begin(); titer != tokens.end(); ++ titer) {
-	    antecedents.push_back(*aiter);
-	    antecedents.back().cat = treebank.cat + "-SPLIT";
-	    antecedents.back().antecedents.push_back(*titer);
-	  }
-	}
-      } else {
-	antecedents.push_back(*aiter);
-	transform(antecedents.back());
-      }
-    }
-    
-    treebank.antecedents = antecedents;
-  }
-}
-
 path_type input_file = "-";
 path_type output_file = "-";
 
@@ -386,7 +196,6 @@ std::string codepage = "utf-8";
 bool escaped = false;
 bool leaf = false;
 
-bool split_digits = false;
 
 void options(int argc, char** argv);
 
@@ -429,9 +238,6 @@ int main(int argc, char** argv)
 	  throw std::runtime_error("parsing failed");
       }
 
-      if (split_digits)
-	transform(parsed);
-      
       if (leaf) {
 	sent.clear();
 	
@@ -476,9 +282,7 @@ void options(int argc, char** argv)
     
     ("escape",    po::bool_switch(&escaped), "escape English penntreebank")
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
-    
-    ("split-digits", po::bool_switch(&split_digits), "split digits")
-    
+        
     ("help", "help message");
   
   po::variables_map vm;
