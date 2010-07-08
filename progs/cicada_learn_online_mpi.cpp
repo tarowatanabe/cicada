@@ -270,6 +270,8 @@ struct Task
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
   typedef Optimizer optimizer_type;
 
+  typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+
   Task(queue_type& __queue,
        queue_type& __queue_send,
        queue_type& __queue_recv,
@@ -299,6 +301,8 @@ struct Task
   score_ptr_set_type scores;
   double norm;
   std::vector<int, std::allocator<int> > norms;
+
+  hypergraph_set_type  hypergraph_oracles;
   
   typedef cicada::semiring::Logprob<double> weight_type;
   
@@ -509,8 +513,8 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(1.0);
-    margins.push_back(bleu_reward.back() * norm * loss_scale);
-    //margins.push_back(1.0);
+    //margins.push_back(bleu_reward.back() * norm * loss_scale);
+    margins.push_back(1.0);
     
     features.push_back(feature_set_type());
     features.back().assign(accumulated_penalty_unique.accumulated.begin(), accumulated_penalty_unique.accumulated.end());
@@ -520,8 +524,8 @@ struct Task
     features.back().erase(feature_name);
     
     labels.push_back(-1.0);
-    margins.push_back(bleu_penalty.back() * norm * loss_scale);
-    //margins.push_back(1.0);
+    //margins.push_back(bleu_penalty.back() * norm * loss_scale);
+    margins.push_back(1.0);
   }
 
   void add_support_vectors_factored(const hypergraph_type& hypergraph_reward,
@@ -561,8 +565,8 @@ struct Task
       features.back().erase(feature_name);
       
       labels.push_back(1.0);
-      margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
-      //margins.push_back(1.0);
+      //margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
+      margins.push_back(1.0);
     }
     
     for (int i = 0; i < accumulated_penalty.size(); ++ i) {
@@ -575,8 +579,8 @@ struct Task
       features.back().erase(feature_name);
       
       labels.push_back(-1.0);
-      margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
-      //margins.push_back(1.0);
+      //margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
+      margins.push_back(1.0);
     }
   }
 
@@ -788,8 +792,20 @@ struct Task
       
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
-
-      prune_hypergraph(model_bleu, model_sparse, hypergraph, hypergraph_reward, yield_reward, weights, loss_margin);
+      
+      if (id >= hypergraph_oracles.size())
+	hypergraph_oracles.resize(id + 1);
+      
+      hypergraph_oracles[id].unite(hypergraph);
+      {
+	hypergraph_type hypergraph_reward;
+      
+	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], hypergraph_reward, yield_reward, weights, loss_margin);
+      
+	hypergraph_oracles[id].swap(hypergraph_reward);
+      }
+      
+      const hypergraph_type& hypergraph_reward = hypergraph_oracles[id];
       
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
