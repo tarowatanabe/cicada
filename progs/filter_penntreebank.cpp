@@ -26,7 +26,6 @@
 #include "cicada/hypergraph.hpp"
 
 #include "utils/program_options.hpp"
-#include "utils/icu_filter.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/space_separator.hpp"
 
@@ -191,8 +190,6 @@ void transform(const treebank_type& treebank, sentence_type& sent)
 path_type input_file = "-";
 path_type output_file = "-";
 
-std::string codepage = "utf-8";
-
 bool escaped = false;
 bool leaf = false;
 
@@ -207,15 +204,10 @@ int main(int argc, char** argv)
 
     typedef boost::spirit::istream_iterator iter_type;
 
-    boost::iostreams::filtering_istream is;
-    is.push(utils::icu_filter(codepage, "utf-8", utils::icu_filter::stop));
-    utils::push_compress_istream(is, input_file, 1024 * 1024);
-    
+    utils::compress_istream is(input_file, 1024 * 1024);
     is.unsetf(std::ios::skipws);
-
-    boost::iostreams::filtering_ostream os;
-    os.push(utils::icu_filter("utf-8", codepage, utils::icu_filter::stop));
-    utils::push_compress_ostream(os, output_file, 1024 * 1024);
+    
+    utils::compress_ostream os(output_file);
     
     penntreebank_grammar<iter_type>         grammar;
     penntreebank_escaped_grammar<iter_type> grammar_escaped;
@@ -277,8 +269,6 @@ void options(int argc, char** argv)
   desc.add_options()
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
-    
-    ("codepage",  po::value<std::string>(&codepage)->default_value(codepage),     "codepage")
     
     ("escape",    po::bool_switch(&escaped), "escape English penntreebank")
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
