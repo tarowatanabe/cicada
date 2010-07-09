@@ -38,20 +38,20 @@ namespace cicada
       typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
       typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
       
-      typedef uint32_t id_type;
+      typedef utils::compact_trie<symbol_type, std::string, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
+
+      typedef tree_map_type::id_type id_type;
       
-      struct string_hash_type : public utils::hashmurmur<size_t>
+      
+      NGramTreeImpl() : forced_feature(false) {}
+      NGramTreeImpl(const NGramTreeImpl& x) : forced_feature(x.forced_feature) {}
+      NGramTreeImpl& operator=(const NGramTreeImpl& x)
       {
-	typedef utils::hashmurmur<size_t> hasher_type;
-	
-	size_t operator()(const std::string& x) const
-	{
-	  return hasher_type::operator()(x.begin(), x.end(), 0);
-	}
-      };
-      
-      typedef utils::indexed_set<std::string, string_hash_type, std::equal_to<std::string>, std::allocator<std::string> > tree_map_type;
-      
+	forced_feature = x.forced_feature;
+	return *this;
+      }
+
       virtual ~NGramTreeImpl() {}
       
       virtual void ngram_tree_score(state_ptr_type& state,
@@ -90,14 +90,14 @@ namespace cicada
 	
 	if (states.empty()) {
 	  // we do not add feature here, since we know nothing abount surrounding context...
-	  std::string prefix = epsilon;
-	  std::string suffix = epsilon;
+	  symbol_type prefix = vocab_type::EPSILON;
+	  symbol_type suffix = vocab_type::EPSILON;
 	  
-	  compute_bound(features, edge, phrase.begin(), phrase.end(), prefix, suffix);
+	  compute_bound(phrase.begin(), phrase.end(), prefix, suffix);
 	  
 	  id_type* context = reinterpret_cast<id_type*>(state);
-	  context[0] = tree_id(compose_path(edge.rule->lhs, prefix));
-	  context[1] = tree_id(compose_path(edge.rule->lhs, suffix));
+	  context[0] = tree_id(edge.rule->lhs, tree_id(prefix, tree_map.root()));
+	  context[1] = tree_id(edge.rule->lhs, tree_id(suffix, tree_map.root()));
 	} else {
 	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
 	  
@@ -107,10 +107,13 @@ namespace cicada
 	  if (phrase_spans.size() != states.size() + 1)
 	    throw std::runtime_error("# of states does not match...");
 	  
-	  std::string prefix;
-	  std::string suffix;
+	  symbol_type prefix;
+	  symbol_type suffix;
 	  
-	  compute_bound(features, edge, phrase_spans.front().first, phrase_spans.front().second, prefix, suffix);
+	  compute_bound(phrase_spans.front().first, phrase_spans.front().second, prefix, suffix);
+	  
+	  id_type prefix_id = (prefix.empty() ? tree_map.root() : tree_id(prefix, tree_map.root()));
+	  id_type suffix_id = (suffix.empty() ? tree_map.root() : tree_id(suffix, tree_map.root()));
 	  
 	  phrase_span_set_type::const_iterator siter_begin = phrase_spans.begin();
 	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
@@ -123,38 +126,69 @@ namespace cicada
 	      antecedent_index = siter - (siter_begin + 1);
 	    
 	    const id_type* antecedent_context = reinterpret_cast<const id_type*>(states[antecedent_index]);
+
+	    const id_type prefix_antecedent_id = antecedent_context[0];
+	    const id_type suffix_antecedent_id = antecedent_context[1];
 	    
-	    const std::string prefix_antecedent = tree_map[antecedent_context[0]];
-	    const std::string suffix_antecedent = tree_map[antecedent_context[1]];
+	    symbol_type prefix_next;
+	    symbol_type suffix_next;
+	    compute_bound(span.first, span.second, prefix_next, suffix_next);
 	    
-	    std::string prefix_next;
-	    std::string suffix_next;
-	    compute_bound(features, edge, span.first, span.second, prefix_next, suffix_next);
+	    const id_type prefix_next_id = (prefix_next.empty() ? tree_map.root() : tree_id(prefix_next, tree_map.root()));
+	    const id_type suffix_next_id = (suffix_next.empty() ? tree_map.root() : tree_id(suffix_next, tree_map.root()));
 	    
-	    if (! suffix.empty())
-	      apply_feature(features, edge.rule->lhs, suffix, prefix_antecedent);
+	    if (! tree_map.is_root(suffix_id))
+	      apply_feature(features, edge.rule->lhs, tree_map[suffix_id], tree_map[prefix_antecedent_id]);
 	    
-	    if (prefix.empty())
-	      prefix = prefix_antecedent;
+	    if (tree_map.is_root(prefix_id))
+	      prefix_id = prefix_antecedent_id;
 	    
-	    if (! prefix_next.empty()) {
-	      apply_feature(features, edge.rule->lhs, suffix_antecedent, prefix_next);
-	      suffix = suffix_next;
+	    if (! tree_map.is_root(prefix_next_id)) {
+	      apply_feature(features, edge.rule->lhs, tree_map[suffix_antecedent_id], tree_map[prefix_next_id]);
+	      suffix_id = suffix_next_id;
 	    } else
-	      suffix = suffix_antecedent;
+	      suffix_id = suffix_antecedent_id;
 	  }
 	  
 	  // construct state...
 	  id_type* context = reinterpret_cast<id_type*>(state);
-	  context[0] = tree_id(compose_path(edge.rule->lhs, prefix.empty() ? epsilon : prefix));
-	  context[1] = tree_id(compose_path(edge.rule->lhs, suffix.empty() ? epsilon : suffix));
+	  
+	  if (tree_map.is_root(prefix_id))
+	    prefix_id = tree_id(vocab_type::EPSILON, tree_map.root());
+	  if (tree_map.is_root(suffix_id))
+	    suffix_id = tree_id(vocab_type::EPSILON, tree_map.root());
+	  
+	  context[0] = tree_id(edge.rule->lhs, prefix_id);
+	  context[1] = tree_id(edge.rule->lhs, suffix_id);
 	}
       }
 
-      id_type tree_id(const std::string& node) const
+      virtual void ngram_tree_final_score(const state_ptr_type& state,
+					  feature_set_type& features) const
       {
-	tree_map_type::iterator iter = const_cast<tree_map_type&>(tree_map).insert(node).first;
-	return iter - tree_map.begin();
+	const id_type* antecedent_context = reinterpret_cast<const id_type*>(state);
+	
+	const std::string prefix_antecedent = tree_map[antecedent_context[0]];
+	const std::string suffix_antecedent = tree_map[antecedent_context[1]];
+	
+	apply_feature(features, vocab_type::GOAL, vocab_type::BOS, prefix_antecedent);
+	apply_feature(features, vocab_type::GOAL, vocab_type::EOS, suffix_antecedent);
+      }
+
+      
+      id_type tree_id(const symbol_type& node, const id_type parent) const
+      {
+	tree_map_type& __tree_map = const_cast<tree_map_type&>(tree_map);
+	
+	const id_type id = __tree_map.insert(parent, node);
+	
+	if (__tree_map[id].empty()) {
+	  if (__tree_map.is_root(parent))
+	    __tree_map[id] = node;
+	  else
+	    __tree_map[id] = compose_path(node, __tree_map[parent]);
+	}
+	return id;
       }
 
       void apply_feature(feature_set_type& features, const std::string& node, const std::string& prev, const std::string& next) const
@@ -165,20 +199,18 @@ namespace cicada
       }
 
       template <typename Iterator>
-      void compute_bound(feature_set_type& features, const edge_type& edge, Iterator first, Iterator last, std::string& prefix, std::string& suffix) const
+      void compute_bound(Iterator first, Iterator last, symbol_type& prefix, symbol_type& suffix) const
       {
-	bool is_front = true;
-	for (/**/; first != last; ++ first) 
-	  if (*first != vocab_type::EPSILON) {
-	    if (is_front)
-	      prefix = *first;
-	    
-	    // we will count only the boundary...
-	    //if (suffix != epsilon)
-	    //  apply_feature(features, edge.rule->lhs, suffix, *first);
-	    
-	    suffix = *first;
-	    is_front = false;
+	for (Iterator iter = first; iter != last; ++ iter)
+	  if (*iter != vocab_type::EPSILON) {
+	    prefix = *iter;
+	    break;
+	  }
+	
+	for (Iterator iter = last; iter != first; -- iter)
+	  if (*(iter - 1) != vocab_type::EPSILON) {
+	    suffix = *(iter - 1);
+	    break;
 	  }
       }
       
@@ -198,19 +230,7 @@ namespace cicada
 	return Extract::feature_prefix +  compose_tree(node, prev, next);
       }
 
-      
-      virtual void ngram_tree_final_score(const state_ptr_type& state,
-					  feature_set_type& features) const
-      {
-	const id_type* antecedent_context = reinterpret_cast<const id_type*>(state);
-	
-	const std::string prefix_antecedent = tree_map[antecedent_context[0]];
-	const std::string suffix_antecedent = tree_map[antecedent_context[1]];
-	
-	apply_feature(features, vocab_type::GOAL, vocab_type::BOS, prefix_antecedent);
-	apply_feature(features, vocab_type::GOAL, vocab_type::EOS, suffix_antecedent);
-      }
-	  
+      	  
 
       template <typename Edge>
       const rule_type::symbol_set_type& extract_phrase(const Edge& x) const

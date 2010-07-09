@@ -78,6 +78,14 @@ namespace cicada
       
       typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
       
+      NeighboursImpl() : forced_feature(false) {}
+      NeighboursImpl(const NeighboursImpl& x) : forced_feature(x.forced_feature) {}
+      NeighboursImpl& operator=(const NeighboursImpl& x)
+      {
+	forced_feature = x.forced_feature;
+	return *this;
+      }
+      
       virtual ~NeighboursImpl() {}
       
       virtual void neighbours_score(state_ptr_type& state,
@@ -329,7 +337,7 @@ namespace cicada
 	return x.rule->source;
       }
       
-      const std::string feature_prefix;
+      std::string feature_prefix;
     };
 
     struct __neighbours_extract_target
@@ -343,7 +351,7 @@ namespace cicada
 	return x.rule->target;
       }
       
-      const std::string feature_prefix;
+      std::string feature_prefix;
     };
     
     

@@ -654,7 +654,7 @@ struct Task
 	continue;
       }
       
-      model.apply_feature(false);
+       model.apply_feature(false);
       
       operations(buffer);
       

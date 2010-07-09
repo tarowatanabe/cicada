@@ -5,6 +5,7 @@
 
 #include "feature/bleu.hpp"
 #include "feature/bleu_linear.hpp"
+#include "feature/boundary.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
 #include "feature/ngram_tree.hpp"
@@ -25,6 +26,7 @@ bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
 \tprecision=<default 0.8>,\n\
 \tratio=<default 0.6>\n\
+boundary: boundary ngram feature\n\
 neighbours: neighbour words feature\n\
 \tyield=[source|target]\n\
 ngram: ngram language model\n\
@@ -50,10 +52,12 @@ rule-penalty: rule penalty feature\n\
     
     if (param.name() == "ngram")
       return feature_function_ptr_type(new feature::NGram(parameter));
-    if (param.name() == "neighbours" || param.name() == "neighbors")
+    else if (param.name() == "neighbours" || param.name() == "neighbors")
       return feature_function_ptr_type(new feature::Neighbours(parameter));
-    if (param.name() == "ngram-tree")
+    else if (param.name() == "ngram-tree")
       return feature_function_ptr_type(new feature::NGramTree(parameter));
+    else if (param.name() == "boundary")
+      return feature_function_ptr_type(new feature::Boundary(parameter));
     else if (param.name() == "bleu")
       return feature_function_ptr_type(new feature::Bleu(parameter));
     else if (param.name() == "bleu-linear")
