@@ -27,7 +27,8 @@ void encode_support_vectors(std::string& data,
 			    const int& source_length,
 			    const sentence_type& viterbi,
 			    const hypergraph_type& oracle,
-			    const hypergraph_type& violated)
+			    const hypergraph_type& violated,
+			    const sentence_set_type& targets)
 {
   data.clear();
   
@@ -39,6 +40,10 @@ void encode_support_vectors(std::string& data,
   os << ' ' << oracle << " |||";
   os << ' ' << violated;
   
+  sentence_set_type::const_iterator titer_end = targets.end();
+  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+    os << " ||| " << *titer;
+  
   os.pop();
 }
 
@@ -48,7 +53,8 @@ void decode_support_vectors(const std::string& data,
 			    int& source_length,
 			    sentence_type& viterbi,
 			    hypergraph_type& oracle,
-			    hypergraph_type& violated)
+			    hypergraph_type& violated,
+			    sentence_set_type& targets)
 {
   namespace qi = boost::spirit::qi;
   namespace standard = boost::spirit::standard;
@@ -82,6 +88,13 @@ void decode_support_vectors(const std::string& data,
   
   if (! violated.assign(iter, end))
     throw std::runtime_error("invalid violated hypergraph");
+
+  targets.clear();
+  while (phrase_parse(iter, end, "|||", space)) {
+    targets.push_back(sentence_type());
+    if (! targets.back().assign(iter, end))
+      throw std::runtime_error("invalid sentence format");
+  }
   
   if (iter != end)
     throw std::runtime_error("still data remain?");

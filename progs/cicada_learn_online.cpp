@@ -551,9 +551,11 @@ struct Task
     margin_collection_type  margins;
     feature_collection_type features;
 
+    sentence_set_type targets;
+
     bool terminated_merge = false;
     bool terminated_sample = false;
-    
+
     std::string buffer;
     while (! terminated_merge || ! terminated_sample) {
       
@@ -566,7 +568,7 @@ struct Task
 	  
 	  size_t id = size_t(-1);
 	  int source_length;
-	  decode_support_vectors(buffer, id, source_length, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty);
+	  decode_support_vectors(buffer, id, source_length, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
 
 	  if (id == size_t(-1))
 	    throw std::runtime_error("invalid encoded feature vector");
@@ -594,6 +596,12 @@ struct Task
 	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
+
+	  scorer->clear();
+	  sentence_set_type::const_iterator titer_end = targets.end();
+	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+	    scorer->insert(*titer);
+	    
 	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
@@ -800,7 +808,7 @@ struct Task
       }
       
       if (asynchronous_vectors) {
-	encode_support_vectors(buffer, id, source_length, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty);
+	encode_support_vectors(buffer, id, source_length, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
 	
 	queue_send.push_swap(buffer);
       }
