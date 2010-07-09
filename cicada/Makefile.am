@@ -92,6 +92,7 @@ rule.hpp \
 semiring.hpp \
 sentence.hpp \
 sort.hpp \
+span.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 transducer.hpp \

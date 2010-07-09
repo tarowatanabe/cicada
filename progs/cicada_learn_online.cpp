@@ -19,6 +19,7 @@
 #include "cicada/weight_vector.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/viterbi.hpp"
+#include "cicada/span.hpp"
 
 #include "cicada/apply.hpp"
 #include "cicada/model.hpp"
@@ -38,6 +39,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/space_separator.hpp"
+#include "utils/sgi_hash_map.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -95,7 +97,6 @@ bool op_list = false;
 std::string scorer_name    = "bleu:order=4,exact=false";
 
 bool learn_regression = false;
-bool learn_merged = false;
 bool learn_factored = false;
 
 int iteration = 100;
@@ -137,9 +138,9 @@ int main(int argc, char ** argv)
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
 
-    if (int(learn_regression) + learn_merged + learn_factored > 1)
-      throw std::runtime_error("you can learn one of learn-regression|learn-merged|learn-factored");
-    if (int(learn_regression) + learn_merged + learn_factored == 0)
+    if (int(learn_regression) + learn_factored > 1)
+      throw std::runtime_error("you can learn one of learn-regression|learn-factored");
+    if (int(learn_regression) + learn_factored == 0)
       learn_regression = true;
 
     if (feature_list) {
@@ -351,6 +352,7 @@ struct Task
     if (! model_sparse.empty()) {
       model_sparse.apply_feature(true);
       cicada::apply_exact(model_sparse, modified);
+      model_sparse.apply_feature(false);
     }
     
     weight_type weight;
@@ -391,53 +393,6 @@ struct Task
     margins.push_back(bleu_score * norm * loss_scale);
   }
   
-  void add_support_vectors_merged(const hypergraph_type& hypergraph_reward,
-				  const hypergraph_type& hypergraph_penalty,
-				  const feature_type& feature_name,
-				  label_collection_type& labels,
-				  margin_collection_type& margins,
-				  feature_collection_type& features)
-  {
-    typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
-    
-    count_set_type counts_reward(hypergraph_reward.nodes.size());
-    count_set_type counts_penalty(hypergraph_penalty.nodes.size());
-    
-    accumulated_set_unique_type accumulated_reward_unique;
-    accumulated_set_unique_type accumulated_penalty_unique;
-    
-    cicada::inside_outside(hypergraph_reward,  counts_reward,  accumulated_reward_unique,  count_function(), feature_count_function());
-    cicada::inside_outside(hypergraph_penalty, counts_penalty, accumulated_penalty_unique, count_function(), feature_count_function());
-
-    bleu_set_type bleu_reward(hypergraph_reward.nodes.size());
-    bleu_set_type bleu_penalty(hypergraph_penalty.nodes.size());
-    
-    cicada::inside(hypergraph_reward, bleu_reward, bleu_function(feature_name, 1.0));
-    cicada::inside(hypergraph_penalty, bleu_penalty, bleu_function(feature_name, - 1.0));
- 
-	  
-    features.push_back(feature_set_type());
-    features.back().assign(accumulated_reward_unique.accumulated.begin(), accumulated_reward_unique.accumulated.end());
-	  
-    features.back() *= (1.0 / counts_reward.back());
-    features.back()["bias"] = 1.0;
-    features.back().erase(feature_name);
-    
-    labels.push_back(1.0);
-    //margins.push_back(bleu_reward.back() * norm * loss_scale);
-    margins.push_back(1.0);
-    
-    features.push_back(feature_set_type());
-    features.back().assign(accumulated_penalty_unique.accumulated.begin(), accumulated_penalty_unique.accumulated.end());
-    
-    features.back() *= (1.0 / counts_penalty.back());
-    features.back()["bias"] = 1.0;
-    features.back().erase(feature_name);
-    
-    labels.push_back(-1.0);
-    //margins.push_back(bleu_penalty.back() * norm * loss_scale);
-    margins.push_back(1.0);
-  }
 
   void add_support_vectors_factored(const hypergraph_type& hypergraph_reward,
 				    const hypergraph_type& hypergraph_penalty,
@@ -446,7 +401,21 @@ struct Task
 				    margin_collection_type& margins,
 				    feature_collection_type& features)
   {
+    typedef std::pair<int, int> span_type;
+    typedef std::vector<span_type, std::allocator<span_type> > span_set_type;
+
     typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+
+    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<span_type, edge_set_type, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+      std::allocator<std::pair<const span_type, edge_set_type> > > cluster_type;
+#else
+    typedef sgi::hash_map<span_type, edge_set_type, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+      std::allocator<std::pair<const span_type, edge_set_type> > > cluster_type;
+#endif
+
 
     count_set_type counts_reward(hypergraph_reward.nodes.size());
     count_set_type counts_penalty(hypergraph_penalty.nodes.size());
@@ -466,33 +435,78 @@ struct Task
     cicada::inside_outside(hypergraph_reward,  bleu_reward,  bleu_edge_reward,  bleu_function(feature_name,   1.0), bleu_function(feature_name,   1.0));
     cicada::inside_outside(hypergraph_penalty, bleu_penalty, bleu_edge_penalty, bleu_function(feature_name, - 1.0), bleu_function(feature_name, - 1.0));
     
-    for (int i = 0; i < accumulated_reward.size(); ++ i) {
-      features.push_back(feature_set_type());
-      features.back().assign(accumulated_reward[i].begin(), accumulated_reward[i].end());
+    span_set_type spans_reward(hypergraph_reward.nodes.size());
+    span_set_type spans_penalty(hypergraph_penalty.nodes.size());
+    
+    cicada::node_span(hypergraph_reward,  spans_reward);
+    cicada::node_span(hypergraph_penalty, spans_penalty);
+    
+    // we will split features into spans...
+    cluster_type cluster_reward;
+    cluster_type cluster_penalty;
+    
+    {
+      hypergraph_type::node_set_type::const_iterator riter_end = hypergraph_reward.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator riter = hypergraph_reward.nodes.begin(); riter != riter_end; ++ riter) {
+	edge_set_type& edges = cluster_reward[spans_reward[riter->id]];
+	edges.insert(edges.end(), riter->edges.begin(), riter->edges.end());
+      }
       
-      features.back() *= (1.0 / counts_reward.back());
-      features.back()["bias"] = 1.0;
-      
-      features.back().erase(feature_name);
-      
-      labels.push_back(1.0);
-      //margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
-      margins.push_back(1.0);
+      hypergraph_type::node_set_type::const_iterator piter_end = hypergraph_penalty.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator piter = hypergraph_penalty.nodes.begin(); piter != piter_end; ++ piter) {
+	edge_set_type& edges = cluster_penalty[spans_penalty[piter->id]];
+	edges.insert(edges.end(), piter->edges.begin(), piter->edges.end());
+      }
     }
     
-    for (int i = 0; i < accumulated_penalty.size(); ++ i) {
-      features.push_back(feature_set_type());
-      features.back().assign(accumulated_penalty[i].begin(), accumulated_penalty[i].end());
+    cluster_type::const_iterator riter_end = cluster_reward.end();
+    for (cluster_type::const_iterator riter = cluster_reward.begin(); riter != riter_end; ++ riter) {
+
+      // collect intersection only...!
+      cluster_type::const_iterator piter = cluster_penalty.find(riter->first);
+      if (piter != cluster_penalty.end()) {
+	
+	const edge_set_type& edges_reward  = riter->second;
+	const edge_set_type& edges_penalty = piter->second;
+
+	feature_set_type features_reward;
+	feature_set_type features_penalty;
+	
+	double bleu_reward = 0;
+	double bleu_penalty = 0;
+	
+	{
+	  edge_set_type::const_iterator eiter_end = edges_reward.end();
+	  for (edge_set_type::const_iterator eiter = edges_reward.begin(); eiter != eiter_end; ++ eiter) {
+	    features_reward += feature_set_type(accumulated_reward[*eiter].begin(), accumulated_reward[*eiter].end());
+	    bleu_reward += bleu_edge_reward[*eiter] * norm * loss_scale;
+	  }
+	}
+
+	{
+	  edge_set_type::const_iterator eiter_end = edges_penalty.end();
+	  for (edge_set_type::const_iterator eiter = edges_penalty.begin(); eiter != eiter_end; ++ eiter) {
+	    features_penalty += feature_set_type(accumulated_penalty[*eiter].begin(), accumulated_penalty[*eiter].end());
+	    bleu_penalty -= bleu_edge_penalty[*eiter] * norm * loss_scale;
+	  }
+	}
+	
+	features_reward *= (1.0 / counts_reward.back());
+	bleu_reward *= (1.0 / edges_reward.size());
       
-      features.back() *= (1.0 / counts_penalty.back());
-      features.back()["bias"] = 1.0;
+	features_penalty *= (1.0 / counts_penalty.back());
+	bleu_penalty *= (1.0 / edges_penalty.size());
       
-      features.back().erase(feature_name);
-      
-      labels.push_back(- 1.0);
-      //margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
-      margins.push_back(1.0);
+	features.push_back(features_reward - features_penalty);
+	
+	features.back()["bias"] = 1.0;
+	features.back().erase(feature_name);
+
+	labels.push_back(1.0);
+	margins.push_back(bleu_reward - bleu_penalty);
+      } 
     }
+    
   }
   
   void operator()()
@@ -626,9 +640,7 @@ struct Task
 		      << std::endl;
 	  }
 
-	  if (learn_merged)
-	    add_support_vectors_merged(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
-	  else if (learn_factored)
+	  if (learn_factored)
 	    add_support_vectors_factored(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
 	  else
 	    add_support_vectors_regression(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
@@ -662,7 +674,7 @@ struct Task
 	continue;
       }
       
-       model.apply_feature(false);
+      model.apply_feature(false);
       
       operations(buffer);
       
@@ -786,9 +798,7 @@ struct Task
 		  << std::endl;
       }
 
-      if (learn_merged)
-	add_support_vectors_merged(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
-      else if (learn_factored)
+      if (learn_factored)
 	add_support_vectors_factored(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
       else
 	add_support_vectors_regression(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
@@ -1103,7 +1113,6 @@ void options(int argc, char** argv)
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
 
     ("learn-regression", po::bool_switch(&learn_regression), "learn by regression")
-    ("learn-merged",     po::bool_switch(&learn_merged),     "learn by linear classification with merged vector")
     ("learn-factored",   po::bool_switch(&learn_factored),   "learn by edge-factored linear classification")
     
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
