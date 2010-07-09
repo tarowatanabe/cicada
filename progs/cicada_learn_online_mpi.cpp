@@ -1210,6 +1210,42 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     bcast_weights(0, weights_mixed);
     
+    if (mpi_rank == 0) {
+      // output mixed weights...
+      bool has_suffix_gz  = false;
+      bool has_suffix_bz2 = false;
+      
+      path_type path_output = output_file;
+      
+      if (path_output.extension() == ".gz") {
+	path_output = path_output.parent_path() / path_output.stem();
+	has_suffix_gz = true;
+      } else if (path_output.extension() == ".bz2") {
+	path_output = path_output.parent_path() / path_output.stem();
+	has_suffix_bz2 = true;
+      }
+      
+      if (has_suffix_gz)
+	path_output = path_output.file_string() + '.' + boost::lexical_cast<std::string>(iter + 1) + ".gz";
+      else if (has_suffix_bz2)
+	path_output = path_output.file_string() + '.' + boost::lexical_cast<std::string>(iter + 1) + ".bz2";
+      else
+	path_output = path_output.file_string() + '.' + boost::lexical_cast<std::string>(iter + 1);
+      
+      if (average_weights) {
+	weights = weights_accumulated;
+	weights /= norm_accumulated;
+	
+	utils::compress_ostream os(path_output, 1024 * 1024);
+	os.precision(20);
+	os << weights;
+      } else {
+	utils::compress_ostream os(path_output, 1024 * 1024);
+	os.precision(20);
+	os << weights_mixed;
+      }
+    }
+    
     if (mix_weights)
       optimizer.weights = weights_mixed;
     
