@@ -294,6 +294,19 @@ namespace cicada
     }
     
     Variational::~Variational() { std::auto_ptr<impl_type> tmp(pimpl); }
+
+    Variational::Variational(const Variational& x)
+      : base_type(static_cast<const base_type&>(x)),
+	pimpl(new impl_type(*x.pimpl))
+    {}
+    
+    Variational& Variational::operator=(const Variational& x)
+    {
+      static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+      *pimpl = *x.pimpl;
+      
+      return *this;
+    }
     
     template <typename FeaturePrefix, typename Feature>
     inline

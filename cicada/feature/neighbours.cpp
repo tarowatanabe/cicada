@@ -397,7 +397,36 @@ namespace cicada
     }
     
     Neighbours::~Neighbours() { std::auto_ptr<impl_type> tmp(pimpl); }
+    
+    Neighbours::Neighbours(const Neighbours& x)
+      : base_type(static_cast<const base_type&>(x)),
+	pimpl(0)
+    {
+      typedef __NeighboursImpl<__neighbours_extract_source> neighbours_source_type;
+      typedef __NeighboursImpl<__neighbours_extract_target> neighbours_target_type;
+      
+      if (dynamic_cast<const neighbours_source_type*>(x.pimpl))
+	pimpl = new neighbours_source_type();
+      else
+	pimpl = new neighbours_target_type();
+    }
+    
+    Neighbours& Neighbours::operator=(const Neighbours& x)
+    {
+      typedef __NeighboursImpl<__neighbours_extract_source> neighbours_source_type;
+      typedef __NeighboursImpl<__neighbours_extract_target> neighbours_target_type;
 
+      static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+      
+      std::auto_ptr<impl_type> tmp(pimpl);
+      
+      if (dynamic_cast<const neighbours_source_type*>(x.pimpl))
+	pimpl = new neighbours_source_type();
+      else
+	pimpl = new neighbours_target_type();
+      
+      return *this;
+    }
     
     template <typename FeaturePrefix, typename Feature>
     inline

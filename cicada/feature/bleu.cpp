@@ -84,6 +84,7 @@ namespace cicada
       BleuImpl(const int __order,
 	       const bool __exact)
 	: order(__order), exact(__exact) {}
+      
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
@@ -601,6 +602,19 @@ namespace cicada
     }
     
     Bleu::~Bleu() { std::auto_ptr<impl_type> tmp(pimpl); }
+
+    Bleu::Bleu(const Bleu& x)
+      : base_type(static_cast<const base_type&>(x)),
+	pimpl(new impl_type(*x.pimpl))
+    {}
+
+    Bleu& Bleu::operator=(const Bleu& x)
+    {
+      static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+      *pimpl = *x.pimpl;
+      
+      return *this;
+    }
     
     void Bleu::operator()(state_ptr_type& state,
 			  const state_ptr_set_type& states,

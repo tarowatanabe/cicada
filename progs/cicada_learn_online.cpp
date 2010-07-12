@@ -157,7 +157,6 @@ int main(int argc, char ** argv)
     
     threads = utils::bithack::max(threads, 1);
     
-    
     weight_set_type weights;
     if (boost::filesystem::exists(weights_file)) {
       utils::compress_istream is(weights_file);

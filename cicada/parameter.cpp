@@ -74,16 +74,10 @@ namespace cicada
   {
     typedef std::string::const_iterator iter_type;
     typedef parameter_parser<iter_type> parser_type;
-
-#if 0
     
-    
-    
-#endif
-
     __attr.clear();
     __values.clear();
-
+    
     parser_type parser;
 
     parameter_parsed_type parsed;

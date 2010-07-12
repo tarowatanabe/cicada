@@ -33,12 +33,14 @@ namespace cicada
       
     public:
       Neighbours(const std::string& parameter);
+      Neighbours(const Neighbours&);
+      
       ~Neighbours();
+
+      Neighbours& operator=(const Neighbours&);
       
     private:
       Neighbours() {}
-      Neighbours(const Neighbours&) {}
-      Neighbours& operator=(const Neighbours&) { return *this; }
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -50,6 +52,8 @@ namespace cicada
 			      feature_set_type& features,
 			      feature_set_type& estimates) const;
       virtual void initialize();
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Neighbours(*this)); }
       
     private:
       impl_type* pimpl;

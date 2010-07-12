@@ -38,12 +38,13 @@ namespace cicada
       
     public:
       Bleu(const std::string& parameter);
+      Bleu(const Bleu&);
       ~Bleu();
+
+      Bleu& operator=(const Bleu&);
       
     private:
       Bleu() {}
-      Bleu(const Bleu&) {}
-      Bleu& operator=(const Bleu&) { return *this; }
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -55,6 +56,8 @@ namespace cicada
 			      feature_set_type& features,
 			      feature_set_type& estimates) const {}
       virtual void initialize();
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Bleu(*this)); }
       
       void clear();
       void insert(const int source_size, const sentence_type& sentence);

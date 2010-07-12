@@ -64,6 +64,9 @@ namespace cicada
     virtual void operator()(const state_ptr_type& state,
 			    feature_set_type& features,
 			    feature_set_type& estimates) const = 0;
+    
+    virtual feature_function_ptr_type clone() const = 0;
+
     virtual void initialize() {}
     
     size_type state_size() const { return __state_size; }

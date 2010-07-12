@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <set>
+#include <memory>
 
 #include "model.hpp"
 
@@ -127,6 +128,8 @@ namespace cicada
       offsets(x.offsets),
       states_size(x.states_size) {}
   
+  Model::~Model() { std::auto_ptr<state_allocator_type> tmp(allocator); }
+  
   Model& Model::operator=(const Model& x)
   {
     models      = x.models;
@@ -144,7 +147,7 @@ namespace cicada
 				      edge_type& edge,
 				      feature_set_type& estimates) const
   {
-    state_type state_all = allocator->allocate();
+    state_type state = allocator->allocate();
     
     feature_function_type::state_ptr_set_type states(edge.tails.size());
 
@@ -157,14 +160,14 @@ namespace cicada
 	for (int k = 0; k < states.size(); ++ k)
 	  states[k] = node_states[edge.tails[k]].base + offsets[i];
       
-      feature_function_type::state_ptr_type state = (feature_function.state_size() ? state_all.base + offsets[i] : 0);
+      feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
-      feature_function(state, states, edge, edge.features, estimates);
+      feature_function(state_feature, states, edge, edge.features, estimates);
     }
     
     //std::cerr << "apply features end" << std::endl;
     
-    return state_all;
+    return state;
   }
   
   
@@ -175,9 +178,9 @@ namespace cicada
     for (int i = 0; i < models.size(); ++ i) {
       const feature_function_type& feature_function = *models[i];
       
-      feature_function_type::state_ptr_type antecedent_state = (feature_function.state_size() ? state.base + offsets[i] : 0);
+      feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
-      feature_function(antecedent_state, edge.features, estimates);
+      feature_function(state_feature, edge.features, estimates);
     }
   }
   

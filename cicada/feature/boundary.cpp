@@ -269,6 +269,19 @@ namespace cicada
     
     Boundary::~Boundary() { std::auto_ptr<impl_type> tmp(pimpl); }
 
+    Boundary::Boundary(const Boundary& x)
+      : base_type(static_cast<const base_type&>(x)),
+	pimpl(new impl_type(*x.pimpl))
+    {}
+    
+    Boundary& Boundary::operator=(const Boundary& x)
+    {
+      static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+      *pimpl = *x.pimpl;
+      
+      return *this;
+    }
+    
     template <typename FeaturePrefix, typename Feature>
     inline
     bool equal_prefix(const FeaturePrefix& prefix, const Feature& x)

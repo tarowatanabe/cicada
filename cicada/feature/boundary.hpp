@@ -33,12 +33,14 @@ namespace cicada
       
     public:
       Boundary(const std::string& parameter);
+      Boundary(const Boundary&);
+      
       ~Boundary();
+
+      Boundary& operator=(const Boundary&);
       
     private:
       Boundary() {}
-      Boundary(const Boundary&) {}
-      Boundary& operator=(const Boundary&) { return *this; }
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -50,6 +52,8 @@ namespace cicada
 			      feature_set_type& features,
 			      feature_set_type& estimates) const;
       virtual void initialize();
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Boundary(*this)); }
       
     private:
       impl_type* pimpl;

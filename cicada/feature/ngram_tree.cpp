@@ -314,6 +314,38 @@ namespace cicada
     
     NGramTree::~NGramTree() { std::auto_ptr<impl_type> tmp(pimpl); }
 
+    
+    NGramTree::NGramTree(const NGramTree& x)
+      : base_type(static_cast<const base_type&>(x)),
+	pimpl(0)
+    {
+      typedef __NGramTreeImpl<__ngram_tree_extract_source> ngram_tree_source_type;
+      typedef __NGramTreeImpl<__ngram_tree_extract_target> ngram_tree_target_type;
+      
+      if (dynamic_cast<const ngram_tree_source_type*>(x.pimpl))
+	pimpl = new ngram_tree_source_type();
+      else
+	pimpl = new ngram_tree_target_type();
+    }
+    
+    NGramTree& NGramTree::operator=(const NGramTree& x)
+    {
+      typedef __NGramTreeImpl<__ngram_tree_extract_source> ngram_tree_source_type;
+      typedef __NGramTreeImpl<__ngram_tree_extract_target> ngram_tree_target_type;
+
+      static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+      
+      std::auto_ptr<impl_type> tmp(pimpl);
+      
+      if (dynamic_cast<const ngram_tree_source_type*>(x.pimpl))
+	pimpl = new ngram_tree_source_type();
+      else
+	pimpl = new ngram_tree_target_type();
+      
+      return *this;
+    }
+
+
     template <typename FeaturePrefix, typename Feature>
     inline
     bool equal_prefix(const FeaturePrefix& prefix, const Feature& x)

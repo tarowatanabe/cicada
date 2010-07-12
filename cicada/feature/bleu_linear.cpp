@@ -351,6 +351,19 @@ namespace cicada
     }
     
     BleuLinear::~BleuLinear() { std::auto_ptr<impl_type> tmp(pimpl); }
+
+    BleuLinear::BleuLinear(const BleuLinear& x)
+      : base_type(static_cast<const base_type&>(x)),
+	pimpl(new impl_type(*x.pimpl))
+    {}
+
+    BleuLinear& BleuLinear::operator=(const BleuLinear& x)
+    {
+      static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+      *pimpl = *x.pimpl;
+      
+      return *this;
+    }
     
     void BleuLinear::operator()(state_ptr_type& state,
 				const state_ptr_set_type& states,

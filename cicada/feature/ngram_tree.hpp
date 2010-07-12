@@ -33,12 +33,14 @@ namespace cicada
       
     public:
       NGramTree(const std::string& parameter);
+      NGramTree(const NGramTree&);
+      
       ~NGramTree();
+      
+      NGramTree& operator=(const NGramTree&);
       
     private:
       NGramTree() {}
-      NGramTree(const NGramTree&) {}
-      NGramTree& operator=(const NGramTree&) { return *this; }
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -50,6 +52,8 @@ namespace cicada
 			      feature_set_type& features,
 			      feature_set_type& estimates) const;
       virtual void initialize();
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new NGramTree(*this)); }
       
     private:
       impl_type* pimpl;

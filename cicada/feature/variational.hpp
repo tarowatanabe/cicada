@@ -35,12 +35,14 @@ namespace cicada
       
     public:
       Variational(const std::string& parameter);
+      Variational(const Variational&);
+      
       ~Variational();
+
+      Variational& operator=(const Variational&);
       
     private:
       Variational() {}
-      Variational(const Variational&) {}
-      Variational& operator=(const Variational&) { return *this; }
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -51,6 +53,8 @@ namespace cicada
       virtual void operator()(const state_ptr_type& state,
 			      feature_set_type& features,
 			      feature_set_type& estimates) const;
+      
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Variational(*this)); }
       
       int order() const;
       

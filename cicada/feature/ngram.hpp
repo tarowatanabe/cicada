@@ -47,6 +47,9 @@ namespace cicada
       ~NGram();
       
       NGram& operator=(const NGram&);
+
+    private:
+      NGram() {}
       
     public:
       virtual void operator()(state_ptr_type& state,
@@ -57,6 +60,8 @@ namespace cicada
       virtual void operator()(const state_ptr_type& state,
 			      feature_set_type& features,
 			      feature_set_type& estimates) const;
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new NGram(*this)); }
       
     private:
       

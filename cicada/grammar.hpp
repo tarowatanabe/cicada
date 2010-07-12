@@ -56,6 +56,17 @@ namespace cicada
     void pop_back() { transducers.pop_back(); }
     void clear() { transducers.clear(); }
     
+    Grammar clone() const
+    {
+      Grammar __grammar;
+      
+      transducer_ptr_set_type::const_iterator iter_end = transducers.end();
+      for (transducer_ptr_set_type::const_iterator iter = transducers.begin(); iter != iter_end; ++ iter)
+	__grammar.push_back((*iter)->clone());
+      
+      return __grammar;
+    }
+    
   private:
     transducer_ptr_set_type transducers;
   };

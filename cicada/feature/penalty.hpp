@@ -31,6 +31,8 @@ namespace cicada
       void operator()(const state_ptr_type& state,
 		      feature_set_type& features,
 		      feature_set_type& estimates) const {}
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new TargetWordPenalty(*this)); }
     };
 
     class SourceWordPenalty : public FeatureFunction
@@ -56,6 +58,8 @@ namespace cicada
       void operator()(const state_ptr_type& state,
 		      feature_set_type& features,
 		      feature_set_type& estimates) const {}
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new SourceWordPenalty(*this)); }
     };
     
     class RulePenalty : public FeatureFunction
@@ -75,6 +79,8 @@ namespace cicada
       void operator()(const state_ptr_type& state,
 		      feature_set_type& features,
 		      feature_set_type& estimates) const {}
+      
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new RulePenalty(*this)); }
     };
     
   };

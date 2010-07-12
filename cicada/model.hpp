@@ -113,6 +113,8 @@ namespace cicada
   public:
     Model();
     Model(const Model& x);
+    ~Model();
+    
     Model& operator=(const Model& x);
 
   public:
@@ -165,6 +167,18 @@ namespace cicada
       model_set_type::iterator iter_end = models.end();
       for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
 	(*iter)->apply_feature() = mode;
+    }
+
+    Model clone() const
+    {
+      Model __model(*this);
+      
+      __model.models.clear();
+      model_set_type::const_iterator iter_end = models.end();
+      for (model_set_type::const_iterator iter = models.begin(); iter != iter_end; ++ iter)
+	__model.push_back((*iter)->clone());
+      
+      return __model;
     }
     
   private:
