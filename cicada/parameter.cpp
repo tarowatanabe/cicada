@@ -17,56 +17,86 @@
 namespace cicada
 {
   
-  void Parameter::parse(const std::string& parameter)
-  {
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
-	
-    using qi::phrase_parse;
-    using qi::lexeme;
-    using standard::char_;
-    using qi::_1;
-    using standard::space;
-    
-    using phoenix::push_back;
-    using phoenix::ref;
-    
-    typedef std::string::const_iterator iter_type;
+  typedef std::pair<std::string, std::string> value_parsed_type;
+  typedef std::vector<value_parsed_type, std::allocator<value_parsed_type> > value_parsed_set_type;
+  
+  typedef std::pair<std::string, value_parsed_set_type> parameter_parsed_type;
 
-#if 0
+  template <typename Iterator>
+  struct parameter_parser : boost::spirit::qi::grammar<Iterator, parameter_parsed_type(), boost::spirit::standard::space_type>
+  {
+    parameter_parser() : parameter_parser::base_type(parameter)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using qi::phrase_parse;
+      using qi::lexeme;
+      using qi::hold;
+      using standard::char_;
+      using standard::space;
+
+      escape_char.add
+	("\\\"", '\"')
+	("\\\\", '\\')
+	("\\a", '\a')
+	("\\b", '\b')
+	("\\f", '\f')
+	("\\n", '\n')
+	("\\r", '\r')
+	("\\t", '\t')
+	("\\v", '\v');
+      
+      escaped %= '"' >> lexeme[*(escape_char | ~char_('"'))] >> '"';
+      
+      param %= lexeme[+(char_ - space - ':')];
+      key   %= lexeme[+(char_ - space - '=')];
+      value %= lexeme[+(char_ - space - ',')];
+      key_values %= ((hold[escaped] | key) >> '=' >> (hold[escaped] | value)) % ',';
+      parameter %= (hold[escaped] | param) >> -(':' >> key_values);
+    }
+    
+    typedef boost::spirit::standard::space_type space_type;
+    
     boost::spirit::qi::symbols<char, char> escape_char;
     
-    escape_char.add
-      ("\\\"", '\"')
-      ("\\\\", '\\')
-      ("\\a", '\a')
-      ("\\b", '\b')
-      ("\\f", '\f')
-      ("\\n", '\n')
-      ("\\r", '\r')
-      ("\\t", '\t')
-      ("\\v", '\v');
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>           escaped;
+    
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>           param;
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>           key;
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>           value;
+    boost::spirit::qi::rule<Iterator, value_parsed_set_type(), space_type> key_values;
+    boost::spirit::qi::rule<Iterator, parameter_parsed_type(), space_type> parameter;
+  };
+  
+  void Parameter::parse(const std::string& parameter)
+  {
+    typedef std::string::const_iterator iter_type;
+    typedef parameter_parser<iter_type> parser_type;
+
+#if 0
+    
+    
+    
 #endif
 
-    qi::rule<iter_type, attribute_type(), standard::space_type> rule_param     = (lexeme[+(char_ - space - ':')]);
-    qi::rule<iter_type, key_type(), standard::space_type>       rule_key       = (lexeme[+(char_ - space - '=')]);
-    qi::rule<iter_type, key_type(), standard::space_type>       rule_value     = (lexeme[+(char_ - space - ',')]);
-    qi::rule<iter_type, value_type(), standard::space_type>     rule_key_value = (rule_key >> '=' >> rule_value);
-    
     __attr.clear();
     __values.clear();
 
-    std::string::const_iterator iter = parameter.begin();
-    std::string::const_iterator iter_end = parameter.end();
+    parser_type parser;
+
+    parameter_parsed_type parsed;
+
+    iter_type iter     = parameter.begin();
+    iter_type iter_end = parameter.end();
     
-    const bool result = phrase_parse(iter, iter_end,
-				     (
-				      rule_param[ref(__attr) = _1]
-				      >> -(':' >> (rule_key_value % ',') [ref(__values) = _1])
-				      ),
-				     space);
+    const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::space, parsed);
+    
     if (! result || iter != iter_end)
       throw std::runtime_error(std::string("parameter parsing failed: ") + parameter);
+
+    __attr   = parsed.first;
+    __values.insert(__values.end(), parsed.second.begin(), parsed.second.end());
   }
 };

@@ -3,7 +3,7 @@
 
 int main(int argc, char** argv)
 {
-  cicada::GrammarMutable grammar("-,feature0=prob-soruce-target,feature2=lex-target-source,feature2=prob-target-source,feature3=lex-target-source");
+  cicada::GrammarMutable grammar("-:feature0=prob-soruce-target,feature2=lex-target-source,feature2=prob-target-source,feature3=lex-target-source");
   
   grammar.insert("[x] ||| good boy |||  bad boy ||| feature1=0.4");
   
