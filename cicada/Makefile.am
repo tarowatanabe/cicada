@@ -64,6 +64,7 @@ libcicadainclude_HEADERS = \
 apply.hpp \
 apply_cube_prune.hpp \
 apply_exact.hpp \
+apply_state_less.hpp \
 binarize.hpp \
 compose.hpp \
 compose_cky.hpp \

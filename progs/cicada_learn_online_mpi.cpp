@@ -647,7 +647,7 @@ struct Task
 	  else
 	    *score_1best += *scores[id];
 	  
-	  if (debug) {
+	  if (debug >= 2) {
 	    const std::pair<double, double> bleu_1best = score_1best->score();
 	    const std::pair<double, double> bleu_viterbi = score->score();
 	    
@@ -665,7 +665,7 @@ struct Task
 	  
 	  ++ batch_current;
 	  
-	  if (batch_current >= batch_size) {
+	  if (batch_current >= batch_size && ! labels.empty()) {
 	    if (debug)
 	      std::cerr << "# of support vectors: " << labels.size() << std::endl;
 
@@ -826,7 +826,7 @@ struct Task
       
       ++ batch_current;
       
-      if (batch_current >= batch_size) {
+      if (batch_current >= batch_size && ! labels.empty()) {
 	if (debug)
 	  std::cerr << "# of support vectors: " << labels.size() << std::endl;
 

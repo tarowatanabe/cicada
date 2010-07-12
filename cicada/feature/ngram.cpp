@@ -445,22 +445,13 @@ namespace cicada
     NGram::~NGram() { std::auto_ptr<impl_type> tmp(pimpl); }
     
     NGram::NGram(const NGram& x)
-      : pimpl(new impl_type(*x.pimpl))
-    {
-      __state_size     = x.__state_size;
-      __feature_name   = x.__feature_name;
-      __sparse_feature = x.__sparse_feature;
-      __apply_feature  = x.__apply_feature;
-    }
+      : base_type(static_cast<const base_type&>(x)), pimpl(new impl_type(*x.pimpl)) {}
     
     NGram& NGram::operator=(const NGram& x)
     {
-      *pimpl = *x.pimpl;
+      static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
 
-      __state_size     = x.__state_size;
-      __feature_name   = x.__feature_name;
-      __sparse_feature = x.__sparse_feature;
-      __apply_feature  = x.__apply_feature;
+      *pimpl = *x.pimpl;
       
       return *this;
     }

@@ -102,19 +102,12 @@ namespace cicada
     typedef std::vector<node_score_type, std::allocator<node_score_type> > node_score_list_type;
     typedef std::vector<node_score_list_type, std::allocator<node_score_list_type> > node_score_set_type;
     
-    struct state_hash_type : public utils::hashmurmur<size_t>
-    {
-      size_t operator()(const state_type& x) const
-      {
-	return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
-      }
-    };
     
 #ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<state_type, candidate_type*, state_hash_type, std::equal_to<state_type>,
+    typedef std::tr1::unordered_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
 				    std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
 #else
-    typedef sgi::hash_map<state_type, candidate_type*, state_hash_type, std::equal_to<state_type>,
+    typedef sgi::hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
 			  std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
 #endif
 
@@ -171,11 +164,13 @@ namespace cicada
       : model(_model),
 	function(_function),
 	cube_size_max(_cube_size_max)
-    { const_cast<model_type&>(model).initialize(); }
+    { }
     
     void operator()(const hypergraph_type& graph_in,
 		    hypergraph_type&       graph_out)
     {
+      const_cast<model_type&>(model).initialize();
+      
       candidates.clear();
       
       D.clear();
@@ -230,7 +225,7 @@ namespace cicada
       
       //std::cerr << "perform cube-prune" << std::endl;
 
-      state_node_map_type buf;
+      state_node_map_type buf(cand.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...
@@ -241,7 +236,7 @@ namespace cicada
 	push_succ(*item, is_goal, cand, cand_unique, graph_out);
 	append_item(*item, is_goal, buf, graph_out);
       }
-
+      
       //std::cerr << "finished" << std::endl;
       
       // sort buf to D(v)
@@ -252,6 +247,10 @@ namespace cicada
 	D[v].push_back(node_score_type(biter->second->node, biter->second->score, biter->second->estimate));
       
       std::sort(D[v].begin(), D[v].end(), compare_estimate_type());
+
+      typename candidate_heap_type::const_iterator hiter_end = cand.end();
+      for (typename candidate_heap_type::const_iterator hiter = cand.begin(); hiter != hiter_end; ++ hiter)
+	model.deallocate((*hiter)->state);
     }
     
     // append item to buf
@@ -278,6 +277,7 @@ namespace cicada
 	
 	graph.connect_edge(edge_new.id, node.id);
 	
+	model.deallocate(item.state);
       } else {
 	// hypothesis re-combination...
 	typename state_node_map_type::iterator biter = buf.find(item.state);
@@ -290,7 +290,8 @@ namespace cicada
 	  biter->second->node = node_new.id;
 	  
 	  node_states.push_back(item.state);
-	}
+	} else
+	  model.deallocate(item.state);
 	
 	//std::cerr << "node: " << biter->second->node << std::endl;
 	
@@ -383,7 +384,7 @@ namespace cicada
       }
       
       // perform actual model application...
-
+      
       feature_set_type estimates;
       candidate.state = model(graph, node_states, candidate.out_edge, estimates);
       if (is_goal)
@@ -391,7 +392,7 @@ namespace cicada
       
       candidate.estimate *= function(estimates);
       
-      candidate.score *= function(candidate.out_edge.features);
+      candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= candidate.score;
 
       //std::cerr << "make candidate done" << std::endl;

@@ -818,13 +818,12 @@ public:
 
     weight_set_type weights_zero;
     const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
-    
-    if (exact || model.is_stateless()) {
-      if (weights_one)
-	cicada::apply_exact(model, hypergraph, applied);
-      else
-	cicada::apply_exact(model, hypergraph, applied);
-    } else {
+
+    if (model.is_stateless())
+      cicada::apply_state_less(model, hypergraph, applied);
+    else if (exact)
+      cicada::apply_exact(model, hypergraph, applied);
+    else {
       if (weights_one)
 	cicada::apply_cube_prune(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
       else

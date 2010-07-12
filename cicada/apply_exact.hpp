@@ -43,30 +43,24 @@ namespace cicada
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
     
-    struct state_hash_type : public utils::hashmurmur<size_t>
-    {
-      size_t operator()(const state_type& x) const
-      {
-	return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
-      }
-    };
-    
 #ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<state_type, id_type, state_hash_type, std::equal_to<state_type>,
+    typedef std::tr1::unordered_map<state_type, id_type, model_type::state_hash, model_type::state_equal,
 				    std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
 #else
-    typedef sgi::hash_map<state_type, id_type, state_hash_type, std::equal_to<state_type>,
+    typedef sgi::hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal,
 			  std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
 #endif
     
     
     ApplyExact(const model_type& _model)
       : model(_model)
-    { const_cast<model_type&>(model).initialize(); }
+    {  }
     
     void operator()(const hypergraph_type& graph_in,
 		    hypergraph_type&       graph_out)
     {
+      const_cast<model_type&>(model).initialize();
+
       node_map.clear();
       node_map.reserve(graph_in.nodes.size());
       node_map.resize(graph_in.nodes.size());
@@ -92,7 +86,7 @@ namespace cicada
       const node_type& node = graph_in.nodes[v];
       const bool is_goal(v == graph_in.goal);
 
-      state_node_map_type buf;
+      state_node_map_type buf(node.edges.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
@@ -122,7 +116,7 @@ namespace cicada
 	    model(state, edge_new, estimates);
 	  
 	  // hypothesis recombination
-
+	  
 	  if (is_goal) {
 	    if (graph_out.goal == hypergraph_type::invalid)
 	      graph_out.goal = graph_out.add_node().id;
@@ -130,6 +124,8 @@ namespace cicada
 	    node_type& node = graph_out.nodes[graph_out.goal];
 	    
 	    graph_out.connect_edge(edge_new.id, node.id);
+	    
+	    model.deallocate(state);
 	  } else {
 	    state_node_map_type::iterator biter = buf.find(state);
 	    if (biter == buf.end()) {
@@ -140,7 +136,8 @@ namespace cicada
 	      node_map[edge.head].push_back(node_new.id);
 	      
 	      biter = buf.insert(std::make_pair(state, node_new.id)).first;
-	    }
+	    } else
+	      model.deallocate(state);
 	    
 	    graph_out.connect_edge(edge_new.id, biter->second);
 	  }

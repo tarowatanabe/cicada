@@ -113,10 +113,10 @@ namespace cicada
   typedef boost::fusion::tuple<std::string, phrase_parsed_type, phrase_parsed_type, scores_parsed_type > rule_parsed_type;
   
   template <typename Iterator>
-  struct rule_grammar_parser : boost::spirit::qi::grammar<Iterator, rule_parsed_type(), boost::spirit::standard::space_type>
+  struct rule_grammar_parser_mutable : boost::spirit::qi::grammar<Iterator, rule_parsed_type(), boost::spirit::standard::space_type>
   {
     
-    rule_grammar_parser() : rule_grammar_parser::base_type(rule_grammar)
+    rule_grammar_parser_mutable() : rule_grammar_parser_mutable::base_type(rule_grammar)
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
@@ -155,7 +155,7 @@ namespace cicada
 
     rule_parsed_type rule;
     
-    typedef rule_grammar_parser<std::string::const_iterator> rule_parser_type;
+    typedef rule_grammar_parser_mutable<std::string::const_iterator> rule_parser_type;
 #ifdef HAVE_TLS
     static __thread rule_parser_type* __rule_parser_tls = 0;
     static boost::thread_specific_ptr<rule_parser_type > __rule_parser;
@@ -254,7 +254,7 @@ namespace cicada
 	throw std::runtime_error("unsupported key: " + piter->first);
     }
 
-    typedef rule_grammar_parser<std::string::const_iterator> rule_parser_type;
+    typedef rule_grammar_parser_mutable<std::string::const_iterator> rule_parser_type;
     
 #ifdef HAVE_TLS
     static __thread rule_parser_type* __rule_parser_tls = 0;
