@@ -498,21 +498,23 @@ public:
     param_type param(parameter);
     if (param.name() != "binarize")
       throw std::runtime_error("this is not a binarizer");
-    
-    if (param.find("size") != param.end())
-      size = boost::lexical_cast<int>(param.find("size")->second);
 
-    if (param.find("direction") != param.end()) {
-      const std::string& dir = param.find("direction")->second;
-      
-      if (strcasecmp(dir.c_str(), "left") == 0)
-	left = true;
-      else if (strcasecmp(dir.c_str(), "right") == 0)
-	right = true;
-      else
-	throw std::runtime_error("unuspported direction: " + parameter);
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "size") == 0)
+	size = boost::lexical_cast<int>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "direction") == 0) {
+	const std::string& dir = piter->second;
+	
+	if (strcasecmp(dir.c_str(), "left") == 0)
+	  left = true;
+	else if (strcasecmp(dir.c_str(), "right") == 0)
+	  right = true;
+	else
+	  throw std::runtime_error("unuspported direction: " + parameter);
+      } else
+	std::cerr << "WARNING: unsupported parameter for binarize: " << piter->first << "=" << piter->second << std::endl;
     }
-
+    
     if (! left && ! right)
       right == true;
   }
@@ -573,26 +575,24 @@ public:
     param_type param(parameter);
     if (param.name() != "permute")
       throw std::runtime_error("this is not a permuter");
+
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "size") == 0)
+	size = boost::lexical_cast<int>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "feature") == 0)
+	feature = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "collapse") == 0)
+	collapse = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "exclude") == 0)
+	excludes.insert(piter->second);
+      else
+	std::cerr << "WARNING: unsupported parameter for permute: " << piter->first << "=" << piter->second << std::endl;
+    }
     
-    if (param.find("size") != param.end())
-      size = boost::lexical_cast<int>(param.find("size")->second);
-    
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
-
-    if (param.find("feature") != param.end())
-      feature = true_false(param.find("feature")->second);
-
-    if (param.find("collapse") != param.end())
-      collapse = true_false(param.find("collapse")->second);
-
     if (collapse && ! weights)
       throw std::runtime_error("collapsing but no weights...");
-    
-    if (param.find("exclude") != param.end())
-      for (param_type::const_iterator piter = param.find("exclude"); piter != param.end(); ++ piter)
-	if (piter->first == "exclude")
-	  excludes.insert(piter->second);
   }
   
   struct Filter
@@ -627,7 +627,7 @@ public:
       cicada::permute(hypergraph, permuted, cicada::PermuteNoFeature(), Filter(excludes), size);
     
     utils::resource end;
-	
+    
     if (debug)
       std::cerr << "permute cpu time: " << (end.cpu_time() - start.cpu_time())
 		<< " user time: " << (end.user_time() - start.user_time())
@@ -790,18 +790,19 @@ public:
     if (param.name() != "apply")
       throw std::runtime_error("this is not a feature-functin applier");
 
-    if (param.find("size") != param.end())
-      size = boost::lexical_cast<int>(param.find("size")->second);
-
-    if (param.find("exact") != param.end())
-      exact = true_false(param.find("exact")->second);
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "size") == 0)
+	size = boost::lexical_cast<int>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "exact") == 0)
+	exact = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	weights_one = true_false(piter->second);
+      else
+	std::cerr << "WARNING: unsupported parameter for apply: " << piter->first << "=" << piter->second << std::endl;
+    }
     
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
-    
-    if (param.find("weights-one") != param.end())
-      weights_one = true_false(param.find("weights-one")->second);
-
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
   }
@@ -873,18 +874,19 @@ public:
     if (param.name() != "bleu")
       throw std::runtime_error("this is not a bleu-computer");
     
-    if (param.find("size") != param.end())
-      size = boost::lexical_cast<int>(param.find("size")->second);
-
-    if (param.find("exact") != param.end())
-      exact = true_false(param.find("exact")->second);
-
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "size") == 0)
+	size = boost::lexical_cast<int>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "exact") == 0)
+	exact = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	weights_one = true_false(piter->second);
+      else
+	std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
+    }
     
-    if (param.find("weights-one") != param.end())
-      weights_one = true_false(param.find("weights-one")->second);
-
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
     
@@ -985,7 +987,7 @@ class Variational : public Operation
 {
 public:
   Variational(const std::string& parameter, const model_type& model, const int __debug)
-    : weights(0), weights_variational(0), size(200), weights_one(false), debug(__debug)
+    : weights(0), weights_one(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -993,15 +995,15 @@ public:
     if (param.name() != "variational")
       throw std::runtime_error("this is not a variational decoder");
     
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
-
-    if (param.find("weights-variational") != param.end())
-      weights_variational = &base_type::weights(param.find("weights-variational")->second);
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	weights_one = true_false(piter->second);
+      else
+	std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
+    }
     
-    if (param.find("weights-one") != param.end())
-      weights_one = true_false(param.find("weights-one")->second);
-
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
 
@@ -1030,26 +1032,24 @@ public:
 	  __weights[weight_set_type::feature_type(id)] = 1.0;
     }
     
-    const weight_set_type* weights_orig(weights ? weights : &__weights);
+    const weight_set_type* weights_variational(weights ? weights : &__weights);
     
     if (debug)
       std::cerr << "variational decoding" << std::endl;
-
+    
     cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(feature.get());
     
     utils::resource start;
     
-    __variational->insert(hypergraph, *weights_orig);
+    // first, compute vatiational model
+    __variational->insert(hypergraph, *weights_variational);
     
     model_type model;
     model.push_back(feature);
-
-    const weight_set_type* weights_apply(weights_variational ? weights_variational : weights_orig);
     
     // second, apply again...
-    
     cicada::apply_exact(model, hypergraph, variational);
-	
+    
     utils::resource end;
 
     if (debug)
@@ -1070,7 +1070,7 @@ public:
   {
     weights = &__weights;
   }
-
+  
   void clear()
   {
     dynamic_cast<cicada::feature::Variational*>(feature.get())->clear();
@@ -1079,8 +1079,6 @@ public:
   feature_function_type::feature_function_ptr_type feature;
   
   const weight_set_type* weights;
-  const weight_set_type* weights_variational;
-  int size;
   bool weights_one;
   
   int debug;
@@ -1099,12 +1097,33 @@ public:
     param_type param(parameter);
     if (param.name() != "prune")
       throw std::runtime_error("this is not a pruner");
-    
-    if (param.find("beam") != param.end())
-      beam = boost::lexical_cast<double>(param.find("beam")->second);
-    
-    if (param.find("density") != param.end())
-      density = boost::lexical_cast<double>(param.find("density")->second);
+
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "beam") == 0)
+	beam = boost::lexical_cast<double>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "density") == 0)
+	density = boost::lexical_cast<double>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "scale") == 0)
+	scale = boost::lexical_cast<double>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	weights_one = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "semiring") == 0) {
+	const std::string& name = piter->second;
+	
+	if (strcasecmp(name.c_str(), "tropical") == 0)
+	  semiring_tropical = true;
+	else if (strcasecmp(name.c_str(), "logprob") == 0)
+	  semiring_logprob = true;
+	else if (strcasecmp(name.c_str(), "log") == 0)
+	  semiring_log = true;
+	else
+	  throw std::runtime_error("unknown semiring: " + name);
+	
+      } else
+	std::cerr << "WARNING: unsupported parameter for prune: " << piter->first << "=" << piter->second << std::endl;
+    }
     
     if (beam > 0.0 && density > 1.0)
       throw std::runtime_error("you cannot specify both beam and density pruning");
@@ -1112,33 +1131,9 @@ public:
     if (beam <= 0.0 && density <= 1.0)
       throw std::runtime_error("you may want to specify either beam or density pruning");
 
-    if (param.find("scale") != param.end())
-      scale = boost::lexical_cast<double>(param.find("scale")->second);
-    
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
-    
-    if (param.find("weights-one") != param.end())
-      weights_one = true_false(param.find("weights-one")->second);
-    
-    if (param.find("semiring") != param.end()) {
-      const std::string& name = param.find("semiring")->second;
-
-      if (strcasecmp(name.c_str(), "tropical") == 0)
-	semiring_tropical = true;
-      else if (strcasecmp(name.c_str(), "logprob") == 0)
-	semiring_logprob = true;
-      else if (strcasecmp(name.c_str(), "log") == 0)
-	semiring_log = true;
-      else
-	throw std::runtime_error("unknown semiring: " + name);
-    }
-
-    
     if (int(semiring_tropical) + semiring_logprob + semiring_log == 0)
       semiring_tropical = true;
     
-
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
   }
@@ -1268,39 +1263,42 @@ public:
     if (param.name() != "output")
       throw std::runtime_error("this is not a outputter");
 
-    if (param.find("kbest") != param.end())
-      kbest_size = boost::lexical_cast<int>(param.find("kbest")->second);
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "kbest") == 0)
+	kbest_size = boost::lexical_cast<int>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "unique") == 0)
+	kbest_unique = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	weights_one = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "graphviz") == 0)
+	graphviz = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "file") == 0)
+	;
+      else if (strcasecmp(piter->first.c_str(), "directory") == 0)
+	; 
+      else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	const std::string& value = piter->second;
+	
+	if (strcasecmp(value.c_str(), "source") == 0)
+	  yield_source = true;
+	else if (strcasecmp(value.c_str(), "target") == 0)
+	  yield_target = true;
+	else
+	  throw std::runtime_error("unknown yield: " + value);
+      } else
+	std::cerr << "WARNING: unsupported parameter for output: " << piter->first << "=" << piter->second << std::endl;
+    }
     
-    if (param.find("unique") != param.end())
-      kbest_unique = true_false(param.find("unique")->second);
-    
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
-   
-    if (param.find("weights-one") != param.end())
-      weights_one = true_false(param.find("weights-one")->second);
-
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
-
-    if (param.find("yield") != param.end()) {
-      const std::string& value = param.find("yield")->second;
-      if (strcasecmp(value.c_str(), "source") == 0)
-	yield_source = true;
-      else if (strcasecmp(value.c_str(), "target") == 0)
-	yield_target = true;
-      else
-	throw std::runtime_error("unknown yield: " + value);
-    }
-
+    
     if (yield_source && yield_target)
       throw std::runtime_error("only source or target yield for kbest");
     
     if (! yield_source && ! yield_target)
       yield_target = true;
-
-    if (param.find("graphviz") != param.end())
-      graphviz = true_false(param.find("graphviz")->second);
   }
 
   void clear()
@@ -1389,26 +1387,38 @@ public:
     if (param.name() != "output")
       throw std::runtime_error("this is not a outputter");
 
-    if (param.find("kbest") != param.end())
-      kbest_size = boost::lexical_cast<int>(param.find("kbest")->second);
     
-    if (param.find("unique") != param.end())
-      kbest_unique = true_false(param.find("unique")->second);
-    
-    if (param.find("weights") != param.end())
-      weights = &base_type::weights(param.find("weights")->second);
-    
-    if (param.find("weights-one") != param.end())
-      weights_one = true_false(param.find("weights-one")->second);
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "kbest") == 0)
+	kbest_size = boost::lexical_cast<int>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "unique") == 0)
+	kbest_unique = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	weights_one = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "graphviz") == 0)
+	graphviz = true_false(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "file") == 0)
+	file = piter->second;
+      else if (strcasecmp(piter->first.c_str(), "directory") == 0)
+	directory = piter->second;
+      else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	const std::string& value = piter->second;
+	
+	if (strcasecmp(value.c_str(), "source") == 0)
+	  yield_source = true;
+	else if (strcasecmp(value.c_str(), "target") == 0)
+	  yield_target = true;
+	else
+	  throw std::runtime_error("unknown yield: " + value);
+      } else
+	std::cerr << "WARNING: unsupported parameter for output: " << piter->first << "=" << piter->second << std::endl;
+    }
+
     
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
-    
-    if (param.find("directory") != param.end())
-      directory = param.find("directory")->second;
-    
-    if (param.find("file") != param.end())
-      file = param.find("file")->second;
     
     // default to stdout
     if (directory.empty() && file.empty())
@@ -1417,24 +1427,11 @@ public:
     if (! directory.empty() && ! file.empty())
       throw std::runtime_error("you cannot output both in directory and file");
     
-    if (param.find("yield") != param.end()) {
-      const std::string& value = param.find("yield")->second;
-      if (strcasecmp(value.c_str(), "source") == 0)
-	yield_source = true;
-      else if (strcasecmp(value.c_str(), "target") == 0)
-	yield_target = true;
-      else
-	throw std::runtime_error("unknown yield: " + value);
-    }
-    
     if (yield_source && yield_target)
       throw std::runtime_error("only source or target yield for kbest");
     
     if (! yield_source && ! yield_target)
       yield_target = true;
-    
-    if (param.find("graphviz") != param.end())
-      graphviz = true_false(param.find("graphviz")->second);
   }
 
   void assign(const weight_set_type& __weights)
@@ -1622,7 +1619,6 @@ bleu: BLEU computation\n\
 \tweights-one=[true|false] one initialized weight\n\
 variational: variational decoding\n\
 \tweights=weight file for feature\n\
-\tweights-variational=weighs for variational decoding feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
