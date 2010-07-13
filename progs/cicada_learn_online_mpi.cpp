@@ -657,6 +657,11 @@ struct Task
 		      << " penalty: " << bleu_viterbi.second
 		      << std::endl;
 	  }
+	  
+	  if (id >= hypergraph_oracles.size())
+	    hypergraph_oracles.resize(id + 1);
+	  
+	  hypergraph_oracles[id] = hypergraph_reward;
 
 	  if (learn_factored)
 	    add_support_vectors_factored(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);

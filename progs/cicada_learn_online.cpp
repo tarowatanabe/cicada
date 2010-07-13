@@ -614,8 +614,7 @@ struct Task
 	  sentence_set_type::const_iterator titer_end = targets.end();
 	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
 	    scorer->insert(*titer);
-	    
-	  
+
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
 	    score = scores[id]->clone();
@@ -639,6 +638,11 @@ struct Task
 		      << std::endl;
 	  }
 
+	  if (id >= hypergraph_oracles.size())
+	    hypergraph_oracles.resize(id + 1);
+	  
+	  hypergraph_oracles[id] = hypergraph_reward;
+	  
 	  if (learn_factored)
 	    add_support_vectors_factored(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
 	  else
