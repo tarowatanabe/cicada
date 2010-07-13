@@ -1223,11 +1223,6 @@ void send_weights(const int rank, const weight_set_type& weights)
       os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
 }
 
-void send_weights(const weight_set_type& weights)
-{
-  send_weights(0, weights);
-}
-
 void reduce_weights(const int rank, weight_set_type& weights)
 {
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
@@ -1258,7 +1253,7 @@ void reduce_weights(const int rank, weight_set_type& weights)
 template <typename Iterator>
 void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
 {
-   typedef utils::mpi_device_source            device_type;
+  typedef utils::mpi_device_source            device_type;
   typedef boost::iostreams::filtering_istream stream_type;
 
   typedef boost::shared_ptr<device_type> device_ptr_type;
@@ -1282,7 +1277,6 @@ void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
     stream.back()->push(boost::iostreams::gzip_decompressor());
     stream.back()->push(*device.back());
   }
-  
   
   std::string line;
   
@@ -1314,7 +1308,6 @@ void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }
-
 }
 
 
@@ -1351,66 +1344,6 @@ void reduce_weights(weight_set_type& weights)
   }
 }
 
-#if 0
-void reduce_weights(weight_set_type& weights)
-{
-  typedef utils::mpi_device_source            device_type;
-  typedef boost::iostreams::filtering_istream stream_type;
-
-  typedef boost::shared_ptr<device_type> device_ptr_type;
-  typedef boost::shared_ptr<stream_type> stream_ptr_type;
-
-  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
-  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
-
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  device_ptr_set_type device(mpi_size);
-  stream_ptr_set_type stream(mpi_size);
-
-  for (int rank = 1; rank < mpi_size; ++ rank) {
-    device[rank].reset(new device_type(rank, weights_tag, 1024 * 1024));
-    stream[rank].reset(new stream_type());
-    
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
-    stream[rank]->push(*device[rank]);
-  }
-
-  std::string line;
-  
-  int non_found_iter = 0;
-  while (1) {
-    bool found = false;
-    
-    for (int rank = 1; rank < mpi_size; ++ rank)
-      while (stream[rank] && device[rank] && device[rank]->test()) {
-	if (std::getline(*stream[rank], line)) {
-	  tokenizer_type tokenizer(line);
-	  
-	  tokenizer_type::iterator iter = tokenizer.begin();
-	  if (iter == tokenizer.end()) continue;
-	  std::string feature = *iter;
-	  ++ iter;
-	  if (iter == tokenizer.end()) continue;
-	  std::string value = *iter;
-	  
-	  weights[feature] += utils::decode_base64<double>(value);
-	} else {
-	  stream[rank].reset();
-	  device[rank].reset();
-	}
-	found = true;
-      }
-    
-    if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
-    
-    non_found_iter = loop_sleep(found, non_found_iter);
-  }
-}
-#endif
 
 void bcast_weights(const int rank, weight_set_type& weights)
 {
