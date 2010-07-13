@@ -382,9 +382,9 @@ int main(int argc, char ** argv)
 	  randomize(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin());
 	  
 	  if (weight_normalize_l1 || regularize_l1)
-	    normalize_l1(sample_weights.begin(), sample_weights.end(), regularize_l1 ? 1.0);
+	    normalize_l1(sample_weights.begin(), sample_weights.end(), 1.0);
 	  else
-	    normalize_l2(sample_weights.begin(), sample_weights.end(), regularize_l2 ? 1.0);
+	    normalize_l2(sample_weights.begin(), sample_weights.end(), 1.0);
 	  
 	  if (valid_bounds(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin()))
 	    break;
