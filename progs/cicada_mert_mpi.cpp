@@ -93,7 +93,7 @@ double tolerance = 1e-4;
 
 bool regularize_l1 = false;
 bool regularize_l2 = false;
-double regularize_scale = 1.0; // inverse of C == 1.0 / C : where C is a constant of SVM^{light}
+double C = 1.0; // inverse of C == 1.0 / C : where C is a constant of SVM^{light}
 
 bool weight_normalize_l1 = false;
 bool weight_normalize_l2 = false;
@@ -265,7 +265,7 @@ int main(int argc, char ** argv)
       weight_normalize_l1 = false;
       weight_normalize_l2 = false;
       
-      if (regularize_scale <= 0.0)
+      if (C <= 0.0)
 	throw std::runtime_error("the scaling for L1/L2 must be positive");
     }
     
@@ -396,7 +396,7 @@ int main(int argc, char ** argv)
 			 graphs,
 			 bound_lower,
 			 bound_upper,
-			 line_search_type::RegularizeL1(regularize_scale),
+			 line_search_type::RegularizeL1(C),
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -406,7 +406,7 @@ int main(int argc, char ** argv)
 			 graphs,
 			 bound_lower,
 			 bound_upper,
-			 line_search_type::RegularizeL2(regularize_scale),
+			 line_search_type::RegularizeL2(C),
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -416,7 +416,7 @@ int main(int argc, char ** argv)
 			 graphs,
 			 bound_lower,
 			 bound_upper,
-			 line_search_type::RegularizeNone(regularize_scale),
+			 line_search_type::RegularizeNone(C),
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -469,7 +469,7 @@ int main(int argc, char ** argv)
 			 graphs,
 			 bound_lower,
 			 bound_upper,
-			 line_search_type::RegularizeL1(regularize_scale),
+			 line_search_type::RegularizeL1(C),
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -479,7 +479,7 @@ int main(int argc, char ** argv)
 			 graphs,
 			 bound_lower,
 			 bound_upper,
-			 line_search_type::RegularizeL2(regularize_scale),
+			 line_search_type::RegularizeL2(C),
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -489,7 +489,7 @@ int main(int argc, char ** argv)
 			 graphs,
 			 bound_lower,
 			 bound_upper,
-			 line_search_type::RegularizeNone(regularize_scale),
+			 line_search_type::RegularizeNone(C),
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -1070,9 +1070,9 @@ void options(int argc, char** argv)
     
     ("tolerance", po::value<double>(&tolerance)->default_value(tolerance), "tolerance")
     
-    ("regularize-l1",    po::bool_switch(&regularize_l1),      "regularization via L1")
-    ("regularize-l2",    po::bool_switch(&regularize_l2),      "regularization via L2")
-    ("regularize-scale", po::value<double>(&regularize_scale)->default_value(regularize_scale), "scaling for regularizer")
+    ("regularize-l1",    po::bool_switch(&regularize_l1),         "regularization via L1")
+    ("regularize-l2",    po::bool_switch(&regularize_l2),         "regularization via L2")
+    ("C",                po::value<double>(&C)->default_value(C), "scaling for regularizer")
     
     ("normalize-l1",    po::bool_switch(&weight_normalize_l1), "weight normalization via L1 (not a regularizer...)")
     ("normalize-l2",    po::bool_switch(&weight_normalize_l2), "weight normalization via L2 (not a regularizer...)")
