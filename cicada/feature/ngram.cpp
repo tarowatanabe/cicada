@@ -415,29 +415,32 @@ namespace cicada
       if (param.name() != "ngram")
 	throw std::runtime_error("is this really ngram feature function? " + parameter);
 
-      parameter_type::const_iterator fiter = param.find("file");
-      if (fiter == param.end() || ! boost::filesystem::exists(fiter->second))
-	throw std::runtime_error("no ngram file?");
+      path_type   path;
+      int         order = 3;
+      std::string name;
 
-      const path_type path = fiter->second;
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "file") == 0)
+	  path = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "order") == 0)
+	  order = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	  name = piter->second;
+	else
+	  std::cerr << "WARNING: unsupported parameter for ngram: " << piter->first << "=" << piter->second << std::endl;
+      }
       
-      int order = 3;
-      parameter_type::const_iterator oiter = param.find("order");
-      if (oiter != param.end())
-	order = boost::lexical_cast<int>(oiter->second);
+      if (path.empty())
+	throw std::runtime_error("no ngram file? " + path.file_string());
+      
       if (order <= 0)
-	throw std::runtime_error("invalid ngram order");
+	throw std::runtime_error("invalid ngram order: " + boost::lexical_cast<std::string>(order));
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
       
       // two contexts (order - 1) for each edge, with two separator..
       base_type::__state_size = sizeof(symbol_type) * ngram_impl->order * 2;
-      
-      parameter_type::const_iterator niter = param.find("name");
-      if (niter != param.end())
-	base_type::__feature_name = niter->second;
-      else
-	base_type::__feature_name = "ngram";
+      base_type::__feature_name = (name.empty() ? std::string("ngram") : name);
       
       pimpl = ngram_impl.release();
     }

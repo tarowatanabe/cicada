@@ -128,7 +128,6 @@ int debug = 0;
 void optimize(OperationSet& operations, model_type& model, weight_set_type& weights);
 
 void bcast_weights(const int rank, weight_set_type& weights);
-void send_weights(const weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
 void options(int argc, char** argv);
 
@@ -1147,23 +1146,17 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     // merge weights...
     
     weights_mixed = optimizer.weights;
-    if (mpi_rank == 0)
-      reduce_weights(weights_mixed);
-    else
-      send_weights(optimizer.weights);
+    reduce_weights(weights_mixed);
     weights_mixed *= (1.0 / mpi_size);
+
+    bcast_weights(0, weights_mixed);
     
     weights_accumulated += optimizer.accumulated;
-    if (mpi_rank == 0)
-      reduce_weights(weights_accumulated);
-    else
-      send_weights(optimizer.accumulated);
+    reduce_weights(weights_accumulated);
     
     long updated_accumulated = 0;
     MPI::COMM_WORLD.Reduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM, 0);
     norm_accumulated += updated_accumulated;
-    
-    bcast_weights(0, weights_mixed);
     
     if (mpi_rank == 0) {
       // output mixed weights...
@@ -1216,7 +1209,149 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   }
 }
 
+void send_weights(const int rank, const weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::gzip_compressor());
+  os.push(utils::mpi_device_sink(rank, weights_tag, 1024 * 1024));
+  
+  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
+    if (! feature_type(id).empty() && weights[id] != 0.0)
+      os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
+}
 
+void send_weights(const weight_set_type& weights)
+{
+  send_weights(0, weights);
+}
+
+void reduce_weights(const int rank, weight_set_type& weights)
+{
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_istream is;
+  is.push(boost::iostreams::gzip_decompressor());
+  is.push(utils::mpi_device_source(rank, weights_tag, 1024 * 1024));
+  
+  std::string line;
+  
+  while (std::getline(is, line)) {
+    tokenizer_type tokenizer(line);
+    
+    tokenizer_type::iterator iter = tokenizer.begin();
+    if (iter == tokenizer.end()) continue;
+    std::string feature = *iter;
+    ++ iter;
+    if (iter == tokenizer.end()) continue;
+    std::string value = *iter;
+    
+    weights[feature] += utils::decode_base64<double>(value);
+  }
+}
+
+template <typename Iterator>
+void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
+{
+   typedef utils::mpi_device_source            device_type;
+  typedef boost::iostreams::filtering_istream stream_type;
+
+  typedef boost::shared_ptr<device_type> device_ptr_type;
+  typedef boost::shared_ptr<stream_type> stream_ptr_type;
+  
+  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+  
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  device_ptr_set_type device;
+  stream_ptr_set_type stream;
+  
+  for (/**/; first != last; ++ first) {
+    device.push_back(device_ptr_type(new device_type(*first, weights_tag, 1024 * 1024)));
+    stream.push_back(stream_ptr_type(new stream_type()));
+    
+    stream.back()->push(boost::iostreams::gzip_decompressor());
+    stream.back()->push(*device.back());
+  }
+  
+  
+  std::string line;
+  
+  int non_found_iter = 0;
+  while (1) {
+    bool found = false;
+    
+    for (int i = 0; i < device.size(); ++ i)
+      while (stream[i] && device[i] && device[i]->test()) {
+	if (std::getline(*stream[i], line)) {
+	  tokenizer_type tokenizer(line);
+	  
+	  tokenizer_type::iterator iter = tokenizer.begin();
+	  if (iter == tokenizer.end()) continue;
+	  std::string feature = *iter;
+	  ++ iter;
+	  if (iter == tokenizer.end()) continue;
+	  std::string value = *iter;
+	  
+	  weights[feature] += utils::decode_base64<double>(value);
+	} else {
+	  stream[i].reset();
+	  device[i].reset();
+	}
+	found = true;
+      }
+    
+    if (std::count(device.begin(), device.end(), device_ptr_type()) == device.size()) break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+
+}
+
+
+void reduce_weights(weight_set_type& weights)
+{
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  rank_set_type ranks;
+  int merge_size = mpi_size;
+  
+  while (merge_size > 1 && mpi_rank < merge_size) {
+    const int reduce_size = (merge_size / 2 == 0 ? 1 : merge_size / 2);
+    
+    if (mpi_rank < reduce_size) {
+      ranks.clear();
+      for (int i = reduce_size; i < merge_size; ++ i)
+	if (i % reduce_size == mpi_rank)
+	  ranks.push_back(i);
+      
+      if (ranks.empty()) continue;
+      
+      if (ranks.size() == 1)
+	reduce_weights(ranks.front(), weights);
+      else
+	reduce_weights(ranks.begin(), ranks.end(), weights);
+      
+    } else
+      send_weights(mpi_rank % reduce_size, weights);
+    
+    merge_size = reduce_size;
+  }
+}
+
+#if 0
 void reduce_weights(weight_set_type& weights)
 {
   typedef utils::mpi_device_source            device_type;
@@ -1275,20 +1410,7 @@ void reduce_weights(weight_set_type& weights)
     non_found_iter = loop_sleep(found, non_found_iter);
   }
 }
-
-void send_weights(const weight_set_type& weights)
-{
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  boost::iostreams::filtering_ostream os;
-  os.push(boost::iostreams::gzip_compressor());
-  os.push(utils::mpi_device_sink(0, weights_tag, 1024 * 1024));
-  
-  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
-    if (! feature_type(id).empty() && weights[id] != 0.0)
-      os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
-}
+#endif
 
 void bcast_weights(const int rank, weight_set_type& weights)
 {
