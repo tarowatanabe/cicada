@@ -1090,7 +1090,7 @@ class Prune : public Operation
 {
 public:
   Prune(const std::string& parameter, const int __debug)
-    : weights(0), beam(0.0), scale(1.0), weights_one(false), 
+    : weights(0), beam(0.0), density(0.0), scale(1.0), weights_one(false), 
       semiring_tropical(false), semiring_logprob(false), semiring_log(false),
       debug(__debug)
   {
@@ -1103,8 +1103,14 @@ public:
     if (param.find("beam") != param.end())
       beam = boost::lexical_cast<double>(param.find("beam")->second);
     
-    if (beam <= 0.0)
-      throw std::runtime_error("beam threshold must be 0.0 < threshold");
+    if (param.find("density") != param.end())
+      density = boost::lexical_cast<double>(param.find("density")->second);
+    
+    if (beam > 0.0 && density > 1.0)
+      throw std::runtime_error("you cannot specify both beam and density pruning");
+    
+    if (beam <= 0.0 && density <= 1.0)
+      throw std::runtime_error("you may want to specify either beam or density pruning");
 
     if (param.find("scale") != param.end())
       scale = boost::lexical_cast<double>(param.find("scale")->second);
@@ -1152,13 +1158,23 @@ public:
     const weight_set_type* weights_prune = (weights ? weights : &__weights);
     
     utils::resource prune_start;
-    
-    if (semiring_tropical)
-      cicada::beam_prune(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
-    else if (semiring_logprob)
-      cicada::beam_prune(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
-    else
-      cicada::beam_prune(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
+
+    if (beam > 0.0) {
+      if (semiring_tropical)
+	cicada::prune_beam(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
+      else if (semiring_logprob)
+	cicada::prune_beam(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
+      else
+	cicada::prune_beam(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
+    } else if (density > 1.0) {
+      if (semiring_tropical)
+	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
+      else if (semiring_logprob)
+	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
+      else
+	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
+    } else
+      throw std::runtime_error("what pruning?");
     
 	
     utils::resource prune_end;
@@ -1186,6 +1202,7 @@ public:
   const weight_set_type* weights;
   
   double beam;
+  double density;
   double scale;
   
   bool weights_one;
@@ -1607,13 +1624,14 @@ variational: variational decoding\n\
 \tweights=weight file for feature\n\
 \tweights-variational=weighs for variational decoding feature\n\
 \tweights-one=[true|false] one initialized weight\n\
-prune: beam pruning\n\
-\tbeam=beam threshold in 0.0 < threshold\n\
+prune: pruning\n\
+\tbeam=beam pruning threshold in threshold > 0.0\n\
+\tdensity=density pruning threshold in threshold > 1.0\n\
 \tscale=scaling for score\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
-\tintersect\n\
+intersect: compute intersection\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
 \tunique=[true|false] unique translation\n\

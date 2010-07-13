@@ -88,6 +88,8 @@ optimize.hpp \
 parameter.hpp \
 permute.hpp \
 prune.hpp \
+prune_beam.hpp \
+prune_density.hpp \
 quantizer.hpp \
 rule.hpp \
 semiring.hpp \
