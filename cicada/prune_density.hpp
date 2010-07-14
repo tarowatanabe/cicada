@@ -9,6 +9,8 @@
 #include <cicada/viterbi.hpp>
 #include <cicada/inside_outside.hpp>
 
+#include <utils/sgi_hash_set.hpp>
+
 namespace cicada
 {
   
@@ -40,16 +42,17 @@ namespace cicada
       }
     };
 
-    struct length_traversal
+    struct edge_traversal
     {
-      typedef int value_type;
+      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > value_type;
       
       template <typename Edge, typename Iterator>
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
-	yield = 1;
+	yield.clear();
+	yield.push_back(edge.id);
 	for (/**/; first != last; ++ first)
-	  yield += *first;
+	  yield.insert(yield.end(), first->begin(), first->end());
       }
     };
 
@@ -63,6 +66,19 @@ namespace cicada
     {
       typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
       typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
+
+      typedef hypergraph_type::id_type id_type;
+      
+      typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
+
+#ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+	std::allocator<id_type> > id_set_type;
+#else
+      typedef sgi::hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+	std::allocator<id_type> > id_set_type;
+#endif
+
       
       if (source.goal == hypergraph_type::invalid)
 	throw std::runtime_error("invalid graph");
@@ -70,32 +86,36 @@ namespace cicada
       target.clear();
       
       weight_type viterbi_weight;
-      int         viterbi_length;
-      viterbi(source, viterbi_length, viterbi_weight, length_traversal(), function);
+      edge_set_type viterbi_edges;
+      viterbi(source, viterbi_edges, viterbi_weight, edge_traversal(), function);
       
-      const size_t prune_size = size_t(threshold * viterbi_length) + 1;
+      const size_t prune_size = size_t(threshold * viterbi_edges.size());
       
       if (source.edges.size() <= prune_size) {
 	target = source;
 	return;
       }
+
+      id_set_type edges_unique(viterbi_edges.begin(), viterbi_edges.end());
       
       inside_type    inside(source.nodes.size());
       posterior_type posterior(source.edges.size());
       
       inside_outside(source, inside, posterior, function, function);
-
+      
       posterior_type sorted(posterior);
       
       std::nth_element(sorted.begin(), sorted.begin() + prune_size, sorted.end(), std::greater<weight_type>());
       
-      const weight_type cutoff = sorted[prune_size];
+      const weight_type cutoff = *(sorted.begin() + prune_size);
       
       removed_type removed(source.edges.size(), false);
       size_t num_removed = 0;
       for (id_type id = 0; id != source.edges.size(); ++ id) {
-	removed[id] = (posterior[id] < cutoff);
-	num_removed += (posterior[id] < cutoff);
+	const bool remove = (posterior[id] < cutoff) && (edges_unique.find(id) == edges_unique.end());
+	
+	removed[id] = remove;
+	num_removed += remove;
       }
       
       topologically_sort(source, target, filter_pruned(removed));
