@@ -22,6 +22,32 @@
 #include <utils/arc_list.hpp>
 
 inline
+path_type add_suffix(const path_type& path, const std::string& suffix)
+{
+  bool has_suffix_gz  = false;
+  bool has_suffix_bz2 = false;
+  
+  path_type path_added = path;
+  
+  if (path.extension() == ".gz") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_gz = true;
+  } else if (path.extension() == ".bz2") {
+    path_added = path.parent_path() / path.stem();
+    has_suffix_bz2 = true;
+  }
+  
+  path_added += suffix;
+  
+  if (has_suffix_gz)
+    path_added += ".gz";
+  else if (has_suffix_bz2)
+    path_added += ".bz2";
+  
+  return path_added;
+}
+
+inline
 void encode_support_vectors(std::string& data,
 			    const size_t& id,
 			    const int& source_length,
@@ -140,30 +166,11 @@ struct OptimizeMIRA
 
     double operator()(int i, int j) const
     {
-#if 0
-      std::pair<typename cache_type::iterator, bool> result = const_cast<cache_type&>(cache).find(i);
-      if (! result.second) {
-	value_set_type& values = result.first->second;
-	values.reserve(labels.size());
-	values.resize(labels.size(), 0.0);
-	
-	for (int k = 0; k < labels.size(); ++ k)
-	  values[k] = labels[i] * labels[k] * features[i].dot(features[k]);
-      }
-      
-      return result.first->second[j];
-#endif
       return labels[i] * labels[j] * features[i].dot(features[j]);
     }
     
-    typedef std::vector<double, std::allocator<double> > value_set_type;
-    
-    typedef utils::arc_list<int, value_set_type, 16, std::equal_to<int>, std::allocator<std::pair<int, value_set_type> > > cache_type;
-    
     const LabelSet& labels;
     const FeatureSet& features;
-
-    //cache_type cache;
   };
   
   template <typename LabelSet, typename MarginSet, typename FeatureSet>

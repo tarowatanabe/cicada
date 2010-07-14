@@ -283,15 +283,20 @@ namespace cicada
 
       bool source = false;
       bool target = false;
-      if (param.find("yield") != param.end()) {
-	const std::string& yield = param.find("yield")->second;
-
-	if (strcasecmp(yield.c_str(), "source") == 0)
-	  source = true;
-	else if (strcasecmp(yield.c_str(), "target") == 0)
-	  target = true;
-	else
-	  throw std::runtime_error("unknown parameter: " + parameter);
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	  const std::string& yield = piter->second;
+	  
+	  if (strcasecmp(yield.c_str(), "source") == 0)
+	    source = true;
+	  else if (strcasecmp(yield.c_str(), "target") == 0)
+	    target = true;
+	  else
+	    throw std::runtime_error("unknown parameter: " + parameter);
+	  
+	} else
+	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
       
       if (source && target)

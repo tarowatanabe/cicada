@@ -112,7 +112,6 @@ int batch_size = 1;
 bool reranking = false;
 bool asynchronous_vectors = false;
 bool mix_weights = false;
-bool average_weights = false;
 
 bool apply_exact = false;
 int  cube_size = 200;
@@ -122,8 +121,7 @@ int threads = 4;
 int debug = 0;
 
 
-
-void optimize(weight_set_type& weights);
+void optimize(weight_set_type& weights, weight_set_type& weights_average);
 
 void options(int argc, char** argv);
 
@@ -158,16 +156,28 @@ int main(int argc, char ** argv)
     threads = utils::bithack::max(threads, 1);
     
     weight_set_type weights;
+    weight_set_type weights_average;
+    
     if (boost::filesystem::exists(weights_file)) {
       utils::compress_istream is(weights_file);
       is >> weights;
     }
     
-    optimize(weights);
+    optimize(weights, weights_average);
     
-    utils::compress_ostream os(output_file);
-    os.precision(20);
-    os << weights;
+    
+
+    {
+      utils::compress_ostream os(output_file);
+      os.precision(20);
+      os << weights;
+    }
+
+    {
+      utils::compress_ostream os(add_suffix(output_file, ".average"));
+      os.precision(20);
+      os << weights_average;
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -895,7 +905,7 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
-void optimize(weight_set_type& weights)
+void optimize(weight_set_type& weights, weight_set_type& weights_average)
 {
   typedef OptimizeMIRA optimizer_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
@@ -1022,39 +1032,18 @@ void optimize(weight_set_type& weights)
     weights_mixed *= (1.0 / tasks.size());
     
     {
-      // output mixed weights...
-      bool has_suffix_gz  = false;
-      bool has_suffix_bz2 = false;
+      utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)));
+      os.precision(20);
+      os << weights_mixed;
+    }
+    
+    {
+      weights_average = weights_accumulated;
+      weights_average /= norm_accumulated;
       
-      path_type path_output = output_file;
-      
-      if (path_output.extension() == ".gz") {
-	path_output = path_output.parent_path() / path_output.stem();
-	has_suffix_gz = true;
-      } else if (path_output.extension() == ".bz2") {
-	path_output = path_output.parent_path() / path_output.stem();
-	has_suffix_bz2 = true;
-      }
-      
-      if (has_suffix_gz)
-	path_output = path_output.file_string() + '.' + boost::lexical_cast<std::string>(iter + 1) + ".gz";
-      else if (has_suffix_bz2)
-	path_output = path_output.file_string() + '.' + boost::lexical_cast<std::string>(iter + 1) + ".bz2";
-      else
-	path_output = path_output.file_string() + '.' + boost::lexical_cast<std::string>(iter + 1);
-
-      if (average_weights) {
-	weights = weights_accumulated;
-	weights /= norm_accumulated;
-	
-	utils::compress_ostream os(path_output, 1024 * 1024);
-	os.precision(20);
-	os << weights;
-      } else {
-	utils::compress_ostream os(path_output, 1024 * 1024);
-	os.precision(20);
-	os << weights_mixed;
-      }
+      utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"));
+      os.precision(20);
+      os << weights_average;
     }
     
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
@@ -1066,11 +1055,8 @@ void optimize(weight_set_type& weights)
   }
   
   weights = weights_mixed;
-  
-  if (average_weights) {
-    weights = weights_accumulated;
-    weights /= norm_accumulated;
-  }
+  weights_average = weights_accumulated;
+  weights_average /= norm_accumulated;
 }
 
 
@@ -1132,7 +1118,6 @@ void options(int argc, char** argv)
     ("batch-size",           po::value<int>(&batch_size)->default_value(batch_size), "batch size")
     ("reranking",            po::bool_switch(&reranking),                            "learn by forest reranking")
     ("asynchronous-vectors", po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
-    ("average-weights",      po::bool_switch(&average_weights),                      "average weight vectors")
     ("mix-weights",          po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")

@@ -588,9 +588,18 @@ namespace cicada
       
       if (param.name() != "bleu")
 	throw std::runtime_error("this is not Bleu feature: " + parameter);
+
+      int order = 4;
+      bool exact = false;
       
-      const int order = (param.find("order") != param.end() ? boost::lexical_cast<int>(param.find("order")->second) : 4);
-      const bool exact = (param.find("exact") != param.end() ? true_false(param.find("exact")->second) : false);
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	  order = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
+	  exact = true_false(piter->second);
+	else
+	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
+      }
       
       std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact));
       

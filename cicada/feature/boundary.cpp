@@ -262,6 +262,9 @@ namespace cicada
       if (param.name() != "boundary")
 	throw std::runtime_error("is this really boundary feature function? " + parameter);
       
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
+	std::cerr << "WARNING: unsupported parameter for boundary: " << piter->first << "=" << piter->second << std::endl;
+      
       base_type::__state_size = sizeof(symbol_type) * 4;
       base_type::__feature_name = "boundary";
       base_type::__sparse_feature = true;

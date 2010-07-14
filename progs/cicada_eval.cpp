@@ -92,12 +92,19 @@ int main(int argc, char** argv)
 	
 	finished[id] = true;
       }
-
-      const std::pair<double, double> value = score->score();
-    
-      utils::compress_ostream os(output_file);
-      os << "score: " << value.first << " penalty: " << value.second << '\n';
     }
+    
+    for (int seg = 0; seg < finished[seg]; ++ seg)
+      if (scorers[seg] && ! finished[seg])
+	std::cerr << "WARNING: no translation at: " << seg << std::endl;
+
+    if (! score)
+      throw std::runtime_error("no statistics to compute error score");
+
+    const std::pair<double, double> value = score->score();
+    
+    utils::compress_ostream os(output_file);
+    os << "score: " << value.first << " penalty: " << value.second << '\n';
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;

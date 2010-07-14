@@ -281,9 +281,14 @@ namespace cicada
 	throw std::runtime_error("is this variational feature?" + parameter);
       
       int order = 3;
-      parameter_type::const_iterator oiter = param.find("order");
-      if (oiter != param.end())
-	order = boost::lexical_cast<int>(oiter->second);
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	  order = boost::lexical_cast<int>(piter->second);
+	else
+	  std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
+      }
+      
       if (order <= 0)
 	throw std::runtime_error("invalid ngram order");
       

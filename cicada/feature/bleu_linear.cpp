@@ -336,10 +336,21 @@ namespace cicada
       
       if (param.name() != "bleu-linear")
 	throw std::runtime_error("this is not BleuLinear feature: " + parameter);
-      
-      const int order         = (param.find("order") != param.end() ? boost::lexical_cast<int>(param.find("order")->second) : 4);
-      const double precision  = (param.find("precision") != param.end() ? boost::lexical_cast<double>(param.find("precision")->second) : 0.8);
-      const double ratio      = (param.find("ratio") != param.end() ? boost::lexical_cast<double>(param.find("ratio")->second) : 0.6);
+
+      int order        = 4;
+      double precision = 0.8;
+      double ratio     = 0.6;
+
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	  order = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "precision") == 0)
+	  precision = boost::lexical_cast<double>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "ratio") == 0)
+	  ratio = boost::lexical_cast<double>(piter->second);
+	else
+	  std::cerr << "WARNING: unsupported parameter for bleu-linear: " << piter->first << "=" << piter->second << std::endl;
+      }
       
       std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio));
       
