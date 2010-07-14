@@ -9,8 +9,6 @@
 #include <cicada/viterbi.hpp>
 #include <cicada/inside_outside.hpp>
 
-#include <utils/sgi_hash_set.hpp>
-
 namespace cicada
 {
   
@@ -42,17 +40,16 @@ namespace cicada
       }
     };
 
-    struct edge_traversal
+    struct length_traversal
     {
-      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > value_type;
+      typedef int value_type;
       
       template <typename Edge, typename Iterator>
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
-	yield.clear();
-	yield.push_back(edge.id);
+	yield = 1;
 	for (/**/; first != last; ++ first)
-	  yield.insert(yield.end(), first->begin(), first->end());
+	  yield += *first;
       }
     };
 
@@ -70,15 +67,6 @@ namespace cicada
       typedef hypergraph_type::id_type id_type;
       
       typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
-
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
-	std::allocator<id_type> > id_set_type;
-#else
-      typedef sgi::hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
-	std::allocator<id_type> > id_set_type;
-#endif
-
       
       if (source.goal == hypergraph_type::invalid)
 	throw std::runtime_error("invalid graph");
@@ -86,17 +74,15 @@ namespace cicada
       target.clear();
       
       weight_type viterbi_weight;
-      edge_set_type viterbi_edges;
-      viterbi(source, viterbi_edges, viterbi_weight, edge_traversal(), function);
+      int         viterbi_length;
+      viterbi(source, viterbi_length, viterbi_weight, length_traversal(), function);
       
-      const size_t prune_size = size_t(threshold * viterbi_edges.size());
+      const size_t prune_size = static_cast<size_t>(threshold * viterbi_length);
       
       if (source.edges.size() <= prune_size) {
 	target = source;
 	return;
       }
-
-      id_set_type edges_unique(viterbi_edges.begin(), viterbi_edges.end());
       
       inside_type    inside(source.nodes.size());
       posterior_type posterior(source.edges.size());
@@ -110,13 +96,8 @@ namespace cicada
       const weight_type cutoff = *(sorted.begin() + prune_size);
       
       removed_type removed(source.edges.size(), false);
-      size_t num_removed = 0;
-      for (id_type id = 0; id != source.edges.size(); ++ id) {
-	const bool remove = (posterior[id] < cutoff) && (edges_unique.find(id) == edges_unique.end());
-	
-	removed[id] = remove;
-	num_removed += remove;
-      }
+      for (id_type id = 0; id != source.edges.size(); ++ id)
+	removed[id] = (posterior[id] < cutoff);
       
       topologically_sort(source, target, filter_pruned(removed));
     }

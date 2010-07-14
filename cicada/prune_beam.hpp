@@ -67,11 +67,8 @@ namespace cicada
       const weight_type cutoff(posterior_max * cicada::semiring::traits<weight_type>::log(- threshold));
       
       removed_type removed(source.edges.size(), false);
-      size_t num_removed = 0;
-      for (id_type id = 0; id != source.edges.size(); ++ id) {
+      for (id_type id = 0; id != source.edges.size(); ++ id)
 	removed[id] = (posterior[id] < cutoff);
-	num_removed += (posterior[id] < cutoff);
-      }
       
       topologically_sort(source, target, filter_pruned(removed));
     }
