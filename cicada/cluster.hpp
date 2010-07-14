@@ -1,0 +1,68 @@
+// -*- mode: c++ -*-
+
+#ifndef __CICADA__CLUSTER__HPP__
+#define __CICADA__CLUSTER__HPP__ 1
+
+#include <string>
+#include <algorithm>
+
+#include <cicada/symbol.hpp>
+#include <cicada/vocab.hpp>
+
+#include <utils/packed_vector.hpp>
+
+#include <boost/filesystem.hpp>
+
+namespace cicada
+{
+  class Cluster
+  {
+  public:
+    typedef Symbol    symbol_type;
+    typedef Vocab     vocab_type;
+
+    typedef symbol_type          word_type;
+    typedef symbol_type::id_type id_type;
+    
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    typedef uint64_t  hash_value_type;
+    
+    typedef boost::filesystem::path path_type;
+    
+  private:
+    typedef utils::packed_vector_mapped<id_type, std::allocator<id_type> > cluster_set_type;
+    
+  public:
+    Cluster(const path_type& path) { open(path); }
+
+    bool empty() const { return clusters.empty(); }
+    
+    void clear()
+    {
+      vocab.clear();
+      clusters.clear();
+    }
+    void close() { clear(); }
+    
+    void open(const path_type& path);
+    void write(const path_type& path) const;
+    
+    symbol_type operator[](const symbol_type& word) const
+    {
+      const id_type id = vocab[word];
+      
+      if (id < clusters.size()){
+	const id_type cluster = clusters[id];
+	return (cluster == 0 ? vocab_type::UNK : vocab[cluster - 1]);
+      } else
+	return vocab_type::UNK;
+    }
+    
+  private:
+    vocab_type       vocab;
+    cluster_set_type clusters;
+  };
+};
+
+#endif

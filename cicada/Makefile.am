@@ -66,6 +66,7 @@ apply_cube_prune.hpp \
 apply_exact.hpp \
 apply_state_less.hpp \
 binarize.hpp \
+cluster.hpp \
 compose.hpp \
 compose_cky.hpp \
 eval.hpp \
@@ -104,6 +105,7 @@ vocab.hpp \
 weight_vector.hpp
 
 libcicada_la_SOURCES = \
+cluster.cpp \
 feature.cpp \
 feature_function.cpp \
 grammar_mutable.cpp \
@@ -141,6 +143,7 @@ libcicada_la_LIBADD = \
 	$(ICU_LDFLAGS)
 
 noinst_PROGRAMS = \
+cluster_main \
 grammar_mutable_main \
 grammar_static_main \
 hypergraph_main \
@@ -149,6 +152,9 @@ parameter_main \
 rule_main \
 sentence_main \
 symbol_main
+
+cluster_main_SOURCES = cluster_main.cpp
+cluster_main_LDADD = libcicada.la
 
 grammar_mutable_main_SOURCES = grammar_mutable_main.cpp
 grammar_mutable_main_LDADD = libcicada.la
