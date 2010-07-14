@@ -1159,8 +1159,8 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     bcast_weights(0, weights_mixed);
     
+    reduce_weights(optimizer.accumulated);
     weights_accumulated += optimizer.accumulated;
-    reduce_weights(weights_accumulated);
     
     long updated_accumulated = 0;
     MPI::COMM_WORLD.Reduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM, 0);
