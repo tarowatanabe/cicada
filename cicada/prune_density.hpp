@@ -68,12 +68,12 @@ namespace cicada
 	throw std::runtime_error("invalid graph");
       
       target.clear();
-
+      
       weight_type viterbi_weight;
       int         viterbi_length;
       viterbi(source, viterbi_length, viterbi_weight, length_traversal(), function);
-
-      const size_t prune_size = viterbi_length * threshold;
+      
+      const size_t prune_size = size_t(threshold * viterbi_length) + 1;
       
       if (source.edges.size() <= prune_size) {
 	target = source;
