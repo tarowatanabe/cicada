@@ -213,7 +213,7 @@ namespace cicada
 	  const symbol_type prev_cluster = cluster[prev];
 	  const symbol_type next_cluster = cluster[next];
 	  
-	  if (prev_cluster != prev && next_cluster != next) {
+	  if (prev_cluster != prev || next_cluster != next) {
 	    const std::string name = feature_name(node, prev_cluster, next_cluster, span);
 	    if (forced_feature || feature_set_type::feature_type::exists(name))
 	      features[name] += 1.0;

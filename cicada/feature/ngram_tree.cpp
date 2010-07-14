@@ -206,7 +206,7 @@ namespace cicada
 	const node_pair_type& prev_node = tree_map[prev];
 	const node_pair_type& next_node = tree_map[next];
 	
-	if (! cluster.empty() && prev_node.first != prev_node.second && next_node.first != next_node.second) {
+	if (! cluster.empty() && (prev_node.first != prev_node.second || next_node.first != next_node.second)) {
 	  const std::string name = feature_name(node, prev_node.second, next_node.second);
 	  if (forced_feature || feature_set_type::feature_type::exists(name))
 	    features[name] += 1.0;
