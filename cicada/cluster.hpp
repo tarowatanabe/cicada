@@ -50,6 +50,15 @@ namespace cicada
     
     symbol_type operator[](const symbol_type& word) const
     {
+      // empty word, non-terminals are not clusters...
+      if (word == vocab_type::EMPTY || word.is_non_terminal())
+	return word;
+      
+      // SGML-like symbols are not clusters...
+      const size_type word_size = word.size();
+      if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
+	return word;
+
       const id_type id = vocab[word];
       
       if (id < clusters.size()){
