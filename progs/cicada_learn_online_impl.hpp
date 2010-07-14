@@ -37,12 +37,12 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
     has_suffix_bz2 = true;
   }
   
-  path_added += suffix;
+  path_added = path_added.file_string() + suffix;
   
   if (has_suffix_gz)
-    path_added += ".gz";
+    path_added = path_added.file_string() + ".gz";
   else if (has_suffix_bz2)
-    path_added += ".bz2";
+    path_added = path_added.file_string() + ".bz2";
   
   return path_added;
 }
