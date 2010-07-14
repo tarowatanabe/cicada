@@ -1163,11 +1163,11 @@ public:
 	cicada::prune_beam(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
     } else if (density > 1.0) {
       if (semiring_tropical)
-	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
+	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), density);
       else if (semiring_logprob)
-	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
+	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), density);
       else
-	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
+	cicada::prune_density(hypergraph, pruned, weight_set_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), density);
     } else
       throw std::runtime_error("what pruning?");
     
