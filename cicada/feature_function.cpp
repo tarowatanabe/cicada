@@ -29,12 +29,14 @@ bleu-linear: linear corpus-BLEU\n\
 boundary: boundary ngram feature\n\
 neighbours: neighbour words feature\n\
 \tyield=[source|target]\n\
+\tcluster=[word class file]\n\
 ngram: ngram language model\n\
 \tfile=<file>,\n\
 \torder=<order>,\n\
 \tname=feature-name(default: ngram)\n\
 ngram-tree: ngram tree feature\n\
 \tyield=[source|target]\n\
+\tcluster=[word class file]\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 target-word-penalty: target word penalty feature\n\

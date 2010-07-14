@@ -5,6 +5,7 @@
 
 #include "cicada/feature/neighbours.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/cluster.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
@@ -22,6 +23,8 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+
+      typedef cicada::Cluster  cluster_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -78,10 +81,11 @@ namespace cicada
       
       typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
       
-      NeighboursImpl() : forced_feature(false) {}
-      NeighboursImpl(const NeighboursImpl& x) : forced_feature(x.forced_feature) {}
+      NeighboursImpl() : cluster(), forced_feature(false) {}
+      NeighboursImpl(const NeighboursImpl& x) : cluster(x.cluster), forced_feature(x.forced_feature) {}
       NeighboursImpl& operator=(const NeighboursImpl& x)
       {
+	cluster = x.cluster;
 	forced_feature = x.forced_feature;
 	return *this;
       }
@@ -99,6 +103,8 @@ namespace cicada
       {
 	state_map.clear();
       }
+
+      cluster_type cluster;
       
       state_map_type state_map;
       
@@ -201,14 +207,25 @@ namespace cicada
 	}
       }
 
-      void apply_feature(feature_set_type& features, const std::string& node, const std::string& prev, const std::string& next, const int span) const
+      void apply_feature(feature_set_type& features, const std::string& node, const symbol_type& prev, const symbol_type& next, const int span) const
       {
+	if (! cluster.empty()) {
+	  const symbol_type prev_cluster = cluster[prev];
+	  const symbol_type next_cluster = cluster[next];
+	  
+	  if (prev_cluster != prev && next_cluster != next) {
+	    const std::string name = feature_name(node, prev_cluster, next_cluster, span);
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
+	
 	const std::string name = feature_name(node, prev, next, span);
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
 
-      id_type apply_features(feature_set_type& features, id_type id_curr, id_type id, const std::string& prefix, const std::string& suffix) const
+      id_type apply_features(feature_set_type& features, id_type id_curr, id_type id, const symbol_type& prefix, const symbol_type& suffix) const
       {
 	typedef std::vector<state_type, std::allocator<state_type> > state_set_type;
 
@@ -367,6 +384,7 @@ namespace cicada
       
       bool source = false;
       bool target = false;
+      boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
@@ -379,7 +397,9 @@ namespace cicada
 	  else
 	    throw std::runtime_error("unknown parameter: " + parameter);
 	  
-	} else
+	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	  cluster_path = piter->second;
+	else
 	  std::cerr << "WARNING: unsupported parameter for neighbours: " << piter->first << "=" << piter->second << std::endl;
       }
       
@@ -387,10 +407,17 @@ namespace cicada
 	throw std::runtime_error("both source and target?");
       if (! source && ! target)
 	throw std::runtime_error("what side are you going to use?");
-      
+
       std::auto_ptr<impl_type> neighbours_impl(source
 					       ? dynamic_cast<impl_type*>(new __NeighboursImpl<__neighbours_extract_source>())
 					       : dynamic_cast<impl_type*>(new __NeighboursImpl<__neighbours_extract_target>()));
+
+      if (! cluster_path.empty()) {
+	if (! boost::filesystem::exists(cluster_path))
+	  throw std::runtime_error("no cluster file" + cluster_path.file_string());
+
+	neighbours_impl->cluster = cicada::Cluster(cluster_path);
+      }
 
       
       // non-terminal + two neighbouring symbols + span-size

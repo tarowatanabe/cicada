@@ -34,6 +34,7 @@ namespace cicada
     typedef utils::packed_vector_mapped<id_type, std::allocator<id_type> > cluster_set_type;
     
   public:
+    Cluster() {}
     Cluster(const path_type& path) { open(path); }
 
     bool empty() const { return clusters.empty(); }
@@ -51,7 +52,7 @@ namespace cicada
     symbol_type operator[](const symbol_type& word) const
     {
       // empty word, non-terminals are not clusters...
-      if (word == vocab_type::EMPTY || word.is_non_terminal())
+      if (word == vocab_type::EMPTY || word.is_non_terminal() || empty())
 	return word;
       
       // SGML-like symbols are not clusters...

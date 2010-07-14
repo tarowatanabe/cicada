@@ -4,6 +4,7 @@
 
 #include "cicada/feature/ngram_tree.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/cluster.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
@@ -21,6 +22,7 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+      typedef cicada::Cluster  cluster_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -37,17 +39,20 @@ namespace cicada
       
       typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
       typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
+
+      typedef std::pair<std::string, std::string> node_pair_type;
       
-      typedef utils::compact_trie<symbol_type, std::string, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
+      typedef utils::compact_trie<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
 
       typedef tree_map_type::id_type id_type;
       
       
       NGramTreeImpl() : forced_feature(false) {}
-      NGramTreeImpl(const NGramTreeImpl& x) : forced_feature(x.forced_feature) {}
+      NGramTreeImpl(const NGramTreeImpl& x) : cluster(x.cluster), forced_feature(x.forced_feature) {}
       NGramTreeImpl& operator=(const NGramTreeImpl& x)
       {
+	cluster = x.cluster;
 	forced_feature = x.forced_feature;
 	return *this;
       }
@@ -65,6 +70,8 @@ namespace cicada
       {
 	tree_map.clear();
       }
+
+      cluster_type cluster;
       
       tree_map_type  tree_map;
       
@@ -138,13 +145,13 @@ namespace cicada
 	    const id_type suffix_next_id = (suffix_next.empty() ? tree_map.root() : tree_id(suffix_next, tree_map.root()));
 	    
 	    if (! tree_map.is_root(suffix_id))
-	      apply_feature(features, edge.rule->lhs, tree_map[suffix_id], tree_map[prefix_antecedent_id]);
+	      apply_feature(features, edge.rule->lhs, suffix_id, prefix_antecedent_id);
 	    
 	    if (tree_map.is_root(prefix_id))
 	      prefix_id = prefix_antecedent_id;
 	    
 	    if (! tree_map.is_root(prefix_next_id)) {
-	      apply_feature(features, edge.rule->lhs, tree_map[suffix_antecedent_id], tree_map[prefix_next_id]);
+	      apply_feature(features, edge.rule->lhs, suffix_antecedent_id, prefix_next_id);
 	      suffix_id = suffix_next_id;
 	    } else
 	      suffix_id = suffix_antecedent_id;
@@ -168,32 +175,44 @@ namespace cicada
       {
 	const id_type* antecedent_context = reinterpret_cast<const id_type*>(state);
 	
-	const std::string prefix_antecedent = tree_map[antecedent_context[0]];
-	const std::string suffix_antecedent = tree_map[antecedent_context[1]];
+	const id_type prefix_antecedent_id = antecedent_context[0];
+	const id_type suffix_antecedent_id = antecedent_context[1];
 	
-	apply_feature(features, vocab_type::GOAL, vocab_type::BOS, prefix_antecedent);
-	apply_feature(features, vocab_type::GOAL, vocab_type::EOS, suffix_antecedent);
+	apply_feature(features, vocab_type::GOAL, tree_id(vocab_type::BOS, tree_map.root()), prefix_antecedent_id);
+	apply_feature(features, vocab_type::GOAL, tree_id(vocab_type::EOS, tree_map.root()), suffix_antecedent_id);
       }
 
       
       id_type tree_id(const symbol_type& node, const id_type parent) const
       {
 	tree_map_type& __tree_map = const_cast<tree_map_type&>(tree_map);
-	
+
 	const id_type id = __tree_map.insert(parent, node);
 	
-	if (__tree_map[id].empty()) {
-	  if (__tree_map.is_root(parent))
-	    __tree_map[id] = node;
-	  else
-	    __tree_map[id] = compose_path(node, __tree_map[parent]);
+	if (__tree_map[id].first.empty()) {
+	  if (__tree_map.is_root(parent)) {
+	    __tree_map[id].first  = node;
+	    __tree_map[id].second = cluster[node];
+	  } else {
+	    __tree_map[id].first  = compose_path(node, __tree_map[parent].first);
+	    __tree_map[id].second = compose_path(node, __tree_map[parent].second);
+	  }
 	}
 	return id;
       }
 
-      void apply_feature(feature_set_type& features, const std::string& node, const std::string& prev, const std::string& next) const
+      void apply_feature(feature_set_type& features, const std::string& node, const id_type& prev, const id_type& next) const
       {
-	const std::string name = feature_name(node, prev, next);
+	const node_pair_type& prev_node = tree_map[prev];
+	const node_pair_type& next_node = tree_map[next];
+	
+	if (! cluster.empty() && prev_node.first != prev_node.second && next_node.first != next_node.second) {
+	  const std::string name = feature_name(node, prev_node.second, next_node.second);
+	  if (forced_feature || feature_set_type::feature_type::exists(name))
+	    features[name] += 1.0;
+	}
+	
+	const std::string name = feature_name(node, prev_node.first, next_node.first);
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
@@ -283,6 +302,7 @@ namespace cicada
 
       bool source = false;
       bool target = false;
+      boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
@@ -294,8 +314,9 @@ namespace cicada
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown parameter: " + parameter);
-	  
-	} else
+	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	  cluster_path = piter->second;
+	else
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
       
@@ -307,6 +328,13 @@ namespace cicada
       std::auto_ptr<impl_type> ngram_tree_impl(source
 					       ? dynamic_cast<impl_type*>(new __NGramTreeImpl<__ngram_tree_extract_source>())
 					       : dynamic_cast<impl_type*>(new __NGramTreeImpl<__ngram_tree_extract_target>()));
+
+      if (! cluster_path.empty()) {
+	if (! boost::filesystem::exists(cluster_path))
+	  throw std::runtime_error("no cluster file" + cluster_path.file_string());
+	
+	ngram_tree_impl->cluster = cicada::Cluster(cluster_path);
+      }
 
       
       // non-terminal + two neighbouring symbols + span-size
