@@ -692,11 +692,13 @@ struct Task
 	}
       }
       
-      if (terminated_sample) continue;
-      if (! queue.pop_swap(buffer, true)) {
-	
+      if (terminated_sample) {
 	non_found_iter = loop_sleep(found, non_found_iter);
-	
+	continue;
+      }
+      
+      if (! queue.pop_swap(buffer, true)) {
+	non_found_iter = loop_sleep(found, non_found_iter);
 	continue;
       }
       

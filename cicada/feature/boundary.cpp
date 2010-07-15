@@ -192,12 +192,22 @@ namespace cicada
 	apply_feature(features, vocab_type::BOS, source_prefix,   vocab_type::BOS, target_prefix);
 	apply_feature(features, source_suffix,   vocab_type::EOS, target_suffix,   vocab_type::EOS);
       }
+
+      void compose_feature(std::string& name,
+			   const std::string& source_prev, const std::string& source_next,
+			   const std::string& target_prev, const std::string& target_next) const
+      {
+	name = "boundary:" + source_prev + '|' + source_next + '|' + target_prev + '|' + target_next;
+      }
       
       void apply_feature(feature_set_type& features,
-			 const std::string& source_prev, const std::string& source_next,
-			 const std::string& target_prev, const std::string& target_next) const
+			 const symbol_type& source_prev, const symbol_type& source_next,
+			 const symbol_type& target_prev, const symbol_type& target_next) const
       {
-	const std::string name = "boundary:" + source_prev + '|' + source_next + '|' + target_prev + '|' + target_next;
+	std::string name;
+	
+	compose_feature(name, source_prev, source_next, target_prev, target_next);
+	
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
