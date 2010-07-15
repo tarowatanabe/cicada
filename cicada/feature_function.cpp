@@ -26,7 +26,9 @@ bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
 \tprecision=<default 0.8>,\n\
 \tratio=<default 0.6>\n\
-boundary: boundary ngram feature\n\
+boundary: boundary bigram feature\n\
+\tcluster-source=[word class file for source]\n\
+\tcluster-taRget=[word class file for target]\n\
 neighbours: neighbour words feature\n\
 \tyield=[source|target]\n\
 \tcluster=[word class file]\n\

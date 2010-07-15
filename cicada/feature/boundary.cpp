@@ -4,6 +4,7 @@
 
 #include "cicada/feature/boundary.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/cluster.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
@@ -21,6 +22,7 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+      typedef cicada::Cluster  cluster_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -49,10 +51,12 @@ namespace cicada
       typedef std::vector<int, std::allocator<int> > position_map_type;
       
       
-      BoundaryImpl() : forced_feature(false) {}
-      BoundaryImpl(const BoundaryImpl& x) : forced_feature(x.forced_feature) {}
+      BoundaryImpl() : cluster_source(), cluster_target(), forced_feature(false) {}
+      BoundaryImpl(const BoundaryImpl& x) : cluster_source(x.cluster_source), cluster_target(x.cluster_target), forced_feature(x.forced_feature) {}
       BoundaryImpl& operator=(const BoundaryImpl& x)
       {
+	cluster_source = x.cluster_source;
+	cluster_target = x.cluster_target;
 	forced_feature = x.forced_feature;
 	return *this;
       }
@@ -204,6 +208,24 @@ namespace cicada
 			 const symbol_type& source_prev, const symbol_type& source_next,
 			 const symbol_type& target_prev, const symbol_type& target_next) const
       {
+	if (! cluster_source.empty() || ! cluster_target.empty()) {
+	  const symbol_type source_prev_class = cluster_source[source_prev];
+	  const symbol_type source_next_class = cluster_source[source_next];
+	  const symbol_type target_prev_class = cluster_target[target_prev];
+	  const symbol_type target_next_class = cluster_target[target_next];
+	  
+	  if (source_prev_class != source_prev || source_next_class != source_next
+	      || target_prev_class != target_prev || target_next_class != target_next) {
+	    
+	    std::string name;
+	    
+	    compose_feature(name, source_prev_class, source_next_class, target_prev_class, target_next_class);
+	    
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
+
 	std::string name;
 	
 	compose_feature(name, source_prev, source_next, target_prev, target_next);
@@ -251,6 +273,9 @@ namespace cicada
 	    break;
 	  }
       }
+
+      cluster_type cluster_source;
+      cluster_type cluster_target;
       
       phrase_span_set_type source_spans_impl;
       phrase_span_set_type target_spans_impl;
@@ -272,8 +297,33 @@ namespace cicada
       if (param.name() != "boundary")
 	throw std::runtime_error("is this really boundary feature function? " + parameter);
       
-      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
-	std::cerr << "WARNING: unsupported parameter for boundary: " << piter->first << "=" << piter->second << std::endl;
+      boost::filesystem::path cluster_path_source;
+      boost::filesystem::path cluster_path_target;
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "cluster-source") == 0)
+	  cluster_path_source = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "cluster-target") == 0)
+	  cluster_path_target = piter->second;
+	else
+	  std::cerr << "WARNING: unsupported parameter for boundary: " << piter->first << "=" << piter->second << std::endl;
+      }
+      
+      
+      if (! cluster_path_source.empty()) {
+	if (! boost::filesystem::exists(cluster_path_source))
+	  throw std::runtime_error("no source cluster file: " + cluster_path_source.file_string());
+	
+	pimpl->cluster_source = cicada::Cluster(cluster_path_source);
+      }
+      
+      if (! cluster_path_target.empty()) {
+	if (! boost::filesystem::exists(cluster_path_target))
+	  throw std::runtime_error("no target cluster file: " + cluster_path_target.file_string());
+	
+	pimpl->cluster_target = cicada::Cluster(cluster_path_target);
+      }
+
       
       base_type::__state_size = sizeof(symbol_type) * 4;
       base_type::__feature_name = "boundary";

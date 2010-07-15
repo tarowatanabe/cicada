@@ -414,7 +414,7 @@ namespace cicada
 
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
-	  throw std::runtime_error("no cluster file" + cluster_path.file_string());
+	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
 
 	neighbours_impl->cluster = cicada::Cluster(cluster_path);
       }
