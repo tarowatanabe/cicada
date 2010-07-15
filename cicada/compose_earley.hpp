@@ -816,7 +816,7 @@ namespace cicada
 	
 	// removed epsilon edges...
 	graph_removed.clear();
-	topologically_sort(graph, graph_removed, filter_epsilon(removed));
+	topologically_sort(graph, graph_removed, filter_epsilon(removed), true);
 	graph.swap(graph_removed);
 	
 	// re-compute out-edges

@@ -61,7 +61,7 @@ namespace cicada
     };
     
     template <typename Filter>
-    void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter)
+    void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter, const bool no_empty_check=false)
     {
       sorted.clear();
       
@@ -184,7 +184,7 @@ namespace cicada
       
       sorted.goal = sorted.nodes.size() - 1;
       
-      if (! nodes_empty.empty()) {
+      if (! nodes_empty.empty() && ! no_empty_check) {
 	hypergraph_type sorted_new;
 	filter_edge filter(sorted.edges.size());
 	
@@ -199,7 +199,7 @@ namespace cicada
 	    }
 	}
 	
-	operator()(sorted, sorted_new, filter);
+	operator()(sorted, sorted_new, filter, no_empty_check);
 	
 	sorted.swap(sorted_new);
       }
@@ -208,15 +208,15 @@ namespace cicada
   
   template <typename Filter>
   inline
-  void topologically_sort(const HyperGraph& source, HyperGraph& target, Filter filter)
+  void topologically_sort(const HyperGraph& source, HyperGraph& target, Filter filter, const bool no_empty_check=false)
   {
-    TopologicallySort()(source, target, filter);
+    TopologicallySort()(source, target, filter, no_empty_check);
   }
   
   inline
-  void topologically_sort(const HyperGraph& source, HyperGraph& target)
+  void topologically_sort(const HyperGraph& source, HyperGraph& target, const bool no_empty_check=false)
   {
-    TopologicallySort()(source, target, TopologicallySort::no_filter_edge());
+    TopologicallySort()(source, target, TopologicallySort::no_filter_edge(), no_empty_check);
   }
   
   inline
