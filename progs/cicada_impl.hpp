@@ -1151,6 +1151,13 @@ public:
     }
     
     const weight_set_type* weights_prune = (weights ? weights : &__weights);
+
+    if (debug)
+      std::cerr << "pruning:"
+		<< " # of nodes: " << hypergraph.nodes.size()
+		<< " # of edges: " << hypergraph.edges.size()
+		<< " valid? " << (hypergraph.is_valid() ? "true" : "false")
+		<< std::endl;
     
     utils::resource prune_start;
 
@@ -1180,7 +1187,8 @@ public:
 		<< std::endl;
     
     if (debug)
-      std::cerr << "# of nodes: " << pruned.nodes.size()
+      std::cerr << "pruned:"
+		<< " # of nodes: " << pruned.nodes.size()
 		<< " # of edges: " << pruned.edges.size()
 		<< " valid? " << (pruned.is_valid() ? "true" : "false")
 		<< std::endl;
