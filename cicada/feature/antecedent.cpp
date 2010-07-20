@@ -137,7 +137,7 @@ namespace cicada
 	      const int*         antecedent_size   = reinterpret_cast<const int*>(antecedent_symbol + 2);
 	      
 	      node = tree_id(*piter, node);
-													   
+	      
 	      antecedent_string += compose_tree(*piter, *antecedent_tree);
 	      span_size += *antecedent_size;
 	      
