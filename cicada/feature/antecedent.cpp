@@ -192,7 +192,7 @@ namespace cicada
 	
 	if (__tree_map[id].empty())
 	  if (! __tree_map.is_root(parent))
-	    __tree_map[id] = static_cast<const std::string&>(node) + __tree_map[parent];
+	    __tree_map[id] =  __tree_map[parent] + static_cast<const std::string&>(node);
 	  else
 	    __tree_map[id] = node;
 	
