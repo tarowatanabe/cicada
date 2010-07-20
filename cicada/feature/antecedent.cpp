@@ -280,7 +280,7 @@ namespace cicada
       const parameter_type param(parameter);
 
       if (param.name() != "antecedent")
-	throw std::runtime_error("is this really ngram tree feature function? " + parameter);
+	throw std::runtime_error("is this really antecedent feature function? " + parameter);
 
       bool source = false;
       bool target = false;
