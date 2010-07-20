@@ -3,6 +3,7 @@
 
 #include "parameter.hpp"
 
+#include "feature/antecedent.hpp"
 #include "feature/bleu.hpp"
 #include "feature/bleu_linear.hpp"
 #include "feature/boundary.hpp"
@@ -19,6 +20,9 @@ namespace cicada
   std::string FeatureFunction::lists()
   {
     static const char* desc = "\
+antecedent: antecedent feature\n\
+\tyield=[source|target]\n\
+\tcluster=[word class file]\n\
 bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
@@ -60,6 +64,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::Neighbours(parameter));
     else if (param.name() == "ngram-tree")
       return feature_function_ptr_type(new feature::NGramTree(parameter));
+    else if (param.name() == "antecedent")
+      return feature_function_ptr_type(new feature::Antecedent(parameter));
     else if (param.name() == "boundary")
       return feature_function_ptr_type(new feature::Boundary(parameter));
     else if (param.name() == "bleu")

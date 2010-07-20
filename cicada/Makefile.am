@@ -41,6 +41,7 @@ optimize/line_search.hpp \
 optimize/powell.hpp
 
 dist_feature_HEADERS = \
+feature/antecedent.hpp \
 feature/bleu.hpp \
 feature/bleu_linear.hpp \
 feature/boundary.hpp \
@@ -51,6 +52,7 @@ feature/penalty.hpp \
 feature/variational.hpp
 
 libcicada_feature_la_SOURCES = \
+feature/antecedent.cpp \
 feature/bleu.cpp \
 feature/bleu_linear.cpp \
 feature/boundary.cpp \
