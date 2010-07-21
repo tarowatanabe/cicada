@@ -68,6 +68,9 @@ namespace cicada
       } else
 	return vocab_type::UNK;
     }
+
+  public:
+    static Cluster& create(const path_type& path);
     
   private:
     vocab_type       vocab;

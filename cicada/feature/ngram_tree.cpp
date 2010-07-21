@@ -48,7 +48,7 @@ namespace cicada
       typedef tree_map_type::id_type id_type;
       
       
-      NGramTreeImpl() : forced_feature(false) {}
+      NGramTreeImpl() : cluster(0), forced_feature(false) {}
       NGramTreeImpl(const NGramTreeImpl& x) : cluster(x.cluster), forced_feature(x.forced_feature) {}
       NGramTreeImpl& operator=(const NGramTreeImpl& x)
       {
@@ -71,7 +71,7 @@ namespace cicada
 	tree_map.clear();
       }
 
-      cluster_type cluster;
+      cluster_type* cluster;
       
       tree_map_type  tree_map;
       
@@ -192,7 +192,7 @@ namespace cicada
 	if (__tree_map[id].first.empty()) {
 	  if (__tree_map.is_root(parent)) {
 	    __tree_map[id].first  = node;
-	    __tree_map[id].second = cluster[node];
+	    __tree_map[id].second = (cluster ? cluster->operator[](node) : node);
 	  } else {
 	    __tree_map[id].first  = compose_path(node, __tree_map[parent].first);
 	    __tree_map[id].second = compose_path(node, __tree_map[parent].second);
@@ -206,7 +206,7 @@ namespace cicada
 	const node_pair_type& prev_node = tree_map[prev];
 	const node_pair_type& next_node = tree_map[next];
 	
-	if (! cluster.empty() && (prev_node.first != prev_node.second || next_node.first != next_node.second)) {
+	if (cluster && (prev_node.first != prev_node.second || next_node.first != next_node.second)) {
 	  const std::string name = feature_name(node, prev_node.second, next_node.second);
 	  if (forced_feature || feature_set_type::feature_type::exists(name))
 	    features[name] += 1.0;
@@ -333,7 +333,7 @@ namespace cicada
 	if (! boost::filesystem::exists(cluster_path))
 	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
 	
-	ngram_tree_impl->cluster = cicada::Cluster(cluster_path);
+	ngram_tree_impl->cluster = &cicada::Cluster::create(cluster_path);
       }
 
       

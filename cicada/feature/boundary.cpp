@@ -51,7 +51,7 @@ namespace cicada
       typedef std::vector<int, std::allocator<int> > position_map_type;
       
       
-      BoundaryImpl() : cluster_source(), cluster_target(), forced_feature(false) {}
+      BoundaryImpl() : cluster_source(0), cluster_target(0), forced_feature(false) {}
       BoundaryImpl(const BoundaryImpl& x) : cluster_source(x.cluster_source), cluster_target(x.cluster_target), forced_feature(x.forced_feature) {}
       BoundaryImpl& operator=(const BoundaryImpl& x)
       {
@@ -208,11 +208,11 @@ namespace cicada
 			 const symbol_type& source_prev, const symbol_type& source_next,
 			 const symbol_type& target_prev, const symbol_type& target_next) const
       {
-	if (! cluster_source.empty() || ! cluster_target.empty()) {
-	  const symbol_type source_prev_class = cluster_source[source_prev];
-	  const symbol_type source_next_class = cluster_source[source_next];
-	  const symbol_type target_prev_class = cluster_target[target_prev];
-	  const symbol_type target_next_class = cluster_target[target_next];
+	if (cluster_source || cluster_target) {
+	  const symbol_type source_prev_class = (cluster_source ? cluster_source->operator[](source_prev) : source_prev);
+	  const symbol_type source_next_class = (cluster_source ? cluster_source->operator[](source_next) : source_next);
+	  const symbol_type target_prev_class = (cluster_target ? cluster_target->operator[](target_prev) : target_prev);
+	  const symbol_type target_next_class = (cluster_target ? cluster_target->operator[](target_next) : target_next);
 	  
 	  if (source_prev_class != source_prev || source_next_class != source_next
 	      || target_prev_class != target_prev || target_next_class != target_next) {
@@ -274,8 +274,8 @@ namespace cicada
 	  }
       }
 
-      cluster_type cluster_source;
-      cluster_type cluster_target;
+      cluster_type* cluster_source;
+      cluster_type* cluster_target;
       
       phrase_span_set_type source_spans_impl;
       phrase_span_set_type target_spans_impl;
@@ -314,14 +314,14 @@ namespace cicada
 	if (! boost::filesystem::exists(cluster_path_source))
 	  throw std::runtime_error("no source cluster file: " + cluster_path_source.file_string());
 	
-	pimpl->cluster_source = cicada::Cluster(cluster_path_source);
+	pimpl->cluster_source = &cicada::Cluster::create(cluster_path_source);
       }
       
       if (! cluster_path_target.empty()) {
 	if (! boost::filesystem::exists(cluster_path_target))
 	  throw std::runtime_error("no target cluster file: " + cluster_path_target.file_string());
 	
-	pimpl->cluster_target = cicada::Cluster(cluster_path_target);
+	pimpl->cluster_target = &cicada::Cluster::create(cluster_path_target);
       }
 
       

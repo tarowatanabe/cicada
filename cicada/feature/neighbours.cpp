@@ -81,7 +81,7 @@ namespace cicada
       
       typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
       
-      NeighboursImpl() : cluster(), forced_feature(false) {}
+      NeighboursImpl() : cluster(0), forced_feature(false) {}
       NeighboursImpl(const NeighboursImpl& x) : cluster(x.cluster), forced_feature(x.forced_feature) {}
       NeighboursImpl& operator=(const NeighboursImpl& x)
       {
@@ -104,7 +104,7 @@ namespace cicada
 	state_map.clear();
       }
 
-      cluster_type cluster;
+      cluster_type* cluster;
       
       state_map_type state_map;
       
@@ -209,9 +209,9 @@ namespace cicada
 
       void apply_feature(feature_set_type& features, const std::string& node, const symbol_type& prev, const symbol_type& next, const int span) const
       {
-	if (! cluster.empty()) {
-	  const symbol_type prev_cluster = cluster[prev];
-	  const symbol_type next_cluster = cluster[next];
+	if (cluster) {
+	  const symbol_type prev_cluster = cluster->operator[](prev);
+	  const symbol_type next_cluster = cluster->operator[](next);
 	  
 	  if (prev_cluster != prev || next_cluster != next) {
 	    const std::string name = feature_name(node, prev_cluster, next_cluster, span);
@@ -416,7 +416,7 @@ namespace cicada
 	if (! boost::filesystem::exists(cluster_path))
 	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
 
-	neighbours_impl->cluster = cicada::Cluster(cluster_path);
+	neighbours_impl->cluster = &cicada::Cluster::create(cluster_path);
       }
 
       

@@ -4,8 +4,10 @@
 #include <utils/tempfile.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/space_separator.hpp>
+#include <utils/sgi_hash_map.hpp>
 
 #include <boost/tokenizer.hpp>
+#include <boost/thread.hpp>
 
 namespace cicada
 {
@@ -88,5 +90,52 @@ namespace cicada
     
     vocab.write(rep.path("vocab"));
     clusters.write(rep.path("clusters"));
+  }
+  
+  template <typename Tp>
+  struct hash_string : public utils::hashmurmur<size_t>
+  {
+    size_t operator()(const Tp& x) const
+    {
+      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
+    }
+  };
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
+				  std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
+#else
+  typedef sgi::hash_map<std::string, Cluster, hash_string, std::equal_to<std::string>,
+			std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
+
+#endif
+
+  
+
+  Cluster& Cluster::create(const path_type& path)
+  {
+#ifdef HAVE_TLS
+    static __thread cluster_map_type* __clusters_tls = 0;
+    static boost::thread_specific_ptr<cluster_map_type> __clusters;
+    
+    if (! __clusters_tls) {
+      __clusters.reset(new cluster_map_type());
+      __clusters_tls = __clusters.get();
+    }
+    cluster_map_type& clusters_map = *__clusters_tls;    
+#else
+    static boost::thread_specific_ptr<cluster_map_type> __clusters;
+    
+    if (! __clusters.get())
+      __clusters.reset(new cluster_map_type());
+    
+    cluster_map_type& clusters_map = *__clusters;
+#endif
+    
+    cluster_map_type::iterator iter = clusters_map.find(path.file_string());
+    if (iter == clusters_map.end())
+      iter = clusters_map.insert(std::make_pair(path.file_string(), Cluster(path))).first;
+    
+    return iter->second;
   }
 };

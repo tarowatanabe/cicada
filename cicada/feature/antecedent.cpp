@@ -45,7 +45,7 @@ namespace cicada
       
       typedef tree_map_type::id_type id_type;
       
-      AntecedentImpl() : forced_feature(false) {}
+      AntecedentImpl() : cluster(0), forced_feature(false) {}
       AntecedentImpl(const AntecedentImpl& x) : cluster(x.cluster), forced_feature(x.forced_feature) {}
       AntecedentImpl& operator=(const AntecedentImpl& x)
       {
@@ -68,7 +68,7 @@ namespace cicada
 	tree_map.clear();
       }
 
-      cluster_type cluster;
+      cluster_type* cluster;
       
       tree_map_type  tree_map;
       
@@ -115,7 +115,6 @@ namespace cicada
 	  context_symbol[0] = prefix;
 	  context_symbol[1] = suffix;
 	  *context_size = span_size;
-	  
 	} else {
 	  symbol_type prefix = vocab_type::EMPTY;
 	  symbol_type suffix = vocab_type::EMPTY;
@@ -205,12 +204,11 @@ namespace cicada
 			 const symbol_type& prefix, const symbol_type& suffix,
 			 const int span_size) const
       {
-	if (! cluster.empty()) {
-	  const symbol_type prefix_cluster = cluster[prefix];
-	  const symbol_type suffix_cluster = cluster[suffix];
+	if (cluster) {
+	  const symbol_type prefix_cluster = cluster->operator[](prefix);
+	  const symbol_type suffix_cluster = cluster->operator[](suffix);
 
 	  if (prefix_cluster != prefix || suffix_cluster != suffix) {
-	    
 	    const std::string name = feature_name(node, antecedent, prefix_cluster, suffix_cluster, span_size);
 	    if (forced_feature || feature_set_type::feature_type::exists(name))
 	      features[name] += 1.0;
@@ -228,7 +226,7 @@ namespace cicada
 				     const std::string& suffix,
 				     const int span_size) const
       {
-	return Extract::feature_prefix +  node + antecedent + '|' + prefix + '|' + suffix + '|' + boost::lexical_cast<std::string>(span_size);
+	return Extract::feature_prefix + node + antecedent + '|' + prefix + '|' + suffix + '|' + boost::lexical_cast<std::string>(span_size);
       }
 
       	  
@@ -315,7 +313,7 @@ namespace cicada
 	if (! boost::filesystem::exists(cluster_path))
 	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
 	
-	antecedent_impl->cluster = cicada::Cluster(cluster_path);
+	antecedent_impl->cluster = &cicada::Cluster::create(cluster_path);
       }
 
       
