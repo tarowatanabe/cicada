@@ -55,8 +55,9 @@ namespace cicada
       if (word == vocab_type::EMPTY || word.is_non_terminal() || empty())
 	return word;
       
-      // SGML-like symbols are not clusters...
       const size_type word_size = word.size();
+      
+      // SGML-like symbols are not clusters...
       if (word_size >= 3 && word[0] == '<' && word[word_size - 1] == '>')
 	return word;
 
