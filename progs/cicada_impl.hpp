@@ -183,6 +183,29 @@ struct kbest_function_one
   }
 };
 
+struct kbest_traversal_edges
+{
+  typedef rule_type::feature_set_type feature_set_type;
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
+
+  typedef boost::tuple<edge_set_type, feature_set_type> value_type;
+  
+  template <typename Edge, typename Iterator>
+  void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+  {
+    boost::get<0>(yield).clear();
+
+    boost::get<0>(yield).push_back(edge.id);
+    boost::get<1>(yield) = edge.features;
+    
+    // collect edge and features
+    for (/**/; first != last; ++ first) {
+      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*first).begin(), boost::get<0>(*first).end());
+      boost::get<1>(yield) += boost::get<1>(*first);
+    }
+  }
+};
+
 struct kbest_traversal_source
 {
   typedef rule_type::feature_set_type feature_set_type;
@@ -290,6 +313,90 @@ struct kbest_filter_unique
 
   unique_set_type uniques;
 };
+
+template <typename Function, typename Filter>
+void kbest_derivations(std::ostream& os,
+		       const size_t id,
+		       const hypergraph_type& graph,
+		       const int kbest_size,
+		       const Function& function,
+		       const Filter& filter)
+{
+  cicada::KBest<kbest_traversal_edges, Function, Filter> derivations(graph, kbest_size, kbest_traversal_edges(), function, filter);
+  
+  typedef kbest_traversal_edges::value_type    derivation_type;
+  typedef kbest_traversal_edges::edge_set_type edge_set_type;
+  
+  typedef hypergraph_type::id_type id_type;
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+    std::allocator<std::pair<id_type, id_type> > > node_map_type;
+#else
+  typedef sgi::hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
+    std::allocator<std::pair<id_type, id_type> > > node_map_type;
+#endif
+
+  derivation_type derivation;
+  node_map_type   node_maps;
+  hypergraph_type graph_kbest;
+
+  edge_set_type tails;
+  
+  for (int k = 0; k < kbest_size; ++ k) {
+    if (! derivations(k, derivation))
+      break;
+    
+    const edge_set_type& edges = boost::get<0>(derivation);
+    node_maps.clear();
+    graph_kbest.clear();
+    
+    id_type node_id = 0;
+    edge_set_type::const_iterator eiter_end = edges.end();
+    for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter)
+      if (node_maps.find(graph.edges[*eiter].head) == node_maps.end()) {
+	node_maps[graph.edges[*eiter].head] = node_id;
+	++ node_id;
+      }
+    
+    for (id_type node = 0; node != node_id; ++ node)
+      graph_kbest.add_node();
+    
+    for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
+      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+      
+      tails.clear();
+      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+	node_map_type::const_iterator niter = node_maps.find(*titer);
+	if (niter == node_maps.end())
+	  throw std::runtime_error("no node?");
+	
+	tails.push_back(niter->second);
+      }
+      
+      hypergraph_type::edge_type& edge_kbest = graph_kbest.add_edge(tails.begin(), tails.end());
+      
+      graph_kbest.connect_edge(edge_kbest.id, node_maps[edge.head]);
+    }
+    
+    node_map_type::const_iterator niter = node_maps.find(graph.goal);
+    if (niter == node_maps.end())
+      throw std::runtime_error("did not reach goal?");
+    
+    graph_kbest.goal = niter->second;
+
+    graph_kbest.topologically_sort();
+    
+    os << id << " ||| " << graph_kbest << " |||";
+    rule_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
+    for (rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
+      os << ' ' << fiter->first << '=' << fiter->second;
+    os << " ||| ";
+    os << function(boost::get<1>(derivation));
+    os << '\n';
+  }
+}
 
 
 template <typename Traversal, typename Function, typename Filter>
