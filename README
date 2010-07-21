@@ -23,7 +23,7 @@ After the hypergraph generation, you can:
 
 Various learning components are implemented:
   - Large feature set from input lattice/hypergraph on large training data via MaxEnt [3]
-  - Large feature set on small devset with MIRA [6,7] (TODO), but with hypergraph (New! But still open problems!)
+  - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
   - Small feature set on small devset learned by hypergraph-MERT [8]
   - Small/Large feature set on small devset learned by hypergraph-MaxEnt (New! But still open problems!) + softmax-margin [9]
 

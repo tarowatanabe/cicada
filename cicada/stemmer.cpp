@@ -1,6 +1,9 @@
 
 #include "stemmer.hpp"
-#include "stemmer_simple.hpp"
+#include "stemmer/prefix.hpp"
+#include "stemmer/suffix.hpp"
+#include "stemmer/latin.hpp"
+#include "stemmer/digit.hpp"
 #include "parameter.hpp"
 
 #include <utils/sgi_hash_map.hpp>
@@ -72,7 +75,7 @@ namespace cicada
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end())
-	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new StemmerPrefix(size)))).first;
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Prefix(size)))).first;
       
       return *(iter->second);
     } else if (param.name() == "suffix") {
@@ -91,7 +94,7 @@ namespace cicada
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end())
-	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new StemmerSuffix(size)))).first;
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Suffix(size)))).first;
       
       return *(iter->second);
     } else if (param.name() == "digit" || param.name() == "digits") {
@@ -100,7 +103,7 @@ namespace cicada
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end())
-	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new StemmerDigit()))).first;
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Digit()))).first;
       
       return *(iter->second);
     } else if (param.name() == "latin") {
@@ -109,7 +112,7 @@ namespace cicada
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end())
-	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new StemmerLatin()))).first;
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Latin()))).first;
       
       return *(iter->second);
     } else

@@ -7,7 +7,8 @@ lib_LTLIBRARIES = libcicada.la
 noinst_LTLIBRARIES = \
 libcicada-feature.la \
 libcicada-semiring.la \
-libcicada-eval.la
+libcicada-eval.la \
+libcicada-stemmer.la
 
 libcicadaincludedir= $(pkgincludedir)/cicada
 
@@ -15,6 +16,7 @@ semiringdir = $(pkgincludedir)/cicada/semiring
 evaldir     = $(pkgincludedir)/cicada/eval
 optimizedir = $(pkgincludedir)/cicada/optimize
 featuredir  = $(pkgincludedir)/cicada/feature
+stemmerdir  = $(pkgincludedir)/cicada/stemmer
 
 dist_semiring_HEADERS = \
 semiring/envelope.hpp \
@@ -62,6 +64,19 @@ feature/ngram_tree.cpp \
 feature/variational.cpp
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
+dist_stemmer_HEADERS = \
+stemmer/prefix.hpp \
+stemmer/suffix.hpp \
+stemmer/latin.hpp \
+stemmer/digit.hpp
+
+libcicada_stemmer_la_SOURCES = \
+stemmer/prefix.cpp \
+stemmer/suffix.cpp \
+stemmer/latin.cpp \
+stemmer/digit.cpp
+libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
+
 libcicadainclude_HEADERS = \
 apply.hpp \
 apply_cube_prune.hpp \
@@ -100,7 +115,6 @@ sentence.hpp \
 sort.hpp \
 span.hpp \
 stemmer.hpp \
-stemmer_simple.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 transducer.hpp \
@@ -124,7 +138,6 @@ parameter.cpp \
 rule.cpp \
 sentence.cpp \
 stemmer.cpp \
-stemmer_simple.cpp \
 symbol.cpp \
 symbol_vector.cpp \
 vocab.cpp
@@ -140,6 +153,7 @@ libcicada_la_LIBADD = \
 	libcicada-eval.la \
 	libcicada-feature.la \
 	libcicada-semiring.la \
+	libcicada-stemmer.la \
 	\
 	$(LIBUTILS) \
 	$(BOOST_THREAD_LIBS) \
