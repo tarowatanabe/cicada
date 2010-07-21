@@ -9,6 +9,7 @@
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -48,8 +49,9 @@ namespace cicada
 	std::string cluster;
 	std::string prefix;
 	std::string suffix;
+	std::string digits;
 	
-	node_pair_type() : node(), cluster(), prefix(), suffix() {}
+	node_pair_type() : node(), cluster(), prefix(), suffix(), digits() {}
       };
       
       typedef utils::compact_trie<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
@@ -59,21 +61,8 @@ namespace cicada
       
       
       NGramTreeImpl()
-	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), forced_feature(false) {}
-      NGramTreeImpl(const NGramTreeImpl& x)
-	: cluster(x.cluster),
-	  stemmer_prefix(x.stemmer_prefix),
-	  stemmer_suffix(x.stemmer_suffix),
-	  forced_feature(x.forced_feature) {}
-      NGramTreeImpl& operator=(const NGramTreeImpl& x)
-      {
-	cluster = x.cluster;
-	stemmer_prefix = x.stemmer_prefix;
-	stemmer_suffix = x.stemmer_suffix;
-	forced_feature = x.forced_feature;
-	return *this;
-      }
-
+	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), forced_feature(false) {}
+      
       virtual ~NGramTreeImpl() {}
       
       virtual void ngram_tree_score(state_ptr_type& state,
@@ -91,6 +80,7 @@ namespace cicada
       cluster_type* cluster;
       stemmer_type* stemmer_prefix;
       stemmer_type* stemmer_suffix;
+      stemmer_type* stemmer_digits;
       
       tree_map_type  tree_map;
       
@@ -217,6 +207,8 @@ namespace cicada
 	      __tree_map[id].prefix = stemmer_prefix->operator[](node);
 	    if (stemmer_suffix)
 	      __tree_map[id].suffix = stemmer_suffix->operator[](node);
+	    if (stemmer_digits)
+	      __tree_map[id].digits = stemmer_digits->operator[](node);
 	  } else {
 	    __tree_map[id].node = compose_path(node, __tree_map[parent].node);
 	    if (cluster)
@@ -225,6 +217,8 @@ namespace cicada
 	      __tree_map[id].prefix = compose_path(node, __tree_map[parent].prefix);
 	    if (stemmer_suffix)
 	      __tree_map[id].suffix = compose_path(node, __tree_map[parent].suffix);
+	    if (stemmer_digits)
+	      __tree_map[id].digits = compose_path(node, __tree_map[parent].digits);
 	  }
 	}
 	return id;
@@ -249,6 +243,12 @@ namespace cicada
 
 	if (stemmer_suffix && (prev_node.node != prev_node.suffix || next_node.node != next_node.suffix)) {
 	  const std::string name = feature_name(node, prev_node.suffix, next_node.suffix);
+	  if (forced_feature || feature_set_type::feature_type::exists(name))
+	    features[name] += 1.0;
+	}
+	
+	if (stemmer_digits && (prev_node.node != prev_node.digits || next_node.node != next_node.digits)) {
+	  const std::string name = feature_name(node, prev_node.digits, next_node.digits);
 	  if (forced_feature || feature_set_type::feature_type::exists(name))
 	    features[name] += 1.0;
 	}
@@ -347,6 +347,7 @@ namespace cicada
       
       int stemmer_prefix_size = 0;
       int stemmer_suffix_size = 0;
+      bool stemmer_digits = false;
       
       boost::filesystem::path cluster_path;
       
@@ -366,6 +367,8 @@ namespace cicada
 	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "suffix") == 0)
 	  stemmer_suffix_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "digits") == 0)
+	  stemmer_digits = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -396,6 +399,9 @@ namespace cicada
       
       if (stemmer_suffix_size > 0)
 	ngram_tree_impl->stemmer_suffix = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_size));
+
+      if (stemmer_digits)
+	ngram_tree_impl->stemmer_digits = &cicada::Stemmer::create("digits");
 
       
       // non-terminal + two neighbouring symbols + span-size

@@ -16,6 +16,7 @@
 
 #include <utils/compress_stream.hpp>
 #include <utils/filesystem.hpp>
+#include <utils/lexical_cast.hpp>
 
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
@@ -376,6 +377,8 @@ void kbest_derivations(std::ostream& os,
       }
       
       hypergraph_type::edge_type& edge_kbest = graph_kbest.add_edge(tails.begin(), tails.end());
+      edge_kbest.rule = edge.rule;
+      edge_kbest.features = edge.features;
       
       graph_kbest.connect_edge(edge_kbest.id, node_maps[edge.head]);
     }
@@ -426,18 +429,6 @@ void kbest_derivations(std::ostream& os,
   }
 }
 
-
-inline
-bool true_false(const std::string& token)
-{
-  if (strcasecmp(token.c_str(), "true") == 0)
-    return true;
-  if (strcasecmp(token.c_str(), "yes") == 0)
-    return true;
-  if (atoi(token.c_str()) > 0)
-    return true;
-  return false;
-}		  
 
 template <typename Iterator>
 inline
@@ -651,7 +642,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << binarized.nodes.size()
 		<< " # of edges: " << binarized.edges.size()
-		<< " valid? " << (binarized.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(binarized.is_valid())
 		<< std::endl;
     
     hypergraph.swap(binarized);
@@ -689,9 +680,9 @@ public:
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "feature") == 0)
-	feature = true_false(piter->second);
+	feature = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "collapse") == 0)
-	collapse = true_false(piter->second);
+	collapse = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "exclude") == 0)
 	excludes.insert(piter->second);
       else
@@ -743,7 +734,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << permuted.nodes.size()
 		<< " # of edges: " << permuted.edges.size()
-		<< " valid? " << (permuted.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(permuted.is_valid())
 		<< std::endl;
     
     hypergraph.swap(permuted);
@@ -804,7 +795,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << composed.nodes.size()
 		<< " # of edges: " << composed.edges.size()
-		<< " valid? " << (composed.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		<< std::endl;
     
     hypergraph.swap(composed);
@@ -865,7 +856,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << composed.nodes.size()
 		<< " # of edges: " << composed.edges.size()
-		<< " valid? " << (composed.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		<< std::endl;
     
     hypergraph.swap(composed);
@@ -901,11 +892,11 @@ public:
       if (strcasecmp(piter->first.c_str(), "size") == 0)
 	size = boost::lexical_cast<int>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "exact") == 0)
-	exact = true_false(piter->second);
+	exact = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
-	weights_one = true_false(piter->second);
+	weights_one = utils::lexical_cast<bool>(piter->second);
       else
 	std::cerr << "WARNING: unsupported parameter for apply: " << piter->first << "=" << piter->second << std::endl;
     }
@@ -948,7 +939,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << applied.nodes.size()
 		<< " # of edges: " << applied.edges.size()
-		<< " valid? " << (applied.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(applied.is_valid())
 		<< std::endl;
 	
     hypergraph.swap(applied);
@@ -985,11 +976,11 @@ public:
       if (strcasecmp(piter->first.c_str(), "size") == 0)
 	size = boost::lexical_cast<int>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "exact") == 0)
-	exact = true_false(piter->second);
+	exact = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
-	weights_one = true_false(piter->second);
+	weights_one = utils::lexical_cast<bool>(piter->second);
       else
 	std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
     }
@@ -1064,7 +1055,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << applied.nodes.size()
 		<< " # of edges: " << applied.edges.size()
-		<< " valid? " << (applied.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(applied.is_valid())
 		<< std::endl;
     
     hypergraph.swap(applied);
@@ -1106,7 +1097,7 @@ public:
       if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
-	weights_one = true_false(piter->second);
+	weights_one = utils::lexical_cast<bool>(piter->second);
       else
 	std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
     }
@@ -1167,7 +1158,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << variational.nodes.size()
 		<< " # of edges: " << variational.edges.size()
-		<< " valid? " << (variational.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(variational.is_valid())
 		<< std::endl;
     
     hypergraph.swap(variational);
@@ -1215,7 +1206,7 @@ public:
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
-	weights_one = true_false(piter->second);
+	weights_one = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "semiring") == 0) {
 	const std::string& name = piter->second;
 	
@@ -1263,7 +1254,7 @@ public:
       std::cerr << "pruning:"
 		<< " # of nodes: " << hypergraph.nodes.size()
 		<< " # of edges: " << hypergraph.edges.size()
-		<< " valid? " << (hypergraph.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(hypergraph.is_valid())
 		<< std::endl;
     
     utils::resource prune_start;
@@ -1297,7 +1288,7 @@ public:
       std::cerr << "pruned:"
 		<< " # of nodes: " << pruned.nodes.size()
 		<< " # of edges: " << pruned.edges.size()
-		<< " valid? " << (pruned.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(pruned.is_valid())
 		<< std::endl;
     
     hypergraph.swap(pruned);
@@ -1353,7 +1344,7 @@ public:
     if (debug)
       std::cerr << "# of nodes: " << intersected.nodes.size()
 		<< " # of edges: " << intersected.edges.size()
-		<< " valid? " << (intersected.is_valid() ? "true" : "false")
+		<< " valid? " << utils::lexical_cast<std::string>(intersected.is_valid())
 		<< std::endl;
     
     hypergraph.swap(intersected);
@@ -1368,7 +1359,7 @@ public:
   OutputString(const std::string& parameter, std::string& __buffer, size_t& __id, const int __debug)
     : buffer(__buffer), id(__id), weights(0), weights_one(false),
       kbest_size(0), kbest_unique(false),
-      yield_source(false), yield_target(false),
+      yield_source(false), yield_target(false), yield_tree(false),
       graphviz(false),
       debug(__debug)
   {
@@ -1382,13 +1373,13 @@ public:
       if (strcasecmp(piter->first.c_str(), "kbest") == 0)
 	kbest_size = boost::lexical_cast<int>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "unique") == 0)
-	kbest_unique = true_false(piter->second);
+	kbest_unique = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
-	weights_one = true_false(piter->second);
+	weights_one = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "graphviz") == 0)
-	graphviz = true_false(piter->second);
+	graphviz = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "file") == 0)
 	;
       else if (strcasecmp(piter->first.c_str(), "directory") == 0)
@@ -1400,6 +1391,8 @@ public:
 	  yield_source = true;
 	else if (strcasecmp(value.c_str(), "target") == 0)
 	  yield_target = true;
+	else if (strcasecmp(value.c_str(), "derivation") == 0 || strcasecmp(value.c_str(), "tree") == 0)
+	  yield_tree = true;
 	else
 	  throw std::runtime_error("unknown yield: " + value);
       } else
@@ -1409,10 +1402,10 @@ public:
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
     
-    if (yield_source && yield_target)
-      throw std::runtime_error("only source or target yield for kbest");
+    if (int(yield_source) + yield_target + yield_tree > 1)
+      throw std::runtime_error("only source, target or tree yield for kbest");
     
-    if (! yield_source && ! yield_target)
+    if (! yield_source && ! yield_target && ! yield_tree)
       yield_target = true;
   }
 
@@ -1446,25 +1439,33 @@ public:
 	if (kbest_unique) {
 	  if (yield_source)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
 	} else {
 	  if (yield_source)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
 	}
       } else {
 	if (kbest_unique) {
 	  if (yield_source)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_function(*weights_kbest), kbest_filter(hypergraph));
 	} else {
 	  if (yield_source)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(os, id, hypergraph, kbest_size, kbest_function(*weights_kbest), kbest_filter(hypergraph));
 	}
       }
     }    
@@ -1480,6 +1481,7 @@ public:
 
   bool yield_source;
   bool yield_target;
+  bool yield_tree;
 
   bool graphviz;
 
@@ -1492,7 +1494,7 @@ public:
   Output(const std::string& parameter, boost::shared_ptr<std::ostream>& __os, size_t& __id, const int __debug)
     : os(__os), id(__id), file(), directory(), weights(0), weights_one(false),
       kbest_size(0), kbest_unique(false),
-      yield_source(false), yield_target(false),
+      yield_source(false), yield_target(false), yield_tree(false),
       graphviz(false),
       debug(__debug)
   {
@@ -1507,13 +1509,13 @@ public:
       if (strcasecmp(piter->first.c_str(), "kbest") == 0)
 	kbest_size = boost::lexical_cast<int>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "unique") == 0)
-	kbest_unique = true_false(piter->second);
+	kbest_unique = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
-	weights_one = true_false(piter->second);
+	weights_one = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "graphviz") == 0)
-	graphviz = true_false(piter->second);
+	graphviz = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "file") == 0)
 	file = piter->second;
       else if (strcasecmp(piter->first.c_str(), "directory") == 0)
@@ -1525,6 +1527,8 @@ public:
 	  yield_source = true;
 	else if (strcasecmp(value.c_str(), "target") == 0)
 	  yield_target = true;
+	else if (strcasecmp(value.c_str(), "derivation") == 0 || strcasecmp(value.c_str(), "tree") == 0)
+	  yield_tree = true;
 	else
 	  throw std::runtime_error("unknown yield: " + value);
       } else
@@ -1542,10 +1546,10 @@ public:
     if (! directory.empty() && ! file.empty())
       throw std::runtime_error("you cannot output both in directory and file");
     
-    if (yield_source && yield_target)
-      throw std::runtime_error("only source or target yield for kbest");
+    if (int(yield_source) + yield_target + yield_tree > 1)
+      throw std::runtime_error("only source, target or tree yield for kbest");
     
-    if (! yield_source && ! yield_target)
+    if (! yield_source && ! yield_target && ! yield_tree)
       yield_target = true;
   }
 
@@ -1587,25 +1591,33 @@ public:
 	if (kbest_unique) {
 	  if (yield_source)
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
 	} else {
 	  if (yield_source)	  
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_function_one(*weights_kbest), kbest_filter(hypergraph));
 	}
       } else {
 	if (kbest_unique) {
 	  if (yield_source)
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter_unique(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_function(*weights_kbest), kbest_filter(hypergraph));
 	} else {
 	  if (yield_source)
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal_source(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
-	  else
+	  else if (yield_target)
 	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_traversal(), kbest_function(*weights_kbest), kbest_filter(hypergraph));
+	  else
+	    kbest_derivations(*os, id, hypergraph, kbest_size, kbest_function(*weights_kbest), kbest_filter(hypergraph));
 	}
       }
     }    
@@ -1624,6 +1636,7 @@ public:
 
   bool yield_source;
   bool yield_target;
+  bool yield_tree;
 
   bool graphviz;
   
@@ -1748,7 +1761,7 @@ output: kbest or hypergraph output\n\
 \tunique=[true|false] unique translation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialize weight\n\
-\tyield=[source|target] yield for kbest\n\
+\tyield=[source|target|derivation|tree] yield for kbest\n\
 \tgraphviz=[true|false] dump in graphviz format\n\
 \tdirectory=directory for output\n\
 \tfile=file for output\n\

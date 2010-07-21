@@ -25,6 +25,7 @@ antecedent: antecedent feature\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
+\tdigits=[perform digits stemming]\n\
 bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
@@ -35,11 +36,18 @@ bleu-linear: linear corpus-BLEU\n\
 boundary: boundary bigram feature\n\
 \tcluster-source=[word class file for source]\n\
 \tcluster-target=[word class file for target]\n\
+\tprefix-source=[source prefix stemming size]\n\
+\tprefix-target=[target prefix stemming size]\n\
+\tsuffix-source=[source suffix stemming size]\n\
+\tsuffix-target=[target suffix stemming size]\n\
+\tdigits-source=[source digits stemming]\n\
+\tdigits-target=[target digits stemming]\n\
 neighbours: neighbour words feature\n\
 \tyield=[source|target]\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
+\tdigits=[perform digits stemming]\n\
 ngram: ngram language model\n\
 \tfile=<file>,\n\
 \torder=<order>,\n\
@@ -49,6 +57,7 @@ ngram-tree: ngram tree feature\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
+\tdigits=[perform digits stemming]\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 target-word-penalty: target word penalty feature\n\

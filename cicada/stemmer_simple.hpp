@@ -40,6 +40,36 @@ namespace cicada
     symbol_set_type cache;
     size_type       size;
   };
+
+  class StemmerDigit : public Stemmer
+  {
+  private:
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+    
+  public:
+    StemmerDigit() {}
+    
+  public:
+    symbol_type operator[](const symbol_type& x) const;
+    
+  private:
+    symbol_set_type cache;
+  };
+
+  class StemmerLatin : public Stemmer
+  {
+  private:
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+    
+  public:
+    StemmerLatin() {}
+    
+  public:
+    symbol_type operator[](const symbol_type& x) const;
+    
+  private:
+    symbol_set_type cache;
+  };
   
 };
 

@@ -9,6 +9,7 @@
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -57,30 +58,8 @@ namespace cicada
 	: cluster_source(0), cluster_target(0),
 	  stemmer_prefix_source(0), stemmer_prefix_target(0),
 	  stemmer_suffix_source(0), stemmer_suffix_target(0),
+	  stemmer_digits_source(0), stemmer_digits_target(0),
 	  forced_feature(false) {}
-      BoundaryImpl(const BoundaryImpl& x)
-	: cluster_source(x.cluster_source),
-	  cluster_target(x.cluster_target),
-	  stemmer_prefix_source(x.stemmer_prefix_source),
-	  stemmer_prefix_target(x.stemmer_prefix_target),
-	  stemmer_suffix_source(x.stemmer_suffix_source),
-	  stemmer_suffix_target(x.stemmer_suffix_target),
-	  forced_feature(x.forced_feature) {}
-      BoundaryImpl& operator=(const BoundaryImpl& x)
-      {
-	cluster_source = x.cluster_source;
-	cluster_target = x.cluster_target;
-	
-	stemmer_prefix_source = x.stemmer_prefix_source;
-	stemmer_prefix_target = x.stemmer_prefix_target;
-	stemmer_suffix_source = x.stemmer_suffix_source;
-	stemmer_suffix_target = x.stemmer_suffix_target;
-
-	forced_feature = x.forced_feature;
-	return *this;
-      }
-
-      virtual ~BoundaryImpl() {}
       
       void boundary_score(state_ptr_type& state,
 			  const state_ptr_set_type& states,
@@ -280,6 +259,24 @@ namespace cicada
 	      features[name] += 1.0;
 	  }
 	}
+		
+	if (stemmer_digits_source || stemmer_digits_target) {
+	  const symbol_type source_prev_stemmed = (stemmer_digits_source ? stemmer_digits_source->operator[](source_prev) : source_prev);
+	  const symbol_type source_next_stemmed = (stemmer_digits_source ? stemmer_digits_source->operator[](source_next) : source_next);
+	  const symbol_type target_prev_stemmed = (stemmer_digits_target ? stemmer_digits_target->operator[](target_prev) : target_prev);
+	  const symbol_type target_next_stemmed = (stemmer_digits_target ? stemmer_digits_target->operator[](target_next) : target_next);
+	  
+	  if (source_prev_stemmed != source_prev || source_next_stemmed != source_next
+	      || target_prev_stemmed != target_prev || target_next_stemmed != target_next) {
+	    
+	    std::string name;
+	    
+	    compose_feature(name, source_prev_stemmed, source_next_stemmed, target_prev_stemmed, target_next_stemmed);
+	    
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
 
 
 	std::string name;
@@ -337,6 +334,8 @@ namespace cicada
       stemmer_type* stemmer_prefix_target;
       stemmer_type* stemmer_suffix_source;
       stemmer_type* stemmer_suffix_target;
+      stemmer_type* stemmer_digits_source;
+      stemmer_type* stemmer_digits_target;
       
       phrase_span_set_type source_spans_impl;
       phrase_span_set_type target_spans_impl;
@@ -347,6 +346,7 @@ namespace cicada
       bool forced_feature;
     };
     
+
     
     Boundary::Boundary(const std::string& parameter)
       : pimpl(new impl_type())
@@ -362,6 +362,9 @@ namespace cicada
       int stemmer_prefix_target_size = 0;
       int stemmer_suffix_source_size = 0;
       int stemmer_suffix_target_size = 0;
+      
+      bool stemmer_digits_source = false;
+      bool stemmer_digits_target = false;
       
       boost::filesystem::path cluster_path_source;
       boost::filesystem::path cluster_path_target;
@@ -379,6 +382,10 @@ namespace cicada
 	  stemmer_suffix_source_size = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "suffix-target") == 0)
 	  stemmer_suffix_target_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "digits-source") == 0)
+	  stemmer_digits_source = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "digits-target") == 0)
+	  stemmer_digits_target = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for boundary: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -415,6 +422,11 @@ namespace cicada
 	pimpl->stemmer_suffix_source = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_source_size));
       if (stemmer_suffix_target_size > 0)
 	pimpl->stemmer_suffix_target = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_target_size));
+      
+      if (stemmer_digits_source)
+	pimpl->stemmer_digits_source = &cicada::Stemmer::create("digits");
+      if (stemmer_digits_target)
+	pimpl->stemmer_digits_target = &cicada::Stemmer::create("digits");
       
       
       base_type::__state_size = sizeof(symbol_type) * 4;

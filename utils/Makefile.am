@@ -53,6 +53,7 @@ indexed_hashtable.hpp \
 indexed_map.hpp \
 indexed_set.hpp \
 istream_line_iterator.hpp \
+lexical_cast.hpp \
 lockfree_list_queue.hpp \
 lockfree_queue.hpp \
 malloc_stats.hpp \

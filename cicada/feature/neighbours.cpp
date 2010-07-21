@@ -10,6 +10,7 @@
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -84,20 +85,7 @@ namespace cicada
       typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
       
       NeighboursImpl()
-	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), forced_feature(false) {}
-      NeighboursImpl(const NeighboursImpl& x)
-	: cluster(x.cluster),
-	  stemmer_prefix(x.stemmer_prefix),
-	  stemmer_suffix(x.stemmer_suffix),
-	  forced_feature(x.forced_feature) {}
-      NeighboursImpl& operator=(const NeighboursImpl& x)
-      {
-	cluster = x.cluster;
-	stemmer_prefix = x.stemmer_prefix;
-	stemmer_suffix = x.stemmer_suffix;
-	forced_feature = x.forced_feature;
-	return *this;
-      }
+	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), forced_feature(false) {}
       
       virtual ~NeighboursImpl() {}
       
@@ -116,6 +104,7 @@ namespace cicada
       cluster_type* cluster;
       stemmer_type* stemmer_prefix;
       stemmer_type* stemmer_suffix;
+      stemmer_type* stemmer_digits;
       
       state_map_type state_map;
       
@@ -245,6 +234,17 @@ namespace cicada
 	if (stemmer_suffix) {
 	  const symbol_type prev_stemmed = stemmer_suffix->operator[](prev);
 	  const symbol_type next_stemmed = stemmer_suffix->operator[](next);
+	  
+	  if (prev_stemmed != prev || next_stemmed != next) {
+	    const std::string name = feature_name(node, prev_stemmed, next_stemmed, span);
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
+
+	if (stemmer_digits) {
+	  const symbol_type prev_stemmed = stemmer_digits->operator[](prev);
+	  const symbol_type next_stemmed = stemmer_digits->operator[](next);
 	  
 	  if (prev_stemmed != prev || next_stemmed != next) {
 	    const std::string name = feature_name(node, prev_stemmed, next_stemmed, span);
@@ -404,7 +404,6 @@ namespace cicada
       std::string feature_prefix;
     };
     
-    
     Neighbours::Neighbours(const std::string& parameter)
       : pimpl(0)
     {
@@ -420,6 +419,7 @@ namespace cicada
       
       int stemmer_prefix_size = 0;
       int stemmer_suffix_size = 0;
+      bool stemmer_digits = false;
       
       boost::filesystem::path cluster_path;
       
@@ -440,6 +440,8 @@ namespace cicada
 	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "suffix") == 0)
 	  stemmer_suffix_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "digits") == 0)
+	  stemmer_digits = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for neighbours: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -470,6 +472,9 @@ namespace cicada
       
       if (stemmer_suffix_size > 0)
 	neighbours_impl->stemmer_suffix = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_size));
+
+      if (stemmer_digits)
+	neighbours_impl->stemmer_digits = &cicada::Stemmer::create("digits");
 
       
       // non-terminal + two neighbouring symbols + span-size

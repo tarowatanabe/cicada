@@ -94,6 +94,24 @@ namespace cicada
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new StemmerSuffix(size)))).first;
       
       return *(iter->second);
+    } else if (param.name() == "digit" || param.name() == "digits") {
+
+      const std::string name("digit");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end())
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new StemmerDigit()))).first;
+      
+      return *(iter->second);
+    } else if (param.name() == "latin") {
+
+      const std::string name("latin");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end())
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new StemmerLatin()))).first;
+      
+      return *(iter->second);
     } else
       throw std::runtime_error("invalid parameter: " + parameter);
   }

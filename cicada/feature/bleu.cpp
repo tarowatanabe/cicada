@@ -8,6 +8,7 @@
 #include "utils/compact_trie.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include "cicada/eval/bleu.hpp"
 
@@ -567,17 +568,6 @@ namespace cicada
       bool exact;
     };
     
-    inline
-    bool true_false(const std::string& token)
-    {
-      if (strcasecmp(token.c_str(), "true") == 0)
-	return true;
-      if (strcasecmp(token.c_str(), "yes") == 0)
-	return true;
-      if (atoi(token.c_str()) > 0)
-	return true;
-      return false;
-    }
     
     Bleu::Bleu(const std::string& parameter)
       : pimpl(0)
@@ -596,7 +586,7 @@ namespace cicada
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
-	  exact = true_false(piter->second);
+	  exact = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }
