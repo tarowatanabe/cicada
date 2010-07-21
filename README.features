@@ -7,7 +7,7 @@ each rule:
 
 or, when specifying by --grammar option, you can include additional parameters,
 
-<grammar-file>,feature0=a-name,feature1=another-name, etc.
+<grammar-file>:feature0=a-name,feature1=another-name, etc.
 
 which will assign non-named features to pre-specified names. By default, we will
 assign, rule-table-0, rule-table-1, etc.
@@ -15,4 +15,19 @@ assign, rule-table-0, rule-table-1, etc.
 For "static grammar", such as grammar learned by moses, joshua, nicttm etc.,
 you cannot assign arbitrary different features, since the number of features
 should be equal. However, you can assign feature-names, as in non-static mutable
-grammar.
+grammar:
+	--grammar-static <grammar-file>:feature0=name,feature1=name1
+
+Other dynamically assigned features are applied via "apply" operaion:
+
+antecedent: sparse features assigned two-level non-terminals, delimited terminals and span-size
+bleu: bleu score
+blue-linear: linear bleu score
+boundary: sparse features assigned for 4-tuple of source/target words at non-terminal boundaries
+neighbours: sparse features assigned for non-terminal, its neighboring words and span-size
+ngram: ngram langauge model feature. You can assign multiple LM by defining name=<feature-name> option.
+ngram-tree: sparse featuers assigned for non-terminal path for boundaries.
+variational: features for variational decoding
+target-word-penalty: simply count # of target words
+source-word-penalty: simply count # of source words
+rule-penalty: simply count # of rules
