@@ -105,7 +105,7 @@ namespace cicada
   typedef std::tr1::unordered_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
 				  std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
 #else
-  typedef sgi::hash_map<std::string, Cluster, hash_string, std::equal_to<std::string>,
+  typedef sgi::hash_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
 
 #endif

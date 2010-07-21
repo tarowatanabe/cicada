@@ -99,6 +99,8 @@ semiring.hpp \
 sentence.hpp \
 sort.hpp \
 span.hpp \
+stemmer.hpp \
+stemmer_simple.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 transducer.hpp \
@@ -121,6 +123,8 @@ model.cpp \
 parameter.cpp \
 rule.cpp \
 sentence.cpp \
+stemmer.cpp \
+stemmer_simple.cpp \
 symbol.cpp \
 symbol_vector.cpp \
 vocab.cpp
