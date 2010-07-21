@@ -90,7 +90,6 @@ eval.hpp \
 feature.hpp \
 feature_function.hpp \
 feature_vector.hpp \
-ngram.hpp \
 grammar.hpp \
 grammar_mutable.hpp \
 grammar_static.hpp \
