@@ -5,6 +5,7 @@
 #include "cicada/feature/antecedent.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
+#include "cicada/stemmer.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
@@ -22,7 +23,9 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+      
       typedef cicada::Cluster  cluster_type;
+      typedef cicada::Stemmer  stemmer_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -45,11 +48,18 @@ namespace cicada
       
       typedef tree_map_type::id_type id_type;
       
-      AntecedentImpl() : cluster(0), forced_feature(false) {}
-      AntecedentImpl(const AntecedentImpl& x) : cluster(x.cluster), forced_feature(x.forced_feature) {}
+      AntecedentImpl()
+	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), forced_feature(false) {}
+      AntecedentImpl(const AntecedentImpl& x)
+	: cluster(x.cluster),
+	  stemmer_prefix(x.stemmer_prefix),
+	  stemmer_suffix(x.stemmer_suffix),
+	  forced_feature(x.forced_feature) {}
       AntecedentImpl& operator=(const AntecedentImpl& x)
       {
 	cluster = x.cluster;
+	stemmer_prefix = x.stemmer_prefix;
+	stemmer_suffix = x.stemmer_suffix;
 	forced_feature = x.forced_feature;
 	return *this;
       }
@@ -69,6 +79,8 @@ namespace cicada
       }
 
       cluster_type* cluster;
+      stemmer_type* stemmer_prefix;
+      stemmer_type* stemmer_suffix;
       
       tree_map_type  tree_map;
       
@@ -215,6 +227,29 @@ namespace cicada
 	  }
 	}
 	
+	if (stemmer_prefix) {
+	  const symbol_type prefix_stemmed = stemmer_prefix->operator[](prefix);
+	  const symbol_type suffix_stemmed = stemmer_prefix->operator[](suffix);
+
+	  if (prefix_stemmed != prefix || suffix_stemmed != suffix) {
+	    const std::string name = feature_name(node, antecedent, prefix_stemmed, suffix_stemmed, span_size);
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
+
+	if (stemmer_suffix) {
+	  const symbol_type prefix_stemmed = stemmer_suffix->operator[](prefix);
+	  const symbol_type suffix_stemmed = stemmer_suffix->operator[](suffix);
+
+	  if (prefix_stemmed != prefix || suffix_stemmed != suffix) {
+	    const std::string name = feature_name(node, antecedent, prefix_stemmed, suffix_stemmed, span_size);
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
+
+	
 	const std::string name = feature_name(node, antecedent, prefix, suffix, span_size);
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
@@ -282,6 +317,10 @@ namespace cicada
 
       bool source = false;
       bool target = false;
+      
+      int stemmer_prefix_size = 0;
+      int stemmer_suffix_size = 0;
+      
       boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -296,6 +335,10 @@ namespace cicada
 	    throw std::runtime_error("unknown parameter: " + parameter);
 	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
 	  cluster_path = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
+	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "suffix") == 0)
+	  stemmer_suffix_size = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for antecedent: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -305,6 +348,11 @@ namespace cicada
       if (! source && ! target)
 	throw std::runtime_error("what side are you going to use?");
       
+      if (stemmer_prefix_size < 0)
+	throw std::runtime_error("negative prefix size?");
+      if (stemmer_suffix_size < 0)
+	throw std::runtime_error("negative suffix size?");
+
       std::auto_ptr<impl_type> antecedent_impl(source
 					       ? dynamic_cast<impl_type*>(new __AntecedentImpl<__antecedent_extract_source>())
 					       : dynamic_cast<impl_type*>(new __AntecedentImpl<__antecedent_extract_target>()));
@@ -315,7 +363,12 @@ namespace cicada
 	
 	antecedent_impl->cluster = &cicada::Cluster::create(cluster_path);
       }
-
+      
+      if (stemmer_prefix_size > 0)
+	antecedent_impl->stemmer_prefix = &cicada::Stemmer::create("prefix:size=" + boost::lexical_cast<std::string>(stemmer_prefix_size));
+      
+      if (stemmer_suffix_size > 0)
+	antecedent_impl->stemmer_suffix = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_size));
       
       // antecedent conext + terminal-boundary + span-size
       base_type::__state_size = sizeof(impl_type::id_type) + sizeof(symbol_type) * 2 + sizeof(int);

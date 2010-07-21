@@ -5,6 +5,7 @@
 #include "cicada/feature/ngram_tree.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
+#include "cicada/stemmer.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
@@ -23,6 +24,7 @@ namespace cicada
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
       typedef cicada::Cluster  cluster_type;
+      typedef cicada::Stemmer  stemmer_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -39,8 +41,16 @@ namespace cicada
       
       typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
       typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
-
-      typedef std::pair<std::string, std::string> node_pair_type;
+      
+      struct node_pair_type
+      {
+	std::string node;
+	std::string cluster;
+	std::string prefix;
+	std::string suffix;
+	
+	node_pair_type() : node(), cluster(), prefix(), suffix() {}
+      };
       
       typedef utils::compact_trie<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				  std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
@@ -48,11 +58,18 @@ namespace cicada
       typedef tree_map_type::id_type id_type;
       
       
-      NGramTreeImpl() : cluster(0), forced_feature(false) {}
-      NGramTreeImpl(const NGramTreeImpl& x) : cluster(x.cluster), forced_feature(x.forced_feature) {}
+      NGramTreeImpl()
+	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), forced_feature(false) {}
+      NGramTreeImpl(const NGramTreeImpl& x)
+	: cluster(x.cluster),
+	  stemmer_prefix(x.stemmer_prefix),
+	  stemmer_suffix(x.stemmer_suffix),
+	  forced_feature(x.forced_feature) {}
       NGramTreeImpl& operator=(const NGramTreeImpl& x)
       {
 	cluster = x.cluster;
+	stemmer_prefix = x.stemmer_prefix;
+	stemmer_suffix = x.stemmer_suffix;
 	forced_feature = x.forced_feature;
 	return *this;
       }
@@ -72,6 +89,8 @@ namespace cicada
       }
 
       cluster_type* cluster;
+      stemmer_type* stemmer_prefix;
+      stemmer_type* stemmer_suffix;
       
       tree_map_type  tree_map;
       
@@ -189,13 +208,23 @@ namespace cicada
 
 	const id_type id = __tree_map.insert(parent, node);
 	
-	if (__tree_map[id].first.empty()) {
+	if (__tree_map[id].node.empty()) {
 	  if (__tree_map.is_root(parent)) {
-	    __tree_map[id].first  = node;
-	    __tree_map[id].second = (cluster ? cluster->operator[](node) : node);
+	    __tree_map[id].node = node;
+	    if (cluster)
+	      __tree_map[id].cluster = cluster->operator[](node);
+	    if (stemmer_prefix)
+	      __tree_map[id].prefix = stemmer_prefix->operator[](node);
+	    if (stemmer_suffix)
+	      __tree_map[id].suffix = stemmer_suffix->operator[](node);
 	  } else {
-	    __tree_map[id].first  = compose_path(node, __tree_map[parent].first);
-	    __tree_map[id].second = compose_path(node, __tree_map[parent].second);
+	    __tree_map[id].node = compose_path(node, __tree_map[parent].node);
+	    if (cluster)
+	      __tree_map[id].cluster = compose_path(node, __tree_map[parent].cluster);
+	    if (stemmer_prefix)
+	      __tree_map[id].prefix = compose_path(node, __tree_map[parent].prefix);
+	    if (stemmer_suffix)
+	      __tree_map[id].suffix = compose_path(node, __tree_map[parent].suffix);
 	  }
 	}
 	return id;
@@ -206,13 +235,26 @@ namespace cicada
 	const node_pair_type& prev_node = tree_map[prev];
 	const node_pair_type& next_node = tree_map[next];
 	
-	if (cluster && (prev_node.first != prev_node.second || next_node.first != next_node.second)) {
-	  const std::string name = feature_name(node, prev_node.second, next_node.second);
+	if (cluster && (prev_node.node != prev_node.cluster || next_node.node != next_node.cluster)) {
+	  const std::string name = feature_name(node, prev_node.cluster, next_node.cluster);
 	  if (forced_feature || feature_set_type::feature_type::exists(name))
 	    features[name] += 1.0;
 	}
 	
-	const std::string name = feature_name(node, prev_node.first, next_node.first);
+	if (stemmer_prefix && (prev_node.node != prev_node.prefix || next_node.node != next_node.prefix)) {
+	  const std::string name = feature_name(node, prev_node.prefix, next_node.prefix);
+	  if (forced_feature || feature_set_type::feature_type::exists(name))
+	    features[name] += 1.0;
+	}
+
+	if (stemmer_suffix && (prev_node.node != prev_node.suffix || next_node.node != next_node.suffix)) {
+	  const std::string name = feature_name(node, prev_node.suffix, next_node.suffix);
+	  if (forced_feature || feature_set_type::feature_type::exists(name))
+	    features[name] += 1.0;
+	}
+	
+	
+	const std::string name = feature_name(node, prev_node.node, next_node.node);
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
@@ -241,7 +283,7 @@ namespace cicada
 
       const std::string compose_tree(const std::string& node, const std::string& prev, const std::string& next) const
       {
-	return node + "(" + prev + ")(" + next + ')';
+	return node + '(' + prev + ")(" + next + ')';
       }
 
       const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next) const
@@ -302,6 +344,10 @@ namespace cicada
 
       bool source = false;
       bool target = false;
+      
+      int stemmer_prefix_size = 0;
+      int stemmer_suffix_size = 0;
+      
       boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -316,6 +362,10 @@ namespace cicada
 	    throw std::runtime_error("unknown parameter: " + parameter);
 	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
 	  cluster_path = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
+	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "suffix") == 0)
+	  stemmer_suffix_size = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -324,6 +374,11 @@ namespace cicada
 	throw std::runtime_error("both source and target?");
       if (! source && ! target)
 	throw std::runtime_error("what side are you going to use?");
+
+      if (stemmer_prefix_size < 0)
+	throw std::runtime_error("negative prefix size?");
+      if (stemmer_suffix_size < 0)
+	throw std::runtime_error("negative suffix size?");
       
       std::auto_ptr<impl_type> ngram_tree_impl(source
 					       ? dynamic_cast<impl_type*>(new __NGramTreeImpl<__ngram_tree_extract_source>())
@@ -335,6 +390,12 @@ namespace cicada
 	
 	ngram_tree_impl->cluster = &cicada::Cluster::create(cluster_path);
       }
+      
+      if (stemmer_prefix_size > 0)
+	ngram_tree_impl->stemmer_prefix = &cicada::Stemmer::create("prefix:size=" + boost::lexical_cast<std::string>(stemmer_prefix_size));
+      
+      if (stemmer_suffix_size > 0)
+	ngram_tree_impl->stemmer_suffix = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_size));
 
       
       // non-terminal + two neighbouring symbols + span-size

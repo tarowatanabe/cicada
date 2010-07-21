@@ -107,7 +107,6 @@ namespace cicada
 #else
   typedef sgi::hash_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
-
 #endif
 
   

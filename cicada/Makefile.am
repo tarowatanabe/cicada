@@ -157,6 +157,7 @@ lattice_main \
 parameter_main \
 rule_main \
 sentence_main \
+stemmer_main \
 symbol_main
 
 cluster_main_SOURCES = cluster_main.cpp
@@ -182,6 +183,9 @@ rule_main_LDADD = libcicada.la
 
 sentence_main_SOURCES = sentence_main.cpp
 sentence_main_LDADD = libcicada.la
+
+stemmer_main_SOURCES = stemmer_main.cpp
+stemmer_main_LDADD = libcicada.la
 
 symbol_main_SOURCES = symbol_main.cpp
 symbol_main_LDADD = libcicada.la

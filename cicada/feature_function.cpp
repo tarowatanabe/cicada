@@ -23,6 +23,8 @@ namespace cicada
 antecedent: antecedent feature\n\
 \tyield=[source|target]\n\
 \tcluster=[word class file]\n\
+\tprefix=[prefix stemming size]\n\
+\tsuffix=[suffix stemming size]\n\
 bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
@@ -32,10 +34,12 @@ bleu-linear: linear corpus-BLEU\n\
 \tratio=<default 0.6>\n\
 boundary: boundary bigram feature\n\
 \tcluster-source=[word class file for source]\n\
-\tcluster-taRget=[word class file for target]\n\
+\tcluster-target=[word class file for target]\n\
 neighbours: neighbour words feature\n\
 \tyield=[source|target]\n\
 \tcluster=[word class file]\n\
+\tprefix=[prefix stemming size]\n\
+\tsuffix=[suffix stemming size]\n\
 ngram: ngram language model\n\
 \tfile=<file>,\n\
 \torder=<order>,\n\
@@ -43,6 +47,8 @@ ngram: ngram language model\n\
 ngram-tree: ngram tree feature\n\
 \tyield=[source|target]\n\
 \tcluster=[word class file]\n\
+\tprefix=[prefix stemming size]\n\
+\tsuffix=[suffix stemming size]\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 target-word-penalty: target word penalty feature\n\

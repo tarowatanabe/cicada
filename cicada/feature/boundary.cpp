@@ -5,6 +5,7 @@
 #include "cicada/feature/boundary.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
+#include "cicada/stemmer.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
@@ -23,6 +24,7 @@ namespace cicada
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
       typedef cicada::Cluster  cluster_type;
+      typedef cicada::Stemmer  stemmer_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -51,12 +53,29 @@ namespace cicada
       typedef std::vector<int, std::allocator<int> > position_map_type;
       
       
-      BoundaryImpl() : cluster_source(0), cluster_target(0), forced_feature(false) {}
-      BoundaryImpl(const BoundaryImpl& x) : cluster_source(x.cluster_source), cluster_target(x.cluster_target), forced_feature(x.forced_feature) {}
+      BoundaryImpl()
+	: cluster_source(0), cluster_target(0),
+	  stemmer_prefix_source(0), stemmer_prefix_target(0),
+	  stemmer_suffix_source(0), stemmer_suffix_target(0),
+	  forced_feature(false) {}
+      BoundaryImpl(const BoundaryImpl& x)
+	: cluster_source(x.cluster_source),
+	  cluster_target(x.cluster_target),
+	  stemmer_prefix_source(x.stemmer_prefix_source),
+	  stemmer_prefix_target(x.stemmer_prefix_target),
+	  stemmer_suffix_source(x.stemmer_suffix_source),
+	  stemmer_suffix_target(x.stemmer_suffix_target),
+	  forced_feature(x.forced_feature) {}
       BoundaryImpl& operator=(const BoundaryImpl& x)
       {
 	cluster_source = x.cluster_source;
 	cluster_target = x.cluster_target;
+	
+	stemmer_prefix_source = x.stemmer_prefix_source;
+	stemmer_prefix_target = x.stemmer_prefix_target;
+	stemmer_suffix_source = x.stemmer_suffix_source;
+	stemmer_suffix_target = x.stemmer_suffix_target;
+
 	forced_feature = x.forced_feature;
 	return *this;
       }
@@ -225,6 +244,43 @@ namespace cicada
 	      features[name] += 1.0;
 	  }
 	}
+	
+	if (stemmer_prefix_source || stemmer_prefix_target) {
+	  const symbol_type source_prev_stemmed = (stemmer_prefix_source ? stemmer_prefix_source->operator[](source_prev) : source_prev);
+	  const symbol_type source_next_stemmed = (stemmer_prefix_source ? stemmer_prefix_source->operator[](source_next) : source_next);
+	  const symbol_type target_prev_stemmed = (stemmer_prefix_target ? stemmer_prefix_target->operator[](target_prev) : target_prev);
+	  const symbol_type target_next_stemmed = (stemmer_prefix_target ? stemmer_prefix_target->operator[](target_next) : target_next);
+	  
+	  if (source_prev_stemmed != source_prev || source_next_stemmed != source_next
+	      || target_prev_stemmed != target_prev || target_next_stemmed != target_next) {
+	    
+	    std::string name;
+	    
+	    compose_feature(name, source_prev_stemmed, source_next_stemmed, target_prev_stemmed, target_next_stemmed);
+	    
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
+	
+	if (stemmer_suffix_source || stemmer_suffix_target) {
+	  const symbol_type source_prev_stemmed = (stemmer_suffix_source ? stemmer_suffix_source->operator[](source_prev) : source_prev);
+	  const symbol_type source_next_stemmed = (stemmer_suffix_source ? stemmer_suffix_source->operator[](source_next) : source_next);
+	  const symbol_type target_prev_stemmed = (stemmer_suffix_target ? stemmer_suffix_target->operator[](target_prev) : target_prev);
+	  const symbol_type target_next_stemmed = (stemmer_suffix_target ? stemmer_suffix_target->operator[](target_next) : target_next);
+	  
+	  if (source_prev_stemmed != source_prev || source_next_stemmed != source_next
+	      || target_prev_stemmed != target_prev || target_next_stemmed != target_next) {
+	    
+	    std::string name;
+	    
+	    compose_feature(name, source_prev_stemmed, source_next_stemmed, target_prev_stemmed, target_next_stemmed);
+	    
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
+	}
+
 
 	std::string name;
 	
@@ -276,6 +332,11 @@ namespace cicada
 
       cluster_type* cluster_source;
       cluster_type* cluster_target;
+
+      stemmer_type* stemmer_prefix_source;
+      stemmer_type* stemmer_prefix_target;
+      stemmer_type* stemmer_suffix_source;
+      stemmer_type* stemmer_suffix_target;
       
       phrase_span_set_type source_spans_impl;
       phrase_span_set_type target_spans_impl;
@@ -296,6 +357,11 @@ namespace cicada
       
       if (param.name() != "boundary")
 	throw std::runtime_error("is this really boundary feature function? " + parameter);
+
+      int stemmer_prefix_source_size = 0;
+      int stemmer_prefix_target_size = 0;
+      int stemmer_suffix_source_size = 0;
+      int stemmer_suffix_target_size = 0;
       
       boost::filesystem::path cluster_path_source;
       boost::filesystem::path cluster_path_target;
@@ -305,9 +371,26 @@ namespace cicada
 	  cluster_path_source = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "cluster-target") == 0)
 	  cluster_path_target = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "prefix-source") == 0)
+	  stemmer_prefix_source_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "prefix-target") == 0)
+	  stemmer_prefix_target_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "suffix-source") == 0)
+	  stemmer_suffix_source_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "suffix-target") == 0)
+	  stemmer_suffix_target_size = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for boundary: " << piter->first << "=" << piter->second << std::endl;
       }
+
+      if (stemmer_prefix_source_size < 0)
+	throw std::runtime_error("negative source prefix size?");
+      if (stemmer_prefix_target_size < 0)
+	throw std::runtime_error("negative target prefix size?");
+      if (stemmer_suffix_source_size < 0)
+	throw std::runtime_error("negative source suffix size?");
+      if (stemmer_suffix_target_size < 0)
+	throw std::runtime_error("negative target suffix size?");
       
       
       if (! cluster_path_source.empty()) {
@@ -323,7 +406,16 @@ namespace cicada
 	
 	pimpl->cluster_target = &cicada::Cluster::create(cluster_path_target);
       }
-
+      
+      if (stemmer_prefix_source_size > 0)
+	pimpl->stemmer_prefix_source = &cicada::Stemmer::create("prefix:size=" + boost::lexical_cast<std::string>(stemmer_prefix_source_size));
+      if (stemmer_prefix_target_size > 0)
+	pimpl->stemmer_prefix_target = &cicada::Stemmer::create("prefix:size=" + boost::lexical_cast<std::string>(stemmer_prefix_target_size));
+      if (stemmer_suffix_source_size > 0)
+	pimpl->stemmer_suffix_source = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_source_size));
+      if (stemmer_suffix_target_size > 0)
+	pimpl->stemmer_suffix_target = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_target_size));
+      
       
       base_type::__state_size = sizeof(symbol_type) * 4;
       base_type::__feature_name = "boundary";

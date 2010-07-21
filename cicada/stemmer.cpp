@@ -28,7 +28,6 @@ namespace cicada
 #else
   typedef sgi::hash_map<std::string, stemmer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, stemmer_ptr_type> > > stemmer_map_type;
-
 #endif
   
 
@@ -69,7 +68,7 @@ namespace cicada
       if (size <= 0)
 	throw std::runtime_error("invalid prefix size: " + boost::lexical_cast<std::string>(size));
       
-      std::string name = "prefix:" + boost::lexical_cast<std::string>(size);
+      const std::string name = "prefix:" + boost::lexical_cast<std::string>(size);
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end())
@@ -82,13 +81,13 @@ namespace cicada
 	if (strcasecmp(piter->first.c_str(), "size") == 0)
 	  size = boost::lexical_cast<int>(piter->second);
 	else
-	  std::cerr << "unsupported parameter for prefix stemmer: " << piter->first << "=" << piter->second << std::endl;
+	  std::cerr << "unsupported parameter for suffix stemmer: " << piter->first << "=" << piter->second << std::endl;
       }
       
       if (size <= 0)
-	throw std::runtime_error("invalid prefix size: " + boost::lexical_cast<std::string>(size));
+	throw std::runtime_error("invalid suffix size: " + boost::lexical_cast<std::string>(size));
       
-      std::string name = "suffix:" + boost::lexical_cast<std::string>(size);
+      const std::string name = "suffix:" + boost::lexical_cast<std::string>(size);
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end())
