@@ -103,15 +103,10 @@ namespace cicada
     
       using qi::phrase_parse;
       using qi::lexeme;
-      using qi::no_skip;
-      using qi::repeat;
       using qi::hold;
-      using qi::lit;
-      using qi::inf;
       using qi::attr;
       using standard::char_;
       using qi::double_;
-      using qi::_1;
       using standard::space;
       
       lhs    %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);

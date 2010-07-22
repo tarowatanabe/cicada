@@ -210,11 +210,7 @@ namespace cicada
       
       using qi::phrase_parse;
       using qi::lexeme;
-      using qi::omit;
-      using qi::repeat;
       using qi::lit;
-      using qi::eps;
-      using qi::inf;
       using qi::attr;
       using standard::char_;
       using qi::double_;
@@ -445,10 +441,7 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
       
-      using karma::omit;
       using karma::repeat;
-      using karma::lit;
-      using karma::inf;
       using karma::buffer;
       using standard::char_;
       using karma::double_;
@@ -507,10 +500,6 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
       
-      using karma::omit;
-      using karma::repeat;
-      using karma::lit;
-      using karma::inf;
       using standard::char_;
       using karma::double_;
       using karma::int_;

@@ -113,11 +113,11 @@ namespace cicada
 	  compute_bound(phrase.begin(), phrase.end(), prefix, suffix);
 	  
 	  id_type* context = reinterpret_cast<id_type*>(state);
-	  //context[0] = tree_id(edge.rule->lhs, tree_id(prefix, tree_map.root()));
-	  //context[1] = tree_id(edge.rule->lhs, tree_id(suffix, tree_map.root()));
+	  context[0] = tree_id(edge.rule->lhs, tree_id(prefix, tree_map.root()));
+	  context[1] = tree_id(edge.rule->lhs, tree_id(suffix, tree_map.root()));
 	  
-	  context[0] = tree_id(prefix, tree_map.root());
-	  context[1] = tree_id(suffix, tree_map.root());
+	  //context[0] = tree_id(prefix, tree_map.root());
+	  //context[1] = tree_id(suffix, tree_map.root());
 	} else {
 	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
 	  
@@ -146,9 +146,11 @@ namespace cicada
 	      antecedent_index = siter - (siter_begin + 1);
 	    
 	    const id_type* antecedent_context = reinterpret_cast<const id_type*>(states[antecedent_index]);
-
-	    const id_type prefix_antecedent_id = tree_id(*(span.first - 1), antecedent_context[0]);
-	    const id_type suffix_antecedent_id = tree_id(*(span.first - 1), antecedent_context[1]);
+	    
+	    const id_type prefix_antecedent_id = antecedent_context[0];
+	    const id_type suffix_antecedent_id = antecedent_context[1];
+	    //const id_type prefix_antecedent_id = tree_id(*(span.first - 1), antecedent_context[0]);
+	    //const id_type suffix_antecedent_id = tree_id(*(span.first - 1), antecedent_context[1]);
 	    
 	    symbol_type prefix_next;
 	    symbol_type suffix_next;
@@ -178,10 +180,10 @@ namespace cicada
 	  if (tree_map.is_root(suffix_id))
 	    suffix_id = tree_id(vocab_type::EPSILON, tree_map.root());
 	  
-	  //context[0] = tree_id(edge.rule->lhs, prefix_id);
-	  //context[1] = tree_id(edge.rule->lhs, suffix_id);
-	  context[0] = prefix_id;
-	  context[1] = suffix_id;
+	  context[0] = tree_id(edge.rule->lhs, prefix_id);
+	  context[1] = tree_id(edge.rule->lhs, suffix_id);
+	  //context[0] = prefix_id;
+	  //context[1] = suffix_id;
 	}
       }
 
