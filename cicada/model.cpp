@@ -180,7 +180,7 @@ namespace cicada
       
       feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
-      feature_function(state_feature, edge.features, estimates);
+      feature_function(state_feature, edge, edge.features, estimates);
     }
   }
   

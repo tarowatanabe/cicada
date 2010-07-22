@@ -545,6 +545,7 @@ namespace cicada
     }
     
     void Neighbours::operator()(const state_ptr_type& state,
+				const edge_type& edge,
 				feature_set_type& features,
 				feature_set_type& estimates) const
     {
