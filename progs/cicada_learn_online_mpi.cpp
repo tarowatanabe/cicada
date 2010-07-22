@@ -1170,7 +1170,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     if (mpi_rank == 0) {
       {
-	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)));
+	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)), 1024 * 1024);
 	os.precision(20);
 	os << weights_mixed;
       }
@@ -1179,7 +1179,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
 	weights_average = weights_accumulated;
 	weights_average /= norm_accumulated;
 	
-	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"));
+	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"), 1024 * 1024);
 	os.precision(20);
 	os << weights_average;
       }
