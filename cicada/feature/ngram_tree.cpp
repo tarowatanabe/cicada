@@ -194,8 +194,8 @@ namespace cicada
 	const id_type prefix_antecedent_id = antecedent_context[0];
 	const id_type suffix_antecedent_id = antecedent_context[1];
 	
-	apply_feature(features, vocab_type::GOAL, tree_id(vocab_type::BOS, tree_map.root()), prefix_antecedent_id);
-	apply_feature(features, vocab_type::GOAL, suffix_antecedent_id, tree_id(vocab_type::EOS, tree_map.root()));
+	apply_feature(features, edge.rule->lhs, tree_id(vocab_type::BOS, tree_map.root()), prefix_antecedent_id);
+	apply_feature(features, edge.rule->lhs, suffix_antecedent_id, tree_id(vocab_type::EOS, tree_map.root()));
       }
 
       
