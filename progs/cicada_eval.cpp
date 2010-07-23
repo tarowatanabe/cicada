@@ -8,14 +8,21 @@
 #include <string>
 #include <stdexcept>
 
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
 #include "cicada/sentence.hpp"
 #include "cicada/eval.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
-#include "utils/space_separator.hpp"
 
-#include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
@@ -41,6 +48,34 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers);
 
 void options(int argc, char** argv);
 
+
+typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
+typedef std::pair<int, tokens_type> id_tokens_type;
+
+template <typename Iterator>
+struct sentence_parser : boost::spirit::qi::grammar<Iterator, id_tokens_type(), boost::spirit::standard::space_type>
+{
+    
+  sentence_parser() : sentence_parser::base_type(id_tokens)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    namespace phoenix = boost::phoenix;
+    
+    using qi::lexeme;
+    using qi::int_;
+    
+    using standard::char_;
+    using standard::space;
+
+    sentence    %= *lexeme[+(char_ - space) - "|||"];
+    id_tokens %= int_ >> "|||" >> sentence;
+  }
+  
+  boost::spirit::qi::rule<Iterator, tokens_type(), boost::spirit::standard::space_type>    sentence;
+  boost::spirit::qi::rule<Iterator, id_tokens_type(), boost::spirit::standard::space_type> id_tokens;
+};
+
 int main(int argc, char** argv)
 {
   options(argc, argv);
@@ -60,9 +95,8 @@ int main(int argc, char** argv)
     std::vector<bool, std::allocator<bool> > finished(scorers.size(), false);
     score_ptr_type score;
 
-    int id;
-    std::string sep;
-    sentence_type sentence;
+    sentence_parser<std::string::const_iterator> parser;
+    id_tokens_type id_tokens;
 
     if (tstset_files.empty())
       tstset_files.push_back("-");
@@ -73,17 +107,22 @@ int main(int argc, char** argv)
 	throw std::runtime_error("no test set file: " + fiter->file_string());
       
       utils::compress_istream is(*fiter, 1024 * 1024);
-      
-      while (is >> id >> sep >> sentence) {
-	if (sep != "|||") throw std::runtime_error("invalid tstset format...");
+
+      std::string line;
+    
+      while (std::getline(is, line)) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
 	
-	if (id >= finished.size())
-	  throw std::runtime_error("id exceeds our reference set...");
+	id_tokens.second.clear();
       
+	if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_tokens))
+	  continue;
+
+	const int& id = id_tokens.first;
+	const sentence_type sentence(id_tokens.second.begin(), id_tokens.second.end());
+	
 	if (finished[id]) continue;
-	
-	// erase |||
-	sentence.erase(std::find(sentence.begin(), sentence.end(), "|||"), sentence.end());
 	
 	if (! score)
 	  score = scorers[id]->score(sentence);
@@ -115,12 +154,13 @@ int main(int argc, char** argv)
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
 {
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
   if (files.empty())
     throw std::runtime_error("no reference files?");
     
   scorers.clear();
+
+  sentence_parser<std::string::const_iterator> parser;
+  id_tokens_type id_tokens;
 
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
@@ -132,25 +172,24 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
     std::string line;
     
     while (std::getline(is, line)) {
-      tokenizer_type tokenizer(line);
-    
-      tokenizer_type::iterator iter = tokenizer.begin();
-      if (iter == tokenizer.end()) continue;
-    
-      const int id = boost::lexical_cast<int>(*iter);
-      ++ iter;
-    
-      if (iter == tokenizer.end()) continue;
-      if (*iter != "|||") continue;
-      ++ iter;
-    
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+      
+      id_tokens.second.clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_tokens))
+	continue;
+
+      const int& id = id_tokens.first;
+      const tokens_type& tokens = id_tokens.second;
+      
       if (id >= scorers.size())
 	scorers.resize(id + 1);
-    
+      
       if (! scorers[id])
 	scorers[id] = scorers.create();
-    
-      scorers[id]->insert(sentence_type(iter, tokenizer.end()));
+      
+      scorers[id]->insert(sentence_type(tokens.begin(), tokens.end()));
     }
   }  
 }
