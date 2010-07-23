@@ -19,6 +19,7 @@ Translation can be carried out by:
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
+   - Perform variational decoding for hypergraph [10].
    - K-bests sentences are generated from hypergraph [5].
 
 Various learning components are implemented:
@@ -145,4 +146,18 @@ References:
   pages     = {733--736},
   url       = {http://www.aclweb.org/anthology/N10-1112}
 }
+
+[10]
+@InProceedings{li-eisner-khudanpur:2009:ACLIJCNLP,
+  author    = {Li, Zhifei  and  Eisner, Jason  and  Khudanpur, Sanjeev},
+  title     = {Variational Decoding for Statistical Machine Translation},
+  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+  month     = {August},
+  year      = {2009},
+  address   = {Suntec, Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {593--601},
+  url       = {http://www.aclweb.org/anthology/P/P09/P09-1067}
+}
+
 

@@ -64,7 +64,8 @@ namespace cicada
       for (id_type id = 0; id != source.edges.size(); ++ id)
 	posterior_max = std::max(posterior_max, posterior[id]);
       
-      const weight_type cutoff(posterior_max * cicada::semiring::traits<weight_type>::log(- threshold));
+      // 1e-7 for adjusting numerical instability
+      const weight_type cutoff(posterior_max * cicada::semiring::traits<weight_type>::log(- threshold - 1e-7));
       
       removed_type removed(source.edges.size(), false);
       for (id_type id = 0; id != source.edges.size(); ++ id)

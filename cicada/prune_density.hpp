@@ -93,7 +93,8 @@ namespace cicada
       
       std::nth_element(sorted.begin(), sorted.begin() + prune_size, sorted.end(), std::greater<weight_type>());
       
-      const weight_type cutoff = *(sorted.begin() + prune_size);
+      // 1e-7 for adjusting numerical instability
+      const weight_type cutoff = *(sorted.begin() + prune_size) * cicada::semiring::traits<weight_type>::log(- 1e-7);
       
       removed_type removed(source.edges.size(), false);
       for (id_type id = 0; id != source.edges.size(); ++ id)
