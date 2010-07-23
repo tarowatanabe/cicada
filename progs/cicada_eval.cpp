@@ -49,14 +49,13 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers);
 void options(int argc, char** argv);
 
 
-typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
-typedef std::pair<int, tokens_type> id_tokens_type;
+typedef std::pair<int, sentence_type> id_sentence_type;
 
 template <typename Iterator>
-struct sentence_parser : boost::spirit::qi::grammar<Iterator, id_tokens_type(), boost::spirit::standard::space_type>
+struct sentence_parser : boost::spirit::qi::grammar<Iterator, id_sentence_type(), boost::spirit::standard::space_type>
 {
     
-  sentence_parser() : sentence_parser::base_type(id_tokens)
+  sentence_parser() : sentence_parser::base_type(id_sentence)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
@@ -67,13 +66,15 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, id_tokens_type(), 
     
     using standard::char_;
     using standard::space;
-
-    sentence    %= *lexeme[+(char_ - space) - "|||"];
-    id_tokens %= int_ >> "|||" >> sentence;
+    
+    word        %= lexeme[+(char_ - space) - "|||"];
+    sentence    %= *word;
+    id_sentence %= int_ >> "|||" >> sentence;
   }
   
-  boost::spirit::qi::rule<Iterator, tokens_type(), boost::spirit::standard::space_type>    sentence;
-  boost::spirit::qi::rule<Iterator, id_tokens_type(), boost::spirit::standard::space_type> id_tokens;
+  boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>    word;
+  boost::spirit::qi::rule<Iterator, sentence_type(), boost::spirit::standard::space_type>    sentence;
+  boost::spirit::qi::rule<Iterator, id_sentence_type(), boost::spirit::standard::space_type> id_sentence;
 };
 
 int main(int argc, char** argv)
@@ -96,7 +97,7 @@ int main(int argc, char** argv)
     score_ptr_type score;
 
     sentence_parser<std::string::const_iterator> parser;
-    id_tokens_type id_tokens;
+    id_sentence_type id_sentence;
 
     if (tstset_files.empty())
       tstset_files.push_back("-");
@@ -114,13 +115,13 @@ int main(int argc, char** argv)
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end = line.end();
 	
-	id_tokens.second.clear();
+	id_sentence.second.clear();
       
-	if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_tokens))
+	if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_sentence))
 	  continue;
 
-	const int& id = id_tokens.first;
-	const sentence_type sentence(id_tokens.second.begin(), id_tokens.second.end());
+	const int& id = id_sentence.first;
+	const sentence_type& sentence = id_sentence.second;
 	
 	if (finished[id]) continue;
 	
@@ -160,7 +161,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
   scorers.clear();
 
   sentence_parser<std::string::const_iterator> parser;
-  id_tokens_type id_tokens;
+  id_sentence_type id_sentence;
 
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
@@ -175,13 +176,13 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator end = line.end();
       
-      id_tokens.second.clear();
+      id_sentence.second.clear();
       
-      if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_tokens))
+      if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_sentence))
 	continue;
 
-      const int& id = id_tokens.first;
-      const tokens_type& tokens = id_tokens.second;
+      const int& id = id_sentence.first;
+      const sentence_type& sentence = id_sentence.second;
       
       if (id >= scorers.size())
 	scorers.resize(id + 1);
@@ -189,7 +190,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       if (! scorers[id])
 	scorers[id] = scorers.create();
       
-      scorers[id]->insert(sentence_type(tokens.begin(), tokens.end()));
+      scorers[id]->insert(sentence);
     }
   }  
 }
