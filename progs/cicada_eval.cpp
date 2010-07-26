@@ -214,7 +214,6 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("config", po::value<path_type>(), "configuration file")
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   
@@ -227,10 +226,6 @@ void options(int argc, char** argv)
   po::variables_map variables;
 
   po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
-  if (variables.count("config")) {
-    utils::compress_istream is(variables["config"].as<path_type>());
-    po::store(po::parse_config_file(is, desc_config), variables);
-  }
   
   po::notify(variables);
 

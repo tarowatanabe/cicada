@@ -55,9 +55,11 @@ namespace cicada
 
 
     PruneDensity(const function_type& __function,
-		 const double __threshold)
+		 const double __threshold,
+		 const bool __validate=true)
       : function(__function),
-	threshold(__threshold) {}
+	threshold(__threshold),
+	validate(__validate) {}
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -92,36 +94,36 @@ namespace cicada
       posterior_type sorted(posterior);
       
       std::nth_element(sorted.begin(), sorted.begin() + prune_size, sorted.end(), std::greater<weight_type>());
-      
-      // 1e-7 for adjusting numerical instability
-      const weight_type cutoff = sorted[prune_size] * cicada::semiring::traits<weight_type>::log(- 1e-7);
+
+      const weight_type cutoff = sorted[prune_size];
       
       removed_type removed(source.edges.size(), false);
       for (id_type id = 0; id != source.edges.size(); ++ id)
 	removed[id] = (posterior[id] < cutoff);
       
-      topologically_sort(source, target, filter_pruned(removed));
+      topologically_sort(source, target, filter_pruned(removed), validate);
     }
 
     const function_type& function;
     const double threshold;
+    const bool validate;
   };
   
   
   template <typename Function>
   inline
-  void prune_density(const HyperGraph& source, HyperGraph& target, const Function& func, const double threshold)
+  void prune_density(const HyperGraph& source, HyperGraph& target, const Function& func, const double threshold, const bool validate=true)
   {
-    PruneDensity<Function> __prune(func, threshold);
+    PruneDensity<Function> __prune(func, threshold, validate);
     
     __prune(source, target);
   }
   
   template <typename Function>
   inline
-  void prune_density(HyperGraph& source, const Function& func, const double threshold)
+  void prune_density(HyperGraph& source, const Function& func, const double threshold, const bool validate=true)
   {
-    PruneDensity<Function> __prune(func, threshold);
+    PruneDensity<Function> __prune(func, threshold, validate);
 
     HyperGraph target;
     
