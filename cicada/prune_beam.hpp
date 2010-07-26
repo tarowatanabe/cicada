@@ -92,7 +92,7 @@ namespace cicada
   
   template <typename Function>
   inline
-  void prune_beam(HyperGraph& source, const Function& func, const double threshold, const bool validte=true)
+  void prune_beam(HyperGraph& source, const Function& func, const double threshold, const bool validate=true)
   {
     PruneBeam<Function> __prune(func, threshold, validate);
 
