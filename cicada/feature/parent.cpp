@@ -118,9 +118,9 @@ namespace cicada
 	rule += '(';
 	for (/**/; first != last - 1; ++ first)
 	  rule += extractor(*first) + '|';
-	rule += extractor(*first);
+	rule += extractor(*first) + ')';
       }
-      return rule + ')';
+      return rule;
     }
     
     template <typename Iterator, typename Extractor>
@@ -134,9 +134,9 @@ namespace cicada
 	rule += '(';
 	for (/**/; first != last - 1; ++ first)
 	  rule += extractor(first->non_terminal()) + '|';
-	rule += extractor(first->non_terminal());
+	rule += extractor(first->non_terminal()) + ')';
       }
-      return rule + ')';
+      return rule;
     }
 
     
