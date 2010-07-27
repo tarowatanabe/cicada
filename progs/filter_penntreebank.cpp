@@ -192,7 +192,7 @@ path_type output_file = "-";
 
 bool escaped = false;
 bool leaf = false;
-
+bool rule = false;
 
 void options(int argc, char** argv);
 
@@ -241,15 +241,20 @@ int main(int argc, char** argv)
 	  os << '\n';
 	} else
 	  os << '\n';
-	
       } else {
 	graph.clear();
 	
 	transform(parsed, graph);
 
 	graph.topologically_sort();
-	
-	os << graph << '\n';
+
+	if (rule) {
+	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+	  for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
+	    if (eiter->rule)
+	      os << *(eiter->rule) << '\n';
+	} else
+	  os << graph << '\n';
       }
     }
   }
@@ -272,6 +277,7 @@ void options(int argc, char** argv)
     
     ("escape",    po::bool_switch(&escaped), "escape English penntreebank")
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
+    ("rule",      po::bool_switch(&rule),    "collect rules only")
         
     ("help", "help message");
   

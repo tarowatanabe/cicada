@@ -62,6 +62,10 @@ ngram-tree: ngram tree feature\n\
 \tdigits=[perform digits stemming]\n\
 parent: parent feature\n\
 \tyield=[source|target]\n\
+\tcluster=[word class file]\n\
+\tprefix=[prefix stemming size]\n\
+\tsuffix=[suffix stemming size]\n\
+\tdigits=[perform digits stemming]\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 target-word-penalty: target word penalty feature\n\

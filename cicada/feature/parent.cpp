@@ -8,6 +8,9 @@
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie.hpp"
 #include "utils/lexical_cast.hpp"
+#include "cicada/cluster.hpp"
+#include "cicada/stemmer.hpp"
+
 
 #include <boost/tuple/tuple.hpp>
 
@@ -22,6 +25,8 @@ namespace cicada
       typedef cicada::Symbol   symbol_type;
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
+      typedef cicada::Cluster  cluster_type;
+      typedef cicada::Stemmer  stemmer_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -52,7 +57,7 @@ namespace cicada
       typedef string_map_type::index_type id_type;
       
       ParentImpl()
-	: forced_feature(false) {}
+	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), forced_feature(false) {}
 
       virtual ~ParentImpl() {}
       
@@ -68,11 +73,72 @@ namespace cicada
       {
 	string_map.clear();
       }
+
+      cluster_type* cluster;
+      stemmer_type* stemmer_prefix;
+      stemmer_type* stemmer_suffix;
+      stemmer_type* stemmer_digits;
       
       string_map_type string_map;
       
       bool forced_feature;
     };
+
+    struct __extractor_none
+    {
+      template <typename Word>
+      std::string operator()(const Word& word) const
+      {
+	return word;
+      }
+    };
+
+    template <typename Extract>
+    struct __extractor
+    {
+      __extractor(const Extract& __extract) : extract(__extract) {}
+      
+      const Extract& extract;
+      
+      template <typename Word>
+      std::string operator()(const Word& word) const
+      {
+	return extract[word];
+      }
+    };
+    
+    template <typename Iterator, typename Extractor>
+    std::string extract_phrase_rule(const std::string& lhs,
+				    Iterator first, Iterator last,
+				    Extractor extractor)
+    {
+      std::string rule = lhs;
+      
+      if (last != first) {
+	rule += '(';
+	for (/**/; first != last - 1; ++ first)
+	  rule += extractor(*first) + '|';
+	rule += extractor(*first);
+      }
+      return rule + ')';
+    }
+    
+    template <typename Iterator, typename Extractor>
+    std::string extract_rule(const std::string& lhs,
+			     Iterator first, Iterator last,
+			     Extractor extractor)
+    {
+      std::string rule = lhs;
+      
+      if (last != first) {
+	rule += '(';
+	for (/**/; first != last - 1; ++ first)
+	  rule += extractor(first->non_terminal()) + '|';
+	rule += extractor(first->non_terminal());
+      }
+      return rule + ')';
+    }
+
     
     template <typename Extract>
     class __ParentImpl : public ParentImpl, public Extract
@@ -88,23 +154,45 @@ namespace cicada
 	const rule_type::symbol_set_type& phrase = extract_phrase(edge);
 	
 	if (states.empty()) {
-	  std::string rule_string = edge.rule->lhs;
-	  if (! phrase.empty()) {
-	    rule_string += '(';
-	    phrase_type::const_iterator piter_end = phrase.end();
-	    for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end - 1; ++ piter)
-	      rule_string += static_cast<const std::string&>(*piter) + '|';
-	    rule_string += static_cast<const std::string&>(*(piter_end - 1)) + ')';
-	  }
+	  const std::string rule_string  = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());
+	  
+	  std::string rule_cluster = rule_string;
+	  std::string rule_prefix  = rule_string;
+	  std::string rule_suffix  = rule_string;
+	  std::string rule_digits  = rule_string;
+	  
+	  if (cluster)
+	    rule_cluster += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<cluster_type>(*cluster));
+	  if (stemmer_prefix)
+	    rule_prefix += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_prefix));
+	  if (stemmer_suffix)
+	    rule_suffix += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_suffix));
+	  if (stemmer_digits)
+	    rule_digits += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_digits));
+	  
+	  const id_type id_string  = rule_id(rule_string);
+	  const id_type id_cluster = (cluster         ? rule_id(rule_cluster) : id_string);
+	  const id_type id_prefix  = (stemmer_prefix  ? rule_id(rule_prefix)  : id_string);
+	  const id_type id_suffix  = (stemmer_suffix  ? rule_id(rule_suffix)  : id_string);
+	  const id_type id_digits  = (stemmer_digits  ? rule_id(rule_digits)  : id_string);
 	  
 	  apply_feature(features, rule_string);
-	  
-	  string_map_type::iterator iter = const_cast<string_map_type&>(string_map).insert(rule_string).first;
-	  
-	  *reinterpret_cast<id_type*>(state) = iter - string_map.begin();
+	  if (id_cluster != id_string)
+	    apply_feature(features, rule_cluster);
+	  if (id_prefix != id_string)
+	    apply_feature(features, rule_prefix);
+	  if (id_suffix != id_string)
+	    apply_feature(features, rule_suffix);
+	  if (id_digits != id_string)
+	    apply_feature(features, rule_digits);
+
+	  id_type* context = reinterpret_cast<id_type*>(state);
+	  context[0] = id_string;
+	  context[1] = id_cluster;
+	  context[1] = id_prefix;
+	  context[1] = id_suffix;
+	  context[1] = id_digits;
 	} else {
-	  std::string rule_string;
-	  
 	  int pos_non_terminal = 0;
 	  phrase_type::const_iterator piter_end = phrase.end();
 	  for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
@@ -113,32 +201,67 @@ namespace cicada
 	      if (antecedent_index < 0)
 		antecedent_index = pos_non_terminal;
 	      
-	       const id_type* antecedent = reinterpret_cast<const id_type*>(states[antecedent_index]);
+	      const id_type* antecedent_context = reinterpret_cast<const id_type*>(states[antecedent_index]);
 	      
-	      apply_feature(features, edge.rule->lhs, string_map[*antecedent]);
-	      
-	      if (rule_string.empty())
-		rule_string += static_cast<const std::string&>(piter->non_terminal());
-	      else
-		rule_string += '|' + static_cast<const std::string&>(piter->non_terminal());
-	      
-	      ++ pos_non_terminal;
-	    } else {
-	      if (rule_string.empty())
-		rule_string += static_cast<const std::string&>(*piter);
-	      else
-		rule_string += '|' + static_cast<const std::string&>(*piter);
+	      apply_feature(features, edge.rule->lhs, string_map[antecedent_context[0]]);
+	      if (antecedent_context[1] != antecedent_context[0])
+		apply_feature(features, edge.rule->lhs, string_map[antecedent_context[1]]);
+	      if (antecedent_context[2] != antecedent_context[0])
+		apply_feature(features, edge.rule->lhs, string_map[antecedent_context[2]]);
+	      if (antecedent_context[3] != antecedent_context[0])
+		apply_feature(features, edge.rule->lhs, string_map[antecedent_context[3]]);
+	      if (antecedent_context[4] != antecedent_context[0])
+		apply_feature(features, edge.rule->lhs, string_map[antecedent_context[4]]);
 	    }
 	  
-	  rule_string = static_cast<const std::string&>(edge.rule->lhs) + '(' + rule_string + ')';
+	  const std::string rule_string  = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());
+	  
+	  std::string rule_cluster = rule_string;
+	  std::string rule_prefix  = rule_string;
+	  std::string rule_suffix  = rule_string;
+	  std::string rule_digits  = rule_string;
+	  
+	  if (cluster)
+	    rule_cluster += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<cluster_type>(*cluster));
+	  if (stemmer_prefix)
+	    rule_prefix += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_prefix));
+	  if (stemmer_suffix)
+	    rule_suffix += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_suffix));
+	  if (stemmer_digits)
+	    rule_digits += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_digits));
+	  
+	  const id_type id_string  = rule_id(rule_string);
+	  const id_type id_cluster = (cluster         ? rule_id(rule_cluster) : id_string);
+	  const id_type id_prefix  = (stemmer_prefix  ? rule_id(rule_prefix)  : id_string);
+	  const id_type id_suffix  = (stemmer_suffix  ? rule_id(rule_suffix)  : id_string);
+	  const id_type id_digits  = (stemmer_digits  ? rule_id(rule_digits)  : id_string);
 	  
 	  apply_feature(features, rule_string);
-	  
-	  string_map_type::iterator iter = const_cast<string_map_type&>(string_map).insert(rule_string).first;
-	  
-	  *reinterpret_cast<id_type*>(state) = iter - string_map.begin();
+	  if (id_cluster != id_string)
+	    apply_feature(features, rule_cluster);
+	  if (id_prefix != id_string)
+	    apply_feature(features, rule_prefix);
+	  if (id_suffix != id_string)
+	    apply_feature(features, rule_suffix);
+	  if (id_digits != id_string)
+	    apply_feature(features, rule_digits);
+
+	  id_type* context = reinterpret_cast<id_type*>(state);
+	  context[0] = id_string;
+	  context[1] = id_cluster;
+	  context[1] = id_prefix;
+	  context[1] = id_suffix;
+	  context[1] = id_digits;
 	}
       }
+
+      id_type rule_id(const std::string& rule) const
+      {
+	string_map_type::iterator iter = const_cast<string_map_type&>(string_map).insert(rule).first;
+	
+	return iter - string_map.begin();
+      }
+      
       
       virtual void parent_final_score(const state_ptr_type& state,
 				      const edge_type& edge,
@@ -219,6 +342,11 @@ namespace cicada
       bool source = false;
       bool target = false;
       
+      int stemmer_prefix_size = 0;
+      int stemmer_suffix_size = 0;
+      bool stemmer_digits = false;
+      
+      boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
@@ -230,7 +358,15 @@ namespace cicada
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else
+	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	  cluster_path = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
+	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "suffix") == 0)
+	  stemmer_suffix_size = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "digits") == 0)
+	  stemmer_digits = utils::lexical_cast<bool>(piter->second);
+	else
 	  std::cerr << "WARNING: unsupported parameter for parent: " << piter->first << "=" << piter->second << std::endl;
       }
       
@@ -238,14 +374,35 @@ namespace cicada
 	throw std::runtime_error("both source and target?");
       if (! source && ! target)
 	throw std::runtime_error("what side are you going to use?");
+      
+      if (stemmer_prefix_size < 0)
+	throw std::runtime_error("negative prefix size?");
+      if (stemmer_suffix_size < 0)
+	throw std::runtime_error("negative suffix size?");
 
       std::auto_ptr<impl_type> parent_impl(source
 					   ? dynamic_cast<impl_type*>(new __ParentImpl<__parent_extract_source>())
 					   : dynamic_cast<impl_type*>(new __ParentImpl<__parent_extract_target>()));
       
       
-      // parent conext + terminal-boundary + span-size
-      base_type::__state_size = sizeof(impl_type::id_type) + sizeof(symbol_type) * 2 + sizeof(int);
+      if (! cluster_path.empty()) {
+	if (! boost::filesystem::exists(cluster_path))
+	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
+	
+	parent_impl->cluster = &cicada::Cluster::create(cluster_path);
+      }
+      
+      if (stemmer_prefix_size > 0)
+	parent_impl->stemmer_prefix = &cicada::Stemmer::create("prefix:size=" + boost::lexical_cast<std::string>(stemmer_prefix_size));
+      
+      if (stemmer_suffix_size > 0)
+	parent_impl->stemmer_suffix = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_size));
+
+      if (stemmer_digits)
+	parent_impl->stemmer_digits = &cicada::Stemmer::create("digits");
+      
+      // parent conext (surface, cluster, prefix, suffix, digits)
+      base_type::__state_size = sizeof(impl_type::id_type) * 5;
       base_type::__feature_name = std::string("parent-") + (source ? "source" : "target");
       base_type::__sparse_feature = true;
       
