@@ -78,7 +78,7 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
       NGramImpl(const path_type& __path, const int __order)
-	: ngram(__path), order(__order)
+	: ngram(__path), order(__order), yield_source(false)
       {
 	order = utils::bithack::min(order, ngram.index.order());
 	
@@ -89,7 +89,7 @@ namespace cicada
       }
 
       NGramImpl(const NGramImpl& x)
-	: ngram(x.ngram), order(x.order)
+	: ngram(x.ngram), order(x.order), yield_source(x.yield_source)
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -101,6 +101,7 @@ namespace cicada
       {
 	ngram = x.ngram;
 	order = x.order;
+	yield_source = x.yield_source;
 	
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -202,7 +203,7 @@ namespace cicada
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
-	const phrase_type& target = rule.target;
+	const phrase_type& target = (yield_source ? rule.source : rule.target);
 	
 	phrase_type::const_iterator titer_begin = target.begin();
 	phrase_type::const_iterator titer_end   = target.end();
@@ -255,13 +256,14 @@ namespace cicada
 	
 	buffer_type::const_iterator biter_first = buffer.begin();
 	
+	phrase_span_set_type::const_iterator siter_begin = phrase_spans.begin();
 	phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
-	for (phrase_span_set_type::const_iterator siter = phrase_spans.begin() + 1; siter != siter_end; ++ siter) {
+	for (phrase_span_set_type::const_iterator siter = siter_begin + 1; siter != siter_end; ++ siter) {
 	  const phrase_span_type& span = *siter;
 	  
-	  const int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
+	  int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
 	  if (antecedent_index < 0)
-	    throw std::runtime_error("this is a non-terminal, but no index!");
+	    antecedent_index = siter - (siter_begin + 1);
 	  
 	  const symbol_type* context = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
 	  const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
@@ -402,6 +404,9 @@ namespace cicada
       // ngrams
       ngram_type     ngram;
       int            order;
+      
+      // yield
+      bool yield_source;
     };
     
     
@@ -417,6 +422,8 @@ namespace cicada
 
       path_type   path;
       int         order = 3;
+      bool        yield_source = false;
+      bool        yield_target = false;
       std::string name;
 
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -426,7 +433,16 @@ namespace cicada
 	  order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	  name = piter->second;
-	else
+	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	  const std::string& yield = piter->second;
+	  
+	  if (strcasecmp(yield.c_str(), "source") == 0)
+	    yield_source = true;
+	  else if (strcasecmp(yield.c_str(), "target") == 0)
+	    yield_target = true;
+	  else
+	    throw std::runtime_error("unknown parameter: " + parameter);
+	} else
 	  std::cerr << "WARNING: unsupported parameter for ngram: " << piter->first << "=" << piter->second << std::endl;
       }
       
@@ -435,8 +451,14 @@ namespace cicada
       
       if (order <= 0)
 	throw std::runtime_error("invalid ngram order: " + boost::lexical_cast<std::string>(order));
+
+      if (yield_source && yield_target)
+	throw std::runtime_error("you cannot specify both source/target yield");
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
+      
+      // set up yield..
+      ngram_impl->yield_source = yield_source;
       
       // two contexts (order - 1) for each edge, with two separator..
       base_type::__state_size = sizeof(symbol_type) * ngram_impl->order * 2;

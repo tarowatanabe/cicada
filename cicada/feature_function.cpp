@@ -10,6 +10,7 @@
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
 #include "feature/ngram_tree.hpp"
+#include "feature/parent.hpp"
 #include "feature/penalty.hpp"
 #include "feature/variational.hpp"
 
@@ -49,8 +50,9 @@ neighbours: neighbour words feature\n\
 \tsuffix=[suffix stemming size]\n\
 \tdigits=[perform digits stemming]\n\
 ngram: ngram language model\n\
-\tfile=<file>,\n\
-\torder=<order>,\n\
+\tfile=<file>\n\
+\torder=<order>\n\
+\tyiled=[source|target yield (default target)]\n\
 \tname=feature-name(default: ngram)\n\
 ngram-tree: ngram tree feature\n\
 \tyield=[source|target]\n\
@@ -58,6 +60,8 @@ ngram-tree: ngram tree feature\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
 \tdigits=[perform digits stemming]\n\
+parent: parent feature\n\
+\tyield=[source|target]\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 target-word-penalty: target word penalty feature\n\
@@ -81,6 +85,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::NGramTree(parameter));
     else if (param.name() == "antecedent")
       return feature_function_ptr_type(new feature::Antecedent(parameter));
+    else if (param.name() == "parent")
+      return feature_function_ptr_type(new feature::Parent(parameter));
     else if (param.name() == "boundary")
       return feature_function_ptr_type(new feature::Boundary(parameter));
     else if (param.name() == "bleu")

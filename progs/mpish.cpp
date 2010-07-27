@@ -159,7 +159,7 @@ int main(int argc, char** argv)
 	      
 	      found = true;
 	    }
-
+	  
 	  if (queue.empty() && std::getline(is, command)) {
 	    boost::algorithm::trim(command);
 	    

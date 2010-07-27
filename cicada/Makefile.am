@@ -50,6 +50,7 @@ feature/boundary.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
 feature/ngram_tree.hpp \
+feature/parent.hpp \
 feature/penalty.hpp \
 feature/variational.hpp
 
@@ -61,6 +62,7 @@ feature/boundary.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \
 feature/ngram_tree.cpp \
+feature/parent.cpp \
 feature/variational.cpp
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
