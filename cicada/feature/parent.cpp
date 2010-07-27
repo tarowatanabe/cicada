@@ -162,13 +162,13 @@ namespace cicada
 	  std::string rule_digits  = rule_string;
 	  
 	  if (cluster)
-	    rule_cluster += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<cluster_type>(*cluster));
+	    rule_cluster = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<cluster_type>(*cluster));
 	  if (stemmer_prefix)
-	    rule_prefix += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_prefix));
+	    rule_prefix = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_prefix));
 	  if (stemmer_suffix)
-	    rule_suffix += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_suffix));
+	    rule_suffix = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_suffix));
 	  if (stemmer_digits)
-	    rule_digits += extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_digits));
+	    rule_digits = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_digits));
 	  
 	  const id_type id_string  = rule_id(rule_string);
 	  const id_type id_cluster = (cluster         ? rule_id(rule_cluster) : id_string);
@@ -222,13 +222,13 @@ namespace cicada
 	  std::string rule_digits  = rule_string;
 	  
 	  if (cluster)
-	    rule_cluster += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<cluster_type>(*cluster));
+	    rule_cluster = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<cluster_type>(*cluster));
 	  if (stemmer_prefix)
-	    rule_prefix += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_prefix));
+	    rule_prefix = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_prefix));
 	  if (stemmer_suffix)
-	    rule_suffix += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_suffix));
+	    rule_suffix = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_suffix));
 	  if (stemmer_digits)
-	    rule_digits += extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_digits));
+	    rule_digits = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<stemmer_type>(*stemmer_digits));
 	  
 	  const id_type id_string  = rule_id(rule_string);
 	  const id_type id_cluster = (cluster         ? rule_id(rule_cluster) : id_string);
