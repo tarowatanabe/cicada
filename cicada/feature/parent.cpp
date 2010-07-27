@@ -189,9 +189,9 @@ namespace cicada
 	  id_type* context = reinterpret_cast<id_type*>(state);
 	  context[0] = id_string;
 	  context[1] = id_cluster;
-	  context[1] = id_prefix;
-	  context[1] = id_suffix;
-	  context[1] = id_digits;
+	  context[2] = id_prefix;
+	  context[3] = id_suffix;
+	  context[4] = id_digits;
 	} else {
 	  int pos_non_terminal = 0;
 	  phrase_type::const_iterator piter_end = phrase.end();
@@ -249,9 +249,9 @@ namespace cicada
 	  id_type* context = reinterpret_cast<id_type*>(state);
 	  context[0] = id_string;
 	  context[1] = id_cluster;
-	  context[1] = id_prefix;
-	  context[1] = id_suffix;
-	  context[1] = id_digits;
+	  context[2] = id_prefix;
+	  context[3] = id_suffix;
+	  context[4] = id_digits;
 	}
       }
 
