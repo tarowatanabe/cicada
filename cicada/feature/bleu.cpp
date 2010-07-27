@@ -185,13 +185,14 @@ namespace cicada
 
 	  buffer_type::const_iterator biter_first = buffer.begin();
 	  
+	  phrase_span_set_type::const_iterator siter_begin = phrase_spans.begin();
 	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
-	  for (phrase_span_set_type::const_iterator siter = phrase_spans.begin() + 1; siter != siter_end; ++ siter) {
+	  for (phrase_span_set_type::const_iterator siter = siter_begin + 1; siter != siter_end; ++ siter) {
 	    const phrase_span_type& span = *siter;
 	    
-	    const int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
+	    int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
 	    if (antecedent_index < 0)
-	      throw std::runtime_error("this is a non-terminal, but no index!");
+	      antecedent_index = siter - (siter_begin + 1);
 	    
 	    const symbol_type* antecedent_first = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
 	    const symbol_type* antecedent_last  = antecedent_first + order * 2;
