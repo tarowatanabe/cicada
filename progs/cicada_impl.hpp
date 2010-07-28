@@ -41,6 +41,7 @@
 #include "cicada/feature_function.hpp"
 #include "cicada/weight_vector.hpp"
 #include "cicada/semiring.hpp"
+#include "cicada/span_vector.hpp"
 
 #include "cicada/feature/variational.hpp"
 #include "cicada/feature/bleu.hpp"
@@ -70,6 +71,8 @@ typedef feature_function_type::feature_function_ptr_type feature_function_ptr_ty
 typedef rule_type::feature_set_type    feature_set_type;
 typedef feature_set_type::feature_type feature_type;
 typedef cicada::WeightVector<double>   weight_set_type;
+
+typedef cicada::SpanVector span_set_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 
@@ -524,7 +527,7 @@ public:
   Operation() {}
   virtual ~Operation() {}
   
-  virtual void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& graph) const = 0;
+  virtual void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& graph) const = 0;
 
   virtual void assign(const weight_set_type& weights) {}
 
@@ -618,7 +621,7 @@ public:
   }
   
   
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type binarized;
     
@@ -708,7 +711,7 @@ public:
   };
 
   
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type permuted;
     
@@ -766,7 +769,7 @@ public:
       debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type composed;
     
@@ -827,7 +830,7 @@ public:
       debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type composed;
     
@@ -906,18 +909,24 @@ public:
   }
 
   
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type applied;
-
+    
+    // assignment...
+    const_cast<model_type&>(model).assign(hypergraph);
+    const_cast<model_type&>(model).assign(lattice);
+    const_cast<model_type&>(model).assign(spans);
+    
     if (debug)
       std::cerr << "apply features" << std::endl;
     
     utils::resource start;
-
+    
     weight_set_type weights_zero;
     const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
-
+    
+    // apply...
     if (model.is_stateless())
       cicada::apply_state_less(model, hypergraph, applied);
     else if (exact)
@@ -998,7 +1007,7 @@ public:
       throw std::runtime_error("you have no bleu feature function");
   }
 
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     int source_length = lattice.shortest_distance();
     if (hypergraph.is_valid()) {
@@ -1024,7 +1033,7 @@ public:
     
     model_type model;
     model.push_back(feature);
-
+        
     weight_set_type weights_zero;
     const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
     
@@ -1046,6 +1055,8 @@ public:
     }
     
     utils::resource end;
+
+    __bleu->clear();
 	
     if (debug)
       std::cerr << "bleu cpu time: " << (end.cpu_time() - start.cpu_time())
@@ -1116,7 +1127,7 @@ public:
       throw std::runtime_error("you have no variational feature function");
   }
     
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type variational;
 
@@ -1144,11 +1155,13 @@ public:
     
     model_type model;
     model.push_back(feature);
-    
+        
     // second, apply again...
     cicada::apply_exact(model, hypergraph, variational);
     
     utils::resource end;
+
+    __variational->clear();
 
     if (debug)
       std::cerr << "variational cpu time: " << (end.cpu_time() - start.cpu_time())
@@ -1236,7 +1249,7 @@ public:
       throw std::runtime_error("you have weights, but specified all-one parameter");
   }
 
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type pruned;
 
@@ -1321,7 +1334,7 @@ public:
   Intersect(const int __debug)
     : debug(__debug) {}
 
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     if (targets.empty())
       throw std::runtime_error("no target?");
@@ -1419,7 +1432,7 @@ public:
     weights = &__weights;
   }
   
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     if (! hypergraph.is_valid()) return;
     
@@ -1568,7 +1581,7 @@ public:
       *os << std::flush;
   }
   
-  void operator()(const lattice_type& lattice, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     if (! hypergraph.is_valid()) return;
 
@@ -1662,6 +1675,7 @@ public:
 	       const bool __input_id,
 	       const bool __input_lattice,
 	       const bool __input_forest,
+	       const bool __input_span,
 	       const bool __input_bitext,
 	       const bool __input_mpi,
 	       const int debug)
@@ -1669,6 +1683,7 @@ public:
       input_id(__input_id),
       input_lattice(__input_lattice),
       input_forest(__input_forest),
+      input_span(__input_span),
       input_bitext(__input_bitext),
       input_mpi(__input_mpi)
   {
@@ -1807,6 +1822,16 @@ output: kbest or hypergraph output\n\
       lattice = lattice_type(sentence);
     }
     
+    if (input_span) {
+      spans.clear();
+      
+      if (! parse_separator(iter, end))
+	throw std::runtime_error("invalid span format (separator)");
+      
+      if (! spans.assign(iter, end))
+	throw std::runtime_error("invalid span format");
+    }
+    
     if (input_bitext) {
       targets.clear();
       
@@ -1829,13 +1854,14 @@ output: kbest or hypergraph output\n\
     } else {
       operation_ptr_set_type::const_iterator oiter_end = operations.end();
       for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
-	(*oiter)->operator()(lattice, targets, hypergraph);
+	(*oiter)->operator()(lattice, spans, targets, hypergraph);
     }
   }
   
   bool input_id;
   bool input_lattice;
   bool input_forest;
+  bool input_span;
   bool input_bitext;
   bool input_mpi;
   
@@ -1849,6 +1875,7 @@ output: kbest or hypergraph output\n\
   size_t id;
   
   lattice_type      lattice;
+  span_set_type     spans;
   sentence_set_type targets;
   hypergraph_type   hypergraph;
 

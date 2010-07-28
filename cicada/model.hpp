@@ -8,6 +8,8 @@
 
 #include <cicada/feature_function.hpp>
 #include <cicada/hypergraph.hpp>
+#include <cicada/lattice.hpp>
+#include <cicada/span_vector.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -26,6 +28,8 @@ namespace cicada
     typedef cicada::Symbol     symbol_type;
     typedef cicada::Feature    feature_type;
     typedef cicada::HyperGraph hypergraph_type;
+    typedef cicada::Lattice    lattice_type;
+    typedef cicada::SpanVector span_set_type;
     
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
@@ -168,7 +172,28 @@ namespace cicada
       for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
 	(*iter)->apply_feature() = mode;
     }
-
+    
+    void assign(const hypergraph_type& hypergraph)
+    {
+      model_set_type::iterator iter_end = models.end();
+      for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
+	(*iter)->assign(hypergraph);
+    }
+    
+    void assign(const lattice_type& lattice)
+    {
+      model_set_type::iterator iter_end = models.end();
+      for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
+	(*iter)->assign(lattice);
+    }
+    
+    void assign(const span_set_type& spans)
+    {
+      model_set_type::iterator iter_end = models.end();
+      for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
+	(*iter)->assign(spans);
+    }
+    
     Model clone() const
     {
       Model __model(*this);

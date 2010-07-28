@@ -212,6 +212,8 @@ namespace cicada
 		apply_feature(features, edge.rule->lhs, string_map[antecedent_context[3]]);
 	      if (antecedent_context[4] != antecedent_context[0])
 		apply_feature(features, edge.rule->lhs, string_map[antecedent_context[4]]);
+
+	      ++ pos_non_terminal;
 	    }
 	  
 	  const std::string rule_string  = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());

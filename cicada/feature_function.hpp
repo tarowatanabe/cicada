@@ -11,8 +11,10 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/hypergraph.hpp>
+#include <cicada/lattice.hpp>
 #include <cicada/feature_vector.hpp>
 #include <cicada/feature.hpp>
+#include <cicada/span_vector.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -28,6 +30,8 @@ namespace cicada
     typedef cicada::Vocab      vocab_type;
     typedef cicada::Feature    feature_type;
     typedef cicada::HyperGraph hypergraph_type;
+    typedef cicada::SpanVector span_set_type;
+    typedef cicada::Lattice    lattice_type;
     typedef cicada::Rule       rule_type;
     
     typedef hypergraph_type::node_type node_type;
@@ -67,8 +71,13 @@ namespace cicada
 			    feature_set_type& estimates) const = 0;
     
     virtual feature_function_ptr_type clone() const = 0;
-
+    
     virtual void initialize() {}
+    
+    virtual void assign(const hypergraph_type& hypergraph) {}
+    virtual void assign(const lattice_type& lattice) {}
+    virtual void assign(const span_set_type& spans) {}
+    
     
     size_type state_size() const { return __state_size; }
     const feature_type& feature_name() const { return __feature_name; }
@@ -76,7 +85,7 @@ namespace cicada
     
     bool& apply_feature() { return __apply_feature; }
     bool  apply_feature() const { return __apply_feature; }
-
+    
   protected:
     size_type    __state_size;
     feature_type __feature_name;

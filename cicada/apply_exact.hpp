@@ -107,6 +107,7 @@ namespace cicada
 	    tails[i] = node_map[edge.tails[i]][j[i]];
 	  
 	  edge_type& edge_new = graph_out.add_edge(tails.begin(), tails.end());
+	  edge_new.head = v;
 	  edge_new.rule = edge.rule;
 	  edge_new.features = edge.features;
 
