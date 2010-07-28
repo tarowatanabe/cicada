@@ -115,6 +115,7 @@ semiring.hpp \
 sentence.hpp \
 sort.hpp \
 span.hpp \
+span_vector.hpp \
 stemmer.hpp \
 symbol.hpp \
 symbol_vector.hpp \
@@ -138,6 +139,7 @@ model.cpp \
 parameter.cpp \
 rule.cpp \
 sentence.cpp \
+span_vector.cpp \
 stemmer.cpp \
 symbol.cpp \
 symbol_vector.cpp \
@@ -172,6 +174,7 @@ lattice_main \
 parameter_main \
 rule_main \
 sentence_main \
+span_vector_main \
 stemmer_main \
 symbol_main
 
@@ -198,6 +201,9 @@ rule_main_LDADD = libcicada.la
 
 sentence_main_SOURCES = sentence_main.cpp
 sentence_main_LDADD = libcicada.la
+
+span_vector_main_SOURCES = span_vector_main.cpp
+span_vector_main_LDADD = libcicada.la
 
 stemmer_main_SOURCES = stemmer_main.cpp
 stemmer_main_LDADD = libcicada.la
