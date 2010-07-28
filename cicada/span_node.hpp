@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__SPAN__HPP__
-#define __CICADA__SPAN__HPP__ 1
+#ifndef __CICADA__SPAN_NODE__HPP__
+#define __CICADA__SPAN_NODE__HPP__ 1
 
 #include <stdint.h>
 
@@ -17,7 +17,7 @@
 namespace cicada
 {
   
-  struct NodeSpan
+  struct SpanNode
   {
     typedef HyperGraph hypergraph_type;
     
@@ -76,13 +76,13 @@ namespace cicada
       }
     }
   };
-
+  
   template <typename SpanSet>
-  void node_span(const HyperGraph& graph, SpanSet& spans)
+  void span_node(const HyperGraph& graph, SpanSet& spans)
   {
-    NodeSpan __node_span;
+    SpanNode __span_node;
     
-    __node_span(graph, spans);
+    __span_node(graph, spans);
   }
 };
 

@@ -19,7 +19,6 @@
 #include "cicada/weight_vector.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/viterbi.hpp"
-#include "cicada/span.hpp"
 
 #include "cicada/apply.hpp"
 #include "cicada/model.hpp"

@@ -114,7 +114,8 @@ rule.hpp \
 semiring.hpp \
 sentence.hpp \
 sort.hpp \
-span.hpp \
+span_node.hpp \
+span_edge.hpp \
 span_vector.hpp \
 stemmer.hpp \
 symbol.hpp \
