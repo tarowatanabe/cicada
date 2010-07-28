@@ -12,6 +12,7 @@
 #include "feature/ngram_tree.hpp"
 #include "feature/parent.hpp"
 #include "feature/penalty.hpp"
+#include "feature/span.hpp"
 #include "feature/variational.hpp"
 
 
@@ -67,6 +68,7 @@ parent: parent feature\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
 \tdigits=[perform digits stemming]\n\
+span: lexical span feature\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 target-word-penalty: target word penalty feature\n\
@@ -98,6 +100,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::Bleu(parameter));
     else if (param.name() == "bleu-linear")
       return feature_function_ptr_type(new feature::BleuLinear(parameter));
+    else if (param.name() == "span")
+      return feature_function_ptr_type(new feature::Span(parameter));
     else if (param.name() == "variational")
       return feature_function_ptr_type(new feature::Variational(parameter));
     else if (param.name() == "target-word-penalty")
