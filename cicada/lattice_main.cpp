@@ -12,4 +12,9 @@ int main(int argc, char** argv)
   std::cout << "lattice size: " << lattice.size() << std::endl;
 
   std::cout << lattice << std::endl;
+
+
+  lattice_type input;
+  while (std::cin >> input)
+    std::cout << input << std::endl;
 }
