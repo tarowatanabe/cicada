@@ -144,7 +144,7 @@ namespace cicada
       typedef std::vector<int, std::allocator<int> > size_set_type;
 
     public:
-      BleuScorer(int __order = 4) : order(__order) {}
+      BleuScorer(int __order = 4, bool __split=false) : Scorer(__split), order(__order) {}
 
       bool error_metric() const { return false; }
 
@@ -154,13 +154,17 @@ namespace cicada
 	sizes.clear();
       }
       
-      void insert(const sentence_type& sentence)
+      void insert(const sentence_type& __sentence)
       {
 	typedef ngram_set_type::id_type id_type;
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
-	
+
+	sentence_type sentence_split;
+	if (split)
+	  split_non_ascii_characters(__sentence, sentence_split);
+	const sentence_type& sentence = (split ? sentence_split : __sentence);
+
 	counts_type counts;
-	
 	
 	sentence_type::const_iterator siter_end = sentence.end();
 	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
@@ -181,13 +185,17 @@ namespace cicada
 	std::sort(sizes.begin(), sizes.end());
       }
 
-      score_ptr_type score(const sentence_type& sentence) const
+      score_ptr_type score(const sentence_type& __sentence) const
       {
 	typedef ngram_set_type::id_type id_type;
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
 	
 	typedef std::vector<counts_type, std::allocator<counts_type> > counts_set_type;
 	
+	sentence_type sentence_split;
+	if (split)
+	  split_non_ascii_characters(__sentence, sentence_split);
+	const sentence_type& sentence = (split ? sentence_split : __sentence);
 	
 	std::auto_ptr<Bleu> bleu(new Bleu(order));
 	counts_set_type counts(order);
@@ -243,6 +251,7 @@ namespace cicada
     private:
       ngram_set_type ngrams;
       size_set_type  sizes;
+      
       int            order;
     };
   };

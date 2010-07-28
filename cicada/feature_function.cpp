@@ -30,6 +30,7 @@ antecedent: antecedent feature\n\
 bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
+\tsplit=[true|false] split non-ascii chars\n\
 bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
 \tprecision=<default 0.8>,\n\

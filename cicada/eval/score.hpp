@@ -89,6 +89,7 @@ namespace cicada
       typedef boost::shared_ptr<scorer_type> scorer_ptr_type;
       
     public:
+      Scorer(bool __split=false) : split(__split) {}
       virtual ~Scorer() {}
       
       // insert a sentence for scoring
@@ -99,6 +100,11 @@ namespace cicada
       
       static std::string lists();
       static scorer_ptr_type create(const std::string& parameter);
+      
+      void split_non_ascii_characters(const sentence_type& sentence, sentence_type& sentence_split) const;
+      
+    protected:
+      bool split;
     };    
     
     class ScorerDocument

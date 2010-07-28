@@ -14,6 +14,11 @@
 
 #include <boost/numeric/conversion/bounds.hpp>
 
+#include <unicode/uchar.h>
+#include <unicode/unistr.h>
+#include <unicode/schriter.h>
+#include <unicode/bytestream.h>
+
 namespace cicada
 {
   namespace feature
@@ -83,8 +88,48 @@ namespace cicada
 
     public:
       BleuImpl(const int __order,
-	       const bool __exact)
-	: order(__order), exact(__exact) {}
+	       const bool __exact,
+	       const bool __split)
+	: order(__order), exact(__exact), split(__split) {}
+      
+      template <typename Sentence>
+      void split_non_ascii_characters(const Sentence& phrase, Sentence& result) const
+      {
+	std::vector<word_type, std::allocator<word_type> > tokens;
+	std::string buffer;
+	
+	typename Sentence::const_iterator piter_end = phrase.end();
+	for (typename Sentence::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
+	  
+	  UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*piter));
+	  
+	  StringCharacterIterator iter(uword);
+	  for (iter.setToStart(); iter.hasNext(); /**/) {
+	    const UChar32 c = iter.next32PostInc();
+	    
+	    if (c < 128)
+	      buffer.push_back(c);
+	    else {
+	      // we will split...
+	      if (! buffer.empty())
+		tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	      buffer.clear();
+	      
+	      StringByteSink<std::string> __sink(&buffer);
+	      UnicodeString(c).toUTF8(__sink);
+	      
+	      tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	      buffer.clear();
+	    }
+	  }
+	  
+	  if (! buffer.empty())
+	    tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	  buffer.clear();
+	}
+	
+	result.assign(tokens.begin(), tokens.end());
+      }
       
 
       double bleu_score(state_ptr_type& state,
@@ -98,7 +143,12 @@ namespace cicada
 	}
 
 	const rule_type& rule = *edge.rule;
-	const phrase_type& target = rule.target;
+	
+	phrase_type target_split;
+	if (split)
+	  split_non_ascii_characters(rule.target, target_split);
+	
+	const phrase_type& target = (split ? target_split : rule.target);
 	const phrase_type& source = rule.source;
 	
 	count_set_type counts;
@@ -327,9 +377,14 @@ namespace cicada
 	  throw std::runtime_error("this is not a bleu-score!");
       }
       
-      void insert(const int __source_size, const sentence_type& sentence)
+      void insert(const int __source_size, const sentence_type& __sentence)
       {
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
+	
+	sentence_type sentence_split;
+	if (split)
+	  split_non_ascii_characters(__sentence, sentence_split);
+	const sentence_type& sentence = (split ? sentence_split : __sentence);
 	
 	source_size = __source_size;
 	
@@ -567,6 +622,7 @@ namespace cicada
 
       int order;
       bool exact;
+      bool split;
     };
     
     
@@ -582,17 +638,20 @@ namespace cicada
 
       int order = 4;
       bool exact = false;
+      bool split = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
 	  exact = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "split") == 0)
+	  split = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, split));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
