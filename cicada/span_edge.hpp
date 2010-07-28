@@ -32,11 +32,16 @@ namespace cicada
 
     typedef std::pair<int, int> span_type;
     typedef std::vector<span_type, std::allocator<span_type> > span_set_type;
+
+    typedef std::vector<bool, std::allocator<bool> > visited_type;
     
     template <typename SpanSet>
     void operator()(const hypergraph_type& graph, SpanSet& spans)
     {
       if (graph.is_valid()) {
+	visited.clear();
+	visited.resize(graph.nodes.size(), false);
+
 	spans_node.clear();
 	spans_node.reserve(graph.nodes.size());
 	spans_node.resize(graph.nodes.size());
@@ -50,6 +55,8 @@ namespace cicada
     template <typename SpanSet>
     void traverse(const hypergraph_type& graph, SpanSet& spans, id_type node_id)
     {
+      if (visited[node_id]) return;
+
       const node_type& node = graph.nodes[node_id];
       
       // parant-span starts from spans_node[node_id].first;
@@ -85,9 +92,12 @@ namespace cicada
 	
 	spans_node[node_id].second = utils::bithack::max(spans_node[node_id].second, span_pos);
       }
+
+      visited[node_id] = true;
     }
 
     span_set_type spans_node;
+    visited_type  visited;
   };
   
   template <typename SpanSet>

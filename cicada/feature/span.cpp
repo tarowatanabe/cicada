@@ -71,6 +71,7 @@ namespace cicada
 	  std::cerr << "WARNING: node id exceeds our limit!" << std::endl;
 	  return;
 	}
+
 	
 	span_node_type span = spans_node[edge.head];
 	int* context = reinterpret_cast<int*>(state);
@@ -91,13 +92,18 @@ namespace cicada
 	    
 	    rule_string += span_label(std::make_pair(antecedent_context[0], antecedent_context[1]));
 	    
+	    span.first = antecedent_context[1];
+	    
 	    ++ pos_non_terminal;
+	  } else if (span.first >= span.second) {
+	    std::cerr << "WARNING: invalid span?" << std::endl;
 	  } else {
 	    rule_string += '<' + span_label(std::make_pair(span.first, span.first + 1)) + '>';
 	    ++ span.first;
 	  }
 	
 	rule_string += ')';
+
 	
 	features[rule_string] += 1.0;
 
@@ -118,6 +124,13 @@ namespace cicada
 	
 	if (! label.empty())
 	  return label;
+	
+	// exact mathc...
+	label_map_type::const_iterator niter = label_map.find(span);
+	if (niter != label_map.end()) {
+	  label = niter->second;
+	  return label;
+	}
 	
 	// try binary combination...
 	for (int middle = span.first + 1; middle != span.second; ++ middle) {

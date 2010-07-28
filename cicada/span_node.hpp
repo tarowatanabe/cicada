@@ -29,11 +29,16 @@ namespace cicada
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     typedef Vocab vocab_type;
+
+    typedef std::vector<bool, std::allocator<bool> > visited_type;
     
     template <typename SpanSet>
     void operator()(const hypergraph_type& graph, SpanSet& spans)
     {
       if (graph.is_valid()) {
+	visited.clear();
+	visited.resize(graph.nodes.size(), false);
+	
 	spans[graph.goal] = std::make_pair(0, 0);
 	traverse(graph, spans, graph.goal);
       }
@@ -43,6 +48,8 @@ namespace cicada
     template <typename SpanSet>
     void traverse(const hypergraph_type& graph, SpanSet& spans, id_type node_id)
     {
+      if (visited[node_id]) return;
+
       const node_type& node = graph.nodes[node_id];
       
       // parant-span starts from spans[node_id].first;
@@ -74,7 +81,11 @@ namespace cicada
 	
 	spans[node_id].second = utils::bithack::max(spans[node_id].second, span_pos);
       }
+
+      visited[node_id] = true;
     }
+
+    visited_type visited;
   };
   
   template <typename SpanSet>
