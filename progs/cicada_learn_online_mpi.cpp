@@ -726,6 +726,7 @@ struct Task
       // operations.hypergraph contains result...
       const size_t& id = operations.id;
       const lattice_type& lattice = operations.lattice;
+      const lattice_type& spans = operations.spans;
       const hypergraph_type& hypergraph = operations.hypergraph;
       const sentence_set_type& targets = operations.targets;
       
