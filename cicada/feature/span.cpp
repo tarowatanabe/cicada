@@ -60,7 +60,7 @@ namespace cicada
 #endif
 
       SpanImpl()
-	: forced_featrue(false) {}
+	: forced_feature(false) {}
       
       
       void span_score(state_ptr_type& state,
