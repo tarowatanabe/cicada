@@ -58,6 +58,9 @@ namespace cicada
 			    std::allocator<std::pair<const span_node_type, std::string> > > label_map_type;
       
 #endif
+
+      SpanImpl()
+	: forced_featrue(false) {}
       
       
       void span_score(state_ptr_type& state,
@@ -103,10 +106,9 @@ namespace cicada
 	  }
 	
 	rule_string += ')';
-
 	
-	features[rule_string] += 1.0;
-
+	if (forced_feature || feature_set_type::feature_type::exists(rule_string))
+	  features[rule_string] += 1.0;
       }
       
       std::string strip_label(const std::string& label) const
@@ -237,6 +239,8 @@ namespace cicada
       label_map_type   label_map;
       
       span_node_set_type spans_node;
+
+      bool forced_feature;
     };
     
 
@@ -294,6 +298,8 @@ namespace cicada
 	  features.erase(fiter ++);
 	else
 	  ++ fiter;
+
+      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
       pimpl->span_score(state, states, edge, features);
     }

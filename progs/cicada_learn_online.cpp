@@ -348,6 +348,8 @@ struct Task
   void prune_hypergraph(model_type& model_bleu,
 			model_type& model_sparse,
 			const hypergraph_type& hypergraph,
+			const lattice_type& lattice,
+			const span_set_type& spans,
 			hypergraph_type& modified,
 			yield_type& yield, 
 			const weight_set_type& weights,
@@ -356,11 +358,17 @@ struct Task
   {
     cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, 1.0), cube_size);
     
-    cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin, false);
+    cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
     if (! model_sparse.empty()) {
+      model_sparse.assign(hypergraph);
+      model_sparse.assign(lattice);
+      model_sparse.assign(spans);
+      
       model_sparse.apply_feature(true);
+      
       cicada::apply_exact(model_sparse, modified);
+      
       model_sparse.apply_feature(false);
     }
     
@@ -636,6 +644,7 @@ struct Task
       // operations.hypergraph contains result...
       const size_t& id = operations.id;
       const lattice_type& lattice = operations.lattice;
+      const span_set_type& spans = operations.spans;
       const hypergraph_type& hypergraph = operations.hypergraph;
       const sentence_set_type& targets = operations.targets;
       
@@ -697,7 +706,7 @@ struct Task
       {
 	hypergraph_type hypergraph_reward;
       
-	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
       
 	hypergraph_oracles[id].swap(hypergraph_reward);
       }
@@ -707,7 +716,7 @@ struct Task
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
       
-      prune_hypergraph(model_bleu, model_sparse, hypergraph, hypergraph_penalty, yield_penalty, weights, weights, score_margin);
+      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_penalty, yield_penalty, weights, weights, score_margin);
       
       // erase unused weights...
       weights.erase(__bleu->feature_name());
