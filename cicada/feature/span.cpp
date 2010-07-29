@@ -177,49 +177,24 @@ namespace cicada
 		break;
 	      }
 	    }
-	
+	    
 	    if (! label.empty()) continue;
-
-	    // try again with entries in label_chart!
-	    // try binary combination...
-	    for (int middle = first + 1; middle != last; ++ middle) {
-	      const std::string& prev = label_chart(first, middle);
-	      const std::string& next = label_chart(middle, last);
-	      
-	      if (! prev.empty() && ! next.empty()) {
-		label = '[' + strip_label(prev) + "++" + strip_label(next) + ']';
-		break;
+	    
+	    // try tripple combination...
+	    for (int middle1 = first + 1; middle1 < last && label.empty(); ++ middle1)
+	      for (int middle2 = middle1 + 1; middle2 < last && label.empty(); ++ middle2) {
+		label_map_type::const_iterator iter1 = label_map.find(std::make_pair(first, middle1));
+		label_map_type::const_iterator iter2 = label_map.find(std::make_pair(middle1, middle2));
+		label_map_type::const_iterator iter3 = label_map.find(std::make_pair(middle2, last));
+		
+		if (iter1 != label_map.end() && iter2 != label_map.end() && iter3 != label_map.end()) {
+		  label = '[' + strip_label(iter1->second) + '+' + strip_label(iter2->second) + '+' + strip_label(iter3->second) + ']';
+		  break;
+		}
 	      }
-	    }
-
+	    
 	    if (! label.empty()) continue;
-	
-	    // try right-substitution...
-	    for (int last_super = last + 1; last_super < label_chart.size(); ++ last_super) {
-	      const std::string& super = label_chart(first, last_super);
-	      const std::string& right = label_chart(last, last_super);
-
-	      if (! super.empty() && ! right.empty()) {
-		label = '[' + strip_label(super) + "//" + strip_label(right) + ']';
-		break;
-	      }
-	    }
-
-	    if (! label.empty()) continue;
-
-	    // try left-subtraction...
-	    for (int first_super = first - 1; first_super >= 0; -- first_super) {
-	      const std::string& super = label_chart(first_super, last);
-	      const std::string& left  = label_chart(first_super, first);
-	  
-	      if (! super.empty() && ! left.empty()) { 
-		label = '[' + strip_label(left) + "\\\\" + strip_label(super) + ']';
-		break;
-	      }
-	    }
-
-	    if (! label.empty()) continue;
-	
+	    
 	    // try longest left and longest right
 	    {
 	      label_map_type::const_iterator liter = label_map.end();
