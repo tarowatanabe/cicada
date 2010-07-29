@@ -125,8 +125,8 @@ namespace cicada
 	if (! label_chart.empty())
 	  return label_chart(span.first, span.second);
 	
-	label_chart.reserve(spans_node.back().second + 1);
-	label_chart.resize(spans_node.back().second + 1);
+	const_cast<label_chart_type&>(label_chart).reserve(spans_node.back().second + 1);
+	const_cast<label_chart_type&>(label_chart).resize(spans_node.back().second + 1);
 	
 	for (int length = 1; length != label_chart.size(); ++ length)
 	  for (int first = 0; first + length != label_chart.size(); ++ first) {
