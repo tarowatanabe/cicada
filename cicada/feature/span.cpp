@@ -201,7 +201,23 @@ namespace cicada
 	    return label;
 	  }
 	}
-
+	
+	// try longest left and longest right
+	{
+	  label_map_type::const_iterator liter = label_map.end();
+	  for (int last_left = span.second - 1; span.first < last_left && liter == label_map.end(); -- last_left)
+	    liter = label_map.find(std::make_pair(span.first, last_left));
+	  
+	  label_map_type::const_iterator riter = label_map.end();
+	  for (int first_right = span.first + 1; first_right < span.second && riter == label_map.end(); ++ first_right)
+	    riter = label_map.find(std::make_pair(first_right, span.second));
+	  
+	  if (liter != label_map.end() && riter != label_map.end()) {
+	    label = '[' + strip_label(liter->second) + ".." + strip_label(riter->second) + ']';
+	    return label;
+	  }
+	}
+	
 	static const std::string __default = "[x]";
 	
 	label = __default;
