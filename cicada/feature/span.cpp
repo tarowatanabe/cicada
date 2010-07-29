@@ -230,10 +230,8 @@ namespace cicada
 	      for (int first_right = first + 1; first_right < last && riter == label_map.end(); ++ first_right)
 		riter = label_map.find(std::make_pair(first_right, last));
 	      
-	      if (liter != label_map.end() && riter != label_map.end()) {
+	      if (liter != label_map.end() && riter != label_map.end())
 		label = '[' + strip_label(liter->second) + ".." + strip_label(riter->second) + ']';
-		break;
-	      }
 	    }
 	    
 	    if (! label.empty()) continue;
