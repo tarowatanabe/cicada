@@ -135,7 +135,7 @@ namespace cicada
 	}
 	
 	// try binary combination...
-	for (int middle = span.first + 1; middle != span.second; ++ middle) {
+	for (int middle = span.first + 1; middle < span.second; ++ middle) {
 	  label_map_type::const_iterator piter = label_map.find(std::make_pair(span.first, middle));
 	  label_map_type::const_iterator niter = label_map.find(std::make_pair(middle, span.second));
 	  
