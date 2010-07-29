@@ -122,102 +122,83 @@ namespace cicada
 
       const std::string& span_label(const span_node_type& span) const
       {
-	if (! label_chart.empty())
-	  return label_chart(span.first, span.second);
+	std::string& label = const_cast<std::string&>(label_chart(span.first, span.last));
 	
-	const_cast<label_chart_type&>(label_chart).reserve(spans_node.back().second + 1);
-	const_cast<label_chart_type&>(label_chart).resize(spans_node.back().second + 1);
+	if (! label.empty())
+	  return label;
+	    
+	// exact match...
+	label_map_type::const_iterator niter = label_map.find(std::make_pair(span.first, span.last));
+	if (niter != label_map.end()) {
+	  label = niter->second;
+	  return label;
+	}
 	
-	for (int length = 1; length != label_chart.size(); ++ length)
-	  for (int first = 0; first + length != label_chart.size(); ++ first) {
-	    const int last = first + length;
-	    
-	    std::string& label = const_cast<std::string&>(label_chart(first, last));
-	    
-	    // exact match...
-	    label_map_type::const_iterator niter = label_map.find(std::make_pair(first, last));
-	    if (niter != label_map.end()) {
-	      label = niter->second;
-	      continue;
-	    }
-	    
-	    // try binary combination...
-	    for (int middle = first + 1; middle != last; ++ middle) {
-	      label_map_type::const_iterator piter = label_map.find(std::make_pair(first, middle));
-	      label_map_type::const_iterator niter = label_map.find(std::make_pair(middle, last));
-	      
-	      if (piter != label_map.end() && niter != label_map.end()) {
-		label = '[' + strip_label(piter->second) + '+' + strip_label(niter->second) + ']';
-		break;
-	      }
-	    }
-	    
-	    if (! label.empty()) continue;
-	    
-	    // try right-substitution...
-	    for (int last_super = last + 1; last_super < label_chart.size(); ++ last_super) {
-	      label_map_type::const_iterator siter = label_map.find(std::make_pair(first, last_super));
-	      label_map_type::const_iterator riter = label_map.find(std::make_pair(last, last_super));
-	      
-	      if (siter != label_map.end() && riter != label_map.end()) {
-		label = '[' + strip_label(siter->second) + '/' + strip_label(riter->second) + ']';
-		break;
-	      }
-	    }
-
-	    if (! label.empty()) continue;
-
-	    // try left-subtraction...
-	    for (int first_super = first - 1; first_super >= 0; -- first_super) {
-	      label_map_type::const_iterator siter = label_map.find(std::make_pair(first_super, last));
-	      label_map_type::const_iterator liter = label_map.find(std::make_pair(first_super, first));
+	// try binary combination...
+	for (int middle = span.first + 1; middle != span.last; ++ middle) {
+	  label_map_type::const_iterator piter = label_map.find(std::make_pair(span.first, middle));
+	  label_map_type::const_iterator niter = label_map.find(std::make_pair(middle, span.last));
 	  
-	      if (siter != label_map.end() && liter != label_map.end()) { 
-		label = '[' + strip_label(liter->second) + '\\' + strip_label(siter->second) + ']';
-		break;
-	      }
-	    }
+	  if (piter != label_map.end() && niter != label_map.end()) {
+	    label = '[' + strip_label(piter->second) + '+' + strip_label(niter->second) + ']';
+	    return label;
+	  }
+	}
 	    
-	    if (! label.empty()) continue;
-	    
-	    // try tripple combination...
-	    for (int middle1 = first + 1; middle1 < last && label.empty(); ++ middle1)
-	      for (int middle2 = middle1 + 1; middle2 < last && label.empty(); ++ middle2) {
-		label_map_type::const_iterator iter1 = label_map.find(std::make_pair(first, middle1));
-		label_map_type::const_iterator iter2 = label_map.find(std::make_pair(middle1, middle2));
-		label_map_type::const_iterator iter3 = label_map.find(std::make_pair(middle2, last));
-		
-		if (iter1 != label_map.end() && iter2 != label_map.end() && iter3 != label_map.end()) {
-		  label = '[' + strip_label(iter1->second) + '+' + strip_label(iter2->second) + '+' + strip_label(iter3->second) + ']';
-		  break;
-		}
-	      }
-	    
-	    if (! label.empty()) continue;
-	    
-	    // try longest left and longest right
-	    {
-	      label_map_type::const_iterator liter = label_map.end();
-	      for (int last_left = last - 1; first < last_left && liter == label_map.end(); -- last_left)
-		liter = label_map.find(std::make_pair(first, last_left));
+	// try right-substitution...
+	for (int last_super = span.last + 1; last_super < label_chart.size(); ++ last_super) {
+	  label_map_type::const_iterator siter = label_map.find(std::make_pair(span.first, last_super));
+	  label_map_type::const_iterator riter = label_map.find(std::make_pair(span.last, last_super));
 	  
-	      label_map_type::const_iterator riter = label_map.end();
-	      for (int first_right = first + 1; first_right < last && riter == label_map.end(); ++ first_right)
-		riter = label_map.find(std::make_pair(first_right, last));
-	      
-	      if (liter != label_map.end() && riter != label_map.end())
-		label = '[' + strip_label(liter->second) + ".." + strip_label(riter->second) + ']';
+	  if (siter != label_map.end() && riter != label_map.end()) {
+	    label = '[' + strip_label(siter->second) + '/' + strip_label(riter->second) + ']';
+	    return label;
+	  }
+	}
+	
+	// try left-subtraction...
+	for (int first_super = span.first - 1; first_super >= 0; -- first_super) {
+	  label_map_type::const_iterator siter = label_map.find(std::make_pair(first_super, span.last));
+	  label_map_type::const_iterator liter = label_map.find(std::make_pair(first_super, span.first));
+	  
+	  if (siter != label_map.end() && liter != label_map.end()) { 
+	    label = '[' + strip_label(liter->second) + '\\' + strip_label(siter->second) + ']';
+	    return label;
+	  }
+	}
+	
+	// try tripple combination...
+	for (int middle1 = span.first + 1; middle1 < span.last; ++ middle1)
+	  for (int middle2 = middle1 + 1; middle2 < span.last; ++ middle2) {
+	    label_map_type::const_iterator iter1 = label_map.find(std::make_pair(span.first, middle1));
+	    label_map_type::const_iterator iter2 = label_map.find(std::make_pair(middle1, middle2));
+	    label_map_type::const_iterator iter3 = label_map.find(std::make_pair(middle2, span.last));
+	    
+	    if (iter1 != label_map.end() && iter2 != label_map.end() && iter3 != label_map.end()) {
+	      label = '[' + strip_label(iter1->second) + '+' + strip_label(iter2->second) + '+' + strip_label(iter3->second) + ']';
+	      return label;
 	    }
-	    
-	    if (! label.empty()) continue;
-	    
-	    static const std::string __default = "[x]";
-	    
-	    label = __default;
 	  }
 	
+	// try longest left and longest right
+	{
+	  label_map_type::const_iterator liter = label_map.end();
+	  for (int last_left = span.last - 1; span.first < last_left && liter == label_map.end(); -- last_left)
+	    liter = label_map.find(std::make_pair(span.first, last_left));
+	  
+	  label_map_type::const_iterator riter = label_map.end();
+	  for (int first_right = span.first + 1; first_right < span.last && riter == label_map.end(); ++ first_right)
+	    riter = label_map.find(std::make_pair(first_right, span.last));
+	  
+	  if (liter != label_map.end() && riter != label_map.end()) {
+	    label = '[' + strip_label(liter->second) + ".." + strip_label(riter->second) + ']';
+	    return label;
+	  }
+	}
 	
-	return label_chart(span.first, span.second);
+	static const std::string __default = "[x]";
+	label = __default;
+	return label;
       }
       
       
@@ -230,8 +211,11 @@ namespace cicada
 	cicada::span_node(hypergraph, spans_node);
 	
 	const span_node_type& span_goal = spans_node[hypergraph.goal];
-	
+
 	label_chart.clear();
+	
+	label_chart.reserve(span_goal.second + 1);
+	label_chart.resize(span_goal.second + 1);
       }
 
       void assign(const span_set_type& spans)
