@@ -162,7 +162,7 @@ namespace cicada
       
       return maps[__id];
     }
-
+    
     Symbol non_terminal(const int index) const
     {
       if (! is_non_terminal() || index < 0)

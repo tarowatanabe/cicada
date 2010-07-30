@@ -812,13 +812,13 @@ struct Task
       grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarStatic(*fiter)));
     
     if (debug)
-      std::cerr << "loaded mutable grammar: " << grammar.size() << std::endl;
+      std::cerr << "loaded static grammar: " << grammar.size() << std::endl;
     
     for (grammar_file_set_type::const_iterator fiter = grammar_mutable_files.begin(); fiter != grammar_mutable_files.end(); ++ fiter)
       grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarMutable(*fiter)));
 
     if (debug)
-      std::cerr << "loaded static grammar: " << grammar.size() << std::endl;
+      std::cerr << "loaded mutable grammar: " << grammar.size() << std::endl;
     
     if (grammar_glue_straight || grammar_glue_inverted)
       grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,

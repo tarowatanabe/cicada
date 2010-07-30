@@ -883,7 +883,7 @@ public:
   Apply(const std::string& parameter,
 	const model_type& __model,
 	const int __debug)
-    : model(__model), weights(0), size(200), weights_one(false), exact(false), debug(__debug)
+    : model(__model), weights(0), size(200), weights_one(false), exact(false), forced(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -896,6 +896,8 @@ public:
 	size = boost::lexical_cast<int>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "exact") == 0)
 	exact = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "forced") == 0)
+	forced = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
@@ -920,11 +922,14 @@ public:
     
     if (debug)
       std::cerr << "apply features" << std::endl;
-    
-    utils::resource start;
+
+    if (forced)
+      const_cast<model_type&>(model).apply_feature(true);
     
     weight_set_type weights_zero;
     const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
+    
+    utils::resource start;
     
     // apply...
     if (model.is_stateless())
@@ -939,6 +944,9 @@ public:
     }
     
     utils::resource end;
+
+    const_cast<model_type&>(model).apply_feature(false);
+	
     
     if (debug)
       std::cerr << "apply cpu time: " << (end.cpu_time() - start.cpu_time())
@@ -964,7 +972,7 @@ public:
   int size;
   bool weights_one;
   bool exact;
-  
+  bool forced;
   
   int debug;
 };
@@ -1753,6 +1761,7 @@ compose-cky: composition from lattice (or sentence) with grammar\n\
 apply: feature application\n\
 \tsize=<cube size>\n\
 \texact=[true|false] no pruning feature application\n\
+\tforced=[true|false] forced feature application\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 bleu: BLEU computation\n\

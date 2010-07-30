@@ -63,11 +63,20 @@ namespace cicada
     template <typename Filter>
     void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter, const bool validate=true)
     {
+#ifdef HAVE_TR1_UNORDERED_SET 
+      typedef std::tr1::unordered_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > id_set_type;
+#else
+      typedef sgi::hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > id_set_type;
+#endif
+      
+
       sorted.clear();
       
       if (x.goal == hypergraph_type::invalid)
 	return;
-      
+
+      id_set_type edges_cycle;
+
       reloc_set_type reloc_node(x.nodes.size(), -1);
       reloc_set_type reloc_edge(x.edges.size(), -1);
       color_set_type color(x.nodes.size(), white);
@@ -119,7 +128,23 @@ namespace cicada
 	    ++ pos_tail;
 	    break;
 	  case gray:
-	    throw std::runtime_error("detected cycle!");
+	    // cycle detected...
+	    // we will force cutting this cycle!
+	    ++ pos_tail;
+
+	    edges_cycle.insert(curr_edge.id);
+	    
+#if 0
+	    {
+	      std::cerr << "backtrack: " << *curr_edge.rule << std::endl;
+	      stack_type::const_reverse_iterator siter_end = stack.rend();
+	      for (stack_type::const_reverse_iterator siter = stack.rbegin(); siter != siter_end; ++ siter)
+		std::cerr << "backtrack: " << *(x.edges[x.nodes[siter->node].edges[siter->edge]].rule) << std::endl;
+	    }
+	    
+	    throw std::runtime_error("detected cycle!: " + boost::lexical_cast<std::string>(*curr_edge.rule));
+#endif
+	    
 	    break;
 	  }
 	}
@@ -162,12 +187,7 @@ namespace cicada
 	if (reloc_node[i] >= 0)
 	  reloc_map_node[reloc_node[i]] = i;
 
-
-#ifdef HAVE_TR1_UNORDERED_SET 
-      std::tr1::unordered_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > nodes_empty;
-#else
-      sgi::hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > nodes_empty;
-#endif
+      id_set_type nodes_empty;
       
       for (int i = 0; i < reloc_map_node.size(); ++ i) {
 	const node_type& node_old = x.nodes[reloc_map_node[i]];
@@ -184,20 +204,27 @@ namespace cicada
       
       sorted.goal = sorted.nodes.size() - 1;
       
-      if (! nodes_empty.empty() && validate) {
+      if ((! nodes_empty.empty() && validate) || ! edges_cycle.empty()) {
 	hypergraph_type sorted_new;
 	filter_edge filter(sorted.edges.size());
 	
-	for (typename hypergraph_type::edge_set_type::const_iterator eiter = sorted.edges.begin(); eiter != sorted.edges.end(); ++ eiter) {
-	  const edge_type& edge = *eiter;
-	  
-	  typename edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	  for (typename edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	    if (nodes_empty.find(*titer) != nodes_empty.end()) {
-	      filter.removed[edge.id] = true;
-	      break;
-	    }
-	}
+	
+	id_set_type::const_iterator eiter_end = edges_cycle.end();
+	for (id_set_type::const_iterator eiter = edges_cycle.begin(); eiter != eiter_end; ++ eiter)
+	  if (reloc_edge[*eiter] >= 0)
+	    filter.removed[reloc_edge[*eiter]] = true;
+	
+	if (! nodes_empty.empty() && validate)
+	  for (typename hypergraph_type::edge_set_type::const_iterator eiter = sorted.edges.begin(); eiter != sorted.edges.end(); ++ eiter) {
+	    const edge_type& edge = *eiter;
+	    
+	    typename edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	    for (typename edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	      if (nodes_empty.find(*titer) != nodes_empty.end()) {
+		filter.removed[edge.id] = true;
+		break;
+	      }
+	  }
 	
 	operator()(sorted, sorted_new, filter, validate);
 	
