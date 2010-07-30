@@ -1,0 +1,45 @@
+Following is a list of operations applicable via --operation [op] in the order specified by command line
+or by a config file. "output" must be placed as its final operations, otherwise, you will easily mess up.
+
+
+binarize: perform binarization (monolingual tree)
+        direction=[left|right] binarization direction
+        size=binarization size
+permute: permute tree (monolingual tree only)
+        feature=[true|false] apply feature
+        weights=file weight file for composed feature
+        size=permute size
+        collapse=[true|false] collapse sparse features
+        exclude=[a non-terminal] to prohibit permutation. You can supply multiple
+compose-earley: composition from tree with grammar
+compose-cky: composition from lattice (or sentence) with grammar
+apply: feature application
+        size=<cube size>
+        exact=[true|false] no pruning feature application
+        weights=weight file for feature
+        weights-one=[true|false] one initialized weight
+bleu: BLEU computation
+        size=<cube size>
+        exact=[true|false] no pruning feature application
+        weights=weight file for feature
+        weights-one=[true|false] one initialized weight
+variational: variational decoding
+        weights=weight file for feature
+        weights-one=[true|false] one initialized weight
+prune: pruning
+        beam=beam pruning threshold in threshold > 0.0
+        density=density pruning threshold in threshold > 1.0
+        scale=scaling for score
+        semiring=[tropical|logprob|log] semiring to perform score computation
+        weights=weight file for feature
+        weights-one=[true|false] one initialzied weight
+intersect: compute intersection
+output: kbest or hypergraph output
+        kbest=<kbest size> zero for hypergraph output (default)
+        unique=[true|false] unique translation
+        weights=weight file for feature
+        weights-one=[true|false] one initialize weight
+        yield=[source|target|derivation|tree] yield for kbest
+        graphviz=[true|false] dump in graphviz format
+        directory=directory for output
+        file=file for output

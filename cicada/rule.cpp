@@ -37,7 +37,9 @@ namespace cicada
     sequence_type::iterator siter_end = source_new.end();
     for (sequence_type::iterator siter = source_new.begin(); siter != siter_end; ++ siter)
       if (siter->is_non_terminal()) {
-	index[siter->non_terminal_index()] = pos;
+	const int non_terminal_pos = siter->non_terminal_index();
+	
+	index[non_terminal_pos == 0 ? pos : non_terminal_pos] = pos;
 	*siter = siter->non_terminal(pos);
 	++ pos;
       }
@@ -69,7 +71,9 @@ namespace cicada
     sequence_type::iterator titer_end = target_new.end();
     for (sequence_type::iterator titer = target_new.begin(); titer != titer_end; ++ titer)
       if (titer->is_non_terminal()) {
-	index[titer->non_terminal_index()] = pos;
+	const int non_terminal_pos = titer->non_terminal_index();
+	
+	index[non_terminal_pos == 0 ? pos : non_terminal_pos] = pos;
 	*titer = titer->non_terminal(pos);
 	++ pos;
       }

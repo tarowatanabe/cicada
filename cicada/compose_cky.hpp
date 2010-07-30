@@ -231,16 +231,7 @@ namespace cicada
     }
 
   private:
-    
-    template <typename Tp>
-    struct less_non_terminal_index
-    {
-      bool operator()(const Tp& x, const Tp& y) const
-      {
-	return x.first.non_terminal_index() < y.first.non_terminal_index();
-      }
-    };
-    
+        
     template <typename Iterator>
     void apply_rule(const rule_ptr_type& rule,
 		    const feature_set_type& features,
