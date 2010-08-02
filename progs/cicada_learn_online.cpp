@@ -973,11 +973,13 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     // merge vector...
     weights_mixed.clear();
     
+    int updated = 0;
     optimizer_set_type::iterator oiter_end = optimizers.end();
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
       weights_mixed       += oiter->weights;
       weights_accumulated += oiter->accumulated;
       norm_accumulated    += oiter->updated;
+      updated += oiter->updated;
     }
     
     weights_mixed *= (1.0 / tasks.size());
@@ -1003,6 +1005,8 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
       oiter->accumulated.clear();
       oiter->updated = 1;
     }
+
+    if (updated == optimizers.size()) break;
   }
   
   weights = weights_mixed;

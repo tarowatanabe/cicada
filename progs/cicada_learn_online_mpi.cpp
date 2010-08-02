@@ -1176,6 +1176,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     long updated_accumulated = 0;
     MPI::COMM_WORLD.Reduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM, 0);
+    MPI::COMM_WORLD.Bcast(&updated_accumulated, 1, MPI::LONG, 0);
     norm_accumulated += updated_accumulated;
     
     if (mpi_rank == 0) {
@@ -1200,6 +1201,8 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     optimizer.accumulated.clear();
     optimizer.updated = 1;
+    
+    if (updated_accumulated == mpi_size) break;
   }
   
   weights = weights_mixed;
