@@ -112,6 +112,7 @@ int batch_size = 1;
 bool reranking = false;
 bool asynchronous_vectors = false;
 bool mix_weights = false;
+bool dump_weights = false;
 
 bool apply_exact = false;
 int  cube_size = 200;
@@ -984,19 +985,21 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     
     weights_mixed *= (1.0 / tasks.size());
     
-    {
-      utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)));
-      os.precision(20);
-      os << weights_mixed;
-    }
-    
-    {
-      weights_average = weights_accumulated;
-      weights_average /= norm_accumulated;
+    if (dump_weights) {
+      {
+	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)));
+	os.precision(20);
+	os << weights_mixed;
+      }
       
-      utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"));
-      os.precision(20);
-      os << weights_average;
+      {
+	weights_average = weights_accumulated;
+	weights_average /= norm_accumulated;
+	
+	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"));
+	os.precision(20);
+	os << weights_average;
+      }
     }
     
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
@@ -1075,7 +1078,8 @@ void options(int argc, char** argv)
     ("reranking",            po::bool_switch(&reranking),                            "learn by forest reranking")
     ("asynchronous-vectors", po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
     ("mix-weights",          po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")
-    
+    ("dump-weights",         po::bool_switch(&dump_weights),                         "dump weight vectors at every epoch")
+
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")
     
