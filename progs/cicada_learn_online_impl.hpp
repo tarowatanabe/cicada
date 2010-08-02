@@ -21,6 +21,8 @@
 
 #include <utils/arc_list.hpp>
 
+#include <utils/lockfree_list_queue.hpp>
+
 inline
 path_type add_suffix(const path_type& path, const std::string& suffix)
 {
@@ -371,4 +373,30 @@ struct OptimizeMIRA
   size_t          updated;
 
   int debug;
+};
+
+struct Dumper
+{
+  typedef std::pair<path_type, weight_set_type > value_type;
+  typedef utils::lockfree_list_queue<value_type, std::allocator<value_type> > queue_type;
+  
+  
+  Dumper(queue_type& __queue)
+    : queue(__queue) {}
+  
+  void operator()()
+  {
+    value_type value;
+    
+    while (1) {
+      queue.pop_swap(value);
+      if (value.first.empty()) break;
+      
+      utils::compress_ostream os(value.first, 1024 * 1024);
+      os.precision(20);
+      os << value.second;
+    }
+  }
+
+  queue_type& queue;
 };

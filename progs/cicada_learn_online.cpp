@@ -871,6 +871,8 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
   typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
   
   typedef std::vector<std::string, std::allocator<std::string> > sample_set_type;
+
+  typedef Dumper dumper_type;
   
   // read all the training data...
   sample_set_type samples;
@@ -917,6 +919,9 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
   task_ptr_set_type tasks(threads);
   for (int i = 0; i < threads; ++ i)
     tasks[i].reset(new task_type(queue, *queue_reduce[i], *queue_bcast[i], optimizers[i]));
+
+  dumper_type::queue_type queue_dumper;
+  std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
   
   weight_set_type weights_mixed;
   weight_set_type weights_accumulated;
@@ -986,20 +991,13 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     weights_mixed *= (1.0 / tasks.size());
     
     if (dump_weights) {
-      {
-	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)));
-	os.precision(20);
-	os << weights_mixed;
-      }
+
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)), weights_mixed));
       
-      {
-	weights_average = weights_accumulated;
-	weights_average /= norm_accumulated;
-	
-	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"));
-	os.precision(20);
-	os << weights_average;
-      }
+      weights_average = weights_accumulated;
+      weights_average /= norm_accumulated;
+      
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"), weights_average));
     }
     
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
@@ -1011,10 +1009,14 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
 
     if (updated == optimizers.size()) break;
   }
+
+  queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
   
   weights = weights_mixed;
   weights_average = weights_accumulated;
   weights_average /= norm_accumulated;
+
+  thread_dumper->join();
 }
 
 

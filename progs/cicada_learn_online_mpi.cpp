@@ -970,6 +970,8 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   typedef boost::shared_ptr<std::string> buffer_ptr_type;
   typedef std::deque<buffer_ptr_type, std::allocator<buffer_ptr_type> > buffer_set_type;
   typedef std::vector<buffer_set_type, std::allocator<buffer_set_type> > buffer_map_type;
+
+  typedef Dumper dumper_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -1015,6 +1017,9 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   optimizer_type optimizer(weights, C, debug);
   
   task_type task(queue, queue_reduce, queue_bcast, operations, model, optimizer);
+
+  dumper_type::queue_type queue_dumper;
+  std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
 
   weight_set_type weights_mixed;
   weight_set_type weights_accumulated;
@@ -1181,20 +1186,13 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     norm_accumulated += updated_accumulated;
     
     if (mpi_rank == 0 && dump_weights) {
-      {
-	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)), 1024 * 1024);
-	os.precision(20);
-	os << weights_mixed;
-      }
       
-      {
-	weights_average = weights_accumulated;
-	weights_average /= norm_accumulated;
-	
-	utils::compress_ostream os(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"), 1024 * 1024);
-	os.precision(20);
-	os << weights_average;
-      }
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)), weights_mixed));
+      
+      weights_average = weights_accumulated;
+      weights_average /= norm_accumulated;
+      
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"), weights_average));
     }
     
     if (mix_weights)
@@ -1205,11 +1203,15 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     if (updated_accumulated == mpi_size) break;
   }
+
+  queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
   
   weights = weights_mixed;
   
   weights_average = weights_accumulated;
   weights_average /= norm_accumulated;
+
+  thread_dumper->join();
 }
 
 void send_weights(const int rank, const weight_set_type& weights)
