@@ -340,6 +340,7 @@ struct OptimizeMIRA
       }
     }
     
+    bool perform_update = false;
     for (int i = 0; i < labels.size(); ++ i) 
       if (alpha[i] > 0.0) {
 	typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
@@ -347,8 +348,10 @@ struct OptimizeMIRA
 	  weights[fiter->first] += alpha[i] * labels[i] * fiter->second;
 	  accumulated[fiter->first] += alpha[i] * labels[i] * fiter->second * updated;
 	}
+	
+	perform_update = true;
       }
-    ++ updated;
+    updated += perform_update;
     
     if (debug) {
       double obj_primal = 0.0;
