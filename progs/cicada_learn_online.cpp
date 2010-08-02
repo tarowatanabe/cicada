@@ -102,8 +102,10 @@ bool learn_factored = false;
 int iteration = 100;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
+
 double C = 1.0;
 double loss_scale = 100;
+double tolerance = 1e-4;
 
 double loss_margin = 0.001;
 double score_margin = 0.001;
@@ -914,7 +916,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     queue_bcast[i].reset(new queue_type());
   }
 
-  optimizer_set_type optimizers(threads, optimizer_type(weights, C, debug));
+  optimizer_set_type optimizers(threads, optimizer_type(weights, C, tolerance, debug));
   
   task_ptr_set_type tasks(threads);
   for (int i = 0; i < threads; ++ i)
@@ -1070,8 +1072,8 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
-
     ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
+    ("tolerance",     po::value<double>(&tolerance)->default_value(tolerance),       "tolerance threshold")
     
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")

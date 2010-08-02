@@ -139,9 +139,11 @@ struct OptimizeMIRA
 {
   OptimizeMIRA(const weight_set_type& __weights,
 	       const double& __lambda,
+	       const double& __tolerance,
 	       const int __debug=0)
     : lambda(__lambda),
       C(1.0 / __lambda),
+      tolerance(__tolerance),
       weights(__weights),
       accumulated(),
       updated(1),
@@ -233,7 +235,7 @@ struct OptimizeMIRA
       delta += C * gradient[u];
       
       // tolerance
-      if (delta <= 1e-4) break;
+      if (delta <= tolerance) break;
       
       // select v (26)
       if (u >= 0) {
@@ -370,6 +372,7 @@ struct OptimizeMIRA
   
   double lambda;
   double C;
+  double tolerance;
   
   weight_set_type weights;
   weight_set_type accumulated;

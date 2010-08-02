@@ -110,6 +110,7 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 double loss_scale = 100;
+double tolerance = 1e-4;
 
 double loss_margin = 0.01;
 double score_margin = 0.01;
@@ -1014,7 +1015,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   queue_type queue_reduce;
   queue_type queue_bcast;
 
-  optimizer_type optimizer(weights, C, debug);
+  optimizer_type optimizer(weights, C, tolerance, debug);
   
   task_type task(queue, queue_reduce, queue_bcast, operations, model, optimizer);
 
@@ -1441,8 +1442,8 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
-
     ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
+    ("tolerance",     po::value<double>(&tolerance)->default_value(tolerance),       "tolerance threshold")
     
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
