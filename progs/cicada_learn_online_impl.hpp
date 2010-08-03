@@ -151,6 +151,7 @@ struct OptimizeMIRA
 
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    gradient_type;
+  typedef std::vector<bool, std::allocator<bool> >        skipped_type;
 
   void finalize()
   {
@@ -187,25 +188,35 @@ struct OptimizeMIRA
 
     alpha.clear();
     gradient.clear();
+    skipped.clear();
 
     alpha.reserve(labels.size());
     gradient.reserve(labels.size());
+    skipped.reserve(labels.size());
     
     alpha.resize(labels.size(), 0.0);
     gradient.resize(labels.size(), 0.0);
+    skipped.resize(labels.size(), false);
     
     double alpha_neq = C;
     
-    for (int i = 0; i < labels.size(); ++ i)
+    size_t num_instance = 0;
+    for (int i = 0; i < labels.size(); ++ i) {
       gradient[i] = margins[i] - labels[i] * features[i].dot(weights);
+      skipped[i] = (gradient[i] <= 0);
+      num_instance += ! (gradient[i] <= 0);
+    }
+    
+    if (! num_instance) return;
     
     if (debug) {
       double obj_primal = 0.0;
       double obj_dual = 0.0;
-      for (int i = 0; i < labels.size(); ++ i) {
-	obj_primal += (std::max(gradient[i], 0.0) * C) / labels.size();
-	obj_dual += gradient[i] * alpha[i];
-      }
+      for (int i = 0; i < labels.size(); ++ i) 
+	if (! skipped[i]) {
+	  obj_primal += (std::max(gradient[i], 0.0) * C) / num_instance;
+	  obj_dual += gradient[i] * alpha[i];
+	}
       
       std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl; 
     }
@@ -218,15 +229,16 @@ struct OptimizeMIRA
       double max_obj = - std::numeric_limits<double>::infinity();
       double delta = 0.0;
       
-      for (int i = 0; i < labels.size(); ++ i) {
-	delta -= alpha[i] * gradient[i];
-	
-	if (gradient[i] > max_obj)  {
-	  max_obj = gradient[i];
-	  u = i;
+      for (int i = 0; i < labels.size(); ++ i) 
+	if (! skipped[i]) {
+	  delta -= alpha[i] * gradient[i];
+	  
+	  if (gradient[i] > max_obj)  {
+	    max_obj = gradient[i];
+	    u = i;
+	  }
 	}
-      }
-
+      
       // if we relax the summation constraints, we select different u...
       // is this correct?
       //if (gradient[u] < 0.0)
@@ -244,7 +256,7 @@ struct OptimizeMIRA
 	double tau = 1.0;
 	
 	for (int i = 0; i < labels.size(); ++ i)
-	  if (i != u && alpha[i] > 0.0) {
+	  if (! skipped[i] && i != u && alpha[i] > 0.0) {
 	    // compute (25)
 	    const double numer = alpha[i] * (gradient[u] - gradient[i]);
 	    const double denom = alpha[i] * alpha[i] * (H(u, u) - 2.0 * H(u, i) + H(i, i));
@@ -290,7 +302,8 @@ struct OptimizeMIRA
 	  
 	  // update g...
 	  for (int i = 0; i < labels.size(); ++ i)
-	    gradient[i] += update * (H(i, v) - H(i, u));
+	    if (! skipped[i])
+	      gradient[i] += update * (H(i, v) - H(i, u));
 	  
 	} else if (alpha_neq > 0.0) {
 	  double update = alpha_neq * tau;
@@ -302,7 +315,8 @@ struct OptimizeMIRA
 	  
 	  // update g..
 	  for (int i = 0; i < labels.size(); ++ i)
-	    gradient[i] -= update * H(i, u);
+	    if (! skipped[i])
+	      gradient[i] -= update * H(i, u);
 	}
 	
       } else {
@@ -311,7 +325,7 @@ struct OptimizeMIRA
 	double tau = 1.0;
 	
 	for (int i = 0; i < labels.size(); ++ i) 
-	  if (alpha[i] > 0.0) {
+	  if (! skipped[i] && alpha[i] > 0.0) {
 	    
 	    const double numer = alpha[i] * gradient[i];
 	    const double denom = alpha[i] * alpha[i] * H(i, i);
@@ -337,14 +351,15 @@ struct OptimizeMIRA
 	  alpha[v] -= update;
 	  
 	  for (int i = 0; i < labels.size(); ++ i)
-	    gradient[i] += update * H(i, v);
+	    if (! skipped[i])
+	      gradient[i] += update * H(i, v);
 	}
       }
     }
     
     bool perform_update = false;
     for (int i = 0; i < labels.size(); ++ i) 
-      if (alpha[i] > 0.0) {
+      if (! skipped[i] && alpha[i] > 0.0) {
 	typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
 	for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
 	  weights[fiter->first] += alpha[i] * labels[i] * fiter->second;
@@ -358,8 +373,9 @@ struct OptimizeMIRA
     if (debug) {
       double obj_primal = 0.0;
       double obj_dual = 0.0;
-      for (int i = 0; i < labels.size(); ++ i) {
-	obj_primal += (std::max(gradient[i], 0.0) * C) / labels.size();
+      for (int i = 0; i < labels.size(); ++ i) 
+	if (! skipped[i]) {
+	obj_primal += (std::max(gradient[i], 0.0) * C) / num_instance;
 	obj_dual += gradient[i] * alpha[i];
       }
       
@@ -369,6 +385,7 @@ struct OptimizeMIRA
 
   alpha_type    alpha;
   gradient_type gradient;
+  skipped_type  skipped;
   
   double lambda;
   double C;
