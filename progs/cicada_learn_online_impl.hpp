@@ -144,6 +144,8 @@ struct OptimizeMIRA
     : lambda(__lambda),
       C(1.0 / __lambda),
       tolerance(__tolerance),
+      objective_max(- std::numeric_limits<double>::infinity()),
+      objective_min(  std::numeric_limits<double>::infinity()),
       weights(__weights),
       accumulated(),
       updated(1),
@@ -158,6 +160,15 @@ struct OptimizeMIRA
     accumulated *= - 1.0 / updated;
     accumulated += weights;
     accumulated *= updated;
+  }
+
+  void initialize()
+  {
+    objective_max = - std::numeric_limits<double>::infinity();
+    objective_min =   std::numeric_limits<double>::infinity();
+
+    accumulated.clear();
+    updated = 1;
   }
   
 
@@ -203,8 +214,16 @@ struct OptimizeMIRA
     size_t num_instance = 0;
     for (int i = 0; i < labels.size(); ++ i) {
       gradient[i] = margins[i] - labels[i] * features[i].dot(weights);
-      skipped[i] = (gradient[i] <= 0);
-      num_instance += ! (gradient[i] <= 0);
+      
+      const bool skipping = (gradient[i] <= 0);
+      
+      skipped[i] = skipping;
+      num_instance += ! skipping;
+      
+      if (! skipping) {
+	objective_max = std::max(objective_max, gradient[i]);
+	objective_min = std::min(objective_min, gradient[i]);
+      }
     }
     
     if (! num_instance) return;
@@ -390,6 +409,9 @@ struct OptimizeMIRA
   double lambda;
   double C;
   double tolerance;
+
+  double objective_max;
+  double objective_min;
   
   weight_set_type weights;
   weight_set_type accumulated;

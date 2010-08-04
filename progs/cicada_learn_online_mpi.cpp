@@ -110,7 +110,9 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 double loss_scale = 100;
-double tolerance = 1e-4;
+
+double tolerance_objective = 1e-4;
+double tolerance_solver = 1e-4;
 
 double loss_margin = 0.01;
 double score_margin = 0.01;
@@ -1015,7 +1017,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
   queue_type queue_reduce;
   queue_type queue_bcast;
 
-  optimizer_type optimizer(weights, C, tolerance, debug);
+  optimizer_type optimizer(weights, C, tolerance_solver, debug);
   
   task_type task(queue, queue_reduce, queue_bcast, operations, model, optimizer);
 
@@ -1182,9 +1184,13 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     weights_accumulated += optimizer.accumulated;
     
     long updated_accumulated = 0;
-    MPI::COMM_WORLD.Reduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM, 0);
-    MPI::COMM_WORLD.Bcast(&updated_accumulated, 1, MPI::LONG, 0);
+    MPI::COMM_WORLD.Allreduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM);
     norm_accumulated += updated_accumulated;
+    
+    double objective_max = - std::numeric_limits<double>::infinity();
+    double objective_min =   std::numeric_limits<double>::infinity();
+    MPI::COMM_WORLD.Allreduce(&optimizer.objective_max, &objective_max, 1, MPI::DOUBLE, MPI::MAX);
+    MPI::COMM_WORLD.Allreduce(&optimizer.objective_min, &objective_min, 1, MPI::DOUBLE, MPI::MIN);
     
     if (mpi_rank == 0 && dump_weights) {
       
@@ -1199,10 +1205,10 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     if (mix_weights)
       optimizer.weights = weights_mixed;
     
-    optimizer.accumulated.clear();
-    optimizer.updated = 1;
+    optimizer.initialize();
     
     if (updated_accumulated == mpi_size) break;
+    if (objective_max - objective_min < tolerance_objective) break;
   }
 
   queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
@@ -1443,7 +1449,9 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
     ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
-    ("tolerance",     po::value<double>(&tolerance)->default_value(tolerance),       "tolerance threshold")
+    
+    ("tolerance-objective",     po::value<double>(&tolerance_objective)->default_value(tolerance_objective), "tolerance threshold for primal objective")
+    ("tolerance-solver",        po::value<double>(&tolerance_solver)->default_value(tolerance_solver),       "tolerance threshold for QP solver")
     
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")

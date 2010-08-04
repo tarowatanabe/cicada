@@ -105,7 +105,8 @@ bool regularize_l2 = false;
 
 double C = 1.0;
 double loss_scale = 100;
-double tolerance = 1e-4;
+double tolerance_objective = 1e-4;
+double tolerance_solver = 1e-4;
 
 double loss_margin = 0.001;
 double score_margin = 0.001;
@@ -916,7 +917,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     queue_bcast[i].reset(new queue_type());
   }
 
-  optimizer_set_type optimizers(threads, optimizer_type(weights, C, tolerance, debug));
+  optimizer_set_type optimizers(threads, optimizer_type(weights, C, tolerance_solver, debug));
   
   task_ptr_set_type tasks(threads);
   for (int i = 0; i < threads; ++ i)
@@ -981,6 +982,9 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     // merge vector...
     weights_mixed.clear();
     
+    double objective_max = - std::numeric_limits<double>::infinity();
+    double objective_min =   std::numeric_limits<double>::infinity();
+    
     int updated = 0;
     optimizer_set_type::iterator oiter_end = optimizers.end();
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
@@ -988,6 +992,9 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
       weights_accumulated += oiter->accumulated;
       norm_accumulated    += oiter->updated;
       updated += oiter->updated;
+
+      objective_max = std::max(objective_max, oiter->objective_max);
+      objective_min = std::min(objective_min, oiter->objective_min);
     }
     
     weights_mixed *= (1.0 / tasks.size());
@@ -1005,11 +1012,12 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
       if (mix_weights)
 	oiter->weights = weights_mixed;
-      oiter->accumulated.clear();
-      oiter->updated = 1;
+      
+      oiter->initialize();
     }
 
     if (updated == optimizers.size()) break;
+    if (objective_max - objective_min < tolerance_objective) break;
   }
 
   queue_dumper.push(std::make_pair(path_type(), weight_set_type()));
@@ -1073,7 +1081,9 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
     ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
-    ("tolerance",     po::value<double>(&tolerance)->default_value(tolerance),       "tolerance threshold")
+    
+    ("tolerance-objective",     po::value<double>(&tolerance_objective)->default_value(tolerance_objective), "tolerance threshold for primal objective")
+    ("tolerance-solver",        po::value<double>(&tolerance_solver)->default_value(tolerance_solver),       "tolerance threshold for QP solver")
     
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
