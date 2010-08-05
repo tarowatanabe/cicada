@@ -679,10 +679,10 @@ struct Task
 		      << std::endl;
 	  }
 	  
-	  if (id >= hypergraph_oracles.size())
-	    hypergraph_oracles.resize(id + 1);
+	  //if (id >= hypergraph_oracles.size())
+	  //  hypergraph_oracles.resize(id + 1);
 	  
-	  hypergraph_oracles[id] = hypergraph_reward;
+	  //hypergraph_oracles[id] = hypergraph_reward;
 
 	  if (learn_factored)
 	    add_support_vectors_factored(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
@@ -785,6 +785,7 @@ struct Task
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
       
+#if 0
       if (id >= hypergraph_oracles.size())
 	hypergraph_oracles.resize(id + 1);
       
@@ -798,6 +799,9 @@ struct Task
       }
       
       const hypergraph_type& hypergraph_reward = hypergraph_oracles[id];
+#endif
+      
+      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
       
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
