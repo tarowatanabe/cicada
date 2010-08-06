@@ -1012,7 +1012,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
       objective_min = std::min(objective_min, oiter->objective_min);
     }
     
-    weights_mixed *= (1.0 / (tasks.size() * updated));
+    weights_mixed *= (1.0 / updated);
     
     if (dump_weights) {
 

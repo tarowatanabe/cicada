@@ -1201,7 +1201,7 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     MPI::COMM_WORLD.Allreduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM);
     norm_accumulated += updated_accumulated;
     
-    weights_mixed *= (1.0 / (mpi_size * updated_accumulated));
+    weights_mixed *= (1.0 / updated_accumulated);
     
     double objective_max = - std::numeric_limits<double>::infinity();
     double objective_min =   std::numeric_limits<double>::infinity();
