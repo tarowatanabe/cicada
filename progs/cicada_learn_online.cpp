@@ -1000,16 +1000,19 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     int updated = 0;
     optimizer_set_type::iterator oiter_end = optimizers.end();
     for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
-      weights_mixed       += oiter->weights;
+      weight_set_type weights_scaled = oiter->weights;
+      weights_scaled *= oiter->updated;
+      
+      weights_mixed       += weights_scaled;
       weights_accumulated += oiter->accumulated;
       norm_accumulated    += oiter->updated;
       updated += oiter->updated;
-
+      
       objective_max = std::max(objective_max, oiter->objective_max);
       objective_min = std::min(objective_min, oiter->objective_min);
     }
     
-    weights_mixed *= (1.0 / tasks.size());
+    weights_mixed *= (1.0 / (tasks.size() * updated));
     
     if (dump_weights) {
 

@@ -1187,8 +1187,10 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     // merge weights...
     weights_mixed = optimizer.weights;
+    weights_mixed *= optimizer.updated;
+    
     reduce_weights(weights_mixed);
-    weights_mixed *= (1.0 / mpi_size);
+    
     
     bcast_weights(0, weights_mixed);
     
@@ -1198,6 +1200,8 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     long updated_accumulated = 0;
     MPI::COMM_WORLD.Allreduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM);
     norm_accumulated += updated_accumulated;
+    
+    weights_mixed *= (1.0 / (mpi_size * updated_accumulated));
     
     double objective_max = - std::numeric_limits<double>::infinity();
     double objective_min =   std::numeric_limits<double>::infinity();
