@@ -367,7 +367,7 @@ struct Task
     if (merged.is_valid()) {
       hypergraph_type hypergraph_merged;
       
-      cicada::apply_cube_prune(model_bleu, merged, hypergraph_merged, weight_set_function(weights, 1.0), cube_size);
+      cicada::apply_exact(model_bleu, merged, hypergraph_merged);
     
       modified.unite(hypergraph_merged);
     }
