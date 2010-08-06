@@ -362,8 +362,6 @@ struct Task
 			const weight_set_type& weights_prune,
 			const double margin)
   {
-    
-
     cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, 1.0), cube_size);
 
     hypergraph_type hypergraph_merged;
@@ -756,7 +754,7 @@ struct Task
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
       
-#if 1
+#if 0
       if (id >= hypergraph_oracles.size())
 	hypergraph_oracles.resize(id + 1);
       
