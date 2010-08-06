@@ -363,12 +363,14 @@ struct Task
 			const double margin)
   {
     cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, 1.0), cube_size);
-
-    hypergraph_type hypergraph_merged;
     
-    cicada::apply_cube_prune(model_bleu, merged, hypergraph_merged, weight_set_function(weights, 1.0), cube_size);
+    if (merged.is_valid()) {
+      hypergraph_type hypergraph_merged;
+      
+      cicada::apply_cube_prune(model_bleu, merged, hypergraph_merged, weight_set_function(weights, 1.0), cube_size);
     
-    modified.unite(hypergraph_merged);
+      modified.unite(hypergraph_merged);
+    }
     
     cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
