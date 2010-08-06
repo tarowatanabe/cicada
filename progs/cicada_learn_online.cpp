@@ -609,6 +609,8 @@ struct Task
 	  norm += source_length;
 	  norm -= norms[id];
 	  norms[id] = source_length;
+
+	  norm = 1;
 #endif
 #if 0
 	  if (score)
@@ -730,6 +732,8 @@ struct Task
       norm += source_length;
       norm -= norms[id];
       norms[id] = source_length;
+
+      norm = 1;
 #endif
 #if 0
       if (score)
