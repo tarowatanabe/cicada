@@ -769,7 +769,13 @@ struct Task
 #if 0
       prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
 #endif
+      
+#if 1
+      if (id >= hypergraph_oracles.size())
+	hypergraph_oracles.resize(id + 1);
+      
       prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_oracles[id], hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+#endif
       
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
