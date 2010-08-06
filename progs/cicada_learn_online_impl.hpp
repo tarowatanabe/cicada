@@ -215,7 +215,7 @@ struct OptimizeMIRA
     for (int i = 0; i < labels.size(); ++ i) {
       gradient[i] = margins[i] - labels[i] * features[i].dot(weights);
       
-      const bool skipping = (gradient[i] <= 0);
+      const bool skipping = (gradient[i] <= 0 || margins[i] <= 0);
       
       skipped[i] = skipping;
       num_instance += ! skipping;
