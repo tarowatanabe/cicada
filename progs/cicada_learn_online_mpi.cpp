@@ -438,6 +438,42 @@ struct Task
   typedef std::vector<int, std::allocator<int> > count_set_type;
   typedef boost::tuple<sentence_type, feature_set_type> yield_type;
   
+  void prune_hypergraph(model_type& model_bleu,
+			model_type& model_sparse,
+			const hypergraph_type& hypergraph,
+			const lattice_type& lattice,
+			const span_set_type& spans,
+			hypergraph_type& merged,
+			hypergraph_type& modified,
+			yield_type& yield, 
+			const weight_set_type& weights,
+			const weight_set_type& weights_prune,
+			const double margin)
+  {
+    cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, 1.0), cube_size);
+    
+    merged.unite(modified);
+    
+    cicada::prune_beam(merged, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
+
+    modified = merged;
+    
+    if (! model_sparse.empty()) {
+      model_sparse.assign(modified);
+      model_sparse.assign(lattice);
+      model_sparse.assign(spans);
+      
+      model_sparse.apply_feature(true);
+      
+      cicada::apply_exact(model_sparse, modified);
+      
+      model_sparse.apply_feature(false);
+    }
+    
+    weight_type weight;
+    
+    cicada::viterbi(modified, yield, weight, kbest_traversal(), weight_set_function(weights, 1.0));
+  }
   
   void prune_hypergraph(model_type& model_bleu,
 			model_type& model_sparse,
@@ -793,7 +829,7 @@ struct Task
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
       
-#if 1
+#if 0
       if (id >= hypergraph_oracles.size())
 	hypergraph_oracles.resize(id + 1);
       
@@ -808,8 +844,12 @@ struct Task
       
       const hypergraph_type& hypergraph_reward = hypergraph_oracles[id];
 #endif
-      
-      //prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+#if 0
+      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+#endif
+#if 1
+      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_oracles[id], hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+#endif
       
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
