@@ -635,19 +635,23 @@ struct Task
 	    norms.resize(id + 1);
 	  
 	  // remove "this" score
-#if 0
+#if 1
 	  if (score && scores[id])
 	    *score -= *scores[id];
-
+	  
 	  norm += source_length;
 	  norm -= norms[id];
 	  norms[id] = source_length;
+
+	  norm = 1;
 #endif
-	  
-	  norm *= 0.9;
+#if 0
 	  if (score)
 	    *score *= 0.9;
+	  
+	  norm *= 0.9;
 	  norm += source_length;
+#endif
 	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
@@ -758,19 +762,23 @@ struct Task
       if (id >= norms.size())
 	norms.resize(id + 1);
       
-#if 0
+#if 1
       if (score && scores[id])
         *score -= *scores[id];
       
       norm += source_length;
       norm -= norms[id];
       norms[id] = source_length;
-#endif
       
-      norm *= 0.9;
+      norm = 1;
+#endif
+#if 0
       if (score)
 	*score *= 0.9;
+       
+      norm *= 0.9;
       norm += source_length;
+#endif
       
       // create scorers...
       scorer->clear();
