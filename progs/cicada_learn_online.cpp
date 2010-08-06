@@ -384,7 +384,7 @@ struct Task
     
     cicada::viterbi(modified, yield, weight, kbest_traversal(), weight_set_function(weights, 1.0));
 
-    merged = modified
+    merged = modified;
   }
 
   
