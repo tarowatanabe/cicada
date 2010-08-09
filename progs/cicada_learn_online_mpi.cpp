@@ -677,7 +677,7 @@ struct Task
 	    norms.resize(id + 1);
 	  
 	  // remove "this" score
-#if 1
+#if 0
 	  if (score && scores[id])
 	    *score -= *scores[id];
 	  
@@ -685,7 +685,7 @@ struct Task
 	  norm -= norms[id];
 	  norms[id] = source_length;
 #endif
-#if 0
+#if 1
 	  if (score)
 	    *score *= 0.9;
 	  
@@ -802,7 +802,7 @@ struct Task
       if (id >= norms.size())
 	norms.resize(id + 1);
       
-#if 1
+#if 0
       if (score && scores[id])
         *score -= *scores[id];
       
@@ -810,7 +810,7 @@ struct Task
       norm -= norms[id];
       norms[id] = source_length;
 #endif
-#if 0
+#if 1
       if (score)
 	*score *= 0.9;
        
