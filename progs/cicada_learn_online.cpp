@@ -96,6 +96,8 @@ bool op_list = false;
 
 std::string scorer_name    = "bleu:order=4,exact=false";
 
+std::string algorithm = "mira";
+
 bool learn_regression = false;
 bool learn_factored = false;
 
@@ -124,7 +126,7 @@ int threads = 4;
 
 int debug = 0;
 
-
+template <typename Optimizer>
 void optimize(weight_set_type& weights, weight_set_type& weights_average);
 
 void options(int argc, char** argv);
@@ -167,8 +169,12 @@ int main(int argc, char ** argv)
       is >> weights;
     }
     
-    optimize(weights, weights_average);
-    
+    if (strcasecmp(algorithm.c_str(), "mira") == 0)
+      optimize<OptimizeMIRA>(weights, weights_average);
+    else if (strcasecmp(algorithm.c_str(), "cp") == 0)
+      optimize<OptimizeCP>(weights, weights_average);
+    else
+      throw std::runtime_error("unsupported learning algorithm: " + algorithm);
     
 
     {
@@ -342,6 +348,7 @@ struct Task
     }
   };
 
+  typedef std::vector<size_t, std::allocator<size_t> > id_collection_type;
   typedef std::vector<double, std::allocator<double> > label_collection_type;
   typedef std::vector<double, std::allocator<double> > margin_collection_type;
   typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_collection_type;
@@ -426,9 +433,11 @@ struct Task
     cicada::viterbi(modified, yield, weight, kbest_traversal(), weight_set_function(weights, 1.0));
   }
 
-  void add_support_vectors_regression(const hypergraph_type& hypergraph_reward,
+  void add_support_vectors_regression(const size_t& id,
+				      const hypergraph_type& hypergraph_reward,
 				      const hypergraph_type& hypergraph_penalty,
 				      const feature_type& feature_name,
+				      id_collection_type& ids,
 				      label_collection_type& labels,
 				      margin_collection_type& margins,
 				      feature_collection_type& features)
@@ -455,14 +464,17 @@ struct Task
     features.back()["bias"] = 1.0;
     features.back().erase(feature_name);
     
+    ids.push_back(id);
     labels.push_back(1.0);
     margins.push_back(bleu_score * norm * loss_scale);
   }
   
 
-  void add_support_vectors_factored(const hypergraph_type& hypergraph_reward,
+  void add_support_vectors_factored(const size_t& id,
+				    const hypergraph_type& hypergraph_reward,
 				    const hypergraph_type& hypergraph_penalty,
 				    const feature_type& feature_name,
+				    id_collection_type& ids,
 				    label_collection_type& labels,
 				    margin_collection_type& margins,
 				    feature_collection_type& features)
@@ -496,9 +508,10 @@ struct Task
       
       features.back().erase(feature_name);
       
+      ids.push_back(id);
       labels.push_back(1.0);
-      //margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
-      margins.push_back(1.0);
+      margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
+      //margins.push_back(1.0);
     }
     
     for (int i = 0; i < accumulated_penalty.size(); ++ i) {
@@ -510,9 +523,10 @@ struct Task
 	    
       features.back().erase(feature_name);
       
+      ids.push_back(id);
       labels.push_back(-1.0);
-      //margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
-      margins.push_back(1.0);
+      margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
+      //margins.push_back(1.0);
     }
   }
   
@@ -567,8 +581,8 @@ struct Task
     
     yield_type  yield_penalty;
     weight_type weight_penalty;
-
     
+    id_collection_type      ids;
     label_collection_type   labels;
     margin_collection_type  margins;
     feature_collection_type features;
@@ -670,9 +684,9 @@ struct Task
 	  hypergraph_oracles[id] = hypergraph_reward;
 	  
 	  if (learn_factored)
-	    add_support_vectors_factored(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
+	    add_support_vectors_factored(id, hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), ids, labels, margins, features);
 	  else
-	    add_support_vectors_regression(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
+	    add_support_vectors_regression(id, hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), ids, labels, margins, features);
 	  
 	  ++ batch_current;
 	  
@@ -680,9 +694,10 @@ struct Task
 	    if (debug)
 	      std::cerr << "# of support vectors: " << labels.size() << std::endl;
 	    
-	    optimizer(labels, margins, features);
+	    optimizer(ids, labels, margins, features);
 	    
 	    batch_current = 0;
+	    ids.clear();
 	    labels.clear();
 	    margins.clear();
 	    features.clear();
@@ -844,9 +859,9 @@ struct Task
       }
 
       if (learn_factored)
-	add_support_vectors_factored(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
+	add_support_vectors_factored(id, hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), ids, labels, margins, features);
       else
-	add_support_vectors_regression(hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), labels, margins, features);
+	add_support_vectors_regression(id, hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), ids, labels, margins, features);
       
       ++ batch_current;
       
@@ -854,9 +869,10 @@ struct Task
 	if (debug)
 	  std::cerr << "# of support vectors: " << labels.size() << std::endl;
 	
-	optimizer(labels, margins, features);
+	optimizer(ids, labels, margins, features);
 	
 	batch_current = 0;
+	ids.clear();
 	labels.clear();
 	margins.clear();
 	features.clear();
@@ -873,9 +889,10 @@ struct Task
       if (debug)
 	std::cerr << "# of support vectors: " << labels.size() << std::endl;
       
-      optimizer(labels, margins, features);
+      optimizer(ids, labels, margins, features);
 
       batch_current = 0;
+      ids.clear();
       labels.clear();
       margins.clear();
       features.clear();
@@ -937,16 +954,17 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
+template <typename Optimizer>
 void optimize(weight_set_type& weights, weight_set_type& weights_average)
 {
-  typedef OptimizeMIRA optimizer_type;
+  typedef Optimizer optimizer_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
   
   typedef Task<optimizer_type>         task_type;
   typedef boost::shared_ptr<task_type> task_ptr_type;
   typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_ptr_set_type;
   
-  typedef task_type::queue_type queue_type;
+  typedef typename task_type::queue_type queue_type;
   typedef boost::shared_ptr<queue_type> queue_ptr_type;
   typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
   
@@ -1063,8 +1081,8 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     double objective_min =   std::numeric_limits<double>::infinity();
     
     int updated = 0;
-    optimizer_set_type::iterator oiter_end = optimizers.end();
-    for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
+    typename optimizer_set_type::iterator oiter_end = optimizers.end();
+    for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
       weight_set_type weights_scaled = oiter->weights;
       weights_scaled *= oiter->updated;
       
@@ -1089,7 +1107,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
       queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"), weights_average));
     }
     
-    for (optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
+    for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
       if (mix_weights)
 	oiter->weights = weights_mixed;
       
@@ -1151,6 +1169,8 @@ void options(int argc, char** argv)
     
     // learning related..
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    
+    ("algorithm", po::value<std::string>(&algorithm)->default_value(algorithm), "optimization algorithm (MIRA or CP)")
 
     ("learn-regression", po::bool_switch(&learn_regression), "learn by regression")
     ("learn-factored",   po::bool_switch(&learn_factored),   "learn by edge-factored linear classification")

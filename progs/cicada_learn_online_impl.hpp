@@ -132,7 +132,392 @@ void decode_support_vectors(const std::string& data,
 struct OptimizeCP
 {
   // cutting-plane optimizer...
+
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
+  typedef std::vector<double, std::allocator<double> >    alpha_type;
+  typedef std::vector<double, std::allocator<double> >    gradient_type;
+  typedef std::vector<double, std::allocator<double> >    error_bound_type;
+  typedef std::vector<double, std::allocator<double> >    objective_type;
   
+  typedef std::vector<int, std::allocator<int> > pos_set_type;
+  typedef std::vector<pos_set_type, std::allocator<pos_set_type> >  pos_map_type;
+  
+  typedef std::vector<int, std::allocator<int> > ids_type;
+  typedef std::vector<double, std::allocator<double> > labels_type;
+  typedef std::vector<double, std::allocator<double> > margins_type;
+  typedef std::vector<feature_set_type, std::allocator<feature_set_type> > features_type;
+  
+  typedef std::vector<int, std::allocator<int> >          timestamp_type;
+  
+  
+  OptimizeCP(const weight_set_type& __weights,
+	     const double& __lambda,
+	     const double& __tolerance,
+	     const int __debug=0)
+    : lambda(__lambda),
+      C(1.0 / __lambda),
+      tolerance(__tolerance),
+      objective_max(- std::numeric_limits<double>::infinity()),
+      objective_min(  std::numeric_limits<double>::infinity()),
+      weights(__weights),
+      accumulated(),
+      updated(1),
+      debug(__debug) {}
+  
+  void finalize()
+  {
+    
+  }
+  
+  void initialize()
+  {
+    objective_max = - std::numeric_limits<double>::infinity();
+    objective_min =   std::numeric_limits<double>::infinity();
+    
+    accumulated.clear();
+    updated = 1;
+  }
+
+  template <typename LabelSet, typename FeatureSet>
+  struct h_matrix : public utils::hashmurmur<size_t>
+  {
+    h_matrix(const LabelSet& __labels, const FeatureSet& __features)
+      : labels(__labels), features(__features) {}
+    
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    double operator()(int i, int j) const
+    {
+      return labels[i] * labels[j] * features[i].dot(features[j]);
+    }
+    
+    const LabelSet& labels;
+    const FeatureSet& features;
+  };
+
+  template <typename IDSet, typename LabelSet, typename MarginSet, typename FeatureSet>
+  void operator()(const IDSet&      __ids,
+		  const LabelSet&   __labels,
+		  const MarginSet&  __margins,
+		  const FeatureSet& __features)
+  {
+    // QP solver used on OCAS
+    //h_matrix<LabelSet, FeatureSet>  H(labels, features);
+    
+    size_t num_instance = 0;
+    for (int i = 0; i < __labels.size(); ++ i) {
+      if (__margins[i] <= 0) continue;
+      
+      const double margin = __labels[i] * __features[i].dot(weights);
+      const double grad = __margins[i] - margin;
+      
+      // we have reached better error bound
+      if (__ids[i] < error_bound.size() && error_bound[__ids[i]] >= grad) continue;
+      
+      // we have achieved some tolerance
+      if (__ids[i] < objective.size() && C * grad - objective[__ids[i]] <= tolerance) continue;
+      
+      ids.push_back(__ids[i]);
+      labels.push_back(__labels[i]);
+      margins.push_back(__margins[i]);
+      features.push_back(__features[i]);
+      
+      objective_max = std::max(objective_max, grad);
+      objective_min = std::min(objective_min, grad);
+      
+      ++ num_instance;
+    }
+    
+    if (! num_instance) return;
+
+    h_matrix<labels_type, features_type>  H(labels, features);
+    
+    const size_t model_size = labels.size();
+    
+    alpha.resize(model_size, 0.0);
+    
+    gradient.clear();
+    gradient.assign(margins.begin(), margins.end());
+    
+    pos_map.clear();
+    alpha_neq.clear();
+    for (int i = 0; i < model_size; ++ i) {
+      const int pos = ids[i];
+      const size_t size = std::max(pos_map.size(), size_t(pos + 1));
+      
+      pos_map.resize(size);
+      alpha_neq.resize(size, C);
+      
+      pos_map[pos].push_back(i);
+      alpha_neq[pos] -= alpha[i];
+    }
+    
+    for (int i = 0; i < model_size; ++ i)
+      for (int j = 0; j < model_size; ++ j)
+	gradient[i] -= H(i, j) * alpha[j];
+    
+    double obj_primal = 0.0;
+    double obj_dual   = 0.0;
+    
+    objective.clear();
+    objective.resize(pos_map.size(), 0.0);
+    
+    size_type num_samples = 0;
+    for (int k = 0; k < pos_map.size(); ++ k) 
+      if (! pos_map[k].empty()) {
+	++ num_samples;
+	
+	double obj_primal_local = 0.0;
+	objective[k] = 0.0;
+	for (pos_set_type::const_iterator kiter = pos_map[k].begin(); kiter != pos_map[k].end(); ++ kiter) {
+	  obj_primal_local = std::max(obj_primal_local, gradient[*kiter]);
+	  objective[k] += gradient[*kiter] * alpha[*kiter];
+	}
+	obj_primal += C * obj_primal_local;
+	obj_dual += objective[k];
+      }
+    
+    if (debug)
+      std::cerr << "initial primal: " << obj_primal 
+		<< " dual: " << obj_dual 
+		<< std::endl;
+    
+    for (int iter = 0; iter != 1000; ++ iter) {
+      
+      for (int k = 0; k < pos_map.size(); ++ k) 
+	if (! pos_map[k].empty()) {
+	  int u = -1;
+	  double max_obj = - std::numeric_limits<double>::infinity();
+	  double delta = 0.0;
+	  
+	  for (pos_set_type::const_iterator kiter = pos_map[k].begin(); kiter != pos_map[k].end(); ++ kiter) {
+	    delta -= alpha[*kiter] * gradient[*kiter];
+	    
+	    if (gradient[*kiter] > max_obj) {
+	      max_obj = gradient[*kiter];
+	      u = *kiter;
+	    }
+	  }
+	  
+	  if (gradient[u] < 0.0)
+	    u = -1;
+	  else
+	    delta += C * gradient[u];
+	  
+	  if (delta <= tolerance) continue;
+	  
+	  
+	  if (u >= 0) {
+	    
+	    int v = -1;
+	    double max_improvement = - std::numeric_limits<double>::infinity();
+	    double tau = 1.0;
+	    
+	    for (pos_set_type::const_iterator kiter = pos_map[k].begin(); kiter != pos_map[k].end(); ++ kiter) 
+	      if (*kiter != u && alpha[*kiter] > 0.0) {
+		
+		const double numer = alpha[*kiter] * (gradient[u] - gradient[*kiter]);
+		const double denom = alpha[*kiter] * alpha[*kiter] * (H(u, u) - 2.0 * H(u, *kiter) + H(*kiter, *kiter));
+		
+		if (denom > 0.0) {
+		  const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+		  
+		  if (improvement > max_improvement) {
+		    max_improvement = improvement;
+		    tau = std::max(0.0, std::min(1.0, numer / denom));
+		    v = *kiter;
+		  }
+		}
+	      }
+	    
+	    if (alpha_neq[k] > 0.0) {
+	      const double numer = alpha_neq[k] * gradient[u];
+	      const double denom = alpha_neq[k] * alpha_neq[k] * H(u, u);
+	      
+	      if (denom > 0.0) {
+		const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+		
+		if (improvement > max_improvement) {
+		  max_improvement = improvement;
+		  tau = std::max(0.0, std::min(1.0, numer / denom));
+		  v = -1;
+		}
+	      }
+	    }
+	    
+	    if (v >= 0) {
+	      // maximize objective, u and v
+	      double update = alpha[v] * tau;
+	      if (alpha[u] + update < 0.0)
+		update = - alpha[u];
+	      
+	      // clipping...
+	      alpha[u] += update;
+	      alpha[v] -= update;
+	      
+	      // update g...
+	      for (int i = 0; i < model_size; ++ i)
+		gradient[i] += update * (H(i, v) - H(i, u));
+	      
+	    } else {
+	      double update = alpha_neq[k] * tau;
+	      if (alpha[u] + update < 0.0)
+		update = - alpha[u];
+	      
+	      alpha[u] += update;
+	      alpha_neq[k] -= update;
+	      
+	      // update g..
+	      for (int i = 0; i < model_size; ++ i)
+		gradient[i] -= update * H(i, u);
+	    }
+	    
+	  } else {
+	    int v = -1;
+	    double max_improvement = - std::numeric_limits<double>::infinity();
+	    double tau = 1.0;
+	    
+	    for (pos_set_type::const_iterator kiter = pos_map[k].begin(); kiter != pos_map[k].end(); ++ kiter) 
+	      if (alpha[*kiter] > 0.0) {
+		
+		const double numer = alpha[*kiter] * gradient[*kiter];
+		const double denom = alpha[*kiter] * alpha[*kiter] * H(*kiter, *kiter);
+		
+		if (denom > 0.0) {
+		  const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+		  
+		  if (improvement > max_improvement) {
+		    max_improvement = improvement;
+		    tau = std::max(0.0, std::min(1.0, numer / denom));
+		    v = *kiter;
+		  }
+		}
+	      }
+	    
+	    if (v >= 0) {
+	      double update = alpha[v] * tau;
+	      if (alpha_neq[k] + update < 0.0)
+		update = - alpha_neq[k];
+	      
+	      alpha_neq[k] += update;
+	      alpha[v] -= update;
+	      	      
+	      for (int i = 0; i < model_size; ++ i)
+		gradient[i] += update * H(i, v);
+	    }
+	  }
+	}
+     
+      // compute primal/dual
+
+      obj_primal = 0.0;
+      obj_dual   = 0.0;
+      for (int k = 0; k < pos_map.size(); ++ k) 
+	if (! pos_map[k].empty()) {
+	  ++ num_samples;
+	  
+	  double obj_primal_local = 0.0;
+	  objective[k] = 0.0;
+	  for (pos_set_type::const_iterator kiter = pos_map[k].begin(); kiter != pos_map[k].end(); ++ kiter) {
+	    obj_primal_local = std::max(obj_primal_local, gradient[*kiter]);
+	    objective[k] += gradient[*kiter] * alpha[*kiter];
+	  }
+	  obj_primal += C * obj_primal_local;
+	  obj_dual += objective[k];
+	}
+      
+      if (obj_primal - obj_dual <= tolerance * num_samples)
+	break;
+    }
+    
+    if (debug)
+      std::cerr << "final primal: " << obj_primal
+		<< " dual: " << obj_dual
+		<< std::endl;
+    
+    timestamp.resize(model_size, 0);
+    weights.clear();
+    for (int i = 0; i < labels.size(); ++ i) {
+      if (alpha[i] > 0.0) {
+	
+	typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
+	for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	  const double value = alpha[i] * labels[i] * fiter->second;
+	  
+	  weights[fiter->first]     += value;
+	  accumulated[fiter->first] += value;
+	}
+      }
+      
+      timestamp[i] = ((int(alpha[i] != 0.0) - 1) & (timestamp[i] + 1));
+    }
+    
+    ++ updated;
+    
+    // if the alpha value for a support vector is zero for a fixed amount of time, 50, then, prune...
+    int pos_last = model_size;
+    for (int pos = 0; pos < pos_last; /**/) 
+      if (timestamp[pos] >= 50) {
+	if (pos_last - 1 != pos) {
+	  const int pos_swap1 = pos;
+	  const int pos_swap2 = pos_last - 1;
+	  
+	  std::swap(timestamp[pos_swap1], timestamp[pos_swap2]);
+	  std::swap(alpha[pos_swap1],     alpha[pos_swap2]);
+	  
+	  std::swap(ids[pos_swap1],      ids[pos_swap2]);
+	  std::swap(labels[pos_swap1],   labels[pos_swap2]);
+	  std::swap(margins[pos_swap1],  margins[pos_swap2]);
+	  std::swap(features[pos_swap1], features[pos_swap2]);
+	  
+	}
+	-- pos_last;
+      } else
+	  ++ pos;
+    
+    if (pos_last != model_size) {
+      timestamp.resize(pos_last);
+      alpha.resize(pos_last);
+      
+      ids.resize(pos_last);
+      labels.resize(pos_last);
+      margins.resize(pos_last);
+      features.resize(pos_last);
+
+      if (debug)
+	std::cerr << "support vector size: " << model_size << " pruned: " << pos_last << std::endl;
+    }
+    
+  }
+  
+  ids_type      ids;
+  labels_type   labels;
+  margins_type  margins;
+  features_type features;
+  
+  alpha_type       alpha;
+  alpha_type       alpha_neq;
+  gradient_type    gradient;
+  error_bound_type error_bound;
+  objective_type   objective;
+  pos_map_type     pos_map;
+
+  timestamp_type   timestamp;
+  
+  double lambda;
+  double C;
+  double tolerance;
+
+  double objective_max;
+  double objective_min;
+  
+  weight_set_type weights;
+  weight_set_type accumulated;
+  size_t          updated;
+
+  int debug;
 };
 
 struct OptimizeMIRA
@@ -189,8 +574,9 @@ struct OptimizeMIRA
     const FeatureSet& features;
   };
   
-  template <typename LabelSet, typename MarginSet, typename FeatureSet>
-  void operator()(const LabelSet&   labels,
+  template <typename IDSet, typename LabelSet, typename MarginSet, typename FeatureSet>
+  void operator()(const IDSet&      ids,
+		  const LabelSet&   labels,
 		  const MarginSet&  margins,
 		  const FeatureSet& features)
   {
