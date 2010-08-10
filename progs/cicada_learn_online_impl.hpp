@@ -178,7 +178,7 @@ struct OptimizeCP
     objective_max = - std::numeric_limits<double>::infinity();
     objective_min =   std::numeric_limits<double>::infinity();
     
-    accumulated.clear();
+    accumulated = weights;
     updated = 1;
   }
 
