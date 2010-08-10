@@ -697,9 +697,24 @@ struct Task
 	    *score_1best -= *scores[id];
 
 	  scorer->clear();
+	  __bleu->clear();
 	  sentence_set_type::const_iterator titer_end = targets.end();
-	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer) {
 	    scorer->insert(*titer);
+	    __bleu->insert(source_length, *titer);
+	  }
+	  __bleu->insert(score);
+	  
+	  {
+	    hypergraph_type hypergraph_reward_rescored;
+	    hypergraph_type hypergraph_penalty_rescored;
+	    
+	    cicada::apply_exact(model_bleu, hypergraph_reward, hypergraph_reward_rescored);
+	    cicada::apply_exact(model_bleu, hypergraph_penalty, hypergraph_penalty_rescored);
+	    
+	    hypergraph_reward.swap(hypergraph_reward_rescored);
+	    hypergraph_penalty.swap(hypergraph_penalty_rescored);
+	  }
 	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
