@@ -22,6 +22,7 @@
 #include <utils/arc_list.hpp>
 
 #include <utils/lockfree_list_queue.hpp>
+#include <utils/vector2.hpp>
 
 inline
 path_type add_suffix(const path_type& path, const std::string& suffix)
@@ -150,7 +151,8 @@ struct OptimizeCP
   typedef std::vector<feature_set_type, std::allocator<feature_set_type> > features_type;
   
   typedef std::vector<int, std::allocator<int> >          timestamp_type;
-  
+
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
   
   OptimizeCP(const weight_set_type& __weights,
 	     const double& __lambda,
@@ -231,10 +233,20 @@ struct OptimizeCP
     }
     
     if (! num_instance) return;
-
-    h_matrix<labels_type, features_type>  H(labels, features);
     
     const size_t model_size = labels.size();
+    const size_t model_size_prev = model_size - num_instance;
+    
+    H_new.resize(model_size, model_size, 0.0);
+    for (int i = 0; i < model_size_prev; ++ i)
+      std::copy(H.begin(i), H.end(i), H_new.begin(i));
+    H.swap(H_new);
+
+    // re-compute new H for  i >= size_prev || j >= size_prev
+    // 
+    for (int i = 0; i < model_size; ++ i)
+      for (int j = (i >= model_size_prev ? size_type(0) : model_size_prev); j < model_size; ++ j)
+	H(i, j) = labels[i] * labels[j] * features[i].dot(features[j]);;
     
     alpha.resize(model_size, 0.0);
     
@@ -284,7 +296,7 @@ struct OptimizeCP
 		<< " dual: " << obj_dual 
 		<< std::endl;
     
-    for (int iter = 0; iter != 1000; ++ iter) {
+    for (int iter = 0; iter != 100; ++ iter) {
       
       for (int k = 0; k < pos_map.size(); ++ k) 
 	if (! pos_map[k].empty()) {
@@ -471,7 +483,8 @@ struct OptimizeCP
 	  std::swap(labels[pos_swap1],   labels[pos_swap2]);
 	  std::swap(margins[pos_swap1],  margins[pos_swap2]);
 	  std::swap(features[pos_swap1], features[pos_swap2]);
-	  
+
+	  H.swap(pos_swap1, pos_swap2);
 	}
 	-- pos_last;
       } else
@@ -485,6 +498,11 @@ struct OptimizeCP
       labels.resize(pos_last);
       margins.resize(pos_last);
       features.resize(pos_last);
+      
+      H_new.resize(pos_last, pos_last, 0.0);
+      for (int i = 0; i < pos_last; ++ i)
+	std::copy(H.begin(i), H.begin(i) + pos_last, H_new.begin(i));
+      H.swap(H_new);
 
       if (debug)
 	std::cerr << "support vector size: " << model_size << " pruned: " << pos_last << std::endl;
@@ -496,6 +514,9 @@ struct OptimizeCP
   labels_type   labels;
   margins_type  margins;
   features_type features;
+
+  matrix_type H;
+  matrix_type H_new;
   
   alpha_type       alpha;
   alpha_type       alpha_neq;
