@@ -507,7 +507,11 @@ struct OptimizeCP
       if (debug)
 	std::cerr << "support vector size: " << model_size << " pruned: " << pos_last << std::endl;
     }
-    
+
+    error_bound.clear();
+    error_bound.resize(objective.size(), - std::numeric_limits<double>::infinity());
+    for (int i = 0; i < labels.size(); ++ i)
+      error_bound[ids[i]] = std::max(error_bound[ids[i]], margins[i] - labels[i] * features[i].dot(weights));
   }
   
   ids_type      ids;
