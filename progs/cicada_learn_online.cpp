@@ -776,7 +776,8 @@ struct Task
 	scorer->insert(*titer);
 	__bleu->insert(source_length, *titer);
       }
-      __bleu->insert(score);
+      if (! loss_segment)
+	__bleu->insert(score);
       
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
@@ -793,19 +794,6 @@ struct Task
       
       // erase unused weights...
       weights.erase(__bleu->feature_name());
-
-      if (loss_segment) {
-	__bleu->insert(score_ptr_type());
-	
-	hypergraph_type hypergraph_reward_rescored;
-	hypergraph_type hypergraph_penalty_rescored;
-	
-	cicada::apply_exact(model_bleu, hypergraph_reward, hypergraph_reward_rescored);
-	cicada::apply_exact(model_bleu, hypergraph_penalty, hypergraph_penalty_rescored);
-	
-	hypergraph_reward.swap(hypergraph_reward_rescored);
-	hypergraph_penalty.swap(hypergraph_penalty_rescored);
-      }
       
       score_ptr_type score_reward  = scorer->score(boost::get<0>(yield_reward));
       score_ptr_type score_penalty = scorer->score(boost::get<0>(yield_penalty));
