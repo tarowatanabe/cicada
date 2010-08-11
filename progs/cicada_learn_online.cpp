@@ -108,6 +108,7 @@ bool regularize_l2 = false;
 double C = 1.0;
 
 bool loss_document = false;
+bool loss_segment = false;
 double loss_scale = 100;
 
 double tolerance_objective = 1e-4;
@@ -645,7 +646,8 @@ struct Task
 	    scorer->insert(*titer);
 	    __bleu->insert(source_length, *titer);
 	  }
-	  __bleu->insert(score);
+	  if (! loss_segment)
+	    __bleu->insert(score);
 	  
 	  {
 	    hypergraph_type hypergraph_reward_rescored;
@@ -780,7 +782,8 @@ struct Task
 	scorer->insert(*titer);
 	__bleu->insert(source_length, *titer);
       }
-      __bleu->insert(score);
+      if (! loss_segment)
+	__bleu->insert(score);
       
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
@@ -1184,8 +1187,9 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
 
-    ("loss-document", po::bool_switch(&loss_document),                               "document-wise loss")
-    ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
+    ("loss-document", po::bool_switch(&loss_document),                           "document-wise loss")
+    ("loss-segment",  po::bool_switch(&loss_segment),                            "segment-wise loss")
+    ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale), "loss scaling")
     
     ("tolerance-objective",     po::value<double>(&tolerance_objective)->default_value(tolerance_objective), "tolerance threshold for primal objective")
     ("tolerance-solver",        po::value<double>(&tolerance_solver)->default_value(tolerance_solver),       "tolerance threshold for QP solver")
