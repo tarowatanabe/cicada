@@ -483,12 +483,12 @@ struct OptimizeCP
 	  std::swap(labels[pos_swap1],   labels[pos_swap2]);
 	  std::swap(margins[pos_swap1],  margins[pos_swap2]);
 	  std::swap(features[pos_swap1], features[pos_swap2]);
-
+	  
 	  H.swap(pos_swap1, pos_swap2);
 	}
 	-- pos_last;
       } else
-	  ++ pos;
+	++ pos;
     
     if (pos_last != model_size) {
       timestamp.resize(pos_last);

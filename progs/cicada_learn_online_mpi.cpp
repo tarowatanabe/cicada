@@ -111,6 +111,8 @@ int iteration = 100;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+
+bool loss_document = false;
 double loss_scale = 100;
 
 double tolerance_objective = 1e-4;
@@ -689,26 +691,25 @@ struct Task
 
 	  if (id >= scores.size())
 	    scores.resize(id + 1);
-	  
 	  if (id >= norms.size())
 	    norms.resize(id + 1);
 	  
-	  // remove "this" score
-#if 0
-	  if (score && scores[id])
-	    *score -= *scores[id];
-	  
-	  norm += source_length;
-	  norm -= norms[id];
-	  norms[id] = source_length;
-#endif
-#if 1
-	  if (score)
-	    *score *= 0.9;
-	  
-	  norm *= 0.9;
-	  norm += source_length;
-#endif
+	  if (loss_document) {
+	    if (score && scores[id])
+	      *score -= *scores[id];
+	    
+	    norm -= norms[id];
+	    norm += source_length;
+	    norms[id] = source_length;
+
+	    norm = 1;
+	  } else {
+	    if (score)
+	      *score *= 0.9;
+	    
+	    norm *= 0.9;
+	    norm += source_length;
+	  }
 	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
@@ -831,25 +832,25 @@ struct Task
       // update scores...
       if (id >= scores.size())
 	scores.resize(id + 1);
-
       if (id >= norms.size())
 	norms.resize(id + 1);
       
-#if 0
-      if (score && scores[id])
-        *score -= *scores[id];
-      
-      norm += source_length;
-      norm -= norms[id];
-      norms[id] = source_length;
-#endif
-#if 1
-      if (score)
-	*score *= 0.9;
-       
-      norm *= 0.9;
-      norm += source_length;
-#endif
+      if (loss_document) {
+	if (score && scores[id])
+	  *score -= *scores[id];
+	
+	norm -= norms[id];
+	norm += source_length;
+	norms[id] = source_length;
+	
+	norm = 1;
+      } else {
+	if (score)
+	  *score *= 0.9;
+	
+	norm *= 0.9;
+	norm += source_length;
+      }
       
       // create scorers...
       scorer->clear();
@@ -1547,6 +1548,8 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
+
+    ("loss-document", po::bool_switch(&loss_document),                               "document-wise loss")
     ("loss-scale",    po::value<double>(&loss_scale)->default_value(loss_scale),     "loss scaling")
     
     ("tolerance-objective",     po::value<double>(&tolerance_objective)->default_value(tolerance_objective), "tolerance threshold for primal objective")
