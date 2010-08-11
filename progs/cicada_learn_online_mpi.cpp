@@ -692,16 +692,10 @@ struct Task
 
 	  if (id >= scores.size())
 	    scores.resize(id + 1);
-	  if (id >= norms.size())
-	    norms.resize(id + 1);
 	  
 	  if (loss_document) {
 	    if (score && scores[id])
 	      *score -= *scores[id];
-	    
-	    norm -= norms[id];
-	    norm += source_length;
-	    norms[id] = source_length;
 
 	    norm = 1;
 	  } else {
@@ -711,6 +705,9 @@ struct Task
 	    norm *= 0.9;
 	    norm += source_length;
 	  }
+
+	  if (loss_segment)
+	    norm = 1;
 	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
@@ -834,16 +831,10 @@ struct Task
       // update scores...
       if (id >= scores.size())
 	scores.resize(id + 1);
-      if (id >= norms.size())
-	norms.resize(id + 1);
       
       if (loss_document) {
 	if (score && scores[id])
 	  *score -= *scores[id];
-	
-	norm -= norms[id];
-	norm += source_length;
-	norms[id] = source_length;
 	
 	norm = 1;
       } else {
@@ -854,6 +845,9 @@ struct Task
 	norm += source_length;
       }
       
+      if (loss_segment)
+	norm = 1;
+      
       // create scorers...
       scorer->clear();
       __bleu->clear();
@@ -862,37 +856,15 @@ struct Task
 	scorer->insert(*titer);
 	__bleu->insert(source_length, *titer);
       }
-      
-      if (! loss_segment)
-	__bleu->insert(score);
+      __bleu->insert(score);
       
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
       
-#if 0
-      if (id >= hypergraph_oracles.size())
-	hypergraph_oracles.resize(id + 1);
-      
-      hypergraph_oracles[id].unite(hypergraph);
-      {
-	hypergraph_type hypergraph_reward;
-      
-	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
-      
-	hypergraph_oracles[id].swap(hypergraph_reward);
-      }
-      
-      const hypergraph_type& hypergraph_reward = hypergraph_oracles[id];
-#endif
-#if 0
-      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
-#endif
-#if 1
       if (id >= hypergraph_oracles.size())
 	hypergraph_oracles.resize(id + 1);
 
       prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_oracles[id], hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
-#endif
       
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
@@ -901,6 +873,19 @@ struct Task
       
       // erase unused weights...
       weights.erase(__bleu->feature_name());
+      
+      if (loss_segment) {
+	__bleu->insert(score_ptr_type());
+
+	hypergraph_type hypergraph_reward_rescored;
+	hypergraph_type hypergraph_penalty_rescored;
+	
+	cicada::apply_exact(model_bleu, hypergraph_reward, hypergraph_reward_rescored);
+	cicada::apply_exact(model_bleu, hypergraph_penalty, hypergraph_penalty_rescored);
+	
+	hypergraph_reward.swap(hypergraph_reward_rescored);
+	hypergraph_penalty.swap(hypergraph_penalty_rescored);
+      }
       
       score_ptr_type score_reward  = scorer->score(boost::get<0>(yield_reward));
       score_ptr_type score_penalty = scorer->score(boost::get<0>(yield_penalty));

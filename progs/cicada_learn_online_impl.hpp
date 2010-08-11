@@ -296,7 +296,10 @@ struct OptimizeCP
 		<< " dual: " << obj_dual 
 		<< std::endl;
     
+    bool perform_update = false;
     for (int iter = 0; iter != 100; ++ iter) {
+
+      bool perform_update_local = false;
       
       for (int k = 0; k < pos_map.size(); ++ k) 
 	if (! pos_map[k].empty()) {
@@ -365,25 +368,27 @@ struct OptimizeCP
 	      if (alpha[u] + update < 0.0)
 		update = - alpha[u];
 	      
-	      // clipping...
-	      alpha[u] += update;
-	      alpha[v] -= update;
-	      
-	      // update g...
-	      for (int i = 0; i < model_size; ++ i)
-		gradient[i] += update * (H(i, v) - H(i, u));
-	      
+	      if (update != 0.0) {
+		perform_update_local = true;
+		
+		alpha[u] += update;
+		alpha[v] -= update;
+		for (int i = 0; i < model_size; ++ i)
+		  gradient[i] += update * (H(i, v) - H(i, u));
+	      }
 	    } else {
 	      double update = alpha_neq[k] * tau;
 	      if (alpha[u] + update < 0.0)
 		update = - alpha[u];
 	      
-	      alpha[u] += update;
-	      alpha_neq[k] -= update;
-	      
-	      // update g..
-	      for (int i = 0; i < model_size; ++ i)
-		gradient[i] -= update * H(i, u);
+	      if (update != 0.0) {
+		perform_update_local = true;
+		
+		alpha[u] += update;
+		alpha_neq[k] -= update;
+		for (int i = 0; i < model_size; ++ i)
+		  gradient[i] -= update * H(i, u);
+	      }
 	    }
 	    
 	  } else {
@@ -413,17 +418,23 @@ struct OptimizeCP
 	      if (alpha_neq[k] + update < 0.0)
 		update = - alpha_neq[k];
 	      
-	      alpha_neq[k] += update;
-	      alpha[v] -= update;
-	      	      
-	      for (int i = 0; i < model_size; ++ i)
-		gradient[i] += update * H(i, v);
+	      if (update != 0.0) {
+		perform_update_local = true;
+		
+		alpha_neq[k] += update;
+		alpha[v] -= update;
+		for (int i = 0; i < model_size; ++ i)
+		  gradient[i] += update * H(i, v);
+	      }
 	    }
 	  }
 	}
-     
+      
+      perform_update |= perform_update_local;
+      
+      if (! perform_update_local) break;
+      
       // compute primal/dual
-
       obj_primal = 0.0;
       obj_dual   = 0.0;
       for (int k = 0; k < pos_map.size(); ++ k) 
@@ -448,6 +459,8 @@ struct OptimizeCP
       std::cerr << "final primal: " << obj_primal
 		<< " dual: " << obj_dual
 		<< std::endl;
+
+    if (! perform_update) return;
     
     timestamp.resize(model_size, 0);
     weights.clear();
