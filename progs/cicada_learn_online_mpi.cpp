@@ -690,7 +690,7 @@ struct Task
 	  if (! loss_segment)
 	    __bleu->insert(score);
 	  
-	  {
+	  if (! loss_segment) {
 	    hypergraph_type hypergraph_reward_rescored;
 	    hypergraph_type hypergraph_penalty_rescored;
 	    
@@ -845,17 +845,17 @@ struct Task
 	bleu_set_type bleu_curr(hypergraph_reward.nodes.size());
 	bleu_set_type bleu_prev(hypergraph_oracle.nodes.size());
 	
-	bleu_set_type bleu_edge_curr(hypergraph_reward.edges.size());
-	bleu_set_type bleu_edge_prev(hypergraph_oracle.edges.size());
-	
-	cicada::inside_outside(hypergraph_reward, bleu_curr, bleu_edge_curr, bleu_function(__bleu->feature_name(), 1.0), bleu_function(__bleu->feature_name(), 1.0));
-	cicada::inside_outside(hypergraph_oracle, bleu_prev, bleu_edge_prev, bleu_function(__bleu->feature_name(), 1.0), bleu_function(__bleu->feature_name(), 1.0));
+	cicada::inside(hypergraph_reward, bleu_curr, bleu_function(__bleu->feature_name(), 1.0));
+	cicada::inside(hypergraph_oracle, bleu_prev, bleu_function(__bleu->feature_name(), 1.0));
 	
 	if (bleu_curr.back() >= bleu_prev.back())
 	  hypergraph_oracles[id] = hypergraph_reward;
 	else {
 	  hypergraph_oracles[id] = hypergraph_oracle;
 	  hypergraph_reward.swap(hypergraph_oracle);
+	  
+	  weight_type weight;
+	  cicada::viterbi(hypergraph_reward, yield_reward, weight, kbest_traversal(), weight_set_function(weights, 1.0));
 	}
       }
       

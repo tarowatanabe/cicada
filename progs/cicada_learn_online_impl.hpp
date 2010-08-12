@@ -12,6 +12,7 @@
 #include <iostream>
 #include <numeric>
 #include <stdexcept>
+#include <map>
 
 #include <boost/tuple/tuple.hpp>
 #include <boost/tokenizer.hpp>
@@ -246,7 +247,7 @@ struct OptimizeCP
     // 
     for (int i = 0; i < model_size; ++ i)
       for (int j = (i >= model_size_prev ? size_type(0) : model_size_prev); j < model_size; ++ j)
-	H(i, j) = labels[i] * labels[j] * features[i].dot(features[j]);;
+	H(i, j) = labels[i] * labels[j] * features[i].dot(features[j]);
     
     alpha.resize(model_size, 0.0);
     
@@ -578,6 +579,10 @@ struct OptimizeMIRA
   typedef std::vector<double, std::allocator<double> >    gradient_type;
   typedef std::vector<bool, std::allocator<bool> >        skipped_type;
 
+  typedef std::vector<int, std::allocator<int> > pos_set_type;
+
+  typedef std::map<int, pos_set_type, std::less<int>, std::allocator<std::pair<const int, pos_set_type> > >  pos_map_type;
+
   void finalize()
   {
     accumulated *= - 1.0 / updated;
@@ -633,7 +638,7 @@ struct OptimizeMIRA
     gradient.resize(labels.size(), 0.0);
     skipped.resize(labels.size(), false);
 
-    std::set<int, std::less<int>, std::allocator<int> > id_set;
+    pos_map.clear();
     
     size_t num_instance = 0;
     for (int i = 0; i < labels.size(); ++ i) {
@@ -645,13 +650,13 @@ struct OptimizeMIRA
       num_instance += ! skipping;
       
       if (! skipping) {
-	id_set.insert(ids[i]);
+	pos_map[ids[i]].push_back(i);
 	objective_max = std::max(objective_max, gradient[i]);
 	objective_min = std::min(objective_min, gradient[i]);
       }
     }
-
-    const double C_scale = id_set.size();
+    
+    const size_t C_scale = pos_map.size();
     
     double alpha_neq = C * C_scale;
     
@@ -834,6 +839,7 @@ struct OptimizeMIRA
   alpha_type    alpha;
   gradient_type gradient;
   skipped_type  skipped;
+  pos_map_type  pos_map;
   
   double lambda;
   double C;
