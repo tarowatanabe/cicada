@@ -293,9 +293,7 @@ struct OptimizeCP
       }
     
     if (debug)
-      std::cerr << "initial primal: " << obj_primal 
-		<< " dual: " << obj_dual 
-		<< std::endl;
+      std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl;
     
     bool perform_update = false;
     for (int iter = 0; iter != 100; ++ iter) {
@@ -324,9 +322,7 @@ struct OptimizeCP
 	  
 	  if (delta <= tolerance) continue;
 	  
-	  
 	  if (u >= 0) {
-	    
 	    int v = -1;
 	    double max_improvement = - std::numeric_limits<double>::infinity();
 	    double tau = 1.0;
@@ -580,8 +576,10 @@ struct OptimizeMIRA
   typedef std::vector<bool, std::allocator<bool> >        skipped_type;
 
   typedef std::vector<int, std::allocator<int> > pos_set_type;
+  
+  typedef std::pair<pos_set_type, double> id_map_type;
 
-  typedef std::map<int, pos_set_type, std::less<int>, std::allocator<std::pair<const int, pos_set_type> > >  pos_map_type;
+  typedef std::map<int, id_map_type, std::less<int>, std::allocator<std::pair<const int, id_map_type> > >  pos_map_type;
 
   void finalize()
   {
@@ -650,167 +648,206 @@ struct OptimizeMIRA
       num_instance += ! skipping;
       
       if (! skipping) {
-	pos_map[ids[i]].push_back(i);
+	pos_map[ids[i]].first.push_back(i);
+	pos_map[ids[i]].second = C;
 	objective_max = std::max(objective_max, gradient[i]);
 	objective_min = std::min(objective_min, gradient[i]);
       }
     }
-    
-    const size_t C_scale = pos_map.size();
-    
-    double alpha_neq = C * C_scale;
-    
+        
     if (! num_instance) return;
-    
-    if (debug) {
-      double obj_primal = 0.0;
-      double obj_dual = 0.0;
-      for (int i = 0; i < labels.size(); ++ i) 
-	if (! skipped[i]) {
-	  obj_primal += (std::max(gradient[i], 0.0) * C * C_scale) / num_instance;
-	  obj_dual += gradient[i] * alpha[i];
-	}
+
+    const size_t model_size = num_instance;
+
+    double obj_primal = 0.0;
+    double obj_dual   = 0.0;
+
+    for (pos_map_type::iterator miter = pos_map.begin(); miter != pos_map.end(); ++ miter) {
+      const pos_set_type& pos_set = miter->second.first;
       
-      std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl; 
-    }
-    
-    
-    for (int iter = 0; iter != 1000; ++ iter) {
+      double obj_primal_local = 0.0;
+      double objective = 0.0;
       
-      // eq (23) and (26) to compute u and delta
-      int u = -1;
-      double max_obj = - std::numeric_limits<double>::infinity();
-      double delta = 0.0;
-      
-      for (int i = 0; i < labels.size(); ++ i) 
-	if (! skipped[i]) {
-	  delta -= alpha[i] * gradient[i];
-	  
-	  if (gradient[i] > max_obj)  {
-	    max_obj = gradient[i];
-	    u = i;
-	  }
-	}
-      
-      // if we relax the summation constraints, we select different u...
-      // is this correct?
-      //if (gradient[u] < 0.0)
-      //  u = -1;
-      //else
-      delta += C * C_scale * gradient[u];
-      
-      // tolerance
-      if (delta <= tolerance) break;
-      
-      // select v (26)
-      if (u >= 0) {
-	int v = -1;
-	double max_improvement = - std::numeric_limits<double>::infinity();;
-	double tau = 1.0;
-	
-	for (int i = 0; i < labels.size(); ++ i)
-	  if (! skipped[i] && i != u && alpha[i] > 0.0) {
-	    // compute (25)
-	    const double numer = alpha[i] * (gradient[u] - gradient[i]);
-	    const double denom = alpha[i] * alpha[i] * (H(u, u) - 2.0 * H(u, i) + H(i, i));
-	    
-	    if (denom > 0.0) {
-	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
-	      
-	      if (improvement > max_improvement) {
-		max_improvement = improvement;
-		tau = std::max(0.0, std::min(1.0, numer / denom));
-		v = i;
-	      }
-	    }
-	  }
-	
-#if 0
-	// check if virtual variable can be used for update...
-	if (alpha_neq > 0.0) {
-	  const double numer = alpha_neq * gradient[u];
-	  const double denom = alpha_neq * alpha_neq * H(u, u);
-	  
-	  if (denom > 0.0) {
-	    const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
-	    
-	    if (improvement > max_improvement) {
-	      max_improvement = improvement;
-	      tau = std::max(0.0, std::min(1.0, numer / denom));
-	      v = -1;
-	    }
-	  }
-	}
-#endif
-	
-	if (v >= 0) {
-	  // maximize objective, u and v
-	  double update = alpha[v] * tau;
-	  if (alpha[u] + update < 0.0)
-	    update = - alpha[u];
-	  
-	  // clipping...
-	  alpha[u] += update;
-	  alpha[v] -= update;
-	  
-	  // update g...
-	  for (int i = 0; i < labels.size(); ++ i)
-	    if (! skipped[i])
-	      gradient[i] += update * (H(i, v) - H(i, u));
-	  
-	} else if (alpha_neq > 0.0) {
-	  double update = alpha_neq * tau;
-	  if (alpha[u] + update < 0.0)
-	    update = - alpha[u];
-	  
-	  alpha[u] += update;
-	  alpha_neq -= update;
-	  
-	  // update g..
-	  for (int i = 0; i < labels.size(); ++ i)
-	    if (! skipped[i])
-	      gradient[i] -= update * H(i, u);
-	}
-	
-      } else {
-	int v = -1;
-	double max_improvement = - std::numeric_limits<double>::infinity();
-	double tau = 1.0;
-	
-	for (int i = 0; i < labels.size(); ++ i) 
-	  if (! skipped[i] && alpha[i] > 0.0) {
-	    
-	    const double numer = alpha[i] * gradient[i];
-	    const double denom = alpha[i] * alpha[i] * H(i, i);
-	    
-	    if (denom > 0.0) {
-	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
-	      
-	      if (improvement > max_improvement) {
-		max_improvement = improvement;
-		tau = std::max(0.0, std::min(1.0, numer / denom));
-		v = i;
-	      }
-	    }
-	  }
-	
-	// safe to check this...
-	if (v >= 0) {
-	  double update = alpha[v] * tau;
-	  if (alpha_neq + update < 0.0)
-	    update = - alpha_neq;
-	  
-	  alpha_neq += update;
-	  alpha[v] -= update;
-	  
-	  for (int i = 0; i < labels.size(); ++ i)
-	    if (! skipped[i])
-	      gradient[i] += update * H(i, v);
-	}
+      for (pos_set_type::const_iterator kiter = pos_set.begin(); kiter != pos_set.end(); ++ kiter) {
+	obj_primal_local = std::max(obj_primal_local, gradient[*kiter]);
+	objective += gradient[*kiter] * alpha[*kiter];
       }
+      
+      obj_primal += C * obj_primal_local;
+      obj_dual += objective;
     }
+    
+    if (debug)
+      std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl; 
     
     bool perform_update = false;
+    for (int iter = 0; iter != 100; ++ iter) {
+      
+      bool perform_update_local = false;
+      
+      for (pos_map_type::iterator miter = pos_map.begin(); miter != pos_map.end(); ++ miter) {
+	const int k = miter->first;
+	const pos_set_type& pos_set = miter->second.first;
+	double& alpha_neq = miter->second.second;
+	
+	int u = -1;
+	double max_obj = - std::numeric_limits<double>::infinity();
+	double delta = 0.0;
+	
+	for (pos_set_type::const_iterator kiter = pos_set.begin(); kiter != pos_set.end(); ++ kiter) {
+	  delta -= alpha[*kiter] * gradient[*kiter];
+	  
+	  if (gradient[*kiter] > max_obj) {
+	    max_obj = gradient[*kiter];
+	    u = *kiter;
+	  }
+	}
+	
+	if (gradient[u] < 0.0)
+	  u = -1;
+	else
+	  delta += C * gradient[u];
+	
+	if (delta <= tolerance) continue;
+	
+	if (u >= 0) {
+	  int v = -1;
+	  double max_improvement = - std::numeric_limits<double>::infinity();
+	  double tau = 1.0;
+	  
+	  for (pos_set_type::const_iterator kiter = pos_set.begin(); kiter != pos_set.end(); ++ kiter) 
+	    if (*kiter != u && alpha[*kiter] > 0.0) {
+	      const double numer = alpha[*kiter] * (gradient[u] - gradient[*kiter]);
+	      const double denom = alpha[*kiter] * alpha[*kiter] * (H(u, u) - 2.0 * H(u, *kiter) + H(*kiter, *kiter));
+	      
+	      if (denom > 0.0) {
+		const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+		
+		if (improvement > max_improvement) {
+		  max_improvement = improvement;
+		  tau = std::max(0.0, std::min(1.0, numer / denom));
+		  v = *kiter;
+		}
+	      }
+	    }
+	  
+	  if (alpha_neq > 0.0) {
+	    const double numer = alpha_neq * gradient[u];
+	    const double denom = alpha_neq * alpha_neq * H(u, u);
+	      
+	    if (denom > 0.0) {
+	      const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+	      
+	      if (improvement > max_improvement) {
+		max_improvement = improvement;
+		tau = std::max(0.0, std::min(1.0, numer / denom));
+		v = -1;
+	      }
+	    }
+	  }
+	  
+	  if (v >= 0) {
+	    // maximize objective, u and v
+	    double update = alpha[v] * tau;
+	    if (alpha[u] + update < 0.0)
+	      update = - alpha[u];
+	      
+	    if (update != 0.0) {
+	      perform_update_local = true;
+	      
+	      alpha[u] += update;
+	      alpha[v] -= update;
+	      for (int i = 0; i < model_size; ++ i)
+		if (! skipped[i])
+		  gradient[i] += update * (H(i, v) - H(i, u));
+	    }
+	  } else {
+	    double update = alpha_neq * tau;
+	    if (alpha[u] + update < 0.0)
+	      update = - alpha[u];
+	      
+	    if (update != 0.0) {
+	      perform_update_local = true;
+		
+	      alpha[u] += update;
+	      alpha_neq -= update;
+	      for (int i = 0; i < model_size; ++ i)
+		if (! skipped[i])
+		  gradient[i] -= update * H(i, u);
+	    }
+	  }
+	    
+	} else {
+	  int v = -1;
+	  double max_improvement = - std::numeric_limits<double>::infinity();
+	  double tau = 1.0;
+	    
+	  for (pos_set_type::const_iterator kiter = pos_set.begin(); kiter != pos_set.end(); ++ kiter) 
+	    if (alpha[*kiter] > 0.0) {
+	      
+	      const double numer = alpha[*kiter] * gradient[*kiter];
+	      const double denom = alpha[*kiter] * alpha[*kiter] * H(*kiter, *kiter);
+		
+	      if (denom > 0.0) {
+		const double improvement = (numer < denom ? (numer * numer) / denom : numer - 0.5 * denom);
+		  
+		if (improvement > max_improvement) {
+		  max_improvement = improvement;
+		  tau = std::max(0.0, std::min(1.0, numer / denom));
+		  v = *kiter;
+		}
+	      }
+	    }
+	    
+	  if (v >= 0) {
+	    double update = alpha[v] * tau;
+	    if (alpha_neq + update < 0.0)
+	      update = - alpha_neq;
+	    
+	    if (update != 0.0) {
+	      perform_update_local = true;
+		
+	      alpha_neq += update;
+	      alpha[v] -= update;
+	      for (int i = 0; i < model_size; ++ i)
+		if (! skipped[i])
+		  gradient[i] += update * H(i, v);
+	    }
+	  }
+	}
+      }
+      
+      perform_update |= perform_update_local;
+      
+      if (! perform_update_local) break;
+      
+      // compute primal/dual
+      obj_primal = 0.0;
+      obj_dual   = 0.0;
+      for (pos_map_type::iterator miter = pos_map.begin(); miter != pos_map.end(); ++ miter) {
+	const pos_set_type& pos_set = miter->second.first;
+      
+	double obj_primal_local = 0.0;
+	double objective = 0.0;
+      
+	for (pos_set_type::const_iterator kiter = pos_set.begin(); kiter != pos_set.end(); ++ kiter) {
+	  obj_primal_local = std::max(obj_primal_local, gradient[*kiter]);
+	  objective += gradient[*kiter] * alpha[*kiter];
+	}
+      
+	obj_primal += C * obj_primal_local;
+	obj_dual += objective;
+      }
+      
+      if (obj_primal - obj_dual <= tolerance * num_instance)
+	break;
+    }
+
+    std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
+    
+    if (! perform_update) return;
+    
+    perform_update = false;
     for (int i = 0; i < labels.size(); ++ i) 
       if (! skipped[i] && alpha[i] > 0.0) {
 	typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
@@ -822,18 +859,6 @@ struct OptimizeMIRA
 	perform_update = true;
       }
     updated += perform_update;
-    
-    if (debug) {
-      double obj_primal = 0.0;
-      double obj_dual = 0.0;
-      for (int i = 0; i < labels.size(); ++ i) 
-	if (! skipped[i]) {
-	obj_primal += (std::max(gradient[i], 0.0) * C * C_scale) / num_instance;
-	obj_dual += gradient[i] * alpha[i];
-      }
-      
-      std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
-    }
   }
 
   alpha_type    alpha;
