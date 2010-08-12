@@ -620,9 +620,7 @@ struct OptimizeMIRA
   {
     // QP solver used on OCAS
     h_matrix<LabelSet, FeatureSet>  H(labels, features);
-
-    const size_t C_scale = std::set<int, std::less<int>, std::allocator<int> >(ids.begin(), ids.end()).size();
-
+    
     alpha.clear();
     gradient.clear();
     skipped.clear();
@@ -634,8 +632,8 @@ struct OptimizeMIRA
     alpha.resize(labels.size(), 0.0);
     gradient.resize(labels.size(), 0.0);
     skipped.resize(labels.size(), false);
-    
-    double alpha_neq = C * C_scale;
+
+    std::set<int, std::less<int>, std::allocator<int> > id_set;
     
     size_t num_instance = 0;
     for (int i = 0; i < labels.size(); ++ i) {
@@ -647,10 +645,15 @@ struct OptimizeMIRA
       num_instance += ! skipping;
       
       if (! skipping) {
+	id_set.insert(ids[i]);
 	objective_max = std::max(objective_max, gradient[i]);
 	objective_min = std::min(objective_min, gradient[i]);
       }
     }
+
+    const double C_scale = id_set.size();
+    
+    double alpha_neq = C * C_scale;
     
     if (! num_instance) return;
     
