@@ -621,6 +621,8 @@ struct OptimizeMIRA
     // QP solver used on OCAS
     h_matrix<LabelSet, FeatureSet>  H(labels, features);
 
+    const size_t C_scale = std::set<int, std::less<int>, std::allocator<int> >(ids.begin(), ids.end()).size();
+
     alpha.clear();
     gradient.clear();
     skipped.clear();
@@ -633,7 +635,7 @@ struct OptimizeMIRA
     gradient.resize(labels.size(), 0.0);
     skipped.resize(labels.size(), false);
     
-    double alpha_neq = C;
+    double alpha_neq = C * C_scale;
     
     size_t num_instance = 0;
     for (int i = 0; i < labels.size(); ++ i) {
@@ -657,7 +659,7 @@ struct OptimizeMIRA
       double obj_dual = 0.0;
       for (int i = 0; i < labels.size(); ++ i) 
 	if (! skipped[i]) {
-	  obj_primal += (std::max(gradient[i], 0.0) * C) / num_instance;
+	  obj_primal += (std::max(gradient[i], 0.0) * C * C_scale) / num_instance;
 	  obj_dual += gradient[i] * alpha[i];
 	}
       
@@ -687,7 +689,7 @@ struct OptimizeMIRA
       //if (gradient[u] < 0.0)
       //  u = -1;
       //else
-      delta += C * gradient[u];
+      delta += C * C_scale * gradient[u];
       
       // tolerance
       if (delta <= tolerance) break;
@@ -818,7 +820,7 @@ struct OptimizeMIRA
       double obj_dual = 0.0;
       for (int i = 0; i < labels.size(); ++ i) 
 	if (! skipped[i]) {
-	obj_primal += (std::max(gradient[i], 0.0) * C) / num_instance;
+	obj_primal += (std::max(gradient[i], 0.0) * C * C_scale) / num_instance;
 	obj_dual += gradient[i] * alpha[i];
       }
       

@@ -361,49 +361,6 @@ struct Task
   typedef boost::tuple<sentence_type, feature_set_type> yield_type;
 
   
-  void prune_hypergraph(model_type& model_bleu,
-			model_type& model_sparse,
-			const hypergraph_type& hypergraph,
-			const lattice_type& lattice,
-			const span_set_type& spans,
-			hypergraph_type& merged,
-			hypergraph_type& modified,
-			yield_type& yield, 
-			const weight_set_type& weights,
-			const weight_set_type& weights_prune,
-			const double margin)
-  {
-    cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, 1.0), cube_size);
-    
-    if (merged.is_valid()) {
-      hypergraph_type hypergraph_merged;
-      
-      cicada::apply_exact(model_bleu, merged, hypergraph_merged);
-    
-      modified.unite(hypergraph_merged);
-    }
-    
-    cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
-    
-    if (! model_sparse.empty()) {
-      model_sparse.assign(modified);
-      model_sparse.assign(lattice);
-      model_sparse.assign(spans);
-      
-      model_sparse.apply_feature(true);
-      
-      cicada::apply_exact(model_sparse, modified);
-      
-      model_sparse.apply_feature(false);
-    }
-    
-    weight_type weight;
-    
-    cicada::viterbi(modified, yield, weight, kbest_traversal(), weight_set_function(weights, 1.0));
-
-    merged = modified;
-  }
-
   
   void prune_hypergraph(model_type& model_bleu,
 			model_type& model_sparse,
@@ -511,11 +468,16 @@ struct Task
       features.back()["bias"] = 1.0;
       
       features.back().erase(feature_name);
+
+      if (features.back().size() == 1) {
+	features.pop_back();
+	continue;
+      }
       
       ids.push_back(id);
       labels.push_back(1.0);
-      margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
-      //margins.push_back(1.0);
+      //margins.push_back(bleu_edge_reward[i] * norm * loss_scale);
+      margins.push_back(1.0);
     }
     
     for (int i = 0; i < accumulated_penalty.size(); ++ i) {
@@ -526,11 +488,16 @@ struct Task
       features.back()["bias"] = 1.0;
 	    
       features.back().erase(feature_name);
+
+      if (features.back().size() == 1) {
+	features.pop_back();
+	continue;
+      }
       
       ids.push_back(id);
       labels.push_back(-1.0);
-      margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
-      //margins.push_back(1.0);
+      //margins.push_back(bleu_edge_penalty[i] * norm * loss_scale);
+      margins.push_back(1.0);
     }
   }
   
@@ -785,7 +752,34 @@ struct Task
       if (id >= hypergraph_oracles.size())
 	hypergraph_oracles.resize(id + 1);
       
-      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_oracles[id], hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+
+      if (id >= hypergraph_oracles.size())
+	hypergraph_oracles.resize(id + 1);
+
+      if (hypergraph_oracles[id].is_valid()) {
+	typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+	
+	hypergraph_type hypergraph_oracle;
+	
+	cicada::apply_exact(model_bleu, hypergraph_oracles[id], hypergraph_oracle);
+	
+	bleu_set_type bleu_curr(hypergraph_reward.nodes.size());
+	bleu_set_type bleu_prev(hypergraph_oracle.nodes.size());
+	
+	bleu_set_type bleu_edge_curr(hypergraph_reward.edges.size());
+	bleu_set_type bleu_edge_prev(hypergraph_oracle.edges.size());
+	
+	cicada::inside_outside(hypergraph_reward, bleu_curr, bleu_edge_curr, bleu_function(__bleu->feature_name(), 1.0), bleu_function(__bleu->feature_name(), 1.0));
+	cicada::inside_outside(hypergraph_oracle, bleu_prev, bleu_edge_prev, bleu_function(__bleu->feature_name(), 1.0), bleu_function(__bleu->feature_name(), 1.0));
+	
+	if (bleu_curr.back() >= bleu_prev.back())
+	  hypergraph_oracles[id] = hypergraph_reward;
+	else {
+	  hypergraph_oracles[id] = hypergraph_oracle;
+	  hypergraph_reward.swap(hypergraph_oracle);
+	}
+      }
       
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
