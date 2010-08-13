@@ -204,7 +204,7 @@ struct LineSearch
       }
     
     // traverse segments...
-    const optimum_type optimum = line_search(segments, 0.0, 1.0, false);
+    const optimum_type optimum = line_search(segments, 0.5, 1.5, false);
     
     return (optimum.lower + optimum.upper) * 0.5;
   }
