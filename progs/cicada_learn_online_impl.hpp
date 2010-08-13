@@ -170,6 +170,10 @@ struct LineSearch
     
     for (int seg = 0; seg < graphs.size(); ++ seg) 
       if (graphs[seg].is_valid()) {
+	
+	if (debug >= 4)
+	  std::cerr << "line-search segment: " << seg << std::endl;
+
 	envelopes.clear();
 	envelopes.resize(graphs[seg].nodes.size());
 	
