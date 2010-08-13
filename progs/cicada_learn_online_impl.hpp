@@ -236,7 +236,8 @@ struct OptimizeCP
 	     const double& __lambda,
 	     const double& __tolerance,
 	     const int __debug=0)
-    : lambda(__lambda),
+    : line_search(__debug),
+      lambda(__lambda),
       C(1.0 / __lambda),
       tolerance(__tolerance),
       objective_max(- std::numeric_limits<double>::infinity()),
@@ -534,25 +535,56 @@ struct OptimizeCP
       std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
 
     if (! perform_update) return;
-    
-    timestamp.resize(model_size, 0);
-    weights.clear();
-    for (int i = 0; i < labels.size(); ++ i) {
-      if (alpha[i] > 0.0) {
-	
-	typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
-	for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
-	  const double value = alpha[i] * labels[i] * fiter->second;
-	  
-	  weights[fiter->first]     += value;
-	  accumulated[fiter->first] += value;
+
+    if (optimized) {
+      timestamp.resize(model_size, 0);
+      weights_new.clear();
+      
+      for (int i = 0; i < labels.size(); ++ i) {
+	if (alpha[i] > 0.0) {
+	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
+	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
+	    weights_new[fiter->first] += alpha[i] * labels[i] * fiter->second;
 	}
+	
+	timestamp[i] = ((int(alpha[i] != 0.0) - 1) & (timestamp[i] + 1));
       }
       
-      timestamp[i] = ((int(alpha[i] != 0.0) - 1) & (timestamp[i] + 1));
+      direction = weights_new;
+      direction -= weights;
+      
+      if (! direction.empty()) {
+	const double update = line_search(hypergraphs, scorers, weights, direction);
+	if (update != 0.0)
+	  direction *= update;
+	
+	if (debug)
+	  std::cerr << "optimized update: " << update << std::endl;
+		
+	weights += direction;
+	accumulated += weights;
+
+	++ updated;
+      }
+    } else {
+      timestamp.resize(model_size, 0);
+      weights.clear();
+      for (int i = 0; i < labels.size(); ++ i) {
+	if (alpha[i] > 0.0) {
+	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
+	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	    const double value = alpha[i] * labels[i] * fiter->second;
+	    
+	    weights[fiter->first]     += value;
+	    accumulated[fiter->first] += value;
+	  }
+	}
+	
+	timestamp[i] = ((int(alpha[i] != 0.0) - 1) & (timestamp[i] + 1));
+      }
+      
+      ++ updated;
     }
-    
-    ++ updated;
     
     // if the alpha value for a support vector is zero for a fixed amount of time, 50, then, prune...
     int pos_last = model_size;
@@ -600,6 +632,8 @@ struct OptimizeCP
       error_bound[ids[i]] = std::max(error_bound[ids[i]], margins[i] - labels[i] * features[i].dot(weights));
   }
 
+  LineSearch line_search;
+
   hypergraph_set_type hypergraphs;
   scorer_set_type     scorers;
   
@@ -628,7 +662,9 @@ struct OptimizeCP
   double objective_min;
   
   weight_set_type weights;
+  weight_set_type weights_new;
   weight_set_type accumulated;
+  weight_set_type direction;
   size_t          updated;
 
   int debug;
@@ -640,7 +676,8 @@ struct OptimizeMIRA
 	       const double& __lambda,
 	       const double& __tolerance,
 	       const int __debug=0)
-    : lambda(__lambda),
+    : line_search(__debug),
+      lambda(__lambda),
       C(1.0 / __lambda),
       tolerance(__tolerance),
       objective_max(- std::numeric_limits<double>::infinity()),
@@ -949,12 +986,8 @@ struct OptimizeMIRA
 	}
       
       if (! direction.empty()) {
-	
-	
 	// starting from weights, we will move toward direction
 	// we will adjust amount of move!
-	
-	LineSearch line_search(debug);
 	
 	const double update = line_search(hypergraphs, scorers, weights, direction);
 	if (update != 0.0)
@@ -985,6 +1018,8 @@ struct OptimizeMIRA
       updated += perform_update;
     }
   }
+
+  LineSearch line_search;
 
   hypergraph_set_type hypergraphs;
   scorer_set_type     scorers;
