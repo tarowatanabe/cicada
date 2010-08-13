@@ -173,14 +173,20 @@ struct LineSearch
 	
 	if (debug >= 4)
 	  std::cerr << "line-search segment: " << seg << std::endl;
-
+	
 	envelopes.clear();
 	envelopes.resize(graphs[seg].nodes.size());
 	
 	cicada::inside(graphs[seg], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
+
+	if (debug >= 4)
+	  std::cerr << "line-search: inside computed" << std::endl;
 	
 	const envelope_type& envelope = envelopes[graphs[seg].goal];
 	const_cast<envelope_type&>(envelope).sort();
+	
+	if (debug >= 4)
+	  std::cerr << "line-search: sorted" << std::endl;
 	
 	envelope_type::const_iterator eiter_end = envelope.end();
 	for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
