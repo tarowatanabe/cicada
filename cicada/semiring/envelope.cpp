@@ -166,13 +166,20 @@ namespace cicada
       yield_set_type yields;
       
       const Line* curr = this;
+      
+      std::cerr << "curr: " << curr << std::endl;
+
       while (! curr->edge) {
 	yields.push_back(sentence_type());
 	
 	curr->antecedent->yield(yields.back());
 	
 	curr = curr->parent.get();
+
+	std::cerr << "next: " << curr << std::endl;
       }
+
+      std::cerr << "edge: " << curr->edge << std::endl;
       
       // we will traverse in reverse...
       sentence.clear();
