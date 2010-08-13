@@ -180,6 +180,7 @@ namespace cicada
       }
 
       std::cerr << "edge: " << curr->edge << std::endl;
+      std::cerr << "rule: " << *(curr->edge->rule) << std::endl;
       
       // we will traverse in reverse...
       sentence.clear();
