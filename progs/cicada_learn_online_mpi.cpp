@@ -703,17 +703,19 @@ struct Task
 	    hypergraph_penalty.swap(hypergraph_penalty_rescored);
 	  }
 	  
-	  if (id >= optimizer.scorers.size())
-	    optimizer.scorers.resize(id + 1);
-	  
-	  if (! optimizer.scorers[id])
-	    optimizer.scorers[id] = scorer->clone();
-	  
-	  if (id >= optimizer.hypergraphs.size())
-	    optimizer.hypergraphs.resize(id + 1);
-	  
-	  optimizer.hypergraphs[id].unite(hypergraph_reward);
-	  optimizer.hypergraphs[id].unite(hypergraph_penalty);
+	  if (learn_optimized) {
+	    if (id >= optimizer.scorers.size())
+	      optimizer.scorers.resize(id + 1);
+	    
+	    if (! optimizer.scorers[id])
+	      optimizer.scorers[id] = scorer->clone();
+	    
+	    if (id >= optimizer.hypergraphs.size())
+	      optimizer.hypergraphs.resize(id + 1);
+	    
+	    optimizer.hypergraphs[id].unite(hypergraph_reward);
+	    optimizer.hypergraphs[id].unite(hypergraph_penalty);
+	  }
 	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
@@ -881,17 +883,19 @@ struct Task
       // erase unused weights...
       weights.erase(__bleu->feature_name());
 
-      if (id >= optimizer.scorers.size())
-	optimizer.scorers.resize(id + 1);
-      
-      if (! optimizer.scorers[id])
-	optimizer.scorers[id] = scorer->clone();
-      
-      if (id >= optimizer.hypergraphs.size())
-	optimizer.hypergraphs.resize(id + 1);
-      
-      optimizer.hypergraphs[id].unite(hypergraph_reward);
-      optimizer.hypergraphs[id].unite(hypergraph_penalty);
+      if (learn_optimized) {
+	if (id >= optimizer.scorers.size())
+	  optimizer.scorers.resize(id + 1);
+	
+	if (! optimizer.scorers[id])
+	  optimizer.scorers[id] = scorer->clone();
+	
+	if (id >= optimizer.hypergraphs.size())
+	  optimizer.hypergraphs.resize(id + 1);
+	
+	optimizer.hypergraphs[id].unite(hypergraph_reward);
+	optimizer.hypergraphs[id].unite(hypergraph_penalty);
+      }
       
       score_ptr_type score_reward  = scorer->score(boost::get<0>(yield_reward));
       score_ptr_type score_penalty = scorer->score(boost::get<0>(yield_penalty));
