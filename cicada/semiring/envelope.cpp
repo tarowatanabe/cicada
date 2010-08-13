@@ -166,32 +166,30 @@ namespace cicada
       yield_set_type yields;
       
       const Line* curr = this;
-      
-      std::cerr << "curr: " << curr << std::endl;
-
       while (! curr->edge) {
 	yields.push_back(sentence_type());
 	
 	curr->antecedent->yield(yields.back());
 	
 	curr = curr->parent.get();
-
-	std::cerr << "next: " << curr << std::endl;
       }
-
-      std::cerr << "edge: " << curr->edge << std::endl;
-      std::cerr << "rule: " << *(curr->edge->rule) << std::endl;
       
       // we will traverse in reverse...
       sentence.clear();
+      
+      int pos_non_terminal = 0;
       rule_type::symbol_set_type::const_iterator titer_end = curr->edge->rule->target.end();
       for (rule_type::symbol_set_type::const_iterator titer = curr->edge->rule->target.begin(); titer != titer_end; ++ titer)
 	if (titer->is_non_terminal()) {
-	  const int pos = titer->non_terminal_index() - 1;
+	  int pos = titer->non_terminal_index() - 1;
+	  if (pos < 0)
+	    pos = pos_non_terminal;
+	  
 	  const sentence_type& antecedent = *(yields.rbegin() + pos);
 	  
 	  sentence.insert(sentence.end(), antecedent.begin(), antecedent.end());
 	  
+	  ++ pos_non_terminal;
 	} else if (*titer != cicada::Vocab::EPSILON)
 	  sentence.push_back(*titer);
     }
