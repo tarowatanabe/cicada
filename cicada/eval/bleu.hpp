@@ -148,6 +148,8 @@ namespace cicada
 
       bool error_metric() const { return false; }
 
+      scorer_ptr_type clone() const { return scorer_ptr_type(new BleuScorer(*this)); }
+
       void clear()
       {
 	ngrams.clear();

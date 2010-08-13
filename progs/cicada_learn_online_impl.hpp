@@ -25,6 +25,8 @@
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/vector2.hpp>
 
+#include <cicada/optimize/line_search.hpp>
+
 inline
 path_type add_suffix(const path_type& path, const std::string& suffix)
 {
@@ -130,6 +132,77 @@ void decode_support_vectors(const std::string& data,
     throw std::runtime_error("still data remain?");
 }
 
+struct LineSearch
+{
+  typedef cicada::eval::Scorer         scorer_type;
+  typedef cicada::eval::ScorerDocument scorer_document_type;
+  
+  typedef scorer_type::scorer_ptr_type scorer_ptr_type;
+  typedef scorer_type::score_ptr_type  score_ptr_type;
+
+  typedef cicada::optimize::LineSearch line_search_type;
+  
+  typedef line_search_type::segment_type          segment_type;
+  typedef line_search_type::segment_set_type      segment_set_type;
+  typedef line_search_type::segment_document_type segment_document_type;
+
+  typedef line_search_type::value_type optimum_type;
+  
+  typedef cicada::semiring::Envelope envelope_type;
+  typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
+
+  typedef cicada::Sentence sentence_type;
+
+  LineSearch(const int __debug=0) : debug(__debug) {}
+
+  int debug;
+  
+  template <typename HypergraphSet, typename ScorerSet>
+  double operator()(const HypergraphSet& graphs, const ScorerSet& scorers, const weight_set_type& origin, const weight_set_type& direction)
+  {
+    segment_document_type segments(graphs.size());
+    envelope_set_type     envelopes;
+    sentence_type         yield;
+    
+    for (int seg = 0; seg < graphs.size(); ++ seg) 
+      if (graphs[seg].is_valid()) {
+	envelopes.clear();
+	envelopes.resize(graphs[seg].nodes.size());
+	
+	cicada::inside(graphs[seg], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
+	
+	const envelope_type& envelope = envelopes[graphs[seg].goal];
+	const_cast<envelope_type&>(envelope).sort();
+	
+	envelope_type::const_iterator eiter_end = envelope.end();
+	for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
+	  const envelope_type::line_ptr_type& line = *eiter;
+	  
+	  line->yield(yield);
+	  
+	  scorer_type::score_ptr_type score = scorers[seg]->score(yield);
+	  
+	  if (debug >= 4)
+	    std::cerr << "segment: " << seg << " x: " << line->x << std::endl;
+	  
+	  segments[seg].push_back(std::make_pair(line->x, score));
+	}
+      }
+    
+    // traverse segments...
+    optimum_type optimum;
+    {
+      line_search_type line_search(debug);
+      
+      // maximizer...
+      optimum = line_search(segments, origin, direction, line_search_type::RegularizeNone(), false);
+    }
+        
+    return (optimum.lower + optimum.upper) * 0.5;
+  }
+  
+};
+
 
 struct OptimizeCP
 {
@@ -137,6 +210,15 @@ struct OptimizeCP
 
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+
+  typedef cicada::eval::Scorer         scorer_type;
+  typedef cicada::eval::ScorerDocument scorer_document_type;
+  
+  typedef scorer_type::scorer_ptr_type scorer_ptr_type;
+  typedef scorer_type::score_ptr_type  score_ptr_type;
+  
+  typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+  typedef std::deque<scorer_ptr_type, std::allocator<scorer_ptr_type> > scorer_set_type;
 
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    gradient_type;
@@ -204,7 +286,8 @@ struct OptimizeCP
   void operator()(const IDSet&      __ids,
 		  const LabelSet&   __labels,
 		  const MarginSet&  __margins,
-		  const FeatureSet& __features)
+		  const FeatureSet& __features,
+		  const bool optimized)
   {
     // QP solver used on OCAS
     //h_matrix<LabelSet, FeatureSet>  H(labels, features);
@@ -296,7 +379,7 @@ struct OptimizeCP
       std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl;
     
     bool perform_update = false;
-    for (int iter = 0; iter != 100; ++ iter) {
+    for (int iter = 0; iter != 1000; ++ iter) {
 
       bool perform_update_local = false;
       
@@ -453,9 +536,7 @@ struct OptimizeCP
     }
     
     if (debug)
-      std::cerr << "final primal: " << obj_primal
-		<< " dual: " << obj_dual
-		<< std::endl;
+      std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
 
     if (! perform_update) return;
     
@@ -523,6 +604,9 @@ struct OptimizeCP
     for (int i = 0; i < labels.size(); ++ i)
       error_bound[ids[i]] = std::max(error_bound[ids[i]], margins[i] - labels[i] * features[i].dot(weights));
   }
+
+  hypergraph_set_type hypergraphs;
+  scorer_set_type     scorers;
   
   ids_type      ids;
   labels_type   labels;
@@ -571,14 +655,24 @@ struct OptimizeMIRA
       updated(1),
       debug(__debug) {}
 
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef cicada::eval::Scorer         scorer_type;
+  typedef cicada::eval::ScorerDocument scorer_document_type;
+  
+  typedef scorer_type::scorer_ptr_type scorer_ptr_type;
+  typedef scorer_type::score_ptr_type  score_ptr_type;
+  
+  typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+  typedef std::deque<scorer_ptr_type, std::allocator<scorer_ptr_type> > scorer_set_type;
+
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    gradient_type;
   typedef std::vector<bool, std::allocator<bool> >        skipped_type;
 
   typedef std::vector<int, std::allocator<int> > pos_set_type;
-  
   typedef std::pair<pos_set_type, double> id_map_type;
-
   typedef std::map<int, id_map_type, std::less<int>, std::allocator<std::pair<const int, id_map_type> > >  pos_map_type;
 
   void finalize()
@@ -619,7 +713,8 @@ struct OptimizeMIRA
   void operator()(const IDSet&      ids,
 		  const LabelSet&   labels,
 		  const MarginSet&  margins,
-		  const FeatureSet& features)
+		  const FeatureSet& features,
+		  const bool optimized)
   {
     // QP solver used on OCAS
     h_matrix<LabelSet, FeatureSet>  H(labels, features);
@@ -681,7 +776,7 @@ struct OptimizeMIRA
       std::cerr << "initial primal: " << obj_primal << " dual: " << obj_dual << std::endl; 
     
     bool perform_update = false;
-    for (int iter = 0; iter != 100; ++ iter) {
+    for (int iter = 0; iter != 1000; ++ iter) {
       
       bool perform_update_local = false;
       
@@ -842,24 +937,62 @@ struct OptimizeMIRA
       if (obj_primal - obj_dual <= tolerance * num_instance)
 	break;
     }
-
-    std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
+    
+    if (debug)
+      std::cerr << "final primal: " << obj_primal << " dual: " << obj_dual << std::endl;
     
     if (! perform_update) return;
     
-    perform_update = false;
-    for (int i = 0; i < labels.size(); ++ i) 
-      if (! skipped[i] && alpha[i] > 0.0) {
-	typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
-	for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
-	  weights[fiter->first] += alpha[i] * labels[i] * fiter->second;
-	  accumulated[fiter->first] += alpha[i] * labels[i] * fiter->second * updated;
+    if (optimized) {
+      
+      direction.clear();
+      for (int i = 0; i < labels.size(); ++ i) 
+	if (! skipped[i] && alpha[i] > 0.0) {
+	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
+	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
+	    direction[fiter->first] += alpha[i] * labels[i] * fiter->second;
 	}
+      
+      if (! direction.empty()) {
 	
-	perform_update = true;
+	
+	// starting from weights, we will move toward direction
+	// we will adjust amount of move!
+	
+	LineSearch line_search(debug);
+	
+	const double update = line_search(hypergraphs, scorers, weights, direction);
+	if (update != 0.0)
+	  direction *= update;
+
+	if (debug)
+	  std::cerr << "optimized update: " << update << std::endl;
+	
+	weights += direction;
+	
+	direction *= updated;
+	accumulated += direction;
+
+	++ updated;
       }
-    updated += perform_update;
+    } else {
+      bool perform_update = false;
+      for (int i = 0; i < labels.size(); ++ i) 
+	if (! skipped[i] && alpha[i] > 0.0) {
+	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
+	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
+	    weights[fiter->first] += alpha[i] * labels[i] * fiter->second;
+	    accumulated[fiter->first] += alpha[i] * labels[i] * fiter->second * updated;
+	  }
+	  
+	  perform_update = true;
+	}
+      updated += perform_update;
+    }
   }
+
+  hypergraph_set_type hypergraphs;
+  scorer_set_type     scorers;
 
   alpha_type    alpha;
   gradient_type gradient;
@@ -875,6 +1008,7 @@ struct OptimizeMIRA
   
   weight_set_type weights;
   weight_set_type accumulated;
+  weight_set_type direction;
   size_t          updated;
 
   int debug;

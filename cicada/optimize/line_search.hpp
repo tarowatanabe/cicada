@@ -50,6 +50,8 @@ namespace cicada
       {
 	RegularizeNone(const double& __scale)
 	{}
+	RegularizeNone()
+	{}
 	
 	double operator()(const weight_set_type& weights) const
 	{
@@ -364,20 +366,8 @@ namespace cicada
       {
 	static const feature_type feature_none;
 	
-	if (bound_lower.empty()) {
-	  bound_lower.allocate();
-	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	    bound_lower[feature_type(id)] = value_min;
-	}
-	
-	if (bound_upper.empty()) {
-	  bound_upper.allocate();
-	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	    bound_upper[feature_type(id)] = value_max;
-	}
-	
-	bound_lower.allocate();
-	bound_upper.allocate();
+	bound_lower.allocate(value_min);
+	bound_upper.allocate(value_max);
 	
 	bound_lower[feature_none] = 0.0;
 	bound_upper[feature_none] = 0.0;

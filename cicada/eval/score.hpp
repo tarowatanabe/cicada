@@ -97,9 +97,11 @@ namespace cicada
       virtual void insert(const sentence_type& sentence) = 0;
       virtual score_ptr_type score(const sentence_type& sentence) const = 0;
       virtual bool error_metric() const = 0;
+      virtual scorer_ptr_type clone() const = 0;
       
       static std::string lists();
       static scorer_ptr_type create(const std::string& parameter);
+      
       
       void split_non_ascii_characters(const sentence_type& sentence, sentence_type& sentence_split) const;
       

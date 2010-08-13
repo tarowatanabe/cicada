@@ -104,6 +104,7 @@ std::string scorer_name = "bleu:order=4,exact=false";
 
 std::string algorithm = "mira";
 
+bool learn_optimized = false;
 bool learn_regression = false;
 bool learn_factored = false;
 
@@ -259,9 +260,9 @@ int main(int argc, char ** argv)
     }
     
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
-      optimize<OptimizeMIRA>(operations, model, weights, weights_average);
+      ::optimize<OptimizeMIRA>(operations, model, weights, weights_average);
     else if (strcasecmp(algorithm.c_str(), "cp") == 0)
-      optimize<OptimizeCP>(operations, model, weights, weights_average);
+      ::optimize<OptimizeCP>(operations, model, weights, weights_average);
     else
       throw std::runtime_error("unsupported learning algorithm: " + algorithm);
     
@@ -679,7 +680,7 @@ struct Task
 	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
-
+	  
 	  scorer->clear();
 	  __bleu->clear();
 	  sentence_set_type::const_iterator titer_end = targets.end();
@@ -687,6 +688,7 @@ struct Task
 	    scorer->insert(*titer);
 	    __bleu->insert(source_length, *titer);
 	  }
+	  
 	  if (! loss_segment)
 	    __bleu->insert(score);
 	  
@@ -700,6 +702,18 @@ struct Task
 	    hypergraph_reward.swap(hypergraph_reward_rescored);
 	    hypergraph_penalty.swap(hypergraph_penalty_rescored);
 	  }
+	  
+	  if (id >= optimizer.scorers.size())
+	    optimizer.scorers.resize(id + 1);
+	  
+	  if (! optimizer.scorers[id])
+	    optimizer.scorers[id] = scorer->clone();
+	  
+	  if (id >= optimizer.hypergraphs.size())
+	    optimizer.hypergraphs.resize(id + 1);
+	  
+	  optimizer.hypergraphs[id].unite(hypergraph_reward);
+	  optimizer.hypergraphs[id].unite(hypergraph_penalty);
 	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
@@ -739,7 +753,7 @@ struct Task
 	    if (debug)
 	      std::cerr << "# of support vectors: " << labels.size() << std::endl;
 
-	    optimizer(ids, labels, margins, features);
+	    optimizer(ids, labels, margins, features, learn_optimized);
 	    
 	    batch_current = 0;
 	    ids.clear();
@@ -866,7 +880,19 @@ struct Task
       
       // erase unused weights...
       weights.erase(__bleu->feature_name());
-            
+
+      if (id >= optimizer.scorers.size())
+	optimizer.scorers.resize(id + 1);
+      
+      if (! optimizer.scorers[id])
+	optimizer.scorers[id] = scorer->clone();
+      
+      if (id >= optimizer.hypergraphs.size())
+	optimizer.hypergraphs.resize(id + 1);
+      
+      optimizer.hypergraphs[id].unite(hypergraph_reward);
+      optimizer.hypergraphs[id].unite(hypergraph_penalty);
+      
       score_ptr_type score_reward  = scorer->score(boost::get<0>(yield_reward));
       score_ptr_type score_penalty = scorer->score(boost::get<0>(yield_penalty));
       if (score) {
@@ -919,7 +945,7 @@ struct Task
 	if (debug)
 	  std::cerr << "# of support vectors: " << labels.size() << std::endl;
 
-	optimizer(ids, labels, margins, features);
+	optimizer(ids, labels, margins, features, learn_optimized);
 	
 	batch_current = 0;
 	ids.clear();
@@ -939,7 +965,7 @@ struct Task
       if (debug)
 	std::cerr << "# of support vectors: " << labels.size() << std::endl;
       
-      optimizer(ids, labels, margins, features);
+      optimizer(ids, labels, margins, features, learn_optimized);
       
       batch_current = 0;
       ids.clear();
@@ -1509,6 +1535,7 @@ void options(int argc, char** argv)
 
     ("algorithm", po::value<std::string>(&algorithm)->default_value(algorithm), "optimization algorithm (MIRA or CP)")
 
+    ("learn-optimized",  po::bool_switch(&learn_optimized),  "learn by line-search optimization")
     ("learn-regression", po::bool_switch(&learn_regression), "learn by regression")
     ("learn-factored",   po::bool_switch(&learn_factored),   "learn by edge-factored linear classification")
     
