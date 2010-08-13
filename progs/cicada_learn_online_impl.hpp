@@ -153,8 +153,9 @@ struct LineSearch
 
   typedef cicada::Sentence sentence_type;
 
-  LineSearch(const int __debug=0) : debug(__debug) {}
-
+  LineSearch(const int __debug=0) : line_search(__debug), debug(__debug) {}
+  
+  line_search_type line_search;
   int debug;
   
   template <typename HypergraphSet, typename ScorerSet>
@@ -190,14 +191,8 @@ struct LineSearch
       }
     
     // traverse segments...
-    optimum_type optimum;
-    {
-      line_search_type line_search(debug);
-      
-      // maximizer...
-      optimum = line_search(segments, origin, direction, line_search_type::RegularizeNone(), false);
-    }
-        
+    const optimum_type optimum = line_search(segments, 0.0, 1.0, false);
+    
     return (optimum.lower + optimum.upper) * 0.5;
   }
   
