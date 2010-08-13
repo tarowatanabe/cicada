@@ -205,8 +205,11 @@ struct LineSearch
     
     // traverse segments...
     const optimum_type optimum = line_search(segments, 0.8, 1.2, false);
-    
-    return (optimum.lower + optimum.upper) * 0.5;
+
+    if (optimum.lower == 0.0 && optimum.upper == 0.0)
+      return 1.0;
+    else
+      return (optimum.lower + optimum.upper) * 0.5;
   }
   
 };
@@ -568,7 +571,7 @@ struct OptimizeCP
       
       if (! direction.empty()) {
 	const double update = line_search(hypergraphs, scorers, weights, direction);
-	if (update != 0.0)
+	if (update != 1.0 && update != 0.0)
 	  direction *= update;
 	
 	if (debug)
@@ -1003,7 +1006,7 @@ struct OptimizeMIRA
 	// we will adjust amount of move!
 	
 	const double update = line_search(hypergraphs, scorers, weights, direction);
-	if (update != 0.0)
+	if (update != 1.0 && update != 0.0)
 	  direction *= update;
 
 	if (debug)
