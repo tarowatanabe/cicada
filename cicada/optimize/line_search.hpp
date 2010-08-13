@@ -185,7 +185,7 @@ namespace cicada
 	}
 	
 	
-	Result() : objective(std::numeric_limits<double>::infinity()), score(), lower(), upper() {}
+	Result() : objective(std::numeric_limits<double>::infinity()), score(0.0), lower(0.0), upper(0.0) {}
 	
 	Result(const double& _objective,
 	       const double& _score,

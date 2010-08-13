@@ -154,6 +154,10 @@ struct LineSearch
   typedef cicada::Sentence sentence_type;
 
   LineSearch(const int __debug=0) : line_search(__debug), debug(__debug) {}
+
+  segment_document_type segments;
+  envelope_set_type     envelopes;
+  sentence_type         yield;
   
   line_search_type line_search;
   int debug;
@@ -161,9 +165,8 @@ struct LineSearch
   template <typename HypergraphSet, typename ScorerSet>
   double operator()(const HypergraphSet& graphs, const ScorerSet& scorers, const weight_set_type& origin, const weight_set_type& direction)
   {
-    segment_document_type segments(graphs.size());
-    envelope_set_type     envelopes;
-    sentence_type         yield;
+    segments.clear();
+    segments.resize(graphs.size());
     
     for (int seg = 0; seg < graphs.size(); ++ seg) 
       if (graphs[seg].is_valid()) {
