@@ -122,6 +122,7 @@ int batch_size = 1;
 bool reranking = false;
 bool asynchronous_vectors = false;
 bool mix_weights = false;
+bool mix_weights_optimized = false;
 bool dump_weights = false;
 
 bool apply_exact = false;
@@ -625,7 +626,7 @@ struct Task
 	    hypergraph_penalty.swap(hypergraph_penalty_rescored);
 	  }
 	  
-	  if (learn_optimized) {
+	  if (learn_optimized || mix_weights_optimized) {
 	    if (id >= optimizer.scorers.size())
 	      optimizer.scorers.resize(id + 1);
 	    
@@ -635,6 +636,7 @@ struct Task
 	    if (id >= optimizer.hypergraphs.size())
 	      optimizer.hypergraphs.resize(id + 1);
 	    
+	    optimizer.hypergraphs[id].clear();
 	    optimizer.hypergraphs[id].unite(hypergraph_reward);
 	    optimizer.hypergraphs[id].unite(hypergraph_penalty);
 	  }
@@ -804,7 +806,7 @@ struct Task
       // erase unused weights...
       weights.erase(__bleu->feature_name());
 
-      if (learn_optimized) {
+      if (learn_optimized || mix_weights_optimized) {
 	if (id >= optimizer.scorers.size())
 	  optimizer.scorers.resize(id + 1);
 	
@@ -814,6 +816,7 @@ struct Task
 	if (id >= optimizer.hypergraphs.size())
 	  optimizer.hypergraphs.resize(id + 1);
 	
+	optimizer.hypergraphs[id].clear();
 	optimizer.hypergraphs[id].unite(hypergraph_reward);
 	optimizer.hypergraphs[id].unite(hypergraph_penalty);
       }
@@ -1084,10 +1087,29 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     int updated = 0;
     typename optimizer_set_type::iterator oiter_end = optimizers.end();
     for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
-      weight_set_type weights_scaled = oiter->weights;
-      weights_scaled *= oiter->updated;
       
-      weights_mixed       += weights_scaled;
+      if (mix_weights_optimized) {
+	if (weights_mixed.empty())
+	  weights_mixed = oiter->weights;
+	else {
+	  weight_set_type direction = oiter->weights;
+	  direction -= weights_mixed;
+	  
+	  const double update = oiter->line_search(oiter->hypergraphs, oiter->scorers, weights_mixed, direction, 0.1, 0.9);
+	  if (update == 0.0)
+	    direction *= 0.5;
+	  else
+	    direction *= update;
+	  
+	  weights_mixed += direction;
+	}
+      } else {
+	weight_set_type weights_scaled = oiter->weights;
+	weights_scaled *= oiter->updated;
+	
+	weights_mixed       += weights_scaled;
+      }
+      
       weights_accumulated += oiter->accumulated;
       norm_accumulated    += oiter->updated;
       updated += oiter->updated;
@@ -1096,7 +1118,8 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
       objective_min = std::min(objective_min, oiter->objective_min);
     }
     
-    weights_mixed *= (1.0 / updated);
+    if (! mix_weights_optimized)
+      weights_mixed *= (1.0 / updated);
     
     if (dump_weights) {
 
@@ -1193,11 +1216,12 @@ void options(int argc, char** argv)
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
     
-    ("batch-size",           po::value<int>(&batch_size)->default_value(batch_size), "batch size")
-    ("reranking",            po::bool_switch(&reranking),                            "learn by forest reranking")
-    ("asynchronous-vectors", po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
-    ("mix-weights",          po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")
-    ("dump-weights",         po::bool_switch(&dump_weights),                         "dump weight vectors at every epoch")
+    ("batch-size",            po::value<int>(&batch_size)->default_value(batch_size), "batch size")
+    ("reranking",             po::bool_switch(&reranking),                            "learn by forest reranking")
+    ("asynchronous-vectors",  po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
+    ("mix-weights",           po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")
+    ("mix-weights-optimized", po::bool_switch(&mix_weights_optimized),                "mixing weight vectors by line-search optimization")
+    ("dump-weights",          po::bool_switch(&dump_weights),                         "dump weight vectors at every epoch")
 
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")

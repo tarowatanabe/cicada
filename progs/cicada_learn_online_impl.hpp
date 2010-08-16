@@ -163,7 +163,7 @@ struct LineSearch
   int debug;
   
   template <typename HypergraphSet, typename ScorerSet>
-  double operator()(const HypergraphSet& graphs, const ScorerSet& scorers, const weight_set_type& origin, const weight_set_type& direction)
+  double operator()(const HypergraphSet& graphs, const ScorerSet& scorers, const weight_set_type& origin, const weight_set_type& direction, const double lower, const double upper)
   {
     segments.clear();
     segments.resize(graphs.size());
@@ -195,15 +195,8 @@ struct LineSearch
       }
     
     // traverse segments...
-    const optimum_type optimum = line_search(segments, 0.8, 1.2, false);
-
-    if (debug)
-      std::cerr << "optimized objective: " << optimum.objective << std::endl;
-
-    if (optimum.lower == 0.0 && optimum.upper == 0.0)
-      return 1.0;
-    else
-      return (optimum.lower + optimum.upper) * 0.5;
+    const optimum_type optimum = line_search(segments, lower, upper, false);
+    return (optimum.lower + optimum.upper) * 0.5;
   }
   
 };
@@ -564,7 +557,7 @@ struct OptimizeCP
       direction -= weights;
       
       if (! direction.empty()) {
-	const double update = line_search(hypergraphs, scorers, weights, direction);
+	const double update = line_search(hypergraphs, scorers, weights, direction, 0.5, 1.0);
 	if (update != 1.0 && update != 0.0)
 	  direction *= update;
 	
@@ -999,7 +992,7 @@ struct OptimizeMIRA
 	// starting from weights, we will move toward direction
 	// we will adjust amount of move!
 	
-	const double update = line_search(hypergraphs, scorers, weights, direction);
+	const double update = line_search(hypergraphs, scorers, weights, direction, 0.5, 1.0);
 	if (update != 1.0 && update != 0.0)
 	  direction *= update;
 

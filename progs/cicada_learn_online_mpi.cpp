@@ -127,6 +127,7 @@ int batch_size = 1;
 bool reranking = false;
 bool asynchronous_vectors = false;
 bool mix_weights = false;
+bool mix_weights_optimized = false;
 bool dump_weights = false;
 
 bool apply_exact = false;
@@ -139,6 +140,8 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
 
 void bcast_weights(const int rank, weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
+template <typename Optimizer>
+void reduce_weights_optimized(weight_set_type& weights, Optimizer& optimizer);
 void options(int argc, char** argv);
 
 enum {
@@ -703,7 +706,7 @@ struct Task
 	    hypergraph_penalty.swap(hypergraph_penalty_rescored);
 	  }
 	  
-	  if (learn_optimized) {
+	  if (learn_optimized || mix_weights_optimized) {
 	    if (id >= optimizer.scorers.size())
 	      optimizer.scorers.resize(id + 1);
 	    
@@ -713,6 +716,7 @@ struct Task
 	    if (id >= optimizer.hypergraphs.size())
 	      optimizer.hypergraphs.resize(id + 1);
 	    
+	    optimizer.hypergraphs[id].clear();
 	    optimizer.hypergraphs[id].unite(hypergraph_reward);
 	    optimizer.hypergraphs[id].unite(hypergraph_penalty);
 	  }
@@ -883,7 +887,7 @@ struct Task
       // erase unused weights...
       weights.erase(__bleu->feature_name());
 
-      if (learn_optimized) {
+      if (learn_optimized || mix_weights_optimized) {
 	if (id >= optimizer.scorers.size())
 	  optimizer.scorers.resize(id + 1);
 	
@@ -892,7 +896,9 @@ struct Task
 	
 	if (id >= optimizer.hypergraphs.size())
 	  optimizer.hypergraphs.resize(id + 1);
+
 	
+	optimizer.hypergraphs[id].clear();
 	optimizer.hypergraphs[id].unite(hypergraph_reward);
 	optimizer.hypergraphs[id].unite(hypergraph_penalty);
       }
@@ -1268,10 +1274,13 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     
     // merge weights...
     weights_mixed = optimizer.weights;
-    weights_mixed *= optimizer.updated;
     
-    reduce_weights(weights_mixed);
-    
+    if (mix_weights_optimized)
+      reduce_weights_optimized(weights_mixed, optimizer);
+    else {
+      weights_mixed *= optimizer.updated;
+      reduce_weights(weights_mixed);
+    }
     
     bcast_weights(0, weights_mixed);
     
@@ -1282,7 +1291,8 @@ void optimize(OperationSet& operations, model_type& model, weight_set_type& weig
     MPI::COMM_WORLD.Allreduce(&optimizer.updated, &updated_accumulated, 1, MPI::LONG, MPI::SUM);
     norm_accumulated += updated_accumulated;
     
-    weights_mixed *= (1.0 / updated_accumulated);
+    if (! mix_weights_optimized)
+      weights_mixed *= (1.0 / updated_accumulated);
     
     double objective_max = - std::numeric_limits<double>::infinity();
     double objective_min =   std::numeric_limits<double>::infinity();
@@ -1453,6 +1463,87 @@ void reduce_weights(weight_set_type& weights)
   }
 }
 
+template <typename Optimizer>
+void reduce_weights_optimized(const int rank, weight_set_type& weights, Optimizer& optimizer)
+{
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_istream is;
+  is.push(boost::iostreams::gzip_decompressor());
+  is.push(utils::mpi_device_source(rank, weights_tag, 1024 * 1024));
+  
+  std::string line;
+
+  weight_set_type direction;
+  
+  while (std::getline(is, line)) {
+    tokenizer_type tokenizer(line);
+    
+    tokenizer_type::iterator iter = tokenizer.begin();
+    if (iter == tokenizer.end()) continue;
+    std::string feature = *iter;
+    ++ iter;
+    if (iter == tokenizer.end()) continue;
+    std::string value = *iter;
+    
+    direction[feature] += utils::decode_base64<double>(value);
+  }
+  
+  direction -= weights;
+  
+  const double update = optimizer.line_search(optimizer.hypergraphs, optimizer.scorers, weights, direction, 0.1, 0.9);
+  if (update == 0.0)
+    direction *= 0.5;
+  else
+    direction *= update;
+  
+  weights += direction;
+}
+
+template <typename Iterator, typename Optimizer>
+void reduce_weights_optimized(Iterator first, Iterator last, weight_set_type& weights, Optimizer& optimizer)
+{
+  for (/**/; first != last; ++ first)
+    reduce_weights_optimized(*first, weights, optimizer);
+}
+
+template <typename Optimizer>
+void reduce_weights_optimized(weight_set_type& weights, Optimizer& optimizer)
+{
+  typedef std::vector<int, std::allocator<int> > rank_set_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  rank_set_type ranks;
+  int merge_size = mpi_size;
+  
+  while (merge_size > 1 && mpi_rank < merge_size) {
+    const int reduce_size = (merge_size / 2 == 0 ? 1 : merge_size / 2);
+    
+    if (mpi_rank < reduce_size) {
+      ranks.clear();
+      for (int i = reduce_size; i < merge_size; ++ i)
+	if (i % reduce_size == mpi_rank)
+	  ranks.push_back(i);
+      
+      if (ranks.empty()) continue;
+      
+      if (ranks.size() == 1)
+	reduce_weights_optimized(ranks.front(), weights, optimizer);
+      else
+	reduce_weights_optimized(ranks.begin(), ranks.end(), weights, optimizer);
+      
+    } else
+      send_weights(mpi_rank % reduce_size, weights);
+    
+    merge_size = reduce_size;
+  }
+}
+
 
 void bcast_weights(const int rank, weight_set_type& weights)
 {
@@ -1559,11 +1650,12 @@ void options(int argc, char** argv)
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
     
-    ("batch-size",           po::value<int>(&batch_size)->default_value(batch_size), "batch size")
-    ("reranking",            po::bool_switch(&reranking),                            "learn by forest reranking")
-    ("asynchronous-vectors", po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
-    ("mix-weights",          po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")
-    ("dump-weights",         po::bool_switch(&dump_weights),                         "dump weight vectors at every epoch")
+    ("batch-size",            po::value<int>(&batch_size)->default_value(batch_size), "batch size")
+    ("reranking",             po::bool_switch(&reranking),                            "learn by forest reranking")
+    ("asynchronous-vectors",  po::bool_switch(&asynchronous_vectors),                 "asynchrounsly merge support vectors")
+    ("mix-weights",           po::bool_switch(&mix_weights),                          "mixing weight vectors at every epoch")
+    ("mix-weights-optimized", po::bool_switch(&mix_weights_optimized),                "mixing weight vectors by line-search optimization")
+    ("dump-weights",          po::bool_switch(&dump_weights),                         "dump weight vectors at every epoch")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")
