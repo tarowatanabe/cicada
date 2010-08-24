@@ -105,7 +105,7 @@ namespace cicada
     typedef std::vector<node_score_list_type, std::allocator<node_score_list_type> > node_score_set_type;
     
     
-#if 1
+#if 0
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
 				    std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
@@ -114,24 +114,24 @@ namespace cicada
 			  std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
 #endif
 #endif
-    //typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
+    typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
 
     struct candidate_hash_type : public utils::hashmurmur<size_t>
     {
       size_t operator()(const candidate_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), x->in_edge->id);
+	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), x->in_edge->id));
       }
     };
     struct candidate_equal_type
     {
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->in_edge->id == y->in_edge->id && x->j == y->j;
+	return (x == y) || (x && y && x->in_edge->id == y->in_edge->id && x->j == y->j);
       }
     };
     
-#if 1
+#if 0
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<const candidate_type*, candidate_hash_type, candidate_equal_type,
 				    std::allocator<const candidate_type*> > candidate_set_unique_type;
@@ -140,7 +140,7 @@ namespace cicada
 			  std::allocator<const candidate_type*> > candidate_set_unique_type;
 #endif
 #endif
-    //typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type> candidate_set_unique_type;
+    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
     
     struct compare_heap_type
     {
@@ -173,7 +173,9 @@ namespace cicada
       : model(_model),
 	function(_function),
 	cube_size_max(_cube_size_max)
-    { }
+    { 
+      cand_unique.set_empty_key(0);
+    }
     
     void operator()(const hypergraph_type& graph_in,
 		    hypergraph_type&       graph_out)
@@ -217,9 +219,7 @@ namespace cicada
       const node_type& node = graph_in.nodes[v];
       const bool is_goal(v == graph_in.goal);
       
-      candidate_set_unique_type cand_unique;
-      
-      //cand_unique.set_empty_key(0);
+      cand_unique.clear();
       
       // for each incoming e, cand \leftarrow { <e, 1>}
       candidate_heap_type cand;
@@ -244,9 +244,7 @@ namespace cicada
       //std::cerr << "perform cube-prune" << std::endl;
       
       state_node_map_type buf(cand.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
-      
-      //buf.set_empty_key(state_type());
-      //buf.set_deleted_key(state_type());
+      buf.set_empty_key(state_type());
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...
@@ -425,6 +423,8 @@ namespace cicada
     candidate_set_type  candidates;
     node_score_set_type D;
     state_set_type      node_states;
+
+    candidate_set_unique_type cand_unique;
 
     const model_type& model;
     const function_type& function;

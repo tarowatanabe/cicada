@@ -46,7 +46,7 @@ namespace cicada
     typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
-#if 1
+#if 0
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<state_type, id_type, model_type::state_hash, model_type::state_equal,
 				    std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
@@ -55,7 +55,7 @@ namespace cicada
 			  std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
 #endif
 #endif
-    //typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
+    typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
         
     ApplyExact(const model_type& _model)
       : model(_model)
@@ -97,9 +97,7 @@ namespace cicada
       const bool is_goal(v == graph_in.goal);
 
       state_node_map_type buf(node.edges.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
-      
-      //buf.set_empty_key(state_type());
-      //buf.set_deleted_key(state_type());
+      buf.set_empty_key(state_type());
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {

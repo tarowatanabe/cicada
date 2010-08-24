@@ -49,8 +49,7 @@ namespace cicada
       : grammar(__grammar) 
 
     {
-      //edges_unique.set_empty_key(0);
-      //edges_unique.set_deleted_key(0);
+      edges_unique.set_empty_key(0);
     }
     
     //
@@ -214,11 +213,13 @@ namespace cicada
     struct edge_unique_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
-
+      
       size_t operator()(const edge_type* x) const
       {
 	// passive edge do not care about what dot we have consumed...
-	if (x->is_active())
+	if (! x)
+	  return 0;
+	else if (x->is_active())
 	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id())));
 	else
 	  return hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id()));
@@ -230,11 +231,13 @@ namespace cicada
       bool operator()(const edge_type* x, const edge_type* y) const
       {
 	// passive edge do not care dot...
-	return (x->is_active() == y->is_active()
-		&& x->lhs == y->lhs
-		&& x->first == y->first
-		&& x->last == y->last
-		&& (x->is_passive() || x->dot == y->dot));
+	return ((x == y) 
+		|| (x && y
+		    && x->is_active() == y->is_active()
+		    && x->lhs == y->lhs
+		    && x->first == y->first
+		    && x->last == y->last
+		    && (x->is_passive() || x->dot == y->dot)));
       }
     };
     
@@ -270,7 +273,7 @@ namespace cicada
       }
     };
 
-#if 1
+#if 0
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type,
 				    std::allocator<const edge_type*> > edge_set_unique_type;
@@ -279,7 +282,7 @@ namespace cicada
 			  std::allocator<const edge_type*> > edge_set_unique_type;
 #endif
 #endif
-    //typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
+    typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,

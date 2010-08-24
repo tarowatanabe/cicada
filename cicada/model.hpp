@@ -70,7 +70,7 @@ namespace cicada
     
       size_t operator()(const state_type& x) const
       {
-	return hasher_type::operator()(x.base, x.base + state_size, 0);
+	return (x.base == 0 ? size_t(0) : hasher_type::operator()(x.base, x.base + state_size, 0));
       }
     
       size_t state_size;
@@ -83,7 +83,7 @@ namespace cicada
       
       bool operator()(const state_type& x, const state_type& y) const
       {
-	return std::equal(x.base, x.base + state_size, y.base);
+	return x.base == y.base || (x.base && y.base && std::equal(x.base, x.base + state_size, y.base));
       }
     
       size_t state_size;
