@@ -105,7 +105,7 @@ namespace cicada
     typedef std::vector<node_score_list_type, std::allocator<node_score_list_type> > node_score_set_type;
     
     
-#if 0
+#if 1
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
 				    std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
@@ -114,7 +114,7 @@ namespace cicada
 			  std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
 #endif
 #endif
-    typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
+    //typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
 
     struct candidate_hash_type : public utils::hashmurmur<size_t>
     {
@@ -131,7 +131,7 @@ namespace cicada
       }
     };
     
-#if 0
+#if 1
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<const candidate_type*, candidate_hash_type, candidate_equal_type,
 				    std::allocator<const candidate_type*> > candidate_set_unique_type;
@@ -140,7 +140,7 @@ namespace cicada
 			  std::allocator<const candidate_type*> > candidate_set_unique_type;
 #endif
 #endif
-    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type> candidate_set_unique_type;
+    //typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type> candidate_set_unique_type;
     
     struct compare_heap_type
     {
@@ -219,8 +219,8 @@ namespace cicada
       
       candidate_set_unique_type cand_unique;
       
-      cand_unique.set_empty_key(0);
-      cand_unique.set_deleted_key(0);
+      //cand_unique.set_empty_key(0);
+      //cand_unique.set_deleted_key(0);
       
       // for each incoming e, cand \leftarrow { <e, 1>}
       candidate_heap_type cand;
@@ -246,8 +246,8 @@ namespace cicada
       
       state_node_map_type buf(cand.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
       
-      buf.set_empty_key(state_type());
-      buf.set_deleted_key(state_type());
+      //buf.set_empty_key(state_type());
+      //buf.set_deleted_key(state_type());
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...

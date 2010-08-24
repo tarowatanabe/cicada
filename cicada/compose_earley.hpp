@@ -49,8 +49,8 @@ namespace cicada
       : grammar(__grammar) 
 
     {
-      edges_unique.set_empty_key(0);
-      edges_unique.set_deleted_key(0);
+      //edges_unique.set_empty_key(0);
+      //edges_unique.set_deleted_key(0);
     }
     
     //
@@ -270,7 +270,7 @@ namespace cicada
       }
     };
 
-#if 0
+#if 1
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type,
 				    std::allocator<const edge_type*> > edge_set_unique_type;
@@ -279,7 +279,7 @@ namespace cicada
 			  std::allocator<const edge_type*> > edge_set_unique_type;
 #endif
 #endif
-    typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
+    //typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
