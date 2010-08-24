@@ -19,7 +19,7 @@
 #include <boost/throw_exception.hpp>
 #include <boost/iterator/iterator_adaptor.hpp>
 
-#include "parameter.hpp"
+#include <boost/parameter.hpp>
 
 namespace boost {
 namespace heap {

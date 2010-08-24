@@ -16,6 +16,8 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort.hpp>
 
+#include <google/dense_hash_set>
+
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/sgi_hash_map.hpp>
@@ -44,7 +46,12 @@ namespace cicada
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     ComposeEarley(const grammar_type& __grammar)
-      : grammar(__grammar) {}
+      : grammar(__grammar) 
+
+    {
+      edges_unique.set_empty_key(0);
+      edges_unique.set_deleted_key(0);
+    }
     
     //
     // compose source hypergraph with FST grammar in grammar...!
@@ -195,6 +202,7 @@ namespace cicada
       }
     };
     
+
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<traversal_type, traversal_hash_type, traversal_equal_type,
 				    std::allocator<traversal_type> > traversal_set_type;
@@ -202,8 +210,6 @@ namespace cicada
     typedef sgi::hash_set<traversal_type, traversal_hash_type, traversal_equal_type,
 			  std::allocator<traversal_type> > traversal_set_type;
 #endif
-      
-
     
     struct edge_unique_hash_type : public utils::hashmurmur<size_t>
     {
@@ -264,17 +270,25 @@ namespace cicada
       }
     };
 
+#if 0
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type,
 				    std::allocator<const edge_type*> > edge_set_unique_type;
+#else
+    typedef sgi::hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type,
+			  std::allocator<const edge_type*> > edge_set_unique_type;
+#endif
+#endif
+    typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
+
+#ifdef HAVE_TR1_UNORDERED_SET
+    
     typedef std::tr1::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
 					 std::allocator<const edge_type*> > edge_set_active_type;
     typedef std::tr1::unordered_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
 					 std::allocator<const edge_type*> > edge_set_passive_type;
     
 #else
-    typedef sgi::hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type,
-			  std::allocator<const edge_type*> > edge_set_unique_type;
     typedef sgi::hash_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
 			       std::allocator<const edge_type*> > edge_set_active_type;
     typedef sgi::hash_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
@@ -651,7 +665,7 @@ namespace cicada
 
       agenda_finishing.clear();
       agenda_exploration.clear();
-      
+
       edges_unique.clear();
       edges_active.clear();
       edges_passive.clear();

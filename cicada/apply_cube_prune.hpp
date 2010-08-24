@@ -8,11 +8,15 @@
 
 #include <cicada/semiring/traits.hpp>
 
+#include <google/dense_hash_set>
+
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_map.hpp>
 #include <utils/sgi_hash_set.hpp>
+
+//#include <boost/heap/b_heap.hpp>
 
 namespace cicada
 {
@@ -84,9 +88,7 @@ namespace cicada
 
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
-    
-    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
-    
+        
     struct node_score_type
     {
       id_type node;
@@ -126,6 +128,7 @@ namespace cicada
       }
     };
     
+#if 0
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<const candidate_type*, candidate_hash_type, candidate_equal_type,
 				    std::allocator<const candidate_type*> > candidate_set_unique_type;
@@ -133,6 +136,8 @@ namespace cicada
     typedef sgi::hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type,
 			  std::allocator<const candidate_type*> > candidate_set_unique_type;
 #endif
+#endif
+    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type> candidate_set_unique_type;
     
     struct compare_heap_type
     {
@@ -156,6 +161,14 @@ namespace cicada
 	return x.estimate > y.estimate;
       }
     };
+
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
+#if 0
+    typedef boost::heap::b_heap<const candidate_type*,
+				boost::heap::compare<compare_heap_type>
+				boost::heap::allocator<std::allocator<const candidate_type*> > > candidate_heap_type;
+#endif
+
 
     
     ApplyCubePrune(const model_type& _model,
@@ -205,6 +218,9 @@ namespace cicada
       
       candidate_set_unique_type cand_unique;
       
+      cand_unique.set_empty_key(0);
+      cand_unique.set_deleted_key(0);
+      
       // for each incoming e, cand \leftarrow { <e, 1>}
       candidate_heap_type cand;
       cand.reserve(node.edges.size() * cube_size_max);
@@ -213,9 +229,12 @@ namespace cicada
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph_in.edges[*eiter];
 	const index_set_type j(edge.tails.size(), 0);
+
+	const candidate_type* item = make_candidate(edge, j, graph_out, is_goal);
 	
-	cand.push_back(make_candidate(edge, j, graph_out, is_goal));
-	cand_unique.insert(cand.back());
+	cand.push_back(item);
+	//cand.push(item);
+	cand_unique.insert(item);
       }
       
       //std::cerr << "heapify" << std::endl;
@@ -232,6 +251,9 @@ namespace cicada
 	std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
 	const candidate_type* item = cand.back();
 	cand.pop_back();
+
+	//const candidate_type* item = cand.top();
+	//cand.pop();
 	
 	push_succ(*item, is_goal, cand, cand_unique, graph_out);
 	append_item(*item, is_goal, buf, graph_out);
