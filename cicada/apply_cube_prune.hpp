@@ -3,20 +3,20 @@
 #ifndef __CICADA__APPLY_CUBE_PRUNE__HPP__
 #define __CICADA__APPLY_CUBE_PRUNE__HPP__ 1
 
+#include <cicada/apply_state_less.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/model.hpp>
 
 #include <cicada/semiring/traits.hpp>
 
 #include <google/dense_hash_set>
+#include <google/dense_hash_map>
 
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_map.hpp>
 #include <utils/sgi_hash_set.hpp>
-
-//#include <boost/heap/b_heap.hpp>
 
 namespace cicada
 {
@@ -105,6 +105,7 @@ namespace cicada
     typedef std::vector<node_score_list_type, std::allocator<node_score_list_type> > node_score_set_type;
     
     
+#if 0
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
 				    std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
@@ -112,6 +113,8 @@ namespace cicada
     typedef sgi::hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
 			  std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
 #endif
+#endif
+    typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
 
     struct candidate_hash_type : public utils::hashmurmur<size_t>
     {
@@ -163,13 +166,6 @@ namespace cicada
     };
 
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
-#if 0
-    typedef boost::heap::b_heap<const candidate_type*,
-				boost::heap::compare<compare_heap_type>
-				boost::heap::allocator<std::allocator<const candidate_type*> > > candidate_heap_type;
-#endif
-
-
     
     ApplyCubePrune(const model_type& _model,
 		   const function_type& _function,
@@ -183,25 +179,30 @@ namespace cicada
 		    hypergraph_type&       graph_out)
     {
       const_cast<model_type&>(model).initialize();
+
+      if (model.is_stateless()) {
+	ApplyStateLess __applier(model);
+	__applier(graph_in, graph_out);
+      } else {
+	candidates.clear();
+	
+	D.clear();
+	D.reserve(graph_in.nodes.size());
+	D.resize(graph_in.nodes.size());
+	
+	node_states.clear();
+	node_states.reserve(graph_in.nodes.size() * cube_size_max);
+	
+	graph_out.clear();
+	for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
+	  kbest(node_id, graph_in, graph_out);
       
-      candidates.clear();
-      
-      D.clear();
-      D.reserve(graph_in.nodes.size());
-      D.resize(graph_in.nodes.size());
-      
-      node_states.clear();
-      node_states.reserve(graph_in.nodes.size() * cube_size_max);
-      
-      graph_out.clear();
-      for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
-	kbest(node_id, graph_in, graph_out);
-      
-      // topologically sort...
-      graph_out.topologically_sort();
-      
-      // re-initialize again...
-      const_cast<model_type&>(model).initialize();
+	// topologically sort...
+	graph_out.topologically_sort();
+	
+	// re-initialize again...
+	const_cast<model_type&>(model).initialize();
+      }
     };
     
   private:
@@ -229,11 +230,10 @@ namespace cicada
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph_in.edges[*eiter];
 	const index_set_type j(edge.tails.size(), 0);
-
+	
 	const candidate_type* item = make_candidate(edge, j, graph_out, is_goal);
 	
 	cand.push_back(item);
-	//cand.push(item);
 	cand_unique.insert(item);
       }
       
@@ -243,17 +243,17 @@ namespace cicada
       std::make_heap(cand.begin(), cand.end(), compare_heap_type());
       
       //std::cerr << "perform cube-prune" << std::endl;
-
+      
       state_node_map_type buf(cand.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
+      
+      buf.set_empty_key(state_type());
+      buf.set_deleted_key(state_type());
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...
 	std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
 	const candidate_type* item = cand.back();
 	cand.pop_back();
-
-	//const candidate_type* item = cand.top();
-	//cand.pop();
 	
 	push_succ(*item, is_goal, cand, cand_unique, graph_out);
 	append_item(*item, is_goal, buf, graph_out);

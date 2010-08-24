@@ -5,9 +5,13 @@
 
 #include <vector>
 
+#include <cicada/apply_state_less.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/model.hpp>
 #include <cicada/semiring/traits.hpp>
+
+#include <google/dense_hash_set>
+#include <google/dense_hash_map>
 
 #include <utils/simple_vector.hpp>
 #include <utils/hashmurmur.hpp>
@@ -42,7 +46,7 @@ namespace cicada
     typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
-    
+#if 0    
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<state_type, id_type, model_type::state_hash, model_type::state_equal,
 				    std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
@@ -50,8 +54,9 @@ namespace cicada
     typedef sgi::hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal,
 			  std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
 #endif
-    
-    
+#endif
+    typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
+        
     ApplyExact(const model_type& _model)
       : model(_model)
     {  }
@@ -61,22 +66,27 @@ namespace cicada
     {
       const_cast<model_type&>(model).initialize();
 
-      node_map.clear();
-      node_map.reserve(graph_in.nodes.size());
-      node_map.resize(graph_in.nodes.size());
-      
-      node_states.clear();
-      node_states.reserve(graph_in.nodes.size() * 10000);
-      
-      graph_out.clear();
-      for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
-	process(node_id, graph_in, graph_out);
-            
-      // topologically sort...
-      graph_out.topologically_sort();
-
-      // re-initialize again...
-      const_cast<model_type&>(model).initialize();
+      if (model.is_stateless()) {
+	ApplyStateLess __applier(model);
+	__applier(graph_in, graph_out);
+      } else {
+	node_map.clear();
+	node_map.reserve(graph_in.nodes.size());
+	node_map.resize(graph_in.nodes.size());
+	
+	node_states.clear();
+	node_states.reserve(graph_in.nodes.size() * 10000);
+	
+	graph_out.clear();
+	for (id_type node_id = 0; node_id < graph_in.nodes.size(); ++ node_id)
+	  process(node_id, graph_in, graph_out);
+	
+	// topologically sort...
+	graph_out.topologically_sort();
+	
+	// re-initialize again...
+	const_cast<model_type&>(model).initialize();
+      }
     };
     
   private:
@@ -87,6 +97,9 @@ namespace cicada
       const bool is_goal(v == graph_in.goal);
 
       state_node_map_type buf(node.edges.size(), model_type::state_hash(model.state_size()), model_type::state_equal(model.state_size()));
+      
+      buf.set_empty_key(state_type());
+      buf.set_deleted_key(state_type());
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
