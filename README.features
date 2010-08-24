@@ -31,3 +31,10 @@ variational: features for variational decoding
 target-word-penalty: simply count # of target words
 source-word-penalty: simply count # of source words
 rule-penalty: simply count # of rules
+
+
+How to develop your feature functions?
+
+The feature function classes are located at cicada/featuer/
+Basically, you have to inherit FeatureFunction class in cicada/feature_function.hpp
+and add initializer in cicada/feature_function.cpp
