@@ -213,14 +213,13 @@ namespace cicada
       
       // clear candidates!
       candidates.clear();
-
+      
       const node_type& node = graph_in.nodes[v];
       const bool is_goal(v == graph_in.goal);
       
       candidate_set_unique_type cand_unique;
       
       //cand_unique.set_empty_key(0);
-      //cand_unique.set_deleted_key(0);
       
       // for each incoming e, cand \leftarrow { <e, 1>}
       candidate_heap_type cand;
