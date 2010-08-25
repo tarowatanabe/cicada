@@ -6,8 +6,8 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/indexed_set.hpp"
-#include "utils/compact_trie.hpp"
 #include "utils/lexical_cast.hpp"
+
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
 

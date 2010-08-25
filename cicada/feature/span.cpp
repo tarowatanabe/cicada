@@ -9,7 +9,6 @@
 #include "cicada/span_node.hpp"
 
 #include "utils/indexed_set.hpp"
-#include "utils/compact_trie.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/hashmurmur.hpp"

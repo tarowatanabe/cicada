@@ -1,16 +1,17 @@
 // -*- mode: c++ -*-
 
-#ifndef __UTILS__COMPACT_TRIE__HPP__
-#define __UTILS__COMPACT_TRIE__HPP__ 1
+#ifndef __UTILS__COMPACT_TRIE_DENSE__HPP__
+#define __UTILS__COMPACT_TRIE_DENSE__HPP__ 1
+
+#include <google/dense_hash_map>
 
 #include <utils/chunk_vector.hpp>
-#include <utils/sgi_hash_map.hpp>
 
 #include <boost/functional/hash.hpp>
 
 namespace utils
 {
-  struct __compact_trie_base
+  struct __compact_trie_dense_base
   {
     typedef uint32_t                   id_type;
     
@@ -25,7 +26,7 @@ namespace utils
 	    typename Hash=boost::hash<Key>,
 	    typename Equal=std::equal_to<Key>,
 	    typename Alloc=std::allocator<std::pair<const Key, Data> > >
-  class compact_trie : public __compact_trie_base
+  class compact_trie_dense : public __compact_trie_dense_base
   {
   public:
     typedef Key                        key_type;
@@ -44,21 +45,15 @@ namespace utils
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
     
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
-    typedef std::tr1::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_root_type;
-#else
-    typedef sgi::hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
-    typedef sgi::hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_root_type;
-#endif
+    typedef google::dense_hash_map<key_type, id_type, hash_type, equal_type > id_map_type;
+    typedef google::dense_hash_map<key_type, id_type, hash_type, equal_type > id_map_root_type;
     
     struct Node
     {
       id_map_type __map;
       mapped_type __data;
-
-      Node() : __map(), __data() { }
-      Node(const mapped_type& data) : __map(), __data(data) {}
+      
+      Node(const key_type& __empty) : __map(), __data() { __map.set_empty_key(__empty); }
     };
     typedef Node node_type;
     
@@ -73,7 +68,10 @@ namespace utils
     typedef typename id_map_root_type::const_iterator       root_iterator;
     
   public:
-    compact_trie() {}
+    compact_trie_dense(const key_type& __empty) { __root.set_empty_key(__empty); }
+
+  private:
+    compact_trie_dense() {}
     
   public:
     const_root_iterator begin() const { return __root.begin(); }
@@ -92,7 +90,7 @@ namespace utils
     
     bool is_root(id_type __id) const { return __id == npos(); }
 
-    void swap(compact_trie& x)
+    void swap(compact_trie_dense& x)
     {
       __root.swap(x.__root);
       __nodes.swap(x.__nodes);
@@ -166,7 +164,7 @@ namespace utils
 	else {
 	  __root.insert(std::make_pair(key, __nodes.size()));
 	  __id = __nodes.size();
-	  __nodes.push_back(node_type());
+	  __nodes.push_back(node_type(__root.empty_key()));
 	  return __id;
 	}
       } else {
@@ -176,7 +174,7 @@ namespace utils
 	else {
 	  __nodes[__id].__map.insert(std::make_pair(key, __nodes.size()));
 	  __id = __nodes.size();
-	  __nodes.push_back(node_type());
+	  __nodes.push_back(node_type(__root.empty_key()));
 	  return __id;
 	}
       }
@@ -203,8 +201,8 @@ namespace std
 {
   template <typename Key, typename Data, typename Hash, typename Equal, typename Alloc>
   inline
-  void swap(utils::compact_trie<Key,Data,Hash,Equal,Alloc>& x,
-	    utils::compact_trie<Key,Data,Hash,Equal,Alloc>& y)
+  void swap(utils::compact_trie_dense<Key,Data,Hash,Equal,Alloc>& x,
+	    utils::compact_trie_dense<Key,Data,Hash,Equal,Alloc>& y)
   {
     x.swap(y);
   }

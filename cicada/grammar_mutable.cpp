@@ -6,7 +6,7 @@
 #include "grammar_mutable.hpp"
 #include "parameter.hpp"
 
-#include "utils/compact_trie.hpp"
+#include "utils/compact_trie_dense.hpp"
 #include "utils/compress_stream.hpp"
 
 #include <boost/lexical_cast.hpp>
@@ -53,9 +53,11 @@ namespace cicada
     typedef Transducer::rule_set_type rule_set_type;
     
 
-    typedef utils::compact_trie<symbol_type, rule_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, rule_set_type> > > trie_type;
+    typedef utils::compact_trie_dense<symbol_type, rule_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				      std::allocator<std::pair<const symbol_type, rule_set_type> > > trie_type;
     typedef trie_type::id_type id_type;
+
+    GrammarMutableImpl() : trie(symbol_type()) {}
     
     void read(const std::string& parameter);
     

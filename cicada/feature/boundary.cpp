@@ -8,7 +8,6 @@
 #include "cicada/stemmer.hpp"
 
 #include "utils/indexed_set.hpp"
-#include "utils/compact_trie.hpp"
 #include "utils/lexical_cast.hpp"
 
 #include <boost/tuple/tuple.hpp>
@@ -43,11 +42,6 @@ namespace cicada
       typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
       typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
       
-      typedef utils::compact_trie<symbol_type, std::string, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
-
-      typedef tree_map_type::id_type id_type;
-
       typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
       typedef std::vector<symbol_pair_type, std::allocator<symbol_pair_type> > symbol_pair_set_type;
 

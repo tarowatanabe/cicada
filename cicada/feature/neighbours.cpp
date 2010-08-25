@@ -9,7 +9,6 @@
 #include "cicada/stemmer.hpp"
 
 #include "utils/indexed_set.hpp"
-#include "utils/compact_trie.hpp"
 #include "utils/lexical_cast.hpp"
 
 #include <boost/tuple/tuple.hpp>

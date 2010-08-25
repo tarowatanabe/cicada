@@ -14,7 +14,7 @@
 
 #include <cicada/eval/score.hpp>
 
-#include <utils/compact_trie.hpp>
+#include <utils/compact_trie_dense.hpp>
 #include <utils/bithack.hpp>
 
 #include <boost/numeric/conversion/bounds.hpp>
@@ -139,12 +139,12 @@ namespace cicada
       typedef double count_type;
       
       typedef std::allocator<std::pair<const word_type, count_type> > ngram_allocator_type;
-      typedef utils::compact_trie<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
+      typedef utils::compact_trie_dense<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
       
       typedef std::vector<int, std::allocator<int> > size_set_type;
 
     public:
-      BleuScorer(int __order = 4, bool __split=false) : Scorer(__split), order(__order) {}
+      BleuScorer(int __order = 4, bool __split=false) : Scorer(__split), ngrams(word_type()), sizes(), order(__order) { }
 
       bool error_metric() const { return false; }
 

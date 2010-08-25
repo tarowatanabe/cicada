@@ -5,7 +5,7 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/hashmurmur.hpp"
-#include "utils/compact_trie.hpp"
+#include "utils/compact_trie_dense.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
@@ -57,7 +57,7 @@ namespace cicada
       typedef symbol_type word_type;
       
       typedef std::allocator<std::pair<const word_type, count_type> >  ngram_allocator_type;
-      typedef utils::compact_trie<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
+      typedef utils::compact_trie_dense<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
       
       struct Node
       {
@@ -90,7 +90,7 @@ namespace cicada
       BleuImpl(const int __order,
 	       const bool __exact,
 	       const bool __split)
-	: order(__order), exact(__exact), split(__split) {}
+	: ngrams(word_type()), nodes(), sizes(), order(__order), exact(__exact), split(__split) {}
       
       template <typename Sentence>
       void split_non_ascii_characters(const Sentence& phrase, Sentence& result) const

@@ -8,7 +8,7 @@
 #include "cicada/stemmer.hpp"
 
 #include "utils/indexed_set.hpp"
-#include "utils/compact_trie.hpp"
+#include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 
 #include <boost/tuple/tuple.hpp>
@@ -54,14 +54,16 @@ namespace cicada
 	node_pair_type() : node(), cluster(), prefix(), suffix(), digits() {}
       };
       
-      typedef utils::compact_trie<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
+      typedef utils::compact_trie_dense<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+					std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
 
       typedef tree_map_type::id_type id_type;
       
       
       NGramTreeImpl()
-	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), forced_feature(false) {}
+	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0),
+	  tree_map(symbol_type()),
+	  forced_feature(false) {}
       
       virtual ~NGramTreeImpl() {}
       
