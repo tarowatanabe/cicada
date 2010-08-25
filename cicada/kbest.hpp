@@ -306,7 +306,7 @@ namespace cicada
       
       const node_type& node = graph.nodes[v];
       
-      stat.cand.reserve(node.edges.size());
+      state.cand.reserve(node.edges.size());
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
