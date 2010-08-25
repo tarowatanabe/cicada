@@ -11,7 +11,6 @@
 
 #include <utils/simple_vector.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_map.hpp>
 
 namespace cicada
 {

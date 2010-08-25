@@ -46,8 +46,6 @@ namespace utils
     
   private:  
     typedef typename Alloc::template rebind<std::pair<const key_type, id_type> >::other id_map_alloc_type;
-    //typedef google::sparse_hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
-    //typedef google::dense_hash_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
     
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<key_type, id_type, hash_type, equal_type, id_map_alloc_type> id_map_type;
@@ -62,7 +60,7 @@ namespace utils
       id_map_type __map;
       mapped_type __data;
 
-      Node() : __map(), __data() {}
+      Node() : __map(), __data() { }
       Node(const mapped_type& data) : __map(), __data(data) {}
     };
     typedef Node node_type;

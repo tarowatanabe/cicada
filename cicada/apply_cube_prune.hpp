@@ -15,8 +15,6 @@
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_map.hpp>
-#include <utils/sgi_hash_set.hpp>
 
 namespace cicada
 {
@@ -104,18 +102,6 @@ namespace cicada
     typedef std::vector<node_score_type, std::allocator<node_score_type> > node_score_list_type;
     typedef std::vector<node_score_list_type, std::allocator<node_score_list_type> > node_score_set_type;
     
-    
-#if 0
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
-				    std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
-#else
-    typedef sgi::hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal,
-			  std::allocator<std::pair<const state_type, candidate_type*> > > state_node_map_type;
-#endif
-#endif
-    typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
-
     struct candidate_hash_type : public utils::hashmurmur<size_t>
     {
       size_t operator()(const candidate_type* x) const
@@ -130,17 +116,6 @@ namespace cicada
 	return (x == y) || (x && y && x->in_edge->id == y->in_edge->id && x->j == y->j);
       }
     };
-    
-#if 0
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<const candidate_type*, candidate_hash_type, candidate_equal_type,
-				    std::allocator<const candidate_type*> > candidate_set_unique_type;
-#else
-    typedef sgi::hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type,
-			  std::allocator<const candidate_type*> > candidate_set_unique_type;
-#endif
-#endif
-    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
     
     struct compare_heap_type
     {
@@ -166,6 +141,9 @@ namespace cicada
     };
 
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
+    
+    typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
+    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
     
     ApplyCubePrune(const model_type& _model,
 		   const function_type& _function,

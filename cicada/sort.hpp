@@ -7,8 +7,9 @@
 
 #include <cicada/hypergraph.hpp>
 
-#include <utils/sgi_hash_set.hpp>
 #include <utils/hashmurmur.hpp>
+
+#include <google/dense_hash_set>
 
 namespace cicada
 {
@@ -63,19 +64,15 @@ namespace cicada
     template <typename Filter>
     void operator()(const hypergraph_type& x, hypergraph_type& sorted, Filter filter, const bool validate=true)
     {
-#ifdef HAVE_TR1_UNORDERED_SET 
-      typedef std::tr1::unordered_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > id_set_type;
-#else
-      typedef sgi::hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>, std::allocator<id_type> > id_set_type;
-#endif
+      typedef google::dense_hash_set<id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > id_set_type;
       
-
       sorted.clear();
       
       if (x.goal == hypergraph_type::invalid)
 	return;
 
       id_set_type edges_cycle;
+      edges_cycle.set_empty_key(id_type(-1));
 
       reloc_set_type reloc_node(x.nodes.size(), -1);
       reloc_set_type reloc_edge(x.edges.size(), -1);
@@ -188,6 +185,7 @@ namespace cicada
 	  reloc_map_node[reloc_node[i]] = i;
 
       id_set_type nodes_empty;
+      nodes_empty.set_empty_key(id_type(-1));
       
       for (int i = 0; i < reloc_map_node.size(); ++ i) {
 	const node_type& node_old = x.nodes[reloc_map_node[i]];

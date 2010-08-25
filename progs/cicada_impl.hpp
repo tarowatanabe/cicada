@@ -932,9 +932,7 @@ public:
     utils::resource start;
     
     // apply...
-    if (model.is_stateless())
-      cicada::apply_state_less(model, hypergraph, applied);
-    else if (exact)
+    if (exact)
       cicada::apply_exact(model, hypergraph, applied);
     else {
       if (weights_one)

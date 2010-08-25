@@ -15,8 +15,9 @@
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
+
+#include <google/dense_hash_map>
 
 namespace cicada
 {
@@ -71,14 +72,33 @@ namespace cicada
     typedef hypergraph_type::id_type passive_type;
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
+    
+    struct NodeMap
+    {
+      typedef google::dense_hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > node_map_type;
+      
+      typedef node_map_type::value_type     value_type;
+      
+      typedef node_map_type::const_iterator const_iterator;
+      typedef node_map_type::iterator       iterator;
+      
+      NodeMap() : node_map() { node_map.set_empty_key(symbol_type()); }
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				    std::allocator<std::pair<const symbol_type, hypergraph_type::id_type > > > node_map_type;
-#else
-    typedef sgi::hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			  std::allocator<std::pair<const symbol_type, hypergraph_type::id_type > > > node_map_type;
-#endif
+      inline       iterator find(const symbol_type& key)       { return node_map.find(key); }
+      inline const_iterator find(const symbol_type& key) const { return node_map.find(key); }
+      
+      inline       iterator begin()       { return node_map.begin(); }
+      inline const_iterator begin() const { return node_map.begin(); }
+
+      inline       iterator end()       { return node_map.end(); }
+      inline const_iterator end() const { return node_map.end(); }
+      
+      std::pair<iterator, bool> insert(const value_type& x) { return node_map.insert(x); }
+      
+      node_map_type node_map;
+    };
+    typedef NodeMap node_map_type;
+
     typedef utils::chart<node_map_type, std::allocator<node_map_type> > node_map_chart_type;
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
@@ -158,7 +178,7 @@ namespace cicada
 	    
 	    
 	    // apply rules on actives at [first, last)
-	    node_map_type& node_map        = nodes(first, last);
+	    node_map_type&    node_map     = nodes(first, last);
 	    passive_set_type& passive_arcs = passives(first, last);
 	    
 	    active_set_type::const_iterator citer_end = cell.end();
@@ -220,7 +240,7 @@ namespace cicada
       
       // finally, collect all the parsed rules, and proceed to [goal] rule...
       // passive arcs will not be updated!
-      node_map_type& node_map        = nodes(0, lattice.size());
+      node_map_type&    node_map     = nodes(0, lattice.size());
       passive_set_type& passive_arcs = passives(0, lattice.size());
       for (int p = 0; p < passive_arcs.size(); ++ p)
 	if (non_terminals[passive_arcs[p]] == goal)

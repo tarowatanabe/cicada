@@ -19,7 +19,8 @@
 
 #include "utils/config.hpp"
 #include "utils/hashmurmur.hpp"
-#include "utils/sgi_hash_map.hpp"
+
+#include <google/dense_hash_map>
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Rule,
@@ -538,19 +539,14 @@ namespace cicada
     typedef HyperGraph hypergraph_type;
     typedef hypergraph_type::rule_type rule_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*>,
-      std::allocator<std::pair<const rule_type*, int> > > rule_unique_map_type;
-#else
-    typedef sfi::hash_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*>,
-			  std::allocator<std::pair<const rule_type*, int> > > rule_unique_map_type;
-#endif
+    typedef google::dense_hash_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*> > rule_unique_map_type;
     
     typedef std::back_insert_iterator<std::string> iterator_type;
     
     os << '{';
-
+    
     rule_unique_map_type rules_unique;
+    rules_unique.set_empty_key(0);
     
     {
       os << "\"rules\"" << ": " << '[';

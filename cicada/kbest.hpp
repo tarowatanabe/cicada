@@ -12,8 +12,9 @@
 #include <utils/bithack.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
-#include <utils/sgi_hash_set.hpp>
 #include <utils/hashmurmur.hpp>
+
+#include <google/dense_hash_set>
 
 namespace cicada
 {
@@ -116,7 +117,7 @@ namespace cicada
     {
       size_t operator()(const derivation_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), (intptr_t) x->edge);
+	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), (intptr_t) x->edge));
       }
     };
     
@@ -124,22 +125,18 @@ namespace cicada
     {
       bool operator()(const derivation_type* x, const derivation_type* y) const
       {
-	return x->edge == y->edge && x->j == y->j;
+	return (x == y) || (x && y && x->edge == y->edge && x->j == y->j);
       }
     };
-
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<const derivation_type*, derivation_hash_type, derivation_equal_type,
-				    std::allocator<const derivation_type*> > derivation_set_unique_type;
-#else
-    typedef sgi::hash_set<const derivation_type*, derivation_hash_type, derivation_equal_type,
-			  std::allocator<const derivation_type*> > derivation_set_unique_type;
-#endif
+    
+    typedef google::dense_hash_set<const derivation_type*, derivation_hash_type, derivation_equal_type,
+				   std::allocator<const derivation_type*> > derivation_set_unique_type;
 
     
     struct State
     {
-      State() {}
+      State() { uniques.set_empty_key(0); }
+      
       derivation_heap_type cand;
       derivation_list_type D;
       derivation_set_unique_type uniques;

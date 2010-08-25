@@ -12,7 +12,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
 
-#include <utils/sgi_hash_set.hpp>
+#include <google/dense_hash_set>
 
 namespace cicada
 {
@@ -90,13 +90,10 @@ namespace cicada
   public:
     GrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
     {
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#else
-      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#endif
+      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
       symbol_set_type symbols;
+      symbols.set_empty_key(symbol_type());
       
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
@@ -122,13 +119,10 @@ namespace cicada
     GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
- #ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#else
-      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#endif
+      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
       symbol_set_type symbols;
+      symbols.set_empty_key(symbol_type());
 
       for (int first = 0; first < lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
@@ -180,13 +174,10 @@ namespace cicada
   public:
     GrammarDeletion(const hypergraph_type& graph, const symbol_type& non_terminal)
     {
- #ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#else
-      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#endif
+      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
       symbol_set_type symbols;
+      symbols.set_empty_key(symbol_type());
       
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
@@ -212,13 +203,10 @@ namespace cicada
     GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
- #ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#else
-      typedef sgi::hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
-#endif
+      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
       symbol_set_type symbols;
+      symbols.set_empty_key(symbol_type());
       
       for (int first = 0; first < lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];

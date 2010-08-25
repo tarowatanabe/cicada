@@ -17,10 +17,10 @@
 #include <cicada/sort.hpp>
 
 #include <google/dense_hash_set>
+#include <google/dense_hash_map>
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
-#include <utils/sgi_hash_map.hpp>
 #include <utils/sgi_hash_set.hpp>
 #include <utils/hashmurmur.hpp>
 
@@ -50,6 +50,13 @@ namespace cicada
 
     {
       edges_unique.set_empty_key(0);
+
+      traversals.set_empty_key(traversal_type());
+
+      terminal_nodes.set_empty_key(transducer_id_type(-1, 0));
+      non_terminal_nodes.set_empty_key(0);
+      
+      goal_nodes.set_empty_key(hypergraph_type::id_type(-1));
     }
     
     //
@@ -58,28 +65,29 @@ namespace cicada
     
 
     typedef uint32_t id_type;
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				    std::allocator<std::pair<const symbol_type, id_type> > > id_map_type;
-#else
-    typedef sgi::hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			  std::allocator<std::pair<const symbol_type, id_type> > > id_map_type;
-#endif
+    typedef google::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > id_map_type;
     
   
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
     {
       grammar_node_type(const bool __is_root)
-	: edge(hypergraph_type::invalid), is_root(__is_root) {}
+	: edge(hypergraph_type::invalid), is_root(__is_root) { initialize(); }
       grammar_node_type()
-	: edge(hypergraph_type::invalid), is_root(false) {}
+	: edge(hypergraph_type::invalid), is_root(false) { initialize(); }
       
       id_map_type terminals;
       id_map_type non_terminals;
       
       hypergraph_type::id_type edge;
       bool is_root;
+
+    private:
+      void initialize()
+      {
+	terminals.set_empty_key(symbol_type());
+	non_terminals.set_empty_key(symbol_type());
+      }
     };
 
     typedef utils::chunk_vector<grammar_node_type, 4096 / sizeof(grammar_node_type), std::allocator<grammar_node_type> > grammar_node_set_type;
@@ -189,6 +197,9 @@ namespace cicada
       
       Traversal(const edge_type* __active, const edge_type* __passive, const bool __is_active)
 	: active(__active), passive(__passive), is_active(__is_active) {}
+
+      Traversal()
+	: active(0), passive(0), is_active(0) {}
     };
     typedef Traversal traversal_type;
     
@@ -201,14 +212,9 @@ namespace cicada
       }
     };
     
-
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<traversal_type, traversal_hash_type, traversal_equal_type,
-				    std::allocator<traversal_type> > traversal_set_type;
-#else
-    typedef sgi::hash_set<traversal_type, traversal_hash_type, traversal_equal_type,
-			  std::allocator<traversal_type> > traversal_set_type;
-#endif
+    typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
+    
+    // edge hash/comparison
     
     struct edge_unique_hash_type : public utils::hashmurmur<size_t>
     {
@@ -272,16 +278,7 @@ namespace cicada
 	return x->first == y->first;
       }
     };
-
-#if 0
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type,
-				    std::allocator<const edge_type*> > edge_set_unique_type;
-#else
-    typedef sgi::hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type,
-			  std::allocator<const edge_type*> > edge_set_unique_type;
-#endif
-#endif
+    
     typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
@@ -289,36 +286,18 @@ namespace cicada
 					 std::allocator<const edge_type*> > edge_set_active_type;
     typedef std::tr1::unordered_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
 					 std::allocator<const edge_type*> > edge_set_passive_type;
-    
 #else
     typedef sgi::hash_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
 			       std::allocator<const edge_type*> > edge_set_active_type;
     typedef sgi::hash_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
 			       std::allocator<const edge_type*> > edge_set_passive_type;
-    
 #endif
     
     // edge to traversal graph mappings...
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<transducer_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<transducer_id_type>,
-				    std::allocator<std::pair<const transducer_id_type, hypergraph_type::id_type> > > terminal_node_set_type;
-    typedef std::tr1::unordered_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type,
-				    std::allocator<std::pair<const edge_type*, hypergraph_type::id_type> > > non_terminal_node_set_type;
-#else
-    typedef sgi::hash_map<transducer_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<transducer_id_type>,
-			  std::allocator<std::pair<const transducer_id_type, hypergraph_type::id_type> > > terminal_node_set_type;
-    typedef sgi::hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type,
-			  std::allocator<std::pair<const edge_type*, hypergraph_type::id_type> > > non_terminal_node_set_type;
-#endif
     
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
-				    std::allocator<hypergraph_type::id_type> > goal_node_set_type;
-#else
-    typedef sgi::hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
-			  std::allocator<hypergraph_type::id_type> > goal_node_set_type;
-    
-#endif
+    typedef google::dense_hash_map<transducer_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<transducer_id_type> > terminal_node_set_type;
+    typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type > non_terminal_node_set_type;
+    typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > goal_node_set_type;
 
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)

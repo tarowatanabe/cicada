@@ -7,7 +7,6 @@
 #include "vocab.hpp"
 
 #include "utils/filesystem.hpp"
-#include "utils/sgi_hash_map.hpp"
 #include "utils/atomicop.hpp"
 #include "utils/spinlock.hpp"
 #include "utils/config.hpp"

@@ -10,12 +10,10 @@
 #include <cicada/model.hpp>
 #include <cicada/semiring/traits.hpp>
 
-#include <google/dense_hash_set>
 #include <google/dense_hash_map>
 
 #include <utils/simple_vector.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/sgi_hash_map.hpp>
 
 namespace cicada
 {
@@ -45,16 +43,7 @@ namespace cicada
     
     typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
-
-#if 0
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<state_type, id_type, model_type::state_hash, model_type::state_equal,
-				    std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
-#else
-    typedef sgi::hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal,
-			  std::allocator<std::pair<const state_type, id_type> > > state_node_map_type;
-#endif
-#endif
+    
     typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
         
     ApplyExact(const model_type& _model)
