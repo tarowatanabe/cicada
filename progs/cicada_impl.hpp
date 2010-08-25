@@ -914,17 +914,19 @@ public:
   void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
   {
     hypergraph_type applied;
+
+    model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
     
     // assignment...
-    const_cast<model_type&>(model).assign(hypergraph);
-    const_cast<model_type&>(model).assign(lattice);
-    const_cast<model_type&>(model).assign(spans);
+    __model.assign(hypergraph);
+    __model.assign(lattice);
+    __model.assign(spans);
     
     if (debug)
       std::cerr << "apply features" << std::endl;
 
     if (forced)
-      const_cast<model_type&>(model).apply_feature(true);
+      __model.apply_feature(true);
     
     weight_set_type weights_zero;
     const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
@@ -933,17 +935,17 @@ public:
     
     // apply...
     if (exact)
-      cicada::apply_exact(model, hypergraph, applied);
+      cicada::apply_exact(__model, hypergraph, applied);
     else {
       if (weights_one)
-	cicada::apply_cube_prune(model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
+	cicada::apply_cube_prune(__model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
       else
-	cicada::apply_cube_prune(model, hypergraph, applied, weight_set_function(*weights_apply), size);
+	cicada::apply_cube_prune(__model, hypergraph, applied, weight_set_function(*weights_apply), size);
     }
     
     utils::resource end;
 
-    const_cast<model_type&>(model).apply_feature(false);
+    __model.apply_feature(false);
 	
     
     if (debug)
@@ -964,6 +966,8 @@ public:
   {
     weights = &__weights;
   }
+
+  model_type model_local;
 
   const model_type& model;
   const weight_set_type* weights;
