@@ -902,6 +902,9 @@ public:
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
 	weights_one = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "feature") == 0
+	       || strcasecmp(piter->first.c_str(), "feature-function") == 0)
+	model_local.push_back(feature_function_type::create(piter->second));
       else
 	std::cerr << "WARNING: unsupported parameter for apply: " << piter->first << "=" << piter->second << std::endl;
     }
@@ -1766,6 +1769,7 @@ apply: feature application\n\
 \tforced=[true|false] forced feature application\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tfeature=feature function\n\
 bleu: BLEU computation\n\
 \tsize=<cube size>\n\
 \texact=[true|false] no pruning feature application\n\
