@@ -33,6 +33,7 @@ allocinfo_allocator.hpp \
 arc_list.hpp \
 array_power2.hpp \
 atomicop.hpp \
+b_heap.hpp \
 base64.hpp \
 bithack.hpp \
 bitpack.hpp \
@@ -41,6 +42,7 @@ bounded_queue.hpp \
 byte_aligned_code.hpp \
 chunk_vector.hpp \
 compact_trie.hpp \
+compact_trie_dense.hpp \
 compress_stream.hpp \
 config.hpp \
 config.h \
@@ -94,6 +96,7 @@ vertical_coded_vector.hpp
 
 noinst_PROGRAMS = \
 sample_arc_list \
+sample_b_heap \
 sample_bithack \
 sample_bitpack \
 sample_bit_vector \
@@ -150,6 +153,9 @@ group_aligned_code_offsets.hpp : group_aligned_code_offsets.py
 sample_arc_list_SOURCES = sample_arc_list.cpp
 sample_arc_list_LDFLAGS = $(BOOST_THREAD_LDFLAGS) 
 sample_arc_list_LDADD = $(BOOST_THREAD_LIBS)
+
+sample_b_heap_SOURCES = sample_b_heap.cpp
+sample_b_heap_LDADD = $(LIBUTILS)
 
 sample_bithack_SOURCES = sample_bithack.cpp
 

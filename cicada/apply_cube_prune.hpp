@@ -16,6 +16,8 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 
+#include <utils/b_heap.hpp>
+
 namespace cicada
 {
   
@@ -140,7 +142,10 @@ namespace cicada
       }
     };
 
-    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
+    //typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
+    
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
+    typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
     typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
     typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
@@ -197,11 +202,12 @@ namespace cicada
       const node_type& node = graph_in.nodes[v];
       const bool is_goal(v == graph_in.goal);
       
-      cand_unique.clear();
-      
       // for each incoming e, cand \leftarrow { <e, 1>}
-      candidate_heap_type cand;
+      
+      cand.clear();
       cand.reserve(node.edges.size() * cube_size_max);
+      
+      cand_unique.clear();
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
@@ -210,14 +216,15 @@ namespace cicada
 	
 	const candidate_type* item = make_candidate(edge, j, graph_out, is_goal);
 	
-	cand.push_back(item);
+	//cand.push_back(item);
+	cand.push(item);
 	cand_unique.insert(item);
       }
       
       //std::cerr << "heapify" << std::endl;
       
       // heapify
-      std::make_heap(cand.begin(), cand.end(), compare_heap_type());
+      //std::make_heap(cand.begin(), cand.end(), compare_heap_type());
       
       //std::cerr << "perform cube-prune" << std::endl;
       
@@ -226,9 +233,13 @@ namespace cicada
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...
-	std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
-	const candidate_type* item = cand.back();
-	cand.pop_back();
+
+	//std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
+	//const candidate_type* item = cand.back();
+	//cand.pop_back();
+
+	const candidate_type* item = cand.top();
+	cand.pop();
 	
 	push_succ(*item, is_goal, cand, cand_unique, graph_out);
 	append_item(*item, is_goal, buf, graph_out);
@@ -346,8 +357,11 @@ namespace cicada
 	    // new candidate...
 	    const candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
 	    
-	    cand.push_back(candidate_new);
-	    std::push_heap(cand.begin(), cand.end(), compare_heap_type());
+	    //cand.push_back(candidate_new);
+	    //std::push_heap(cand.begin(), cand.end(), compare_heap_type());
+	    
+	    cand.push(candidate_new);
+
 	    candidates_unique.insert(candidate_new);
 	    ++ inserted;
 	    
@@ -402,6 +416,7 @@ namespace cicada
     node_score_set_type D;
     state_set_type      node_states;
 
+    candidate_heap_type       cand;
     candidate_set_unique_type cand_unique;
 
     const model_type& model;
