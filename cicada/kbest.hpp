@@ -13,6 +13,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/b_heap.hpp>
 
 #include <google/dense_hash_set>
 
@@ -110,7 +111,12 @@ namespace cicada
       }
     };
     
-    typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_heap_type;
+    //typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_heap_type;
+    
+    typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_heap_base_type;
+    typedef utils::b_heap<const derivation_type*, derivation_heap_base_type, compare_heap_type > derivation_heap_type;
+    
+    
     typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_list_type;
     
     struct derivation_hash_type : public utils::hashmurmur<size_t>
@@ -205,10 +211,13 @@ namespace cicada
 
 	add_next = false;
 	
-	if (cand.size() > 0) {
-	  std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
-	  const derivation_type* derivation = cand.back();
-	  cand.pop_back();
+	if (! cand.empty()) {
+	  //std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
+	  //const derivation_type* derivation = cand.back();
+	  //cand.pop_back();
+
+	  const derivation_type* derivation = cand.top();
+	  cand.pop();
 	  
 	  // perform traversal here...
 	  
@@ -256,8 +265,10 @@ namespace cicada
 	    const derivation_type* derivation_new = make_derivation(*(derivation.edge), j);
 	    
 	    if (derivation_new) {
-	      state.cand.push_back(derivation_new);
-	      std::push_heap(state.cand.begin(), state.cand.end(), compare_heap_type());
+	      //state.cand.push_back(derivation_new);
+	      //std::push_heap(state.cand.begin(), state.cand.end(), compare_heap_type());
+
+	      state.cand.push(derivation_new);
 	      state.uniques.insert(derivation_new);
 	    }
 	  }
@@ -295,6 +306,8 @@ namespace cicada
       
       const node_type& node = graph.nodes[v];
       
+      stat.cand.reserve(node.edges.size());
+      
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[*eiter];
@@ -305,19 +318,12 @@ namespace cicada
 	if (! derivation)
 	  throw std::runtime_error("no derivation?");
 	
-	state.cand.push_back(derivation);
+	//state.cand.push_back(derivation);
+	state.cand.push(derivation);
       }
-      
-#if 0
-      // top k elements
-      const size_type size = utils::bithack::min(k_prime, state.cand.size());
-      
-      std::nth_element(state.cand.begin(), state.cand.begin() + size, state.cand.end(), compare_derivation_type());
-      state.cand.resize(size);
-#endif
-      
+            
       // heapify
-      std::make_heap(state.cand.begin(), state.cand.end(), compare_heap_type());
+      //std::make_heap(state.cand.begin(), state.cand.end(), compare_heap_type());
       
       return state;
     }
