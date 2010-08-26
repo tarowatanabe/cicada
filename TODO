@@ -1,1 +1,13 @@
 Better MIRA training
+
+Support other metrics (at least for sentence-based scoring)
+	TER/WER/PER etc.
+
+System combination as statitical generation
+  Parse nbests
+  Collect rules
+  Generate from rules
+
+  Problems:
+    Use Earley parsing as generation?
+    Do we really handle unary rules with cycles/loops?

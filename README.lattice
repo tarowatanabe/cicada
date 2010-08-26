@@ -17,3 +17,6 @@ by inserting new one in {}, such as
 
 Remark, the costs are interpreted as logarithmic value so that we can compute score by "weight \cdot feature-function".
 
+
+Currently, we do not directly support confusion network, but you can transform your confusion network
+by WFST via epsilon-removal (log-semiring will be prefered to tropical-semiring)

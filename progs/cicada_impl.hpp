@@ -938,7 +938,7 @@ public:
     __model.assign(spans);
     
     if (debug)
-      std::cerr << "apply features" << std::endl;
+      std::cerr << "apply features: " << (exact ? "exact" : (grow ? "grow" : "prune")) << std::endl;
 
     if (forced)
       __model.apply_feature(true);

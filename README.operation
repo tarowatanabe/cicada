@@ -16,8 +16,11 @@ compose-cky: composition from lattice (or sentence) with grammar
 apply: feature application
         size=<cube size>
         exact=[true|false] no pruning feature application
+        prune=[true|false] cube-pruning for feature application
+        grow=[true|false]  cube-growing for feature application
         weights=weight file for feature
         weights-one=[true|false] one initialized weight
+        feature=feature function
 bleu: BLEU computation
         size=<cube size>
         exact=[true|false] no pruning feature application

@@ -24,3 +24,36 @@ options:
   --output arg (=-)     output
   --leaf                collect leaf nodes only
   --help                help message
+
+
+FORMAT of HYPEERGRAPH
+
+The hypergraph is represented by JSON data format (www.json.org)
+Strings must be escaped. You may insert spaces at arbitrary positions.
+One-line-per-single-hypergraph is prefered for faster preprocessing
+
+HYPERGRAPH
+
+{
+ "rules" : [ RULE, RULE, ... ], (RULE position (one-based) is the rule-id inside this hypergraph)
+ "nodes" : [ NODE, NODE, ...],  (NODE positin (zero-based) is the node-id inside this hypergraph)
+ "goal" : node-id-for-goal
+}
+
+RULE
+
+"lhs ||| rhs-source ||| rhs-target ||| list-of-features"
+
+NODE (contains list of edge)
+
+[EDGE, EDGE, ...]
+
+EDGE
+
+{
+ "tail" : [node-id, node-id, ...],
+ "featuers" : {"feature-name" : double, "feature-name2" : double, ... },
+ "rule" : rule-id (zero indicating no-rule)
+}
+
+

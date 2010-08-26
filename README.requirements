@@ -1,0 +1,17 @@
+Requirements
+
+expgram: ngram language model training/indexing
+nicttm:  translation model training
+
+Others:
+Boost library
+MPI (Open MPI)
+ICU
+google-sparsehash
+
+Optional:
+	google-perftools
+	jemalloc
+		You should install one of them for better memory performance
+		and to know how many bytes malloced in Linux
+
