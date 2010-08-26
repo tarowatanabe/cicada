@@ -79,9 +79,9 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, id_sentence_type()
 
 int main(int argc, char** argv)
 {
-  options(argc, argv);
-
   try {
+
+    options(argc, argv);
   
     if (scorer_list) {
       std::cout << cicada::eval::Scorer::lists();
