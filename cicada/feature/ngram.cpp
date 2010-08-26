@@ -70,11 +70,9 @@ namespace cicada
       
       typedef CacheContext cache_context_type;
       typedef CacheNGram   cache_ngram_type;
-      typedef CacheNGram   cache_estimate_type;
-
+      
       typedef utils::array_power2<cache_context_type,  1024 * 128, std::allocator<cache_context_type> >  cache_context_set_type;
       typedef utils::array_power2<cache_ngram_type,    1024 * 64,  std::allocator<cache_ngram_type> >    cache_ngram_set_type;
-      typedef utils::array_power2<cache_estimate_type, 1024 * 128, std::allocator<cache_estimate_type> > cache_estimate_set_type;
             
     public:
       typedef boost::filesystem::path path_type;
@@ -86,7 +84,6 @@ namespace cicada
 	
 	cache_logprob.clear();
 	cache_estimate.clear();
-	cache_phrase.clear();
 	
 	initialize_decay();
       }
@@ -96,7 +93,6 @@ namespace cicada
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
-	cache_phrase.clear();
 	
 	initialize_decay();
       }
@@ -109,7 +105,6 @@ namespace cicada
 	
 	cache_logprob.clear();
 	cache_estimate.clear();
-	cache_phrase.clear();
 	
 	initialize_decay();
 	
@@ -362,44 +357,38 @@ namespace cicada
 	phrase_type::const_iterator titer_begin = target.begin();
 	phrase_type::const_iterator titer_end   = target.end();
 	
-	const size_t cache_pos = hash_phrase(titer_begin, titer_end) & (cache_phrase.size() - 1);
-	cache_estimate_type& cache = const_cast<cache_estimate_type&>(cache_phrase[cache_pos]);
-
-	if (! equal_phrase(titer_begin, titer_end, cache.ngram)) {
-	  cache.ngram.assign(titer_begin, titer_end);
-	  cache.logprob = 0.0;
 	  
-	  // we will reserve enough space so that buffer's memory will not be re-allocated.
-	  buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
-	  buffer.clear();
-	  buffer.reserve(titer_end - titer_begin);
-	  
-	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
-	    if (titer->is_non_terminal()) {
-	      if (! buffer.empty()) {
-		buffer_type::iterator biter_begin = buffer.begin();
-		buffer_type::iterator biter_end   = buffer.end();
-		buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
-		
-		cache.logprob += ngram_estimate(biter_begin, biter);
-		cache.logprob += ngram_score(biter_begin, biter, biter_end);
-	      }
-	      
-	      buffer.clear();
-	    } else if (*titer != vocab_type::EPSILON)
-	      buffer.push_back(*titer);
-	  
-	  if (! buffer.empty()) {
-	    buffer_type::iterator biter_begin = buffer.begin();
-	    buffer_type::iterator biter_end   = buffer.end();
-	    buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
-	    
-	    cache.logprob += ngram_estimate(biter_begin, biter);
-	    cache.logprob += ngram_score(biter_begin, biter, biter_end);
-	  }
-	}
+	// we will reserve enough space so that buffer's memory will not be re-allocated.
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	buffer.clear();
+	buffer.reserve(titer_end - titer_begin);
 	
-	return cache.logprob;
+	double scofre = 0.0;
+	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
+	  if (titer->is_non_terminal()) {
+	    if (! buffer.empty()) {
+	      buffer_type::iterator biter_begin = buffer.begin();
+	      buffer_type::iterator biter_end   = buffer.end();
+	      buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
+	      
+	      score += ngram_estimate(biter_begin, biter);
+	      score += ngram_score(biter_begin, biter, biter_end);
+	    }
+	    
+	    buffer.clear();
+	  } else if (*titer != vocab_type::EPSILON)
+	    buffer.push_back(*titer);
+	
+	if (! buffer.empty()) {
+	  buffer_type::iterator biter_begin = buffer.begin();
+	  buffer_type::iterator biter_end   = buffer.end();
+	  buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
+	  
+	  score += ngram_estimate(biter_begin, biter);
+	  score += ngram_score(biter_begin, biter, biter_end);
+	}
+
+	return score;
       }
 
       
@@ -448,7 +437,6 @@ namespace cicada
       // caching...
       cache_context_set_type  cache_logprob;
       cache_ngram_set_type    cache_estimate;
-      cache_estimate_set_type cache_phrase;
       
       phrase_span_set_type phrase_spans_impl;
       
