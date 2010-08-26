@@ -145,7 +145,7 @@ namespace cicada
     //typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
-    typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
+    typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     
     typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
     typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
@@ -278,14 +278,15 @@ namespace cicada
       if (is_goal) {
 	// perform hypothesis re-combination toward goal-node...
 	
-	if (graph.goal == hypergraph_type::invalid)
+	if (graph.goal == hypergraph_type::invalid) {
 	  graph.goal = graph.add_node().id;
+	  node_states.push_back(item.state);
+	} else
+	  model.deallocate(item.state);
 	
 	node_type& node = graph.nodes[graph.goal];
 	
 	graph.connect_edge(edge_new.id, node.id);
-	
-	model.deallocate(item.state);
       } else {
 	// hypothesis re-combination...
 	typename state_node_map_type::iterator biter = buf.find(item.state);
@@ -294,9 +295,7 @@ namespace cicada
 	  
 	  biter = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item))).first;
 	  
-	  const node_type& node_new = graph.add_node();
-	  biter->second->node = node_new.id;
-	  
+	  biter->second->node = graph.add_node().id;
 	  node_states.push_back(item.state);
 	} else
 	  model.deallocate(item.state);
@@ -397,13 +396,10 @@ namespace cicada
       // perform actual model application...
       
       feature_set_type estimates;
-      candidate.state = model(graph, node_states, candidate.out_edge, estimates);
-      if (is_goal)
-	model(candidate.state, candidate.out_edge, estimates);
-      
-      candidate.estimate *= function(estimates);
+      candidate.state = model(node_states, candidate.out_edge, estimates, is_goal);
       
       candidate.score    *= function(candidate.out_edge.features);
+      candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
 
       //std::cerr << "make candidate done" << std::endl;

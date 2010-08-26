@@ -112,26 +112,24 @@ namespace cicada
 	  edge_new.features = edge.features;
 
 	  feature_set_type estimates;
-	  const state_type state = model(graph_out, node_states, edge_new, estimates);
-	  if (is_goal)
-	    model(state, edge_new, estimates);
+	  const state_type state = model(node_states, edge_new, estimates, is_goal);
 	  
 	  // hypothesis recombination
 	  
 	  if (is_goal) {
-	    if (graph_out.goal == hypergraph_type::invalid)
+	    if (graph_out.goal == hypergraph_type::invalid) {
 	      graph_out.goal = graph_out.add_node().id;
+	      node_states.push_back(state);
+	    } else
+	      model.deallocate(state);
 	    
 	    node_type& node = graph_out.nodes[graph_out.goal];
 	    
 	    graph_out.connect_edge(edge_new.id, node.id);
-	    
-	    model.deallocate(state);
 	  } else {
 	    state_node_map_type::iterator biter = buf.find(state);
 	    if (biter == buf.end()) {
 	      const node_type& node_new = graph_out.add_node();
-	      
 	      node_states.push_back(state);
 	      
 	      node_map[edge.head].push_back(node_new.id);

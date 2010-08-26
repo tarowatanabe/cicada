@@ -19,6 +19,7 @@ Translation can be carried out by:
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
+     * cicada implementes cube-pruning, cube-growing and exact (and stateless) methods
    - Perform variational decoding for hypergraph [10].
    - K-bests sentences are generated from hypergraph [5].
 

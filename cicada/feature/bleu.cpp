@@ -679,7 +679,8 @@ namespace cicada
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
 			  feature_set_type& features,
-			  feature_set_type& estimates) const
+			  feature_set_type& estimates,
+			  const bool final) const
     {
       const double score = pimpl->bleu_score(state, states, edge);
       

@@ -52,11 +52,11 @@ namespace cicada
 			      const state_ptr_set_type& states,
 			      const edge_type& edge,
 			      feature_set_type& features,
-			      feature_set_type& estimates) const;
-      virtual void operator()(const state_ptr_type& state,
-			      const edge_type& edge,
-			      feature_set_type& features,
-			      feature_set_type& estimates) const {}
+			      feature_set_type& estimates,
+			      const bool final) const;
+      virtual void operator()(const edge_type& edge,
+			      feature_set_type& features) const {}
+      
       virtual void initialize();
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new BleuLinear(*this)); }

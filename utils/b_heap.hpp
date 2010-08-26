@@ -12,7 +12,7 @@ namespace utils
 {
   
   // priority_queue like interface...
-  template <typename _Tp, typename _Sequence=std::vector<_Tp>, typename _Compare=std::less<typename _Sequence::value_type> >
+  template <typename _Tp, typename _Sequence=std::vector<_Tp>, typename _Compare=std::less<typename _Sequence::value_type>, size_t _PageSize=8 >
   class b_heap
   {
   public:
@@ -46,6 +46,8 @@ namespace utils
     
     void reserve(size_type x) { c.reserve(x + 1); }
     
+
+    // a conventional interface...
     const_reference top()
     {
       return c[1];
@@ -64,7 +66,7 @@ namespace utils
       
       siftdown(1);
     }
-
+    
     const_iterator begin() const { return c.begin() + 1; }
     const_iterator end() const { return c.end(); }
     
@@ -113,8 +115,11 @@ namespace utils
     }
     
     // some definitions...
-
-    static const size_type bh_psize = 8;
+    static const bool      bh_is_power2   = utils::bithack::static_is_power2<_PageSize>::result;
+    static const size_type bh_next_power2 = utils::bithack::static_next_largest_power2<_PageSize>::result;
+    static const size_type bh_power2      = (bh_is_power2 ? _PageSize : bh_next_power2);
+    
+    static const size_type bh_psize = (bh_power2 >= 8 ? bh_power2 : size_type(8));
     static const size_type bh_shift = utils::bithack::static_floor_log2<bh_psize>::result;
     static const size_type bh_mask  = bh_psize - 1;
     

@@ -139,13 +139,12 @@ namespace cicada
     
     return *this;
   }
-    
 
   
-  Model::state_type Model::operator()(const hypergraph_type& graph,
-				      const state_set_type& node_states,
+  Model::state_type Model::operator()(const state_set_type& node_states,
 				      edge_type& edge,
-				      feature_set_type& estimates) const
+				      feature_set_type& estimates,
+				      const bool final) const
   {
     state_type state = allocator->allocate();
     
@@ -162,27 +161,23 @@ namespace cicada
       
       feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
-      feature_function(state_feature, states, edge, edge.features, estimates);
+      feature_function(state_feature, states, edge, edge.features, estimates, final);
     }
     
     //std::cerr << "apply features end" << std::endl;
     
     return state;
   }
-  
-  
-  void Model::operator()(const state_type& state,
-			 edge_type& edge,
-			 feature_set_type& estimates) const
+
+  void Model::operator()(edge_type& edge) const
   {
     for (int i = 0; i < models.size(); ++ i) {
       const feature_function_type& feature_function = *models[i];
       
-      feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
-      
-      feature_function(state_feature, edge, edge.features, estimates);
+      feature_function(edge, edge.features);
     }
   }
+  
   
   void Model::deallocate(const state_type& state) const
   {

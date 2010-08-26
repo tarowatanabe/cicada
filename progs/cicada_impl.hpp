@@ -883,7 +883,7 @@ public:
   Apply(const std::string& parameter,
 	const model_type& __model,
 	const int __debug)
-    : model(__model), weights(0), size(200), weights_one(false), exact(false), forced(false), debug(__debug)
+    : model(__model), weights(0), size(200), weights_one(false), exact(false), prune(false), grow(false), forced(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -896,6 +896,10 @@ public:
 	size = boost::lexical_cast<int>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "exact") == 0)
 	exact = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "prune") == 0)
+	prune = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "grow") == 0)
+	grow = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "forced") == 0)
 	forced = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
@@ -907,6 +911,14 @@ public:
 	model_local.push_back(feature_function_type::create(piter->second));
       else
 	std::cerr << "WARNING: unsupported parameter for apply: " << piter->first << "=" << piter->second << std::endl;
+    }
+
+    // default to prune...
+    switch (int(exact) + prune + grow) {
+    case 0: prune = true; break; // default to cube-prune
+    case 1: break; // OK
+    default:
+      throw std::runtime_error("specify one of exact/prune/grow");
     }
     
     if (weights && weights_one)
@@ -939,7 +951,12 @@ public:
     // apply...
     if (exact)
       cicada::apply_exact(__model, hypergraph, applied);
-    else {
+    else if (grow) {
+      if (weights_one)
+	cicada::apply_cube_grow(__model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
+      else
+	cicada::apply_cube_grow(__model, hypergraph, applied, weight_set_function(*weights_apply), size);
+    } else {
       if (weights_one)
 	cicada::apply_cube_prune(__model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
       else
@@ -976,7 +993,11 @@ public:
   const weight_set_type* weights;
   int size;
   bool weights_one;
+  
   bool exact;
+  bool prune;
+  bool grow;
+  
   bool forced;
   
   int debug;
@@ -1766,6 +1787,8 @@ compose-cky: composition from lattice (or sentence) with grammar\n\
 apply: feature application\n\
 \tsize=<cube size>\n\
 \texact=[true|false] no pruning feature application\n\
+\tprune=[true|false] cube-pruning for feature application\n\
+\tgrow=[true|false]  cube-growing for feature application\n\
 \tforced=[true|false] forced feature application\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\

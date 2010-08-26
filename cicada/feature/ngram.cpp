@@ -348,6 +348,47 @@ namespace cicada
 	return score;
       }
 
+      double ngram_estimate(const edge_type& edge) const
+      {
+	const int context_size = order - 1;
+	const rule_type& rule = *(edge.rule);
+	const phrase_type& target = (yield_source ? rule.source : rule.target);
+	
+	phrase_type::const_iterator titer_begin = target.begin();
+	phrase_type::const_iterator titer_end   = target.end();
+
+	// we will reserve enough space so that buffer's memory will not be re-allocated.
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	buffer.clear();
+	buffer.reserve(titer_end - titer_begin);
+	
+	double score = 0.0;
+	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
+	  if (titer->is_non_terminal()) {
+	    if (! buffer.empty()) {
+	      buffer_type::iterator biter_begin = buffer.begin();
+	      buffer_type::iterator biter_end   = buffer.end();
+	      buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
+
+	      score += ngram_estimate(biter_begin, biter);
+	      score += ngram_score(biter_begin, biter, biter_end);
+	    }
+	    
+	    buffer.clear();
+	  } else if (*titer != vocab_type::EPSILON)
+	    buffer.push_back(*titer);
+	
+	if (! buffer.empty()) {
+	  buffer_type::iterator biter_begin = buffer.begin();
+	  buffer_type::iterator biter_end   = buffer.end();
+	  buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
+	  
+	  score += ngram_estimate(biter_begin, biter);
+	  score += ngram_score(biter_begin, biter, biter_end);
+	}
+	return score;
+      }
+
       
       double ngram_final_score(const state_ptr_type& state) const
       {
@@ -486,32 +527,38 @@ namespace cicada
 			   const state_ptr_set_type& states,
 			   const edge_type& edge,
 			   feature_set_type& features,
-			   feature_set_type& estimates) const
+			   feature_set_type& estimates,
+			   const bool final) const
     {
-      const double score    = pimpl->ngram_score(state, states, edge);
-      const double estimate = pimpl->ngram_estimate(state);
+      double score = pimpl->ngram_score(state, states, edge);
+      if (final)
+	score += pimpl->ngram_final_score(state);
       
       if (score != 0.0)
 	features[base_type::feature_name()] = score;
       else
 	features.erase(base_type::feature_name());
       
-      if (estimate != 0.0)
-	estimates[base_type::feature_name()] = estimate;
-      else
-	estimates.erase(base_type::feature_name());
+      if (! final) {
+	const double estimate = pimpl->ngram_estimate(state);
+	if (estimate != 0.0)
+	  estimates[base_type::feature_name()] = estimate;
+	else
+	  estimates.erase(base_type::feature_name());
+      }
     }
-    
-    void NGram::operator()(const state_ptr_type& state,
-			   const edge_type& edge,
-			   feature_set_type& features,
-			   feature_set_type& estimates) const
+
+    void NGram::operator()(const edge_type& edge,
+			   feature_set_type& features) const
     {
-      const double score = pimpl->ngram_final_score(state);
-      if (score != 0.0)
-	features[base_type::feature_name()] += score;
+      // implement here!
+      const double score = pimpl->ngram_estimate(edge);
       
-      estimates.erase(base_type::feature_name());
+      if (score != 0.0)
+	features[base_type::feature_name()] = score;
+      else
+	features.erase(base_type::feature_name());
+      
     }
   };
 };

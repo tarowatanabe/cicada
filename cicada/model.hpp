@@ -123,15 +123,16 @@ namespace cicada
 
   public:
     
-    state_type operator()(const hypergraph_type& graph,
-			  const state_set_type& node_states,
+    // score with states
+    state_type operator()(const state_set_type& node_states,
 			  edge_type& edge,
-			  feature_set_type& estimates) const;
+			  feature_set_type& estimates,
+			  const bool final=false) const;
     
-    void operator()(const state_type& state,
-		    edge_type& edge,
-		    feature_set_type& estimates) const;
-
+    // estimate score without states
+    void operator()(edge_type& edge) const;
+    
+    
     void deallocate(const state_type& state) const;
     
     const_reference operator[](size_type pos) const { return models[pos]; }

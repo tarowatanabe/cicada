@@ -453,10 +453,11 @@ namespace cicada
     }
     
     void Parent::operator()(state_ptr_type& state,
-			       const state_ptr_set_type& states,
-			       const edge_type& edge,
-			       feature_set_type& features,
-			       feature_set_type& estimates) const
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features,
+			    feature_set_type& estimates,
+			    const bool final) const
     {
       const std::string& __feature_prefix = base_type::feature_name();
       for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
@@ -468,18 +469,17 @@ namespace cicada
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
 
       pimpl->parent_score(state, states, edge, features);
-    }
-    
-    void Parent::operator()(const state_ptr_type& state,
-			    const edge_type& edge,
-			    feature_set_type& features,
-			    feature_set_type& estimates) const
-    {
-      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
-      
-      pimpl->parent_final_score(state, edge, features);
+
+      if (final)
+	pimpl->parent_final_score(state, edge, features);
     }
 
+    void Parent::operator()(const edge_type& edge,
+			    feature_set_type& features) const
+    {
+      
+    }
+    
     void Parent::initialize()
     {
       pimpl->clear();

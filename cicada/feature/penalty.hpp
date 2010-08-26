@@ -17,7 +17,14 @@ namespace cicada
 		      const state_ptr_set_type& states,
 		      const edge_type& edge,
 		      feature_set_type& features,
-		      feature_set_type& estimates) const
+		      feature_set_type& estimates,
+		      const bool final) const
+      {
+	operator()(edge, features);
+      }
+      
+      void operator()(const edge_type& edge,
+		      feature_set_type& features) const
       {
 	int count = 0;
 	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
@@ -28,10 +35,6 @@ namespace cicada
 	  features[feature_name()] = count;
       }
 
-      void operator()(const state_ptr_type& state,
-		      const edge_type& edge,
-		      feature_set_type& features,
-		      feature_set_type& estimates) const {}
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new TargetWordPenalty(*this)); }
     };
@@ -45,21 +48,23 @@ namespace cicada
 		      const state_ptr_set_type& states,
 		      const edge_type& edge,
 		      feature_set_type& features,
-		      feature_set_type& estimates) const
+		      feature_set_type& estimates,
+		      const bool final) const
+      {
+	operator()(edge, features);
+      }
+      
+      void operator()(const edge_type& edge,
+		      feature_set_type& features) const
       {
 	int count = 0;
-	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->source.begin(); titer != titer_end; ++ titer)
-	  count -= (titer->is_terminal() && *titer != vocab_type::EPSILON);
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+	  count -= (siter->is_terminal() && *siter != vocab_type::EPSILON);
 	
 	if (count)
 	  features[feature_name()] = count;
       }
-
-      void operator()(const state_ptr_type& state,
-		      const edge_type& edge,
-		      feature_set_type& features,
-		      feature_set_type& estimates) const {}
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new SourceWordPenalty(*this)); }
     };
@@ -73,15 +78,17 @@ namespace cicada
 		      const state_ptr_set_type& states,
 		      const edge_type& edge,
 		      feature_set_type& features,
-		      feature_set_type& estimates) const
+		      feature_set_type& estimates,
+		      const bool final) const
+      {
+	operator()(edge, features);
+      }
+      
+      void operator()(const edge_type& edge,
+		      feature_set_type& features) const
       {
 	features[feature_name()] = -1;
       }
-      
-      void operator()(const state_ptr_type& state,
-		      const edge_type& edge,
-		      feature_set_type& features,
-		      feature_set_type& estimates) const {}
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new RulePenalty(*this)); }
     };
