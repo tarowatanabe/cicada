@@ -357,13 +357,12 @@ namespace cicada
 	phrase_type::const_iterator titer_begin = target.begin();
 	phrase_type::const_iterator titer_end   = target.end();
 	
-	  
 	// we will reserve enough space so that buffer's memory will not be re-allocated.
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	buffer.clear();
 	buffer.reserve(titer_end - titer_begin);
 	
-	double scofre = 0.0;
+	double score = 0.0;
 	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
 	  if (titer->is_non_terminal()) {
 	    if (! buffer.empty()) {
