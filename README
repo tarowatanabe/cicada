@@ -5,7 +5,7 @@ Based on the generic framework, we can
    - learn model(s): tree-to-string, string-to-tree, string-to-string (with latent tree)
    - translate sentence, lattice and/or parse tree
 
-Remark: cicada is 蝉, (or セミ) in Japanese, pronounsed "SEMI"
+Remark: cicada is 蝉, (or セミ) in Japanese, pronounced "SEMI"
 
 Basically, we have three distinct structures:
    - lattice: a representation of graph implemented as a two-dimentional array.
