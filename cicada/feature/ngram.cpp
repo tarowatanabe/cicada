@@ -227,9 +227,16 @@ namespace cicada
 	  std::fill(context, context + order * 2, vocab_type::EMPTY);
 	  
 	  // we will copy to buffer...
-	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	    if (*titer != vocab_type::EPSILON)
-	      buffer.push_back(*titer);
+	  
+	  if (cluster) {
+	    for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+	      if (*titer != vocab_type::EPSILON)
+		buffer.push_back(cluster->operator[](*titer));
+	  } else {
+	    for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+	      if (*titer != vocab_type::EPSILON)
+		buffer.push_back(*titer);
+	  }
 	  
 	  if (buffer.size() <= context_size) {
 	    std::copy(buffer.begin(), buffer.end(), context);
@@ -304,7 +311,11 @@ namespace cicada
 	  {
 	    buffer_type::const_iterator biter = buffer.end();
 	    
-	    buffer.insert(buffer.end(), span.first, span.second);
+	    if (cluster) {
+	      for (phrase_type::const_iterator titer = span.first; titer != span.second; ++ titer)
+		buffer.push_back(cluster->operator[](*titer));
+	    } else
+	      buffer.insert(buffer.end(), span.first, span.second);
 	    
 	    buffer_type::const_iterator biter_end = buffer.end();
 	    
@@ -372,20 +383,37 @@ namespace cicada
 	buffer.reserve(titer_end - titer_begin);
 	
 	double score = 0.0;
-	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
-	  if (titer->is_non_terminal()) {
-	    if (! buffer.empty()) {
-	      buffer_type::iterator biter_begin = buffer.begin();
-	      buffer_type::iterator biter_end   = buffer.end();
-	      buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
+	if (cluster) {
+	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
+	    if (titer->is_non_terminal()) {
+	      if (! buffer.empty()) {
+		buffer_type::iterator biter_begin = buffer.begin();
+		buffer_type::iterator biter_end   = buffer.end();
+		buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
+		
+		score += ngram_estimate(biter_begin, biter);
+		score += ngram_score(biter_begin, biter, biter_end);
+	      }
 	      
-	      score += ngram_estimate(biter_begin, biter);
-	      score += ngram_score(biter_begin, biter, biter_end);
-	    }
-	    
-	    buffer.clear();
-	  } else if (*titer != vocab_type::EPSILON)
-	    buffer.push_back(*titer);
+	      buffer.clear();
+	    } else if (*titer != vocab_type::EPSILON)
+	      buffer.push_back(cluster->operator[](*titer));
+	} else {
+	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
+	    if (titer->is_non_terminal()) {
+	      if (! buffer.empty()) {
+		buffer_type::iterator biter_begin = buffer.begin();
+		buffer_type::iterator biter_end   = buffer.end();
+		buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
+		
+		score += ngram_estimate(biter_begin, biter);
+		score += ngram_score(biter_begin, biter, biter_end);
+	      }
+	      
+	      buffer.clear();
+	    } else if (*titer != vocab_type::EPSILON)
+	      buffer.push_back(*titer);
+	}
 	
 	if (! buffer.empty()) {
 	  buffer_type::iterator biter_begin = buffer.begin();
