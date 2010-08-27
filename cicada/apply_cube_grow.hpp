@@ -303,8 +303,8 @@ namespace cicada
 	
 	state.D.push_back(item);
 	
-	edge_type& edge = graph_out.add_edge(item->out_edge);
-	graph_out.connect_edge(edge.id, item->node);
+	//edge_type& edge = graph_out.add_edge(item->out_edge);
+	//graph_out.connect_edge(edge.id, item->node);
       }
     }
 
@@ -334,7 +334,9 @@ namespace cicada
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
-
+      
+      // I believe there will be no problem inserting a new edge into graph_out for "diversity"
+      
       if (is_goal) {
 	if (! graph_out.is_valid()) {
 	  node_maps.push_back(candidate.node);
@@ -357,6 +359,10 @@ namespace cicada
 	
 	candidate.node = siter->second;
       }
+      
+      // create edge for "diversity"...??
+      edge_type& edge = graph_out.add_edge(candidat.out_edge);
+      graph_out.connect_edge(edge.id, candidate.node);
       
       state.buf.push(&candidate);
       
