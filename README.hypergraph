@@ -16,6 +16,9 @@ options:
   --leaf                collect leaf nodes only
   --help                help message
 
+For English treebanks, you may want to transform [,] or [.] into [COMMA] [PERIOD] respectively, otherwise
+you may encounter serious errors. (',' is a separator for index and category!)
+
 Cabocha supports only the latest version, 0.60pre4 (probably)
 
 filter_cabocha [options]
@@ -29,18 +32,18 @@ options:
 FORMAT of HYPEERGRAPH
 
 The hypergraph is represented by JSON data format (www.json.org)
-Strings must be escaped. You may insert spaces at arbitrary positions.
-One-line-per-single-hypergraph is prefered for faster preprocessing
+Strings must be escaped (see JSON specification). You may insert spaces at arbitrary positions.
+One-line-per-single-hypergraph is prefered for easier preprocessing.
 
 HYPERGRAPH
 
 {
- "rules" : [ RULE, RULE, ... ], (RULE position (one-based) is the rule-id inside this hypergraph)
+ "rules" : [ RULE, RULE, ... ], (RULE position (one-based) is the rule-id inside this hypergraph. zero is reserved for no-rule (error?))
  "nodes" : [ NODE, NODE, ...],  (NODE positin (zero-based) is the node-id inside this hypergraph)
  "goal" : node-id-for-goal
 }
 
-RULE
+RULE (rules are double quoted, thus you should perform proper escaping, i.e. " to \", \ to \\ etc.)
 
 "lhs ||| rhs-source ||| rhs-target ||| list-of-features"
 

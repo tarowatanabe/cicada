@@ -175,36 +175,35 @@ namespace cicada
 	
 	return cache.logprob;
       }
-
+      
       template <typename Iterator>
       double ngram_estimate(Iterator first, Iterator last) const
       {
 	const size_t cache_pos = hash_phrase(first, last) & (cache_estimate.size() - 1);
 	cache_ngram_type& cache = const_cast<cache_ngram_type&>(cache_estimate[cache_pos]);
-	
+	  
 	if (! equal_phrase(first, last, cache.ngram)) {
 	  cache.ngram.assign(first, last);
 	  cache.logprob = 0.0;
-	  
+	    
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
-
+	    
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
-	    
+	      
 	    bool estimated = false;
 	    double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
-	    
+	      
 	    if (estimated && logbound < 0.0)
 	      logbound *= decays[buffer_id.size()];
-	    
+	      
 	    cache.logprob += logbound;
 	  }
 	}
-	
+	  
 	return cache.logprob;
       }
-
       
       double ngram_score(state_ptr_type& state,
 			 const state_ptr_set_type& states,
