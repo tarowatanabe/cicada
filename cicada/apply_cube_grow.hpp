@@ -24,7 +24,7 @@ namespace cicada
   //
   // @InProceedings{huang-chiang:2007:ACLMain,
   //  author    = {Huang, Liang  and  Chiang, David},
- //  title     = {Forest Rescoring: Faster Decoding with Integrated Language Models},
+  //  title     = {Forest Rescoring: Faster Decoding with Integrated Language Models},
   //  booktitle = {Proceedings of the 45th Annual Meeting of the Association of Computational Linguistics},
   //  month     = {June},
   //  year      = {2007},
@@ -138,7 +138,7 @@ namespace cicada
     struct State
     {
       State(const size_type& hint, const size_type& state_size)
-	: nodes(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
+	: nodes(hint >> 1, model_type::state_hash(state_size), model_type::state_equal(state_size)),
 	  nodes_coarse(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
 	  fired(false)
       {
@@ -387,6 +387,7 @@ namespace cicada
       for (int i = 0; i < j.size(); ++ i) {
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
 	
+	// assign coarse node id
 	candidate.out_edge.tails[i] = node_maps[antecedent.node];
 	candidate.score *= antecedent.score;
       }
@@ -399,7 +400,7 @@ namespace cicada
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
 
-      // state merging
+      // state merging... so that we may reuse state structure
       state_node_map_type::iterator siter = state.nodes_coarse.find(node_state);
       if (siter == state.nodes_coarse.end()) {
 	siter = state.nodes_coarse.insert(std::make_pair(node_state, node_states_coarse.size())).first;
