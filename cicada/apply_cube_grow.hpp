@@ -171,6 +171,9 @@ namespace cicada
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * cube_size_max);
+
+	node_states_coarse.clear();
+	node_states_coarse.reserve(graph_in.nodes.size() * cube_size_max);
 	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
@@ -256,7 +259,7 @@ namespace cicada
       
       //std::cerr << "fired: " << (*edge.rule) << std::endl;
       
-      const candidate_type* item = make_candidate(edge, j);
+      const candidate_type* item = make_candidate(edge, j, graph.goal == edge.head, graph_out);
       
       state.uniques.insert(item);
       state.cand.push(item);
@@ -315,34 +318,27 @@ namespace cicada
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
+
+      if (candidate.node >= node_states.size())
+	node_states.resize(candidate.node + 1);
       
-      if (is_goal) {
-	if (! graph_out.is_valid()) {
-	  graph_out.goal = graph_out.add_node().id;
-	  node_states.push_back(node_state);
-	} else
-	  model.deallocate(node_state);
-	
-	candidate.node = graph_out.goal;
-      } else {
-	candidate.node = graph_out.add_node().id;
-	node_states.push_back(node_state);
-      }
+      if (node_states[candidate.node].empty())
+	node_states[candidate.node] = node_state;
+      else
+	model.deallocate(node_state);
       
       state.buf.push(&candidate);
 
       //std::cerr << "end push buf" << std::endl;
     }
     
-    const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j)
+    const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const bool is_goal, hypergraph_type& graph_out)
     {
       //std::cerr << "make candidate for: " << *(edge.rule) << std::endl;
       
       candidates.push_back(candidate_type(edge, j));
       
       candidate_type& candidate = candidates.back();
-      
-      candidate.node = id_type(-1);
       
       candidate.out_edge.tails = edge_type::node_set_type(j.size());
       
@@ -356,13 +352,26 @@ namespace cicada
       }
       
       // perform "estimated" model application
-      
-      model.apply_estimate(candidate.out_edge);
-      
-      candidate.score *= function(candidate.out_edge.features);
-      candidate.estimate *= candidate.score;
 
-      //std::cerr << "score: " << candidate.score << " estimate: " << candidate.estimate << std::endl;
+      feature_set_type estimates;
+      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, estimates, is_goal);
+
+      candidate.score    *= function(candidate.out_edge.features);
+      candidate.estimate *= function(estimates);
+      candidate.estimate *= candidate.score;
+      
+      if (is_goal) {
+	if (! graph_out.is_valid()) {
+	  graph_out.goal = graph_out.add_node().id;
+	  node_states_coarse.push_back(node_state);
+	} else
+	  model.deallocate(node_state);
+	
+	candidate.node = graph_out.goal;
+      } else {
+	candidate.node = graph_out.add_node().id;
+	node_states_coarse.push_back(node_state);
+      }
       
       return &candidate;
     };
@@ -371,6 +380,7 @@ namespace cicada
   private:
     candidate_set_type  candidates;
     state_set_type      node_states;
+    state_set_type      node_states_coarse;
     cand_state_set_type states;
     
     const model_type& model;

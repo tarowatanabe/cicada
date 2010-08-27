@@ -5,7 +5,6 @@
 
 #include <cicada/apply_cube_prune.hpp>
 #include <cicada/apply_cube_grow.hpp>
-#include <cicada/apply_cube_coarse.hpp>
 #include <cicada/apply_exact.hpp>
 #include <cicada/apply_state_less.hpp>
 

@@ -197,15 +197,6 @@ namespace cicada
     return state;
   }
   
-  void Model::apply_estimate(edge_type& edge) const
-  {
-    for (int i = 0; i < models.size(); ++ i) {
-      const feature_function_type& feature_function = *models[i];
-      
-      feature_function.apply_estimate(edge, edge.features);
-    }
-  }
-  
   
   void Model::deallocate(const state_type& state) const
   {

@@ -689,21 +689,15 @@ namespace cicada
 	  else
 	    estimates.erase(base_type::feature_name());
 	}
-      } else
-	apply_estimate(edge, features);
-    }
-
-    void NGram::apply_estimate(const edge_type& edge,
-			       feature_set_type& features) const
-    {
-      // implement here!
-      const double score = pimpl->ngram_estimate(edge);
-      
-      if (score != 0.0)
-	features[base_type::feature_name()] = score;
-      else
-	features.erase(base_type::feature_name());
-      
+      } else {
+	// state-less...
+	const double score = pimpl->ngram_estimate(edge);
+	
+	if (score != 0.0)
+	  features[base_type::feature_name()] = score;
+	else
+	  features.erase(base_type::feature_name());
+      }
     }
   };
 };

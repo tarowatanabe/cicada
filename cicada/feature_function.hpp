@@ -72,10 +72,7 @@ namespace cicada
 			      feature_set_type& features,
 			      feature_set_type& estimates,
 			      const bool final) const = 0;
-    
-    virtual void apply_estimate(const edge_type& edge,
-				feature_set_type& features) const = 0;
-    
+        
     virtual feature_function_ptr_type clone() const = 0;
     
     virtual void initialize() {}
@@ -83,7 +80,6 @@ namespace cicada
     virtual void assign(const hypergraph_type& hypergraph) {}
     virtual void assign(const lattice_type& lattice) {}
     virtual void assign(const span_set_type& spans) {}
-    
     
     size_type state_size() const { return __state_size; }
     const feature_type& feature_name() const { return __feature_name; }

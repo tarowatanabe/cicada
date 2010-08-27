@@ -137,10 +137,6 @@ namespace cicada
 			    feature_set_type& estimates,
 			    const bool final=false) const;
     
-    // estimate score without states
-    void apply_estimate(edge_type& edge) const;
-    
-    
     void deallocate(const state_type& state) const;
     
     const_reference operator[](size_type pos) const { return models[pos]; }

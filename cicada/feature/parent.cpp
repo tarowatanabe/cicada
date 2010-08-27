@@ -483,12 +483,6 @@ namespace cicada
     {
     }
 
-    void Parent::apply_estimate(const edge_type& edge,
-				feature_set_type& features) const
-    {
-      
-    }
-    
     void Parent::initialize()
     {
       pimpl->clear();

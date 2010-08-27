@@ -57,8 +57,6 @@ namespace cicada
 				feature_set_type& features,
 				feature_set_type& estimates,
 				const bool final) const;
-      virtual void apply_estimate(const edge_type& edge,
-				  feature_set_type& features) const {}
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Variational(*this)); }
       
