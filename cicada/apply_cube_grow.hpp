@@ -70,6 +70,8 @@ namespace cicada
       
       const edge_type* in_edge;
       edge_type        out_edge;
+
+      state_type state;
       
       index_set_type j;
       
@@ -194,11 +196,11 @@ namespace cicada
 	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max, model.state_size()));
 	
 	for (int j = 0; j < cube_size_max; ++ j) {
-	  const size_type edge_size = graph_out.edges.size();
+	  const size_type edge_size_prev = graph_out.edges.size();
 	  lazy_jth_best(graph_in.goal, j, graph_in, graph_out);
 
-	  // quit if no new edges inserted...
-	  if (graph_out.edges.size() == edge_size) break;
+	  // quit if no new edges inserted
+	  if (edge_size_prev == graph_out.edges.size()) break;
 	}
 
 	//std::cerr << "topologically sort" << std::endl;
@@ -218,6 +220,8 @@ namespace cicada
     void lazy_jth_best(id_type v, int j, const hypergraph_type& graph, hypergraph_type& graph_out)
     {
       //std::cerr << "node: " << v << std::endl;
+      
+      const bool is_goal = graph.goal == v;
       
       cand_state_type& state = states[v];
       
@@ -243,15 +247,15 @@ namespace cicada
 	const candidate_type* item = state.cand.top();
 	state.cand.pop();
 	
-	push_buf(*item, state, graph.goal == v, graph_out);
+	push_buf(*item, state, is_goal, graph_out);
 	
 	push_succ(*item, state, graph, graph_out);
 	
 	if (! state.cand.empty())
-	  enum_item(state, state.cand.top()->estimate, graph_out);
+	  enum_item(state, state.cand.top()->estimate, is_goal, graph_out);
       }
       
-      enum_item(state, semiring::traits<score_type>::zero(), graph_out);
+      enum_item(state, semiring::traits<score_type>::zero(), is_goal, graph_out);
     }
 
     void fire(const edge_type& edge, const index_set_type& j, cand_state_type& state, const hypergraph_type& graph, hypergraph_type& graph_out)
@@ -295,16 +299,43 @@ namespace cicada
       }
     }
     
-    void enum_item(cand_state_type& state, const score_type bound, hypergraph_type& graph_out)
+    void enum_item(cand_state_type& state, const score_type bound, const bool is_goal, hypergraph_type& graph_out)
     {
       while (! state.buf.empty() && state.buf.top()->estimate > bound) {
 	const candidate_type* item = state.buf.top();
 	state.buf.pop();
 	
-	state.D.push_back(item);
+	candidate_type& candidate = const_cast<candidate_type&>(*item);
 	
-	//edge_type& edge = graph_out.add_edge(item->out_edge);
-	//graph_out.connect_edge(edge.id, item->node);
+	// we will add new node/edge here 
+	// If possible, state merge
+	if (is_goal) {
+	  if (! graph_out.is_valid()) {
+	    node_maps.push_back(candidate.node);
+	    node_states.push_back(candidate.state);
+	    
+	    graph_out.goal = graph_out.add_node().id;
+	  } else
+	    model.deallocate(candidate.state);
+	  
+	  candidate.node = graph_out.goal;
+	} else {
+	  state_node_map_type::iterator siter = state.nodes.find(candidate.state);
+	  if (siter == state.nodes.end()) {
+	    node_maps.push_back(candidate.node);
+	    node_states.push_back(candidate.state);
+	    
+	    siter = state.nodes.insert(std::make_pair(candidate.state, graph_out.add_node().id)).first;
+	  } else
+	    model.deallocate(candidate.state);
+	  
+	  candidate.node = siter->second;
+	}
+	
+	edge_type& edge = graph_out.add_edge(candidate.out_edge);
+	graph_out.connect_edge(edge.id, candidate.node);
+	
+	state.D.push_back(item);
       }
     }
 
@@ -329,40 +360,11 @@ namespace cicada
       //std::cerr << "apply: " << std::endl;
       
       feature_set_type estimates;
-      const state_type node_state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
+      candidate.state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
       
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
-      
-      // I believe there will be no problem inserting a new edge into graph_out for "diversity"
-      
-      if (is_goal) {
-	if (! graph_out.is_valid()) {
-	  node_maps.push_back(candidate.node);
-          node_states.push_back(node_state);
-	  
-          graph_out.goal = graph_out.add_node().id;
-        } else
-	  model.deallocate(node_state);
-	
-	candidate.node = graph_out.goal;
-      } else {
-	state_node_map_type::iterator siter = state.nodes.find(state_node);
-	if (siter == state.nodes.end()) {
-	  node_maps.push_back(candidate.node);
-	  node_states.push_back(node_state);
-	  
-	  siter = state.nodes.insert(std::make_pair(node_state, graph_out.add_node().id)).first;
-	} else
-	  model.deallocate(node_state);
-	
-	candidate.node = siter->second;
-      }
-      
-      // create edge for "diversity"...??
-      edge_type& edge = graph_out.add_edge(candidate.out_edge);
-      graph_out.connect_edge(edge.id, candidate.node);
       
       state.buf.push(&candidate);
     }
@@ -386,8 +388,7 @@ namespace cicada
 	candidate.score *= antecedent.score;
       }
       
-      // perform "estimated" model application
-
+      // perform "estimated" coarse model application
       feature_set_type estimates;
       const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, estimates, is_goal);
       
@@ -409,7 +410,7 @@ namespace cicada
     cand_state_set_type states;
 
     node_map_type       node_maps;
-    
+
     const model_type& model;
     const function_type& function;
     size_type  cube_size_max;
