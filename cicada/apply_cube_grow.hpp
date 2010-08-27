@@ -139,9 +139,12 @@ namespace cicada
     {
       State(const size_type& hint, const size_type& state_size)
 	: nodes(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
+	  nodes_coarse(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
 	  fired(false)
       {
 	nodes.set_empty_key(state_type());
+	nodes_coarse.set_empty_key(state_type());
+	
 	uniques.set_empty_key(0);
       }
       
@@ -152,6 +155,7 @@ namespace cicada
       candidate_set_unique_type uniques;
       
       state_node_map_type nodes;
+      state_node_map_type nodes_coarse;
 
       bool fired;
     };
@@ -193,7 +197,7 @@ namespace cicada
 	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
-	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max, model.state_size()));
+	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
 	
 	for (int j = 0; j < cube_size_max; ++ j) {
 	  const size_type edge_size_prev = graph_out.edges.size();
@@ -395,8 +399,15 @@ namespace cicada
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
 
-      candidate.node = node_states_coarse.size();
-      node_states_coarse.push_back(node_state);
+      // state merging
+      state_node_map_type::iterator siter = state.nodes_coarse.find(node_state);
+      if (siter == state.nodes_coarse.end()) {
+	siter = state.nodes_coarse.insert(std::make_pair(node_state, node_states_coarse.size())).first;
+	node_states_coarse.push_back(node_state);
+      } else
+	model.deallocate(node_state);
+      
+      candidate.node = siter->second;
       
       return &candidate;
     };
