@@ -5,6 +5,7 @@
 #include "cicada/feature/ngram.hpp"
 #include "cicada/parameter.hpp"
 #include "cicada/symbol_vector.hpp"
+#include "cicada/cluster.hpp"
 
 #include "utils/array_power2.hpp"
 #include "utils/hashmurmur.hpp"
@@ -24,6 +25,8 @@ namespace cicada
       typedef cicada::Vocab  vocab_type;
       
       typedef cicada::NGram ngram_type;
+
+      typedef cicada::Cluster cluster_type;
       
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
       typedef std::vector<symbol_type::id_type, std::allocator<symbol_type::id_type> > buffer_id_type;
@@ -78,7 +81,7 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
       NGramImpl(const path_type& __path, const int __order)
-	: ngram(__path), order(__order), yield_source(false), coarse(false)
+	: ngram(__path), order(__order), cluster(0), yield_source(false), coarse(false)
       {
 	order = utils::bithack::min(order, ngram.index.order());
 	
@@ -89,7 +92,7 @@ namespace cicada
       }
 
       NGramImpl(const NGramImpl& x)
-	: ngram(x.ngram), order(x.order), yield_source(x.yield_source), coarse(x.coarse)
+	: ngram(x.ngram), order(x.order), cluster(x.cluster), yield_source(x.yield_source), coarse(x.coarse)
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -101,6 +104,7 @@ namespace cicada
       {
 	ngram = x.ngram;
 	order = x.order;
+	cluster = x.cluster;
 	yield_source = x.yield_source;
 	coarse = x.coarse;
 	
@@ -451,6 +455,9 @@ namespace cicada
       // ngrams
       ngram_type     ngram;
       int            order;
+
+      // cluster...
+      cluster_type* cluster;
       
       // yield/coarse
       bool yield_source;
@@ -470,9 +477,11 @@ namespace cicada
 
       path_type   path;
       int         order = 3;
+      path_type   cluster_path;
       
       path_type   coarse_path;
       int         coarse_order = 0;
+      path_type   coarse_cluster_path;
       
       bool        yield_source = false;
       bool        yield_target = false;
@@ -481,12 +490,16 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "file") == 0)
 	  path = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	  cluster_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "coarse-file") == 0)
 	  coarse_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "coarse-order") == 0)
 	  coarse_order = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "coarse-cluster") == 0)
+	  coarse_cluster_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
@@ -522,6 +535,14 @@ namespace cicada
       // set up yield..
       ngram_impl->yield_source = yield_source;
       
+      if (! cluster_path.empty()) {
+	if (! boost::filesystem::exists(cluster_path))
+	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
+	
+	ngram_impl->cluster = &cicada::Cluster::create(cluster_path);
+      }
+
+      
       // two contexts (order - 1) for each edge, with two separator..
       base_type::__state_size = sizeof(symbol_type) * ngram_impl->order * 2;
       base_type::__feature_name = (name.empty() ? std::string("ngram") : name);
@@ -529,12 +550,32 @@ namespace cicada
       pimpl = ngram_impl.release();
 
       // ...
-      if (coarse_order > 0) {
-	std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
-	ngram_impl->order = coarse_order;
-	ngram_impl->coarse = true;
+      if (coarse_order > 0 || ! coarse_path.empty()) {
 	
-	pimpl_coarse = ngram_impl.release();
+	if (coarse_order <= 0)
+	  throw std::runtime_error("coarse order must be non-zero!");
+	
+	if (! coarse_path.empty()) {
+	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
+	  
+	  // set up yield..
+	  ngram_impl->yield_source = yield_source;
+	  
+	  if (! coarse_cluster_path.empty()) {
+	    if (! boost::filesystem::exists(coarse_cluster_path))
+	      throw std::runtime_error("no cluster file: " + coarse_cluster_path.file_string());
+	    
+	    ngram_impl->cluster = &cicada::Cluster::create(coarse_cluster_path);
+	  }
+	  
+	  pimpl_coarse = ngram_impl.release();
+	} else {
+	  std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
+	  ngram_impl->order = coarse_order;
+	  ngram_impl->coarse = true;
+	  
+	  pimpl_coarse = ngram_impl.release();
+	}
       }
     }
     

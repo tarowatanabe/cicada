@@ -1,3 +1,9 @@
+2010-8-27
+Added cube-growing with order-based coarse heuristic (cube-coarse)
+
+"Quietly" revised grammar-static structure
+
+2010-8-26
 Implemented cube-pruning and cube-growing for faster rescoring
 
-Added cube-growing with order-based coarse heuristic (cube-coarse)
+
