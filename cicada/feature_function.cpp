@@ -54,10 +54,12 @@ neighbours: neighbour words feature\n\
 ngram: ngram language model\n\
 \tfile=<file>\n\
 \torder=<order>\n\
+\tcluster=<word class>\n\
 \tyiled=[source|target yield (default target)]\n\
 \tname=feature-name(default: ngram)\n\
 \tcoarse-order=<order> ngram order for coarse heuristic\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
+\tcoarse-cluster=<word class> word class for coarse heuristics\n\
 ngram-tree: ngram tree feature\n\
 \tyield=[source|target]\n\
 \tcluster=[word class file]\n\
