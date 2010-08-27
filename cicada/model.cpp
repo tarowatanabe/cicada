@@ -72,8 +72,8 @@ namespace cicada
 	pointer state = cache;
 	cache = *reinterpret_cast<pointer*>(state);
 	
-	// clear buffer!
-	std::fill(state, state + state_chunk_size, 0);
+	// clear buffer...
+	std::fill(state, state + state_alloc_size, 0);
 	
 	return state_type(state);
       }
