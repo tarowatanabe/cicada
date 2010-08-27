@@ -123,24 +123,33 @@ namespace cicada
 	: node(__node), score(__score), estimate(__estimate) {}
     };
     
-    typedef std::vector<node_score_type, std::allocator<node_score_type> > node_score_list_type;
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_list_type;
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     
+    typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
     typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
 
     typedef std::vector<id_type, std::allocator<id_type> > node_map_type;
 
     struct State
     {
-      State() : fired(false) { uniques.set_empty_key(0); }
+      State(const size_type& hint, const size_type& state_size)
+	: nodes(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
+	  fired(false)
+      {
+	nodes.set_empty_key(state_type());
+	uniques.set_empty_key(0);
+      }
       
       candidate_heap_type cand;
       candidate_heap_type buf;
       
-      node_score_list_type D;
+      candidate_list_type D;
       candidate_set_unique_type uniques;
+      
+      state_node_map_type nodes;
 
       bool fired;
     };
@@ -182,7 +191,7 @@ namespace cicada
 	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
-	states.resize(graph_in.nodes.size());
+	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max, model.state_size()));
 	
 	for (int j = 0; j < cube_size_max; ++ j) {
 	  const size_type edge_size = graph_out.edges.size();
@@ -292,7 +301,7 @@ namespace cicada
 	const candidate_type* item = state.buf.top();
 	state.buf.pop();
 	
-	state.D.push_back(node_score_type(item->node, item->score, item->estimate));
+	state.D.push_back(item);
 	
 	edge_type& edge = graph_out.add_edge(item->out_edge);
 	graph_out.connect_edge(edge.id, item->node);
@@ -310,7 +319,7 @@ namespace cicada
       candidate.score = semiring::traits<score_type>::one();
       candidate.estimate = semiring::traits<score_type>::one();
       for (int i = 0; i < candidate.j.size(); ++ i) {
-	const node_score_type& antecedent = states[candidate.in_edge->tails[i]].D[candidate.j[i]];
+	const candidate_type& antecedent = *states[candidate.in_edge->tails[i]].D[candidate.j[i]];
 	
 	// assign real-node-id!
 	candidate.out_edge.tails[i] = antecedent.node;
@@ -337,14 +346,20 @@ namespace cicada
 	
 	candidate.node = graph_out.goal;
       } else {
-	node_maps.push_back(candidate.node);
-        node_states.push_back(node_state);
+	state_node_map_type::iterator siter = state.nodes.find(state_node);
+	if (siter == state.nodes.end()) {
+	  node_maps.push_back(candidate.node);
+	  node_states.push_back(node_state);
+	  
+	  siter = state.nodes.insert(std::make_pair(node_state, graph_out.add_node().id)).first;
+	} else
+	  model.deallocate(node_state);
 	
-	candidate.node = graph_out.add_node().id;
+	candidate.node = siter->second;
       }
       
       state.buf.push(&candidate);
-
+      
       //std::cerr << "end push buf" << std::endl;
     }
     
@@ -361,7 +376,7 @@ namespace cicada
       candidate.score = semiring::traits<score_type>::one();
       candidate.estimate = semiring::traits<score_type>::one();
       for (int i = 0; i < j.size(); ++ i) {
-	const node_score_type& antecedent = states[edge.tails[i]].D[j[i]];
+	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
 	
 	candidate.out_edge.tails[i] = node_maps[antecedent.node];
 	candidate.score *= antecedent.score;
