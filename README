@@ -20,6 +20,7 @@ Translation can be carried out by:
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
      * cicada implementes cube-pruning, cube-growing and exact (and stateless) methods
+     * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
    - K-bests sentences are generated from hypergraph [5].
 
@@ -161,4 +162,15 @@ References:
   url       = {http://www.aclweb.org/anthology/P/P09/P09-1067}
 }
 
-
+[11]
+@InProceedings { vilar09:coarseHeuristic,
+   author= {Vilar, David and Ney, Hermann},
+   title= {On LM Heuristics for the Cube Growing Algorithm},
+   booktitle= {Annual Conference of the European Association for Machine Translation},
+   year= 2009,
+   pages= {242-249},
+   address= {Barcelona, Spain},
+   month= may,
+   booktitlelink= {http://www.talp.cat/eamt09/},
+   pdf = {http://www-i6.informatik.rwth-aachen.de/publications/downloader.php?id=617&row=pdf}
+}

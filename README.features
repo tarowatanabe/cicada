@@ -27,14 +27,17 @@ boundary: sparse features assigned for 4-tuple of source/target words at non-ter
 neighbours: sparse features assigned for non-terminal, its neighboring words and span-size
 ngram: ngram langauge model feature. You can assign multiple LM by defining name=<feature-name> option.
 ngram-tree: sparse featuers assigned for non-terminal path for boundaries.
+parent:  rule (itself) and rule with its parent category
 variational: features for variational decoding
 target-word-penalty: simply count # of target words
 source-word-penalty: simply count # of source words
 rule-penalty: simply count # of rules
 
+HOW TO DEVELOP YOUR FEATURE FUNCTIONS?
 
-How to develop your feature functions?
-
-The feature function classes are located at cicada/featuer/
+The feature function classes are located at cicada/feature
 Basically, you have to inherit FeatureFunction class in cicada/feature_function.hpp
-and add initializer in cicada/feature_function.cpp
+and fill-in virtual function. See the comments.
+
+Then, you want to add initializer in cicada/feature_function.cpp so that
+FeatureFunction::create(string) can generate correct feature funtion.
