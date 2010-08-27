@@ -313,7 +313,7 @@ namespace cicada
       //std::cerr << "apply: " << std::endl;
       
       feature_set_type estimates;
-      state_type node_state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
+      const state_type node_state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
       
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
@@ -354,7 +354,7 @@ namespace cicada
       // perform "estimated" model application
 
       feature_set_type estimates;
-      state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, estimates, is_goal);
+      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, estimates, is_goal);
 
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
