@@ -43,14 +43,20 @@ namespace cicada
       Span() {}
       
     public:
-      virtual void operator()(state_ptr_type& state,
-			      const state_ptr_set_type& states,
-			      const edge_type& edge,
-			      feature_set_type& features,
-			      feature_set_type& estimates,
-			      const bool final) const;
-      virtual void operator()(const edge_type& edge,
-			      feature_set_type& features) const {}
+      virtual void apply(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 feature_set_type& estimates,
+			 const bool final) const;
+      virtual void apply_coarse(state_ptr_type& state,
+				const state_ptr_set_type& states,
+				const edge_type& edge,
+				feature_set_type& features,
+				feature_set_type& estimates,
+				const bool final) const;
+      virtual void apply_estimate(const edge_type& edge,
+				  feature_set_type& features) const {}
       virtual void initialize();
 
       virtual void assign(const hypergraph_type& hypergraph);

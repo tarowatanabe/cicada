@@ -60,15 +60,21 @@ namespace cicada
     static std::string               lists();
     
   public:
-    virtual void operator()(state_ptr_type& state,
-			    const state_ptr_set_type& states,
-			    const edge_type& edge,
-			    feature_set_type& features,
-			    feature_set_type& estimates,
-			    const bool final) const = 0;
+    virtual void apply(state_ptr_type& state,
+		       const state_ptr_set_type& states,
+		       const edge_type& edge,
+		       feature_set_type& features,
+		       feature_set_type& estimates,
+		       const bool final) const = 0;
+    virtual void apply_coarse(state_ptr_type& state,
+			      const state_ptr_set_type& states,
+			      const edge_type& edge,
+			      feature_set_type& features,
+			      feature_set_type& estimates,
+			      const bool final) const = 0;
     
-    virtual void operator()(const edge_type& edge,
-			    feature_set_type& features) const = 0;
+    virtual void apply_estimate(const edge_type& edge,
+				feature_set_type& features) const = 0;
     
     virtual feature_function_ptr_type clone() const = 0;
     

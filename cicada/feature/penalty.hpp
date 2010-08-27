@@ -13,18 +13,28 @@ namespace cicada
     public:
       TargetWordPenalty() : FeatureFunction(0, "target-word-penalty") { }
       
-      void operator()(state_ptr_type& state,
-		      const state_ptr_set_type& states,
-		      const edge_type& edge,
-		      feature_set_type& features,
-		      feature_set_type& estimates,
-		      const bool final) const
+      void apply(state_ptr_type& state,
+		 const state_ptr_set_type& states,
+		 const edge_type& edge,
+		 feature_set_type& features,
+		 feature_set_type& estimates,
+		 const bool final) const
       {
-	operator()(edge, features);
+	apply_estimate(edge, features);
       }
       
-      void operator()(const edge_type& edge,
-		      feature_set_type& features) const
+      void apply_coarse(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      
+      void apply_estimate(const edge_type& edge,
+			  feature_set_type& features) const
       {
 	int count = 0;
 	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
@@ -44,18 +54,27 @@ namespace cicada
     public:
       SourceWordPenalty() : FeatureFunction(0, "source-word-penalty") { }
       
-      void operator()(state_ptr_type& state,
-		      const state_ptr_set_type& states,
-		      const edge_type& edge,
-		      feature_set_type& features,
-		      feature_set_type& estimates,
-		      const bool final) const
+      void apply(state_ptr_type& state,
+		 const state_ptr_set_type& states,
+		 const edge_type& edge,
+		 feature_set_type& features,
+		 feature_set_type& estimates,
+		 const bool final) const
       {
-	operator()(edge, features);
+	apply_estimate(edge, features);
+      }
+      void apply_coarse(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final) const
+      {
+	apply_estimate(edge, features);
       }
       
-      void operator()(const edge_type& edge,
-		      feature_set_type& features) const
+      void apply_estimate(const edge_type& edge,
+			  feature_set_type& features) const
       {
 	int count = 0;
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
@@ -74,18 +93,27 @@ namespace cicada
     public:
       RulePenalty() : FeatureFunction(0, "rule-penalty") { }
       
-      void operator()(state_ptr_type& state,
-		      const state_ptr_set_type& states,
-		      const edge_type& edge,
-		      feature_set_type& features,
-		      feature_set_type& estimates,
-		      const bool final) const
+      void apply(state_ptr_type& state,
+		 const state_ptr_set_type& states,
+		 const edge_type& edge,
+		 feature_set_type& features,
+		 feature_set_type& estimates,
+		 const bool final) const
       {
-	operator()(edge, features);
+	apply_estimate(edge, features);
+      }
+      void apply_coarse(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final) const
+      {
+	apply_estimate(edge, features);
       }
       
-      void operator()(const edge_type& edge,
-		      feature_set_type& features) const
+      void apply_estimate(const edge_type& edge,
+			  feature_set_type& features) const
       {
 	features[feature_name()] = -1;
       }

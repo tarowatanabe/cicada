@@ -450,12 +450,12 @@ namespace cicada
       return x.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin());
     }
     
-    void Boundary::operator()(state_ptr_type& state,
-			      const state_ptr_set_type& states,
-			      const edge_type& edge,
-			      feature_set_type& features,
-			      feature_set_type& estimates,
-			      const bool final) const
+    void Boundary::apply(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 feature_set_type& estimates,
+			 const bool final) const
     {
       const std::string& __feature_prefix = base_type::feature_name();
       for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
@@ -470,6 +470,16 @@ namespace cicada
       
       if (final)
 	pimpl->boundary_final_score(state, features);
+    }
+
+    void Boundary::apply_coarse(state_ptr_type& state,
+				const state_ptr_set_type& states,
+				const edge_type& edge,
+				feature_set_type& features,
+				feature_set_type& estimates,
+				const bool final) const
+    {
+
     }
 
     void Boundary::initialize()

@@ -141,10 +141,10 @@ namespace cicada
   }
 
   
-  Model::state_type Model::operator()(const state_set_type& node_states,
-				      edge_type& edge,
-				      feature_set_type& estimates,
-				      const bool final) const
+  Model::state_type Model::apply(const state_set_type& node_states,
+				 edge_type& edge,
+				 feature_set_type& estimates,
+				 const bool final) const
   {
     state_type state = allocator->allocate();
     
@@ -161,7 +161,7 @@ namespace cicada
       
       feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
-      feature_function(state_feature, states, edge, edge.features, estimates, final);
+      feature_function.apply(state_feature, states, edge, edge.features, estimates, final);
     }
     
     //std::cerr << "apply features end" << std::endl;
@@ -169,12 +169,40 @@ namespace cicada
     return state;
   }
 
-  void Model::operator()(edge_type& edge) const
+  Model::state_type Model::apply_coarse(const state_set_type& node_states,
+					edge_type& edge,
+					feature_set_type& estimates,
+					const bool final) const
+  {
+    state_type state = allocator->allocate();
+    
+    feature_function_type::state_ptr_set_type states(edge.tails.size());
+
+    //std::cerr << "apply features for: " << *(edge.rule) << std::endl;
+    
+    for (int i = 0; i < models.size(); ++ i) {
+      const feature_function_type& feature_function = *models[i];
+      
+      if (feature_function.state_size())
+	for (int k = 0; k < states.size(); ++ k)
+	  states[k] = node_states[edge.tails[k]].base + offsets[i];
+      
+      feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
+      
+      feature_function.apply_coarse(state_feature, states, edge, edge.features, estimates, final);
+    }
+    
+    //std::cerr << "apply features end" << std::endl;
+    
+    return state;
+  }
+  
+  void Model::apply_estimate(edge_type& edge) const
   {
     for (int i = 0; i < models.size(); ++ i) {
       const feature_function_type& feature_function = *models[i];
       
-      feature_function(edge, edge.features);
+      feature_function.apply_estimate(edge, edge.features);
     }
   }
   

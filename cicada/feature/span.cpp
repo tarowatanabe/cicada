@@ -278,12 +278,12 @@ namespace cicada
       return x.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin());
     }
     
-    void Span::operator()(state_ptr_type& state,
-			  const state_ptr_set_type& states,
-			  const edge_type& edge,
-			  feature_set_type& features,
-			  feature_set_type& estimates,
-			  const bool final) const
+    void Span::apply(state_ptr_type& state,
+		     const state_ptr_set_type& states,
+		     const edge_type& edge,
+		     feature_set_type& features,
+		     feature_set_type& estimates,
+		     const bool final) const
     {
       const std::string& __feature_prefix = base_type::feature_name();
       for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
@@ -297,6 +297,14 @@ namespace cicada
       pimpl->span_score(state, states, edge, features);
     }
     
+    void Span::apply_coarse(state_ptr_type& state,
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features,
+			    feature_set_type& estimates,
+			    const bool final) const
+    {
+    }
 
     void Span::assign(const hypergraph_type& hypergraph)
     {

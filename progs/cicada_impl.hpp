@@ -883,7 +883,7 @@ public:
   Apply(const std::string& parameter,
 	const model_type& __model,
 	const int __debug)
-    : model(__model), weights(0), size(200), weights_one(false), exact(false), prune(false), grow(false), forced(false), debug(__debug)
+    : model(__model), weights(0), size(200), weights_one(false), exact(false), prune(false), grow(false), coarse(false), forced(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
@@ -900,6 +900,8 @@ public:
 	prune = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "grow") == 0)
 	grow = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "coarse") == 0)
+	coarse = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "forced") == 0)
 	forced = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights") == 0)
@@ -914,11 +916,11 @@ public:
     }
 
     // default to prune...
-    switch (int(exact) + prune + grow) {
+    switch (int(exact) + prune + grow + coarse) {
     case 0: prune = true; break; // default to cube-prune
     case 1: break; // OK
     default:
-      throw std::runtime_error("specify one of exact/prune/grow");
+      throw std::runtime_error("specify one of exact/prune/grow/coarse");
     }
     
     if (weights && weights_one)
@@ -938,7 +940,7 @@ public:
     __model.assign(spans);
     
     if (debug)
-      std::cerr << "apply features: " << (exact ? "exact" : (grow ? "grow" : "prune")) << std::endl;
+      std::cerr << "apply features: " << (exact ? "exact" : (grow ? "grow" : (coarse ? "coarse" : "prune"))) << std::endl;
 
     if (forced)
       __model.apply_feature(true);
@@ -956,6 +958,11 @@ public:
 	cicada::apply_cube_grow(__model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
       else
 	cicada::apply_cube_grow(__model, hypergraph, applied, weight_set_function(*weights_apply), size);
+    } else if (coarse) {
+      if (weights_one)
+	cicada::apply_cube_coarse(__model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
+      else
+	cicada::apply_cube_coarse(__model, hypergraph, applied, weight_set_function(*weights_apply), size);
     } else {
       if (weights_one)
 	cicada::apply_cube_prune(__model, hypergraph, applied, weight_set_function_one(*weights_apply), size);
@@ -997,6 +1004,7 @@ public:
   bool exact;
   bool prune;
   bool grow;
+  bool coarse;
   
   bool forced;
   

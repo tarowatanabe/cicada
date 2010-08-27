@@ -50,6 +50,8 @@ namespace cicada
       
       State(value_type* __base) : base(__base) {}
       State() : base(0) {}
+
+      bool empty() const { return base == 0; }
     
     private:
       pointer base;
@@ -124,13 +126,19 @@ namespace cicada
   public:
     
     // score with states
-    state_type operator()(const state_set_type& node_states,
-			  edge_type& edge,
-			  feature_set_type& estimates,
-			  const bool final=false) const;
+    state_type apply(const state_set_type& node_states,
+		     edge_type& edge,
+		     feature_set_type& estimates,
+		     const bool final=false) const;
+    
+    // score with coarse states
+    state_type apply_coarse(const state_set_type& node_states,
+			    edge_type& edge,
+			    feature_set_type& estimates,
+			    const bool final=false) const;
     
     // estimate score without states
-    void operator()(edge_type& edge) const;
+    void apply_estimate(edge_type& edge) const;
     
     
     void deallocate(const state_type& state) const;

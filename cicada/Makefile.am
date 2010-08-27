@@ -83,6 +83,8 @@ libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 libcicadainclude_HEADERS = \
 apply.hpp \
+apply_cube_coarse.hpp \
+apply_cube_grow.hpp \
 apply_cube_prune.hpp \
 apply_exact.hpp \
 apply_state_less.hpp \

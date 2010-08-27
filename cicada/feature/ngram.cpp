@@ -78,7 +78,7 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
       NGramImpl(const path_type& __path, const int __order)
-	: ngram(__path), order(__order), yield_source(false)
+	: ngram(__path), order(__order), yield_source(false), coarse(false)
       {
 	order = utils::bithack::min(order, ngram.index.order());
 	
@@ -89,7 +89,7 @@ namespace cicada
       }
 
       NGramImpl(const NGramImpl& x)
-	: ngram(x.ngram), order(x.order), yield_source(x.yield_source)
+	: ngram(x.ngram), order(x.order), yield_source(x.yield_source), coarse(x.coarse)
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -102,6 +102,7 @@ namespace cicada
 	ngram = x.ngram;
 	order = x.order;
 	yield_source = x.yield_source;
+	coarse = x.coarse;
 	
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -117,9 +118,9 @@ namespace cicada
 	decays.resize(order + 1, 1.0);
 	
 	for (int n = 1; n < order - 1; ++ n) {
-	  // 0.7 ^ (order - 1 - n)
+	  // 0.8 ^ (order - 1 - n)
 	  for (int i = 0; i < order - 1 - n; ++ i)
-	    decays[n] *= 0.7;
+	    decays[n] *= 0.8;
 	}
       }
 
@@ -160,7 +161,11 @@ namespace cicada
 	  
 	  for (/**/; iter != last; ++ iter) {
 	    buffer_id.push_back(ngram.index.vocab()[*iter]);
-	    cache.logprob += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	    
+	    if (coarse)
+	      cache.logprob += ngram.logbound(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
+	    else
+	      cache.logprob += ngram.logprob(std::max(buffer_id.begin(), buffer_id.end() - order), buffer_id.end());
 	  }
 	}
 	
@@ -447,13 +452,14 @@ namespace cicada
       ngram_type     ngram;
       int            order;
       
-      // yield
+      // yield/coarse
       bool yield_source;
+      bool coarse;
     };
     
     
     NGram::NGram(const std::string& parameter)
-      : pimpl(0)
+      : pimpl(0), pimpl_coarse(0)
     {
       typedef cicada::Parameter parameter_type;
       
@@ -464,6 +470,10 @@ namespace cicada
 
       path_type   path;
       int         order = 3;
+      
+      path_type   coarse_path;
+      int         coarse_order = 0;
+      
       bool        yield_source = false;
       bool        yield_target = false;
       std::string name;
@@ -473,6 +483,10 @@ namespace cicada
 	  path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "coarse-file") == 0)
+	  coarse_path = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "coarse-order") == 0)
+	  coarse_order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
@@ -497,6 +511,12 @@ namespace cicada
       if (yield_source && yield_target)
 	throw std::runtime_error("you cannot specify both source/target yield");
       
+      if (coarse_order > order)
+	throw std::runtime_error("invalid coarse order: coarse-order <= order");
+      if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
+	throw std::runtime_error("no coarse ngram language model? " + coarse_path.file_string());
+      
+      
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
       
       // set up yield..
@@ -507,29 +527,56 @@ namespace cicada
       base_type::__feature_name = (name.empty() ? std::string("ngram") : name);
       
       pimpl = ngram_impl.release();
+
+      // ...
+      if (coarse_order > 0) {
+	std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
+	ngram_impl->order = coarse_order;
+	ngram_impl->coarse = true;
+	
+	pimpl_coarse = ngram_impl.release();
+      }
     }
     
-    NGram::~NGram() { std::auto_ptr<impl_type> tmp(pimpl); }
+    NGram::~NGram()
+    {
+      std::auto_ptr<impl_type> tmp(pimpl);
+      if (pimpl_coarse)
+	std::auto_ptr<impl_type> tmp_coarse(pimpl_coarse);
+    }
     
     NGram::NGram(const NGram& x)
-      : base_type(static_cast<const base_type&>(x)), pimpl(new impl_type(*x.pimpl)) {}
+      : base_type(static_cast<const base_type&>(x)),
+	pimpl(new impl_type(*x.pimpl)),
+	pimpl_coarse(x.pimpl_coarse ? new impl_type(*x.pimpl_coarse) : 0)
+    {}
     
     NGram& NGram::operator=(const NGram& x)
     {
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
-
+      
       *pimpl = *x.pimpl;
+      if (x.pimpl_coarse) {
+	if (pimpl_coarse)
+	  *pimpl_coarse = *x.pimpl_coarse;
+	else
+	  pimpl_coarse = new impl_type(*x.pimpl_coarse);
+      } else {
+	if (pimpl_coarse)
+	  delete pimpl_coarse;
+	pimpl_coarse = 0;
+      }
       
       return *this;
     }
     
     
-    void NGram::operator()(state_ptr_type& state,
-			   const state_ptr_set_type& states,
-			   const edge_type& edge,
-			   feature_set_type& features,
-			   feature_set_type& estimates,
-			   const bool final) const
+    void NGram::apply(state_ptr_type& state,
+		      const state_ptr_set_type& states,
+		      const edge_type& edge,
+		      feature_set_type& features,
+		      feature_set_type& estimates,
+		      const bool final) const
     {
       double score = pimpl->ngram_score(state, states, edge);
       if (final)
@@ -549,8 +596,36 @@ namespace cicada
       }
     }
 
-    void NGram::operator()(const edge_type& edge,
-			   feature_set_type& features) const
+    void NGram::apply_coarse(state_ptr_type& state,
+			     const state_ptr_set_type& states,
+			     const edge_type& edge,
+			     feature_set_type& features,
+			     feature_set_type& estimates,
+			     const bool final) const
+    {
+      if (pimpl_coarse) {
+	double score = pimpl_coarse->ngram_score(state, states, edge);
+	if (final)
+	  score += pimpl_coarse->ngram_final_score(state);
+      
+	if (score != 0.0)
+	  features[base_type::feature_name()] = score;
+	else
+	  features.erase(base_type::feature_name());
+      
+	if (! final) {
+	  const double estimate = pimpl_coarse->ngram_estimate(state);
+	  if (estimate != 0.0)
+	    estimates[base_type::feature_name()] = estimate;
+	  else
+	    estimates.erase(base_type::feature_name());
+	}
+      } else
+	apply_estimate(edge, features);
+    }
+
+    void NGram::apply_estimate(const edge_type& edge,
+			       feature_set_type& features) const
     {
       // implement here!
       const double score = pimpl->ngram_estimate(edge);

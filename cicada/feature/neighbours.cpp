@@ -524,12 +524,12 @@ namespace cicada
     }
 
     
-    void Neighbours::operator()(state_ptr_type& state,
-				const state_ptr_set_type& states,
-				const edge_type& edge,
-				feature_set_type& features,
-				feature_set_type& estimates,
-				const bool final) const
+    void Neighbours::apply(state_ptr_type& state,
+			   const state_ptr_set_type& states,
+			   const edge_type& edge,
+			   feature_set_type& features,
+			   feature_set_type& estimates,
+			   const bool final) const
     {
       const std::string& __feature_prefix = base_type::feature_name();
       for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
@@ -544,6 +544,15 @@ namespace cicada
 
       if (final)
 	pimpl->neighbours_final_score(state, features);
+    }
+
+    void Neighbours::apply_coarse(state_ptr_type& state,
+				  const state_ptr_set_type& states,
+				  const edge_type& edge,
+				  feature_set_type& features,
+				  feature_set_type& estimates,
+				  const bool final) const
+    {
     }
     
     void Neighbours::initialize()
