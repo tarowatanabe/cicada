@@ -361,7 +361,7 @@ namespace cicada
       }
       
       // create edge for "diversity"...??
-      edge_type& edge = graph_out.add_edge(candidat.out_edge);
+      edge_type& edge = graph_out.add_edge(candidate.out_edge);
       graph_out.connect_edge(edge.id, candidate.node);
       
       state.buf.push(&candidate);
