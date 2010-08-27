@@ -226,10 +226,10 @@ namespace cicada
       cand_state_type& state = states[v];
       
       if (! state.fired) {
-	//std::cerr << "initial fire: " << v << std::endl;
-	
 	const node_type& node = graph.nodes[v];
 	
+	// for each edge in v
+	//   fire(edge, 0, cand)
 	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const edge_type& edge = graph.edges[*eiter];
@@ -241,32 +241,34 @@ namespace cicada
 	state.fired = true;
       }
       
-      //std::cerr << "enumerate: " << v << std::endl;
-      
       while (state.D.size() <= j && state.buf.size() + state.D.size() < cube_size_max && ! state.cand.empty()) {
+	// pop-min
 	const candidate_type* item = state.cand.top();
 	state.cand.pop();
 	
+	// push item to buffer
 	push_buf(*item, state, is_goal, graph_out);
 	
+	// push succ
 	push_succ(*item, state, graph, graph_out);
 	
+	// enum item with current bound
 	if (! state.cand.empty())
 	  enum_item(state, state.cand.top()->estimate, is_goal, graph_out);
       }
       
+      // enum item with zero bound
       enum_item(state, semiring::traits<score_type>::zero(), is_goal, graph_out);
     }
 
     void fire(const edge_type& edge, const index_set_type& j, cand_state_type& state, const hypergraph_type& graph, hypergraph_type& graph_out)
     {
-      //std::cerr << "fire for: " << (*edge.rule) << std::endl;
-      
       candidate_type query(j);
       query.in_edge = &edge;
       
       if (state.uniques.find(&query) != state.uniques.end()) return;
       
+      // for each edge, 
       index_set_type::const_iterator iiter = j.begin();
       edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
       for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ iiter) {
@@ -275,8 +277,7 @@ namespace cicada
 	if (states[*niter].D.size() <= *iiter) return;
       }
       
-      //std::cerr << "fired: " << (*edge.rule) << std::endl;
-      
+      // push cand
       const candidate_type* item = make_candidate(edge, j, graph.goal == edge.head, graph_out);
       
       state.uniques.insert(item);
@@ -285,10 +286,10 @@ namespace cicada
     
     void push_succ(const candidate_type& item, cand_state_type& state, const hypergraph_type& graph, hypergraph_type& graph_out)
     {
-      //std::cerr << "push succ: " << (*item.in_edge->rule) << std::endl;
-      
       index_set_type j = item.j;
       
+      // for each i in 1 ... |e|
+      //   fire(e, j + b_i, cand)
       for (int i = 0; i < item.j.size(); ++ i) {
 	const int j_i_prev = j[i];
 	++ j[i];
@@ -301,6 +302,8 @@ namespace cicada
     
     void enum_item(cand_state_type& state, const score_type bound, const bool is_goal, hypergraph_type& graph_out)
     {
+      // while |buf| and min(buf) < bound (min-cost)
+      //  append pop-min to D
       while (! state.buf.empty() && state.buf.top()->estimate > bound) {
 	const candidate_type* item = state.buf.top();
 	state.buf.pop();
@@ -320,6 +323,8 @@ namespace cicada
 	  
 	  candidate.node = graph_out.goal;
 	} else {
+	  // we will merge states, but do not merge score/estimates, since we
+	  // are enumerating jthe best derivations... is this correct?
 	  state_node_map_type::iterator siter = state.nodes.find(candidate.state);
 	  if (siter == state.nodes.end()) {
 	    node_maps.push_back(candidate.node);
@@ -343,8 +348,6 @@ namespace cicada
     {
       // push this item into state.buf with "correct" score
 
-      //std::cerr << "push buf for: " << *(__item.in_edge->rule) << std::endl;
-
       candidate_type& candidate = const_cast<candidate_type&>(__item);
       
       candidate.score = semiring::traits<score_type>::one();
@@ -356,8 +359,6 @@ namespace cicada
 	candidate.out_edge.tails[i] = antecedent.node;
 	candidate.score *= antecedent.score;
       }
-
-      //std::cerr << "apply: " << std::endl;
       
       feature_set_type estimates;
       candidate.state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
@@ -371,8 +372,6 @@ namespace cicada
     
     const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const bool is_goal, hypergraph_type& graph_out)
     {
-      //std::cerr << "make candidate for: " << *(edge.rule) << std::endl;
-      
       candidates.push_back(candidate_type(edge, j));
       
       candidate_type& candidate = candidates.back();
