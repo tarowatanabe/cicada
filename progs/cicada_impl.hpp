@@ -1794,9 +1794,10 @@ compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
 apply: feature application\n\
 \tsize=<cube size>\n\
-\texact=[true|false] no pruning feature application\n\
-\tprune=[true|false] cube-pruning for feature application\n\
-\tgrow=[true|false]  cube-growing for feature application\n\
+\texact=[true|false]  no pruning feature application\n\
+\tprune=[true|false]  cube-pruning for feature application\n\
+\tgrow=[true|false]   cube-growing for feature application\n\
+\tcoarse=[true|false] cube-growing + coarse heuristic for feature application\n\
 \tforced=[true|false] forced feature application\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
