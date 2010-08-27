@@ -197,7 +197,7 @@ namespace cicada
 	  const size_type edge_size = graph_out.edges.size();
 	  lazy_jth_best(graph_in.goal, j, graph_in, graph_out);
 
-	  // no new edges inserted...
+	  // quit if no new edges inserted...
 	  if (graph_out.edges.size() == edge_size) break;
 	}
 
@@ -365,8 +365,6 @@ namespace cicada
       graph_out.connect_edge(edge.id, candidate.node);
       
       state.buf.push(&candidate);
-      
-      //std::cerr << "end push buf" << std::endl;
     }
     
     const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const bool is_goal, hypergraph_type& graph_out)
