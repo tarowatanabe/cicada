@@ -149,27 +149,7 @@ namespace cicada
     
     typedef utils::array_power2<cache_rule_set_type, 1024 * 16, std::allocator<cache_rule_set_type> > cache_rule_map_type;
     typedef utils::array_power2<cache_phrase_type,   1024 * 16, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
-    
-    struct cache_find_root_type
-    {
-      word_type::id_type word;
-      size_type          node;
-      
-      cache_find_root_type() : word(word_type::id_type(-1)), node(size_type(-1)) {}
-    };
-    
-    struct cache_find_type
-    {
-      word_type::id_type word;
-      size_type          prev;
-      size_type          next;
-      
-      cache_find_type() : word(word_type::id_type(-1)), prev(size_type(-1)), next(size_type(-1)) {}
-    };
-    
-    typedef utils::array_power2<cache_find_root_type, 1024 * 2,   std::allocator<cache_find_root_type> > cache_find_root_set_type;
-    typedef utils::array_power2<cache_find_type,      1024 * 128, std::allocator<cache_find_type> >      cache_find_set_type;
-        
+            
 
   public:
     GrammarStaticImpl(const std::string& parameter) : max_span(15) { read(parameter); }
@@ -212,8 +192,6 @@ namespace cicada
       cache_rule_sets.clear();
       cache_sources.clear();
       cache_targets.clear();
-      cache_find_root.clear();
-      cache_find.clear();
 
       max_span = 15;
     }
@@ -228,34 +206,6 @@ namespace cicada
     {
       const word_type::id_type id = vocab[word];
       return rule_db.find(&id, 1, node);
-
-#if 0
-      if (node == 0) {
-	const size_type cache_pos = hasher_type::operator()(word.id()) & (cache_find_root.size() - 1);
-	cache_find_root_type& cache = const_cast<cache_find_root_type&>(cache_find_root[cache_pos]);
-	if (cache.word != word.id()) {
-	  char codes[8];
-	  const size_type code_size = utils::byte_aligned_encode(vocab[word], codes);
-	  
-	  cache.word = word.id();
-	  cache.node = rule_db.find(codes, code_size, node);
-	}
-	return cache.node;
-      } else {
-	const size_type cache_pos = hasher_type::operator()(word.id(), node) & (cache_find.size() - 1);
-	cache_find_type& cache = const_cast<cache_find_type&>(cache_find[cache_pos]);
-	
-	if (cache.word != word.id() || cache.prev != node) {
-	  char codes[8];
-	  const size_type code_size = utils::byte_aligned_encode(vocab[word], codes);
-	  
-	  cache.word = word.id();
-	  cache.prev = node;
-	  cache.next = rule_db.find(codes, code_size, node);
-	}
-	return cache.next;
-      }
-#endif
     }
     
     template <typename Iterator>
@@ -441,9 +391,6 @@ namespace cicada
     
     cache_phrase_set_type cache_sources;
     cache_phrase_set_type cache_targets;
-
-    cache_find_root_set_type     cache_find_root;
-    cache_find_set_type          cache_find;
 
   public:
     int max_span;
@@ -773,7 +720,6 @@ namespace cicada
     sequence_type target;
     rule_parsed_type rule;
     
-    
     id_set_type source_index;
     
     code_set_type codes_source;
@@ -869,22 +815,9 @@ namespace cicada
 	    sequence_type::const_iterator siter_end = source_prev.end();
 	    for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	      source_index.push_back(siter->non_terminal().id());
-	    
-#if 0
-	    codes_source.resize(source_prev.size() * 8);
-	     
-	    code_set_type::iterator citer = codes_source.begin();
-
-	    sequence_type::const_iterator siter_begin = source_prev.begin();
-	    sequence_type::const_iterator siter_end = source_prev.end();
-	    for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	      citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
-	    codes_source.resize(citer - codes_source.begin());
-#endif
 	  }
 
 	  // insert...
-	  //rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
 	  rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
 	}
 
@@ -1002,21 +935,9 @@ namespace cicada
 	sequence_type::const_iterator siter_end = source_prev.end();
 	for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	  source_index.push_back(siter->non_terminal().id());
-#if 0
-	codes_source.resize(source_prev.size() * 8);
-	     
-	code_set_type::iterator citer = codes_source.begin();
-
-	sequence_type::const_iterator siter_begin = source_prev.begin();
-	sequence_type::const_iterator siter_end = source_prev.end();
-	for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	  citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
-	codes_source.resize(citer - codes_source.begin());
-#endif
       }
 
       // insert...
-      //rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
     }
 
