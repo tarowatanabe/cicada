@@ -74,10 +74,10 @@ namespace cicada
 	
 	// clear buffer!
 	std::fill(state, state + state_chunk_size, 0);
-
+	
 	return state_type(state);
       }
-    
+      
       const size_type chunk_pos = state_iterator & chunk_mask;
     
       if (chunk_pos == 0) {
@@ -100,10 +100,6 @@ namespace cicada
   
     void clear()
     {
-      state_set_type::iterator siter_end = states.end();
-      for (state_set_type::iterator siter = states.begin(); siter != siter_end; ++ siter)
-	allocator_type::deallocate(*siter, state_chunk_size);
-    
       states.clear();
       state_iterator = 0;
       cache = 0;
