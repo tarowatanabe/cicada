@@ -130,6 +130,8 @@ namespace cicada
     
     typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
 
+    typedef std::vector<id_type, std::allocator<id_type> > node_map_type;
+
     struct State
     {
       State() : fired(false) { uniques.set_empty_key(0); }
@@ -174,6 +176,9 @@ namespace cicada
 
 	node_states_coarse.clear();
 	node_states_coarse.reserve(graph_in.nodes.size() * cube_size_max);
+
+	node_maps.clear();
+	node_maps.reserve(graph_in.nodes.size() * cube_size_max);
 	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
@@ -307,6 +312,8 @@ namespace cicada
       for (int i = 0; i < candidate.j.size(); ++ i) {
 	const node_score_type& antecedent = states[candidate.in_edge->tails[i]].D[candidate.j[i]];
 	
+	// assign real-node-id!
+	candidate.out_edge.tails[i] = antecedent.node;
 	candidate.score *= antecedent.score;
       }
 
@@ -319,13 +326,22 @@ namespace cicada
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
 
-      if (candidate.node >= node_states.size())
-	node_states.resize(candidate.node + 1);
-      
-      if (node_states[candidate.node].empty())
-	node_states[candidate.node] = node_state;
-      else
-	model.deallocate(node_state);
+      if (is_goal) {
+	if (! graph_out.is_valid()) {
+	  node_maps.push_back(candidate.node);
+          node_states.push_back(node_state);
+	  
+          graph_out.goal = graph_out.add_node().id;
+        } else
+	  model.deallocate(node_state);
+	
+	candidate.node = graph_out.goal;
+      } else {
+	node_maps.push_back(candidate.node);
+        node_states.push_back(node_state);
+	
+	candidate.node = graph_out.add_node().id;
+      }
       
       state.buf.push(&candidate);
 
@@ -347,7 +363,7 @@ namespace cicada
       for (int i = 0; i < j.size(); ++ i) {
 	const node_score_type& antecedent = states[edge.tails[i]].D[j[i]];
 	
-	candidate.out_edge.tails[i] = antecedent.node;
+	candidate.out_edge.tails[i] = node_maps[antecedent.node];
 	candidate.score *= antecedent.score;
       }
       
@@ -355,23 +371,13 @@ namespace cicada
 
       feature_set_type estimates;
       const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, estimates, is_goal);
-
+      
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
-      
-      if (is_goal) {
-	if (! graph_out.is_valid()) {
-	  graph_out.goal = graph_out.add_node().id;
-	  node_states_coarse.push_back(node_state);
-	} else
-	  model.deallocate(node_state);
-	
-	candidate.node = graph_out.goal;
-      } else {
-	candidate.node = graph_out.add_node().id;
-	node_states_coarse.push_back(node_state);
-      }
+
+      candidate.node = node_states_coarse.size();
+      node_states_coarse.push_back(node_state);
       
       return &candidate;
     };
@@ -382,6 +388,8 @@ namespace cicada
     state_set_type      node_states;
     state_set_type      node_states_coarse;
     cand_state_set_type states;
+
+    node_map_type       node_maps;
     
     const model_type& model;
     const function_type& function;

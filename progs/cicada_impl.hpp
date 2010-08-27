@@ -774,7 +774,7 @@ public:
     hypergraph_type composed;
     
     if (debug)
-      std::cerr << "composition" << std::endl;
+      std::cerr << "composition: earley" << std::endl;
 
     utils::resource start;
 
@@ -835,7 +835,7 @@ public:
     hypergraph_type composed;
     
     if (debug)
-      std::cerr << "composition" << std::endl;
+      std::cerr << "composition: cky" << std::endl;
 
     utils::resource start;
 
