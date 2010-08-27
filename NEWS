@@ -1,1 +1,3 @@
 Implemented cube-pruning and cube-growing for faster rescoring
+
+Added cube-growing with order-based coarse heuristic (cube-coarse)
