@@ -476,7 +476,53 @@ namespace succinctdb
     }
 
   };
+  
+  
+  template <typename Key, typename Alloc, size_t KeySize>
+  struct __succinct_trie_mapped_index_impl
+  {
+    typedef utils::packed_vector_mapped<Key, Alloc> mapped_set_type;
+  };
+  
+  template <typename Key, typename Alloc>
+  struct __succinct_trie_mapped_index_impl<Key, Alloc, 1>
+  {
+    typedef utils::map_file<Key, Alloc> mapped_set_type;
+  };
+  
+  template <typename Key, typename Alloc>
+  struct __succinct_trie_mapped_index
+  {
+    typedef size_t                  size_type;
+    typedef ptrdiff_t               difference_type;
+    typedef boost::filesystem::path path_type;
+    typedef typename __succinct_trie_mapped_index_impl<Key, Alloc, sizeof(Key) >::mapped_set_type impl_type;
 
+    typedef typename impl_type::const_iterator const_iterator;
+    
+    __succinct_trie_mapped_index() {}
+    __succinct_trie_mapped_index(const path_type& path) : __impl(path) {}
+    
+    Key operator[](size_type pos) const { return __impl[pos]; }
+    
+    const_iterator begin() const { return __impl.begin(); }
+    const_iterator end() const { return __impl.end(); }
+    
+    void open(const path_type& path) { __impl.open(path); }
+    void clear() { __impl.clear(); }
+    void close() { __impl.close(); }
+    
+    bool empty() const { return __impl.empty(); }
+    size_type size() const { return __impl.size(); }
+    path_type path() const { return __impl.path(); }
+    
+    uint64_t size_bytes() const { return __impl.size_bytes(); }
+    uint64_t size_compressed() const { return __impl.size_compressed(); }
+    uint64_t size_cache() const { return __impl.size_cache(); }
+    
+    impl_type __impl;
+  };
+  
   template <typename Data, typename Alloc, bool Integral>
   struct __succinct_trie_mapped_data_impl {};
 
@@ -559,7 +605,8 @@ namespace succinctdb
     
     typedef utils::succinct_vector_mapped<bit_alloc_type> position_set_type;
     typedef utils::succinct_vector_mapped<bit_alloc_type> index_map_type;
-    typedef utils::map_file<key_type, key_alloc_type>     index_set_type;
+    //typedef utils::map_file<key_type, key_alloc_type>     index_set_type;
+    typedef __succinct_trie_mapped_index<key_type, key_alloc_type> index_set_type;
     //typedef utils::map_file<data_type, data_alloc_type>   mapped_set_type;
     typedef __succinct_trie_mapped_data<data_type, data_alloc_type> mapped_set_type;
 
@@ -717,6 +764,120 @@ namespace succinctdb
     mapped_set_type   mapped;
   };
 
+  template <typename Key, typename Alloc, size_t KeySize>
+  struct __succinct_trie_index_impl
+  {
+    typedef size_t                  size_type;
+    typedef ptrdiff_t               difference_type;
+    typedef boost::filesystem::path path_type;
+
+    typedef utils::packed_vector<Key, Alloc> mapped_set_type;
+    typedef utils::packed_sink<Key, Alloc>   mapped_sink_type;
+
+    typedef typename mapped_set_type::const_iterator const_iterator;
+    
+    __succinct_trie_index_impl() : __mapped() {}
+    
+    bool empty() const { return __mapped.empty(); }
+    size_type size() const { return __mapped.size(); }
+    
+    uint64_t size_bytes() const { return __mapped.size_bytes(); }
+    uint64_t size_compressed() const { return __mapped.size_compressed(); }
+    uint64_t size_cache() const { return __mapped.size_cache(); }
+    
+    void clear() { __mapped.clear(); }
+    
+    void write(const path_type& path) const { __mapped.write(path); }
+    
+    void push_back(const Key& x) { __mapped.push_back(x); }
+    void build() { __mapped.build(); }
+    
+    Key operator[](size_type pos) const { return __mapped[pos]; }
+    
+    const_iterator begin() const { return __mapped.begin(); }
+    const_iterator end() const { return __mapped.end(); }
+    
+    mapped_set_type __mapped;
+  };
+
+  template <typename Key, typename Alloc>
+  struct __succinct_trie_index_impl<Key,Alloc,1>
+  {
+    typedef size_t                  size_type;
+    typedef ptrdiff_t               difference_type;
+    typedef boost::filesystem::path path_type;
+
+    typedef std::vector<Key, Alloc>       mapped_set_type;
+    typedef boost::iostreams::file_sink   mapped_sink_type;
+
+    typedef typename mapped_set_type::const_iterator const_iterator;
+    
+    __succinct_trie_index_impl() : __mapped() {}
+    
+    bool empty() const { return __mapped.empty(); }
+    size_type size() const { return __mapped.size(); }
+    
+    uint64_t size_bytes() const { return __mapped.size() * sizeof(Key); }
+    uint64_t size_compressed() const { return __mapped.size() * sizeof(Key); }
+    uint64_t size_cache() const { return 0; }
+    
+    void clear() { __mapped.clear(); }
+    
+    void write(const path_type& path)  const
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::file_sink(path.file_string()), 1024 * 1024);
+      
+      const int64_t file_size = sizeof(Key) * __mapped.size();
+      for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)
+	if (! os.write(((char*) &(*__mapped.begin())) + offset, std::min(int64_t(1024 * 1024), file_size - offset)))
+	  throw std::runtime_error("succinct trie: write()");
+    }
+    
+    void push_back(const Key& x) { __mapped.push_back(x); }
+    void build() {}
+    
+    Key operator[](size_type pos) const { return __mapped[pos]; }
+    
+    const_iterator begin() const { return __mapped.begin(); }
+    const_iterator end() const { return __mapped.end(); }
+    
+    mapped_set_type __mapped;
+  };
+  
+
+  template <typename Key, typename Alloc>
+  struct __succinct_trie_index
+  {
+    typedef size_t                  size_type;
+    typedef ptrdiff_t               difference_type;
+    typedef boost::filesystem::path path_type;
+    typedef __succinct_trie_index_impl<Key, Alloc, sizeof(Key) >  impl_type;
+    typedef typename impl_type::mapped_sink_type  sink_type;
+
+    typedef typename impl_type::const_iterator const_iterator;
+    
+    __succinct_trie_index() : __impl() {}
+    
+    Key operator[](size_type pos) const { return __impl[pos]; }
+    const_iterator begin() const { return __impl.begin(); }
+    const_iterator end() const { return __impl.end(); }
+
+    void push_back(const Key& x) { __impl.push_back(x); }
+    void clear() { __impl.clear(); }
+    void build() { __impl.build(); }
+    
+    bool empty() const { return __impl.empty(); }
+    size_type size() const { return __impl.size(); }
+    
+    uint64_t size_bytes() const { return __impl.size_bytes(); }
+    uint64_t size_compressed() const { return __impl.size_compressed(); }
+    uint64_t size_cache() const { return __impl.size_cache(); }
+    
+    void write(const path_type& path) const { __impl.write(path); }
+    
+    impl_type __impl;
+  };
   
   template <typename Data, typename Alloc, bool Integral>
   struct __succinct_trie_data_impl {};
@@ -859,7 +1020,8 @@ namespace succinctdb
     
     typedef utils::succinct_vector<bit_alloc_type>  position_set_type;
     typedef utils::succinct_vector<bit_alloc_type>  index_map_type;
-    typedef std::vector<key_type, key_alloc_type>   index_set_type;
+    //typedef std::vector<key_type, key_alloc_type>   index_set_type;
+    typedef __succinct_trie_index<key_type, key_alloc_type> index_set_type;
     //typedef std::vector<data_type, data_alloc_type> mapped_set_type;
     typedef __succinct_trie_data<data_type, data_alloc_type> mapped_set_type;
     
@@ -977,23 +1139,8 @@ namespace succinctdb
       
       positions.write(rep.path("positions"));
       index_map.write(rep.path("index-map"));
-      dump_file(rep.path("index"), index);
-      //dump_file(rep.path("mapped"), mapped);
+      index.write(rep.path("index"));
       mapped.write(rep.path("mapped"));
-    }
-    
-  private:
-    template <typename _Path, typename _Data>
-    inline
-    void dump_file(const _Path& file, const _Data& data) const
-    {
-      boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::file_sink(file.native_file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
-      
-      const int64_t file_size = sizeof(typename _Data::value_type) * data.size();
-      for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)
-	if (! os.write(((char*) &(*data.begin())) + offset, std::min(int64_t(1024 * 1024), file_size - offset)))
-	  throw std::runtime_error("succinct trie: write()");
     }
     
     // build!
@@ -1066,7 +1213,7 @@ namespace succinctdb
       {
 	boost::iostreams::filtering_ostream os_index;
 	boost::iostreams::filtering_ostream os_mapped;
-	os_index.push(boost::iostreams::file_sink(rep.path("index").file_string()), 1024 * 1024);
+	os_index.push(typename index_set_type::sink_type(rep.path("index").file_string()), 1024 * 1024);
 	os_mapped.push(typename mapped_set_type::sink_type(rep.path("mapped").file_string()), 1024 * 1024);
 	
 	__push_back_stream<key_type, boost::iostreams::filtering_ostream> __index(os_index);
@@ -1106,7 +1253,7 @@ namespace succinctdb
       {
 	boost::iostreams::filtering_ostream os_index;
 	boost::iostreams::filtering_ostream os_mapped;
-	os_index.push(boost::iostreams::file_sink(rep.path("index").file_string()), 1024 * 1024);
+	os_index.push(typename index_set_type::sink_type(rep.path("index").file_string()), 1024 * 1024);
 	os_mapped.push(typename mapped_set_type::sink_type(rep.path("mapped").file_string()), 1024 * 1024);
 	
 	__push_back_stream<key_type, boost::iostreams::filtering_ostream> __index(os_index);
@@ -1141,6 +1288,7 @@ namespace succinctdb
       
       __build(first, last, extract_key, extract_data, __index, __mapped);
       
+      index.build();
       mapped.build();
     }
     
@@ -1152,6 +1300,7 @@ namespace succinctdb
       
       __build(first, last, extract_key, __index, __mapped);
       
+      index.build();
       mapped.build();
     }
     

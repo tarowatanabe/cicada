@@ -73,14 +73,13 @@ namespace cicada
     
     typedef boost::filesystem::path path_type;
 
-    typedef char key_type;
+    typedef char byte_type;
     typedef char mapped_type;
     
+    typedef std::allocator<std::pair<word_type::id_type, mapped_type> > rule_alloc_type;
     
-    typedef std::allocator<std::pair<key_type, mapped_type> > rule_alloc_type;
-    
-    typedef succinctdb::succinct_trie_database<key_type, mapped_type, rule_alloc_type > rule_db_type;
-    typedef succinctdb::succinct_hash_mapped<key_type, std::allocator<key_type> > phrase_db_type;
+    typedef succinctdb::succinct_trie_database<word_type::id_type, mapped_type, rule_alloc_type > rule_db_type;
+    typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > phrase_db_type;
 
     typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
 
@@ -227,6 +226,10 @@ namespace cicada
     
     size_type find(const word_type& word, size_type node) const
     {
+      const word_type::id_type id = vocab[word];
+      return rule_db.find(&id, 1, node);
+
+#if 0
       if (node == 0) {
 	const size_type cache_pos = hasher_type::operator()(word.id()) & (cache_find_root.size() - 1);
 	cache_find_root_type& cache = const_cast<cache_find_root_type&>(cache_find_root[cache_pos]);
@@ -252,6 +255,7 @@ namespace cicada
 	}
 	return cache.next;
       }
+#endif
     }
     
     template <typename Iterator>
@@ -284,7 +288,7 @@ namespace cicada
       
       std::pair<cache_rule_set_type::iterator, bool> result = cache.find(node);
       if (! result.second) {
-	typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
+	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
 	
 	rule_set_type& options = result.first->second;
 	options.clear();
@@ -372,7 +376,7 @@ namespace cicada
       cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
       if (cache.pos != pos) {
 	typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
-	typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
+	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
 	typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
 
 	code_set_type codes(phrase_db[pos].begin(), phrase_db[pos].end());
@@ -724,7 +728,7 @@ namespace cicada
     const parameter_type param(parameter);
     const path_type path = param.name();
 
-    typedef succinctdb::succinct_hash<key_type, std::allocator<key_type> > phrase_db_type;
+    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > phrase_db_type;
     
     typedef ScoreSetStream score_stream_type;
     typedef std::vector<score_stream_type, std::allocator<score_stream_type> > score_stream_set_type;
@@ -735,7 +739,9 @@ namespace cicada
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
     
-    typedef std::vector<key_type, std::allocator<key_type> >  code_set_type;
+    typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
+    
+    typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
     
     if (path != "-" && ! boost::filesystem::exists(path))
       throw std::runtime_error(std::string("no file? ") + path.file_string());
@@ -762,11 +768,13 @@ namespace cicada
     
     int feature_size = -1;
     
-    sequence_type source_index;
     sequence_type source_prev;
     sequence_type source;
     sequence_type target;
     rule_parsed_type rule;
+    
+    
+    id_set_type source_index;
     
     code_set_type codes_source;
     code_set_type codes_target;
@@ -854,8 +862,15 @@ namespace cicada
 	    codes_option.resize(citer - codes_option.begin());
 	  }
 	   
-	  // encode source.. we will use index-stripped indexing!
+	  // encode source.....
 	  {
+	    source_index.clear();
+	    sequence_type::const_iterator siter_begin = source_prev.begin();
+	    sequence_type::const_iterator siter_end = source_prev.end();
+	    for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	      source_index.push_back(siter->non_terminal().id());
+	    
+#if 0
 	    codes_source.resize(source_prev.size() * 8);
 	     
 	    code_set_type::iterator citer = codes_source.begin();
@@ -865,10 +880,12 @@ namespace cicada
 	    for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	      citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
 	    codes_source.resize(citer - codes_source.begin());
+#endif
 	  }
 
 	  // insert...
-	  rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
+	  //rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
+	  rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
 	}
 
 	rule_options.clear();
@@ -980,6 +997,12 @@ namespace cicada
 	   
       // encode source.. we will use index-stripped indexing!
       {
+	source_index.clear();
+	sequence_type::const_iterator siter_begin = source_prev.begin();
+	sequence_type::const_iterator siter_end = source_prev.end();
+	for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	  source_index.push_back(siter->non_terminal().id());
+#if 0
 	codes_source.resize(source_prev.size() * 8);
 	     
 	code_set_type::iterator citer = codes_source.begin();
@@ -989,10 +1012,12 @@ namespace cicada
 	for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	  citer += utils::byte_aligned_encode(siter->non_terminal().id(), &(*citer));
 	codes_source.resize(citer - codes_source.begin());
+#endif
       }
 
       // insert...
-      rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
+      //rule_db.insert(&(*codes_source.begin()), codes_source.size(), &(*codes_option.begin()), codes_option.size());
+      rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
     }
 
     // source phrases...

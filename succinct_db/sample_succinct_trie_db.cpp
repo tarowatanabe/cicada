@@ -139,4 +139,53 @@ int main(int argc, char** argv)
     }
     
   }
+
+  std::cerr << "integer" << std::endl;
+  
+  for (int i = 0; i < 4; ++ i) {
+    typedef succinctdb::succinct_trie_db<int, double> succinct_db_type;
+    typedef std::multimap<int, double> map_db_type;
+    
+    succinct_db_type succinct_db("tmptmp.db.fixed", succinct_db_type::WRITE);
+    map_db_type      map_db;
+    
+    for (int i = 0; i < 1024 * 16; ++ i) {
+      const int value = random();
+      const double value_double = double(random()) /  random();
+      
+      map_db.insert(std::make_pair(value, value_double));
+
+      const size_t size = succinct_db.insert(&value, 1, &value_double);
+      if (size + 1 != map_db.size())
+	std::cerr << "differentn size...?" << std::endl;
+    }
+    
+    succinct_db.close();
+    succinct_db.open("tmptmp.db.fixed", succinct_db_type::READ);
+
+    std::cerr << "db size: " << succinct_db.size() << std::endl;
+    
+    for (map_db_type::const_iterator iter = map_db.begin(); iter != map_db.end(); ++ iter) {
+      
+      const succinct_db_type::size_type node_pos = succinct_db.find(&iter->first, 1);
+
+      if (! succinct_db.is_valid(node_pos))
+	std::cerr << "out of range..?" << std::endl;
+      
+      if (! succinct_db.exists(node_pos))
+	std::cerr << "NO KEY FOUND?" << std::endl;
+      else {
+	
+	bool found = false;
+	for (succinct_db_type::const_cursor citer = succinct_db.cbegin(node_pos); citer != succinct_db.cend(); ++ citer)
+	  if (*citer == iter->second)
+	    found = true;
+	if (! found)
+	  std::cerr << "no data?" << std::endl;
+      }
+	
+    }
+  }
+
+
 }
