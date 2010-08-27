@@ -100,6 +100,10 @@ namespace cicada
   
     void clear()
     {
+      state_set_type::iterator siter_end = states.end();
+      for (state_set_type::iterator siter = states.begin(); siter != siter_end; ++ siter)
+	allocator_type::deallocate(*siter, state_chunk_size);
+    
       states.clear();
       state_iterator = 0;
       cache = 0;
