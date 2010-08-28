@@ -6,6 +6,10 @@ Do we allow state-less features applied during composition???
 	State-less features are sometimes related to composition algorithm,
 	such as shift-reduce etc.
 
+Support tree-to-tree transduction:
+	We need different ids for target side's lhs. Do we preserve in rule-struct?
+	What is the format for tree-fragment? use lisp-like struct?
+
 Better MIRA training
 
 Support other metrics (at least for sentence-based scoring)

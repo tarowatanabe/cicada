@@ -20,7 +20,7 @@
 namespace cicada
 {
   
-  // faith full implementation of 
+  // implementation of 
   //
   // @InProceedings{huang-chiang:2007:ACLMain,
   //  author    = {Huang, Liang  and  Chiang, David},

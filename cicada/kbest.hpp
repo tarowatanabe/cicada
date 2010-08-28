@@ -212,10 +212,6 @@ namespace cicada
 	add_next = false;
 	
 	if (! cand.empty()) {
-	  //std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
-	  //const derivation_type* derivation = cand.back();
-	  //cand.pop_back();
-
 	  const derivation_type* derivation = cand.top();
 	  cand.pop();
 	  
@@ -265,9 +261,6 @@ namespace cicada
 	    const derivation_type* derivation_new = make_derivation(*(derivation.edge), j);
 	    
 	    if (derivation_new) {
-	      //state.cand.push_back(derivation_new);
-	      //std::push_heap(state.cand.begin(), state.cand.end(), compare_heap_type());
-
 	      state.cand.push(derivation_new);
 	      state.uniques.insert(derivation_new);
 	    }
@@ -318,12 +311,8 @@ namespace cicada
 	if (! derivation)
 	  throw std::runtime_error("no derivation?");
 	
-	//state.cand.push_back(derivation);
 	state.cand.push(derivation);
       }
-            
-      // heapify
-      //std::make_heap(state.cand.begin(), state.cand.end(), compare_heap_type());
       
       return state;
     }

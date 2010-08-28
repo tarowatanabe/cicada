@@ -43,11 +43,13 @@ namespace cicada
     {
       vocab.clear();
       clusters.clear();
+      file.clear();
     }
     void close() { clear(); }
     
     void open(const path_type& path);
     void write(const path_type& path) const;
+    const path_type& path() const { return file; }
     
     symbol_type operator[](const symbol_type& word) const
     {
@@ -76,6 +78,7 @@ namespace cicada
   private:
     vocab_type       vocab;
     cluster_set_type clusters;
+    path_type        file;
   };
 };
 

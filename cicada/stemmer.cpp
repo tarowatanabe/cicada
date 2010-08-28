@@ -74,8 +74,10 @@ namespace cicada
       const std::string name = "prefix:" + boost::lexical_cast<std::string>(size);
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
-      if (iter == stemmers_map.end())
+      if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Prefix(size)))).first;
+	iter->second->__algorithm = parameter;
+      }
       
       return *(iter->second);
     } else if (param.name() == "suffix") {
@@ -93,26 +95,30 @@ namespace cicada
       const std::string name = "suffix:" + boost::lexical_cast<std::string>(size);
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
-      if (iter == stemmers_map.end())
+      if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Suffix(size)))).first;
+	iter->second->__algorithm = parameter;
+      }
       
       return *(iter->second);
     } else if (param.name() == "digit" || param.name() == "digits") {
-
       const std::string name("digit");
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
-      if (iter == stemmers_map.end())
+      if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Digit()))).first;
+	iter->second->__algorithm = parameter;
+      }
       
       return *(iter->second);
     } else if (param.name() == "latin") {
-
       const std::string name("latin");
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
-      if (iter == stemmers_map.end())
+      if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Latin()))).first;
+	iter->second->__algorithm = parameter;
+      }
       
       return *(iter->second);
     } else

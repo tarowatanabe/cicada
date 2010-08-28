@@ -26,12 +26,16 @@ namespace cicada
   public:
     Stemmer() {}
     virtual ~Stemmer() {}
-
+    
   public:
     static Stemmer& create(const std::string& parameter);
     
   public:
     virtual symbol_type operator[](const symbol_type& x) const = 0;
+    const std::stirng& algorithm() const { return __algorithm; }
+
+  private:
+    std::string __algorithm;
   };
 };
 

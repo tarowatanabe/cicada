@@ -16,6 +16,10 @@ namespace cicada
   {
     typedef boost::tokenizer<utils::space_separator> tokenizer_type;
     typedef utils::repository repository_type;
+
+    clear();
+
+    file = path;
     
     if (boost::filesystem::is_directory(path)) {
       repository_type rep(path, repository_type::read);

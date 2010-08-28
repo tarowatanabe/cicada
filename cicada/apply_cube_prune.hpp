@@ -21,7 +21,7 @@
 namespace cicada
 {
   
-  // faith full implementation of 
+  // implementation of 
   //
   // @InProceedings{huang-chiang:2007:ACLMain,
   //  author    = {Huang, Liang  and  Chiang, David},
@@ -216,15 +216,9 @@ namespace cicada
 	
 	const candidate_type* item = make_candidate(edge, j, graph_out, is_goal);
 	
-	//cand.push_back(item);
 	cand.push(item);
 	cand_unique.insert(item);
       }
-      
-      //std::cerr << "heapify" << std::endl;
-      
-      // heapify
-      //std::make_heap(cand.begin(), cand.end(), compare_heap_type());
       
       //std::cerr << "perform cube-prune" << std::endl;
       
@@ -233,11 +227,6 @@ namespace cicada
       
       for (size_type num_pop = 0; !cand.empty() && num_pop != cube_size_max; ++ num_pop) {
 	// pop-best...
-
-	//std::pop_heap(cand.begin(), cand.end(), compare_heap_type());
-	//const candidate_type* item = cand.back();
-	//cand.pop_back();
-
 	const candidate_type* item = cand.top();
 	cand.pop();
 	
@@ -356,12 +345,9 @@ namespace cicada
 	    // new candidate...
 	    const candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
 	    
-	    //cand.push_back(candidate_new);
-	    //std::push_heap(cand.begin(), cand.end(), compare_heap_type());
-	    
 	    cand.push(candidate_new);
-
 	    candidates_unique.insert(candidate_new);
+	    
 	    ++ inserted;
 	    
 	    break;
