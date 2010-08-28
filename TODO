@@ -1,3 +1,11 @@
+Do we allow state-less features applied during composition???
+	We need composition-based features for phrase-based MT
+	to compute distortion/lexicalized reordering etc. not represented in
+	hypergraph struct
+
+	State-less features are sometimes related to composition algorithm,
+	such as shift-reduce etc.
+
 Better MIRA training
 
 Support other metrics (at least for sentence-based scoring)
