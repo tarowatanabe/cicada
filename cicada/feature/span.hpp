@@ -57,8 +57,9 @@ namespace cicada
 				const bool final) const;
       virtual void initialize();
 
-      virtual void assign(const hypergraph_type& hypergraph);
-      virtual void assign(const span_set_type& spans);
+      virtual void assign(const hypergraph_type& hypergraph,
+			  const lattice_type& lattice,
+			  const span_set_type& spans);
 
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Span(*this)); }
       

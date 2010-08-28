@@ -178,25 +178,13 @@ namespace cicada
 	(*iter)->apply_feature() = mode;
     }
     
-    void assign(const hypergraph_type& hypergraph)
+    void assign(const hypergraph_type& hypergraph,
+		const lattice_type& lattice,
+		const span_set_type& spans)
     {
       model_set_type::iterator iter_end = models.end();
       for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
-	(*iter)->assign(hypergraph);
-    }
-    
-    void assign(const lattice_type& lattice)
-    {
-      model_set_type::iterator iter_end = models.end();
-      for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
-	(*iter)->assign(lattice);
-    }
-    
-    void assign(const span_set_type& spans)
-    {
-      model_set_type::iterator iter_end = models.end();
-      for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
-	(*iter)->assign(spans);
+	(*iter)->assign(hypergraph, lattice, spans);
     }
     
     Model clone() const

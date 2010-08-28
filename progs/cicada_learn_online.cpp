@@ -380,9 +380,7 @@ struct Task
     cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
     if (! model_sparse.empty()) {
-      model_sparse.assign(modified);
-      model_sparse.assign(lattice);
-      model_sparse.assign(spans);
+      model_sparse.assign(modified, lattice, spans);
       
       model_sparse.apply_feature(true);
       

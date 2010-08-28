@@ -933,18 +933,16 @@ public:
     model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
     
     // assignment...
-    __model.assign(hypergraph);
-    __model.assign(lattice);
-    __model.assign(spans);
+    __model.assign(hypergraph,lattice, spans);
     
-    if (debug)
-      std::cerr << "apply features: " << (exact ? "exact" : (grow ? "grow" : "prune")) << std::endl;
-
     if (forced)
       __model.apply_feature(true);
     
     weight_set_type weights_zero;
     const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
+    
+    if (debug)
+      std::cerr << "apply features: " << (exact ? "exact" : (grow ? "grow" : "prune")) << std::endl;
     
     utils::resource start;
     
@@ -964,9 +962,8 @@ public:
     }
     
     utils::resource end;
-
+    
     __model.apply_feature(false);
-	
     
     if (debug)
       std::cerr << "apply cpu time: " << (end.cpu_time() - start.cpu_time())

@@ -201,7 +201,9 @@ namespace cicada
       }
       
       
-      void assign(const hypergraph_type& hypergraph)
+      void assign(const hypergraph_type& hypergraph,
+		  const lattice_type& lattice,
+		  const span_set_type& spans)
       {
 	spans_node.clear();
 	spans_node.reserve(hypergraph.nodes.size());
@@ -210,17 +212,12 @@ namespace cicada
 	cicada::span_node(hypergraph, spans_node);
 	
 	const span_node_type& span_goal = spans_node[hypergraph.goal];
-
-	label_chart.clear();
 	
+	label_chart.clear();
 	label_chart.reserve(span_goal.second + 1);
 	label_chart.resize(span_goal.second + 1);
-      }
-
-      void assign(const span_set_type& spans)
-      {
-	label_map.clear();
 	
+	label_map.clear();
 	span_set_type::const_iterator siter_end = spans.end();
 	for (span_set_type::const_iterator siter = spans.begin(); siter != siter_end; ++ siter)
 	  if (! siter->label.empty())

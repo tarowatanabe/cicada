@@ -95,9 +95,9 @@ namespace cicada
     
     // You can collect additional data, if necessary.
     // This will be called before feature application.
-    virtual void assign(const hypergraph_type& hypergraph) {} // hypergraph before feature application
-    virtual void assign(const lattice_type& lattice) {}       // input-lattice (may be empty)
-    virtual void assign(const span_set_type& spans) {}        // input-spans (may be empty)
+    virtual void assign(const hypergraph_type& hypergraph,
+			const lattice_type& lattice,
+			const span_set_type& spans) {}
     
     size_type state_size() const { return __state_size; }
     const feature_type& feature_name() const { return __feature_name; }
