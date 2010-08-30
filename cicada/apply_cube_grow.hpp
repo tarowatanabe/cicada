@@ -282,7 +282,7 @@ namespace cicada
       }
       
       // push cand
-      const candidate_type* item = make_candidate(edge, j, graph.goal == edge.head, graph_out);
+      const candidate_type* item = make_candidate(edge, j, state, graph.goal == edge.head, graph_out);
       
       state.uniques.insert(item);
       state.cand.push(item);
@@ -374,7 +374,7 @@ namespace cicada
       state.buf.push(&candidate);
     }
     
-    const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const bool is_goal, hypergraph_type& graph_out)
+    const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, cand_state_type& state, const bool is_goal, hypergraph_type& graph_out)
     {
       candidates.push_back(candidate_type(edge, j));
       

@@ -29,6 +29,7 @@ namespace cicada
       typedef cicada::Sentence sentence_type;
 
       typedef cicada::HyperGraph hypergraph_type;
+      typedef cicada::Lattice    lattice_type;
       typedef cicada::SpanVector span_set_type;
       
       typedef cicada::FeatureFunction feature_function_type;
@@ -303,14 +304,11 @@ namespace cicada
     {
     }
 
-    void Span::assign(const hypergraph_type& hypergraph)
+    void Span::assign(const hypergraph_type& hypergraph,
+		      const lattice_type& lattice,
+		      const span_set_type& spans)
     {
-      pimpl->assign(hypergraph);
-    }
-
-    void Span::assign(const span_set_type& spans)
-    {
-      pimpl->assign(spans);
+      pimpl->assign(hypergraph, lattice, spans);
     }
 
     void Span::initialize()
