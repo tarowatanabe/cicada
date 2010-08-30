@@ -48,7 +48,9 @@ namespace cicada
       typedef char  value_type;
       typedef char* pointer;
       
+    private:
       State(value_type* __base) : base(__base) {}
+    public:
       State() : base(0) {}
 
       bool empty() const { return base == 0; }

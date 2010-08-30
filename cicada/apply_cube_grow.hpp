@@ -399,7 +399,11 @@ namespace cicada
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
-
+      
+      // no state merging...
+      //candidate.node = node_states_coarse.size();
+      //node_states_coarse.push_back(node_state);
+      
       // state merging... so that we may reuse state structure
       state_node_map_type::iterator siter = state.nodes_coarse.find(node_state);
       if (siter == state.nodes_coarse.end()) {
