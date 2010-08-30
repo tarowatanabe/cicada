@@ -422,9 +422,9 @@ namespace cicada
       typedef __ParentImpl<__parent_extract_target> parent_target_type;
       
       if (dynamic_cast<const parent_source_type*>(x.pimpl))
-	pimpl = new parent_source_type();
+	pimpl = new parent_source_type(*dynamic_cast<const parent_source_type*>(x.pimpl));
       else
-	pimpl = new parent_target_type();
+	pimpl = new parent_target_type(*dynamic_cast<const parent_target_type*>(x.pimpl));
     }
     
     Parent& Parent::operator=(const Parent& x)
@@ -437,9 +437,9 @@ namespace cicada
       std::auto_ptr<impl_type> tmp(pimpl);
       
       if (dynamic_cast<const parent_source_type*>(x.pimpl))
-	pimpl = new parent_source_type();
+	pimpl = new parent_source_type(*dynamic_cast<const parent_source_type*>(x.pimpl));
       else
-	pimpl = new parent_target_type();
+	pimpl = new parent_target_type(*dynamic_cast<const parent_target_type*>(x.pimpl));
       
       return *this;
     }

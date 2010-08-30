@@ -434,9 +434,9 @@ namespace cicada
       typedef __NGramTreeImpl<__ngram_tree_extract_target> ngram_tree_target_type;
       
       if (dynamic_cast<const ngram_tree_source_type*>(x.pimpl))
-	pimpl = new ngram_tree_source_type();
+	pimpl = new ngram_tree_source_type(*dynamic_cast<const ngram_tree_source_type*>(x.pimpl));
       else
-	pimpl = new ngram_tree_target_type();
+	pimpl = new ngram_tree_target_type(*dynamic_cast<const ngram_tree_target_type*>(x.pimpl));
     }
     
     NGramTree& NGramTree::operator=(const NGramTree& x)
@@ -449,11 +449,9 @@ namespace cicada
       std::auto_ptr<impl_type> tmp(pimpl);
       
       if (dynamic_cast<const ngram_tree_source_type*>(x.pimpl))
-	pimpl = new ngram_tree_source_type();
+	pimpl = new ngram_tree_source_type(*dynamic_cast<const ngram_tree_source_type*>(x.pimpl));
       else
-	pimpl = new ngram_tree_target_type();
-      
-      return *this;
+	pimpl = new ngram_tree_target_type(*dynamic_cast<const ngram_tree_target_type*>(x.pimpl));
     }
 
 

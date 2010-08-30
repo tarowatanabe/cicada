@@ -494,9 +494,9 @@ namespace cicada
       typedef __NeighboursImpl<__neighbours_extract_target> neighbours_target_type;
       
       if (dynamic_cast<const neighbours_source_type*>(x.pimpl))
-	pimpl = new neighbours_source_type();
+	pimpl = new neighbours_source_type(*dynamic_cast<const neighbours_source_type*>(x.pimpl));
       else
-	pimpl = new neighbours_target_type();
+	pimpl = new neighbours_target_type(*dynamic_cast<const neighbours_target_type*>(x.pimpl));
     }
     
     Neighbours& Neighbours::operator=(const Neighbours& x)
@@ -509,9 +509,9 @@ namespace cicada
       std::auto_ptr<impl_type> tmp(pimpl);
       
       if (dynamic_cast<const neighbours_source_type*>(x.pimpl))
-	pimpl = new neighbours_source_type();
+	pimpl = new neighbours_source_type(*dynamic_cast<const neighbours_source_type*>(x.pimpl));
       else
-	pimpl = new neighbours_target_type();
+	pimpl = new neighbours_target_type(*dynamic_cast<const neighbours_target_type*>(x.pimpl));
       
       return *this;
     }

@@ -397,9 +397,9 @@ namespace cicada
       typedef __AntecedentImpl<__antecedent_extract_target> antecedent_target_type;
       
       if (dynamic_cast<const antecedent_source_type*>(x.pimpl))
-	pimpl = new antecedent_source_type();
+	pimpl = new antecedent_source_type(*dynamic_cast<const antecedent_source_type*>(x.pimpl));
       else
-	pimpl = new antecedent_target_type();
+	pimpl = new antecedent_target_type(*dynamic_cast<const antecedent_target_type*>(x.pimpl));
     }
     
     Antecedent& Antecedent::operator=(const Antecedent& x)
@@ -412,9 +412,9 @@ namespace cicada
       std::auto_ptr<impl_type> tmp(pimpl);
       
       if (dynamic_cast<const antecedent_source_type*>(x.pimpl))
-	pimpl = new antecedent_source_type();
+	pimpl = new antecedent_source_type(*dynamic_cast<const antecedent_source_type*>(x.pimpl));
       else
-	pimpl = new antecedent_target_type();
+	pimpl = new antecedent_target_type(*dynamic_cast<const antecedent_target_type*>(x.pimpl));
       
       return *this;
     }
