@@ -1,3 +1,6 @@
+
+#include <algorithm>
+
 #include "ter.hpp"
 
 #include <google/dense_hash_set>
@@ -79,6 +82,18 @@ namespace cicada
 	: ref(__ref) { words_unique.set_empty_key(word_type()); words_unique.insert(__ref.begin(), __ref.end()); }
 
       
+
+      
+      value_type operator()(const sentence_type& sentence)
+      {
+	
+	
+	
+	
+      }
+
+    private:
+      
       double edit_distance(const sentence_type& hyp, const sentence_type& ref, path_type& path)
       {
 	typedef utils::vector2<transition_type, std::allocator<transition_type> > matrix_transition_type;
@@ -119,17 +134,30 @@ namespace cicada
 	  }
 	}
 
+	path.clear();
+	int i = hyp.size();
+	int j = ref.size();
+	while (i > 0 || j > 0) {
+	  if (j == 0) {
+	    -- i;
+	    path.push_back(trans_ins);
+	  } else if (i == 0) {
+	    -- j;
+	    path.push_back(trans_del);
+	  } else {
+	    const transition_type t = trans(i, j);
+	    path.push_back(t);
+	    switch (t) {
+	    case trans_sub: case trans_mat: -- i; -- j; break;
+	    case trans_ins: -- i; break;
+	    case trans_del: -- j; break;
+	    }
+	  }
+	}
 	
+	std::reverse(path.begin(), path.end());
 	
-      }
-
-      
-      value_type operator()(const sentence_type& sentence)
-      {
-	
-	
-	
-	
+	return costs(hyp.size(), ref.size());
       }
       
     private:
