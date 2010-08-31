@@ -32,11 +32,14 @@ libcicada_semiring_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_eval_HEADERS = \
 eval/bleu.hpp \
-eval/score.hpp 
+eval/score.hpp \
+eval/ter.hpp \
+eval/wer.hpp
 
 libcicada_eval_la_SOURCES = \
 eval/score.cpp \
-eval/ter.cpp
+eval/ter.cpp \
+eval/wer.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_optimize_HEADERS = \

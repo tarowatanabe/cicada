@@ -5,5 +5,7 @@
 
 #include <cicada/eval/score.hpp>
 #include <cicada/eval/bleu.hpp>
+#include <cicada/eval/ter.hpp>
+#include <cicada/eval/wer.hpp>
 
 #endif
