@@ -74,7 +74,7 @@ namespace cicada
 	  curr[0].deletion = prev[0].deletion + cost_del;
 	  
 	  for (size_t j = 1; j <= b_size; ++ j) {
-	    const double subst = (a[i - 1] == b[j - 1] ? 0.0 : cost_sub);
+	    const double subst = cost_sub * (a[i - 1] != b[j - 1]);
 	    
 	    const double score_del = prev[j].score     + cost_del;
 	    const double score_ins = curr[j - 1].score + cost_ins;

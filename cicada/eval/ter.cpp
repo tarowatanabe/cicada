@@ -3,6 +3,7 @@
 #include <google/dense_hash_set>
 
 #include <boost/functional/hash.hpp>
+#include <utils/vector2.hpp>
 
 namespace cicada
 {
@@ -50,11 +51,77 @@ namespace cicada
 	Score() : score(), insertion(0), deletion(0), substitution(0), shift(0) {}
       };
 
+      struct Shift
+      {
+	Shift() : begin(0), end(0), moveto(0) {}
+	Shift(const int __begin, const int __end, const int __moveto)
+	  : begin(__begin), end(__end), moveto(__moveto) {}
+
+	int begin;
+	int end;
+	int moveto;
+      };
+
+      enum transition_type {
+	trans_mat,
+	trans_sub,
+	trans_ins,
+	trans_del,
+      };
+      
       typedef Score value_type;
+      typedef Shift shift_type;
+
+      typedef std::vector<transition_type, std::allocator<transition_type> > path_type;
       
       TERScorerImpl() { words_unique.set_empty_key(word_type()); }
       TERScorerImpl(const sentence_type& __ref)
 	: ref(__ref) { words_unique.set_empty_key(word_type()); words_unique.insert(__ref.begin(), __ref.end()); }
+
+      
+      double edit_distance(const sentence_type& hyp, const sentence_type& ref, path_type& path)
+      {
+	typedef utils::vector2<transition_type, std::allocator<transition_type> > matrix_transition_type;
+	typedef utils::vector2<double, std::allocator<double> > matrix_cost_type;
+
+	matrix_transition_type trans(hyp.size() + 1, ref.size() + 1, trans_mat);
+	matrix_cost_type       costs(hyp.size() + 1, ref.size() + 1, 0.0);
+	
+	for (int i = 0; i <= hyp.size(); ++ i)
+	  costs(i, 0) = i;
+	for (int j = 0; j <= ref.size(); ++ j)
+	  costs(0, j) = j;
+	
+	for (int i = 1; i <= hyp.size(); ++ i) {
+	  
+	  for (int j = 1; j <= ref.size(); ++ j) {
+	    double&          cur_cost = costs(i, j);
+	    transition_type& cur_tran = trans(i, j);
+	    
+	    if (hyp[i - 1] == ref[j - 1]) {
+	      cur_cost = costs(i - 1, j - 1);
+	      cur_tran = trans_mat;
+	    } else {
+	      cur_cost = costs(i - 1, j - 1) + cost_sub;
+	      cur_tran = trans_sub;
+	    }
+	    
+	    const double ins = costs(i - 1, j) + cost_ins;
+	    if (cur_cost > ins) {
+	      cur_cost = ins;
+	      cur_tran = trans_ins;
+	    }
+	    const double del = costs(i, j - 1) + cost_del;
+	    if (cur_cost > del) {
+	      cur_cost = del;
+	      cur_tran = trans_del;
+	    }
+	  }
+	}
+
+	
+	
+      }
 
       
       value_type operator()(const sentence_type& sentence)
