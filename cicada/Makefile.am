@@ -35,7 +35,8 @@ eval/bleu.hpp \
 eval/score.hpp 
 
 libcicada_eval_la_SOURCES = \
-eval/score.cpp
+eval/score.cpp \
+eval/ter.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_optimize_HEADERS = \

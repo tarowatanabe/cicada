@@ -61,14 +61,14 @@ namespace cicada
     
   public:
     // feature application 
-    // state:  is the result of application (concequence)
-    // states: are the states from antecedents
+    // state:  is the result of application (concequence). You should assign new state.
+    // states: are the states from antecedents. You can access the i-th antecedent state by edge.tail[i]
     // edge:   is the current edge (tails will be the tails of new graph, head is the head of old graph)
     //         acces only (*edge.rule) if you are not sure...
     // features: accumulated features.
     //           You should assign by features[feature-name] = score (see feature/ngram.cc), not like features[feature-name] += score
-    //           since "apply" can be applied many times for the same edge...
-    // estiamtes: upper bound estiamtes
+    //           since "apply" can be applied multiple times for the same edge depending on the algorithms
+    // estiamtes: upper bound estiamates
     // final:     final flag indicating that the edge's head is goal
     virtual void apply(state_ptr_type& state,
 		       const state_ptr_set_type& states,
@@ -116,7 +116,7 @@ namespace cicada
     // the state size used by the feature function. Zero implies state-less. Must be fixed value
     size_type    __state_size;   
     
-    // name of the feature. It is used to distinguish feature-functions
+    // name of the feature. You should assign unique name. It is used to distinguish feature-functions especially when create()
     feature_type __feature_name; 
     
     // whether this is a sparse "binary" feature or not
