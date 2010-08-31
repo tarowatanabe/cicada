@@ -4,7 +4,9 @@
 #define __CICADA__EVAL__HPP__ 1
 
 #include <cicada/eval/score.hpp>
+
 #include <cicada/eval/bleu.hpp>
+#include <cicada/eval/per.hpp>
 #include <cicada/eval/ter.hpp>
 #include <cicada/eval/wer.hpp>
 
