@@ -25,6 +25,9 @@ namespace cicada
     const double TERScorerConstant::cost_sub = 1.0;
     const double TERScorerConstant::cost_shi = 1.0;
 
+    
+    
+    // Do we really implement this...???
     class TERScorerImpl : public TERScorerConstant
     {
     private:

@@ -60,13 +60,12 @@ namespace cicada
     {
       static const char* desc = "\
 bleu:\n\
-\torder=<order, default=4>\n\
-\texact=[true|false]\n\
-\tsplit=[true|false]\n\
+\torder=<order, default=4> ngram order\n\
+\tsplit=[true|false] perform character splitting\n\
 per:\n\
-\tsplit=[true|false]\n\
+\tsplit=[true|false] perform character splitting\n\
 wer:\n\
-\tsplit=[true|false]\n\
+\tsplit=[true|false] perform character splitting\n\
 ";
 
       return desc;
