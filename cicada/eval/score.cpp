@@ -1,5 +1,7 @@
 
 #include "eval/score.hpp"
+#include "eval/per.hpp"
+#include "eval/wer.hpp"
 #include "eval/bleu.hpp"
 
 #include "parameter.hpp"
@@ -56,13 +58,24 @@ namespace cicada
 
     std::string Scorer::lists()
     {
-      return "bleu,order=<order, default=4>,exact=[true|false],split=[true|false]\n";
+      static const char* desc = "\
+bleu:\n\
+\torder=<order, default=4>\n\
+\texact=[true|false]\n\
+\tsplit=[true|false]\n\
+per:\n\
+\tsplit=[true|false]\n\
+wer:\n\
+\tsplit=[true|false]\n\
+";
+
+      return desc;
     }
     
     Scorer::scorer_ptr_type Scorer::create(const std::string& parameter)
     {
       typedef cicada::Parameter parameter_type;
-
+      
       const parameter_type param(parameter);
       
       if (param.name() == "bleu" || param.name() == "bleu-linear") {
@@ -81,7 +94,29 @@ namespace cicada
 	    std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
-	return scorer_ptr_type(new BleuScorer(order));
+	return scorer_ptr_type(new BleuScorer(order, split));
+      } else if (param.name() == "per") {
+	bool split = false;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "split") == 0)
+	    split = utils::lexical_cast<bool>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	return scorer_ptr_type(new PERScorer(split));
+      } else if (param.name() == "wer") {
+	bool split = false;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "split") == 0)
+	    split = utils::lexical_cast<bool>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	return scorer_ptr_type(new WERScorer(split));
       } else
 	throw std::runtime_error("unknown scorer" + param.name());
       
