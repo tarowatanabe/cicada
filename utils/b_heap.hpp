@@ -13,7 +13,7 @@ namespace utils
   
   // priority_queue like interface...
   template <typename _Tp, typename _Sequence=std::vector<_Tp>, typename _Compare=std::less<typename _Sequence::value_type>, size_t _PageSize=8 >
-  class b_heap
+  class b_heap : public _Compare
   {
   public:
     typedef typename _Sequence::value_type                value_type;
@@ -27,13 +27,12 @@ namespace utils
     
   protected:
     _Sequence c;
-    _Compare  comp;
     
   public:
     b_heap(size_type x) : c(x + 1) { clear(); }
     b_heap() { c.push_back(value_type()); }
-    b_heap(size_type x, const _Compare& __comp) : c(x + 1), comp(__comp) { clear(); }
-    b_heap(const _Compare& __comp) : comp(__comp) { c.push_back(value_type()); }
+    b_heap(size_type x, const _Compare& __comp) : _Compare(__comp), c(x + 1) { clear(); }
+    b_heap(const _Compare& __comp) : _Compare(__comp) { c.push_back(value_type()); }
     
     bool empty() const { return c.size() == 1; }
     size_type size() const { return c.size() - 1; }
@@ -75,7 +74,7 @@ namespace utils
     {
       while (not_leaf(index)) {
 	size_type max_child_index = max_child(index);
-	if (! comp(c[max_child_index], c[index])) {
+	if (! _Compare::operator()(c[max_child_index], c[index])) {
 	  std::swap(c[max_child_index], c[index]);
 	  index = max_child_index;
 	} else
@@ -88,7 +87,7 @@ namespace utils
       while (index != 1) {
 	size_type parent = parent_index(index);
 	
-	if (comp(c[parent], c[index])) {
+	if (_Compare::operator()(c[parent], c[index])) {
 	  std::swap(c[parent], c[index]);
 	  index = parent;
 	} else
@@ -110,7 +109,7 @@ namespace utils
       const_iterator min_element = std::max_element(c.begin() + first_index,
 						    std::min(c.begin() + end_index,
 							     c.end()),
-						    comp);
+						    static_cast<const _Compare&>(*this));
       return min_element - c.begin();
     }
     
