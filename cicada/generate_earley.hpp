@@ -85,15 +85,6 @@ namespace cicada
     };
 
     typedef utils::chunk_vector<grammar_node_type, 4096 / sizeof(grammar_node_type), std::allocator<grammar_node_type> > grammar_node_set_type;
-
-    // we can uniquely identify parsed phrases by transducer_id_type
-    // Thus, we have only to keep first/last information...
-    // Any idea to keep-track of generated items?
-    // use of another trie to keep generated phrases...
-    
-    typedef utils::compact_trie<symbol_type, id_type, boost::hash<symbol_type>,  std::equal_to<symbol_type>,
-				std::allocator<std::pair<const symbol_type, id_type> > > terminal_trie_type;
-    typedef terminal_trie_type::id_type terminal_id_type;
     
     struct Edge
     {
@@ -101,10 +92,6 @@ namespace cicada
       
       symbol_type lhs; // lhs of rule
       const grammar_node_type* dot;  // earley grammar position
-      
-      // terminal-id-type...
-      // unlike earley composer, we do not keep "first"
-      terminal_id_type last;
       
       // backpointers
       const edge_type* active;
@@ -115,48 +102,38 @@ namespace cicada
       
       
       // created by predict...
-      Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const terminal_id_type& q0)
+      Edge(const symbol_type& __lhs, const grammar_node_type& __dot)
 	: lhs(__lhs), dot(&__dot),
-	  last(q0),
 	  active(0), passive(0),
 	  edge(hypergraph_type::invalid) {}
       
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const terminal_id_type& q0,
 	   const edge_type& __active)
 	: lhs(__lhs), dot(&__dot),
-	  last(q0), 
 	  active(&__active), passive(0),
 	  edge(hypergraph_type::invalid) {}
 
       
       // created by scan... we will always have terminal
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const terminal_id_type& __last,
 	   const edge_type& __active,
 	   const hypergraph_type::id_type& __edge)
 	: lhs(__lhs), dot(&__dot),
-	  last(__last),
 	  active(&__active), passive(0),
 	  edge(__edge) {}
       
       
       // construct by complete
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const terminal_id_type& __last,
 	   const edge_type& __active, const edge_type& __passive,
 	   const hypergraph_type::id_type& __edge)
 	: lhs(__lhs), dot(&__dot),
-	  last(__last),
 	  active(&__active), passive(&__passive),
 	  edge(__edge) {}
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const terminal_id_type& __last,
 	   const edge_type& __active, const edge_type& __passive)
 	: lhs(__lhs), dot(&__dot),
-	  last(__last),
 	  active(&__active), passive(&__passive),
 	  edge(hypergraph_type::invalid) {}
       
@@ -215,9 +192,9 @@ namespace cicada
 	if (! x)
 	  return 0;
 	else if (x->is_active())
-	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->last, x->lhs.id()));
+	  return hasher_type::operator()(x->dot, x->lhs.id());
 	else
-	  return hasher_type::operator()(x->last, x->lhs.id());
+	  return hasher_type::operator()(x->lhs.id());
       }
     };
     
@@ -230,7 +207,6 @@ namespace cicada
 		|| (x && y
 		    && x->is_active() == y->is_active()
 		    && x->lhs == y->lhs
-		    && x->last == y->last
 		    && (x->is_passive() || x->dot == y->dot)));
       }
     };
@@ -264,7 +240,7 @@ namespace cicada
       const grammar_node_type& dot_goal = grammar_nodes[giter->second];
       
       // initial edges for each transducer defined in grammar...
-      insert_edge(edge_type(goal_symbol, dot_goal, terminal_trie_type::npos()));
+      insert_edge(edge_type(goal_symbol, dot_goal));
       
       // forever...
       while (! agenda_exploration.empty() || ! agenda_finishing.empty()) {
@@ -316,12 +292,10 @@ namespace cicada
 	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
-	const terminal_id_type last = terminal_trie.insert(edge.last, titer->first);
-	
 	if (has_rule)
-	  insert_edge(edge_type(edge.lhs, dot_next, last, edge, dot_next.edge));
+	  insert_edge(edge_type(edge.lhs, dot_next, edge, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(edge.lhs, dot_next, last, edge));
+	  insert_edge(edge_type(edge.lhs, dot_next, edge));
       }
     }
     
@@ -342,7 +316,7 @@ namespace cicada
 	
 	const grammar_node_type& dot_next = grammar_nodes[piter->second];
 	
-	insert_edge(edge_type(lhs, dot_next, edge.last, edge));
+	insert_edge(edge_type(lhs, dot_next, edge));
       }
     }
 
@@ -366,9 +340,9 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, passive.last, active, passive, dot_next.edge));
+	  insert_edge(edge_type(active.lhs, dot_next, active, passive, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, passive.last, active, passive));
+	  insert_edge(edge_type(active.lhs, dot_next, active, passive));
       }
     }
     
@@ -392,9 +366,9 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, passive.last, active, passive, dot_next.edge));
+	  insert_edge(edge_type(active.lhs, dot_next, active, passive, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, passive.last, active, passive));
+	  insert_edge(edge_type(active.lhs, dot_next, active, passive));
       }
     }
     
@@ -471,6 +445,11 @@ namespace cicada
       edge_new.features = source.edges[edge.edge].features;
       
       target.connect_edge(edge_new.id, head_id);
+
+      std::cerr << "connected: " << head_id << " rule: " << *edge_new.rule;
+      std::cerr << " tails: ";
+      std::copy(tails.begin(), tails.end(), std::ostream_iterator<hypergraph_type::id_type>(std::cerr, " "));
+      std::cerr << std::endl;
     }
 
 
@@ -482,8 +461,6 @@ namespace cicada
       
       traversals.clear();
       non_terminal_nodes.clear();
-
-      terminal_trie.clear();
 
       agenda_finishing.clear();
       agenda_exploration.clear();
@@ -557,8 +534,6 @@ namespace cicada
 
     traversal_set_type traversals;
     non_terminal_node_set_type non_terminal_nodes;
-
-    terminal_trie_type terminal_trie;
 
     agenda_type agenda_finishing;
     agenda_type agenda_exploration;
