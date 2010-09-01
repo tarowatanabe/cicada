@@ -9,15 +9,17 @@ namespace cicada
 
     struct WERScorerConstant
     {
-      static const double cost_ins;
-      static const double cost_del;
-      static const double cost_sub;
-      
+      struct COSTS
+      {
+	static const double insertion;
+	static const double deletion;
+	static const double substitution;
+      };
     };
     
-    const double WERScorerConstant::cost_ins = 1.0;
-    const double WERScorerConstant::cost_del = 1.0;
-    const double WERScorerConstant::cost_sub = 1.0;
+    const double WERScorerConstant::COSTS::insertion    = 1.0;
+    const double WERScorerConstant::COSTS::deletion     = 1.0;
+    const double WERScorerConstant::COSTS::substitution = 1.0;
 
     class WERScorerImpl : public WERScorerConstant
     {
@@ -48,7 +50,6 @@ namespace cicada
       
       WERScorerImpl() { }
       WERScorerImpl(const sentence_type& __ref) : ref(__ref) {}
-
       
       value_type operator()(const sentence_type& sentence)
       {
@@ -65,19 +66,19 @@ namespace cicada
 	std::vector<value_type, std::allocator<value_type> > prev(b_size + 1, value_type());
 	
 	for (size_t j = 1; j <= b_size; ++ j) {
-	  prev[j].score     = prev[j - 1].score + cost_ins;
-	  prev[j].insertion = prev[j - 1].insertion + cost_ins;
+	  prev[j].score     = prev[j - 1].score + COSTS::insertion;
+	  prev[j].insertion = prev[j - 1].insertion + COSTS::insertion;
 	}
 	
 	for (size_t i = 1; i <= a_size; ++ i) {
-	  curr[0].score    = prev[0].score + cost_del;
-	  curr[0].deletion = prev[0].deletion + cost_del;
+	  curr[0].score    = prev[0].score + COSTS::deletion;
+	  curr[0].deletion = prev[0].deletion + COSTS::deletion;
 	  
 	  for (size_t j = 1; j <= b_size; ++ j) {
-	    const double subst = cost_sub * (a[i - 1] != b[j - 1]);
+	    const double subst = COSTS::substitution * (a[i - 1] != b[j - 1]);
 	    
-	    const double score_del = prev[j].score     + cost_del;
-	    const double score_ins = curr[j - 1].score + cost_ins;
+	    const double score_del = prev[j].score     + COSTS::deletion;
+	    const double score_ins = curr[j - 1].score + COSTS::insertion;
 	    const double score_sub = prev[j - 1].score + subst;
 	    
 	    curr[j] = prev[j - 1];
@@ -86,14 +87,14 @@ namespace cicada
 
 	    if (score_ins < curr[j].score) {
 	      curr[j] = curr[j - 1];
-	      curr[j].score     += cost_ins;
-	      curr[j].insertion += cost_ins;
+	      curr[j].score     += COSTS::insertion;
+	      curr[j].insertion += COSTS::insertion;
 	    }
 	    
 	    if (score_del < curr[j].score) {
 	      curr[j] = prev[j];
-	      curr[j].score    += cost_del;
-	      curr[j].deletion += cost_del;
+	      curr[j].score    += COSTS::deletion;
+	      curr[j].deletion += COSTS::deletion;
 	    }
 	  }
 	  std::swap(prev, curr);

@@ -555,7 +555,7 @@ struct Task
       features.back().assign(accumulated_reward[i].begin(), accumulated_reward[i].end());
       
       features.back() *= (1.0 / counts_reward.back());
-      //features.back()["bias"] = 1.0;
+      features.back()["bias"] = 1.0;
       
       features.back().erase(feature_name);
 
@@ -575,7 +575,7 @@ struct Task
       features.back().assign(accumulated_penalty[i].begin(), accumulated_penalty[i].end());
       
       features.back() *= (1.0 / counts_penalty.back());
-      //features.back()["bias"] = 1.0;
+      features.back()["bias"] = 1.0;
       
       features.back().erase(feature_name);
       

@@ -1,4 +1,4 @@
-
+ 
 #include <algorithm>
 
 #include "ter.hpp"
@@ -15,21 +15,32 @@ namespace cicada
 
     struct TERScorerConstant
     {
-      static const double cost_ins;
-      static const double cost_del;
-      static const double cost_sub;
-      static const double cost_shi;
+      struct COSTS
+      {
+	static const double insertion;
+	static const double deletion;
+	static const double substitution;
+	static const double shift;
+      };
+      
+      struct TRANSITION
+      {
+	enum transition_type {
+	  match,
+	  substitution,
+	  insertion,
+	  deletion,
+	};
+      };
       
       static const int max_shift_size = 10;
       static const int max_shift_dist = 50;
     };
     
-    const double TERScorerConstant::cost_ins = 1.0;
-    const double TERScorerConstant::cost_del = 1.0;
-    const double TERScorerConstant::cost_sub = 1.0;
-    const double TERScorerConstant::cost_shi = 1.0;
-
-    
+    const double TERScorerConstant::COSTS::insertion    = 1.0;
+    const double TERScorerConstant::COSTS::deletion     = 1.0;
+    const double TERScorerConstant::COSTS::substitution = 1.0;
+    const double TERScorerConstant::COSTS::shift        = 1.0;
     
     // Do we really implement this...???
     class TERScorerImpl : public TERScorerConstant
@@ -65,12 +76,7 @@ namespace cicada
 	int moveto;
       };
 
-      enum transition_type {
-	trans_mat,
-	trans_sub,
-	trans_ins,
-	trans_del,
-      };
+      typedef TRANSITION::transition_type transition_type;
       
       typedef Score value_type;
       typedef Shift shift_type;
@@ -99,7 +105,7 @@ namespace cicada
 	typedef utils::vector2<transition_type, std::allocator<transition_type> > matrix_transition_type;
 	typedef utils::vector2<double, std::allocator<double> > matrix_cost_type;
 
-	matrix_transition_type trans(hyp.size() + 1, ref.size() + 1, trans_mat);
+	matrix_transition_type trans(hyp.size() + 1, ref.size() + 1, TRANSITION::match);
 	matrix_cost_type       costs(hyp.size() + 1, ref.size() + 1, 0.0);
 	
 	for (int i = 0; i <= hyp.size(); ++ i)
@@ -115,21 +121,21 @@ namespace cicada
 	    
 	    if (hyp[i - 1] == ref[j - 1]) {
 	      cur_cost = costs(i - 1, j - 1);
-	      cur_tran = trans_mat;
+	      cur_tran = TRANSITION::match;
 	    } else {
-	      cur_cost = costs(i - 1, j - 1) + cost_sub;
-	      cur_tran = trans_sub;
+	      cur_cost = costs(i - 1, j - 1) + COSTS::substitution;
+	      cur_tran = TRANSITION::substitution;
 	    }
 	    
-	    const double ins = costs(i - 1, j) + cost_ins;
+	    const double ins = costs(i - 1, j) + COSTS::insertion;
 	    if (cur_cost > ins) {
 	      cur_cost = ins;
-	      cur_tran = trans_ins;
+	      cur_tran = TRANSITION::insertion;
 	    }
-	    const double del = costs(i, j - 1) + cost_del;
+	    const double del = costs(i, j - 1) + COSTS::deletion;
 	    if (cur_cost > del) {
 	      cur_cost = del;
-	      cur_tran = trans_del;
+	      cur_tran = TRANSITION::deletion;
 	    }
 	  }
 	}
@@ -140,17 +146,17 @@ namespace cicada
 	while (i > 0 || j > 0) {
 	  if (j == 0) {
 	    -- i;
-	    path.push_back(trans_ins);
+	    path.push_back(TRANSITION::insertion);
 	  } else if (i == 0) {
 	    -- j;
-	    path.push_back(trans_del);
+	    path.push_back(TRANSITION::deletion);
 	  } else {
 	    const transition_type t = trans(i, j);
 	    path.push_back(t);
 	    switch (t) {
-	    case trans_sub: case trans_mat: -- i; -- j; break;
-	    case trans_ins: -- i; break;
-	    case trans_del: -- j; break;
+	    case TRANSITION::substitution: case TRANSITION::match: -- i; -- j; break;
+	    case TRANSITION::insertion: -- i; break;
+	    case TRANSITION::deletion: -- j; break;
 	    }
 	  }
 	}

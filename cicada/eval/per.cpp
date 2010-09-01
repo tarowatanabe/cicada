@@ -12,15 +12,17 @@ namespace cicada
 
     struct PERScorerConstant
     {
-      static const double cost_ins;
-      static const double cost_del;
-      static const double cost_sub;
-      
+      struct COSTS
+      {
+	static const double insertion;
+	static const double deletion;
+	static const double substitution;
+      };
     };
     
-    const double PERScorerConstant::cost_ins = 1.0;
-    const double PERScorerConstant::cost_del = 1.0;
-    const double PERScorerConstant::cost_sub = 1.0;
+    const double PERScorerConstant::COSTS::insertion    = 1.0;
+    const double PERScorerConstant::COSTS::deletion     = 1.0;
+    const double PERScorerConstant::COSTS::substitution = 1.0;
 
     class PERScorerImpl : public PERScorerConstant
     {
@@ -73,12 +75,12 @@ namespace cicada
 	
 	if (i_size > d_size) {
 	  value.insertion    = 0;
-	  value.deletion     = cost_del * d_size;
-	  value.substitution = cost_sub * (i_size - d_size);
+	  value.deletion     = COSTS::deletion * d_size;
+	  value.substitution = COSTS::substitution * (i_size - d_size);
 	} else {
-	  value.insertion    = cost_ins * i_size;
+	  value.insertion    = COSTS::insertion * i_size;
 	  value.deletion     = 0;
-	  value.substitution = cost_sub * (d_size - i_size);
+	  value.substitution = COSTS::substitution * (d_size - i_size);
 	}
 	value.score = value.insertion + value.deletion + value.substitution;
 	

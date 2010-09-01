@@ -33,6 +33,12 @@ namespace utils
     typedef uint32_t id_type;
     typedef Tp value_type;
     
+  public:
+    static const id_type& npos() {
+      static const id_type __npos(-1);
+      return __npos;
+    }
+    
   private:
     struct node_type
     {
