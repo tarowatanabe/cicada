@@ -52,7 +52,6 @@ namespace cicada
 
       traversals.set_empty_key(traversal_type());
 
-      terminal_nodes.set_empty_key(transducer_id_type(-1, 0));
       non_terminal_nodes.set_empty_key(0);
     }
     
@@ -243,7 +242,6 @@ namespace cicada
     typedef std::vector<const edge_type*, std::allocator<const edge_type*> > edge_set_passive_type;
     
     // edge to traversal graph mappings...
-    typedef google::dense_hash_map<terminal_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_id_type> > terminal_node_set_type;
     typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type > non_terminal_node_set_type;
     typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > goal_node_set_type;
 
@@ -318,7 +316,7 @@ namespace cicada
 	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
-	const terminal_id_type last = terminal_trie.insert(edge.last, *titer);
+	const terminal_id_type last = terminal_trie.insert(edge.last, titer->first);
 	
 	if (has_rule)
 	  insert_edge(edge_type(edge.lhs, dot_next, last, edge, dot_next.edge));
@@ -394,9 +392,9 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, active, passive.last, passive, dot_next.edge));
+	  insert_edge(edge_type(active.lhs, dot_next, passive.last, active, passive, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, active, passive.last, passive));
+	  insert_edge(edge_type(active.lhs, dot_next, passive.last, active, passive));
       }
     }
     
@@ -449,7 +447,7 @@ namespace cicada
 	  
 	  tails.push_back(niter->second);
 	}
-	cur = curr->active;
+	curr = curr->active;
       }
       
       std::reverse(tails.begin(), tails.end());
@@ -468,9 +466,9 @@ namespace cicada
 	head_id = niter->second;
       }
       
-      hypergraph_type::node_type& edge_new = target.add_edge(tails.begin(), tails.end());
+      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
       edge_new.rule = source.edges[edge.edge].rule;
-      edge_new.featurs = source.edges[edge.edge].features;
+      edge_new.features = source.edges[edge.edge].features;
       
       target.connect_edge(edge_new.id, head_id);
     }
@@ -483,7 +481,6 @@ namespace cicada
       edges.clear();
       
       traversals.clear();
-      terminal_nodes.clear();
       non_terminal_nodes.clear();
 
       terminal_trie.clear();
@@ -553,15 +550,12 @@ namespace cicada
 
     
   private:  
-    const grammar_type& grammar;
-    
     symbol_type           goal_symbol;
     grammar_node_set_type grammar_nodes;
 
     edge_set_type edges;
 
     traversal_set_type traversals;
-    terminal_node_set_type     terminal_nodes;
     non_terminal_node_set_type non_terminal_nodes;
 
     terminal_trie_type terminal_trie;
@@ -575,9 +569,9 @@ namespace cicada
   };
   
   inline
-  void generate_earley(const Grammar& grammar, const HyperGraph& source, HyperGraph& target)
+  void generate_earley(const HyperGraph& source, HyperGraph& target)
   {
-    GenerateEarley generater(grammar);
+    GenerateEarley generater;
       
     generater(source, target);
   }

@@ -31,6 +31,7 @@
 
 #include "cicada/apply.hpp"
 #include "cicada/compose.hpp"
+#include "cicada/generate.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/intersect.hpp"
 #include "cicada/binarize.hpp"
@@ -875,6 +876,49 @@ public:
   
   int debug;
 };
+
+class GenerateEarley : public Operation
+{
+public:
+  GenerateEarley(const grammar_type& __grammar,
+		 const std::string& __goal,
+		 const std::string& __non_terminal,
+		 const bool __insertion,
+		 const bool __deletion,
+		 const int __debug)
+    : debug(__debug)
+  { }
+  
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  {
+    hypergraph_type generated;
+    
+    if (debug)
+      std::cerr << "generation: earley" << std::endl;
+
+    utils::resource start;
+    
+    cicada::generate_earley(hypergraph, generated);
+    
+    utils::resource end;
+    
+    if (debug)
+      std::cerr << "generate cpu time: " << (end.cpu_time() - start.cpu_time())
+		<< " user time: " << (end.user_time() - start.user_time())
+		<< std::endl;
+    
+    if (debug)
+      std::cerr << "# of nodes: " << generated.nodes.size()
+		<< " # of edges: " << generated.edges.size()
+		<< " valid? " << utils::lexical_cast<std::string>(generated.is_valid())
+		<< std::endl;
+    
+    hypergraph.swap(generated);
+  }
+  
+  int debug;
+};
+
 
 
 class Apply : public Operation
@@ -1733,6 +1777,8 @@ public:
 	operations.push_back(operation_ptr_type(new ComposeEarley(grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "compose-cky")
 	operations.push_back(operation_ptr_type(new ComposeCKY(grammar, goal, non_terminal, insertion, deletion, debug)));
+      else if (param.name() == "generate-earley")
+	operations.push_back(operation_ptr_type(new GenerateEarley(grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "apply")
 	operations.push_back(operation_ptr_type(new Apply(*first, model, debug)));
       else if (param.name() == "bleu")
@@ -1781,6 +1827,7 @@ permute: permute tree (monolingual tree only)\n\
 \texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
+generate-earley: re-generation from tree\n\
 apply: feature application\n\
 \tsize=<cube size>\n\
 \texact=[true|false]  no pruning feature application\n\
