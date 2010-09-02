@@ -15,6 +15,7 @@
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort.hpp>
+#include <cicada/span_node.hpp>
 
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
@@ -61,6 +62,9 @@ namespace cicada
     
     typedef uint32_t id_type;
     typedef google::dense_hash_map<symbol_type, id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > id_map_type;
+
+    typedef std::pair<int, int> span_type;
+    typedef std::vector<span_type, std::allocator<span_type> > span_set_type;
     
     // we assume that we have only unique path from tail-nodes to head-node...
     struct grammar_node_type
@@ -74,6 +78,7 @@ namespace cicada
       id_map_type non_terminals;
       
       hypergraph_type::id_type edge;
+      feature_set_type features;
       bool is_root;
 
     private:
@@ -446,16 +451,20 @@ namespace cicada
       
       target.connect_edge(edge_new.id, head_id);
 
-      std::cerr << "connected: " << head_id << " rule: " << *edge_new.rule;
-      std::cerr << " tails: ";
-      std::copy(tails.begin(), tails.end(), std::ostream_iterator<hypergraph_type::id_type>(std::cerr, " "));
-      std::cerr << std::endl;
+      //std::cerr << "connected: " << head_id << " rule: " << *edge_new.rule;
+      //std::cerr << " tails: ";
+      //std::copy(tails.begin(), tails.end(), std::ostream_iterator<hypergraph_type::id_type>(std::cerr, " "));
+      //std::cerr << std::endl;
     }
 
 
     void initialize_grammar(const hypergraph_type& source)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
+
+      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
+      typedef std::vector<edge_set_type, std::allocator<edge_set_type> > node_map_type;
+      
       
       edges.clear();
       
@@ -468,11 +477,53 @@ namespace cicada
       edges_unique.clear();
       edges_active.clear();
       edges_passive.clear();
+
+      spans.clear();
+      spans.reserve(source.nodes.size());
+      spans.resize(source.nodes.size());
+
+      cicada::span_node(source, spans);
+      
+      non_terminal_set_type non_terminals(source.nodes.size());
+      for (int id = 0; id != source.nodes.size(); ++ id) {
+	if (id == source.goal)
+	  non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
+	else
+	  non_terminals[id] = ('['
+			       + source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip()
+			       +'_'+boost::lexical_cast<std::string>(spans[id].first)
+			       +'_'+boost::lexical_cast<std::string>(spans[id].second)
+			       + ']');
+	//std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
+      }
+
+#if 0
+      node_map_type out_edges(source.nodes.size());
+      {
+	hypergraph_type::edge_set_type::const_iterator eiter_end = source.edges.end();
+	for (hypergraph_type::edge_set_type::const_iterator eiter = source.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const hypergraph_type::edge_type& edge = *eiter;
+	  
+	  hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	  for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	    out_edges[*niter].push_back(edge.id);
+	}
+      }
       
       // assigne pseudo non-terminals
       non_terminal_set_type non_terminals(source.nodes.size());
-      for (size_type id = 0; id < source.nodes.size(); ++ id)
-	non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
+      for (int id = source.nodes.size() - 1; id >= 0; -- id) {
+	if (out_edges[id].empty())
+	  non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
+	else
+	  non_terminals[id] = ('['
+			       + non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip()
+			       + ':'
+			       + source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip()
+			       + ']');
+	//std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
+      }
+#endif
       
       // assign goal-symbol!
       goal_symbol = non_terminals[source.goal];
@@ -521,7 +572,11 @@ namespace cicada
 	  }
 	}
 	
-	grammar_nodes[niter->second].edge = edge.id;
+	if (grammar_nodes[niter->second].edge == hypergraph_type::invalid) {
+	  grammar_nodes[niter->second].edge = edge.id;
+	  grammar_nodes[niter->second].features = edge.features;
+	} else 
+	  grammar_nodes[niter->second].features += edge.features;
       }
     }
 
@@ -541,6 +596,8 @@ namespace cicada
     edge_set_unique_type  edges_unique;
     edge_set_active_type  edges_active;
     edge_set_passive_type edges_passive;
+
+    span_set_type spans;
   };
   
   inline
