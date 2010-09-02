@@ -478,6 +478,7 @@ namespace cicada
       edges_active.clear();
       edges_passive.clear();
 
+#if 0
       spans.clear();
       spans.reserve(source.nodes.size());
       spans.resize(source.nodes.size());
@@ -496,8 +497,9 @@ namespace cicada
 			       + ']');
 	//std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
       }
+#endif
 
-#if 0
+#if 1
       node_map_type out_edges(source.nodes.size());
       {
 	hypergraph_type::edge_set_type::const_iterator eiter_end = source.edges.end();
@@ -512,17 +514,42 @@ namespace cicada
       
       // assigne pseudo non-terminals
       non_terminal_set_type non_terminals(source.nodes.size());
-      for (int id = source.nodes.size() - 1; id >= 0; -- id) {
+      for (int id = source.nodes.size() - 1; id >= 0; -- id)
 	if (out_edges[id].empty())
 	  non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
-	else
+	else {
+	  std::string nodes_prev;
+	  std::string nodes_next;
+	  
+	  bool found = false;
+	  for (int pos = 0; pos != source.edges[out_edges[id].front()].tails.size(); ++ pos) {
+	    const int antecedent_id = source.edges[out_edges[id].front()].tails[pos];
+	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
+	    
+	    if (antecedent_id == id)
+	      found = true;
+	    else {
+	      if (! found) {
+		if (nodes_prev.empty())
+		  nodes_prev = non_terminal.non_terminal_strip();
+		else
+		  nodes_prev += '|' + non_terminal.non_terminal_strip();
+	      } else {
+		if (nodes_next.empty())
+		  nodes_next = non_terminal.non_terminal_strip();
+		else
+		  nodes_next += '|' + non_terminal.non_terminal_strip();
+	      }
+	    }
+	  }
+	  
 	  non_terminals[id] = ('['
 			       + non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip()
-			       + ':'
-			       + source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip()
+			       + ':' + nodes_prev
+			       + '+' + source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip()
+			       + '+' + nodes_next
 			       + ']');
-	//std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
-      }
+	}
 #endif
       
       // assign goal-symbol!
