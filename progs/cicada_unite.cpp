@@ -69,8 +69,8 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",  po::value<std::string>()->default_value("-"),   "input in text format")
-    ("output", po::value<std::string>(), "output in binary format")
+    ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input in text format")
+    ("output", po::value<path_type>(&output_file), "output in binary format")
     
     ("confidence", po::bool_switch(&confidence), "add confidence weight")
     
