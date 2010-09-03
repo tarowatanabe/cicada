@@ -23,6 +23,7 @@ After the hypergraph generation, you can:
       * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
    - Perform MBR decoding for hypergraph [12]. (TODO)
+      * Above two computations rely on expected ngram-counts over forest [13].
    - K-bests sentences are generated from hypergraph [5].
 
 Or, you can combine outputs from multiple systems by (New! and TODO):
@@ -194,4 +195,18 @@ References:
   pages     = {567--575},
   url       = {http://www.aclweb.org/anthology/P/P09/P09-1064}
 }
+
+[13]
+@InProceedings{denero-EtAl:2010:NAACLHLT,
+  author    = {DeNero, John  and  Kumar, Shankar  and  Chelba, Ciprian  and  Och, Franz},
+  title     = {Model Combination for Machine Translation},
+  booktitle = {Human Language Technologies: The 2010 Annual Conference of the North American Chapter of the Association for Computational Linguistics},
+  month     = {June},
+  year      = {2010},
+  address   = {Los Angeles, California},
+  publisher = {Association for Computational Linguistics},
+  pages     = {975--983},
+  url       = {http://www.aclweb.org/anthology/N10-1141}
+}
+
 
