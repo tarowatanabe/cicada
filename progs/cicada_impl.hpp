@@ -894,7 +894,10 @@ public:
     hypergraph_type generated;
     
     if (debug)
-      std::cerr << "generation: earley" << std::endl;
+      std::cerr << "generation: earley"
+		<< " # of nodes: " << hypergraph.nodes.size()
+		<< " # of edges: " << hypergraph.edges.size()
+		<< std::endl;
 
     utils::resource start;
     
@@ -908,7 +911,8 @@ public:
 		<< std::endl;
     
     if (debug)
-      std::cerr << "# of nodes: " << generated.nodes.size()
+      std::cerr << "generated: earley"
+		<< " # of nodes: " << generated.nodes.size()
 		<< " # of edges: " << generated.edges.size()
 		<< " valid? " << utils::lexical_cast<std::string>(generated.is_valid())
 		<< std::endl;
