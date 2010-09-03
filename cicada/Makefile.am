@@ -115,6 +115,7 @@ lattice.hpp \
 model.hpp \
 ngram.hpp \
 ngram_index.hpp \
+ngram_count_set.hpp \
 optimize.hpp \
 parameter.hpp \
 permute.hpp \
