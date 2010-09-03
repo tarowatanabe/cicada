@@ -144,8 +144,7 @@ namespace cicada
 
 	  edge_type::node_set_type tails(edge.tails.size());
 	
-	  bool finished = false;
-	  while (! finished) {
+	  for (;;) {
 	    for (int i = 0; i < edge.tails.size(); ++ i)
 	      tails[i] = node_map[edge.tails[i]][j[i]];
 	    
@@ -171,7 +170,8 @@ namespace cicada
 	      if (j[index] < j_ends[index]) break;
 	      j[index] = 0;
 	    }
-	    finished = (index == edge.tails.size());
+	    // finished!
+	    if (index == edge.tails.size()) break;
 	  }
 	}
       }
