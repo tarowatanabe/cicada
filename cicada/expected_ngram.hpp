@@ -332,6 +332,7 @@ namespace cicada
   
   
   template <typename Function, typename Counts>
+  inline
   void expected_ngram(const HyperGraph& graph, Function function, Counts& counts, const int order, const bool bos_eos=false, const bool yield_source=false)
   {
     ExpectedNGram<Function, Counts> __expected(function, order, bos_eos);

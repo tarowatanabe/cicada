@@ -334,6 +334,8 @@ void kbest_derivations(std::ostream& os,
   
   typedef hypergraph_type::id_type id_type;
 
+  typedef typename Function::value_type weight_type;
+
 #ifdef HAVE_TR1_UNORDERED_MAP
   typedef std::tr1::unordered_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
     std::allocator<std::pair<id_type, id_type> > > node_map_type;
@@ -343,13 +345,14 @@ void kbest_derivations(std::ostream& os,
 #endif
 
   derivation_type derivation;
+  weight_type     weight;
   node_map_type   node_maps;
   hypergraph_type graph_kbest;
 
   edge_set_type tails;
   
   for (int k = 0; k < kbest_size; ++ k) {
-    if (! derivations(k, derivation))
+    if (! derivations(k, derivation, weight))
       break;
     
     const edge_set_type& edges = boost::get<0>(derivation);
@@ -400,7 +403,7 @@ void kbest_derivations(std::ostream& os,
     for (rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
       os << ' ' << fiter->first << '=' << fiter->second;
     os << " ||| ";
-    os << function(boost::get<1>(derivation));
+    os << weight;
     os << '\n';
   }
 }
@@ -418,9 +421,10 @@ void kbest_derivations(std::ostream& os,
   cicada::KBest<Traversal, Function, Filter> derivations(graph, kbest_size, traversal, function, filter);
   
   typename Traversal::value_type derivation;
+  typename Function::value_type  weight;
   
   for (int k = 0; k < kbest_size; ++ k) {
-    if (! derivations(k, derivation))
+    if (! derivations(k, derivation, weight))
       break;
     
     os << id << " ||| " << boost::get<0>(derivation) << " |||";
@@ -428,7 +432,7 @@ void kbest_derivations(std::ostream& os,
     for (rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
       os << ' ' << fiter->first << '=' << fiter->second;
     os << " ||| ";
-    os << function(boost::get<1>(derivation));
+    os << weight;
     os << '\n';
   }
 }

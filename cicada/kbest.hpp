@@ -151,14 +151,16 @@ namespace cicada
     typedef State state_type;
     typedef std::vector<state_type, std::allocator<state_type> > state_set_type;
 
-    bool operator()(int k, yield_type& yield)
+    bool operator()(int k, yield_type& yield, weight_type& weight)
     {
       const derivation_type* derivation = lazy_kth_best(graph.goal, k);
       if (derivation) {
 	yield = derivation->yield;
+	weight = derivation->score;
 	return true;
       } else {
 	yield = yield_type();
+	weight = weight_type();
 	return false;
       }
     }
