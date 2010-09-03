@@ -11,7 +11,7 @@
 namespace cicada
 {
   
-  template <typename Traversal, typename Function, typename Filter>
+  template <typename Traversal, typename Function, typename Filter, typename Extract>
   struct MBR
   {
     typedef size_t    size_type;
@@ -31,10 +31,12 @@ namespace cicada
     typedef Traversal traversal_type;
     typedef Function  function_type;
     typedef Filter    filter_type;
+    typedef Extract   extract_type;
     
     typedef typename traversal_type::value_type yield_type;
     typedef typename function_type::value_type  semiring_type;
     typedef typename function_type::value_type  weight_type;
+    typedef typename extract_type::value_type   sentence_type;
     
     typedef symbol_type     word_type;
     typedef symbol_set_type ngram_type;
@@ -48,6 +50,9 @@ namespace cicada
 
     typedef KBest<Traversal, Function, Filter> kbest_derivation_type;
     typedef typename kbest_type::derivation_derivation_type derivation_type;
+
+    typedef std::pair<weight_type, yield_type> weight_yield_type;
+    typedef std::vector<weight_yield_type, std::allocator<weight_yield_type> > weight_yield_set_type;
     
     
     MBR(const hypergraph_type& __graph,
@@ -56,38 +61,92 @@ namespace cicada
 	const traversal_type& __traversal,
 	const function_type& __function,
 	const filter_type& __filter,
+	const extract_type& __extract,
 	const bool __yield_source=false)
       : graph(__graph),
-	kbest_derivation(graph, __kbest, __traversal, __function, __filter),
 	order(__order),
 	kbest(__kbest)
-	yield_source(__yield_source) {}
+	yield_source(__yield_source)
+    {
+      // compute expected ngram counts
+      ngram_set_type ngrams;
+      
+      cicada::expected_ngram(graph, __function, ngrams, order, false, yield_source);
+      
+      // compute kbest-translations
+      kbest_derivation_type derivations(__graph, __kbest, __traversal, __function, __filter);
+
+      weight_yields.clear();
+      weight_yields.resize(kbest);
+      
+      for (int k = 0; k < kbest; ++ k)
+	if (! derivations(k, weight_yields[k].second, weight_yields[k].first)) {
+	  weight_yields.resize(k);
+	  break;
+	}
+      
+      // now, we will perform additional compuation..
+      double expected_length = 0.0;
+      {
+	ngram_set_type::const_iterator niter_end = ngrams.end();
+	for (ngram_set_type::const_iterator niter = ngrams.begin(); niter != niter_end; ++ niter)
+	  if (niter->first.size() == 1)
+	    expected_length += niter->second;
+      }
+      
+      weight_yield_set_type::iterator yiter_end = weight_yields.end();
+      for (weight_yield_set_type::iterator yiter = weight_yields.begin(); yiter != yiter_end; ++ yiter) {
+	const sentence_type& sentence = __extract(yiter->second);
+	
+	const double pnalty = std::min(0.0, 1.0 - (expected_length / sentence.size()));
+	const double factor = 1.0 / order;
+	
+	double score = penalty;
+	for (int n = 1; n <= order; ++ n) {
+	  ngram_set_type ngrams_local;
+	  
+	  sentence_type::const_iterator siter_end = sentence.end();
+	  for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+	    // ngram at [iter, iter + n)
+	    for (sentence_type::const_iterator iter = siter; iter + n < siter_end; ++ iter)
+	      ngrams_local[ngram_type(iter, iter + 2)] += 1;
+	  }
+	  
+	  double count = 0.0;
+	  ngram_set_type::const_iterator niter_end = ngrams_local.end();
+	  for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter) {
+	    ngram_set_type::const_iterator niter_prime = ngrams.find(niter->first);
+	    if (niter_prime != ngrams.end())
+	      count += std::min(niter->second, niter_prime->second);
+	  }
+	  
+	  if (count != 0.0)
+	    score += factor * std::log(count / (sentence.size() - n + 1));
+	}
+	
+	yiter->first = cicada::semiring::traits<weight_type>::log(std::exp(score));
+      }
+      
+      std::sort(weight_yields.begin(), weight_yields.end());
+    }
     
     bool operator()(int k, yield_type& yield, weight_type& weight)
     {
-      
-      
-      
+      if (k < weight_yields.size()) {
+	yield  = weight_yields[k].second;
+	weight = weight_yields[k].first;
+	return true;
+      } else {
+	yield  = yield_type();
+	weight = weight_type();
+	return false;
+      }
     }
     
   private:
-    
-    template <typename YieldSet, typename ExtractYield, typename ExtractScore>
-    void operator()(const hypergraph_type& graph, YieldSet& yields, ExtractYield extract_yield, ExtractScore extract_score)
-    {
-      ngram_set_type ngrams;
-      
-      cicada::expected_ngram(garph, function, ngrams, order, false, yield_source);
-      
-      
-      
-    }
-
     const hypergraph_type& graph;
-
-    kbest_derivation_type kbest_derivation;
     
-    const function_type function;
+    weight_yield_set_type weight_yields;
     
     const int  order;
     const int  kbest;
