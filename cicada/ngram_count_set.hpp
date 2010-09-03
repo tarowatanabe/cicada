@@ -46,6 +46,16 @@ public:
   public:
     size_type size() const { return ngrams.size(); }
     bool empty() const { return ngrams.empty(); }
+
+    count_type sum_unigram() const
+    {
+      count_type sum = 0.0;
+      const_iterator iter_end = ngrams.end();
+      for (const_iterator iter = ngrams.begin(); iter != iter_end; ++ iter)
+	if (iter->first.size() == 1)
+	  sum += iter->second;
+      return sum;
+    }
     
   public:
     count_type& operator[](const ngram_type& ngram) { return ngrams[ngram]; }
