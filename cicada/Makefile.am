@@ -98,6 +98,7 @@ cluster.hpp \
 compose.hpp \
 compose_cky.hpp \
 eval.hpp \
+expected_ngram.hpp \
 feature.hpp \
 feature_function.hpp \
 feature_vector.hpp \
