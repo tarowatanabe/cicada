@@ -19,15 +19,16 @@ Translation can be carried out by:
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
-     * cicada implementes cube-pruning, cube-growing and exact (and stateless) methods
-     * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
+      * cicada implementes cube-pruning, cube-growing and exact (and stateless) methods
+      * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
    - Perform MBR decoding for hypergraph [12]. (TODO)
    - K-bests sentences are generated from hypergraph [5].
 
 Or, you can combine outputs from multiple systems by (New! and TODO):
    - Perform parsing over nbests
-   - Generate context-free confusion forest by combining trees
+   - Generate context-free confusion forest by combining trees (not confusion network!)
+      * It is performed by collecting rules from parse trees, and generate by Earley algorithm (New!)
    - Generate translation as described above
 
 Various learning components are implemented:
