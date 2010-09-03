@@ -22,13 +22,19 @@ After the hypergraph generation, you can:
      * cicada implementes cube-pruning, cube-growing and exact (and stateless) methods
      * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
+   - Perform MBR decoding for hypergraph [12]. (TODO)
    - K-bests sentences are generated from hypergraph [5].
 
+Or, you can combine outputs from multiple systems by (New! and TODO):
+   - Perform parsing over nbests
+   - Generate context-free confusion forest by combining trees
+   - Generate translation as described above
+
 Various learning components are implemented:
-  - Large feature set from input lattice/hypergraph on large training data via MaxEnt [3]
-  - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
-  - Small feature set on small devset learned by hypergraph-MERT [8]
-  - Small/Large feature set on small devset learned by hypergraph-MaxEnt (New! But still open problems!) + softmax-margin [9]
+   - Large feature set from input lattice/hypergraph on large training data via MaxEnt [3]
+   - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
+   - Small feature set on small devset learned by hypergraph-MERT [8]
+   - Small/Large feature set on small devset learned by hypergraph-MaxEnt (New! But still open problems!) + softmax-margin [9]
 
 References:
 
@@ -174,3 +180,17 @@ References:
    booktitlelink= {http://www.talp.cat/eamt09/},
    pdf = {http://www-i6.informatik.rwth-aachen.de/publications/downloader.php?id=617&row=pdf}
 }
+
+[12]
+@InProceedings{denero-chiang-knight:2009:ACLIJCNLP,
+  author    = {DeNero, John  and  Chiang, David  and  Knight, Kevin},
+  title     = {Fast Consensus Decoding over Translation Forests},
+  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+  month     = {August},
+  year      = {2009},
+  address   = {Suntec, Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {567--575},
+  url       = {http://www.aclweb.org/anthology/P/P09/P09-1064}
+}
+

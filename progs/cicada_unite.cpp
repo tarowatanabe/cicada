@@ -38,7 +38,7 @@ int main(int argc, char ** argv)
 	throw std::runtime_error("invalid hypergraph format");
       
       if (confidence) {
-	const double conf = 1.0 / rank;
+	const double conf = 1.0 / (1.0 + rank);
 	
 	hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
 	for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
