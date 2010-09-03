@@ -894,11 +894,8 @@ public:
     hypergraph_type generated;
     
     if (debug)
-      std::cerr << "generation: earley"
-		<< " # of nodes: " << hypergraph.nodes.size()
-		<< " # of edges: " << hypergraph.edges.size()
-		<< std::endl;
-
+      std::cerr << "generation: earley" << std::endl;
+    
     utils::resource start;
     
     cicada::generate_earley(hypergraph, generated);
@@ -912,7 +909,9 @@ public:
     
     if (debug)
       std::cerr << "generated: earley"
-		<< " # of nodes: " << generated.nodes.size()
+		<< " previous: # of nodes: " << hypergraph.nodes.size()
+		<< " # of edges: " << hypergraph.edges.size()
+		<< " generated: # of nodes: " << generated.nodes.size()
 		<< " # of edges: " << generated.edges.size()
 		<< " valid? " << utils::lexical_cast<std::string>(generated.is_valid())
 		<< std::endl;
