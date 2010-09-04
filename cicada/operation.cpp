@@ -67,21 +67,4 @@ namespace cicada
     }
     return iter->second;
   }
-
-  
-  std::string OperationSet::lists()
-  {
-    
-  }
-  
-  void OperationSet::assign(const weight_set_type& weights)
-  {
-    
-  }
-  
-  void OperationSet::operator()(const std::string& line)
-  {
-    
-  }
-  
 };

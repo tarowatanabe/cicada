@@ -11,6 +11,8 @@
 #include <cicada/ngram_count_set.hpp>
 #include <cicada/span_vector.hpp>
 #include <cicada/weight_vector.hpp>
+#include <cicada/grammar.hpp>
+#include <cicada/model.hpp>
 
 #include <boost/filesystem/path.hpp>
 
@@ -30,6 +32,9 @@ namespace cicada
     typedef cicada::Sentence       sentence_type;
     typedef cicada::SentenceVector sentence_set_type;
     typedef cicada::NGramCountSet  ngram_count_set_type;
+
+    typedef cicada::Grammar grammar_type;
+    typedef cicada::Model   model_type;
     
     typedef boost::filesystem::path path_type;    
     
@@ -38,7 +43,7 @@ namespace cicada
     struct Data
     {
       size_type id;
-      
+            
       hypergraph_type      hypergraph;
       lattice_type         lattice;
       span_set_type        spans;
@@ -46,7 +51,6 @@ namespace cicada
       ngram_count_set_type ngram_counts;
     };
     typedef Data data_type;
-    
     
     Operation() {}
     virtual ~Operation() {}
@@ -57,30 +61,6 @@ namespace cicada
     
     static const weight_set_type& weights(const path_type& path);
   };
-  
-  class OperationSet
-  {
-  public:
-    typedef Operation     operation_type;
-    
-    typedef operation_type::data_type data_type;
-    typedef operation_type::weight_set_type weight_set_type;
-    
-    typedef boost::shared_ptr<operation_type> operation_ptr_type;
-    typedef std::vector<operation_ptr_type, std::allocator<operation_ptr_type> > operation_ptr_set_type;
-    
-  public:
-    static std::string lists();
-
-  public:
-    template <typename Iterator>
-    OperationSet(Iterator first, Iterator last) {}
-    
-  public:
-    void assign(const weight_set_type& weights);
-    void operator()(const std::string& line);
-  };
-  
 };
 
 #endif
