@@ -1,6 +1,6 @@
 Merge bleu/variational op into "apply" with local-feature function
-
-add expected-counts operation
+	add sentence-vector class
+	allow model to "assign" sentence-vector and ngram-counts
 
 add MBR to output operation
 
