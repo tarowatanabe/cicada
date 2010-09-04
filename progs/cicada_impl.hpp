@@ -525,20 +525,28 @@ bool parse_line(const std::string& line,
   return iter == end;
 }
 
+struct OperationData
+{
+  size_t id;
+  
+  lattice_type         lattice;
+  span_set_type        spans;
+  sentence_set_type    targets;
+  hypergraph_type      hypergraph;
+  ngram_count_set_type ngram_counts;
+};
+
 
 class Operation
 {
 public:
   typedef Operation base_type;
+  typedef OperationData data_type;
 
   Operation() {}
   virtual ~Operation() {}
   
-  virtual void operator()(const lattice_type& lattice,
-			  const span_set_type& spans,
-			  const sentence_set_type& targets,
-			  hypergraph_type& graph,
-			  ngram_count_set_type& ngram_counts) const = 0;
+  virtual void operator()(data_type& data) const = 0;
 
   virtual void assign(const weight_set_type& weights) {}
 
@@ -632,12 +640,9 @@ public:
   }
   
   
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type binarized;
     
     if (debug)
@@ -726,8 +731,9 @@ public:
   };
 
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph, ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type permuted;
     
     if (debug)
@@ -784,12 +790,9 @@ public:
       debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type composed;
     
     if (debug)
@@ -849,12 +852,10 @@ public:
       debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    const lattice_type& lattice = data.lattice;
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type composed;
     
     if (debug)
@@ -911,12 +912,9 @@ public:
     : debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type generated;
     
     if (debug)
@@ -999,18 +997,15 @@ public:
   }
 
   
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type applied;
 
     model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
     
     // assignment...
-    __model.assign(hypergraph,lattice, spans);
+    __model.assign(data.hypergraph, data.lattice, data.spans);
     
     if (forced)
       __model.apply_feature(true);
@@ -1115,12 +1110,11 @@ public:
       throw std::runtime_error("you have no bleu feature function");
   }
 
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    const lattice_type& lattice = data.lattice;
+    hypergraph_type& hypergraoh = data.hypergraph;
+
     int source_length = lattice.shortest_distance();
     if (hypergraph.is_valid()) {
       // we will enumerate forest structure... and collect min-size...
@@ -1239,12 +1233,9 @@ public:
       throw std::runtime_error("you have no variational feature function");
   }
     
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type variational;
 
     // clear weights to one if feature-weights-one...
@@ -1365,8 +1356,9 @@ public:
       throw std::runtime_error("you have weights, but specified all-one parameter");
   }
 
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph, ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    hypergraph_type& hypergraph = data.hypergraph;
     hypergraph_type pruned;
 
     weight_set_type __weights;
@@ -1450,8 +1442,11 @@ public:
   Intersect(const int __debug)
     : debug(__debug) {}
 
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph, ngram_count_set_type& ngram_counts) const
+  void operator()(data_tye& data) const
   {
+    const sentence_set_type& targets = data.targets;
+    hypergraph_type& hypergraph = data.hypergraph;
+    
     if (targets.empty())
       throw std::runtime_error("no target?");
     
@@ -1485,8 +1480,8 @@ public:
 class OutputString : public Operation
 {
 public:
-  OutputString(const std::string& parameter, std::string& __buffer, size_t& __id, const int __debug)
-    : buffer(__buffer), id(__id), weights(0), weights_one(false),
+  OutputString(const std::string& parameter, std::string& __buffer, const int __debug)
+    : buffer(__buffer), weights(0), weights_one(false),
       kbest_size(0), kbest_unique(false),
       yield_source(false), yield_target(false), yield_tree(false),
       graphviz(false),
@@ -1548,12 +1543,11 @@ public:
     weights = &__weights;
   }
   
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    const size_t& id = data;
+    const hypergraph_type& hypergraph = data.hypergraph;
+    
     if (! hypergraph.is_valid()) return;
     
     boost::iostreams::filtering_ostream os;
@@ -1605,7 +1599,6 @@ public:
   }
   
   std::string& buffer;
-  size_t& id;
   
   const weight_set_type* weights;
   bool weights_one;
@@ -1624,8 +1617,8 @@ public:
 class Output : public Operation
 {
 public:
-  Output(const std::string& parameter, boost::shared_ptr<std::ostream>& __os, size_t& __id, const int __debug)
-    : os(__os), id(__id), file(), directory(), weights(0), weights_one(false),
+  Output(const std::string& parameter, boost::shared_ptr<std::ostream>& __os, const int __debug)
+    : os(__os), file(), directory(), weights(0), weights_one(false),
       kbest_size(0), kbest_unique(false),
       yield_source(false), yield_target(false), yield_tree(false),
       graphviz(false),
@@ -1701,12 +1694,11 @@ public:
       *os << std::flush;
   }
   
-  void operator()(const lattice_type& lattice,
-		  const span_set_type& spans,
-		  const sentence_set_type& targets,
-		  hypergraph_type& hypergraph,
-		  ngram_count_set_type& ngram_counts) const
+  void operator()(data_type& data) const
   {
+    const size_t& id = data;
+    const hypergraph_type& hypergraph = data.hypergraph;
+    
     if (! hypergraph.is_valid()) return;
 
     if (! os) {
@@ -1761,7 +1753,6 @@ public:
   }
   
   boost::shared_ptr<std::ostream>& os;
-  size_t& id;
   
   path_type file;
   path_type directory;
@@ -1803,14 +1794,16 @@ public:
 	       const bool __input_bitext,
 	       const bool __input_mpi,
 	       const int debug)
-    : id(size_t(-1)), 
-      input_id(__input_id),
+    : input_id(__input_id),
       input_lattice(__input_lattice),
       input_forest(__input_forest),
       input_span(__input_span),
       input_bitext(__input_bitext),
       input_mpi(__input_mpi)
   {
+    // initialize...
+    data.id = size_t(-1);
+
     typedef cicada::Parameter param_type;
 
     bool checked = false;
@@ -1840,7 +1833,7 @@ public:
 	operations.push_back(operation_ptr_type(new Intersect(debug)));
       else if (param.name() == "output") {
 	// we do extra checking so that all the output directed to either the same directory or output-file
-	boost::shared_ptr<Output> output(new Output(*first, os, id, debug));
+	boost::shared_ptr<Output> output(new Output(*first, os, debug));
 	
 	if (! checked) {
 	  file      = output->file;
@@ -1853,7 +1846,7 @@ public:
 	checked = true;
 	
 	if (input_mpi && ! file.empty())
-	  operations.push_back(operation_ptr_type(new OutputString(*first, buffer, id, debug)));
+	  operations.push_back(operation_ptr_type(new OutputString(*first, buffer, debug)));
 	else
 	  operations.push_back(output);
 	
@@ -1923,69 +1916,69 @@ output: kbest or hypergraph output\n\
   }
   
   void operator()(const std::string& line) {
-    
+
     // clear...
     {
       operation_ptr_set_type::iterator oiter_end = operations.end();
       for (operation_ptr_set_type::iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
 	(*oiter)->clear();
     }
-
+    
     std::string::const_iterator iter = line.begin();
     std::string::const_iterator end = line.end();
     
     if (input_id) {
-      if (! parse_id(id, iter, end))
+      if (! parse_id(data.id, iter, end))
 	throw std::runtime_error("invalid id-prefixed format");
     } else
-      ++ id;
+      ++ data.id;
     
     if (input_lattice) {
-      if (! lattice.assign(iter, end))
+      if (! data.lattice.assign(iter, end))
 	throw std::runtime_error("invalid lattive format");
     } else if (input_forest) {
-      if (! hypergraph.assign(iter, end))
+      if (! data.hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
     } else {
       if (! sentence.assign(iter, end))
 	throw std::runtime_error("invalid sentence format");
       
-      lattice = lattice_type(sentence);
+      data.lattice = lattice_type(sentence);
     }
     
     if (input_span) {
-      spans.clear();
+      data.spans.clear();
       
       if (! parse_separator(iter, end))
 	throw std::runtime_error("invalid span format (separator)");
       
-      if (! spans.assign(iter, end))
+      if (! data.spans.assign(iter, end))
 	throw std::runtime_error("invalid span format");
     }
     
     if (input_bitext) {
-      targets.clear();
+      data.targets.clear();
       
       while (parse_separator(iter, end)) {
-	targets.push_back(sentence_type());
+	data.targets.push_back(sentence_type());
 	
-	if (! targets.back().assign(iter, end))
+	if (! data.targets.back().assign(iter, end))
 	  throw std::runtime_error("invalid sentence format");
       }
       
-      if (targets.empty())
+      if (data.targets.empty())
 	throw std::runtime_error("no bitext?");
     }
     
     if (iter != end)
       throw std::runtime_error("invalid input format");
     
-    if (lattice.empty() && ! hypergraph.is_valid()) {
+    if (data.lattice.empty() && ! data.hypergraph.is_valid()) {
       
     } else {
       operation_ptr_set_type::const_iterator oiter_end = operations.end();
       for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
-	(*oiter)->operator()(lattice, spans, targets, hypergraph, ngram_counts);
+	(*oiter)->operator()(data);
     }
   }
   
@@ -1996,20 +1989,13 @@ output: kbest or hypergraph output\n\
   bool input_bitext;
   bool input_mpi;
   
-  // output related...
   boost::shared_ptr<std::ostream> os;
   std::string                     buffer;
-
+  
   path_type file;
   path_type directory;
   
-  size_t id;
-  
-  lattice_type         lattice;
-  span_set_type        spans;
-  sentence_set_type    targets;
-  hypergraph_type      hypergraph;
-  ngram_count_set_type ngram_counts;
+  data_type data;
 
   sentence_type sentence;
   

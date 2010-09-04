@@ -791,11 +791,11 @@ struct Task
       operations(buffer);
       
       // operations.hypergraph contains result...
-      const size_t& id = operations.id;
-      const lattice_type& lattice = operations.lattice;
-      const span_set_type& spans = operations.spans;
-      const hypergraph_type& hypergraph = operations.hypergraph;
-      const sentence_set_type& targets = operations.targets;
+      const size_t& id = operations.data.id;
+      const lattice_type& lattice = operations.data.lattice;
+      const span_set_type& spans = operations.data.spans;
+      const hypergraph_type& hypergraph = operations.data.hypergraph;
+      const sentence_set_type& targets = operations.data.targets;
       
       if (debug)
 	std::cerr << "id: " << id << std::endl;
