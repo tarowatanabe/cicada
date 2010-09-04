@@ -43,6 +43,7 @@
 #include "cicada/weight_vector.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/span_vector.hpp"
+#include "cicada/unigram_count_set.hpp"
 
 #include "cicada/feature/variational.hpp"
 #include "cicada/feature/bleu.hpp"
@@ -74,6 +75,7 @@ typedef feature_set_type::feature_type feature_type;
 typedef cicada::WeightVector<double>   weight_set_type;
 
 typedef cicada::SpanVector span_set_type;
+typedef cicada::NGramCountSet ngram_count_set_type;
 
 typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
 
@@ -532,7 +534,11 @@ public:
   Operation() {}
   virtual ~Operation() {}
   
-  virtual void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& graph) const = 0;
+  virtual void operator()(const lattice_type& lattice,
+			  const span_set_type& spans,
+			  const sentence_set_type& targets,
+			  hypergraph_type& graph,
+			  ngram_count_set_type& ngram_counts) const = 0;
 
   virtual void assign(const weight_set_type& weights) {}
 
@@ -626,7 +632,11 @@ public:
   }
   
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type binarized;
     
@@ -716,7 +726,7 @@ public:
   };
 
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph, ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type permuted;
     
@@ -774,7 +784,11 @@ public:
       debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type composed;
     
@@ -835,7 +849,11 @@ public:
       debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type composed;
     
@@ -893,7 +911,11 @@ public:
     : debug(__debug)
   { }
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type generated;
     
@@ -977,7 +999,11 @@ public:
   }
 
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type applied;
 
@@ -1089,7 +1115,11 @@ public:
       throw std::runtime_error("you have no bleu feature function");
   }
 
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     int source_length = lattice.shortest_distance();
     if (hypergraph.is_valid()) {
@@ -1209,7 +1239,11 @@ public:
       throw std::runtime_error("you have no variational feature function");
   }
     
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type variational;
 
@@ -1331,7 +1365,7 @@ public:
       throw std::runtime_error("you have weights, but specified all-one parameter");
   }
 
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph, ngram_count_set_type& ngram_counts) const
   {
     hypergraph_type pruned;
 
@@ -1416,7 +1450,7 @@ public:
   Intersect(const int __debug)
     : debug(__debug) {}
 
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph, ngram_count_set_type& ngram_counts) const
   {
     if (targets.empty())
       throw std::runtime_error("no target?");
@@ -1514,7 +1548,11 @@ public:
     weights = &__weights;
   }
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     if (! hypergraph.is_valid()) return;
     
@@ -1663,7 +1701,11 @@ public:
       *os << std::flush;
   }
   
-  void operator()(const lattice_type& lattice, const span_set_type& spans, const sentence_set_type& targets, hypergraph_type& hypergraph) const
+  void operator()(const lattice_type& lattice,
+		  const span_set_type& spans,
+		  const sentence_set_type& targets,
+		  hypergraph_type& hypergraph,
+		  ngram_count_set_type& ngram_counts) const
   {
     if (! hypergraph.is_valid()) return;
 
@@ -1943,7 +1985,7 @@ output: kbest or hypergraph output\n\
     } else {
       operation_ptr_set_type::const_iterator oiter_end = operations.end();
       for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
-	(*oiter)->operator()(lattice, spans, targets, hypergraph);
+	(*oiter)->operator()(lattice, spans, targets, hypergraph, ngram_counts);
     }
   }
   
@@ -1963,10 +2005,11 @@ output: kbest or hypergraph output\n\
   
   size_t id;
   
-  lattice_type      lattice;
-  span_set_type     spans;
-  sentence_set_type targets;
-  hypergraph_type   hypergraph;
+  lattice_type         lattice;
+  span_set_type        spans;
+  sentence_set_type    targets;
+  hypergraph_type      hypergraph;
+  ngram_count_set_type ngram_counts;
 
   sentence_type sentence;
   

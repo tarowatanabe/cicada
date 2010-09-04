@@ -130,11 +130,12 @@ namespace cicada
 	
 	result.assign(tokens.begin(), tokens.end());
       }
-      
+
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
-			const edge_type& edge) const
+			const edge_type& edge,
+			const bool final=false) const
       {
 	if (ngrams.empty()) {
 	  char* buf = reinterpret_cast<char*>(state);
@@ -199,7 +200,7 @@ namespace cicada
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 
-	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
+	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size, ! final);
 	  
 	  //std::cerr << "bleu: " << bleu << ' ';
 	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
@@ -338,7 +339,7 @@ namespace cicada
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 
-	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size);
+	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size, ! final);
 	  
 	  //std::cerr << "bleu: " << bleu;
 	  //std::cerr << " antecedent: " << bleu_antecedent << ' ';
@@ -517,7 +518,7 @@ namespace cicada
 	  return std::min(1.0 - reference_size / hypothesis_size, 0.0);
       }
       
-      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int parsed_size, const int source_size) const
+      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int parsed_size, const int source_size, const bool scaling=true) const
       {
 	count_set_type counts_bleu(order, count_type(0));
 	if (exact)
@@ -530,7 +531,7 @@ namespace cicada
 	
 	if (__bleu && __bleu->length_reference > 0) {
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size);
+	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
 	  
 	  double smooth = 0.5;
@@ -555,7 +556,7 @@ namespace cicada
 	} else {
 	  if (hypothesis_size == 0 || counts.empty()) return 0.0;
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size);
+	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
 	  
 	  double smooth = 0.5;
@@ -575,13 +576,13 @@ namespace cicada
 	}
       }
 
-      double tst_size(int length, int parsed, int source_size) const
+      double tst_size(int length, int parsed, int source_size, const bool scaling=true) const
       {
 	if (length == 0 || parsed == 0) return 0.0;
 	
 	// we will scale hypothesis length by the # of parsed words
 	
-	return (parsed < source_size
+	return (parsed < source_size && scaling
 		? (double(source_size) / parsed) * length
 		: double(length));
       }
@@ -682,7 +683,7 @@ namespace cicada
 		     feature_set_type& estimates,
 		     const bool final) const
     {
-      const double score = pimpl->bleu_score(state, states, edge);
+      double score = pimpl->bleu_score(state, states, edge, final);
       
       if (score != 0.0)
 	features[base_type::feature_name()] = score;
