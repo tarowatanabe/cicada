@@ -116,6 +116,7 @@ model.hpp \
 ngram.hpp \
 ngram_index.hpp \
 ngram_count_set.hpp \
+operation.hpp \
 optimize.hpp \
 parameter.hpp \
 permute.hpp \
@@ -151,6 +152,7 @@ lattice.cpp \
 ngram.cpp \
 ngram_index.cpp \
 model.cpp \
+operation.cpp \
 parameter.cpp \
 rule.cpp \
 sentence.cpp \
