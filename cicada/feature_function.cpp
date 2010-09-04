@@ -32,10 +32,13 @@ bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
 \tsplit=[true|false] split non-ascii chars\n\
+\tyield=[source|target]\n\
 bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
 \tprecision=<default 0.8>,\n\
 \tratio=<default 0.6>\n\
+\tsplit=[true|false] split non-ascii chars\n\
+\tyield=[source|target]\n\
 boundary: boundary bigram feature\n\
 \tcluster-source=[word class file for source]\n\
 \tcluster-target=[word class file for target]\n\

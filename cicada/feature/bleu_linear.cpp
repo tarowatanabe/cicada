@@ -11,6 +11,11 @@
 
 #include <boost/numeric/conversion/bounds.hpp>
 
+#include <unicode/uchar.h>
+#include <unicode/unistr.h>
+#include <unicode/schriter.h>
+#include <unicode/bytestream.h>
+
 namespace cicada
 {
   namespace feature
@@ -67,8 +72,11 @@ namespace cicada
     public:
       BleuLinearImpl(const int __order,
 		     const double __precision,
-		     const double __ratio)
-	: ngrams(word_type()), nodes(), sizes(), order(__order), precision(__precision), ratio(__ratio)
+		     const double __ratio,
+		     const bool __split,
+		     const bool __yield_source)
+	: ngrams(word_type()), nodes(), sizes(), order(__order), precision(__precision), ratio(__ratio),
+	  split(__split), yield_source(__yield_source)
       {
 	factors.clear();
 	factors.resize(order + 1, 0.0);
@@ -87,9 +95,18 @@ namespace cicada
 			const edge_type& edge) const
       {
 	const rule_type& rule = *edge.rule;
-	const phrase_type& target = rule.target;
+	
+	phrase_type target_split;
+	if (split) {
+	  if (yield_source)
+	    split_non_ascii_characters(rule.source, target_split);
+	  else
+	    split_non_ascii_characters(rule.target, target_split);
+	}
+	
+	const phrase_type& target = (split ? target_split : (yield_source ? rule.source : rule.target));
 	const phrase_type& source = rule.source;
-
+	
 	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
 	symbol_type* context_last  = context_first + order * 2;
 	
@@ -211,6 +228,45 @@ namespace cicada
       {
 	
       }
+
+      template <typename Sentence>
+      void split_non_ascii_characters(const Sentence& phrase, Sentence& result) const
+      {
+	std::vector<word_type, std::allocator<word_type> > tokens;
+	std::string buffer;
+	
+	typename Sentence::const_iterator piter_end = phrase.end();
+	for (typename Sentence::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
+	  
+	  UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*piter));
+	  
+	  StringCharacterIterator iter(uword);
+	  for (iter.setToStart(); iter.hasNext(); /**/) {
+	    const UChar32 c = iter.next32PostInc();
+	    
+	    if (c < 128)
+	      buffer.push_back(c);
+	    else {
+	      // we will split...
+	      if (! buffer.empty())
+		tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	      buffer.clear();
+	      
+	      StringByteSink<std::string> __sink(&buffer);
+	      UnicodeString(c).toUTF8(__sink);
+	      
+	      tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	      buffer.clear();
+	    }
+	  }
+	  
+	  if (! buffer.empty())
+	    tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	  buffer.clear();
+	}
+	
+	result.assign(tokens.begin(), tokens.end());
+      }
       
       void clear()
       {
@@ -326,6 +382,9 @@ namespace cicada
       int order;
       double precision;
       double ratio;
+      
+      bool split;
+      bool yield_source;
     };
     
     BleuLinear::BleuLinear(const std::string& parameter)
@@ -341,6 +400,11 @@ namespace cicada
       int order        = 4;
       double precision = 0.8;
       double ratio     = 0.6;
+      
+      bool split = false;
+      
+      bool yield_source = false;
+      bool yield_target = false;
 
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
@@ -349,11 +413,25 @@ namespace cicada
 	  precision = boost::lexical_cast<double>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "ratio") == 0)
 	  ratio = boost::lexical_cast<double>(piter->second);
-	else
+	else if (strcasecmp(piter->first.c_str(), "split") == 0)
+	  split = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	  const std::string& yield = piter->second;
+	  
+	  if (strcasecmp(yield.c_str(), "source") == 0)
+	    yield_source = true;
+	  else if (strcasecmp(yield.c_str(), "target") == 0)
+	    yield_target = true;
+	  else
+	    throw std::runtime_error("unknown parameter: " + parameter);
+	} else
 	  std::cerr << "WARNING: unsupported parameter for bleu-linear: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio));
+      if (yield_source && yield_target)
+	throw std::runtime_error("you cannot specify both source/target yield");
+      
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, split, yield_source));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2;
