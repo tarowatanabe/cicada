@@ -8,6 +8,7 @@
 #include "utils/compact_trie_dense.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
 

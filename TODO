@@ -1,3 +1,13 @@
+Merge bleu/variational op into "apply" with local-feature function
+
+add expected-counts operation
+
+add MBR to output operation
+
+operations defined in cicada/operation.hpp, not in cicada_impl.hpp
+
+ngram count statistics are treated as an object during operations
+
 Do we allow state-less features applied during composition???
 	We need composition-based features for phrase-based MT
 	to compute distortion/lexicalized reordering etc. not represented in
@@ -24,3 +34,4 @@ System combination as statitical generation
     Use Earley parsing as generation?
     Do we really handle unary rules with cycles/loops?
     Infinite generation: we will clip by the max-length in hypergraph
+

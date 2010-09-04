@@ -1,6 +1,9 @@
 Following is a list of operations applicable via --operation [op] in the order specified by command line
 or by a config file. "output" must be placed as its final operations, otherwise, you will easily mess up.
 
+You can treat the sequence of operations in SIMD (single-instruction multiple-data) fashion, 
+in which the same sequence of operations is applied to each data (potentially in parallel)
+
 
 binarize: perform binarization (monolingual tree)
         direction=[left|right] binarization direction

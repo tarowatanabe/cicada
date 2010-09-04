@@ -24,14 +24,14 @@ namespace utils
     typedef uint8_t   byte_type;
     
   public:
-    static const size_type __block_byte_size = sizeof(block_type);
-    static const size_type __block_bit_size  = __block_byte_size * 8;
-    static const size_type __block_mask      = __block_bit_size - 1;
-    static const size_type __block_shift     = utils::bithack::static_bit_count<__block_mask>::result;
+    static const size_type __bitblock_byte_size = sizeof(block_type);
+    static const size_type __bitblock_bit_size  = __bitblock_byte_size * 8;
+    static const size_type __bitblock_mask      = __bitblock_bit_size - 1;
+    static const size_type __bitblock_shift     = utils::bithack::static_bit_count<__bitblock_mask>::result;
 
     const block_type* __masks() const 
     {
-      static block_type __mask_blocks[__block_bit_size] = {
+      static block_type __mask_blocks[__bitblock_bit_size] = {
 	0x00000001, 0x00000002, 0x00000004, 0x00000008,
 	0x00000010, 0x00000020, 0x00000040, 0x00000080,
 	0x00000100, 0x00000200, 0x00000400, 0x00000800,
@@ -46,7 +46,7 @@ namespace utils
     
     const block_type* __masks_reverse() const 
     {
-      static block_type __mask_blocks[__block_bit_size] = {
+      static block_type __mask_blocks[__bitblock_bit_size] = {
 	~0x00000001, ~0x00000002, ~0x00000004, ~0x00000008,
 	~0x00000010, ~0x00000020, ~0x00000040, ~0x00000080,
 	~0x00000100, ~0x00000200, ~0x00000400, ~0x00000800,
@@ -61,7 +61,7 @@ namespace utils
     
     const block_type* __masks_rank() const 
     {
-      static block_type __mask_blocks[__block_bit_size] = {
+      static block_type __mask_blocks[__bitblock_bit_size] = {
 	0x00000001, 0x00000003, 0x00000007, 0x0000000f,
 	0x0000001f, 0x0000003f, 0x0000007f, 0x000000ff,
 	0x000001ff, 0x000003ff, 0x000007ff, 0x00000fff,
@@ -133,7 +133,7 @@ namespace utils
     static const size_type __bit_size          = NumBits;
     static const size_type __bit_capacity      = (__bit_size + (__bit_multiple_size - 1)) & size_type(- __bit_multiple_size);    
     
-    static const size_type __block_size      = __bit_capacity >> __block_shift;
+    static const size_type __bitblock_size      = __bit_capacity >> __bitblock_shift;
     
   public:
     bit_vector() { clear(); }
@@ -147,7 +147,7 @@ namespace utils
   public:
     size_type size() const { return __bit_size; }
     size_type capacity() const { return __bit_capacity; }
-    size_type block_size() const { return __block_size; }
+    size_type block_size() const { return __bitblock_size; }
     
   public:
     void assign(const bit_vector& x)
@@ -165,17 +165,17 @@ namespace utils
     
     bool test(size_type pos) const
     {
-      return __block[pos >> __block_shift] & __masks()[pos & __block_mask];
+      return __bitblock[pos >> __bitblock_shift] & __masks()[pos & __bitblock_mask];
     }
     
     void clear(size_type pos) { set(pos, false); }
     
     void set(size_type pos, bool bit=true)
     {
-      const size_type pos_block = pos >> __block_shift;
-      const size_type pos_mask  = pos & __block_mask;
+      const size_type pos_block = pos >> __bitblock_shift;
+      const size_type pos_mask  = pos & __bitblock_mask;
       
-      __block[pos_block] = (__block[pos_block] & __masks_reverse()[pos_mask]) | (-bit & __masks()[pos_mask]);
+      __bitblock[pos_block] = (__bitblock[pos_block] & __masks_reverse()[pos_mask]) | (-bit & __masks()[pos_mask]);
     }
     
   private:    
@@ -250,14 +250,14 @@ namespace utils
 
     size_type rank(size_type pos, bool bit) const
     {
-      const size_type pos_block = pos >> __block_shift;
-      const size_type pos_mask  = pos & __block_mask;
+      const size_type pos_block = pos >> __bitblock_shift;
+      const size_type pos_mask  = pos & __bitblock_mask;
       
       // first, computa rank1
       size_type sum = 0;
       for (const block_type* biter = begin(); biter != begin() + pos_block; ++ biter)
 	sum += utils::bithack::bit_count(*biter);
-      sum += utils::bithack::bit_count(__block[pos_block] & __masks_rank()[pos_mask]);
+      sum += utils::bithack::bit_count(__bitblock[pos_block] & __masks_rank()[pos_mask]);
       
       // then, compute rank1 or rank0 according to bit
       const size_type rank_mask = size_type(bit - 1);
@@ -273,7 +273,7 @@ namespace utils
   private:
     struct rank_block_type
     {
-      rank_block_type(const block_type& __block_value) : block_value(__block_value) {}
+      rank_block_type(const block_type& __bitblock_value) : block_value(__bitblock_value) {}
       
       size_type size() const { return sizeof(block_type); }
       
@@ -308,7 +308,7 @@ namespace utils
     
     struct rank_block_reverse_type
     {
-      rank_block_reverse_type(const block_type& __block_value) : block_value(__block_value) {}
+      rank_block_reverse_type(const block_type& __bitblock_value) : block_value(__bitblock_value) {}
       
       size_type size() const { return sizeof(block_type); }
       
@@ -362,7 +362,7 @@ namespace utils
       for (/**/; pos_byte < 4 && rank_block[pos_byte] < bits_remain; ++ pos_byte);
       bits_remain -= (pos_byte == 0 ? size_type(0) : rank_block[pos_byte - 1]);
       
-      size_type pos_bit = ((biter - begin()) << __block_shift) + (pos_byte << 3);
+      size_type pos_bit = ((biter - begin()) << __bitblock_shift) + (pos_byte << 3);
       
       const byte_type byte_value = rank_block(pos_byte);
       const size_type byte_value_count_lower = utils::bithack::bit_count(byte_value & 0x0f);
@@ -383,7 +383,7 @@ namespace utils
       const block_type* biter = begin();
       for (/**/; biter != end(); ++ biter) {
 	sum_prev = sum;
-	sum += __block_bit_size - utils::bithack::bit_count(*biter);
+	sum += __bitblock_bit_size - utils::bithack::bit_count(*biter);
 	
 	if (! (sum < x)) break;
       }
@@ -396,7 +396,7 @@ namespace utils
       for (/**/; pos_byte < 4 && rank_block[pos_byte] < bits_remain; ++ pos_byte);
       bits_remain -= (pos_byte == 0 ? size_type(0) : rank_block[pos_byte - 1]);
       
-      size_type pos_bit = ((biter - begin()) << __block_shift) + (pos_byte << 3);
+      size_type pos_bit = ((biter - begin()) << __bitblock_shift) + (pos_byte << 3);
       
       const byte_type byte_value = rank_block(pos_byte);
       const size_type byte_value_count_lower = 4 - bithack::bit_count(byte_value & 0x0f);
@@ -409,17 +409,17 @@ namespace utils
     }
 
   public:
-    inline const block_type* begin() const { return __block; }
-    inline       block_type* begin()       { return __block; }
+    inline const block_type* begin() const { return __bitblock; }
+    inline       block_type* begin()       { return __bitblock; }
     
-    inline const block_type* end() const { return __block + __block_size; }
-    inline       block_type* end()       { return __block + __block_size; }
+    inline const block_type* end() const { return __bitblock + __bitblock_size; }
+    inline       block_type* end()       { return __bitblock + __bitblock_size; }
     
-    inline const block_type* end(size_type bits) const { return __block + ((bits + __block_mask) >> __block_shift); }
-    inline       block_type* end(size_type bits)       { return __block + ((bits + __block_mask) >> __block_shift); }
+    inline const block_type* end(size_type bits) const { return __bitblock + ((bits + __bitblock_mask) >> __bitblock_shift); }
+    inline       block_type* end(size_type bits)       { return __bitblock + ((bits + __bitblock_mask) >> __bitblock_shift); }
     
   private:
-    block_type __block[__block_size];
+    block_type __bitblock[__bitblock_size];
   };
   
   template <size_t _N>

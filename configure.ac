@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.63])
+AC_PREREQ([2.61])
 AC_INIT([cicada], [0.0.1], [taro.watanabe@nict.go.jp])
 
 AC_CONFIG_AUX_DIR(config)

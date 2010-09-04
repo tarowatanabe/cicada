@@ -33,7 +33,6 @@ public:
     
     typedef ngram_set_type::value_type  value_type;
     typedef ngram_set_type::key_type    key_type;
-    typedef ngram_set_type::data_type   data_type;
     typedef ngram_set_type::mapped_type mapped_type;
 
     typedef ngram_set_type::const_iterator  const_iterator;

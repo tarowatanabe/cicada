@@ -247,7 +247,7 @@ struct TaskStdout
       
       operations(line);
       
-      queue_os.push(boost::lexical_cast<std::string>(operations.id) + ' ' + operations.buffer);
+      queue_os.push(boost::lexical_cast<std::string>(operations.data.id) + ' ' + operations.buffer);
     }
 
     queue_os.push(std::string());

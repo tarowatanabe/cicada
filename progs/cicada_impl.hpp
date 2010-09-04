@@ -43,7 +43,7 @@
 #include "cicada/weight_vector.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/span_vector.hpp"
-#include "cicada/unigram_count_set.hpp"
+#include "cicada/ngram_count_set.hpp"
 
 #include "cicada/feature/variational.hpp"
 #include "cicada/feature/bleu.hpp"
@@ -1127,7 +1127,8 @@ public:
   void operator()(data_type& data) const
   {
     const lattice_type& lattice = data.lattice;
-    hypergraph_type& hypergraoh = data.hypergraph;
+    const sentence_set_type& targets = data.targets;
+    hypergraph_type& hypergraph = data.hypergraph;
     
     int source_length = lattice.shortest_distance();
     if (hypergraph.is_valid()) {
@@ -1244,7 +1245,7 @@ public:
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
 	weights_one = utils::lexical_cast<bool>(piter->second);
       else if (strcasecmp(piter->first.c_str(), "variational") == 0)
-	variational_parameter = piter->second
+	variational_parameter = piter->second;
       else
 	std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
     }
@@ -1252,7 +1253,7 @@ public:
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
 
-    feature = feature_function_type::create(bleu_parameter);
+    feature = feature_function_type::create(variational_parameter);
     if (! feature)
       throw std::runtime_error("no variational feature function?");
     
@@ -1471,7 +1472,7 @@ public:
   Intersect(const int __debug)
     : debug(__debug) {}
 
-  void operator()(data_tye& data) const
+  void operator()(data_type& data) const
   {
     const sentence_set_type& targets = data.targets;
     hypergraph_type& hypergraph = data.hypergraph;
@@ -1574,7 +1575,7 @@ public:
   
   void operator()(data_type& data) const
   {
-    const size_t& id = data;
+    const size_t& id = data.id;
     const hypergraph_type& hypergraph = data.hypergraph;
     
     if (! hypergraph.is_valid()) return;
@@ -1725,7 +1726,7 @@ public:
   
   void operator()(data_type& data) const
   {
-    const size_t& id = data;
+    const size_t& id = data.id;
     const hypergraph_type& hypergraph = data.hypergraph;
     
     if (! hypergraph.is_valid()) return;
@@ -1804,7 +1805,9 @@ class OperationSet
 {
 public:
 
-  typedef Operation operation_type;
+  typedef Operation     operation_type;
+  typedef OperationData data_type;
+  
   typedef boost::shared_ptr<operation_type> operation_ptr_type;
   typedef std::vector<operation_ptr_type, std::allocator<operation_ptr_type> > operation_ptr_set_type;
   

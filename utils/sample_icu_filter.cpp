@@ -4,6 +4,7 @@
 
 #include "icu_filter.hpp"
 
+#include <boost/version.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/device/file.hpp>
@@ -13,7 +14,11 @@ int main(int argc, char** argv)
   try {
     boost::iostreams::filtering_istream is;
     is.push(utils::icu_filter("utf-8", "euc-jp", utils::icu_filter_param::stop));
+#if BOOST_VERSION >= 104400
+    is.push(boost::iostreams::file_descriptor_source(::dup(STDIN_FILENO), boost::iostreams::close_handle));
+#else
     is.push(boost::iostreams::file_descriptor_source(::dup(STDIN_FILENO), true));
+#endif
     
     char buffer[4096];
     

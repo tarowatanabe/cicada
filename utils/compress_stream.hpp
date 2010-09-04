@@ -15,6 +15,7 @@
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/device/file.hpp>
 
+#include <boost/version.hpp>
 #include <boost/filesystem.hpp>
 
 namespace utils
@@ -64,9 +65,13 @@ namespace utils
 				const boost::filesystem::path& path,
 				size_t buffer_size = 4096)
   {
-    if (path.file_string() == "-")  
+    if (path.file_string() == "-")  {
+#if BOOST_VERSION >= 104400
+      os.push(boost::iostreams::file_descriptor_sink(::dup(STDOUT_FILENO), boost::iostreams::close_handle), buffer_size);
+#else
       os.push(boost::iostreams::file_descriptor_sink(::dup(STDOUT_FILENO), true), buffer_size);
-    else {
+#endif
+    } else {
       switch (impl::compress_oformat(path)) {
       case impl::COMPRESS_STREAM_GZIP:
 	os.push(boost::iostreams::gzip_compressor());
@@ -86,9 +91,13 @@ namespace utils
 				const boost::filesystem::path& path,
 				size_t buffer_size = 4096)
   {
-    if (path.file_string() == "-")  
+    if (path.file_string() == "-")  {
+#if BOOST_VERSION >= 104400
+      is.push(boost::iostreams::file_descriptor_source(::dup(STDIN_FILENO), boost::iostreams::close_handle), buffer_size);
+#else
       is.push(boost::iostreams::file_descriptor_source(::dup(STDIN_FILENO), true), buffer_size);
-    else {
+#endif
+    } else {
       if (boost::filesystem::is_regular_file(path)) {
 	switch (impl::compress_iformat(path)) {
 	case impl::COMPRESS_STREAM_GZIP:
