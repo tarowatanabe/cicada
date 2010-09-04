@@ -126,6 +126,7 @@ quantizer.hpp \
 rule.hpp \
 semiring.hpp \
 sentence.hpp \
+sentence_vector.hpp \
 sort.hpp \
 span_node.hpp \
 span_edge.hpp \
@@ -153,6 +154,7 @@ model.cpp \
 parameter.cpp \
 rule.cpp \
 sentence.cpp \
+sentence_vector.cpp \
 span_vector.cpp \
 stemmer.cpp \
 symbol.cpp \
