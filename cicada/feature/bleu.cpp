@@ -89,8 +89,10 @@ namespace cicada
     public:
       BleuImpl(const int __order,
 	       const bool __exact,
-	       const bool __split)
-	: ngrams(word_type()), nodes(), sizes(), order(__order), exact(__exact), split(__split) {}
+	       const bool __split,
+	       const bool __yield_source)
+	: ngrams(word_type()), nodes(), sizes(),
+	  order(__order), exact(__exact), split(__split), yield_source(__yield_source) {}
       
       template <typename Sentence>
       void split_non_ascii_characters(const Sentence& phrase, Sentence& result) const
@@ -146,10 +148,14 @@ namespace cicada
 	const rule_type& rule = *edge.rule;
 	
 	phrase_type target_split;
-	if (split)
-	  split_non_ascii_characters(rule.target, target_split);
+	if (split) {
+	  if (yield_source)
+	    split_non_ascii_characters(rule.source, target_split);
+	  else
+	    split_non_ascii_characters(rule.target, target_split);
+	}
 	
-	const phrase_type& target = (split ? target_split : rule.target);
+	const phrase_type& target = (split ? target_split : (yield_source ? rule.source : rule.target));
 	const phrase_type& source = rule.source;
 	
 	count_set_type counts;
@@ -624,6 +630,7 @@ namespace cicada
       int order;
       bool exact;
       bool split;
+      bool yield_source;
     };
     
     
@@ -641,6 +648,9 @@ namespace cicada
       bool exact = false;
       bool split = false;
       
+      bool yield_source = false;
+      bool yield_target = false;
+      
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
@@ -648,11 +658,23 @@ namespace cicada
 	  exact = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "split") == 0)
 	  split = utils::lexical_cast<bool>(piter->second);
-	else
+	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	  const std::string& yield = piter->second;
+	  
+	  if (strcasecmp(yield.c_str(), "source") == 0)
+	    yield_source = true;
+	  else if (strcasecmp(yield.c_str(), "target") == 0)
+	    yield_target = true;
+	  else
+	    throw std::runtime_error("unknown parameter: " + parameter);
+	} else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, split));
+      if (yield_source && yield_target)
+	throw std::runtime_error("you cannot specify both source/target yield");
+      
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, split, yield_source));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
