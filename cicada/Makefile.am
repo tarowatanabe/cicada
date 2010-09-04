@@ -190,6 +190,7 @@ lattice_main \
 parameter_main \
 rule_main \
 sentence_main \
+sentence_vector_main \
 span_vector_main \
 stemmer_main \
 symbol_main
@@ -217,6 +218,9 @@ rule_main_LDADD = libcicada.la
 
 sentence_main_SOURCES = sentence_main.cpp
 sentence_main_LDADD = libcicada.la
+
+sentence_vector_main_SOURCES = sentence_vector_main.cpp
+sentence_vector_main_LDADD = libcicada.la
 
 span_vector_main_SOURCES = span_vector_main.cpp
 span_vector_main_LDADD = libcicada.la
