@@ -47,6 +47,7 @@
 
 #include "cicada/feature/variational.hpp"
 #include "cicada/feature/bleu.hpp"
+#include "cicada/feature/bleu_linear.hpp"
 
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -1072,17 +1073,26 @@ public:
   int debug;
 };
 
+class ExpectedNGram : public Operation
+{
+public:
+  ExpectedNGram(const std::string& parameter, const model_type& model, const int __debug) {}
+  
+};
+
 class Bleu : public Operation
 {
 public:
-  Bleu(const std::string& parameter, const model_type& model, const int __debug)
-    : weights(0), size(200), weights_one(false), exact(false), debug(__debug)
+  Bleu(const std::string& parameter, const int __debug)
+    : bleu(0), bleu_linear(0), weights(0), size(200), weights_one(false), exact(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
     param_type param(parameter);
     if (param.name() != "bleu")
       throw std::runtime_error("this is not a bleu-computer");
+    
+    std::string bleu_parameter = "bleu";
     
     for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
       if (strcasecmp(piter->first.c_str(), "size") == 0)
@@ -1093,6 +1103,8 @@ public:
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
 	weights_one = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "bleu") == 0)
+	bleu_parameter = piter->second;
       else
 	std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
     }
@@ -1100,21 +1112,23 @@ public:
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
     
-    for (model_type::iterator iter = model.begin(); iter != model.end(); ++ iter) {
-      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(iter->get());
-      if (__bleu)
-	feature = *iter;
-    }
-    
+    feature = feature_function_type::create(bleu_parameter);
     if (! feature)
-      throw std::runtime_error("you have no bleu feature function");
+      throw std::runtime_error("no bleu feature function?");
+    
+    bleu        = dynamic_cast<cicada::feature::Bleu*>(feature.get());
+    bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(feature.get());
+    if (! bleu && ! bleu_linear)
+      throw std::runtime_error("no bleu feature function?");
+    
+    model.push_back(feature);
   }
-
+  
   void operator()(data_type& data) const
   {
     const lattice_type& lattice = data.lattice;
     hypergraph_type& hypergraoh = data.hypergraph;
-
+    
     int source_length = lattice.shortest_distance();
     if (hypergraph.is_valid()) {
       // we will enumerate forest structure... and collect min-size...
@@ -1130,15 +1144,17 @@ public:
     
     hypergraph_type applied;
     
-    cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(feature.get());
-
-    __bleu->clear();
-    sentence_set_type::const_iterator titer_end = targets.end();
-    for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
-      __bleu->insert(source_length, *titer);
-    
-    model_type model;
-    model.push_back(feature);
+    if (bleu) {
+      bleu->clear();
+      sentence_set_type::const_iterator titer_end = targets.end();
+      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+	bleu->insert(source_length, *titer);
+    } else {
+      bleu_linear->clear();
+      sentence_set_type::const_iterator titer_end = targets.end();
+      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+	bleu_linear->insert(source_length, *titer);
+    }
         
     weight_set_type weights_zero;
     const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
@@ -1161,8 +1177,11 @@ public:
     }
     
     utils::resource end;
-
-    __bleu->clear();
+    
+    if (bleu)
+      bleu->clear();
+    if (bleu_linear)
+      bleu_linear->clear();
 	
     if (debug)
       std::cerr << "bleu cpu time: " << (end.cpu_time() - start.cpu_time())
@@ -1185,10 +1204,17 @@ public:
   
   void clear()
   {
-    dynamic_cast<cicada::feature::Bleu*>(feature.get())->clear();
+    if (bleu)
+      bleu->clear();
+    if (bleu_linear)
+      bleu_linear->clear();
   }
   
   feature_function_type::feature_function_ptr_type feature;
+  cicada::feature::Bleu*       bleu;
+  cicada::feature::BleuLinear* bleu_linear;
+
+  model_type model;
   
   const weight_set_type* weights;
   int size;
@@ -1201,20 +1227,24 @@ public:
 class Variational : public Operation
 {
 public:
-  Variational(const std::string& parameter, const model_type& model, const int __debug)
-    : weights(0), weights_one(false), debug(__debug)
+  Variational(const std::string& parameter, const int __debug)
+    : variational(0), weights(0), weights_one(false), debug(__debug)
   {
     typedef cicada::Parameter param_type;
     
     param_type param(parameter);
     if (param.name() != "variational")
       throw std::runtime_error("this is not a variational decoder");
+
+    std::string variational_parameter = "variational";
     
     for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
       if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	weights = &base_type::weights(piter->second);
       else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
 	weights_one = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "variational") == 0)
+	variational_parameter = piter->second
       else
 	std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
     }
@@ -1222,21 +1252,21 @@ public:
     if (weights && weights_one)
       throw std::runtime_error("you have weights, but specified all-one parameter");
 
-
-    for (model_type::iterator iter = model.begin(); iter != model.end(); ++ iter) {
-      cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(iter->get());
-      if (__variational)
-	feature = *iter;
-    }
-    
+    feature = feature_function_type::create(bleu_parameter);
     if (! feature)
-      throw std::runtime_error("you have no variational feature function");
+      throw std::runtime_error("no variational feature function?");
+    
+    variational = dynamic_cast<cicada::feature::Variational*>(feature.get());
+    if (! variational)
+      throw std::runtime_error("no variational feature function?");
+    
+    model.push_back(feature);
   }
     
   void operator()(data_type& data) const
   {
     hypergraph_type& hypergraph = data.hypergraph;
-    hypergraph_type variational;
+    hypergraph_type appied;
 
     // clear weights to one if feature-weights-one...
     
@@ -1253,22 +1283,17 @@ public:
     if (debug)
       std::cerr << "variational decoding" << std::endl;
     
-    cicada::feature::Variational* __variational = dynamic_cast<cicada::feature::Variational*>(feature.get());
-    
     utils::resource start;
     
     // first, compute vatiational model
-    __variational->insert(hypergraph, *weights_variational);
-    
-    model_type model;
-    model.push_back(feature);
+    variational->insert(hypergraph, *weights_variational);
         
-    // second, apply again...
-    cicada::apply_exact(model, hypergraph, variational);
+    // second, apply with exact method...
+    cicada::apply_exact(model, hypergraph, appied);
     
     utils::resource end;
 
-    __variational->clear();
+    variational->clear();
 
     if (debug)
       std::cerr << "variational cpu time: " << (end.cpu_time() - start.cpu_time())
@@ -1276,12 +1301,12 @@ public:
 		<< std::endl;
 	
     if (debug)
-      std::cerr << "# of nodes: " << variational.nodes.size()
-		<< " # of edges: " << variational.edges.size()
-		<< " valid? " << utils::lexical_cast<std::string>(variational.is_valid())
+      std::cerr << "# of nodes: " << appied.nodes.size()
+		<< " # of edges: " << appied.edges.size()
+		<< " valid? " << utils::lexical_cast<std::string>(appied.is_valid())
 		<< std::endl;
     
-    hypergraph.swap(variational);
+    hypergraph.swap(appied);
   }
 
   void assign(const weight_set_type& __weights)
@@ -1291,10 +1316,14 @@ public:
   
   void clear()
   {
-    dynamic_cast<cicada::feature::Variational*>(feature.get())->clear();
+    if (variational)
+      variational->clear();
   }
   
   feature_function_type::feature_function_ptr_type feature;
+  cicada::feature::Variational* variational;
+
+  model_type model;
   
   const weight_set_type* weights;
   bool weights_one;
@@ -1824,9 +1853,9 @@ public:
       else if (param.name() == "apply")
 	operations.push_back(operation_ptr_type(new Apply(*first, model, debug)));
       else if (param.name() == "bleu")
-	operations.push_back(operation_ptr_type(new Bleu(*first, model, debug)));
+	operations.push_back(operation_ptr_type(new Bleu(*first, debug)));
       else if (param.name() == "variational")
-	operations.push_back(operation_ptr_type(new Variational(*first, model, debug)));
+	operations.push_back(operation_ptr_type(new Variational(*first, debug)));
       else if (param.name() == "prune")
 	operations.push_back(operation_ptr_type(new Prune(*first, debug)));
       else if (param.name() == "intersect")
@@ -1884,9 +1913,11 @@ bleu: BLEU computation\n\
 \texact=[true|false] no pruning feature application\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tbleu=bleu feature parameter. default=\"bleu:order=4\"\n\
 variational: variational decoding\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tvariational=variational parameter. default=\"variational:order=3\"\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
