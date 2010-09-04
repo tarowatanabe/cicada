@@ -38,6 +38,7 @@
 #include "cicada/permute.hpp"
 #include "cicada/sort.hpp"
 #include "cicada/prune.hpp"
+#include "cicada/expected_ngram.hpp"
 
 #include "cicada/feature_function.hpp"
 #include "cicada/weight_vector.hpp"
@@ -124,6 +125,11 @@ struct weight_set_function
     : weights(__weights) {}
 
   const weight_set_type& weights;
+
+  value_type operator()(const hypergraph_type::edge_type& x) const
+  {
+    return cicada::semiring::traits<value_type>::log(x.features.dot(weights));
+  }
   
   template <typename FeatureSet>
   value_type operator()(const FeatureSet& x) const
@@ -138,6 +144,11 @@ struct weight_set_function_one
   typedef cicada::semiring::Logprob<double> value_type;
 
   weight_set_function_one(const weight_set_type& __weights) {}
+
+  value_type operator()(const hypergraph_type::edge_type& x) const
+  {
+    return cicada::semiring::traits<value_type>::log(x.features.dot());
+  }
   
   template <typename FeatureSet>
   value_type operator()(const FeatureSet& x) const
@@ -1076,7 +1087,73 @@ public:
 class ExpectedNGram : public Operation
 {
 public:
-  ExpectedNGram(const std::string& parameter, const model_type& model, const int __debug) {}
+  ExpectedNGram(const std::string& parameter, const int __debug)
+    : order(0), bos_eos(false), weights(0), weights_one(false), yield_source(false), yield_target(false)
+  {
+    typedef cicada::Parameter param_type;
+    
+    param_type param(parameter);
+    if (param.name() != "expected-ngram")
+      throw std::runtime_error("this is not an expected-ngram computer"); 
+    
+    for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+      if (strcasecmp(piter->first.c_str(), "order") == 0)
+	order = boost::lexical_cast<int>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "bos-eos") == 0)
+	bos_eos = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	weights = &base_type::weights(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	weights_one = utils::lexical_cast<bool>(piter->second);
+      else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	const std::string& value = piter->second;
+	
+	if (strcasecmp(value.c_str(), "source") == 0)
+	  yield_source = true;
+	else if (strcasecmp(value.c_str(), "target") == 0)
+	  yield_target = true;
+      } else
+	std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
+    }
+
+    if (order <= 0)
+      throw std::runtime_error("order must be positive");
+    
+    if (weights && weights_one)
+      throw std::runtime_error("you have weights, but specified all-one parameter");
+    
+    if (yield_source && yield_target)
+      throw std::runtime_error("do not specify both source and target yield");
+    
+    if (! yield_source && ! yield_target)
+      yield_target = true;
+  }
+
+  void operator()(data_type& data) const
+  {
+    ngram_count_set_type& ngram_counts = data.ngram_counts;
+    const hypergraph_type& hypergraph = data.hypergraph;
+
+    weight_set_type weights_zero;
+    const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
+    
+    ngram_counts.clear();
+    
+    if (weights_one)
+      cicada::expected_ngram(hypergraph, weight_set_function_one(*weights_apply), ngram_counts, order, bos_eos, yield_source);
+    else
+      cicada::expected_ngram(hypergraph, weight_set_function(*weights_apply), ngram_counts, order, bos_eos, yield_source);
+  }
+  
+  int order;
+  bool bos_eos;
+  
+  const weight_set_type* weights;
+  bool weights_one;
+  bool yield_source;
+  bool yield_target;
+  
+  int debug;
   
 };
 
@@ -1863,6 +1940,8 @@ public:
 	operations.push_back(operation_ptr_type(new Prune(*first, debug)));
       else if (param.name() == "intersect")
 	operations.push_back(operation_ptr_type(new Intersect(debug)));
+      else if (param.name() == "expected-ngram")
+	operations.push_back(operation_ptr_type(new ExpectedNGram(*first, debug)));
       else if (param.name() == "output") {
 	// we do extra checking so that all the output directed to either the same directory or output-file
 	boost::shared_ptr<Output> output(new Output(*first, os, debug));
@@ -1911,6 +1990,12 @@ apply: feature application\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tfeature=feature function\n\
+expected-ngram: expected ngram computation\n\
+\torder=<ngram order>\n\
+\tbos-eos=[true|false] include <s> and </s> in ngrams\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialized weight\n\
+\tyield=[source|target]\n\
 bleu: BLEU computation\n\
 \tsize=<cube size>\n\
 \texact=[true|false] no pruning feature application\n\

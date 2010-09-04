@@ -28,6 +28,8 @@ namespace cicada
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
 
+      typedef HyperGraph hypergraph_type;
+      
       typedef double logprob_type;
       
       typedef utils::compact_trie_dense<symbol_type, logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
@@ -363,6 +365,7 @@ namespace cicada
 
     struct variational_function
     {
+      typedef HyperGraph hypergraph_type;
       typedef cicada::semiring::Logprob<double> weight_type;
       typedef weight_type value_type;
 
@@ -373,8 +376,7 @@ namespace cicada
       variational_function(const weight_set_type& __weights)
 	: weights(__weights) {}
 
-      template <typename Edge>
-      value_type operator()(const Edge& edge) const
+      value_type operator()(const hypergraph_type::edge_type& edge) const
       {
 	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
       }

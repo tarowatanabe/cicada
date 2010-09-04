@@ -19,17 +19,24 @@ namespace cicada
     
     typedef cicada::WeightVector<double>   weight_set_type;
     
-    typedef cicada::SpanVector span_set_type;
+    typedef cicada::HyperGraph    hypergraph_type;
+    typedef cicada::Lattice       lattice_type;
+    typedef cicada::Sentence      sentence_type;
+    typedef cicada::SpanVector    span_set_type;
     typedef cicada::NGramCountSet ngram_count_set_type;
+    typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
     
-
     typedef Operation base_type;
     
     struct Parameter
     {
       size_type id;
       
-      
+      lattice_type         lattice;
+      span_set_type        spans;
+      sentence_set_type    targets;
+      hypergraph_type      hypergraph;
+      ngram_count_set_type ngram_counts;
     };
     typedef Parameter parameter_type;
     
