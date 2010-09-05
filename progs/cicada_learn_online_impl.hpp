@@ -557,7 +557,7 @@ struct OptimizeCP
       direction -= weights;
       
       if (! direction.empty()) {
-	const double update = line_search(hypergraphs, scorers, weights, direction, 0.5, 1.0);
+	const double update = line_search(hypergraphs, scorers, weights, direction, 0.1, 1.0);
 	if (update != 1.0 && update != 0.0)
 	  direction *= update;
 	
@@ -992,7 +992,7 @@ struct OptimizeMIRA
 	// starting from weights, we will move toward direction
 	// we will adjust amount of move!
 	
-	const double update = line_search(hypergraphs, scorers, weights, direction, 0.5, 1.0);
+	const double update = line_search(hypergraphs, scorers, weights, direction, 0.1, 1.0);
 	if (update != 1.0 && update != 0.0)
 	  direction *= update;
 
