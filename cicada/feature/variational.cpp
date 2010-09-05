@@ -352,11 +352,6 @@ namespace cicada
 				   const bool final) const
     {
     }
-
-    int Variational::order() const
-    {
-      return pimpl->order;
-    }
     
     void Variational::clear()
     {
