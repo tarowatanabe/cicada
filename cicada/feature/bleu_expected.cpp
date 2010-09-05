@@ -1,7 +1,4 @@
 
-#include <map>
-
-
 #include "utils/hashmurmur.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/indexed_set.hpp"
@@ -13,14 +10,6 @@
 #include "cicada/eval/bleu.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
-
-
-#include <boost/numeric/conversion/bounds.hpp>
-
-#include <unicode/uchar.h>
-#include <unicode/unistr.h>
-#include <unicode/schriter.h>
-#include <unicode/bytestream.h>
 
 namespace cicada
 {
