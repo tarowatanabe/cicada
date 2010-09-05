@@ -8,6 +8,7 @@
 #include <utility>
 
 #include <cicada/sentence.hpp>
+#include <cicada/sentence_vector.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -79,8 +80,9 @@ namespace cicada
       typedef size_t    size_type;
       typedef ptrdiff_t difference_type;
       
-      typedef cicada::Sentence sentence_type;
-      typedef cicada::Symbol   word_type;
+      typedef cicada::Symbol         word_type;
+      typedef cicada::Sentence       sentence_type;
+      typedef cicada::SentenceVector sentence_set_type;
       
       typedef Score score_type;
       typedef Scorer scorer_type;
