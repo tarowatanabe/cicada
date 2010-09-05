@@ -44,7 +44,7 @@ namespace cicada
             
       // this implementation specific...
       typedef uint32_t id_type;
-      typedef uint32_t count_type;
+      typedef uint16_t count_type;
       typedef double   expected_type;
 
       typedef symbol_type word_type;
@@ -438,11 +438,9 @@ namespace cicada
       
       double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int parsed_size, const int source_size, const bool scaling=true) const
       {
-	count_set_type counts_bleu(order, count_type(0));
+	std::vector<double, std::allocator<double> > counts(order);
 	for (ngram_set_type::id_type id = 0; id < __counts.size();++ id)
-	  counts_bleu[nodes[id].order - 1] += std::min(double(__counts[id]), ngrams[id]);
-	
-	const count_set_type& counts = counts_bleu;
+	  counts[nodes[id].order - 1] += std::min(double(__counts[id]), ngrams[id]);
 	
 	const cicada::eval::Bleu* __bleu = (score ? dynamic_cast<const cicada::eval::Bleu*>(score.get()) : 0);
 	
@@ -458,7 +456,7 @@ namespace cicada
 	  
 	  const double factor = 1.0 / order;
 	  for (int n = 1; n <= bleu_order; ++ n) {
-	    const double count = (double(n <= ngram_size ? double(counts[n - 1]) : 0.0)
+	    const double count = (double(n <= ngram_size ? counts[n - 1] : 0.0)
 				  + (n <= __bleu->ngrams_hypothesis.size() ? double(__bleu->ngrams_hypothesis[n - 1]) : 0.0));
 	    const double norm  = (double(n <= ngram_size ? double(hypothesis_size + 1 - n) : 0.0)
 				  + (n <= __bleu->ngrams_reference.size() ? double(__bleu->ngrams_reference[n - 1]) : 0.0));
@@ -482,9 +480,9 @@ namespace cicada
 	  
 	  const double factor = 1.0 / order;
 	  for (int n = 1; n <= ngram_size; ++ n) {
-	    const int count = counts[n - 1];
+	    const double& count = counts[n - 1];
 	    
-	    bleu += std::log((count ? double(count) : smooth) / (hypothesis_size + 1 - n)) * factor;
+	    bleu += std::log((count > 0.0 ? count : smooth) / (hypothesis_size + 1 - n)) * factor;
 	    smooth *= 0.5;
 	  }
 	  
