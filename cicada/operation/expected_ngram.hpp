@@ -74,11 +74,23 @@ namespace cicada
 	const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
     
 	ngram_counts.clear();
+	
+	utils::resource ngram_start;
     
 	if (weights_one)
 	  cicada::expected_ngram(hypergraph, weight_function_one<weight_type>(), ngram_counts, order, bos_eos, yield_source);
 	else
 	  cicada::expected_ngram(hypergraph, weight_function<weight_type>(*weights_apply), ngram_counts, order, bos_eos, yield_source);
+
+	utils::resource ngram_end;
+    
+	if (debug)
+	  std::cerr << "expected ngram cpu time: " << (ngram_end.cpu_time() - ngram_start.cpu_time())
+		    << " user time: " << (ngram_end.user_time() - ngram_start.user_time())
+		    << std::endl;
+	
+	if (debug)
+	  std::cerr << "expected ngram counts: size: " << ngram_counts.size() << std::endl;
       }
   
       int order;
