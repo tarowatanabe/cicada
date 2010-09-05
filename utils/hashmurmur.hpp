@@ -3,6 +3,7 @@
 #ifndef __UTILS__HASHMURMUR__HPP__
 #define __UTILS__HASHMURMUR__HPP__ 1
 
+#include <cstddef>
 #include <stdint.h>
 
 // murmurhash2 by Austin Appleby
