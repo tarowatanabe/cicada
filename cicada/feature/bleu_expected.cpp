@@ -80,10 +80,9 @@ namespace cicada
 
     public:
       BleuExpectedImpl(const int __order,
-		       const bool __exact,
 		       const bool __yield_source)
 	: ngrams(word_type()), nodes(), unigram(0),
-	  order(__order), exact(__exact), yield_source(__yield_source) {}
+	  order(__order), yield_source(__yield_source) {}
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
@@ -394,10 +393,7 @@ namespace cicada
 	
 	first = std::max(first, iter - context_size);
 	
-	if (exact)
-	  counts.resize(nodes.size(), count_type(0));
-	else
-	  counts.resize(order, count_type(0));
+	counts.resize(nodes.size(), count_type(0));
 	
 	// we will collect counts at [iter, last) with context from [first, iter)
 	for (/**/; first != iter; ++ first) {
@@ -408,10 +404,7 @@ namespace cicada
 	    if (ngrams.is_root(id)) break;
 	    if (iter2 < iter) continue;
 	    
-	    if (exact)
-	      ++ counts[id];
-	    else
-	      ++ counts[nodes[id].order - 1];
+	    ++ counts[id];
 	  }
 	}
       }
@@ -419,10 +412,7 @@ namespace cicada
       template <typename Iterator>
       void collect_counts(Iterator first, Iterator last, count_set_type& counts) const
       {
-	if (exact)
-	  counts.resize(nodes.size(), count_type(0));
-	else
-	  counts.resize(order, count_type(0));
+	counts.resize(nodes.size(), count_type(0));
 	
 	// we will collect counts at [first, last)
 	for (/**/; first != last; ++ first) {
@@ -432,10 +422,7 @@ namespace cicada
 	    
 	    if (ngrams.is_root(id)) break;
 	    
-	    if (exact)
-	      ++ counts[id];
-	    else
-	      ++ counts[nodes[id].order - 1];
+	    ++ counts[id];
 	  }
 	}
       }
@@ -452,16 +439,14 @@ namespace cicada
       double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int parsed_size, const int source_size, const bool scaling=true) const
       {
 	count_set_type counts_bleu(order, count_type(0));
-	if (exact)
-	  for (ngram_set_type::id_type id = 0; id < __counts.size();++ id)
-	    counts_bleu[nodes[id].order - 1] += std::min(double(__counts[id]), ngrams[id]);
+	for (ngram_set_type::id_type id = 0; id < __counts.size();++ id)
+	  counts_bleu[nodes[id].order - 1] += std::min(double(__counts[id]), ngrams[id]);
 	
-	const count_set_type& counts = (exact ? counts_bleu : __counts);
-
+	const count_set_type& counts = counts_bleu;
+	
 	const cicada::eval::Bleu* __bleu = (score ? dynamic_cast<const cicada::eval::Bleu*>(score.get()) : 0);
 	
 	if (__bleu && __bleu->length_reference > 0) {
-	  
 	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
 	  
@@ -539,7 +524,6 @@ namespace cicada
       score_ptr_type score;
 
       int order;
-      bool exact;
       bool yield_source;
     };
     
@@ -555,7 +539,6 @@ namespace cicada
 	throw std::runtime_error("this is not BleuExpected feature: " + parameter);
 
       int order = 4;
-      bool exact = false;
       
       bool yield_source = false;
       bool yield_target = false;
@@ -563,8 +546,6 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
-	  exact = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	  const std::string& yield = piter->second;
 	  
@@ -581,7 +562,7 @@ namespace cicada
       if (yield_source && yield_target)
 	throw std::runtime_error("you cannot specify both source/target yield");
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, yield_source));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, yield_source));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;

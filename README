@@ -27,10 +27,10 @@ After the hypergraph generation, you can:
    - K-bests sentences are generated from hypergraph [5].
 
 Or, you can combine outputs from multiple systems by (New! and TODO):
-   - Perform parsing over nbests
+   - Perform parsing over nbests (use your favorite parser, such as Berkeley parser/Stanford parser etc.)
    - Generate context-free confusion forest by combining trees (not confusion network!)
       * It is performed by collecting rules from parse trees, and generate by Earley algorithm (New!)
-   - Generate translation as described above
+   - Generate k-best translations after feature application etc.
 
 Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt [3]

@@ -36,7 +36,6 @@ bleu: BLEU\n\
 \tyield=[source|target]\n\
 bleu-expected: expected-BLEU\n\
 \torder=<order>,\n\
-\texact=[true|false] clipped ngram computation\n\
 \tyield=[source|target]\n\
 bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
