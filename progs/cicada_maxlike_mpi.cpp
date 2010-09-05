@@ -81,7 +81,7 @@ typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergrap
 
 typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 
-typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
+typedef cicada::SentenceVector sentence_set_type;
 typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
 
 typedef cicada::eval::Scorer         scorer_type;
@@ -90,22 +90,6 @@ typedef cicada::eval::ScorerDocument scorer_document_type;
 typedef scorer_type::score_ptr_type  score_ptr_type;
 typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
 
-struct source_length_function
-{
-  typedef cicada::semiring::Tropical<int> value_type;
-  
-  template <typename Edge>
-  value_type operator()(const Edge& edge) const
-  {
-    int length = 0;
-    rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-    for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
-      length += (*siter != vocab_type::EPSILON && siter->is_terminal());
-    
-    // since we will "max" at operator+, we will collect negative length
-    return cicada::semiring::traits<value_type>::log(- length);
-  }
-};
 
 path_set_type tstset_files;
 path_set_type refset_files;
@@ -794,9 +778,9 @@ struct TaskOracle
       cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
       
       if (__bleu)
-	__bleu->insert(score_curr);
+	__bleu->assign(score_curr);
       else
-	__bleu_linear->insert(score_curr);
+	__bleu_linear->assign(score_curr);
       
       model_type model;
       model.push_back(features[id]);
@@ -894,9 +878,9 @@ void compute_oracles(const hypergraph_set_type& graphs,
       cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
       
       if (__bleu)
-	__bleu->insert(score_curr);
+	__bleu->assign(score_curr);
       else
-	__bleu_linear->insert(score_curr);
+	__bleu_linear->assign(score_curr);
     }
 
 }
@@ -977,11 +961,6 @@ void read_tstset(const path_set_type& files,
       if (graphs[id].goal == hypergraph_type::invalid)
 	std::cerr << "invalid graph at: " << id << std::endl;
       else {
-	// we will enumerate forest structure... and collect min-size...
-	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(graphs[id].nodes.size());
-	
-	cicada::inside(graphs[id], lengths, source_length_function());
-	
 	features[id] = feature_function_type::create(scorer_name);
 	
 	cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
@@ -989,18 +968,15 @@ void read_tstset(const path_set_type& files,
 	
 	if (! __bleu && ! __bleu_linear)
 	  throw std::runtime_error("invalid bleu feature function...");
+
+	static const cicada::Lattice       __lattice;
+	static const cicada::SpanVector    __spans;
+	static const cicada::NGramCountSet __ngram_counts;
 	
-	const int source_length = - log(lengths.back());
-	
-	if (__bleu) {
-	  sentence_set_type::const_iterator siter_end = sentences[id].end();
-	  for (sentence_set_type::const_iterator siter = sentences[id].begin(); siter != siter_end; ++ siter)
-	    __bleu->insert(source_length, *siter);
-	} else {
-	  sentence_set_type::const_iterator siter_end = sentences[id].end();
-	  for (sentence_set_type::const_iterator siter = sentences[id].begin(); siter != siter_end; ++ siter)
-	    __bleu_linear->insert(source_length, *siter);
-	}
+	if (__bleu)
+	  __bleu->assign(graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	else
+	  __bleu_linear->assign(graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
       }
     }
   

@@ -35,6 +35,7 @@ namespace cicada
   public:
     // constructor etc...
     SentenceVector() {}
+    SentenceVector(size_type __n) : __sents(__n) {}
     SentenceVector(const std::string& x) { assign(x); }
     SentenceVector(const SentenceVector& x) : __sents(x.__sents) {}
 

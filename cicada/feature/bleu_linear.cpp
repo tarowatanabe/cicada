@@ -3,6 +3,8 @@
 
 #include "cicada/feature/bleu_linear.hpp"
 #include "cicada/parameter.hpp"
+#include "cicada/inside_outside.hpp"
+#include "cicada/semiring.hpp"
 
 #include "utils/hashmurmur.hpp"
 #include "utils/compact_trie_dense.hpp"
@@ -279,11 +281,9 @@ namespace cicada
 	source_size = 0;
       }
       
-      void insert(const int __source_size, const sentence_type& sentence)
+      void insert(const sentence_type& sentence)
       {
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
-	
-	source_size = __source_size;
 	
 	counts_type counts;
 	sentence_type::const_iterator siter_end = sentence.end();
@@ -367,7 +367,7 @@ namespace cicada
       }
       
       
-    private:
+    public:
       
       buffer_type          buffer_impl;
       phrase_span_set_type phrase_spans_impl;
@@ -490,12 +490,50 @@ namespace cicada
       pimpl->clear();
     }
     
-    void BleuLinear::insert(const int source_size, const sentence_type& sentence)
+        struct source_length_function
     {
-      pimpl->insert(source_size, sentence);
+      typedef cicada::Vocab vocab_type;
+      typedef cicada::Rule rule_type;
+      typedef cicada::semiring::Tropical<int> value_type;
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	int length = 0;
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
+    
+	// since we will "max" at operator+, we will collect negative length
+	return cicada::semiring::traits<value_type>::log(- length);
+      }
+    };
+    
+    void BleuLinear::assign(const hypergraph_type& hypergraph,
+			    const lattice_type& lattice,
+			    const span_set_type& spans,
+			    const sentence_set_type& targets,
+			    const ngram_count_set_type& ngram_counts)
+    {
+      int source_length = lattice.shortest_distance();
+      if (hypergraph.is_valid()) {
+	// we will enumerate forest structure... and collect min-size...
+	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(hypergraph.nodes.size());
+	
+	cicada::inside(hypergraph, lengths, source_length_function());
+	
+	source_length = - log(lengths.back());
+      }
+      
+      pimpl->clear();
+      sentence_set_type::const_iterator titer_end = targets.end();
+      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+	pimpl->insert(*titer);
+      
+      pimpl->source_size = source_length;
     }
     
-    void BleuLinear::insert(const score_ptr_type& score)
+    void BleuLinear::assign(const score_ptr_type& score)
     {
       // do nothing...
     }
