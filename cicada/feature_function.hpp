@@ -15,6 +15,8 @@
 #include <cicada/feature_vector.hpp>
 #include <cicada/feature.hpp>
 #include <cicada/span_vector.hpp>
+#include <cicada/sentence_vector.hpp>
+#include <cicada/ngram_count_set.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -34,10 +36,14 @@ namespace cicada
     typedef cicada::Lattice    lattice_type;
     typedef cicada::Rule       rule_type;
     
+    typedef cicada::SentenceVector sentence_set_type;
+    typedef cicada::NGramCountSet  ngram_count_set_type;
+    
+    
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
     typedef hypergraph_type::feature_set_type feature_set_type;
-    
+
   public:
     typedef void* state_ptr_type;
     typedef std::vector<state_ptr_type, std::allocator<state_ptr_type> > state_ptr_set_type;
@@ -97,7 +103,9 @@ namespace cicada
     // This will be called before feature application.
     virtual void assign(const hypergraph_type& hypergraph,
 			const lattice_type& lattice,
-			const span_set_type& spans) {}
+			const span_set_type& spans,
+			const sentence_set_type& targets,
+			const ngram_count_set_type& ngram_counts) {}
     
     size_type state_size() const { return __state_size; }
     const feature_type& feature_name() const { return __feature_name; }

@@ -10,6 +10,8 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
 #include <cicada/span_vector.hpp>
+#include <cicada/sentence_vector.hpp>
+#include <cicada/ngram_count_set.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -30,6 +32,9 @@ namespace cicada
     typedef cicada::HyperGraph hypergraph_type;
     typedef cicada::Lattice    lattice_type;
     typedef cicada::SpanVector span_set_type;
+
+    typedef cicada::SentenceVector sentence_set_type;
+    typedef cicada::NGramCountSet  ngram_count_set_type;
     
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
@@ -182,11 +187,13 @@ namespace cicada
     
     void assign(const hypergraph_type& hypergraph,
 		const lattice_type& lattice,
-		const span_set_type& spans)
+		const span_set_type& spans,
+		const sentence_set_type& targets,
+		const ngram_count_set_type& ngram_counts)
     {
       model_set_type::iterator iter_end = models.end();
       for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
-	(*iter)->assign(hypergraph, lattice, spans);
+	(*iter)->assign(hypergraph, lattice, spans, targets, ngram_counts);
     }
     
     Model clone() const

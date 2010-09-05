@@ -3,6 +3,9 @@
 #ifndef __CICADA__OPERATION__HPP__
 #define __CICADA__OPERATION__HPP__ 1
 
+#include <iostream>
+#include <string>
+
 #include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
 #include <cicada/sentence.hpp>
@@ -15,6 +18,7 @@
 #include <cicada/model.hpp>
 
 #include <boost/filesystem/path.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace cicada
 {
@@ -32,9 +36,15 @@ namespace cicada
     typedef cicada::Sentence       sentence_type;
     typedef cicada::SentenceVector sentence_set_type;
     typedef cicada::NGramCountSet  ngram_count_set_type;
+    
+    typedef cicada::Symbol symbol_type;
+    typedef cicada::Symbol word_type;
 
-    typedef cicada::Grammar grammar_type;
-    typedef cicada::Model   model_type;
+    typedef cicada::Grammar         grammar_type;
+    typedef cicada::Model           model_type;
+    typedef cicada::FeatureFunction feature_function_type;
+    
+    typedef feature_function_type::feature_function_ptr_type feature_function_ptr_type;
     
     typedef boost::filesystem::path path_type;    
     
@@ -50,7 +60,20 @@ namespace cicada
       sentence_set_type    targets;
       ngram_count_set_type ngram_counts;
     };
-    typedef Data data_type;
+
+    struct OutputData
+    {
+      boost::shared_ptr<std::ostream> os;
+      std::string                     buffer;
+      
+      path_type file;
+      path_type directory;
+      
+      bool use_buffer;
+    };
+    
+    typedef Data       data_type;
+    typedef OutputData output_data_type;
     
     Operation() {}
     virtual ~Operation() {}

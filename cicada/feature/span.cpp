@@ -306,7 +306,9 @@ namespace cicada
 
     void Span::assign(const hypergraph_type& hypergraph,
 		      const lattice_type& lattice,
-		      const span_set_type& spans)
+		      const span_set_type& spans,
+		      const sentence_set_type& targets,
+		      const ngram_count_set_type& ngram_counts)
     {
       pimpl->assign(hypergraph, lattice, spans);
     }

@@ -60,8 +60,6 @@ namespace cicada
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Variational(*this)); }
       
-      int order() const;
-      
       void clear();
       
       void insert(const hypergraph_type& graph, const weight_set_type& weights);

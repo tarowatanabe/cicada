@@ -60,7 +60,7 @@ int main(int argc, char ** argv)
     }
 
     if (op_list) {
-      std::cout << OperationSet::lists();
+      std::cout << operation_set_type::lists();
       return 0;
     }
 
@@ -94,29 +94,31 @@ int main(int argc, char ** argv)
       model.push_back(feature_function_type::create(*piter));
     model.initialize();
 
-    OperationSet operations(ops.begin(), ops.end(),
-			    grammar,
-			    model,
-			    symbol_goal,
-			    symbol_non_terminal,
-			    grammar_insertion,
-			    grammar_deletion,
-			    input_id_mode || input_directory_mode,
-			    input_lattice_mode,
-			    input_forest_mode,
-			    input_span_mode,
-			    input_bitext_mode,
-			    false,
-			    debug);
+    operation_set_type operations(ops.begin(), ops.end(),
+				  model,
+				  grammar,
+				  symbol_goal,
+				  symbol_non_terminal,
+				  grammar_insertion,
+				  grammar_deletion,
+				  input_id_mode || input_directory_mode,
+				  input_lattice_mode,
+				  input_forest_mode,
+				  input_span_mode,
+				  input_bitext_mode,
+				  false,
+				  debug);
 
-    if (! operations.directory.empty()) {
-      if (boost::filesystem::exists(operations.directory) && ! boost::filesystem::is_directory(operations.directory))
-	boost::filesystem::remove_all(operations.directory);
+    if (! operations.get_output_data().directory.empty()) {
+      const path_type& directory = operations.get_output_data().directory;
       
-      boost::filesystem::create_directories(operations.directory);
+      if (boost::filesystem::exists(directory) && ! boost::filesystem::is_directory(directory))
+	boost::filesystem::remove_all(directory);
+      
+      boost::filesystem::create_directories(directory);
       
       boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(operations.directory); iter != iter_end; ++ iter)
+      for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
 	boost::filesystem::remove_all(*iter);
     }
     

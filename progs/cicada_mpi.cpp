@@ -5,7 +5,6 @@
 #include <string>
 #include <stdexcept>
 
-
 #include "cicada_impl.hpp"
 
 #include "utils/mpi.hpp"
@@ -52,8 +51,8 @@ int debug = 0;
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
 
-void cicada_stdout(OperationSet& operations);
-void cicada_process(OperationSet& operations);
+void cicada_stdout(operation_set_type& operations);
+void cicada_process(operation_set_type& operations);
 
 enum {
   sample_tag = 1000,
@@ -102,7 +101,7 @@ int main(int argc, char ** argv)
 
     if (op_list) {
       if (mpi_rank == 0)
-	std::cout << OperationSet::lists();
+	std::cout << operation_set_type::lists();
       return 0;
     }
 
@@ -141,36 +140,38 @@ int main(int argc, char ** argv)
     if (debug && mpi_rank == 0)
       std::cerr << "feature functions: " << model.size() << std::endl;
     
-    OperationSet operations(ops.begin(), ops.end(),
-			    grammar,
-			    model,
-			    symbol_goal,
-			    symbol_non_terminal,
-			    grammar_insertion,
-			    grammar_deletion,
-			    true,
-			    input_lattice_mode,
-			    input_forest_mode,
-			    input_span_mode,
-			    input_bitext_mode,
-			    true,
-			    debug);
+    operation_set_type operations(ops.begin(), ops.end(),
+				  model,
+				  grammar,
+				  symbol_goal,
+				  symbol_non_terminal,
+				  grammar_insertion,
+				  grammar_deletion,
+				  true,
+				  input_lattice_mode,
+				  input_forest_mode,
+				  input_span_mode,
+				  input_bitext_mode,
+				  true,
+				  debug);
     
     // make sure to synchronize here... otherwise, badthink may happen...
-    if (mpi_rank == 0 && ! operations.directory.empty()) {
-      if (boost::filesystem::exists(operations.directory) && ! boost::filesystem::is_directory(operations.directory))
-	boost::filesystem::remove_all(operations.directory);
+    if (mpi_rank == 0 && ! operations.get_output_data().directory.empty()) {
+      const path_type& directory = operations.get_output_data().directory;
       
-      boost::filesystem::create_directories(operations.directory);
+      if (boost::filesystem::exists(directory) && ! boost::filesystem::is_directory(directory))
+	boost::filesystem::remove_all(directory);
+      
+      boost::filesystem::create_directories(directory);
       
       boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(operations.directory); iter != iter_end; ++ iter)
+      for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
 	boost::filesystem::remove_all(*iter);
     }
 
     MPI::COMM_WORLD.Barrier();
     
-    if (! operations.file.empty())
+    if (! operations.get_output_data().file.empty())
       cicada_stdout(operations);
     else
       cicada_process(operations);
@@ -233,7 +234,7 @@ struct TaskStdout
 
   TaskStdout(queue_type&   __queue_is,
 	     queue_type&   __queue_os,
-	     OperationSet& __operations)
+	     operation_set_type& __operations)
     : queue_is(__queue_is),
       queue_os(__queue_os),
       operations(__operations) {}
@@ -247,7 +248,7 @@ struct TaskStdout
       
       operations(line);
       
-      queue_os.push(boost::lexical_cast<std::string>(operations.data.id) + ' ' + operations.buffer);
+      queue_os.push(boost::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
     }
 
     queue_os.push(std::string());
@@ -256,7 +257,7 @@ struct TaskStdout
   
   queue_type&   queue_is;
   queue_type&   queue_os;
-  OperationSet& operations;
+  operation_set_type& operations;
 };
 
 struct ReduceStdout
@@ -344,7 +345,7 @@ struct ReduceStdout
   path_type   path;
 };
 
-void cicada_stdout(OperationSet& operations)
+void cicada_stdout(operation_set_type& operations)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -375,7 +376,7 @@ void cicada_stdout(OperationSet& operations)
     
     queue_input_type queue_input(mpi_size);
     
-    boost::thread thread_reduce(reduce_type(queue_os, operations.file));
+    boost::thread thread_reduce(reduce_type(queue_os, operations.get_output_data().file));
     boost::thread thread_map(map_type(input_file, queue_input));
 
     ostream_ptr_set_type ostream(mpi_size);
@@ -510,7 +511,7 @@ struct Task
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
 
   Task(queue_type&   __queue,
-       OperationSet& __operations)
+       operation_set_type& __operations)
     : queue(__queue),
       operations(__operations) {}
   
@@ -527,10 +528,10 @@ struct Task
   }
   
   queue_type&   queue;
-  OperationSet& operations;
+  operation_set_type& operations;
 };
 
-void cicada_process(OperationSet& operations)
+void cicada_process(operation_set_type& operations)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();

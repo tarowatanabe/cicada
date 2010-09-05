@@ -29,6 +29,8 @@
 
 #include "cicada/eval.hpp"
 
+#include "cicada/operation/traversal.hpp"
+
 #include "cicada_impl.hpp"
 #include "cicada_learn_online_impl.hpp"
 
@@ -52,7 +54,7 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 
-typedef std::vector<sentence_type, std::allocator<sentence_type> > sentence_set_type;
+typedef cicada::SentenceVector sentence_set_type;
 typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
 
 typedef cicada::eval::Scorer         scorer_type;
@@ -159,7 +161,7 @@ int main(int argc, char ** argv)
     }
 
     if (op_list) {
-      std::cout << OperationSet::lists();
+      std::cout << operation_set_type::lists();
       return 0;
     }
 
@@ -380,7 +382,10 @@ struct Task
     cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
     if (! model_sparse.empty()) {
-      model_sparse.assign(modified, lattice, spans);
+      static const sentence_set_type __targets;
+      static const ngram_count_set_type __ngram_counts;
+
+      model_sparse.assign(modified, lattice, spans, __targets, __ngram_counts);
       
       model_sparse.apply_feature(true);
       
@@ -391,7 +396,7 @@ struct Task
     
     weight_type weight;
     
-    cicada::viterbi(modified, yield, weight, kbest_traversal(), weight_set_function(weights, 1.0));
+    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal_target(), weight_set_function(weights, 1.0));
   }
 
   void add_support_vectors_regression(const size_t& id,
@@ -521,20 +526,20 @@ struct Task
       if ((*iter)->sparse_feature())
 	model_sparse.push_back(*iter);
     
-    OperationSet operations(ops.begin(), ops.end(),
-			    grammar,
-			    model,
-			    symbol_goal,
-			    symbol_non_terminal,
-			    grammar_insertion,
-			    grammar_deletion,
-			    true,
-			    input_lattice_mode,
-			    input_forest_mode,
-			    input_span_mode,
-			    true,
-			    false,
-			    debug);
+    operation_set_type operations(ops.begin(), ops.end(),
+				  model,
+				  grammar,
+				  symbol_goal,
+				  symbol_non_terminal,
+				  grammar_insertion,
+				  grammar_deletion,
+				  true,
+				  input_lattice_mode,
+				  input_forest_mode,
+				  input_span_mode,
+				  true,
+				  false,
+				  debug);
 
     weight_set_type& weights = optimizer.weights;
 
@@ -707,11 +712,11 @@ struct Task
       operations(buffer);
       
       // operations.hypergraph contains result...
-      const size_t& id = operations.data.id;
-      const lattice_type& lattice = operations.data.lattice;
-      const span_set_type& spans = operations.data.spans;
-      const hypergraph_type& hypergraph = operations.data.hypergraph;
-      const sentence_set_type& targets = operations.data.targets;
+      const size_t& id = operations.get_data().id;
+      const lattice_type& lattice = operations.get_data().lattice;
+      const span_set_type& spans = operations.get_data().spans;
+      const hypergraph_type& hypergraph = operations.get_data().hypergraph;
+      const sentence_set_type& targets = operations.get_data().targets;
       
       if (debug)
 	std::cerr << "id: " << id << std::endl;
@@ -728,7 +733,7 @@ struct Task
       }
             
       // collect max-feature from hypergraph
-      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, kbest_traversal(), weight_set_function(weights, 1.0));
+      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::kbest_traversal_target(), weight_set_function(weights, 1.0));
       
       // update scores...
       if (id >= scores.size())
@@ -792,7 +797,7 @@ struct Task
 	  hypergraph_reward.swap(hypergraph_oracle);
 
 	  weight_type weight;
-	  cicada::viterbi(hypergraph_reward, yield_reward, weight, kbest_traversal(), weight_set_function(weights, 1.0));
+	  cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal_target(), weight_set_function(weights, 1.0));
 	}
       }
       

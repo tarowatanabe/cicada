@@ -3,13 +3,11 @@
 #ifndef __CICADA__OPERATION_SET__HPP__
 #define __CICADA__OPERATION_SET__HPP__ 1
 
-#include <iostream>
 #include <string>
 #include <vector>
 
 #include <cicada/operation.hpp>
 
-#include <boost/shared_ptr.hpp>
 
 namespace cicada
 {
@@ -18,7 +16,9 @@ namespace cicada
   public:
     typedef Operation     operation_type;
     
-    typedef operation_type::data_type       data_type;
+    typedef operation_type::data_type        data_type;
+    typedef operation_type::output_data_type output_data_type;
+    
     typedef operation_type::weight_set_type weight_set_type;
     typedef operation_type::grammar_type    grammar_type;
     typedef operation_type::model_type      model_type;
@@ -35,16 +35,6 @@ namespace cicada
     typedef std::vector<operation_ptr_type, std::allocator<operation_ptr_type> > operation_ptr_set_type;
     
     typedef std::vector<std::string, std::allocator<std::string> > parameter_set_type;
-
-    struct OutputData
-    {
-      boost::shared_ptr<std::ostream> os;
-      std::string                     buffer;
-      
-      path_type file;
-      path_type directory;
-    };
-    typedef OutputData output_data_type;
     
   public:
     static std::string lists();
@@ -92,8 +82,8 @@ namespace cicada
     void assign(const weight_set_type& weights);
     void operator()(const std::string& line);
     
-    output_data_type& get_output_data() { return output_data; }
-    data_type& get_data() { return data; }
+    const output_data_type& get_output_data() const { return output_data; }
+    const data_type& get_data() const { return data; }
     
   private:
     bool input_id;

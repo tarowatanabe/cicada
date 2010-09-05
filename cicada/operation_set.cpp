@@ -7,7 +7,21 @@
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_stl.hpp>
 
+#include <stdexcept>
+#include <memory>
+
 #include "operation_set.hpp"
+#include "parameter.hpp"
+
+#include "operation/binarize.hpp"
+#include "operation/permute.hpp"
+#include "operation/compose.hpp"
+#include "operation/generate.hpp"
+#include "operation/apply.hpp"
+#include "operation/expected_ngram.hpp"
+#include "operation/prune.hpp"
+#include "operation/intersect.hpp"
+#include "operation/output.hpp"
 
 #include "utils/hashmurmur.hpp"
 #include "utils/sgi_hash_map.hpp"
@@ -90,10 +104,60 @@ output: kbest or hypergraph output\n\
       input_bitext(__input_bitext),
       input_mpi(__input_mpi)
   {
-    // operation object creation...
+    typedef cicada::Parameter param_type;
 
+    // operation object creation...
     
+    // initialize...
+    data.id = size_t(-1);
+    output_data.use_buffer = false;
     
+    bool output_initial = true;
+    
+    parameter_set_type::const_iterator piter_end = parameters.end();
+    for (parameter_set_type::const_iterator piter = parameters.begin(); piter != piter_end; ++ piter) {
+      param_type param(*piter);
+      
+      if (param.name() == "binarize")
+	operations.push_back(operation_ptr_type(new operation::Binarize(*piter, debug)));
+      else if (param.name() == "permute")
+	operations.push_back(operation_ptr_type(new operation::Permute(*piter, debug)));
+      else if (param.name() == "compose-earley")
+	operations.push_back(operation_ptr_type(new operation::ComposeEarley(grammar, goal, non_terminal, insertion, deletion, debug)));
+      else if (param.name() == "compose-cky")
+	operations.push_back(operation_ptr_type(new operation::ComposeCKY(grammar, goal, non_terminal, insertion, deletion, debug)));
+      else if (param.name() == "generate-earley")
+	operations.push_back(operation_ptr_type(new operation::GenerateEarley(grammar, goal, non_terminal, insertion, deletion, debug)));
+      else if (param.name() == "apply")
+	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
+      else if (param.name() == "prune")
+	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
+      else if (param.name() == "intersect")
+	operations.push_back(operation_ptr_type(new operation::Intersect(debug)));
+      else if (param.name() == "expected-ngram")
+	operations.push_back(operation_ptr_type(new operation::ExpectedNGram(*piter, debug)));
+      else if (param.name() == "output") {
+	// we do extra checking so that all the output directed to either the same directory or output-file
+	std::auto_ptr<operation::Output> output(new operation::Output(*piter, output_data, debug));
+	
+	if (output_initial) {
+	  output_data.file      = output->file;
+	  output_data.directory = output->directory;
+	  
+	  output_initial = false;
+	} else {
+	  output->file      = output_data.file;
+	  output->directory = output_data.directory;
+	}
+	
+	operations.push_back(operation_ptr_type(output.release()));
+	
+      } else
+	throw std::runtime_error("unsupport op: " + std::string(*piter));
+    }
+    
+    if (input_mpi && ! output_data.file.empty())
+      output_data.use_buffer = true;
   }
   
   void OperationSet::assign(const weight_set_type& weights)
