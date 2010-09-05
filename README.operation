@@ -4,48 +4,49 @@ or by a config file. "output" must be placed as its final operations, otherwise,
 You can treat the sequence of operations in SIMD (single-instruction multiple-data) fashion, 
 in which the same sequence of operations is applied to each data (potentially in parallel)
 
-
 binarize: perform binarization (monolingual tree)
-        direction=[left|right] binarization direction
-        size=binarization size
+	direction=[left|right] binarization direction
+	size=binarization size
 permute: permute tree (monolingual tree only)
-        feature=[true|false] apply feature
-        weights=file weight file for composed feature
-        size=permute size
-        collapse=[true|false] collapse sparse features
-        exclude=[a non-terminal] to prohibit permutation. You can supply multiple
+	feature=[true|false] apply feature
+	weights=file weight file for composed feature
+	size=permute size
+	collapse=[true|false] collapse sparse features
+	exclude=[a non-terminal] to prohibit permutation. You can supply multiple
 compose-earley: composition from tree with grammar
 compose-cky: composition from lattice (or sentence) with grammar
+generate-earley: re-generation from tree
 apply: feature application
-        size=<cube size>
-        exact=[true|false] no pruning feature application
-        prune=[true|false] cube-pruning for feature application
-        grow=[true|false]  cube-growing for feature application
-        weights=weight file for feature
-        weights-one=[true|false] one initialized weight
-        feature=feature function
-bleu: BLEU computation
-        size=<cube size>
-        exact=[true|false] no pruning feature application
-        weights=weight file for feature
-        weights-one=[true|false] one initialized weight
-variational: variational decoding
-        weights=weight file for feature
-        weights-one=[true|false] one initialized weight
+	size=<cube size>
+	exact=[true|false]  no pruning feature application
+	prune=[true|false]  cube-pruning for feature application
+	grow=[true|false]   cube-growing for feature application
+	forced=[true|false] forced feature application
+	weights=weight file for feature
+	weights-one=[true|false] one initialized weight
+	feature=feature function
+expected-ngram: expected ngram computation
+	order=<ngram order>
+	bos-eos=[true|false] include <s> and </s> in ngrams
+	weights=weight file for feature
+	weights-one=[true|false] one initialized weight
+	yield=[source|target]
 prune: pruning
-        beam=beam pruning threshold in threshold > 0.0
-        density=density pruning threshold in threshold > 1.0
-        scale=scaling for score
-        semiring=[tropical|logprob|log] semiring to perform score computation
-        weights=weight file for feature
-        weights-one=[true|false] one initialzied weight
+	beam=beam pruning threshold in threshold > 0.0
+	density=density pruning threshold in threshold > 1.0
+	scale=scaling for score
+	semiring=[tropical|logprob|log] semiring to perform score computation
+	weights=weight file for feature
+	weights-one=[true|false] one initialzied weight
 intersect: compute intersection
 output: kbest or hypergraph output
-        kbest=<kbest size> zero for hypergraph output (default)
-        unique=[true|false] unique translation
-        weights=weight file for feature
-        weights-one=[true|false] one initialize weight
-        yield=[source|target|derivation|tree] yield for kbest
-        graphviz=[true|false] dump in graphviz format
-        directory=directory for output
-        file=file for output
+	kbest=<kbest size> zero for hypergraph output (default)
+	unique=[true|false] unique translation
+	weights=weight file for feature
+	weights-one=[true|false] one initialize weight
+	yield=[source|target|derivation|tree] yield for kbest
+	graphviz=[true|false] dump in graphviz format
+	directory=directory for output
+	file=file for output
+
+
