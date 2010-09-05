@@ -56,11 +56,12 @@ namespace cicada
       // this implementation specific...
       typedef uint32_t id_type;
       typedef uint32_t count_type;
+      typedef double   expected_type;
 
       typedef symbol_type word_type;
       
-      typedef std::allocator<std::pair<const word_type, count_type> >  ngram_allocator_type;
-      typedef utils::compact_trie_dense<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
+      typedef std::allocator<std::pair<const word_type, expected_type> >  ngram_allocator_type;
+      typedef utils::compact_trie_dense<word_type, expected_type, boost::hash<word_type>, std::equal_to<word_type>, ngram_allocator_type> ngram_set_type;
       
       struct Node
       {
@@ -72,8 +73,7 @@ namespace cicada
       };
       typedef Node node_type;
       typedef std::vector<node_type, std::allocator<node_type> > node_set_type;
-      typedef std::vector<int, std::allocator<int> > size_set_type;
-    
+      
       typedef utils::simple_vector<count_type, std::allocator<count_type> > count_set_type;
       
       struct count_set_hash : public utils::hashmurmur<size_t>
@@ -92,50 +92,9 @@ namespace cicada
     public:
       BleuExpectedImpl(const int __order,
 		       const bool __exact,
-		       const bool __split,
 		       const bool __yield_source)
-	: ngrams(word_type()), nodes(), sizes(),
-	  order(__order), exact(__exact), split(__split), yield_source(__yield_source) {}
-      
-      template <typename Sentence>
-      void split_non_ascii_characters(const Sentence& phrase, Sentence& result) const
-      {
-	std::vector<word_type, std::allocator<word_type> > tokens;
-	std::string buffer;
-	
-	typename Sentence::const_iterator piter_end = phrase.end();
-	for (typename Sentence::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
-	  
-	  UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*piter));
-	  
-	  StringCharacterIterator iter(uword);
-	  for (iter.setToStart(); iter.hasNext(); /**/) {
-	    const UChar32 c = iter.next32PostInc();
-	    
-	    if (c < 128)
-	      buffer.push_back(c);
-	    else {
-	      // we will split...
-	      if (! buffer.empty())
-		tokens.push_back(word_type(buffer.begin(), buffer.end()));
-	      buffer.clear();
-	      
-	      StringByteSink<std::string> __sink(&buffer);
-	      UnicodeString(c).toUTF8(__sink);
-	      
-	      tokens.push_back(word_type(buffer.begin(), buffer.end()));
-	      buffer.clear();
-	    }
-	  }
-	  
-	  if (! buffer.empty())
-	    tokens.push_back(word_type(buffer.begin(), buffer.end()));
-	  buffer.clear();
-	}
-	
-	result.assign(tokens.begin(), tokens.end());
-      }
-
+	: ngrams(word_type()), nodes(), unigram(0),
+	  order(__order), exact(__exact), yield_source(__yield_source) {}
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
@@ -150,15 +109,7 @@ namespace cicada
 
 	const rule_type& rule = *edge.rule;
 	
-	phrase_type target_split;
-	if (split) {
-	  if (yield_source)
-	    split_non_ascii_characters(rule.source, target_split);
-	  else
-	    split_non_ascii_characters(rule.target, target_split);
-	}
-	
-	const phrase_type& target = (split ? target_split : (yield_source ? rule.source : rule.target));
+	const phrase_type& target = (yield_source ? rule.source : rule.target);
 	const phrase_type& source = rule.source;
 	
 	count_set_type counts;
@@ -369,7 +320,7 @@ namespace cicada
 	// for ngram handling
 	ngrams.clear();
 	nodes.clear();
-	sizes.clear();
+	unigram = 0.0;
 	
 	// for count set representation
 	states_counts.clear();
@@ -387,45 +338,29 @@ namespace cicada
 	  throw std::runtime_error("this is not a bleu-score!");
       }
       
-      void insert(const sentence_type& __sentence)
+      template <typename Iterator>
+      void insert(Iterator first, Iterator last, const double& count)
       {
-	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
+	if (last - first == 1)
+	  unigram += count;
+
+	ngram_set_type::id_type id = ngrams.root();
+	int n = 1;
 	
-	sentence_type sentence_split;
-	if (split)
-	  split_non_ascii_characters(__sentence, sentence_split);
-	const sentence_type& sentence = (split ? sentence_split : __sentence);
-	
-	counts_type counts;
-	sentence_type::const_iterator siter_end = sentence.end();
-	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	  ngram_set_type::id_type id = ngrams.root();
+	for (/**/; first != last; ++ first, ++ n) {
+	  const ngram_set_type::id_type id_next = ngrams.insert(id, *first);
 	  
-	  int n = 1;
-	  for (sentence_type::const_iterator iter = siter; iter != std::min(siter + order, siter_end); ++ iter, ++ n) {
-	    const ngram_set_type::id_type id_next = ngrams.insert(id, *iter);
-	    
-	    ++ counts[id_next];
-	    
-	    if (id_next >= nodes.size())
-	      nodes.resize(id_next + 1, node_type());
-	    
-	    nodes[id_next].word = *iter;
-	    nodes[id_next].parent = id;
-	    nodes[id_next].order  = n;
-	    
-	    id = id_next;
-	  }
+	  if (id_next >= nodes.size())
+	    nodes.resize(id_next + 1, node_type());
+	  
+	  nodes[id_next].word = *first;
+	  nodes[id_next].parent = id;
+	  nodes[id_next].order  = n;
+	  
+	  id = id_next;
 	}
 	
-	// collect clipped ngram counts
-	counts_type::const_iterator citer_end = counts.end();
-	for (counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-	  ngrams[citer->first] = utils::bithack::max(ngrams[citer->first], citer->second);
-	
-	// keep sizes...
-	sizes.push_back(sentence.size());
-	std::sort(sizes.begin(), sizes.end());
+	ngrams[id] = count;
       }
 
     private:
@@ -530,7 +465,7 @@ namespace cicada
 	count_set_type counts_bleu(order, count_type(0));
 	if (exact)
 	  for (ngram_set_type::id_type id = 0; id < __counts.size();++ id)
-	    counts_bleu[nodes[id].order - 1] += utils::bithack::min(int(__counts[id]), int(ngrams[id]));
+	    counts_bleu[nodes[id].order - 1] += std::min(double(__counts[id]), ngrams[id]);
 	
 	const count_set_type& counts = (exact ? counts_bleu : __counts);
 
@@ -596,31 +531,17 @@ namespace cicada
       
       double ref_size(const double hypothesis_size) const
       {
-	if (hypothesis_size == 0) return 0;
-	
-	int reference_size = 0;
-	double min_diff = boost::numeric::bounds<double>::highest();
-	for (size_set_type::const_iterator siter = sizes.begin(); siter != sizes.end(); ++ siter) {
-	  const double diff = std::fabs(hypothesis_size - *siter);
-
-	  if (diff < min_diff) {
-	    min_diff = diff;
-	    reference_size = *siter;
-	  } else if (diff == min_diff)
-	    reference_size = utils::bithack::min(reference_size, *siter);
-	}
-	
-	return reference_size;
+	return unigram;
       }
       
     public:
       
       buffer_type          buffer_impl;
       phrase_span_set_type phrase_spans_impl;
-
+      
       ngram_set_type ngrams;
       node_set_type  nodes;
-      size_set_type  sizes;
+      count_type     unigram;
       
       states_count_set_type states_counts;
       
@@ -630,7 +551,6 @@ namespace cicada
 
       int order;
       bool exact;
-      bool split;
       bool yield_source;
     };
     
@@ -642,12 +562,11 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (param.name() != "bleu")
+      if (param.name() != "bleu-expected")
 	throw std::runtime_error("this is not BleuExpected feature: " + parameter);
 
       int order = 4;
       bool exact = false;
-      bool split = false;
       
       bool yield_source = false;
       bool yield_target = false;
@@ -657,8 +576,6 @@ namespace cicada
 	  order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
 	  exact = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "split") == 0)
-	  split = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	  const std::string& yield = piter->second;
 	  
@@ -675,11 +592,11 @@ namespace cicada
       if (yield_source && yield_target)
 	throw std::runtime_error("you cannot specify both source/target yield");
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, split, yield_source));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, yield_source));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
-      base_type::__feature_name = "bleu";
+      base_type::__feature_name = "bleu-expected";
       
       pimpl = bleu_impl.release();
     }
@@ -771,10 +688,10 @@ namespace cicada
       }
       
       pimpl->clear();
-      sentence_set_type::const_iterator titer_end = targets.end();
-      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
-	pimpl->insert(*titer);
-
+      ngram_count_set_type::const_iterator niter_end = ngram_counts.end();
+      for (ngram_count_set_type::const_iterator niter = ngram_counts.begin(); niter != niter_end; ++ niter)
+	pimpl->insert(niter->first.begin(), niter->first.end(), niter->second);
+      
       pimpl->source_size = source_length;
     }
     

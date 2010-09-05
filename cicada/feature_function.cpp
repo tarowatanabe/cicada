@@ -5,6 +5,7 @@
 
 #include "feature/antecedent.hpp"
 #include "feature/bleu.hpp"
+#include "feature/bleu_expected.hpp"
 #include "feature/bleu_linear.hpp"
 #include "feature/boundary.hpp"
 #include "feature/neighbours.hpp"
@@ -32,6 +33,10 @@ bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
 \tsplit=[true|false] split non-ascii chars\n\
+\tyield=[source|target]\n\
+bleu-expected: expected-BLEU\n\
+\torder=<order>,\n\
+\texact=[true|false] clipped ngram computation\n\
 \tyield=[source|target]\n\
 bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
@@ -105,6 +110,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::Boundary(parameter));
     else if (param.name() == "bleu")
       return feature_function_ptr_type(new feature::Bleu(parameter));
+    else if (param.name() == "bleu-expected")
+      return feature_function_ptr_type(new feature::BleuExpected(parameter));
     else if (param.name() == "bleu-linear")
       return feature_function_ptr_type(new feature::BleuLinear(parameter));
     else if (param.name() == "span")
