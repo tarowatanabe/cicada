@@ -1,13 +1,3 @@
-Merge bleu/variational op into "apply" with local-feature function
-	add sentence-vector class
-	allow model to "assign" sentence-vector and ngram-counts
-
-add MBR to output operation
-
-operations defined in cicada/operation.hpp, not in cicada_impl.hpp
-
-ngram count statistics are treated as an object during operations
-
 Do we allow state-less features applied during composition???
 	We need composition-based features for phrase-based MT
 	to compute distortion/lexicalized reordering etc. not represented in
