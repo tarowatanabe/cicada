@@ -57,12 +57,16 @@ namespace cicada
 				feature_set_type& features,
 				feature_set_type& estimates,
 				const bool final) const;
+
+      virtual void assign(const hypergraph_type& hypergraph,
+			  const lattice_type& lattice,
+			  const span_set_type& spans,
+			  const sentence_set_type& targets,
+			  const ngram_count_set_type& ngram_counts);
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Variational(*this)); }
       
       void clear();
-      
-      void insert(const hypergraph_type& graph, const weight_set_type& weights);
       
     private:
       impl_type* pimpl;

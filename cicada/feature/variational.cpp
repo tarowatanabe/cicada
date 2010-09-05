@@ -358,89 +358,25 @@ namespace cicada
       pimpl->clear();
     }
 
-    struct variational_function
+    void Variational::assign(const hypergraph_type& hypergraph,
+			     const lattice_type& lattice,
+			     const span_set_type& spans,
+			     const sentence_set_type& targets,
+			     const ngram_count_set_type& ngram_counts)
     {
-      typedef HyperGraph hypergraph_type;
-      typedef cicada::semiring::Logprob<double> weight_type;
-      typedef weight_type value_type;
-
-      typedef Variational::weight_set_type weight_set_type;
-
-      const weight_set_type& weights;
-
-      variational_function(const weight_set_type& __weights)
-	: weights(__weights) {}
-
-      value_type operator()(const hypergraph_type::edge_type& edge) const
-      {
-	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
-      }
-    };
-
-    template <typename Iterator, typename Counts>
-    void collect_counts(Iterator first, Iterator iter, Iterator last, const double& weight, Counts& counts, const int order)
-    {
-      const int context_size = order - 1;
-      
-      first = std::max(iter - context_size, first);
-	
-      for (/**/; first != iter; ++ first)
-	for (Iterator iter2 = iter; iter2 != std::min(first + order, last); ++ iter2)
-	  counts[typename Counts::key_type(first, iter2 + 1)] += weight;
-    }
-
-    template <typename Iterator, typename Counts>
-    void collect_counts(Iterator first, Iterator last, const double& weight, Counts& counts, const int order)
-    {
-      for (/**/; first != last; ++ first)
-	for (Iterator iter = first; iter != std::min(first + order, last); ++ iter)
-	  counts[typename Counts::key_type(first, iter + 1)] += weight;
-    }
-    
-      
-    void Variational::insert(const hypergraph_type& graph, const weight_set_type& weights)
-    {
-      typedef variational_function::weight_type weight_type;
-      
-      typedef rule_type::symbol_set_type ngram_type;
-      typedef rule_type::symbol_set_type phrase_type;
-
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<ngram_type, double, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-	std::allocator<std::pair<ngram_type, double> > > ngram_set_type;
-#else
-      typedef sgi::hash_map<ngram_type, double, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-	std::allocator<std::pair<ngram_type, double> > > ngram_set_type;
-#endif
-
-      typedef std::pair<ngram_type, ngram_type> context_type;
-
-      typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
-      typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
-
-      typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
+      typedef ngram_count_set_type::ngram_type ngram_type;
 
       pimpl->clear();
-      if (! graph.is_valid())
-	return;
       
-      const int order = pimpl->order;
-      const int context_size = order - 1;
-
-      ngram_set_type ngrams;
+      ngram_count_set_type history;
       
-      cicada::expected_ngram(graph, variational_function(weights), ngrams, order, true);
-
-      ngram_set_type ngrams_history;
-      {
-	ngram_set_type::const_iterator niter_end = ngrams.end();
-	for (ngram_set_type::const_iterator niter = ngrams.begin(); niter != niter_end; ++ niter)
-	  ngrams_history[ngram_type(niter->first.begin(), niter->first.end() - 1)] += niter->second;
-	
-	for (ngram_set_type::const_iterator niter = ngrams.begin(); niter != niter_end; ++ niter)
-	  pimpl->insert(niter->first.begin(), niter->first.end(), std::log(niter->second / ngrams_history[ngram_type(niter->first.begin(), niter->first.end() - 1)]));
-      }
-    }
-    
+      ngram_count_set_type::const_iterator niter_end = ngram_counts.end();
+      for (ngram_count_set_type::const_iterator niter = ngram_counts.begin(); niter != niter_end; ++ niter)
+	history[ngram_type(niter->first.begin(), niter->first.end() - 1)] += niter->second;
+      
+      for (ngram_count_set_type::const_iterator niter = ngram_counts.begin(); niter != niter_end; ++ niter)
+	pimpl->insert(niter->first.begin(), niter->first.end(),
+		      std::log(niter->second / history[ngram_type(niter->first.begin(), niter->first.end() - 1)]));
+    };
   };
 };

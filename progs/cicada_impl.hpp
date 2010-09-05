@@ -47,10 +47,6 @@
 #include "cicada/span_vector.hpp"
 #include "cicada/ngram_count_set.hpp"
 
-#include "cicada/feature/variational.hpp"
-#include "cicada/feature/bleu.hpp"
-#include "cicada/feature/bleu_linear.hpp"
-
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
 #include "utils/sgi_hash_map.hpp"
