@@ -22,7 +22,7 @@ After the hypergraph generation, you can:
       * cicada implementes cube-pruning, cube-growing and exact (and stateless) methods
       * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
-   - Perform MBR decoding for hypergraph [12]. (TODO)
+   - Perform MBR decoding for hypergraph [12].
       * Above two computations rely on expected ngram-counts over forest [13].
    - K-bests sentences are generated from hypergraph [5].
 
