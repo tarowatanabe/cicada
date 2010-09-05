@@ -688,15 +688,17 @@ struct Task
 	    *score_1best -= *scores[id];
 	  
 	  scorer->clear();
-	  __bleu->clear();
 	  sentence_set_type::const_iterator titer_end = targets.end();
-	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer) {
+	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer) 
 	    scorer->insert(*titer);
-	    __bleu->insert(source_length, *titer);
-	  }
 	  
+	  static const lattice_type __lattice;
+	  static const span_set_type __spans;
+	  static const ngram_count_set_type __ngram_counts;
+	  
+	  __bleu->assign(hypergraph_reward, __lattice, __spans, targets, __ngram_counts);
 	  if (! loss_segment)
-	    __bleu->insert(score);
+	    __bleu->assign(score);
 	  
 	  if (! loss_segment) {
 	    hypergraph_type hypergraph_reward_rescored;
@@ -841,14 +843,17 @@ struct Task
       
       // create scorers...
       scorer->clear();
-      __bleu->clear();
       sentence_set_type::const_iterator titer_end = targets.end();
-      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer) {
+      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
 	scorer->insert(*titer);
-	__bleu->insert(source_length, *titer);
-      }
+
+      static const lattice_type __lattice;
+      static const span_set_type __spans;
+      static const ngram_count_set_type __ngram_counts;
+      
+      __bleu->assign(hypergraph, __lattice, __spans, targets, __ngram_counts);
       if (! loss_segment)
-	__bleu->insert(score);
+	__bleu->assign(score);
       
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;

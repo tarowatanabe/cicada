@@ -1,8 +1,6 @@
 
 #include <map>
 
-#include "cicada/feature/bleu.hpp"
-#include "cicada/parameter.hpp"
 
 #include "utils/hashmurmur.hpp"
 #include "utils/compact_trie_dense.hpp"
@@ -10,7 +8,12 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 
+#include "cicada/feature/bleu.hpp"
+#include "cicada/parameter.hpp"
 #include "cicada/eval/bleu.hpp"
+#include "cicada/inside_outside.hpp"
+#include "cicada/semiring.hpp"
+
 
 #include <boost/numeric/conversion/bounds.hpp>
 
@@ -384,7 +387,7 @@ namespace cicada
 	  throw std::runtime_error("this is not a bleu-score!");
       }
       
-      void insert(const int __source_size, const sentence_type& __sentence)
+      void insert(const sentence_type& __sentence)
       {
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
 	
@@ -392,8 +395,6 @@ namespace cicada
 	if (split)
 	  split_non_ascii_characters(__sentence, sentence_split);
 	const sentence_type& sentence = (split ? sentence_split : __sentence);
-	
-	source_size = __source_size;
 	
 	counts_type counts;
 	sentence_type::const_iterator siter_end = sentence.end();
@@ -612,7 +613,7 @@ namespace cicada
 	return reference_size;
       }
       
-    private:
+    public:
       
       buffer_type          buffer_impl;
       phrase_span_set_type phrase_spans_impl;
@@ -733,12 +734,52 @@ namespace cicada
       pimpl->clear();
     }
     
-    void Bleu::insert(const int source_size, const sentence_type& sentence)
+    struct source_length_function
     {
-      pimpl->insert(source_size, sentence);
-    }
+      typedef cicada::Vocab vocab_type;
+      typedef cicada::Rule rule_type;
+      typedef cicada::semiring::Tropical<int> value_type;
+      
+      template <typename Edge>
+      value_type operator()(const Edge& edge) const
+      {
+	int length = 0;
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
+    
+	// since we will "max" at operator+, we will collect negative length
+	return cicada::semiring::traits<value_type>::log(- length);
+      }
+    };
 
-    void Bleu::insert(const score_ptr_type& score)
+
+    void Bleu::assign(const hypergraph_type& hypergraph,
+		      const lattice_type& lattice,
+		      const span_set_type& spans,
+		      const sentence_set_type& targets,
+		      const ngram_count_set_type& ngram_counts)
+    {
+      int source_length = lattice.shortest_distance();
+      if (hypergraph.is_valid()) {
+	// we will enumerate forest structure... and collect min-size...
+	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(hypergraph.nodes.size());
+	
+	cicada::inside(hypergraph, lengths, source_length_function());
+	
+	source_length = - log(lengths.back());
+      }
+      
+      pimpl->clear();
+      sentence_set_type::const_iterator titer_end = targets.end();
+      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+	pimpl->insert(*titer);
+
+      pimpl->source_size = source_length;
+    }
+    
+
+    void Bleu::assign(const score_ptr_type& score)
     {
       pimpl->insert(score);
     }
