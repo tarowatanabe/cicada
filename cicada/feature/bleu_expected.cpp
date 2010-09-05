@@ -1,9 +1,9 @@
 
-#include "utils/hashmurmur.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/hashmurmur.hpp"
 
 #include "cicada/feature/bleu_expected.hpp"
 #include "cicada/parameter.hpp"
