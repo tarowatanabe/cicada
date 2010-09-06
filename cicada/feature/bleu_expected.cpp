@@ -41,7 +41,7 @@ namespace cicada
       typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
 
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
-            
+      
       // this implementation specific...
       typedef uint32_t id_type;
       typedef uint16_t count_type;

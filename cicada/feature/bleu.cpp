@@ -481,8 +481,8 @@ namespace cicada
 	      
 	      if (ngrams.is_root(id)) break;
 	      if (iter2 < iter) continue;
-	    
-	      ++ counts[id];
+
+	      counts[id] = utils::bithack::min(count_type(counts[id] + 1), ngrams[id]);
 	    }
 	  }
 	} else {
@@ -516,8 +516,8 @@ namespace cicada
 	      id = ngrams.find(id, *iter);
 	    
 	      if (ngrams.is_root(id)) break;
-	    
-	      ++ counts[id];
+	      
+	      counts[id] = utils::bithack::min(count_type(counts[id] + 1), ngrams[id]);
 	    }
 	  }
 	} else {
