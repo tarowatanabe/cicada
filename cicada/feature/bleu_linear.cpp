@@ -49,7 +49,7 @@ namespace cicada
             
       // this implementation specific...
       typedef uint32_t id_type;
-      typedef uint32_t count_type;
+      typedef uint16_t count_type;
 
       typedef symbol_type word_type;
       

@@ -55,7 +55,7 @@ namespace cicada
             
       // this implementation specific...
       typedef uint32_t id_type;
-      typedef uint32_t count_type;
+      typedef uint16_t count_type;
 
       typedef symbol_type word_type;
       
@@ -470,24 +470,35 @@ namespace cicada
 	
 	first = std::max(first, iter - context_size);
 	
-	if (exact)
+	if (exact) {
 	  counts.resize(nodes.size(), count_type(0));
-	else
-	  counts.resize(order, count_type(0));
-	
-	// we will collect counts at [iter, last) with context from [first, iter)
-	for (/**/; first != iter; ++ first) {
-	  ngram_set_type::id_type id = ngrams.root();
-	  for (Iterator iter2 = first; iter2 != std::min(first + order, last); ++ iter2) {
-	    id = ngrams.find(id, *iter2);
+	  
+	  // we will collect counts at [iter, last) with context from [first, iter)
+	  for (/**/; first != iter; ++ first) {
+	    ngram_set_type::id_type id = ngrams.root();
+	    for (Iterator iter2 = first; iter2 != std::min(first + order, last); ++ iter2) {
+	      id = ngrams.find(id, *iter2);
+	      
+	      if (ngrams.is_root(id)) break;
+	      if (iter2 < iter) continue;
 	    
-	    if (ngrams.is_root(id)) break;
-	    if (iter2 < iter) continue;
-	    
-	    if (exact)
 	      ++ counts[id];
-	    else
+	    }
+	  }
+	} else {
+	  counts.resize(order, count_type(0));
+
+	  // we will collect counts at [iter, last) with context from [first, iter)
+	  for (/**/; first != iter; ++ first) {
+	    ngram_set_type::id_type id = ngrams.root();
+	    for (Iterator iter2 = first; iter2 != std::min(first + order, last); ++ iter2) {
+	      id = ngrams.find(id, *iter2);
+	      
+	      if (ngrams.is_root(id)) break;
+	      if (iter2 < iter) continue;
+	      
 	      ++ counts[nodes[id].order - 1];
+	    }
 	  }
 	}
       }
@@ -495,23 +506,33 @@ namespace cicada
       template <typename Iterator>
       void collect_counts(Iterator first, Iterator last, count_set_type& counts) const
       {
-	if (exact)
+	if (exact) {
 	  counts.resize(nodes.size(), count_type(0));
-	else
-	  counts.resize(order, count_type(0));
-	
-	// we will collect counts at [first, last)
-	for (/**/; first != last; ++ first) {
-	  ngram_set_type::id_type id = ngrams.root();
-	  for (Iterator iter = first; iter != std::min(first + order, last); ++ iter) {
-	    id = ngrams.find(id, *iter);
+	  
+	  // we will collect counts at [first, last)
+	  for (/**/; first != last; ++ first) {
+	    ngram_set_type::id_type id = ngrams.root();
+	    for (Iterator iter = first; iter != std::min(first + order, last); ++ iter) {
+	      id = ngrams.find(id, *iter);
 	    
-	    if (ngrams.is_root(id)) break;
+	      if (ngrams.is_root(id)) break;
 	    
-	    if (exact)
 	      ++ counts[id];
-	    else
+	    }
+	  }
+	} else {
+	  counts.resize(order, count_type(0));
+
+	  // we will collect counts at [first, last)
+	  for (/**/; first != last; ++ first) {
+	    ngram_set_type::id_type id = ngrams.root();
+	    for (Iterator iter = first; iter != std::min(first + order, last); ++ iter) {
+	      id = ngrams.find(id, *iter);
+	      
+	      if (ngrams.is_root(id)) break;
+	      
 	      ++ counts[nodes[id].order - 1];
+	    }
 	  }
 	}
       }
