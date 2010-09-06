@@ -146,9 +146,10 @@ namespace cicada
 
 	
 	  for (;;) {
-	    for (int i = 0; i < edge.tails.size(); ++ i) {
+	    
+	    // current tails...
+	    for (int i = 0; i < edge.tails.size(); ++ i)
 	      tails[i] = node_map[edge.tails[i]][j[i]];
-	    }
 	    
 	    // apply various ngram cconetxt...
 	    const state_type state = apply(extract(edge), tails, weight, counts, is_goal);
@@ -222,7 +223,7 @@ namespace cicada
 	context_type::const_iterator citer_end = context.end();
 	for (context_type::const_iterator citer = context.begin(); citer != citer_end; ++ citer) {
 	  if (citer->is_non_terminal()) {
-		
+	    
 	    // collect ngram counts
 	    collect_counts(biter_first, biter, buffer.end(), weight, counts);
 	    biter = buffer.end();
