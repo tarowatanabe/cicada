@@ -48,18 +48,18 @@ namespace cicada
 		 const std::string& non_terminal,
 		 const bool insertion,
 		 const bool deletion,
-		 const bool input_id,
-		 const bool input_lattice,
-		 const bool input_forest,
-		 const bool input_span,
-		 const bool input_bitext,
-		 const bool input_mpi,
+		 const bool __input_id,
+		 const bool __input_lattice,
+		 const bool __input_forest,
+		 const bool __input_span,
+		 const bool __input_bitext,
+		 const bool __input_mpi,
 		 const int debug)
     {
       parameter_set_type parameters(first, last);
       
       OperationSet(parameters, model, grammar, goal, non_terminal, insertion, deletion,
-		   input_id, input_lattice, input_forest, input_span, input_bitext, input_mpi,
+		   __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
 		   debug);
     }
     
@@ -70,12 +70,12 @@ namespace cicada
 		 const std::string& non_terminal,
 		 const bool insertion,
 		 const bool deletion,
-		 const bool input_id,
-		 const bool input_lattice,
-		 const bool input_forest,
-		 const bool input_span,
-		 const bool input_bitext,
-		 const bool input_mpi,
+		 const bool __input_id,
+		 const bool __input_lattice,
+		 const bool __input_forest,
+		 const bool __input_span,
+		 const bool __input_bitext,
+		 const bool __input_mpi,
 		 const int debug);
     
   public:
