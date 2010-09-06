@@ -59,8 +59,8 @@ namespace cicada
 	const size_t a_size = a.size();
 	const size_t b_size = b.size();
 	
-	if (a_size == 0) return value_type(b_size, b_size, 0, 0);
-	if (b_size == 0) return value_type(a_size, 0, a_size, 0);
+	if (a_size == 0) return value_type(b_size * COSTS::insertion, b_size * COSTS::insertion, 0, 0);
+	if (b_size == 0) return value_type(a_size * COSTS::deletion, 0, a_size * COSTS::deletion, 0);
 	
 	std::vector<value_type, std::allocator<value_type> > curr(b_size + 1, value_type());
 	std::vector<value_type, std::allocator<value_type> > prev(b_size + 1, value_type());
