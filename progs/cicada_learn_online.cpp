@@ -919,18 +919,20 @@ struct Task
   void initialize()
   {
     // read grammars...
-    for (grammar_file_set_type::const_iterator fiter = grammar_static_files.begin(); fiter != grammar_static_files.end(); ++ fiter)
+    
+    size_t grammar_static_size = 0;
+    size_t grammar_mutable_size = 0;
+    
+    for (grammar_file_set_type::const_iterator fiter = grammar_static_files.begin(); fiter != grammar_static_files.end(); ++ fiter, ++ grammar_static_size)
       grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarStatic(*fiter)));
     
-    if (debug)
-      std::cerr << "loaded static grammar: " << grammar.size() << std::endl;
-    
-    for (grammar_file_set_type::const_iterator fiter = grammar_mutable_files.begin(); fiter != grammar_mutable_files.end(); ++ fiter)
+    for (grammar_file_set_type::const_iterator fiter = grammar_mutable_files.begin(); fiter != grammar_mutable_files.end(); ++ fiter, ++ grammar_mutable_size)
       grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarMutable(*fiter)));
-
-    if (debug)
-      std::cerr << "loaded mutable grammar: " << grammar.size() << std::endl;
     
+    if (debug)
+      std::cerr << "loaded static grammar: " << grammar_static_size << std::endl
+		<< "loaded mutable grammar: " << grammar_mutable_size << std::endl;
+
     if (grammar_glue_straight || grammar_glue_inverted)
       grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
 										  symbol_non_terminal,
