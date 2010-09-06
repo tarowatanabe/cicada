@@ -53,8 +53,8 @@ namespace cicada
       
       value_type operator()(const sentence_type& sentence)
       {
-	const sentence_type& a = sentence;
-	const sentence_type& b = ref;
+	const sentence_type& a = ref;
+	const sentence_type& b = sentence;
 
 	const size_t a_size = a.size();
 	const size_t b_size = b.size();
