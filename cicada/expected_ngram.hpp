@@ -114,7 +114,7 @@ namespace cicada
       outside.clear();
       outside.reserve(graph.nodes.size());
       outside.resize(graph.nodes.size());
-      
+
       cicada::inside(graph, inside, function);
       cicada::outside(graph, inside, outside, function);
 
@@ -124,7 +124,7 @@ namespace cicada
       for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
 	const node_type& node = *niter;
 	const bool is_goal = (node.id == graph.goal);
-	
+
 	state_buf.clear();
 	
 	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -143,10 +143,12 @@ namespace cicada
 	    j_ends[i] = node_map[edge.tails[i]].size();
 
 	  edge_type::node_set_type tails(edge.tails.size());
+
 	
 	  for (;;) {
-	    for (int i = 0; i < edge.tails.size(); ++ i)
+	    for (int i = 0; i < edge.tails.size(); ++ i) {
 	      tails[i] = node_map[edge.tails[i]][j[i]];
+	    }
 	    
 	    // apply various ngram cconetxt...
 	    const state_type state = apply(extract(edge), tails, weight, counts, is_goal);
@@ -181,7 +183,7 @@ namespace cicada
     state_type apply(const context_type& context, const Tails& tails, const weight_type& weight, Counts& counts, const bool is_goal)
     {
       const int context_size = order - 1;
-
+      
       buffer.clear();
       
       if (tails.empty()) {
@@ -209,7 +211,7 @@ namespace cicada
 	return state;
       } else {
 	buffer.reserve(context.size() + tails.size() * order * 2);
-	    
+	
 	int star_first = -1;
 	int star_last  = -1;
 	
@@ -246,6 +248,7 @@ namespace cicada
 		star_first = buffer.size();
 		  
 	      buffer.insert(buffer.end(), context_pair.second.begin(), context_pair.second.end());
+	      biter = buffer.end();
 	    }
 		
 	  } else if (*citer != vocab_type::EPSILON)
@@ -291,6 +294,8 @@ namespace cicada
 	    collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
 	  }
 	}
+	
+	return state;
       }
     }
 

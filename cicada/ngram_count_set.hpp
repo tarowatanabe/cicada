@@ -21,10 +21,10 @@ namespace cicada
   private:
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-				    std::allocator<std::pair<ngram_type, count_type> > > ngram_set_type;
+				    std::allocator<std::pair<const ngram_type, count_type> > > ngram_set_type;
 #else
     typedef sgi::hash_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-			  std::allocator<std::pair<ngram_type, count_type> > > ngram_set_type;
+			  std::allocator<std::pair<const ngram_type, count_type> > > ngram_set_type;
 #endif
     
 public:

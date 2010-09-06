@@ -657,8 +657,13 @@ namespace cicada
       
       pimpl->clear();
       ngram_count_set_type::const_iterator niter_end = ngram_counts.end();
-      for (ngram_count_set_type::const_iterator niter = ngram_counts.begin(); niter != niter_end; ++ niter)
+      for (ngram_count_set_type::const_iterator niter = ngram_counts.begin(); niter != niter_end; ++ niter) {
+	//std::cerr << "ngram: " << niter->first << " count: " << niter->second << std::endl;
+	
 	pimpl->insert(niter->first.begin(), niter->first.end(), niter->second);
+      }
+
+      //std::cerr << "source length: " << source_length << std::endl;
       
       pimpl->source_size = source_length;
     }

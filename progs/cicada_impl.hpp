@@ -38,7 +38,6 @@
 #include "cicada/permute.hpp"
 #include "cicada/sort.hpp"
 #include "cicada/prune.hpp"
-#include "cicada/expected_ngram.hpp"
 #include "cicada/operation_set.hpp"
 
 #include "cicada/feature_function.hpp"

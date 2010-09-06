@@ -5,7 +5,6 @@
 #include "cicada/parameter.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
-#include "cicada/expected_ngram.hpp"
 
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sgi_hash_map.hpp"
