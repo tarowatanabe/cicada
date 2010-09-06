@@ -58,9 +58,9 @@ namespace cicada
     {
       parameter_set_type parameters(first, last);
       
-      OperationSet(parameters, model, grammar, goal, non_terminal, insertion, deletion,
-		   __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
-		   debug);
+      initialize(parameters, model, grammar, goal, non_terminal, insertion, deletion,
+		 __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
+		 debug);
     }
     
     OperationSet(const parameter_set_type& parameters,
@@ -76,7 +76,12 @@ namespace cicada
 		 const bool __input_span,
 		 const bool __input_bitext,
 		 const bool __input_mpi,
-		 const int debug);
+		 const int debug)
+    {
+      initialize(parameters, model, grammar, goal, non_terminal, insertion, deletion,
+		 __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
+		 debug);
+    }
     
   public:
     void assign(const weight_set_type& weights);
@@ -84,6 +89,22 @@ namespace cicada
     
     const output_data_type& get_output_data() const { return output_data; }
     const data_type& get_data() const { return data; }
+
+  private:
+    void initialize(const parameter_set_type& parameters,
+		    const model_type& model,
+		    const grammar_type& grammar,
+		    const std::string& goal,
+		    const std::string& non_terminal,
+		    const bool insertion,
+		    const bool deletion,
+		    const bool __input_id,
+		    const bool __input_lattice,
+		    const bool __input_forest,
+		    const bool __input_span,
+		    const bool __input_bitext,
+		    const bool __input_mpi,
+		    const int debug);
     
   private:
     bool input_id;

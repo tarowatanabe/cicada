@@ -83,32 +83,34 @@ output: kbest or hypergraph output\n\
   }
 
 
-  OperationSet::OperationSet(const parameter_set_type& parameters,
-			     const model_type& model,
-			     const grammar_type& grammar,
-			     const std::string& goal,
-			     const std::string& non_terminal,
-			     const bool insertion,
-			     const bool deletion,
-			     const bool __input_id,
-			     const bool __input_lattice,
-			     const bool __input_forest,
-			     const bool __input_span,
-			     const bool __input_bitext,
-			     const bool __input_mpi,
-			     const int debug)
-    : input_id(__input_id),
-      input_lattice(__input_lattice),
-      input_forest(__input_forest),
-      input_span(__input_span),
-      input_bitext(__input_bitext),
-      input_mpi(__input_mpi)
+  void OperationSet::initialize(const parameter_set_type& parameters,
+				const model_type& model,
+				const grammar_type& grammar,
+				const std::string& goal,
+				const std::string& non_terminal,
+				const bool insertion,
+				const bool deletion,
+				const bool __input_id,
+				const bool __input_lattice,
+				const bool __input_forest,
+				const bool __input_span,
+				const bool __input_bitext,
+				const bool __input_mpi,
+				const int debug)
   {
     typedef cicada::Parameter param_type;
 
     // operation object creation...
-    
+
     // initialize...
+    
+    input_id      = __input_id;
+    input_lattice = __input_lattice;
+    input_forest  = __input_forest;
+    input_span    = __input_span;
+    input_bitext  = __input_bitext;
+    input_mpi     = __input_mpi;
+    
     data.id = size_t(-1);
     output_data.use_buffer = false;
     
@@ -211,7 +213,7 @@ output: kbest or hypergraph output\n\
     // perform parsing...
     std::string::const_iterator iter = line.begin();
     std::string::const_iterator end = line.end();
-    
+
     
     if (input_id) {
       if (! parse_id(data.id, iter, end))
