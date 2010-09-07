@@ -299,9 +299,9 @@ if test "$have_malloc_zone_statistics" = "yes"; then
 fi
 
 
-if test "$have_malloc_extension" = "no" -a "$have_malloc_zone_statistics" = "no" -a "$have_jemalloc_stats" = "no"; then
-    AS_ERROR("no malloc statistics...")
-fi
+#if test "$have_malloc_extension" = "no" -a "$have_malloc_zone_statistics" = "no" -a "$have_jemalloc_stats" = "no"; then
+#    AS_ERROR("no malloc statistics...")
+#fi
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h sys/time.h unistd.h])
