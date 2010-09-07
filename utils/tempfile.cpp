@@ -1,7 +1,8 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
 #include <utils/filesystem.hpp>
@@ -106,7 +107,7 @@ namespace utils
     struct SignalSet
     {
       typedef struct sigaction sigaction_type;
-      typedef std::vector<sigaction_type, std::allocator<sigaction_type> > sigaction_set_type;
+      //typedef std::vector<sigaction_type, std::allocator<sigaction_type> > sigaction_set_type;
       
       SignalSet() {}
 
@@ -119,62 +120,58 @@ namespace utils
       {
 	return signals[pos];
       }
-
-      void reserve(size_t __size) { signals.reserve(__size); }
-      void resize(size_t __size) { signals.resize(__size); }
       
-      sigaction_set_type signals;
+      //void reserve(size_t __size) { signals.reserve(__size); }
+      //void resize(size_t __size) { signals.resize(__size); }
+      
+      sigaction_type signals[NSIG];
     };
 
-    static PathSet   __paths;
-    static SignalSet __signals;
+    static boost::shared_ptr<PathSet>   __paths;
+    static boost::shared_ptr<SignalSet> __signals;
     
+    static boost::once_flag signal_installer_once = BOOST_ONCE_INIT;
 
     // callback functions...
     static void callback(int sig) throw()
     {
       // actual clear...
-      __paths.clear();
+      __paths->clear();
       
       // is this safe without mutex???
-      ::sigaction(sig, &__signals[sig], 0);
+      ::sigaction(sig, &__signals->operator[](sig), 0);
       ::kill(getpid(), sig);
     }
     
     struct SignalInstaller
     {
-      SignalInstaller() 
+      static void initializer()
       {
 	typedef struct sigaction sigaction_type;
-
-	int sig_max = SIGHUP;
 	
-	sig_max = std::max(sig_max, SIGINT);
-	sig_max = std::max(sig_max, SIGQUIT);
-	sig_max = std::max(sig_max, SIGILL);
-	sig_max = std::max(sig_max, SIGABRT);
-	sig_max = std::max(sig_max, SIGKILL);
-	sig_max = std::max(sig_max, SIGSEGV);
-	sig_max = std::max(sig_max, SIGTERM);
-	sig_max = std::max(sig_max, SIGBUS);
-	
-	__signals.reserve(sig_max);
-	__signals.resize(sig_max);
-      
+	__paths.reset(new PathSet());
+	__signals.reset(new SignalSet());
+		
 	sigaction_type sa;
 	sa.sa_handler = callback;
 	sa.sa_flags = SA_RESTART;
 	sigemptyset(&sa.sa_mask);
       
-	::sigaction(SIGHUP,  &sa, &__signals[SIGHUP]);
-	::sigaction(SIGINT,  &sa, &__signals[SIGINT]);
-	::sigaction(SIGQUIT, &sa, &__signals[SIGQUIT]);
-	::sigaction(SIGILL,  &sa, &__signals[SIGILL]);
-	::sigaction(SIGABRT, &sa, &__signals[SIGABRT]);
-	::sigaction(SIGKILL, &sa, &__signals[SIGKILL]);
-	::sigaction(SIGSEGV, &sa, &__signals[SIGSEGV]);
-	::sigaction(SIGTERM, &sa, &__signals[SIGTERM]);
-	::sigaction(SIGBUS,  &sa, &__signals[SIGBUS]);
+	::sigaction(SIGHUP,  &sa, &__signals->operator[](SIGHUP));
+	::sigaction(SIGINT,  &sa, &__signals->operator[](SIGINT));
+	::sigaction(SIGQUIT, &sa, &__signals->operator[](SIGQUIT));
+	::sigaction(SIGILL,  &sa, &__signals->operator[](SIGILL));
+	::sigaction(SIGABRT, &sa, &__signals->operator[](SIGABRT));
+	//::sigaction(SIGKILL, &sa, &__signals->operator[](SIGKILL));
+	::sigaction(SIGSEGV, &sa, &__signals->operator[](SIGSEGV));
+	::sigaction(SIGTERM, &sa, &__signals->operator[](SIGTERM));
+	::sigaction(SIGBUS,  &sa, &__signals->operator[](SIGBUS));
+
+      }
+
+      SignalInstaller() 
+      {
+	boost::call_once(signal_installer_once, initializer);
       }
     };
 
@@ -184,14 +181,14 @@ namespace utils
   
   void tempfile::insert(const path_type& path)
   {
-    tempfile_impl::__paths.insert(path);
+    tempfile_impl::__paths->insert(path);
   }
   
   void tempfile::erase(const path_type& path)
   {
-    tempfile_impl::__paths.erase(path);
+    tempfile_impl::__paths->erase(path);
   }
-
+  
   inline 
   std::string get_hostname()
   {

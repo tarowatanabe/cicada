@@ -107,9 +107,9 @@ namespace utils
     bool modified;
     
   public:
-    repository() : modified(false) {}
-    repository(const path_type& dir, const mode_type mode=read): modified(false)  { open(dir, mode); }
-    repository(const repository& x) : modified(false)
+    repository() : repository_mode(read), modified(false) {}
+    repository(const path_type& dir, const mode_type mode=read): repository_mode(read), modified(false)  { open(dir, mode); }
+    repository(const repository& x) : repository_mode(read), modified(false)
     {
       if (x.repository_mode == write) 
 	throw std::runtime_error("cannot initialize with write mode");
