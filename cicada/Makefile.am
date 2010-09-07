@@ -12,11 +12,12 @@ libcicada-stemmer.la
 
 libcicadaincludedir= $(pkgincludedir)/cicada
 
-semiringdir = $(pkgincludedir)/cicada/semiring
-evaldir     = $(pkgincludedir)/cicada/eval
-optimizedir = $(pkgincludedir)/cicada/optimize
-featuredir  = $(pkgincludedir)/cicada/feature
-stemmerdir  = $(pkgincludedir)/cicada/stemmer
+semiringdir  = $(pkgincludedir)/cicada/semiring
+evaldir      = $(pkgincludedir)/cicada/eval
+optimizedir  = $(pkgincludedir)/cicada/optimize
+featuredir   = $(pkgincludedir)/cicada/feature
+stemmerdir   = $(pkgincludedir)/cicada/stemmer
+operationdir = $(pkgincludedir)/cicada/operation
 
 dist_semiring_HEADERS = \
 semiring/envelope.hpp \
@@ -88,6 +89,19 @@ stemmer/suffix.cpp \
 stemmer/latin.cpp \
 stemmer/digit.cpp
 libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
+
+dist_operation_HEADERS = \
+operation/apply.hpp \
+operation/binarize.hpp \
+operation/compose.hpp \
+operation/expected_ngram.hpp \
+operation/functional.hpp \
+operation/generate.hpp \
+operation/intersect.hpp \
+operation/output.hpp \
+operation/permute.hpp \
+operation/prune.hpp \
+operation/traversal.hpp
 
 libcicadainclude_HEADERS = \
 apply.hpp \
