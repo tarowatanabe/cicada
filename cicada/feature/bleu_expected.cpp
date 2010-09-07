@@ -403,8 +403,8 @@ namespace cicada
 	    
 	    if (ngrams.is_root(id)) break;
 	    if (iter2 < iter) continue;
-	    
-	    ++ counts[id];
+
+	    counts[id] = utils::bithack::min(1 + counts[id], int(ngrams[id]) + 1);
 	  }
 	}
       }
@@ -422,7 +422,7 @@ namespace cicada
 	    
 	    if (ngrams.is_root(id)) break;
 	    
-	    ++ counts[id];
+	    counts[id] = utils::bithack::min(1 + counts[id], int(ngrams[id]) + 1);
 	  }
 	}
       }
