@@ -127,8 +127,8 @@ namespace utils
       sigaction_type signals[NSIG];
     };
 
-    static boost::shared_ptr<PathSet>   __paths;
-    static boost::shared_ptr<SignalSet> __signals;
+    static PathSet   __paths;
+    static SignalSet __signals;
     
     static boost::once_flag signal_installer_once = BOOST_ONCE_INIT;
 
@@ -136,10 +136,10 @@ namespace utils
     static void callback(int sig) throw()
     {
       // actual clear...
-      __paths->clear();
+      __paths.clear();
       
       // is this safe without mutex???
-      ::sigaction(sig, &__signals->operator[](sig), 0);
+      ::sigaction(sig, &__signals[sig], 0);
       ::kill(getpid(), sig);
     }
     
@@ -149,23 +149,20 @@ namespace utils
       {
 	typedef struct sigaction sigaction_type;
 	
-	__paths.reset(new PathSet());
-	__signals.reset(new SignalSet());
-		
 	sigaction_type sa;
 	sa.sa_handler = callback;
 	sa.sa_flags = SA_RESTART;
 	sigemptyset(&sa.sa_mask);
       
-	::sigaction(SIGHUP,  &sa, &__signals->operator[](SIGHUP));
-	::sigaction(SIGINT,  &sa, &__signals->operator[](SIGINT));
-	::sigaction(SIGQUIT, &sa, &__signals->operator[](SIGQUIT));
-	::sigaction(SIGILL,  &sa, &__signals->operator[](SIGILL));
-	::sigaction(SIGABRT, &sa, &__signals->operator[](SIGABRT));
-	//::sigaction(SIGKILL, &sa, &__signals->operator[](SIGKILL));
-	::sigaction(SIGSEGV, &sa, &__signals->operator[](SIGSEGV));
-	::sigaction(SIGTERM, &sa, &__signals->operator[](SIGTERM));
-	::sigaction(SIGBUS,  &sa, &__signals->operator[](SIGBUS));
+	::sigaction(SIGHUP,  &sa, &__signals[SIGHUP]);
+	::sigaction(SIGINT,  &sa, &__signals[SIGINT]);
+	::sigaction(SIGQUIT, &sa, &__signals[SIGQUIT]);
+	::sigaction(SIGILL,  &sa, &__signals[SIGILL]);
+	::sigaction(SIGABRT, &sa, &__signals[SIGABRT]);
+	//::sigaction(SIGKILL, &sa, &__signals[SIGKILL]);
+	::sigaction(SIGSEGV, &sa, &__signals[SIGSEGV]);
+	::sigaction(SIGTERM, &sa, &__signals[SIGTERM]);
+	::sigaction(SIGBUS,  &sa, &__signals[SIGBUS]);
 
       }
 
@@ -181,12 +178,12 @@ namespace utils
   
   void tempfile::insert(const path_type& path)
   {
-    tempfile_impl::__paths->insert(path);
+    tempfile_impl::__paths.insert(path);
   }
   
   void tempfile::erase(const path_type& path)
   {
-    tempfile_impl::__paths->erase(path);
+    tempfile_impl::__paths.erase(path);
   }
   
   inline 
