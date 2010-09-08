@@ -22,13 +22,13 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include "cicada/hypergraph.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/space_separator.hpp"
-
 
 
 typedef boost::filesystem::path path_type;
@@ -187,8 +187,19 @@ void transform(const treebank_type& treebank, sentence_type& sent)
       transform(*aiter, sent);
 }
 
+void transform_map(treebank_type& treebank, sentence_type& sent)
+{
+  if (treebank.antecedents.empty()) {
+    treebank.cat = sent.back();
+    sent.pop_back();
+  } else
+    for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+      transform_map(*aiter, sent);
+}
+
 path_type input_file = "-";
 path_type output_file = "-";
+path_type map_file;
 
 bool escaped = false;
 bool leaf = false;
@@ -201,13 +212,21 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-
     typedef boost::spirit::istream_iterator iter_type;
 
     utils::compress_istream is(input_file, 1024 * 1024);
     is.unsetf(std::ios::skipws);
     
     utils::compress_ostream os(output_file);
+
+    boost::shared_ptr<utils::compress_istream> ms;
+
+    if (! map_file.empty()) {
+      if (! boost::filesystem::exists(map_file))
+	throw std::runtime_error("no map file: " + map_file.file_string());
+      
+      ms.reset(new utils::compress_istream(map_file, 1024 * 1024));
+    }
     
     penntreebank_grammar<iter_type>         grammar;
     penntreebank_escaped_grammar<iter_type> grammar_escaped;
@@ -215,7 +234,8 @@ int main(int argc, char** argv)
     treebank_type   parsed;
     hypergraph_type graph;
     sentence_type   sent;
-
+    
+    std::string line;
     iter_type iter(is);
     iter_type iter_end;
     
@@ -228,6 +248,19 @@ int main(int argc, char** argv)
       } else {
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed))
 	  throw std::runtime_error("parsing failed");
+      }
+
+      if (ms) {
+	if (! std::getline(*ms, line))
+	  throw std::runtime_error("# of lines do not match with map-file");
+
+	boost::tokenizer<utils::space_separator> tokenizer(line);
+	
+	sent.assign(tokenizer.begin(), tokenizer.end());
+	
+	std::reverse(sent.begin(), sent.end());
+	
+	transform_map(parsed, sent);
       }
 
       if (leaf) {
@@ -274,6 +307,7 @@ void options(int argc, char** argv)
   desc.add_options()
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
+    ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
     ("escape",    po::bool_switch(&escaped), "escape English penntreebank")
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
