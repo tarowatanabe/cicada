@@ -134,7 +134,7 @@ int main(int argc, char** argv)
       }
     }
     
-    for (int seg = 0; seg < finished[seg].size(); ++ seg)
+    for (int seg = 0; seg < finished.size(); ++ seg)
       if (scorers[seg] && ! finished[seg])
 	std::cerr << "WARNING: no translation at: " << seg << std::endl;
 
