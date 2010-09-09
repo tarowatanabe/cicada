@@ -106,7 +106,7 @@ struct penntreebank_escaped_grammar : boost::spirit::qi::grammar<Iterator, treeb
 template <typename Iterator>
 struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type(), boost::spirit::standard::space_type>
 {
-  penntreebank_grammar() : penntreebank_grammar::base_type(treebank)
+  penntreebank_grammar() : penntreebank_grammar::base_type(root)
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
@@ -125,9 +125,11 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
     
     cat %= lexeme[+(char_ - space - '(' - ')')];
     treebank %= hold['(' >> cat >> +treebank >> ')'] | cat;
+    root %= hold['(' >> cat >> +treebank >> ')'] | cat;
   }
   
   boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   cat;
+  boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> root;
   boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> treebank;
 };
 
@@ -205,6 +207,8 @@ bool escaped = false;
 bool leaf = false;
 bool rule = false;
 
+int debug = 0;
+
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
@@ -239,8 +243,12 @@ int main(int argc, char** argv)
     iter_type iter(is);
     iter_type iter_end;
     
+    int num = 0;
     while (iter != iter_end) {
       parsed.clear();
+
+      if (debug)
+	std::cerr << "parsing: " << num << std::endl;
       
       if (escaped) {
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar_escaped, boost::spirit::standard::space, parsed))
@@ -249,6 +257,9 @@ int main(int argc, char** argv)
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed))
 	  throw std::runtime_error("parsing failed");
       }
+
+
+      ++ num;
 
       if (ms) {
 	if (! std::getline(*ms, line))
@@ -279,7 +290,10 @@ int main(int argc, char** argv)
 	
 	transform(parsed, graph);
 
-	graph.topologically_sort();
+	if (! graph.edges.empty())
+	  graph.topologically_sort();
+	else
+	  graph.clear();
 
 	if (rule) {
 	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
@@ -312,6 +326,8 @@ void options(int argc, char** argv)
     ("escape",    po::bool_switch(&escaped), "escape English penntreebank")
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
+    
+    ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
     ("help", "help message");
   

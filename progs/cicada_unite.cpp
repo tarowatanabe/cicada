@@ -36,6 +36,8 @@ int main(int argc, char ** argv)
       
       if (! hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
+
+      if (! hypergraph.is_valid()) continue;
       
       if (confidence) {
 	const double conf = 1.0 / (1.0 + rank);
