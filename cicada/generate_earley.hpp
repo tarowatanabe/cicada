@@ -518,8 +518,7 @@ namespace cicada
 	if (out_edges[id].empty())
 	  non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
 	else {
-	  std::string nodes_prev;
-	  std::string nodes_next;
+	  std::string nodes;
 	  
 	  bool found = false;
 	  for (int pos = 0; pos != source.edges[out_edges[id].front()].tails.size(); ++ pos) {
@@ -527,27 +526,18 @@ namespace cicada
 	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
 	    
 	    if (antecedent_id == id)
-	      found = true;
+	      nodes += '@' + non_terminal.non_terminal_strip();
 	    else {
-	      if (! found) {
-		if (nodes_prev.empty())
-		  nodes_prev = non_terminal.non_terminal_strip();
-		else
-		  nodes_prev += '|' + non_terminal.non_terminal_strip();
-	      } else {
-		if (nodes_next.empty())
-		  nodes_next = non_terminal.non_terminal_strip();
-		else
-		  nodes_next += '|' + non_terminal.non_terminal_strip();
-	      }
+	      if (nodes.empty())
+		nodes = non_terminal.non_terminal_strip();
+	      else
+		nodes += '|' + non_terminal.non_terminal_strip();
 	    }
 	  }
 	  
 	  non_terminals[id] = ('['
 			       + non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip()
-			       + ':' + nodes_prev
-			       + '+' + source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip()
-			       + '+' + nodes_next
+			       + ':' + nodes
 			       + ']');
 	}
 #endif

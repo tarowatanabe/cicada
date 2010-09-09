@@ -31,7 +31,6 @@
 
 #include "cicada/apply.hpp"
 #include "cicada/compose.hpp"
-#include "cicada/generate.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/intersect.hpp"
 #include "cicada/binarize.hpp"
