@@ -271,7 +271,8 @@ int main(int argc, char** argv)
 	
 	std::reverse(sent.begin(), sent.end());
 	
-	transform_map(parsed, sent);
+	if (! sent.empty())
+	  transform_map(parsed, sent);
       }
 
       if (leaf) {
