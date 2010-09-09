@@ -80,9 +80,9 @@ namespace cicada
 	utils::resource ngram_start;
     
 	if (weights_one)
-	  cicada::expected_ngram(hypergraph, weight_function_scaled_one<weight_type>(scale), ngram_counts, order, bos_eos, yield_source);
+	  cicada::expected_ngram(hypergraph, weight_scaled_function_one<weight_type>(scale), ngram_counts, order, bos_eos, yield_source);
 	else
-	  cicada::expected_ngram(hypergraph, weight_function_scaled<weight_type>(*weights_apply, scale), ngram_counts, order, bos_eos, yield_source);
+	  cicada::expected_ngram(hypergraph, weight_scaled_function<weight_type>(*weights_apply, scale), ngram_counts, order, bos_eos, yield_source);
 
 	utils::resource ngram_end;
     
