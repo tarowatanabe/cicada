@@ -13,6 +13,7 @@ path_type input_file = "-";
 path_type output_file = "-";
 
 bool confidence = false;
+bool count      = false;
 
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
@@ -46,6 +47,12 @@ int main(int argc, char ** argv)
 	for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
 	  eiter->features["tree-confidence"] = conf;
       }
+
+      if (count) {
+	hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
+	for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
+	  eiter->features["tree-count"] = 1;
+      }
       
       merged.unite(hypergraph);
 
@@ -75,6 +82,7 @@ void options(int argc, char** argv)
     ("output", po::value<path_type>(&output_file), "output in binary format")
     
     ("confidence", po::bool_switch(&confidence), "add confidence weight")
+    ("count",      po::bool_switch(&count), "add count weight")
     
     ("help", "help message");
 
