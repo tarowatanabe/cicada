@@ -29,14 +29,6 @@
 #include "cicada/model.hpp"
 #include "cicada/grammar.hpp"
 
-#include "cicada/apply.hpp"
-#include "cicada/compose.hpp"
-#include "cicada/inside_outside.hpp"
-#include "cicada/intersect.hpp"
-#include "cicada/binarize.hpp"
-#include "cicada/permute.hpp"
-#include "cicada/sort.hpp"
-#include "cicada/prune.hpp"
 #include "cicada/operation_set.hpp"
 
 #include "cicada/feature_function.hpp"

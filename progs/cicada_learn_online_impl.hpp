@@ -27,6 +27,11 @@
 
 #include <cicada/optimize/line_search.hpp>
 
+#include "cicada/apply.hpp"
+#include "cicada/inside_outside.hpp"
+#include "cicada/prune.hpp"
+
+
 inline
 path_type add_suffix(const path_type& path, const std::string& suffix)
 {
