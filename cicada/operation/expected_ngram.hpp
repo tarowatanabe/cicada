@@ -22,7 +22,7 @@ namespace cicada
     {
     public:
       ExpectedNGram(const std::string& parameter, const int __debug)
-	: order(0), bos_eos(false), weights(0), weights_one(false), yield_source(false), yield_target(false)
+	: order(0), bos_eos(false), weights(0), weights_one(false), yield_source(false), yield_target(false), debug(__debug)
       {
 	typedef cicada::Parameter param_type;
     
