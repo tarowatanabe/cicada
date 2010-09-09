@@ -22,7 +22,7 @@ namespace cicada
     {
     public:
       ExpectedNGram(const std::string& parameter, const int __debug)
-	: order(0), bos_eos(false), weights(0), weights_one(false), yield_source(false), yield_target(false), debug(__debug)
+	: order(0), bos_eos(false), weights(0), weights_one(false), scale(1.0), yield_source(false), yield_target(false), debug(__debug)
       {
 	typedef cicada::Parameter param_type;
     
@@ -39,6 +39,8 @@ namespace cicada
 	    weights = &base_type::weights(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
 	    weights_one = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "scale") == 0)
+	    scale = boost::lexical_cast<double>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	    const std::string& value = piter->second;
 	
@@ -78,9 +80,9 @@ namespace cicada
 	utils::resource ngram_start;
     
 	if (weights_one)
-	  cicada::expected_ngram(hypergraph, weight_function_one<weight_type>(), ngram_counts, order, bos_eos, yield_source);
+	  cicada::expected_ngram(hypergraph, weight_function_scaled_one<weight_type>(scale), ngram_counts, order, bos_eos, yield_source);
 	else
-	  cicada::expected_ngram(hypergraph, weight_function<weight_type>(*weights_apply), ngram_counts, order, bos_eos, yield_source);
+	  cicada::expected_ngram(hypergraph, weight_function_scaled<weight_type>(*weights_apply, scale), ngram_counts, order, bos_eos, yield_source);
 
 	utils::resource ngram_end;
     
@@ -98,6 +100,9 @@ namespace cicada
   
       const weight_set_type* weights;
       bool weights_one;
+      
+      double scale;
+
       bool yield_source;
       bool yield_target;
   

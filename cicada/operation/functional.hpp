@@ -30,7 +30,32 @@ namespace cicada
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.dot(weights));
+	return cicada::semiring::traits<value_type>::log(x.dot(weights) * scale);
+      }
+    };
+
+
+    template <typename Weight>
+    struct weight_scaled_function_one
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+  
+      weight_scaled_function_one(const double& __scale)
+	: scale(__scale) {}
+      
+      const double scale;
+      
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(x.features.dot() * scale);
+      }
+      
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(x.dot() * scale);
       }
     };
 

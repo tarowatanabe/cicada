@@ -60,6 +60,7 @@ expected-ngram: expected ngram computation\n\
 \tbos-eos=[true|false] include <s> and </s> in ngrams\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+\tscale=scaling for score\n\
 \tyield=[source|target]\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
