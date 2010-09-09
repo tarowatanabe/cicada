@@ -19,14 +19,28 @@ namespace cicada
     class GenerateEarley : public Operation
     {
     public:
-      GenerateEarley(const grammar_type& __grammar,
+      GenerateEarley(const std::string& parameter,
+		     const grammar_type& __grammar,
 		     const std::string& __goal,
 		     const std::string& __non_terminal,
 		     const bool __insertion,
 		     const bool __deletion,
 		     const int __debug)
-	: debug(__debug)
-      { }
+	: depth(0), debug(__debug)
+      { 
+	typedef cicada::Parameter param_type;
+    
+	param_type param(parameter);
+	if (param.name() != "generate-earley")
+	  throw std::runtime_error("this is not a Earley generator");
+	
+	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "depth") == 0)
+	    depth = boost::lexical_cast<int>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for generator: " << piter->first << "=" << piter->second << std::endl;
+	}
+      }
   
       void operator()(data_type& data) const
       {
@@ -38,7 +52,7 @@ namespace cicada
     
 	utils::resource start;
     
-	cicada::generate_earley(hypergraph, generated);
+	cicada::generate_earley(hypergraph, generated, depth);
     
 	utils::resource end;
     
@@ -58,7 +72,9 @@ namespace cicada
     
 	hypergraph.swap(generated);
       }
-  
+      
+      
+      int depth;
       int debug;
     };
 

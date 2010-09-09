@@ -20,7 +20,8 @@ namespace cicada
     class ComposeEarley : public Operation
     {
     public:
-      ComposeEarley(const grammar_type& __grammar,
+      ComposeEarley(const std::string& parameter,
+		    const grammar_type& __grammar,
 		    const std::string& __goal,
 		    const std::string& __non_terminal,
 		    const bool __insertion,
@@ -82,7 +83,8 @@ namespace cicada
     class ComposeCKY : public Operation
     {
     public:
-      ComposeCKY(const grammar_type& __grammar,
+      ComposeCKY(const std::string& parameter,
+		 const grammar_type& __grammar,
 		 const std::string& __goal,
 		 const std::string& __non_terminal,
 		 const bool __insertion,

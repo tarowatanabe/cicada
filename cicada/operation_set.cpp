@@ -46,6 +46,7 @@ permute: permute tree (monolingual tree only)\n\
 compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
 generate-earley: re-generation from tree\n\
+\tdepth: depth of rule pattern \n\
 apply: feature application\n\
 \tsize=<cube size>\n\
 \texact=[true|false]  no pruning feature application\n\
@@ -126,11 +127,11 @@ output: kbest or hypergraph output\n\
       else if (param.name() == "permute")
 	operations.push_back(operation_ptr_type(new operation::Permute(*piter, debug)));
       else if (param.name() == "compose-earley")
-	operations.push_back(operation_ptr_type(new operation::ComposeEarley(grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "compose-cky")
-	operations.push_back(operation_ptr_type(new operation::ComposeCKY(grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposeCKY(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "generate-earley")
-	operations.push_back(operation_ptr_type(new operation::GenerateEarley(grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "apply")
 	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
       else if (param.name() == "prune")

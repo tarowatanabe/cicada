@@ -47,7 +47,8 @@ namespace cicada
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
     
-    GenerateEarley()
+    GenerateEarley(const int __depth)
+      : depth(__depth)
     {
       edges_unique.set_empty_key(0);
 
@@ -447,7 +448,7 @@ namespace cicada
       
       hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
       edge_new.rule = source.edges[edge.edge].rule;
-      edge_new.features = source.edges[edge.edge].features;
+      edge_new.features = edge.dot->features;
       
       target.connect_edge(edge_new.id, head_id);
 
@@ -514,10 +515,13 @@ namespace cicada
       
       // assigne pseudo non-terminals
       non_terminal_set_type non_terminals(source.nodes.size());
+      std::vector<int, std::allocator<int> > depths(source.nodes.size(), 0);
       for (int id = source.nodes.size() - 1; id >= 0; -- id)
 	if (out_edges[id].empty())
 	  non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
 	else {
+	  depths[id] = depths[out_edges[id].front()] + 1;
+
 	  std::string nodes;
 	  
 	  bool found = false;
@@ -535,10 +539,19 @@ namespace cicada
 	    }
 	  }
 	  
-	  non_terminals[id] = ('['
-			       + non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip()
-			       + ':' + nodes
-			       + ']');
+	  std::string non_terminal_nodes = (non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip() + ':' + nodes);
+	  
+	  if (depth > 0 && depths[id] > depth) {
+	    // always strip-off the first non-terminal up-until ':'
+	    
+	    std::string::size_type pos = non_terminal_nodes.find(':');
+	    if (pos != std::string::npos)
+	      non_terminal_nodes = non_terminal_nodes.substr(pos + 1);
+	  }
+	  
+	  non_terminals[id] = '[' + non_terminal_nodes + ']';
+	  
+	  //std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
 	}
 #endif
       
@@ -592,13 +605,15 @@ namespace cicada
 	if (grammar_nodes[niter->second].edge == hypergraph_type::invalid) {
 	  grammar_nodes[niter->second].edge = edge.id;
 	  grammar_nodes[niter->second].features = edge.features;
-	} else 
+	} else
 	  grammar_nodes[niter->second].features += edge.features;
       }
     }
 
     
   private:  
+    int depth;
+
     symbol_type           goal_symbol;
     grammar_node_set_type grammar_nodes;
 
@@ -618,9 +633,9 @@ namespace cicada
   };
   
   inline
-  void generate_earley(const HyperGraph& source, HyperGraph& target)
+  void generate_earley(const HyperGraph& source, HyperGraph& target, const int depth=0)
   {
-    GenerateEarley generater;
+    GenerateEarley generater(depth);
       
     generater(source, target);
   }
