@@ -7,13 +7,14 @@
 #include "cicada_impl.hpp"
 
 #include "utils/program_options.hpp"
+
 #include <boost/program_options.hpp>
 
 path_type input_file = "-";
 path_type output_file = "-";
 
-bool confidence = false;
-bool count      = false;
+std::string confidence;
+std::string count;
 
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
@@ -24,10 +25,12 @@ int main(int argc, char ** argv)
     options(argc, argv);
     
     utils::compress_istream is(input_file, 1024 * 1024);
-    
 
     hypergraph_type merged;
     hypergraph_type hypergraph;
+
+    cicada::Feature feature_confidence(confidence);
+    cicada::Feature feature_count(count);
     
     int rank = 1;
     std::string line;
@@ -40,18 +43,18 @@ int main(int argc, char ** argv)
 
       if (! hypergraph.is_valid()) continue;
       
-      if (confidence) {
+      if (! feature_confidence.empty()) {
 	const double conf = 1.0 / (1.0 + rank);
 	
 	hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
 	for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
-	  eiter->features["tree-confidence"] = conf;
-      }
-
-      if (count) {
+	  eiter->features[feature_confidence] = conf;
+      } 
+      
+      if (! feature_count.empty()) {
 	hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
 	for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
-	  eiter->features["tree-count"] = 1;
+	  eiter->features[feature_count] = 1;
       }
       
       merged.unite(hypergraph);
@@ -81,8 +84,8 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input in text format")
     ("output", po::value<path_type>(&output_file), "output in binary format")
     
-    ("confidence", po::bool_switch(&confidence), "add confidence weight")
-    ("count",      po::bool_switch(&count), "add count weight")
+    ("confidence", po::value<std::string>(&confidence),    "add confidence weight")
+    ("count",      po::value<std::string>(&count),         "add count weight")
     
     ("help", "help message");
 
