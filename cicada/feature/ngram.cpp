@@ -195,7 +195,7 @@ namespace cicada
 	    bool estimated = false;
 	    double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
 	      
-	    if (estimated && logbound < 0.0)
+	    if (! ngram.bound_exact && estimated && logbound < 0.0)
 	      logbound *= decays[buffer_id.size()];
 	      
 	    cache.logprob += logbound;
