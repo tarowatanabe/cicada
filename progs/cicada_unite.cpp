@@ -43,8 +43,6 @@ int main(int argc, char ** argv)
       
       if (! hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
-
-      if (! hypergraph.is_valid()) continue;
       
       if (! feature_confidence.empty()) {
 	const double conf = 1.0 / (1.0 + rank);
@@ -62,7 +60,7 @@ int main(int argc, char ** argv)
       
       if (individual)
 	os << hypergraph << '\n';
-      else
+      else if (hypergraph.is_valid())
 	merged.unite(hypergraph);
       
       ++ rank;
