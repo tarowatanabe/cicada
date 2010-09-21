@@ -16,6 +16,8 @@ path_type output_file = "-";
 std::string confidence;
 std::string count;
 
+bool individual = false;
+
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
 
@@ -25,6 +27,7 @@ int main(int argc, char ** argv)
     options(argc, argv);
     
     utils::compress_istream is(input_file, 1024 * 1024);
+    utils::compress_ostream os(output_file, 1024 * 1024);
 
     hypergraph_type merged;
     hypergraph_type hypergraph;
@@ -57,13 +60,16 @@ int main(int argc, char ** argv)
 	  eiter->features[feature_count] = 1;
       }
       
-      merged.unite(hypergraph);
-
+      if (individual)
+	os << hypergraph << '\n';
+      else
+	merged.unite(hypergraph);
+      
       ++ rank;
     }
     
-    utils::compress_ostream os(output_file, 1024 * 1024);
-    os << merged << '\n';
+    if (! individual)
+      os << merged << '\n';
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -81,11 +87,13 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input in text format")
-    ("output", po::value<path_type>(&output_file), "output in binary format")
+    ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input hypergraphs")
+    ("output", po::value<path_type>(&output_file)->default_value("-"),  "output merged hypergraph")
     
     ("confidence", po::value<std::string>(&confidence),    "add confidence weight")
     ("count",      po::value<std::string>(&count),         "add count weight")
+    
+    ("individual", po::bool_switch(&individual), "no merging")
     
     ("help", "help message");
 
