@@ -71,22 +71,23 @@ namespace cicada
       
       state_type state;
       
-      // "dot" for current poisition
+      // "dot" for current non-terminal/terminal poisition
+      // "dot-antecedent" for current non-terminal position
       // "stack" represented as a back pointer
       int dot;
+      int dot_antecedent;
       stack_type::id_type stack;
       
       index_set_type j;
       
       score_type score;
       score_type estimate;
-
-
+      
       Candidate(const index_set_type& __j)
-	: in_edge(0), dot(0), stack(stack_type::npos()), j(__j) {}
+	: in_edge(0), dot(0), dot_antecedent(0), stack(stack_type::npos()), j(__j) {}
       
       Candidate(const edge_type& __edge, const index_set_type& __j)
-	: in_edge(&__edge), out_edge(__edge), dot(0), stack(stack_type::npos()), j(__j) {}
+	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0), stack(stack_type::npos()), j(__j) {}
     };
 
     typedef Candidate candidate_type;
