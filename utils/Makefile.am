@@ -89,6 +89,7 @@ symbol.hpp \
 symbol_sequence.hpp \
 symbol_tree.hpp \
 tempfile.hpp \
+thread_specific_ptr.hpp \
 vector2.hpp \
 vector3.hpp \
 vertical_coded_device.hpp \

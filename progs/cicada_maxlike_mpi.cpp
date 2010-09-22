@@ -454,17 +454,15 @@ struct OptimizeLBFGS
 	  model_type model;
 	  model.push_back(features[id]);
 
-	  if (apply_exact)
-	    cicada::apply_exact(model, graphs[id], graph_reward);
-	  else {
+	  if (! apply_exact) {
 	    cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights_reward), cube_size);
 	    cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights_penalty), cube_size);
 	    
 	    graph_reward.unite(graph_penalty);
 	    graph_penalty.clear();
 	  }
-	
-	  const hypergraph_type& graph = graph_reward;
+	  
+	  const hypergraph_type& graph = (apply_exact ? graphs[id] : graph_reward);
 	
 	  // compute inside/outside by bleu using tropical semiring...
 	  bleus_inside.clear();
@@ -977,6 +975,17 @@ void read_tstset(const path_set_type& files,
 	  __bleu->assign(graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
 	else
 	  __bleu_linear->assign(graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	
+	if (apply_exact) {
+	  model_type model;
+	  model.push_back(features[id]);
+	  
+	  hypergraph_type graph_reward;
+	  
+	  cicada::apply_exact(model, graphs[id], graph_reward);
+	  
+	  graphs[id].swap(graph_reward);
+	}
       }
     }
   
