@@ -110,18 +110,6 @@ namespace cicada
 	return x->estimate < y->estimate;
       }
     };
-
-    struct node_score_type
-    {
-      id_type node;
-      score_type score;
-      score_type estimate;
-
-      node_score_type() : node(), score(), estimate() {}
-      
-      node_score_type(const id_type __node, const score_type& __score, const score_type& __estimate)
-	: node(__node), score(__score), estimate(__estimate) {}
-    };
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_list_type;
     
