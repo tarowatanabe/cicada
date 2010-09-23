@@ -51,29 +51,34 @@ namespace utils
 	: value(_value), parent(_parent) {}
     };
     
-    struct node_hash_type
+    struct node_hash_type : public Hash
     {
-      Hash __hasher;
       utils::hashmurmur<size_t> hasher;
+      
+      node_hash_type() {}
+      node_hash_type(const Hash& x) : Hash(x) {}
       
       size_t operator()(const node_type& node) const
       {
-	return hasher(node.parent, __hasher(node.value));
+	return hasher(node.parent, Hash::operator()(node.value));
       };
     };
     
-    struct node_equal_type
+    struct node_equal_type : public Equal
     {
-      Equal __equal;
+      node_equal_type() {}
+      node_equal_type(const Equal& x) : Equal(x) {}
+
       bool operator()(const node_type& x, const node_type& y) const
       {
-	return x.parent == y.parent && __equal(x.value, y.value);
+	return x.parent == y.parent && Equal::operator()(x.value, y.value);
       }
     };
     
     typedef typename Alloc::template rebind<node_type >::other node_alloc_type;
     
     typedef utils::indexed_set<node_type, node_hash_type, node_equal_type, node_alloc_type> node_set_type;
+    typedef node_set_type::size_type size_type;
 
     typedef typename node_set_type::const_iterator const_base_iterator;
     
@@ -88,7 +93,12 @@ namespace utils
       const value_type* operator->() const { return &(const_base_iterator::operator*().value); }
     };
     typedef const_iterator iterator;
-    
+
+  public:
+    indexed_trie(const size_type __size=8,
+		 const Hash& __hash=Hash(),
+		 const Equal& __equal=Equal())
+      : nodes(__size, node_hash_type(__hash), node_equal_type(__equal)) {}
     
   public:
     id_type root() const { return id_type(-1); }

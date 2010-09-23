@@ -76,16 +76,14 @@ namespace cicada
       int dot;
       int dot_antecedent;
       
-      index_set_type j;
-      
       score_type score;
       score_type estimate;
       
-      Candidate(const index_set_type& __j)
-	: in_edge(0), dot(0), dot_antecedent(0), j(__j) {}
+      Candidate()
+	: in_edge(0), dot(0), dot_antecedent(0) {}
       
-      Candidate(const edge_type& __edge, const index_set_type& __j)
-	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0), j(__j) {}
+      Candidate(const edge_type& __edge)
+	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
     };
     
     typedef Candidate candidate_type;

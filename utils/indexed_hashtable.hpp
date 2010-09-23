@@ -293,8 +293,12 @@ namespace utils
     node_set_type nodes;
     
   public:
-    indexed_hashtable(const size_type size=8) : bins(power_of_two(size)), nodes() { using namespace std; fill(bins.begin(), bins.end(), 0); }
-    indexed_hashtable(const indexed_hashtable& x) : bins(), nodes() { assign(x); }
+    indexed_hashtable(const size_type size=8,const hash_type& __hash=hash_type(), const equal_type& __equal=equal_type())
+      : Hash(__hash), Equal(__equal), bins(power_of_two(size)), nodes() { using namespace std; fill(bins.begin(), bins.end(), 0); }
+
+    indexed_hashtable(const indexed_hashtable& x)
+      : bins(), nodes() { assign(x); }
+    
     ~indexed_hashtable() { clear(); }
     
     indexed_hashtable& operator=(const indexed_hashtable& x)

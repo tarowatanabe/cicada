@@ -30,6 +30,11 @@ namespace utils
     typedef typename impl_type::const_iterator const_iterator;
     typedef typename impl_type::const_reference reference;
     typedef typename impl_type::const_reference const_reference;
+
+  public:
+    indexed_set(const size_type __size=8, const Hash& __hash=Hash(), const Equal& __equal=Equal())
+      : impl(__size, __hash, __equal) {}
+    
     
   public:
     void assign(const indexed_set& x) { impl.assign(x.impl); }
