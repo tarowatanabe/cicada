@@ -78,8 +78,8 @@ namespace utils
     typedef typename Alloc::template rebind<node_type >::other node_alloc_type;
     
     typedef utils::indexed_set<node_type, node_hash_type, node_equal_type, node_alloc_type> node_set_type;
-    typedef node_set_type::size_type size_type;
-
+    
+    typedef typename node_set_type::size_type size_type;
     typedef typename node_set_type::const_iterator const_base_iterator;
     
   public:
