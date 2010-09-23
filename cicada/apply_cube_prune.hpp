@@ -67,8 +67,6 @@ namespace cicada
     
     struct Candidate
     {
-      id_type node;
-      
       const edge_type* in_edge;
       edge_type        out_edge;
       
@@ -241,7 +239,7 @@ namespace cicada
       
       typename state_node_map_type::const_iterator biter_end = buf.end();
       for (typename state_node_map_type::const_iterator biter = buf.begin(); biter != biter_end; ++ biter)
-	D[v].push_back(node_score_type(biter->second->node, biter->second->score, biter->second->estimate));
+	D[v].push_back(node_score_type(biter->second->out_edge.head, biter->second->score, biter->second->estimate));
       
       std::sort(D[v].begin(), D[v].end(), compare_estimate_type());
 
@@ -284,7 +282,7 @@ namespace cicada
 	  
 	  biter = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item))).first;
 	  
-	  biter->second->node = graph.add_node().id;
+	  biter->second->out_edge.head = graph.add_node().id;
 	  node_states.push_back(item.state);
 	} else
 	  model.deallocate(item.state);
@@ -293,7 +291,7 @@ namespace cicada
 	
 	candidate_type& item_graph = *(biter->second);
 	
-	node_type& node = graph.nodes[item_graph.node];
+	node_type& node = graph.nodes[item_graph.out_edge.head];
 	
 	graph.connect_edge(edge_new.id, node.id);
 	

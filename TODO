@@ -24,4 +24,3 @@ System combination as statitical generation
     Use Earley parsing as generation?
     Do we really handle unary rules with cycles/loops?
     Infinite generation: we will clip by the max-length in hypergraph
-

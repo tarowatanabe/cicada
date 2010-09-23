@@ -66,8 +66,6 @@ namespace cicada
     
     struct Candidate
     {
-      id_type node;
-      
       const edge_type* in_edge;
       edge_type        out_edge;
 
@@ -318,31 +316,31 @@ namespace cicada
 	// If possible, state merge
 	if (is_goal) {
 	  if (! graph_out.is_valid()) {
-	    node_maps.push_back(candidate.node);
+	    node_maps.push_back(candidate.out_edge.head);
 	    node_states.push_back(candidate.state);
 	    
 	    graph_out.goal = graph_out.add_node().id;
 	  } else
 	    model.deallocate(candidate.state);
 	  
-	  candidate.node = graph_out.goal;
+	  candidate.out_edge.head = graph_out.goal;
 	} else {
 	  // we will merge states, but do not merge score/estimates, since we
-	  // are enumerating jthe best derivations... is this correct?
+	  // are enumerating jth best derivations... is this correct?
 	  state_node_map_type::iterator siter = state.nodes.find(candidate.state);
 	  if (siter == state.nodes.end()) {
-	    node_maps.push_back(candidate.node);
+	    node_maps.push_back(candidate.out_edge.head);
 	    node_states.push_back(candidate.state);
 	    
 	    siter = state.nodes.insert(std::make_pair(candidate.state, graph_out.add_node().id)).first;
 	  } else
 	    model.deallocate(candidate.state);
 	  
-	  candidate.node = siter->second;
+	  candidate.out_edge.head = siter->second;
 	}
 	
 	edge_type& edge = graph_out.add_edge(candidate.out_edge);
-	graph_out.connect_edge(edge.id, candidate.node);
+	graph_out.connect_edge(edge.id, candidate.out_edge.head);
 	
 	state.D.push_back(item);
       }
@@ -360,12 +358,20 @@ namespace cicada
 	const candidate_type& antecedent = *states[candidate.in_edge->tails[i]].D[candidate.j[i]];
 	
 	// assign real-node-id!
-	candidate.out_edge.tails[i] = antecedent.node;
+	candidate.out_edge.tails[i] = antecedent.out_edge.head;
 	candidate.score *= antecedent.score;
       }
       
+      
+      const id_type node_id_coarse = candidate.out_edge.head;
+      
+      // assign node-id of in-graph for scoring...
+      const_cast<id_type&>(candidate.out_edge.head) = candidate.in_edge->head;
+      
       feature_set_type estimates;
       candidate.state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
+      
+      const_cast<id_type&>(candidate.out_edge.head) = node_id_coarse;
       
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);
@@ -388,7 +394,7 @@ namespace cicada
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
 	
 	// assign coarse node id
-	candidate.out_edge.tails[i] = node_maps[antecedent.node];
+	candidate.out_edge.tails[i] = node_maps[antecedent.out_edge.head];
 	candidate.score *= antecedent.score;
       }
       
@@ -412,7 +418,7 @@ namespace cicada
       } else
 	model.deallocate(node_state);
       
-      candidate.node = siter->second;
+      candidate.out_edge.head = siter->second;
       
       return &candidate;
     };

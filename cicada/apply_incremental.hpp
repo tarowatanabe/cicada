@@ -63,28 +63,18 @@ namespace cicada
     
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
     
-    // stack structure representing prediction sequences...
-    // we keep edge-id and its dot position of non-terminals
-    // (zero: before the first non-terminal, one: after the first non-temrinal and befoer the second-non-terminal etc.)
-    typedef std::pair<hypergraph_type::id_type, int> stack_state_type;
-    typedef utils::hashmurmur<size_t>                stack_hash_type;
-    typedef std::equal_to<stack_state_type>          stack_equal_type;
-    typedef std::allocator<stack_state_type>         stack_alloc_type;
-    typedef utils::indexed_trie<stack_state_type, stack_hash_type, stack_equal_type, stack_alloc_type > stack_type;
     
+    // we can completely remove id_type node, but remain here for convension...
     struct Candidate
     {
-      id_type node;
-      
       const edge_type* in_edge;
       edge_type        out_edge;
       
       state_type state;
       
       // "dot" for current non-terminal/terminal poisition
-      // "stack" for curent stack state
       int dot;
-      stack_type::id_type stack;
+      int dot_antecedent;
       
       index_set_type j;
       
@@ -92,25 +82,23 @@ namespace cicada
       score_type estimate;
       
       Candidate(const index_set_type& __j)
-	: in_edge(0), dot(0), stack(stack_type::npos()), j(__j) {}
+	: in_edge(0), dot(0), dot_antecedent(0), j(__j) {}
       
       Candidate(const edge_type& __edge, const index_set_type& __j)
-	: in_edge(&__edge), out_edge(__edge), dot(0), stack(stack_type::npos()), j(__j) {}
-      
-      Candidate(const edge_type& __edge, const stack_type::id_type& __stack, const index_set_type& __j)
-	: in_edge(&__edge), out_edge(__edge), dot(0), stack(__stack), j(__j) {}
+	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0), j(__j) {}
     };
     
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
-    
     // hash and equal for keeping derivations
     struct candidate_hash_type : public utils::hashmurmur<size_t>
     {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
       size_t operator()(const candidate_type* x) const
       {
-	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), x->in_edge->id));
+	return (x == 0 ? size_t(0) : hasher_type::operator()(x->j.begin(), x->j.end(), hasher_type::operator()(x->in_edge->id, x->dot)));
       }
     };
     
@@ -118,7 +106,7 @@ namespace cicada
     {
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return (x == y) || (x && y && x->in_edge->id == y->in_edge->id && x->j == y->j);
+	return (x == y) || (x && y && x->in_edge->id == y->in_edge->id && x->dot == y->dot && x->j == y->j);
       }
     };
     
