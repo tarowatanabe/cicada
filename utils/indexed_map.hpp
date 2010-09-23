@@ -39,6 +39,11 @@ namespace utils
     
     typedef mapped_type&      reference;
     typedef const mapped_type& const_reference;
+
+  public:
+    indexed_map(const size_type __size=8, const Hash& __hash=Hash(), const Equal& __equal=Equal())
+      : impl(__size, __hash, __equal) {}
+
   public:
     void assign(const indexed_map& x) { impl.assign(x.impl); }
     void swap(indexed_map& x) { impl.swap(x.impl); }
