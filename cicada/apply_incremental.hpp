@@ -73,6 +73,7 @@ namespace cicada
       state_type state;
       
       // "dot" for current non-terminal/terminal poisition
+      // "dot-antecedent" for current non-terminal position
       int dot;
       int dot_antecedent;
       
