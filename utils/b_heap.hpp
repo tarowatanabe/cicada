@@ -68,6 +68,12 @@ namespace utils
     
     const_iterator begin() const { return c.begin() + 1; }
     const_iterator end() const { return c.end(); }
+
+    void swap(b_heap& x)
+    {
+      std::swap(static_cast<_Compare&>(*this), static_cast<_Compare&>(x));
+      c.swap(x.c);
+    }
     
   private:
     void siftdown(size_type index)
@@ -165,6 +171,17 @@ namespace utils
 	return idx + (idx & bh_mask);
     }
   };
+};
+
+namespace std
+{
+  template <typename T, typename S, typename C, size_t P>
+  inline
+  void swap(utils::b_heap<T,S,C,P>& x,
+	    utils::b_heap<T,S,C,P>& y)
+  {
+    x.swap(y);
+  }
 };
 
 #endif

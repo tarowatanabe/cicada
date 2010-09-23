@@ -14,6 +14,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/indexed_trie.hpp>
 
 #include <utils/b_heap.hpp>
 
@@ -62,6 +63,15 @@ namespace cicada
     
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
     
+    // stack structure representing prediction sequences...
+    // we keep edge-id and its dot position of non-terminals
+    // (zero: before the first non-terminal, one: after the first non-temrinal and befoer the second-non-terminal etc.)
+    typedef std::pair<hypergraph_type::id_type, int> stack_state_type;
+    typedef utils::hashmurmur<size_t>                stack_hash_type;
+    typedef std::equal_to<stack_state_type>          stack_equal_type;
+    typedef std::allocator<stack_state_type>         stack_alloc_type;
+    typedef utils::indexed_trie<stack_state_type, stack_hash_type, stack_equal_type, stack_alloc_type > stack_type;
+    
     struct Candidate
     {
       id_type node;
@@ -72,10 +82,8 @@ namespace cicada
       state_type state;
       
       // "dot" for current non-terminal/terminal poisition
-      // "dot-antecedent" for current non-terminal position
-      // "stack" represented as a back pointer
+      // "stack" for curent stack state
       int dot;
-      int dot_antecedent;
       stack_type::id_type stack;
       
       index_set_type j;
@@ -84,15 +92,20 @@ namespace cicada
       score_type estimate;
       
       Candidate(const index_set_type& __j)
-	: in_edge(0), dot(0), dot_antecedent(0), stack(stack_type::npos()), j(__j) {}
+	: in_edge(0), dot(0), stack(stack_type::npos()), j(__j) {}
       
       Candidate(const edge_type& __edge, const index_set_type& __j)
-	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0), stack(stack_type::npos()), j(__j) {}
+	: in_edge(&__edge), out_edge(__edge), dot(0), stack(stack_type::npos()), j(__j) {}
+      
+      Candidate(const edge_type& __edge, const stack_type::id_type& __stack, const index_set_type& __j)
+	: in_edge(&__edge), out_edge(__edge), dot(0), stack(__stack), j(__j) {}
     };
-
+    
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
+    
+    // hash and equal for keeping derivations
     struct candidate_hash_type : public utils::hashmurmur<size_t>
     {
       size_t operator()(const candidate_type* x) const
@@ -204,14 +217,12 @@ namespace cicada
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
 	
-	for (int j = 0; j < cube_size_max; ++ j) {
-	  const size_type edge_size_prev = graph_out.edges.size();
-	  lazy_jth_best(graph_in.goal, j, graph_in, graph_out);
-
-	  // quit if no new edges inserted
-	  if (edge_size_prev == graph_out.edges.size()) break;
-	}
-
+	// initialization...
+	initialize_bins(graph_in);
+	
+	for (int cardinality = 0; cardinality != graph_in.nodes.size(); ++ cardinality)
+	  process_bins(cardinality, graph_in, graph_out);
+	
 	//std::cerr << "topologically sort" << std::endl;
 	
 	// topologically sort...
@@ -226,10 +237,72 @@ namespace cicada
     
   private:
 
-    void process_bins()
+    void initialize_bins(const hypergraph_type& graph)
     {
-      // uniquify the bins
-      // enumerate survived candidates
+      node_type::edge_set_type::const_iterator eiter_end = graph.nodes[graph.goal].edges.end();
+      for (node_type::edge_set_type::const_iterator eiter = graph.nodes[graph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
+	const edge_type& edge = graph.edges[*eiter];
+	
+	const stack_type::id_type stack_id = stack.push(stack_type::npos(), stack_state_type(*eiter, 0));
+	
+	candidates.push_back(candidate_type(edge, stack_id, index_set_type(edge.tails.begin(), edge.tails.end())));
+	
+	candidate_type& candidate = candidates.back();
+	
+	// perform scoring by model.apply_predict()
+	// state is kept in candidate
+	
+	candidate.stack = stack_id;
+	
+	states.front().buf.push(&candidate);
+      }
+    }
+    
+    void process_bins(const int cardinality, const hypergraph_type& graph_in, hypergraph_type& graph_out)
+    {
+      cand_state_type& state = states[cardinality];
+      
+      for (size_type num_pop = 0; ! state.buf.empty() && num_pop != pop_size_max; ++ num_pop) {
+	const candidate_type* item = state.buf.top();
+	state.buf.pop();
+	
+	// we will iterate until completion...
+	for (;;) {
+	  const rule_type::symbol_set_type& target = item->in_edge->rule->target;
+	  
+	  int dot = item->dot;
+	  int dot_antecedent = stack[item->stack].second;
+	  
+	  // scan... and score...
+	  if (target[dot].is_terminal())
+	    model.apply_scan();
+	  
+	  for (/**/; dot != target.size() && target[dot].is_terminal(); ++ dot);
+	  
+	  if (dot == target.size()) {
+	    // complete...
+	    // pop-stack and loop again...
+	    
+	    continue;
+	  } else {
+	    // predict...
+	    
+	    break;
+	  }
+	}
+	
+      }
+      
+      // clear buf... at the same time, we will clear state associated with each candidate...
+      
+      typename candidate_heap_type::const_iterator biter_end = state.buf.end();
+      for (typename candidate_heap_type::const_iterator biter = state.buf.begin(); biter != biter_end; ++ biter)
+	model.deallocate((*biter)->state);
+      
+      // shrink wrap...
+      state.buf.clear();
+      candidate_heap_type(state.buf).swap(state.buf);
+      
       
       for () {
 	
@@ -477,6 +550,8 @@ namespace cicada
     cand_state_set_type states;
 
     node_map_type       node_maps;
+
+    stack_type stack;
 
     const model_type& model;
     const function_type& function;
