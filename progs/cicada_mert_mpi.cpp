@@ -77,8 +77,8 @@ path_type     output_file = "-";
 path_type bound_lower_file;
 path_type bound_upper_file;
 
-double value_min = -100;
-double value_max =  100;
+double value_lower = -100;
+double value_upper =  100;
 
 
 path_set_type feature_weights_files;
@@ -253,8 +253,8 @@ int main(int argc, char ** argv)
     
     options(argc, argv);
 
-    cicada::optimize::LineSearch::value_min = value_min;
-    cicada::optimize::LineSearch::value_max = value_max;
+    cicada::optimize::LineSearch::value_min = value_lower;
+    cicada::optimize::LineSearch::value_max = value_upper;
 
     if (mpi_size < 2)
       throw std::runtime_error("you should run at least two ranks!");
@@ -1100,8 +1100,8 @@ void options(int argc, char** argv)
     ("bound-lower", po::value<path_type>(&bound_lower_file),                    "lower bounds definition for feature weights")
     ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
 
-    ("value-min", po::value<double>(&value_min)->default_value(value_min),      "default lower bounds")
-    ("value-max", po::value<double>(&value_max)->default_value(value_max),      "default upper_bounds")
+    ("value-lower", po::value<double>(&value_lower)->default_value(value_lower), "default lower bounds")
+    ("value-upper", po::value<double>(&value_upper)->default_value(value_upper), "default upper_bounds")
     
     // feature weight files
     ("feature-weights",  po::value<path_set_type>(&feature_weights_files)->multitoken(), "feature weights file(s)")
