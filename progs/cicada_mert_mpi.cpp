@@ -906,7 +906,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       weight_type weight;
       
-      if (source_yield)
+      if (yield_source)
 	cicada::viterbi(graphs[mpi_id], yield, weight, viterbi_traversal_source(), viterbi_function(weights));
       else
 	cicada::viterbi(graphs[mpi_id], yield, weight, viterbi_traversal(), viterbi_function(weights));
