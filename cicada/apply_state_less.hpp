@@ -66,7 +66,7 @@ namespace cicada
 	  edge_type& edge = graph_out.edges[*eiter];
 	  
 	  feature_set_type estimates;
-	  model.apply(node_states, edge, estimates, node.id == graph_out.goal);
+	  model.apply(node_states, edge, edge.features, estimates, node.id == graph_out.goal);
 	}
       }
       

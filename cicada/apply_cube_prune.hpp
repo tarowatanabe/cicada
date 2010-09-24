@@ -380,7 +380,7 @@ namespace cicada
       // perform actual model application...
       
       feature_set_type estimates;
-      candidate.state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
+      candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, estimates, is_goal);
       
       candidate.score    *= function(candidate.out_edge.features);
       candidate.estimate *= function(estimates);

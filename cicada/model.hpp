@@ -134,13 +134,15 @@ namespace cicada
     
     // score with states
     state_type apply(const state_set_type& node_states,
-		     edge_type& edge,
+		     const edge_type& edge,
+		     feature_set_type& features,
 		     feature_set_type& estimates,
 		     const bool final=false) const;
     
     // score with coarse states
     state_type apply_coarse(const state_set_type& node_states,
-			    edge_type& edge,
+			    const edge_type& edge,
+			    feature_set_type& features,
 			    feature_set_type& estimates,
 			    const bool final=false) const;
     

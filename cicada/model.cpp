@@ -158,7 +158,8 @@ namespace cicada
 
   
   Model::state_type Model::apply(const state_set_type& node_states,
-				 edge_type& edge,
+				 const edge_type& edge,
+				 feature_set_type& features,
 				 feature_set_type& estimates,
 				 const bool final) const
   {
@@ -177,7 +178,7 @@ namespace cicada
       
       feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
-      feature_function.apply(state_feature, states, edge, edge.features, estimates, final);
+      feature_function.apply(state_feature, states, edge, features, estimates, final);
     }
     
     //std::cerr << "apply features end" << std::endl;
@@ -186,7 +187,8 @@ namespace cicada
   }
 
   Model::state_type Model::apply_coarse(const state_set_type& node_states,
-					edge_type& edge,
+					const edge_type& edge,
+					feature_set_type& features,
 					feature_set_type& estimates,
 					const bool final) const
   {
@@ -205,7 +207,7 @@ namespace cicada
       
       feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
-      feature_function.apply_coarse(state_feature, states, edge, edge.features, estimates, final);
+      feature_function.apply_coarse(state_feature, states, edge, features, estimates, final);
     }
     
     //std::cerr << "apply features end" << std::endl;

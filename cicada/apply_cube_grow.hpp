@@ -357,7 +357,7 @@ namespace cicada
       const_cast<id_type&>(candidate.out_edge.head) = candidate.in_edge->head;
       
       feature_set_type estimates;
-      candidate.state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
+      candidate.state = model.apply(node_states, candidate.out_edge, candidate.out_edge.features, estimates, is_goal);
       
       const_cast<id_type&>(candidate.out_edge.head) = node_id_coarse;
       
@@ -388,9 +388,10 @@ namespace cicada
       
       // perform "estimated" coarse model application
       feature_set_type estimates;
-      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, estimates, is_goal);
+      feature_set_type features;
+      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, features, estimates, is_goal);
       
-      candidate.score    *= function(candidate.out_edge.features);
+      candidate.score    *= function(features);
       candidate.estimate *= function(estimates);
       candidate.estimate *= candidate.score;
       
