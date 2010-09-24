@@ -770,10 +770,42 @@ struct viterbi_traversal
     
     yield.clear();
     
+    int non_terminal_pos = 0;
     rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
     for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
       if (titer->is_non_terminal()) {
-	const int pos = titer->non_terminal_index() - 1;
+	int pos = titer->non_terminal_index() - 1;
+	if (pos < 0)
+	  pos = non_terminal_pos;
+	++ non_terminal_pos;
+	
+	yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
+      } else if (*titer != vocab_type::EPSILON)
+	yield.push_back(*titer);
+  }
+};
+
+
+struct viterbi_traversal_source
+{
+  typedef sentence_type value_type;
+  
+  template <typename Edge, typename Iterator>
+  void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+  {
+    // extract target-yield, features
+    
+    yield.clear();
+    
+    int non_terminal_pos = 0;
+    rule_type::symbol_set_type::const_iterator titer_end = edge.rule->source.end();
+    for (rule_type::symbol_set_type::const_iterator titer = edge.rule->source.begin(); titer != titer_end; ++ titer)
+      if (titer->is_non_terminal()) {
+	int pos = titer->non_terminal_index() - 1;
+	if (pos < 0)
+	  pos = non_terminal_pos;
+	++ non_terminal_pos;
+	
 	yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
       } else if (*titer != vocab_type::EPSILON)
 	yield.push_back(*titer);
@@ -874,7 +906,10 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       weight_type weight;
       
-      cicada::viterbi(graphs[mpi_id], yield, weight, viterbi_traversal(), viterbi_function(weights));
+      if (source_yield)
+	cicada::viterbi(graphs[mpi_id], yield, weight, viterbi_traversal_source(), viterbi_function(weights));
+      else
+	cicada::viterbi(graphs[mpi_id], yield, weight, viterbi_traversal(), viterbi_function(weights));
       
       os << id << " ||| " << yield << '\n';
     }
