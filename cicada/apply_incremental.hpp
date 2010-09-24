@@ -62,29 +62,56 @@ namespace cicada
     typedef Function function_type;
     
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
-    
-    
-    // we can completely remove id_type node, but remain here for convension...
-    struct Candidate
+
+    struct StackState
     {
       const edge_type* in_edge;
       edge_type        out_edge;
       
-      state_type state;
-      
-      // "dot" for current non-terminal/terminal poisition
-      // "dot-antecedent" for current non-terminal position
       int dot;
       int dot_antecedent;
+
+      StackState() : in_edge(0), dot(0), dot_antecedent(0) {}
+      StackState(const edge_type& __edge)
+	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
+    };
+    
+    typedef StackState stack_state_type;
+    
+    struct stack_state_hash_type : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const stack_state_type& x) const
+      {
+	return (x.in_edge == 0
+		? size_t(0)
+		: hasher_type::operator()(x.out_edge.tails.begin(), x.out_edge.tails.end(),
+					  hasher_type::operator()(x.in_edge->id, x.dot)));
+      }
+    };
+    struct stack_state_equal_type
+    {
+      bool operator()(const stack_state_type& x, const stack_state_type& y) const
+      {
+	return x.in_edge == y.in_edge && x.in_edge && y.in_edge && x.dot == y.dot && x.out_edge.tails == y.out_edge.tails;
+      }
+    };
+    typedef std::allocator<stack_state_type> stack_state_alloc_type;
+    typedef utils::indexed_trie<stack_state_type, stack_state_hash_type, stack_state_equal_type, stack_state_alloc_type> stack_type;
+    
+    struct Candidate
+    {
+      id_type node;
+      
+      state_type state;
+      stack_type::id_type stack;
       
       score_type score;
       score_type estimate;
       
-      Candidate()
-	: in_edge(0), dot(0), dot_antecedent(0) {}
-      
-      Candidate(const edge_type& __edge)
-	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
+      Candidate() : stack(stack_type::npos()) {}
+      Candidate(const stack_type::id_type& __stack) : stack(__stack) {}
     };
     
     typedef Candidate candidate_type;
@@ -95,17 +122,23 @@ namespace cicada
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
+      model_type::state_hash state_hash;
+      
+      candidate_hash_type(const model_type::state_hash& __state_hash) : state_hash(__state_hash) {}
+      
       size_t operator()(const candidate_type* x) const
       {
-	return (x == 0 ? size_t(0) : hasher_type::operator()(x->j.begin(), x->j.end(), hasher_type::operator()(x->in_edge->id, x->dot)));
+	return (x == 0 ? size_t(0) : hasher_type::opeator()(x->stack, state_hash(x->state)));
       }
     };
     
-    struct candidate_equal_type
+    struct candidate_equal_type : public model_type::state_equal
     {
+      candidate_equal_type(const model_type::state_equal& x) : model_type::state_equal(x) {}
+      
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return (x == y) || (x && y && x->in_edge->id == y->in_edge->id && x->dot == y->dot && x->j == y->j);
+	return (x == y) || (x && y && x->stack == y->stack && model_type::state_equal::operator()(x->state, y->state));
       }
     };
     
@@ -116,18 +149,6 @@ namespace cicada
       {
 	return x->estimate < y->estimate;
       }
-    };
-
-    struct node_score_type
-    {
-      id_type node;
-      score_type score;
-      score_type estimate;
-
-      node_score_type() : node(), score(), estimate() {}
-      
-      node_score_type(const id_type __node, const score_type& __score, const score_type& __estimate)
-	: node(__node), score(__score), estimate(__estimate) {}
     };
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_list_type;
