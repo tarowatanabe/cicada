@@ -910,23 +910,20 @@ void read_tstset(const path_set_type& files,
 	int id;
 	std::string sep;
 	hypergraph_type hypergraph;
-      
-	weight_set_type origin;
-	weight_set_type direction;
-      
+            
 	if (is >> id >> sep >> hypergraph) {
 	  if (sep != "|||")
-	    throw std::runtime_error("format error?");
+	    throw std::runtime_error("format error?: " + path.file_string());
 	
 	  if (id >= graphs.size())
-	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
+	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + path.file_string());
 	  
 	  if (id % mpi_size != mpi_rank)
 	    throw std::runtime_error("difference it?");
 	  
 	  graphs[id].unite(hypergraph);
 	} else
-	  throw std::runtime_error("format error?");
+	  throw std::runtime_error("format error?: " + path.file_string());
       }
     } else {
       
@@ -935,17 +932,14 @@ void read_tstset(const path_set_type& files,
       int id;
       std::string sep;
       hypergraph_type hypergraph;
-      
-      weight_set_type origin;
-      weight_set_type direction;
-      
+            
       while (is >> id >> sep >> hypergraph) {
 	
 	if (sep != "|||")
-	  throw std::runtime_error("format error?");
+	  throw std::runtime_error("format error?: " + titer->file_string());
 	
 	if (id >= graphs.size())
-	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
+	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + titer->file_string());
 	
 	if (id % mpi_size == mpi_rank)
 	  graphs[id].unite(hypergraph);

@@ -70,7 +70,7 @@ namespace cicada
       
       int dot;
       int dot_antecedent;
-
+      
       StackState() : in_edge(0), dot(0), dot_antecedent(0) {}
       StackState(const edge_type& __edge)
 	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
@@ -94,7 +94,7 @@ namespace cicada
     {
       bool operator()(const stack_state_type& x, const stack_state_type& y) const
       {
-	return x.in_edge == y.in_edge && x.in_edge && y.in_edge && x.dot == y.dot && x.out_edge.tails == y.out_edge.tails;
+	return x.in_edge == y.in_edge && (x.in_edge == 0 || (x.dot == y.dot && x.out_edge.tails == y.out_edge.tails));
       }
     };
     typedef std::allocator<stack_state_type> stack_state_alloc_type;
@@ -257,9 +257,8 @@ namespace cicada
 	
 	// perform scoring by model.apply_predict()
 	// state is kept in candidate
-
-	model.apply_predict();
 	
+	model.apply_predict();
 	
 	states.front().buf.push(&candidate);
       }
@@ -281,7 +280,7 @@ namespace cicada
 	// we will iterate until completion...
 	for (;;) {
 	  
-	  const rule_type::symbol_set_type& target = stack[item->stack].in_edge->rule->target;
+ 	  const rule_type::symbol_set_type& target = stack[item->stack].in_edge->rule->target;
 	  
 	  int dot = stack[item->stack].dot;
 	  int dot_antecedent = stack[item->stack].dot_antecedent;
@@ -290,19 +289,54 @@ namespace cicada
 	  if (! target.empty() && target[dot].is_terminal())
 	    model.apply_scan(state, node_states);
 	  
+	  // proceed dot(s)
 	  for (/**/; dot != target.size() && target[dot].is_terminal(); ++ dot);
-	  ++ dot_antecedent;
 	  
 	  if (dot == target.size()) {
 	    // complete...
-	    // pop-stack and loop again...
 	    
-	    continue;
+	    // scoring
+	    model.apply_complete();
+	    
+	    
+	    if (graph_in.goal == stack[item->stack].in_edge->head) {
+	      // create graph_out
+	      
+	      break;
+	    } else {
+	      // create graph_out
+	      
+	      
+	      
+	      // pop-stack...
+	      const stack_type::id_type stack_parent = stack.parent(item->stack);
+	      
+	      stack_state_type stack_state(stack[stack_parent]);
+	      
+	      const rule_type::symbol_set_type& target = stack_state.in_edge->rule->target;
+	      
+	      int antecedent_index = target[stack_state.dot].non_terminal_index() - 1;
+	      if (antecedent_index < 0)
+		antecedent_index = stack_state.dot_antecedent;
+	      
+	      stack_state.out_edge.tails[antecedent_index] = node_new_id;
+	      
+	      candidates.push_back(candidate_type(stack.push(stack.parent(stack_parent), stack_state)));
+	      
+	      candidate_type& candidate = candidates.back();
+	      
+	      candidate.state;
+	      
+	      item = &candidate;
+	      
+	      continue;
+	    }
+	    
 	  } else {
 	    // predict...
 	    int antecedent_index = target[dot].non_terminal_index() - 1;
 	    if (antecedent_index < 0)
-	      antecedent_index = dot_antecedent - 1;
+	      antecedent_index = dot_antecedent;
 	    
 	    const node_type& antecedent_node = graph_in.nodes[stack[item->stack].out_edge.tails[antecedent_index]];
 	    
@@ -334,245 +368,7 @@ namespace cicada
       state.buf.clear();
       candidate_heap_type(state.buf).swap(state.buf);
       
-      
-      for () {
-	
-	const candidate_type* item = *biter;
-	
-	// we will iterate completion...
-	for (;;) {
-	  const rule_type::symbol_set_type& target = item->in_edge->rule->target;
-	  
-	  int dot = item->dot;
-	  
-	  feature_set_type estimates;
-	  
-	  score_type score    = semiring::traits<score_type>::one();
-	  score_type estimate = semiring::traits<score_type>::one();
-	  
-	  // scan
-	  if (target[dot + 1].is_terminal())
-	    model.apply_scan();
-	  
-	  for (/**/; dot != target.size() && target[dot + 1].is_terminal(); ++ dot);
-	  
-	  
-	  if (dot == target.size()) {
-	    // complete
-	    
-	    // pop-stack and loop again...
-	    
-	    continue;
-	  } else {
-	    // predict
-	    // TODO: pop from stack and proceed "dot"
-	    item = item->stack;
-	    ++ item->dot;
-	  
-	    break;
-	  }
-	}
-      }
-      
-      
     };
-    
-    void lazy_jth_best(id_type v, int j, const hypergraph_type& graph, hypergraph_type& graph_out)
-    {
-      //std::cerr << "node: " << v << std::endl;
-      
-      const bool is_goal = graph.goal == v;
-      
-      cand_state_type& state = states[v];
-      
-      if (! state.fired) {
-	const node_type& node = graph.nodes[v];
-	
-	// for each edge in v
-	//   fire(edge, 0, cand)
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const edge_type& edge = graph.edges[*eiter];
-	  const index_set_type j(edge.tails.size(), 0);
-	  
-	  fire(edge, j, state, graph, graph_out);
-	}
-	
-	state.fired = true;
-      }
-      
-      while (state.D.size() <= j && state.buf.size() + state.D.size() < cube_size_max && ! state.cand.empty()) {
-	// pop-min
-	const candidate_type* item = state.cand.top();
-	state.cand.pop();
-	
-	// push item to buffer
-	push_buf(*item, state, is_goal, graph_out);
-	
-	// push succ
-	push_succ(*item, state, graph, graph_out);
-	
-	// enum item with current bound
-	if (! state.cand.empty())
-	  enum_item(state, state.cand.top()->estimate, is_goal, graph_out);
-      }
-      
-      // enum item with zero bound
-      enum_item(state, semiring::traits<score_type>::zero(), is_goal, graph_out);
-    }
-
-    void fire(const edge_type& edge, const index_set_type& j, cand_state_type& state, const hypergraph_type& graph, hypergraph_type& graph_out)
-    {
-      candidate_type query(j);
-      query.in_edge = &edge;
-      
-      if (state.uniques.find(&query) != state.uniques.end()) return;
-      
-      // for each edge, 
-      index_set_type::const_iterator iiter = j.begin();
-      edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-      for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ iiter) {
-	lazy_jth_best(*niter, *iiter, graph, graph_out);
-	
-	if (states[*niter].D.size() <= *iiter) return;
-      }
-      
-      // push cand
-      const candidate_type* item = make_candidate(edge, j, state, graph.goal == edge.head, graph_out);
-      
-      state.uniques.insert(item);
-      state.cand.push(item);
-    }
-    
-    void push_succ(const candidate_type& item, cand_state_type& state, const hypergraph_type& graph, hypergraph_type& graph_out)
-    {
-      index_set_type j = item.j;
-      
-      // for each i in 1 ... |e|
-      //   fire(e, j + b_i, cand)
-      for (int i = 0; i < item.j.size(); ++ i) {
-	const int j_i_prev = j[i];
-	++ j[i];
-	
-	fire(*item.in_edge, j, state, graph, graph_out);
-	
-	j[i] = j_i_prev;
-      }
-    }
-    
-    void enum_item(cand_state_type& state, const score_type bound, const bool is_goal, hypergraph_type& graph_out)
-    {
-      // while |buf| and min(buf) < bound (min-cost)
-      //  append pop-min to D
-      while (! state.buf.empty() && state.buf.top()->estimate > bound) {
-	const candidate_type* item = state.buf.top();
-	state.buf.pop();
-	
-	candidate_type& candidate = const_cast<candidate_type&>(*item);
-	
-	// we will add new node/edge here 
-	// If possible, state merge
-	if (is_goal) {
-	  if (! graph_out.is_valid()) {
-	    node_maps.push_back(candidate.node);
-	    node_states.push_back(candidate.state);
-	    
-	    graph_out.goal = graph_out.add_node().id;
-	  } else
-	    model.deallocate(candidate.state);
-	  
-	  candidate.node = graph_out.goal;
-	} else {
-	  // we will merge states, but do not merge score/estimates, since we
-	  // are enumerating jthe best derivations... is this correct?
-	  state_node_map_type::iterator siter = state.nodes.find(candidate.state);
-	  if (siter == state.nodes.end()) {
-	    node_maps.push_back(candidate.node);
-	    node_states.push_back(candidate.state);
-	    
-	    siter = state.nodes.insert(std::make_pair(candidate.state, graph_out.add_node().id)).first;
-	  } else
-	    model.deallocate(candidate.state);
-	  
-	  candidate.node = siter->second;
-	}
-	
-	edge_type& edge = graph_out.add_edge(candidate.out_edge);
-	graph_out.connect_edge(edge.id, candidate.node);
-	
-	state.D.push_back(item);
-      }
-    }
-
-    void push_buf(const candidate_type& __item, cand_state_type& state, const bool is_goal, hypergraph_type& graph_out)
-    {
-      // push this item into state.buf with "correct" score
-
-      candidate_type& candidate = const_cast<candidate_type&>(__item);
-      
-      candidate.score = semiring::traits<score_type>::one();
-      candidate.estimate = semiring::traits<score_type>::one();
-      for (int i = 0; i < candidate.j.size(); ++ i) {
-	const candidate_type& antecedent = *states[candidate.in_edge->tails[i]].D[candidate.j[i]];
-	
-	// assign real-node-id!
-	candidate.out_edge.tails[i] = antecedent.node;
-	candidate.score *= antecedent.score;
-      }
-      
-      feature_set_type estimates;
-      candidate.state = model.apply(node_states, candidate.out_edge, estimates, is_goal);
-      
-      candidate.score    *= function(candidate.out_edge.features);
-      candidate.estimate *= function(estimates);
-      candidate.estimate *= candidate.score;
-      
-      state.buf.push(&candidate);
-    }
-    
-    const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, cand_state_type& state, const bool is_goal, hypergraph_type& graph_out)
-    {
-      candidates.push_back(candidate_type(edge, j));
-      
-      candidate_type& candidate = candidates.back();
-      
-      candidate.out_edge.tails = edge_type::node_set_type(j.size());
-      
-      candidate.score = semiring::traits<score_type>::one();
-      candidate.estimate = semiring::traits<score_type>::one();
-      for (int i = 0; i < j.size(); ++ i) {
-	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
-	
-	// assign coarse node id
-	candidate.out_edge.tails[i] = node_maps[antecedent.node];
-	candidate.score *= antecedent.score;
-      }
-      
-      // perform "estimated" coarse model application
-      feature_set_type estimates;
-      const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, estimates, is_goal);
-      
-      candidate.score    *= function(candidate.out_edge.features);
-      candidate.estimate *= function(estimates);
-      candidate.estimate *= candidate.score;
-      
-      // no state merging...
-      //candidate.node = node_states_coarse.size();
-      //node_states_coarse.push_back(node_state);
-      
-      // state merging... so that we may reuse state structure
-      state_node_map_type::iterator siter = state.nodes_coarse.find(node_state);
-      if (siter == state.nodes_coarse.end()) {
-	siter = state.nodes_coarse.insert(std::make_pair(node_state, node_states_coarse.size())).first;
-	node_states_coarse.push_back(node_state);
-      } else
-	model.deallocate(node_state);
-      
-      candidate.node = siter->second;
-      
-      return &candidate;
-    };
-    
     
   private:
     candidate_set_type  candidates;
