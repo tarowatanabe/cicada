@@ -92,6 +92,8 @@ double C = 1.0; // inverse of C == 1.0 / C : where C is a constant of SVM^{light
 bool weight_normalize_l1 = false;
 bool weight_normalize_l2 = false;
 
+bool yield_source = false;
+
 int threads = 4;
 
 int debug = 0;
@@ -513,7 +515,7 @@ struct EnvelopeTask
       for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	const envelope_type::line_ptr_type& line = *eiter;
 	
-	line->yield(yield);
+	line->yield(yield, yield_source);
 	
 	scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	
@@ -833,6 +835,7 @@ void options(int argc, char** argv)
     ("normalize-l1",    po::bool_switch(&weight_normalize_l1), "weight normalization via L1 (not a regularizer...)")
     ("normalize-l2",    po::bool_switch(&weight_normalize_l2), "weight normalization via L2 (not a regularizer...)")
 
+    ("yield-source", po::bool_switch(&yield_source), "MERT over source-yield")
 
     ("threads", po::value<int>(&threads), "# of threads")
     ;

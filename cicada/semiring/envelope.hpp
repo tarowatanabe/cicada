@@ -64,7 +64,7 @@ namespace cicada
 	line_ptr_type parent;
 	line_ptr_type antecedent;
 	
-	void yield(sentence_type& sentence) const;
+	void yield(sentence_type& sentence, const bool yield_source=false) const;
       };
       
       typedef Line line_type;

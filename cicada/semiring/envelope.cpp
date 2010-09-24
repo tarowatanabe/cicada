@@ -158,7 +158,7 @@ namespace cicada
       is_sorted = true;
     }
 
-    void Envelope::Line::yield(sentence_type& sentence) const
+    void Envelope::Line::yield(sentence_type& sentence, const bool yield_source) const
     {
       typedef std::vector<sentence_type, std::allocator<sentence_type> > yield_set_type;
       typedef hypergraph_type::rule_type rule_type;
@@ -176,10 +176,12 @@ namespace cicada
       
       // we will traverse in reverse...
       sentence.clear();
+
+      const rule_type::symbol_set_type& phrase = (yield_source ? curr->edge->rule->source : curr->edge->rule->target);
       
       int pos_non_terminal = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = curr->edge->rule->target.end();
-      for (rule_type::symbol_set_type::const_iterator titer = curr->edge->rule->target.begin(); titer != titer_end; ++ titer)
+      rule_type::symbol_set_type::const_iterator titer_end = phrase.end();
+      for (rule_type::symbol_set_type::const_iterator titer = phrase.begin(); titer != titer_end; ++ titer)
 	if (titer->is_non_terminal()) {
 	  int pos = titer->non_terminal_index() - 1;
 	  if (pos < 0)
