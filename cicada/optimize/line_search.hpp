@@ -42,8 +42,8 @@ namespace cicada
       static const double interval_min = 1e-4;
       static const double interval_offset_lower = 200.0;
       static const double interval_offset_upper = 0.2;
-      static const double value_min = -100.0;
-      static const double value_max =  100.0;
+      static double value_min;
+      static double value_max;
       
     public:
       struct RegularizeNone

@@ -71,6 +71,9 @@ path_type     output_file = "-";
 path_type bound_lower_file;
 path_type bound_upper_file;
 
+double value_min = -100;
+double value_max =  100;
+
 
 path_set_type feature_weights_files;
 
@@ -202,6 +205,9 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
+
+    cicada::optimize::LineSearch::value_min = value_min;
+    cicada::optimize::LineSearch::value_max = value_max;
 
     if (scorer_list) {
       std::cout << cicada::eval::Scorer::lists();
@@ -849,6 +855,9 @@ void options(int argc, char** argv)
 
     ("bound-lower", po::value<path_type>(&bound_lower_file),                    "lower bounds definition for feature weights")
     ("bound-upper", po::value<path_type>(&bound_upper_file),                    "upper bounds definition for feature weights")
+
+    ("value-min", po::value<double>(&value_min)->default_value(value_min),      "default lower bounds")
+    ("value-max", po::value<double>(&value_max)->default_value(value_max),      "default upper_bounds")
     
     // feature weight files
     ("feature-weights",  po::value<path_set_type>(&feature_weights_files)->multitoken(), "feature weights file(s)")

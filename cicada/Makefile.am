@@ -8,6 +8,7 @@ noinst_LTLIBRARIES = \
 libcicada-feature.la \
 libcicada-semiring.la \
 libcicada-eval.la \
+libcicada-optimize.la \
 libcicada-stemmer.la
 
 libcicadaincludedir= $(pkgincludedir)/cicada
@@ -48,6 +49,10 @@ libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 dist_optimize_HEADERS = \
 optimize/line_search.hpp \
 optimize/powell.hpp
+
+libcicada_optimize_la_SOURCES = \
+optimize/line_search.cpp
+libcicada_optimize_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_feature_HEADERS = \
 feature/antecedent.hpp \
@@ -191,6 +196,7 @@ libcicada_la_LDFLAGS = \
 libcicada_la_LIBADD = \
 	libcicada-eval.la \
 	libcicada-feature.la \
+	libcicada-optimize.la \
 	libcicada-semiring.la \
 	libcicada-stemmer.la \
 	\
