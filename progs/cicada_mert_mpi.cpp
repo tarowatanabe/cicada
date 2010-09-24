@@ -362,6 +362,8 @@ int main(int argc, char ** argv)
     weight_set_type bound_upper;
     
     if (mpi_rank == 0) {
+      cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
+      
       if (! bound_lower_file.empty())
 	if (bound_lower_file == "-" || boost::filesystem::exists(bound_lower_file)) {
 	  utils::compress_istream is(bound_lower_file);
@@ -375,8 +377,6 @@ int main(int argc, char ** argv)
 	  is >> bound_upper;
 	} else
 	  throw std::runtime_error("no upper-bound file?" + bound_upper_file.file_string());
-      
-      cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     }
     
     
