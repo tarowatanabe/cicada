@@ -169,7 +169,7 @@ namespace cicada
       while (! curr->edge) {
 	yields.push_back(sentence_type());
 	
-	curr->antecedent->yield(yields.back());
+	curr->antecedent->yield(yields.back(), yield_source);
 	
 	curr = curr->parent.get();
       }

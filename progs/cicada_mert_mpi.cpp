@@ -731,9 +731,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	const envelope_type::line_ptr_type& line = *eiter;
 	
 	line->yield(yield, yield_source);
-
-	// yuield...
-	std::cerr << id << " ||| " << yield << std::endl;
 	
 	os << id << " ||| " << utils::encode_base64(line->x) << " ||| " << yield << '\n';
       }
