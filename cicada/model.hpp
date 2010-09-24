@@ -145,6 +145,7 @@ namespace cicada
 			    const bool final=false) const;
     
     void deallocate(const state_type& state) const;
+    state_type clone(const state_type& state) const;
     
     const_reference operator[](size_type pos) const { return models[pos]; }
     reference operator[](size_type pos) { return models[pos]; }

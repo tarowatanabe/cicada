@@ -97,6 +97,18 @@ namespace cicada
       *reinterpret_cast<pointer*>(const_cast<state_type&>(state).base) = cache;
       cache = state.base;
     }
+
+    state_type clone(const state_type& state)
+    {
+      if (state_size == 0)
+	return state_type();
+      
+      state_type state_new = allocate();
+      
+      std::copy(state.base, state.base + state_alloc_size, state_new.base);
+      
+      return state_new;
+    }
   
     void clear()
     {
@@ -205,6 +217,11 @@ namespace cicada
   void Model::deallocate(const state_type& state) const
   {
     const_cast<state_allocator_type&>(*allocator).deallocate(state);
+  }
+
+  Model::state_type Model::clone(const state_type& state) const
+  {
+    return const_cast<state_allocator_type&>(*allocator).clone(state);
   }
   
   

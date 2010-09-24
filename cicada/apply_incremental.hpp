@@ -107,6 +107,8 @@ namespace cicada
       state_type state;
       stack_type::id_type stack;
       
+      feature_set_type features;
+      
       score_type score;
       score_type estimate;
       
@@ -182,8 +184,6 @@ namespace cicada
       
       state_node_map_type nodes;
       state_node_map_type nodes_coarse;
-
-      bool fired;
     };
     
     typedef State cand_state_type;
@@ -251,16 +251,15 @@ namespace cicada
       for (node_type::edge_set_type::const_iterator eiter = graph.nodes[graph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[*eiter];
 	
-	const stack_type::id_type stack_id = stack.push(stack_type::npos(), stack_state_type(*eiter, 0));
-	
-	candidates.push_back(candidate_type(edge, stack_id, index_set_type(edge.tails.begin(), edge.tails.end())));
+	candidates.push_back(candidate_type(stack.push(stack_type::npos(), stack_state_type(edge))));
 	
 	candidate_type& candidate = candidates.back();
 	
 	// perform scoring by model.apply_predict()
 	// state is kept in candidate
+
+	model.apply_predict();
 	
-	candidate.stack = stack_id;
 	
 	states.front().buf.push(&candidate);
       }
@@ -274,18 +273,25 @@ namespace cicada
 	const candidate_type* item = state.buf.top();
 	state.buf.pop();
 	
+	state_type state = item->state;
+	feature_set_type features = item->features;
+	score_type score = item->score;
+	score_type estimate = item->estimate;
+	
 	// we will iterate until completion...
 	for (;;) {
-	  const rule_type::symbol_set_type& target = item->in_edge->rule->target;
 	  
-	  int dot = item->dot;
-	  int dot_antecedent = stack[item->stack].second;
+	  const rule_type::symbol_set_type& target = stack[item->stack].in_edge->rule->target;
 	  
-	  // scan... and score...
-	  if (target[dot].is_terminal())
-	    model.apply_scan();
+	  int dot = stack[item->stack].dot;
+	  int dot_antecedent = stack[item->stack].dot_antecedent;
+	  
+	  // scan... and score... state will be updated...
+	  if (! target.empty() && target[dot].is_terminal())
+	    model.apply_scan(state, node_states);
 	  
 	  for (/**/; dot != target.size() && target[dot].is_terminal(); ++ dot);
+	  ++ dot_antecedent;
 	  
 	  if (dot == target.size()) {
 	    // complete...
@@ -294,11 +300,28 @@ namespace cicada
 	    continue;
 	  } else {
 	    // predict...
+	    int antecedent_index = target[dot].non_terminal_index() - 1;
+	    if (antecedent_index < 0)
+	      antecedent_index = dot_antecedent - 1;
+	    
+	    const node_type& antecedent_node = graph_in.nodes[stack[item->stack].out_edge.tails[antecedent_index]];
+	    
+	    node_type::edge_set_type::const_iterator eiter_end = antecedent_node.edges.end();
+	    for (node_type::edge_set_type::const_iterator eiter = antecedent_node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	      const edge_type& edge = graph_in.edges[*eiter];
+	      
+	      candidates.push_bak(candidate_type(stack.push(item->stack, stack_state_type(edge))));
+	      
+	      candidate_type& candidate = candidates.back();
+	      
+	      model.apply_predict();
+	      
+	      states[cardinality + 1].buf.push(&candidate);
+	    }
 	    
 	    break;
 	  }
 	}
-	
       }
       
       // clear buf... at the same time, we will clear state associated with each candidate...
