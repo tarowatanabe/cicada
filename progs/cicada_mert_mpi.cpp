@@ -362,21 +362,38 @@ int main(int argc, char ** argv)
     weight_set_type bound_upper;
     
     if (mpi_rank == 0) {
-      cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
+
+      typedef cicada::FeatureVector<double> feature_vector_type;
       
       if (! bound_lower_file.empty())
 	if (bound_lower_file == "-" || boost::filesystem::exists(bound_lower_file)) {
+	  
+	  feature_vector_type bounds;
+	  
 	  utils::compress_istream is(bound_lower_file);
-	  is >> bound_lower;
+	  is >> bounds;
+	  
+	  bound_lower.allocate(cicada::optimize::LineSearch::value_min);
+	  for (feature_vector_type::const_iterator biter = bounds.begin(); biter != bounds.end(); ++ biter)
+	    bound_lower[biter->first] = biter->second;
 	} else
 	  throw std::runtime_error("no lower-bound file?" + bound_lower_file.file_string());
       
       if (! bound_upper_file.empty())
 	if (bound_upper_file == "-" || boost::filesystem::exists(bound_upper_file)) {
+	  feature_vector_type bounds;
+	  
 	  utils::compress_istream is(bound_upper_file);
-	  is >> bound_upper;
+	  is >> bounds;
+	  
+	  bound_upper.allocate(cicada::optimize::LineSearch::value_max);
+	  for (feature_vector_type::const_iterator biter = bounds.begin(); biter != bounds.end(); ++ biter)
+	    bound_upper[biter->first] = biter->second;
+	  
 	} else
 	  throw std::runtime_error("no upper-bound file?" + bound_upper_file.file_string());
+      
+      cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     }
     
     
