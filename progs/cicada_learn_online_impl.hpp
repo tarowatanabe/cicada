@@ -20,8 +20,6 @@
 #include <utils/space_separator.hpp>
 #include <utils/base64.hpp>
 
-#include <utils/arc_list.hpp>
-
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/vector2.hpp>
 
