@@ -222,8 +222,18 @@ namespace cicada
 			    feature_set_type& estimates,
 			    const bool final) const
   {
+    if (state.empty())
+      state = allocator->allocate();
     
+    feature_function_type::state_ptr_set_type states(edge.tails.size());
     
+    for (int i = 0; i < models.size(); ++ i) {
+      const feature_function_type& feature_function = *models[i];
+      
+      feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
+      
+      feature_function.apply_predict(state_feature, states, edge, features, estimates, final);
+    }
   }
   
   void Model::apply_scan(state_type& state,
@@ -234,8 +244,15 @@ namespace cicada
 			 feature_set_type& estimates,
 			 const bool final) const
   {
+    feature_function_type::state_ptr_set_type states(edge.tails.size());
     
-    
+    for (int i = 0; i < models.size(); ++ i) {
+      const feature_function_type& feature_function = *models[i];
+      
+      feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
+      
+      feature_function.apply_scan(state_feature, states, edge, dot, features, estimates, final);
+    }
   }
 
   void Model::apply_complete(state_type& state,
@@ -245,11 +262,16 @@ namespace cicada
 			     feature_set_type& estimates,
 			     const bool final) const
   {
+    feature_function_type::state_ptr_set_type states(edge.tails.size());
     
-    
+    for (int i = 0; i < models.size(); ++ i) {
+      const feature_function_type& feature_function = *models[i];
+      
+      feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
+      
+      feature_function.apply_complete(state_feature, states, edge, features, estimates, final);
+    }
   }
-  
-  
   
   void Model::deallocate(const state_type& state) const
   {
