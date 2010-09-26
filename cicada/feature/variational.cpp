@@ -57,7 +57,7 @@ namespace cicada
       
     public:
       VariationalImpl(const int __order)
-	: ngrams(symbol_type()), order(__order)
+	: ngrams(symbol_type()), yield_source(false), order(__order)
       {
 	feature_names.resize(order);
 	for (int n = 0; n < order; ++ n)
@@ -108,10 +108,10 @@ namespace cicada
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
-	const phrase_type& target = rule.target;
+	const phrase_type& phrase = (yield_source ? rule.source : rule.target);
 
-	phrase_type::const_iterator titer_begin = target.begin();
-	phrase_type::const_iterator titer_end   = target.end();
+	phrase_type::const_iterator titer_begin = phrase.begin();
+	phrase_type::const_iterator titer_end   = phrase.end();
 	
 	// we will reserve enough space so that buffer's memory will not be re-allocated.
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
@@ -139,7 +139,7 @@ namespace cicada
 	} else {
 	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
 	  phrase_spans.clear();
-	  target.terminals(std::back_inserter(phrase_spans));
+	  phrase.terminals(std::back_inserter(phrase_spans));
 	
 	  int star_first = -1;
 	  int star_last  = -1;
@@ -270,6 +270,7 @@ namespace cicada
       feature_name_set_type feature_names;
       
     public:
+      bool yield_source;
       int order;
     };
     
@@ -285,12 +286,27 @@ namespace cicada
       
       int order = 3;
       
+      bool        yield_source = false;
+      bool        yield_target = false;
+      
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
-	else
+	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	  const std::string& yield = piter->second;
+	  
+	  if (strcasecmp(yield.c_str(), "source") == 0)
+	    yield_source = true;
+	  else if (strcasecmp(yield.c_str(), "target") == 0)
+	    yield_target = true;
+	  else
+	    throw std::runtime_error("unknown parameter: " + parameter);
+	} else
 	  std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
       }
+
+      if (yield_source && yield_target)
+	throw std::runtime_error("you cannot specify both source/target yield");
       
       if (order <= 0)
 	throw std::runtime_error("invalid ngram order");
@@ -299,6 +315,8 @@ namespace cicada
       base_type::__feature_name = "variational";
       
       pimpl = new impl_type(order);
+
+      pimpl->yield_source = yield_source;
     }
     
     Variational::~Variational() { std::auto_ptr<impl_type> tmp(pimpl); }
