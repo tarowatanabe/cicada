@@ -37,6 +37,10 @@ namespace cicada
   // equality is defined by: source-edge-id, dot, j
   //
   
+  // model.apply_predict   state-less feature application
+  // model.apply_scan      state-full feature application with partial context
+  // model.apply_complete  state-full feature application with full antecedent context
+  
   template <typename Semiring, typename Function>
   struct ApplyIncremental
   {
@@ -102,8 +106,6 @@ namespace cicada
     
     struct Candidate
     {
-      id_type node;
-      
       state_type state;
       stack_type::id_type stack;
       
@@ -191,10 +193,10 @@ namespace cicada
     
     ApplyIncremental(const model_type& _model,
 		  const function_type& _function,
-		  const int _cube_size_max)
+		  const int _pop_size_max)
       : model(_model),
 	function(_function),
-	cube_size_max(_cube_size_max)
+	pop_size_max(_pop_size_max)
     { 
       
     }
@@ -213,17 +215,17 @@ namespace cicada
 	candidates.clear();
 	
 	node_states.clear();
-	node_states.reserve(graph_in.nodes.size() * cube_size_max);
+	node_states.reserve(graph_in.nodes.size() * pop_size_max);
 
 	node_states_coarse.clear();
-	node_states_coarse.reserve(graph_in.nodes.size() * cube_size_max);
+	node_states_coarse.reserve(graph_in.nodes.size() * pop_size_max);
 
 	node_maps.clear();
-	node_maps.reserve(graph_in.nodes.size() * cube_size_max);
+	node_maps.reserve(graph_in.nodes.size() * pop_size_max);
 	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
-	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
+	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
 	
 	// initialization...
 	initialize_bins(graph_in);
@@ -275,19 +277,30 @@ namespace cicada
 	state_type state = item->state;
 	feature_set_type features = item->features;
 	score_type score = item->score;
-	score_type estimate = item->estimate;
+	score_type estimtate = item->estimate;
 	
 	// we will iterate until completion...
 	for (;;) {
-	  
  	  const rule_type::symbol_set_type& target = stack[item->stack].in_edge->rule->target;
 	  
 	  int dot = stack[item->stack].dot;
 	  int dot_antecedent = stack[item->stack].dot_antecedent;
 	  
 	  // scan... and score... state will be updated...
-	  if (! target.empty() && target[dot].is_terminal())
-	    model.apply_scan(state, node_states);
+	  if (! target.empty() && target[dot].is_terminal()) {
+	    feature_set_type features_scan;
+	    feature_set_type estimates_scan;
+	    
+	    state = model.apply_scan(state, node_states, stack[item->stack].out_edge, dot, features_scan, estimates_scan);
+	    
+	    const score_type score_scan = function(features_scan);
+	    const score_type estimate_scan = function(estimates_scan);
+	    
+	    features += features_scan;
+	    score    *= score_scan;
+	    estimate *= score_scan;
+	    estimate *= estimate_scan;
+	  }
 	  
 	  // proceed dot(s)
 	  for (/**/; dot != target.size() && target[dot].is_terminal(); ++ dot);
@@ -297,7 +310,6 @@ namespace cicada
 	    
 	    // scoring
 	    model.apply_complete();
-	    
 	    
 	    if (graph_in.goal == stack[item->stack].in_edge->head) {
 	      // create graph_out
@@ -344,11 +356,25 @@ namespace cicada
 	    for (node_type::edge_set_type::const_iterator eiter = antecedent_node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	      const edge_type& edge = graph_in.edges[*eiter];
 	      
-	      candidates.push_bak(candidate_type(stack.push(item->stack, stack_state_type(edge))));
-	      
+	      candidates.push_back(candidate_type(stack.push(item->stack, stack_state_type(edge))));
 	      candidate_type& candidate = candidates.back();
 	      
-	      model.apply_predict();
+	      feature_set_type features_predict;
+	      feature_set_type estimates_predict;
+
+	      candidate.features = features;
+	      candidate.score    = score;
+	      candidate.estimate = estimate;
+	      
+	      candidate.state = model.apply_predict(state, node_states, edge, features_predict, estimates_predict);
+	      
+	      const score_type score_predict = function(features_predict);
+	      const score_type estimate_predict = function(estimates_predict);
+	      
+	      candidate.features += features_predict;
+	      candidate.score    *= score_predict;
+	      candidate.estimate *= score_predict;
+	      candidate.estimate *= estimate_predict;
 	      
 	      states[cardinality + 1].buf.push(&candidate);
 	    }
@@ -361,8 +387,14 @@ namespace cicada
       // clear buf... at the same time, we will clear state associated with each candidate...
       
       typename candidate_heap_type::const_iterator biter_end = state.buf.end();
-      for (typename candidate_heap_type::const_iterator biter = state.buf.begin(); biter != biter_end; ++ biter)
+      for (typename candidate_heap_type::const_iterator biter = state.buf.begin(); biter != biter_end; ++ biter) {
 	model.deallocate((*biter)->state);
+	
+	// what to do with (*biter) == candidate_type* ??? 
+	// I want to cache this for further reuse...
+	// implement custom allocator similar to the state allocator in model?
+	
+      }
       
       // shrink wrap...
       state.buf.clear();
@@ -382,23 +414,23 @@ namespace cicada
 
     const model_type& model;
     const function_type& function;
-    size_type  cube_size_max;
+    size_type  pop_size_max;
   };
   
   template <typename Function>
   inline
-  void apply_incremental(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int cube_size)
+  void apply_incremental(const Model& model, const HyperGraph& source, HyperGraph& target, const Function& func, const int pop_size)
   {
-    ApplyIncremental<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+    ApplyIncremental<typename Function::value_type, Function>(model, func, pop_size)(source, target);
   }
 
   template <typename Function>
   inline
-  void apply_incremental(const Model& model, HyperGraph& source, const Function& func, const int cube_size)
+  void apply_incremental(const Model& model, HyperGraph& source, const Function& func, const int pop_size)
   {
     HyperGraph target;
     
-    ApplyIncremental<typename Function::value_type, Function>(model, func, cube_size)(source, target);
+    ApplyIncremental<typename Function::value_type, Function>(model, func, pop_size)(source, target);
     
     source.swap(target);
   }

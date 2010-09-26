@@ -214,6 +214,41 @@ namespace cicada
     
     return state;
   }
+
+  void Mode::apply_predict(state_type& state,
+			   const state_set_type& node_states,
+			   const edge_type& edge,
+			   const int dot,
+			   feature_set_type& features,
+			   feature_set_type& estimates,
+			   const bool final=false) const
+  {
+    
+    
+  }
+  
+  void Mode::apply_scan(state_type& state,
+			const state_set_type& node_states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final=false) const
+  {
+    
+    
+  }
+
+  void Mode::apply_complete(state_type& state,
+			    const state_set_type& node_states,
+			    const edge_type& edge,
+			    feature_set_type& features,
+			    feature_set_type& estimates,
+			    const bool final=false) const
+  {
+    
+    
+  }
+  
   
   
   void Model::deallocate(const state_type& state) const
