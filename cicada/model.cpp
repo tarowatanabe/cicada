@@ -218,10 +218,9 @@ namespace cicada
   void Model::apply_predict(state_type& state,
 			    const state_set_type& node_states,
 			    const edge_type& edge,
-			    const int dot,
 			    feature_set_type& features,
 			    feature_set_type& estimates,
-			    const bool final=false) const
+			    const bool final) const
   {
     
     
@@ -230,9 +229,10 @@ namespace cicada
   void Model::apply_scan(state_type& state,
 			 const state_set_type& node_states,
 			 const edge_type& edge,
+			 const int dot,
 			 feature_set_type& features,
 			 feature_set_type& estimates,
-			 const bool final=false) const
+			 const bool final) const
   {
     
     
@@ -243,7 +243,7 @@ namespace cicada
 			     const edge_type& edge,
 			     feature_set_type& features,
 			     feature_set_type& estimates,
-			     const bool final=false) const
+			     const bool final) const
   {
     
     
