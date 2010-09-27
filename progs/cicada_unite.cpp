@@ -15,6 +15,7 @@ path_type output_file = "-";
 
 std::string confidence;
 std::string count;
+double count_weight = 1.0;
 
 bool individual = false;
 
@@ -55,7 +56,7 @@ int main(int argc, char ** argv)
       if (! feature_count.empty()) {
 	hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
 	for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
-	  eiter->features[feature_count] = 1;
+	  eiter->features[feature_count] = count_weight;
       }
       
       if (individual)
@@ -88,8 +89,9 @@ void options(int argc, char** argv)
     ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input hypergraphs")
     ("output", po::value<path_type>(&output_file)->default_value("-"),  "output merged hypergraph")
     
-    ("confidence", po::value<std::string>(&confidence),    "add confidence weight")
-    ("count",      po::value<std::string>(&count),         "add count weight")
+    ("confidence",   po::value<std::string>(&confidence),    "add confidence weight feature name")
+    ("count",        po::value<std::string>(&count),         "add count weight feature name")
+    ("count-weight", po::value<double>&(&count_weight),      "count weight")
     
     ("individual", po::bool_switch(&individual), "no merging")
     
