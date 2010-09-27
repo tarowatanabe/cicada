@@ -91,7 +91,7 @@ void options(int argc, char** argv)
     
     ("confidence",   po::value<std::string>(&confidence),    "add confidence weight feature name")
     ("count",        po::value<std::string>(&count),         "add count weight feature name")
-    ("count-weight", po::value<double>&(&count_weight),      "count weight")
+    ("count-weight", po::value<double>(&count_weight),      "count weight")
     
     ("individual", po::bool_switch(&individual), "no merging")
     
