@@ -265,7 +265,7 @@ namespace cicada
 	    os << id << " ||| " << hypergraph << '\n';
 	} else {
 	  if (debug)
-	    std::cerr << "output " << kbest << "-best for graph: "<< data.id << std::endl;
+	    std::cerr << "output " << kbest_size << "-best for graph: "<< data.id << std::endl;
 
 	  weight_set_type weights_zero;
 	  const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
