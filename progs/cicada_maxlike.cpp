@@ -95,6 +95,7 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 
+double loss_scale = 1.0;
 bool oracle_loss = false;
 bool apply_exact = false;
 int cube_size = 200;
@@ -387,9 +388,9 @@ struct OptimizeLBFGS
 	  break;
 	}
       
-      weights_reward[feature_bleu]  =  1.0;
-      weights_penalty[feature_bleu] = -1.0;
-      weights_bleu[feature_bleu]    =  1.0;
+      weights_reward[feature_bleu]  =  loss_scale;
+      weights_penalty[feature_bleu] = -loss_scale;
+      weights_bleu[feature_bleu]    =  loss_scale;
       
       hypergraph_type graph_reward;
       hypergraph_type graph_penalty;
@@ -981,9 +982,10 @@ void options(int argc, char** argv)
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
 
-    ("oracle-loss", po::bool_switch(&oracle_loss), "loss from oracle translations")
-    ("apply-exact", po::bool_switch(&apply_exact), "exact feature applicatin w/o pruning")
-    ("cube-size",   po::value<int>(&cube_size),    "cube-pruning size")
+    ("loss-scale",  po::value<double>(&loss_scale), "scaling for loss function")
+    ("oracle-loss", po::bool_switch(&oracle_loss),  "loss from oracle translations")
+    ("apply-exact", po::bool_switch(&apply_exact),  "exact feature applicatin w/o pruning")
+    ("cube-size",   po::value<int>(&cube_size),     "cube-pruning size")
 
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     
