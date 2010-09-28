@@ -672,6 +672,8 @@ namespace cicada
       
       bool yield_source = false;
       bool yield_target = false;
+
+      std::string name;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
@@ -680,6 +682,8 @@ namespace cicada
 	  exact = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "split") == 0)
 	  split = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	  const std::string& yield = piter->second;
 	  
@@ -700,7 +704,7 @@ namespace cicada
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
-      base_type::__feature_name = "bleu";
+      base_type::__feature_name = (name.empty() ? std::string("bleu") : name);
       
       pimpl = bleu_impl.release();
     }
