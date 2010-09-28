@@ -385,7 +385,7 @@ struct Task
     cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
     if (! model_sparse.empty()) {
-      static const size_type __id;
+      static const size_type __id = 0;
       static const sentence_set_type __targets;
       static const ngram_count_set_type __ngram_counts;
 
