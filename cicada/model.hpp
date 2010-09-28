@@ -209,7 +209,8 @@ namespace cicada
 	(*iter)->apply_feature() = mode;
     }
     
-    void assign(const hypergraph_type& hypergraph,
+    void assign(const size_type& id,
+		const hypergraph_type& hypergraph,
 		const lattice_type& lattice,
 		const span_set_type& spans,
 		const sentence_set_type& targets,
@@ -217,7 +218,7 @@ namespace cicada
     {
       model_set_type::iterator iter_end = models.end();
       for (model_set_type::iterator iter = models.begin(); iter != iter_end; ++ iter)
-	(*iter)->assign(hypergraph, lattice, spans, targets, ngram_counts);
+	(*iter)->assign(id, hypergraph, lattice, spans, targets, ngram_counts);
     }
     
     Model clone() const
