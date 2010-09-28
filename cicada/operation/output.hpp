@@ -252,13 +252,21 @@ namespace cicada
 	std::ostream& os = (output_data.use_buffer
 			    ? static_cast<std::ostream&>(os_buffer)
 			    : *output_data.os);
+
+	utils::resource start;
     
 	if (kbest_size <= 0) {
+	  if (debug)
+	    std::cerr << "output graph: " << data.id << std::endl;
+
 	  if (graphviz)
 	    cicada::graphviz(os, hypergraph);
 	  else
 	    os << id << " ||| " << hypergraph << '\n';
 	} else {
+	  if (debug)
+	    std::cerr << "output " << kbest << "-best for graph: "<< data.id << std::endl;
+
 	  weight_set_type weights_zero;
 	  const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
       
@@ -295,7 +303,14 @@ namespace cicada
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function<weight_type>(*weights_kbest), kbest_filter());
 	    }
 	  }
-	}    
+	}
+	
+	utils::resource end;
+	
+	if (debug)
+	  std::cerr << "output cpu time: " << (end.cpu_time() - start.cpu_time())
+		    << " user time: " << (end.user_time() - start.user_time())
+		    << std::endl;
       }
       
       output_data_type& output_data;
