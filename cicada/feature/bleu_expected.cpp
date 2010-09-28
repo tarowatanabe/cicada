@@ -639,7 +639,8 @@ namespace cicada
     };
 
 
-    void BleuExpected::assign(const hypergraph_type& hypergraph,
+    void BleuExpected::assign(const size_type& id,
+			      const hypergraph_type& hypergraph,
 			      const lattice_type& lattice,
 			      const span_set_type& spans,
 			      const sentence_set_type& targets,

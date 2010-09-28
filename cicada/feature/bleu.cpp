@@ -779,7 +779,8 @@ namespace cicada
     };
 
 
-    void Bleu::assign(const hypergraph_type& hypergraph,
+    void Bleu::assign(const size_type& id,
+		      const hypergraph_type& hypergraph,
 		      const lattice_type& lattice,
 		      const span_set_type& spans,
 		      const sentence_set_type& targets,

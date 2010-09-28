@@ -34,7 +34,7 @@ namespace cicada
 	if (param.name() != "apply")
 	  throw std::runtime_error("this is not a feature-functin applier");
 
-	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	 for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "size") == 0)
 	    size = boost::lexical_cast<int>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "exact") == 0)
@@ -79,7 +79,7 @@ namespace cicada
 	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
     
 	// assignment...
-	__model.assign(data.hypergraph, data.lattice, data.spans, data.targets, data.ngram_counts);
+	__model.assign(data.id, data.hypergraph, data.lattice, data.spans, data.targets, data.ngram_counts);
     
 	if (forced)
 	  __model.apply_feature(true);

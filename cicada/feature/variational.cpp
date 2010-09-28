@@ -375,7 +375,8 @@ namespace cicada
       pimpl->clear();
     }
 
-    void Variational::assign(const hypergraph_type& hypergraph,
+    void Variational::assign(const size_type& id,
+			     const hypergraph_type& hypergraph,
 			     const lattice_type& lattice,
 			     const span_set_type& spans,
 			     const sentence_set_type& targets,

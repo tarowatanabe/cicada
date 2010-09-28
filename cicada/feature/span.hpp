@@ -57,7 +57,8 @@ namespace cicada
 				const bool final) const;
       virtual void initialize();
 
-      virtual void assign(const hypergraph_type& hypergraph,
+      virtual void assign(const size_type& id,
+			  const hypergraph_type& hypergraph,
 			  const lattice_type& lattice,
 			  const span_set_type& spans,
 			  const sentence_set_type& targets,

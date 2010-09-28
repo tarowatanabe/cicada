@@ -59,7 +59,8 @@ namespace cicada
 				feature_set_type& features,
 				feature_set_type& estimates,
 				const bool final) const;
-      virtual void assign(const hypergraph_type& hypergraph,
+      virtual void assign(const size_type& id,
+			  const hypergraph_type& hypergraph,
 			  const lattice_type& lattice,
 			  const span_set_type& spans,
 			  const sentence_set_type& targets,

@@ -123,7 +123,8 @@ namespace cicada
     
     // You can collect additional data, if necessary.
     // This will be called before feature application.
-    virtual void assign(const hypergraph_type& hypergraph,
+    virtual void assign(const size_type& id,
+			const hypergraph_type& hypergraph,
 			const lattice_type& lattice,
 			const span_set_type& spans,
 			const sentence_set_type& targets,
