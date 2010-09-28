@@ -209,6 +209,9 @@ int main(int argc, char ** argv)
 template <typename Optimizer>
 struct Task
 {
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
   typedef Optimizer optimizer_type;
 
