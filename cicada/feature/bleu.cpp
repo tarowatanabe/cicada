@@ -843,13 +843,11 @@ namespace cicada
 	for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
 	  pimpl->insert(*titer);
       } else if (! pimpl->refset.empty()) {
-	if (id >= pimpl->refset.size())
-	  throw std::runtime_error("sentence id exceeds refset size: " + boost::lexical_cast<std::string>(id));
-		
-	sentence_set_type::const_iterator titer_end = pimpl->refset[id].end();
-	for (sentence_set_type::const_iterator titer = pimpl->refset[id].begin(); titer != titer_end; ++ titer)
-	  pimpl->insert(*titer);
-	
+	if (id < pimpl->refset.size()) {
+	  sentence_set_type::const_iterator titer_end = pimpl->refset[id].end();
+	  for (sentence_set_type::const_iterator titer = pimpl->refset[id].begin(); titer != titer_end; ++ titer)
+	    pimpl->insert(*titer);
+	}	
       } else
 	throw std::runtime_error("no reference set?");
 
