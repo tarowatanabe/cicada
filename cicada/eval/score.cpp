@@ -13,6 +13,8 @@
 #include <unicode/schriter.h>
 #include <unicode/bytestream.h>
 
+#include <boost/filesystem.hpp>
+
 namespace cicada
 {
   namespace eval
@@ -74,6 +76,7 @@ wer:\n\
     Scorer::scorer_ptr_type Scorer::create(const std::string& parameter)
     {
       typedef cicada::Parameter parameter_type;
+      typedef boost::filesystem::path path_type;
       
       const parameter_type param(parameter);
       
@@ -85,6 +88,9 @@ wer:\n\
 	bool yield_source = false;
 	bool yield_target = false;
 	
+	std::string name;
+	path_type   refset_file;
+	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "order") == 0)
 	    order = boost::lexical_cast<int>(piter->second);
@@ -92,6 +98,10 @@ wer:\n\
 	    exact = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "split") == 0)
 	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	    name = piter->second;
+	  else if (strcasecmp(piter->first.c_str(), "refset") == 0)
+	    refset_file = piter->second;
 	  else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	    const std::string& yield = piter->second;
 	    
