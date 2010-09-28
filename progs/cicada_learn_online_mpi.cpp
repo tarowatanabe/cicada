@@ -699,12 +699,11 @@ struct Task
 	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer) 
 	    scorer->insert(*titer);
 	  
-	  static const size_type __id;
 	  static const lattice_type __lattice;
 	  static const span_set_type __spans;
 	  static const ngram_count_set_type __ngram_counts;
 	  
-	  __bleu->assign(__id, hypergraph_reward, __lattice, __spans, targets, __ngram_counts);
+	  __bleu->assign(id, hypergraph_reward, __lattice, __spans, targets, __ngram_counts);
 	  if (! loss_segment)
 	    __bleu->assign(score);
 	  
@@ -855,12 +854,11 @@ struct Task
       for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
 	scorer->insert(*titer);
 
-      static const size_type __id;
       static const lattice_type __lattice;
       static const span_set_type __spans;
       static const ngram_count_set_type __ngram_counts;
       
-      __bleu->assign(__id, hypergraph, __lattice, __spans, targets, __ngram_counts);
+      __bleu->assign(id, hypergraph, __lattice, __spans, targets, __ngram_counts);
       if (! loss_segment)
 	__bleu->assign(score);
       
