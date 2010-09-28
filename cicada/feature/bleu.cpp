@@ -720,10 +720,10 @@ namespace cicada
       
       pimpl = bleu_impl.release();
       
+      pimpl->refset.clear();
+      
       if (! refset_file.empty()) {
 	typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-	
-	pimpl->refset.clear();
 	
 	utils::compress_istream is(refset_file, 1024 * 1024);
 	std::string line;
@@ -845,10 +845,7 @@ namespace cicada
       } else if (! pimpl->refset.empty()) {
 	if (id >= pimpl->refset.size())
 	  throw std::runtime_error("sentence id exceeds refset size: " + boost::lexical_cast<std::string>(id));
-	
-	if (pimpl->refset[id].empty())
-	  throw std::runtime_error("sentence id has no reference data: " + boost::lexical_cast<std::string>(id));
-	
+		
 	sentence_set_type::const_iterator titer_end = pimpl->refset[id].end();
 	for (sentence_set_type::const_iterator titer = pimpl->refset[id].begin(); titer != titer_end; ++ titer)
 	  pimpl->insert(*titer);
