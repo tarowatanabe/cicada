@@ -1,7 +1,7 @@
 
 #include <map>
 
-
+#include "utils/space_separator.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/indexed_set.hpp"
@@ -13,9 +13,10 @@
 #include "cicada/eval/bleu.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
-
+#include "cicada/sentence_vector.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
+#include <boost/tokenizer.hpp>
 
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
@@ -30,9 +31,12 @@ namespace cicada
     class BleuImpl
     {
     public:
-      typedef cicada::Symbol   symbol_type;
-      typedef cicada::Vocab    vocab_type;
-      typedef cicada::Sentence sentence_type;
+      typedef cicada::Symbol         symbol_type;
+      typedef cicada::Vocab          vocab_type;
+      typedef cicada::Sentence       sentence_type;
+      typedef cicada::SentenceVector sentence_set_type;
+
+      typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
 
       typedef cicada::eval::Score score_type;
       typedef score_type::score_ptr_type score_ptr_type;
@@ -635,6 +639,7 @@ namespace cicada
       }
       
     public:
+      sentence_document_type refset;
       
       buffer_type          buffer_impl;
       phrase_span_set_type phrase_spans_impl;
@@ -660,6 +665,7 @@ namespace cicada
       : pimpl(0)
     {
       typedef cicada::Parameter parameter_type;
+      typedef boost::filesystem::path path_type;
       
       const parameter_type param(parameter);
       
@@ -674,6 +680,7 @@ namespace cicada
       bool yield_target = false;
 
       std::string name;
+      path_type   refset_file;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
@@ -684,6 +691,8 @@ namespace cicada
 	  split = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	  name = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "refset") == 0)
+	  refset_file = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	  const std::string& yield = piter->second;
 	  
@@ -700,6 +709,9 @@ namespace cicada
       if (yield_source && yield_target)
 	throw std::runtime_error("you cannot specify both source/target yield");
       
+      if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
+	throw std::runtime_error("no refset file?: " + refset_file.file_string());
+      
       std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, split, yield_source));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
@@ -707,6 +719,34 @@ namespace cicada
       base_type::__feature_name = (name.empty() ? std::string("bleu") : name);
       
       pimpl = bleu_impl.release();
+      
+      if (! refset_file.empty()) {
+	typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+	
+	pimpl->refset.clear();
+	
+	utils::compress_istream is(refset_file, 1024 * 1024);
+	std::string line;
+	
+	while (std::getline(is, line)) {
+	  tokenizer_type tokenizer(line);
+	  
+	  tokenizer_type::iterator iter = tokenizer.begin();
+	  if (iter == tokenizer.end()) continue;
+	  
+	  const int id = boost::lexical_cast<int>(*iter);
+	  ++ iter;
+	  
+	  if (iter == tokenizer.end()) continue;
+	  if (*iter != "|||") continue;
+	  ++ iter;
+	  
+	  if (id >= pimpl->refset.size())
+	    pimpl->refset.resize(id + 1);
+	  
+	  pimpl->refset[id].push_back(sentence_type(iter, tokenizer.end()));
+	}
+      }
     }
     
     Bleu::~Bleu() { std::auto_ptr<impl_type> tmp(pimpl); }
@@ -797,9 +837,24 @@ namespace cicada
       }
       
       pimpl->clear();
-      sentence_set_type::const_iterator titer_end = targets.end();
-      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
-	pimpl->insert(*titer);
+      
+      if (! targets.empty()) {
+	sentence_set_type::const_iterator titer_end = targets.end();
+	for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
+	  pimpl->insert(*titer);
+      } else if (! pimpl->refset.empty()) {
+	if (id >= pimpl->refset.size())
+	  throw std::runtime_error("sentence id exceeds refset size: " + boost::lexical_cast<std::string>(id));
+	
+	if (pimpl->refset[id].empty())
+	  throw std::runtime_error("sentence id has no reference data: " + boost::lexical_cast<std::string>(id));
+	
+	sentence_set_type::const_iterator titer_end = pimpl->refset[id].end();
+	for (sentence_set_type::const_iterator titer = pimpl->refset[id].begin(); titer != titer_end; ++ titer)
+	  pimpl->insert(*titer);
+	
+      } else
+	throw std::runtime_error("no reference set?");
 
       pimpl->source_size = source_length;
     }
