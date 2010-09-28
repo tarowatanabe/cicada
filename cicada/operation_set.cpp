@@ -215,7 +215,12 @@ output: kbest or hypergraph output\n\
     // perform parsing...
     std::string::const_iterator iter = line.begin();
     std::string::const_iterator end = line.end();
-
+    
+    data.hypergraph.clear();
+    data.lattice.clear();
+    data.spans.clear();
+    data.targets.clear();
+    data.ngram_counts.clear();
     
     if (input_id) {
       if (! parse_id(data.id, iter, end))
@@ -238,8 +243,6 @@ output: kbest or hypergraph output\n\
     }
     
     if (input_span) {
-      data.spans.clear();
-      
       if (! parse_separator(iter, end))
 	throw std::runtime_error("invalid span format (separator)");
       
@@ -248,8 +251,6 @@ output: kbest or hypergraph output\n\
     }
     
     if (input_bitext) {
-      data.targets.clear();
-
       if (! parse_separator(iter, end))
 	throw std::runtime_error("invalid bitext format (separator)");
 
