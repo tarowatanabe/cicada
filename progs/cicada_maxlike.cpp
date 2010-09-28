@@ -895,9 +895,9 @@ void read_tstset(const path_set_type& files,
       static const cicada::NGramCountSet __ngram_counts;
       
       if (__bleu)
-	__bleu->assign(graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	__bleu->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
       else
-	__bleu_linear->assign(graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	__bleu_linear->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
       
       if (apply_exact) {
 	model_type model;

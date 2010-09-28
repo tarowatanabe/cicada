@@ -382,10 +382,11 @@ struct Task
     cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
     if (! model_sparse.empty()) {
+      static const size_type __id;
       static const sentence_set_type __targets;
       static const ngram_count_set_type __ngram_counts;
 
-      model_sparse.assign(modified, lattice, spans, __targets, __ngram_counts);
+      model_sparse.assign(__id, modified, lattice, spans, __targets, __ngram_counts);
       
       model_sparse.apply_feature(true);
       
@@ -613,11 +614,12 @@ struct Task
 	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer) 
 	    scorer->insert(*titer);
 
+	  static const size_type __id;
 	  static const lattice_type __lattice;
 	  static const span_set_type __spans;
 	  static const ngram_count_set_type __ngram_counts;
 	  
-	  __bleu->assign(hypergraph_reward, __lattice, __spans, targets, __ngram_counts);
+	  __bleu->assign(__id, hypergraph_reward, __lattice, __spans, targets, __ngram_counts);
 	  if (! loss_segment)
 	    __bleu->assign(score);
 	  
@@ -764,11 +766,12 @@ struct Task
       for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
 	scorer->insert(*titer);
       
+      static const size_type __id;
       static const lattice_type __lattice;
       static const span_set_type __spans;
       static const ngram_count_set_type __ngram_counts;
       
-      __bleu->assign(hypergraph, __lattice, __spans, targets, __ngram_counts);
+      __bleu->assign(__id, hypergraph, __lattice, __spans, targets, __ngram_counts);
       if (! loss_segment)
 	__bleu->assign(score);
       
