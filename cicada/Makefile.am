@@ -103,6 +103,7 @@ operation/expected_ngram.hpp \
 operation/functional.hpp \
 operation/generate.hpp \
 operation/intersect.hpp \
+operation/normalize.hpp \
 operation/output.hpp \
 operation/permute.hpp \
 operation/prune.hpp \

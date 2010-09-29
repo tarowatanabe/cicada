@@ -21,6 +21,7 @@
 #include "operation/expected_ngram.hpp"
 #include "operation/prune.hpp"
 #include "operation/intersect.hpp"
+#include "operation/normalize.hpp"
 #include "operation/output.hpp"
 
 #include "utils/hashmurmur.hpp"
@@ -71,6 +72,8 @@ prune: pruning\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
 intersect: compute intersection\n\
+normalize: feature value normalizer\n\
+\tprefix=feature name prefix\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
 \tunique=[true|false] unique translation\n\
@@ -138,6 +141,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
       else if (param.name() == "intersect")
 	operations.push_back(operation_ptr_type(new operation::Intersect(debug)));
+      else if (param.name() == "normalize")
+	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
       else if (param.name() == "expected-ngram")
 	operations.push_back(operation_ptr_type(new operation::ExpectedNGram(*piter, debug)));
       else if (param.name() == "output") {

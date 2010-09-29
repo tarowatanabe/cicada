@@ -23,13 +23,26 @@ namespace cicada
 		const int __debug)
 	: debug(__debug)
       {
-	
-      }
-      
+	typedef cicada::Parameter param_type;
 
+	param_type param(parameter);
+	if (param.name() != "normalize")
+	  throw std::runtime_error("this is not a feature normalizer");
+	
+	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "prefix") == 0)
+	    feature_prefix = piter->second;
+	  else
+	    std::cerr << "WARNING: unsupported parameter for feature normalizer: " << piter->first << "=" << piter->second << std::endl;
+	}
+      }
+
+      std::string feature_prefix;
+      int debug;
+      
       template <typename FeaturePrefix, typename Feature>
       inline
-      bool equal_prefix(const FeaturePrefix& prefix, const Feature& x)
+      bool equal_prefix(const FeaturePrefix& prefix, const Feature& x) const
       {
 	return x.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin());
       }
@@ -53,22 +66,33 @@ namespace cicada
 	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	    hypergraph_type::edge_type& edge = hypergraph.edges[*eiter];
-
-	    feature_set_type::data_type sum(0.0);
 	    
-	    feature_set_type::iterator fiter_end = edge.featuers.end();
-	    for (feature_set_type::iterator fiter = edge.featuers.begin(); fiter != fiter_end; ++ fiter)
-	      if (equal_prefix(feature_prefix, fiter->first))
-		sum += fiter->second;
-	    
-	    if (sum != 0.0)
-	      for (feature_set_type::iterator fiter = edge.featuers.begin(); fiter != fiter_end; ++ fiter)
+	    if (! feature_prefix.empty()) {
+	      feature_set_type::data_type sum(0.0);
+	      
+	      feature_set_type::iterator fiter_end = edge.features.end();
+	      for (feature_set_type::iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 		if (equal_prefix(feature_prefix, fiter->first))
+		  sum += fiter->second;
+	      
+	      if (sum != 0.0)
+		for (feature_set_type::iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+		  if (equal_prefix(feature_prefix, fiter->first))
+		    fiter->second /= sum;
+	    } else {
+	      feature_set_type::data_type sum(0.0);
+	      
+	      feature_set_type::iterator fiter_end = edge.features.end();
+	      for (feature_set_type::iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+		sum += fiter->second;
+	      
+	      if (sum != 0.0)
+		for (feature_set_type::iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 		  fiter->second /= sum;
+	    }
 	  }
 	}
 	
-
 	utils::resource end;
     
 	if (debug)
