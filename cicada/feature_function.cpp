@@ -83,6 +83,7 @@ parent: parent feature\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
 \tdigits=[perform digits stemming]\n\
+\texclude-terminal=[true|false] exclude terminal symbol\n\
 span: lexical span feature\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\

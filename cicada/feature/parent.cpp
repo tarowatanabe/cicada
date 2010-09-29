@@ -57,7 +57,7 @@ namespace cicada
       typedef string_map_type::index_type id_type;
       
       ParentImpl()
-	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), forced_feature(false) {}
+	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), exclude_terminal(false), forced_feature(false) {}
 
       virtual ~ParentImpl() {}
       
@@ -74,10 +74,70 @@ namespace cicada
 	string_map.clear();
       }
 
+      template <typename Iterator, typename Extractor>
+      std::string extract_phrase_rule(const std::string& lhs,
+				      Iterator first, Iterator last,
+				      Extractor extractor) const
+      {
+	std::string rule = lhs;
+      
+	if (exclude_terminal) {
+	  if (last != first) {
+	    rule += '(';
+	    for (/**/; first != last - 1; ++ first)
+	      if (first->is_non_terminal())
+		rule += extractor(*first) + '|';
+	    if (first->is_non_terminal())
+	      rule += extractor(*first);
+	    rule += ')';
+	  }
+	} else {
+	  if (last != first) {
+	    rule += '(';
+	    for (/**/; first != last - 1; ++ first)
+	      rule += extractor(*first) + '|';
+	    rule += extractor(*first) + ')';
+	  }
+	}
+
+	return rule;
+      }
+    
+      template <typename Iterator, typename Extractor>
+      std::string extract_rule(const std::string& lhs,
+			       Iterator first, Iterator last,
+			       Extractor extractor) const
+      {
+	std::string rule = lhs;
+
+	if (exclude_terminal) {
+	  if (last != first) {
+	    rule += '(';
+	    for (/**/; first != last - 1; ++ first)
+	      if (first->is_non_terminal())
+		rule += extractor(first->non_terminal()) + '|';
+	    if (first->is_non_terminal())
+	      rule += extractor(first->non_terminal());
+	    rule += ')';
+	  }
+	} else {
+	  if (last != first) {
+	    rule += '(';
+	    for (/**/; first != last - 1; ++ first)
+	      rule += extractor(first->non_terminal()) + '|';
+	    rule += extractor(first->non_terminal()) + ')';
+	  }
+	}
+	return rule;
+      }
+
+
       cluster_type* cluster;
       stemmer_type* stemmer_prefix;
       stemmer_type* stemmer_suffix;
       stemmer_type* stemmer_digits;
+
+      bool exclude_terminal;
       
       string_map_type string_map;
       
@@ -107,37 +167,6 @@ namespace cicada
       }
     };
     
-    template <typename Iterator, typename Extractor>
-    std::string extract_phrase_rule(const std::string& lhs,
-				    Iterator first, Iterator last,
-				    Extractor extractor)
-    {
-      std::string rule = lhs;
-      
-      if (last != first) {
-	rule += '(';
-	for (/**/; first != last - 1; ++ first)
-	  rule += extractor(*first) + '|';
-	rule += extractor(*first) + ')';
-      }
-      return rule;
-    }
-    
-    template <typename Iterator, typename Extractor>
-    std::string extract_rule(const std::string& lhs,
-			     Iterator first, Iterator last,
-			     Extractor extractor)
-    {
-      std::string rule = lhs;
-      
-      if (last != first) {
-	rule += '(';
-	for (/**/; first != last - 1; ++ first)
-	  rule += extractor(first->non_terminal()) + '|';
-	rule += extractor(first->non_terminal()) + ')';
-      }
-      return rule;
-    }
 
     
     template <typename Extract>
@@ -348,6 +377,8 @@ namespace cicada
       int stemmer_suffix_size = 0;
       bool stemmer_digits = false;
       
+      bool exclude_terminal = false;
+      
       boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -368,6 +399,8 @@ namespace cicada
 	  stemmer_suffix_size = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "digits") == 0)
 	  stemmer_digits = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "exclude-terminal") == 0)
+	  exclude_terminal = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for parent: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -402,6 +435,8 @@ namespace cicada
 
       if (stemmer_digits)
 	parent_impl->stemmer_digits = &cicada::Stemmer::create("digits");
+
+      parent_impl->exclude_terminal = exclude_terminal;
       
       // parent conext (surface, cluster, prefix, suffix, digits)
       base_type::__state_size = sizeof(impl_type::id_type) * 5;
