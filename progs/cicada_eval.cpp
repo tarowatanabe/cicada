@@ -124,11 +124,18 @@ int main(int argc, char** argv)
 	const sentence_type& sentence = id_sentence.second;
 	
 	if (finished[id]) continue;
-	
+
+	score_ptr_type score_segment = scorers[id]->score(sentence);
+
+	if (debug) {
+	  const std::pair<double, double> value = score_segment->score();
+	  std::cerr << "segment: " << id << " score: " << value.first << " penalty: " << value.second << std::endl;
+	}
+
 	if (! score)
-	  score = scorers[id]->score(sentence);
+	  score = score_segment;
 	else
-	  *score += *scorers[id]->score(sentence);
+	  *score += *score_segment;
 	
 	finished[id] = true;
       }

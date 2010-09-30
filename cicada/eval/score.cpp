@@ -2,6 +2,7 @@
 #include "eval/score.hpp"
 #include "eval/per.hpp"
 #include "eval/wer.hpp"
+#include "eval/ter.hpp"
 #include "eval/bleu.hpp"
 
 #include "parameter.hpp"
@@ -68,6 +69,8 @@ per:\n\
 \tsplit=[true|false] perform character splitting\n\
 wer:\n\
 \tsplit=[true|false] perform character splitting\n\
+ter:\n\
+\tsplit=[true|false] perform character splitting\n\
 ";
 
       return desc;
@@ -124,7 +127,7 @@ wer:\n\
 	  if (strcasecmp(piter->first.c_str(), "split") == 0)
 	    split = utils::lexical_cast<bool>(piter->second);
 	  else
-	    std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
+	    std::cerr << "WARNING: unsupported parameter for per: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
 	return scorer_ptr_type(new PERScorer(split));
@@ -135,10 +138,21 @@ wer:\n\
 	  if (strcasecmp(piter->first.c_str(), "split") == 0)
 	    split = utils::lexical_cast<bool>(piter->second);
 	  else
-	    std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
+	    std::cerr << "WARNING: unsupported parameter for wer: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
 	return scorer_ptr_type(new WERScorer(split));
+      } else if (param.name() == "ter") {
+	bool split = false;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "split") == 0)
+	    split = utils::lexical_cast<bool>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for ter: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	return scorer_ptr_type(new TERScorer(split));
       } else
 	throw std::runtime_error("unknown scorer" + param.name());
       
