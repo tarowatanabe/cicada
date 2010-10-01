@@ -108,9 +108,8 @@ namespace cicada
 #endif
       
       
-      //TERScorerImpl() { words_unique.set_empty_key(word_type()); }
       TERScorerImpl(const sentence_type& __ref)
-	: ref(__ref) { words_unique.set_empty_key(word_type()); words_unique.insert(__ref.begin(), __ref.end()); }
+	: ref(__ref) {  }
       
       
       value_type operator()(const sentence_type& sentence) const
@@ -130,7 +129,7 @@ namespace cicada
 	
 	sentence_type hyp = hyp_orig;
 	path_type     path;
-	double        cost = edit_distance(hyp, ref, path);
+	double        cost = minimum_edit_distance(hyp, ref, path);
 
 	std::cerr << "initial cost: " << cost << std::endl;
 	
@@ -188,27 +187,21 @@ namespace cicada
 	
 	word_set_type words_intersect;
 	words_intersect.set_empty_key(word_type());
-	
-	sentence_type::const_iterator hiter_end = hyp.end();
-	for (sentence_type::const_iterator hiter = hyp.begin(); hiter != hiter_end; ++ hiter)
-	  if (words_unique.find(*hiter) != words_unique.end())
-	    words_intersect.insert(*hiter);
+	words_intersect.insert(hyp.begin(), hyp.end());
+
+	word_set_type::const_iterator iiter_end = words_intersect.end();
 	
 	ngram_type ngram;
 	
-	for (int start = 0; start != ref.size(); ++ start)
-	  if (words_intersect.find(ref[start]) != words_intersect.end()) {
-	    ngram.clear();
+	for (int start = 0; start != ref.size(); ++ start) {
+	  ngram.clear();
+	  const int max_length = utils::bithack::min(max_shift_size, static_cast<int>(ref.size() - start));
+	  for (int length = 0; length != max_length && words_intersect.find(ref[start + length]) != iiter_end; ++ length) {
+	    ngram.push_back(ref[start + length]);
 	    
-	    const int max_length = utils::bithack::min(max_shift_size, static_cast<int>(ref.size() - start));
-	    for (int length = 0; length != max_length; ++ length) {
-	      if (length && words_intersect.find(ref[start + length]) == words_intersect.end()) break;
-	      
-	      ngram.push_back(ref[start + length]);
-	      
-	      ngram_index[ngram].insert(start);
-	    }
+	    ngram_index[ngram].insert(start);
 	  }
+	}
       }
       
       bool calculate_best_shift(const sentence_type& hyp,
@@ -280,41 +273,47 @@ namespace cicada
 	// enumerate from max-shifts
 	sentence_type hyp_shifted(hyp.size());
 	path_type     path_shifted;
-
+	
 	bool found = false;
-	for (int i = shifts.size() - 1; i >= 0; -- i) {
-	  double curr_fix = cost - (cost_best_shift + cost_best);
-	  double max_fix  = 2.0 * (i + 1) - COSTS::shift;
+	for (int i = shifts.size() - 1; i >= 0; -- i) 
+	  if (! shifts[i].empty()) {
+	    const double curr_fix = cost - (cost_best_shift + cost_best);
+	    const double max_fix  = 2.0 * (i + 1) - COSTS::shift;
+	    
+	    if (curr_fix > max_fix || (cost_best_shift == 0 && curr_fix == max_fix)) break;
 	  
-	  if (curr_fix > max_fix || (cost_best_shift == 0 && curr_fix == max_fix)) break;
-	  
-	  for (int j = 0; j < shifts[i].size(); ++ j) {
-	    const shift_type& shift = shifts[i][j];
+	    for (int j = 0; j < shifts[i].size(); ++ j) {
+	      const shift_type& shift = shifts[i][j];
 	    
-	    curr_fix = cost - (cost_best_shift + cost_best);
-	    max_fix = 2.0 * (i + 1) - COSTS::shift;
+	      const double curr_fix = cost - (cost_best_shift + cost_best);
 	    
-	    if (curr_fix > max_fix || (cost_best_shift == 0 && curr_fix == max_fix)) continue;
+	      if (curr_fix > max_fix || (cost_best_shift == 0 && curr_fix == max_fix)) continue;
 	    
-	    hyp_shifted.clear();
-	    shift_sentence(hyp, shift.begin, shift.end, ralign[shift.moveto], hyp_shifted);
+	      std::cerr << "candidate shift: [" << shift.begin << ", " << shift.end << "]: " << ralign[shift.moveto] << std::endl;
 	    
-	    path_shifted.clear();
-	    const double cost_shifted = edit_distance(hyp_shifted, ref, path_shifted);
-	    const double gain = (cost_best + cost_best_shift) - (cost_shifted + COSTS::shift);
+	      hyp_shifted.clear();
+	      shift_sentence(hyp, shift.begin, shift.end, ralign[shift.moveto], hyp_shifted);
 	    
-	    if (gain > 0 || (cost_best_shift == 0 && gain == 0)) {
-	      cost_best = cost_shifted;
-	      cost_best_shift = COSTS::shift;
-	      
-	      path_best.swap(path_shifted);
-	      hyp_best.swap(hyp_shifted);
-	      found = true;
+	      path_shifted.clear();
+	      const double cost_shifted = minimum_edit_distance(hyp_shifted, ref, path_shifted);
+	      const double gain = (cost_best + cost_best_shift) - (cost_shifted + COSTS::shift);
 
-	      std::cerr << "better shift: [" << shift.begin << ", " << shift.end << "]: " << shift.moveto << std::endl;
+	      std::cerr << "hyp original: " << hyp << std::endl;
+	      std::cerr << "hyp shifted:  " << hyp_shifted << std::endl;
+	      std::cerr << "cost shifted: " << cost_shifted << " gain: " << gain << std::endl;
+	    
+	      if (gain > 0 || (cost_best_shift == 0 && gain == 0)) {
+		cost_best = cost_shifted;
+		cost_best_shift = COSTS::shift;
+	      
+		path_best.swap(path_shifted);
+		hyp_best.swap(hyp_shifted);
+		found = true;
+
+		std::cerr << "better shift: [" << shift.begin << ", " << shift.end << "]: " << ralign[shift.moveto] << std::endl;
+	      }
 	    }
 	  }
-	}
 
 	return found;
       }
@@ -424,10 +423,10 @@ namespace cicada
 		
 		for (int roff = 0; roff <= end - start; ++ roff) {
 		  const int rmr = ralign[moveto + roff];
-		  if ((start != rmr) && ((roff == 0) || (rmr != ralign[moveto]))) {
+		  if (start != rmr && (roff == 0 || rmr != ralign[moveto])) {
 		    sshifts.push_back(shift_type(start, end, moveto + roff));
 		    
-		    std::cerr << "shift: [" << start << ", " << end << "]: " << (moveto + roff) << std::endl;
+		    std::cerr << "shift: [" << start << ", " << end << "]: " << ralign[moveto + roff] << std::endl;
 		  }
 		}
 	      }
@@ -436,7 +435,7 @@ namespace cicada
 	}
       }
       
-      double edit_distance(const sentence_type& hyp, const sentence_type& ref, path_type& path) const
+      double minimum_edit_distance(const sentence_type& hyp, const sentence_type& ref, path_type& path) const
       {
 	typedef utils::vector2<transition_type, std::allocator<transition_type> > matrix_transition_type;
 	typedef utils::vector2<double, std::allocator<double> > matrix_cost_type;
@@ -503,7 +502,6 @@ namespace cicada
       
     private:
       sentence_type ref;
-      word_set_type words_unique;
     };
    
     TERScorer::TERScorer(const TERScorer& x)
@@ -579,6 +577,14 @@ namespace cicada
       
       if (! impl.empty())
 	ter->references /= impl.size();
+      
+
+      std::cerr << "final: references: " << ter->references
+		<< " insertion: " << ter->insertion
+		<< " deletion: " << ter->deletion
+		<< " substitution: " << ter->substitution
+		<< " shift: " << ter->shift
+		  << std::endl;
 
       return score_ptr_type(ter.release());
     }
