@@ -98,8 +98,14 @@ namespace cicada
     size_type size() const { return lattice.size(); }
     bool empty() const { return lattice.empty(); }
     
-    const_reference operator[](size_type x) const { return lattice[x]; }
-    reference operator[](size_type x) { return lattice[x]; }
+    inline const_reference operator[](size_type x) const { return lattice[x]; }
+    inline       reference operator[](size_type x)       { return lattice[x]; }
+
+    inline const_iterator begin() const { return lattice.begin(); }
+    inline       iterator begin()       { return lattice.begin(); }
+    
+    inline const_iterator end() const { return lattice.end(); }
+    inline       iterator end()       { return lattice.end(); }
     
     difference_type shortest_distance() const
     {
