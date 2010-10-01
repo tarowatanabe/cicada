@@ -74,13 +74,14 @@ namespace cicada
 
       struct Shift
       {
-	Shift() : begin(0), end(0), moveto(0) {}
-	Shift(const int __begin, const int __end, const int __moveto)
-	  : begin(__begin), end(__end), moveto(__moveto) {}
-
+	Shift() : begin(0), end(0), moveto(0), reloc(0) {}
+	Shift(const int __begin, const int __end, const int __moveto, const int __reloc)
+	  : begin(__begin), end(__end), moveto(__moveto), reloc(__reloc) {}
+	
 	int begin;
 	int end;
 	int moveto;
+	int reloc;
       };
 
       typedef TRANSITION::transition_type transition_type;
@@ -131,7 +132,7 @@ namespace cicada
 	path_type     path;
 	double        cost = minimum_edit_distance(hyp, ref, path);
 
-	std::cerr << "initial cost: " << cost << std::endl;
+	//std::cerr << "initial cost: " << cost << std::endl;
 	
 	sentence_type hyp_new;
 	path_type     path_new;
@@ -155,7 +156,7 @@ namespace cicada
 	  path.swap(path_new);
 	  cost = cost_new;
 
-	  std::cerr << "new cost: " << cost << " shift: " << value.shift << std::endl;
+	  //std::cerr << "new cost: " << cost << " shift: " << value.shift << std::endl;
 	}
 	
 	path_type::const_iterator piter_end = path.end();
@@ -170,6 +171,7 @@ namespace cicada
 	
 	value.score += cost;
 
+#if 0
 	std::cerr << "score: " << value.score
 		  << " match: " << value.match
 		  << " substitution: " << value.substitution
@@ -177,6 +179,7 @@ namespace cicada
 		  << " deletion: " << value.deletion
 		  << " shift: " << value.shift
 		  << std::endl;
+#endif
 	
 	return value.score;
       }
@@ -204,6 +207,49 @@ namespace cicada
 	}
       }
       
+      void find_alignment_error(const path_type& path,
+				error_set_type& herr,
+				error_set_type& rerr,
+				align_set_type& ralign) const
+      {
+	int hpos = -1;
+	int rpos = -1;
+	
+	//std::cerr << "edit distance: ";
+	for (int i = 0; i < path.size(); ++ i) {
+	  switch (path[i]) {
+	  case TRANSITION::match:
+	    //std::cerr << " M";
+	    ++ hpos;
+	    ++ rpos;
+	    herr.push_back(false);
+	    rerr.push_back(false);
+	    ralign.push_back(hpos);
+	    break;
+	  case TRANSITION::substitution:
+	    //std::cerr << " S";
+	    ++ hpos;
+	    ++ rpos;
+	    herr.push_back(true);
+	    rerr.push_back(true);
+	    ralign.push_back(hpos);
+	    break;
+	  case TRANSITION::insertion:
+	    //std::cerr << " I";
+	    ++ hpos;
+	    herr.push_back(true);
+	    break;
+	  case TRANSITION::deletion:
+	    //std::cerr << " D";
+	    ++ rpos;
+	    rerr.push_back(true);
+	    ralign.push_back(hpos);
+	    break;
+	  }
+	}
+	//std::cerr << std::endl;
+      }
+      
       bool calculate_best_shift(const sentence_type& hyp,
 				const path_type& path,
 				const double cost,
@@ -212,45 +258,20 @@ namespace cicada
 				double& cost_best,
 				const ngram_index_map_type& ngram_index) const
       {
-	std::cerr << "hyp: " << hyp << std::endl;
-	std::cerr << "ref: " << ref << std::endl;
+	//std::cerr << "hyp: " << hyp << std::endl;
+	//std::cerr << "ref: " << ref << std::endl;
 
-	error_set_type rerr;
 	error_set_type herr;
+	error_set_type rerr;
 	align_set_type ralign;
-	int hpos = -1;
 	
-	std::cerr << "edit distance: ";
-	for (int i = 0; i < path.size(); ++ i) {
-	  switch (path[i]) {
-	  case TRANSITION::match:
-	    std::cerr << " M";
-	    ++ hpos;
-	    herr.push_back(false);
-	    rerr.push_back(false);
-	    ralign.push_back(hpos);
-	    break;
-	  case TRANSITION::substitution:
-	    std::cerr << " S";
-	    ++ hpos;
-	    herr.push_back(true);
-	    rerr.push_back(true);
-	    ralign.push_back(hpos);
-	    break;
-	  case TRANSITION::insertion:
-	    std::cerr << " I";
-	    ++ hpos;
-	    herr.push_back(true);
-	    break;
-	  case TRANSITION::deletion:
-	    std::cerr << " D";
-	    rerr.push_back(true);
-	    ralign.push_back(hpos);
-	    break;
-	  }
-	}
-	std::cerr << std::endl;
+	herr.reserve(path.size());
+	rerr.reserve(path.size());
+	ralign.reserve(path.size());
 	
+	find_alignment_error(path, herr, rerr, ralign);
+	
+#if 0
 	std::cerr << "ref-align: ";
 	std::copy(ralign.begin(), ralign.end(), std::ostream_iterator<int>(std::cerr, " "));
 	std::cerr << std::endl;
@@ -262,55 +283,54 @@ namespace cicada
 	std::cerr << "hyp-err: ";
 	std::copy(herr.begin(), herr.end(), std::ostream_iterator<bool>(std::cerr, " "));
 	std::cerr << std::endl;
+#endif
 	
 	shift_matrix_type shifts(max_shift_size + 1);
 	
-	compute_all_shifts(hyp, ralign, herr, rerr, ngram_index, shifts);
+	gather_all_possible_shifts(hyp, ralign, herr, rerr, ngram_index, shifts);
 	
-	double cost_best_shift = 0;
+	double cost_shift_best = 0;
 	cost_best = cost;
+	bool found = false;
 	
 	// enumerate from max-shifts
 	sentence_type hyp_shifted(hyp.size());
 	path_type     path_shifted;
 	
-	bool found = false;
 	for (int i = shifts.size() - 1; i >= 0; -- i) 
 	  if (! shifts[i].empty()) {
-	    const double curr_fix = cost - (cost_best_shift + cost_best);
-	    const double max_fix  = 2.0 * (i + 1) - COSTS::shift;
+	    const double curfix = cost - (cost_shift_best + cost_best);
+	    const double maxfix = 2.0 * (i + 1);
 	    
-	    if (curr_fix > max_fix || (cost_best_shift == 0 && curr_fix == max_fix)) break;
+	    if (curfix > maxfix || (cost_shift_best != 0 && curfix == maxfix)) break;
 	  
 	    for (int j = 0; j < shifts[i].size(); ++ j) {
 	      const shift_type& shift = shifts[i][j];
-	    
-	      const double curr_fix = cost - (cost_best_shift + cost_best);
-	    
-	      if (curr_fix > max_fix || (cost_best_shift == 0 && curr_fix == max_fix)) continue;
-	    
-	      std::cerr << "candidate shift: [" << shift.begin << ", " << shift.end << "]: " << ralign[shift.moveto] << std::endl;
-	    
-	      hyp_shifted.clear();
-	      shift_sentence(hyp, shift.begin, shift.end, ralign[shift.moveto], hyp_shifted);
-	    
-	      path_shifted.clear();
-	      const double cost_shifted = minimum_edit_distance(hyp_shifted, ref, path_shifted);
-	      const double gain = (cost_best + cost_best_shift) - (cost_shifted + COSTS::shift);
-
-	      std::cerr << "hyp original: " << hyp << std::endl;
-	      std::cerr << "hyp shifted:  " << hyp_shifted << std::endl;
-	      std::cerr << "cost shifted: " << cost_shifted << " gain: " << gain << std::endl;
-	    
-	      if (gain > 0 || (cost_best_shift == 0 && gain == 0)) {
-		cost_best = cost_shifted;
-		cost_best_shift = COSTS::shift;
 	      
+	      const double curfix = cost - (cost_shift_best + cost_best);
+	      
+	      if (curfix > maxfix || (cost_shift_best != 0 && curfix == maxfix)) break;
+	    
+	      //std::cerr << "candidate shift: [" << shift.begin << ", " << shift.end << "]: " << shift.reloc << std::endl;
+	      
+	      perform_shift(hyp, shift, hyp_shifted);
+	    
+	      const double cost_shifted = minimum_edit_distance(hyp_shifted, ref, path_shifted);
+	      const double gain = (cost_best + cost_shift_best) - (cost_shifted + COSTS::shift);
+	      
+	      //std::cerr << "hyp original: " << hyp << std::endl;
+	      //std::cerr << "hyp shifted:  " << hyp_shifted << std::endl;
+	      //std::cerr << "cost shifted: " << cost_shifted << " gain: " << gain << std::endl;
+	    
+	      if (gain > 0 || (cost_shift_best == 0 && gain == 0)) {
+		cost_best       = cost_shifted;
+		cost_shift_best = COSTS::shift;
+		
 		path_best.swap(path_shifted);
 		hyp_best.swap(hyp_shifted);
 		found = true;
-
-		std::cerr << "better shift: [" << shift.begin << ", " << shift.end << "]: " << ralign[shift.moveto] << std::endl;
+		
+		//std::cerr << "better shift: [" << shift.begin << ", " << shift.end << "]: " << shift.reloc << std::endl;
 	      }
 	    }
 	  }
@@ -318,11 +338,9 @@ namespace cicada
 	return found;
       }
 
-      void shift_sentence(const sentence_type& sentence,
-			  const int begin,
-			  const int end,
-			  const int moveto,
-			  sentence_type& shifted) const
+      void perform_shift(const sentence_type& sentence,
+			 const shift_type& shift,
+			 sentence_type& shifted) const
       {
 	shifted.clear();
 	
@@ -331,37 +349,39 @@ namespace cicada
 	sentence_type::const_iterator siter_begin = sentence.begin();
 	sentence_type::const_iterator siter_end = sentence.end();
 
-	if (moveto == -1) {
-	  std::copy(siter_begin + begin, siter_begin + end + 1, oiter);
-	  std::copy(siter_begin, siter_begin + begin, oiter);
-	  std::copy(siter_begin + end + 1, siter_end, oiter);
-	} else if (moveto < begin) {
-	  std::copy(siter_begin, siter_begin + moveto + 1, oiter);
-	  std::copy(siter_begin + begin, siter_begin + end + 1, oiter);
-	  std::copy(siter_begin + moveto + 1, siter_begin + begin, oiter);
-	  std::copy(siter_begin + end + 1, siter_end, oiter);
-	} else if (end < moveto) {
-	  std::copy(siter_begin, siter_begin + begin, oiter);
-	  std::copy(siter_begin + end + 1, siter_begin + moveto + 1, oiter);
-	  std::copy(siter_begin + begin, siter_begin + end + 1, oiter);
-	  std::copy(siter_begin + moveto + 1, siter_end, oiter);
+	if (shift.reloc == -1) {
+	  std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+	  std::copy(siter_begin, siter_begin + shift.begin, oiter);
+	  std::copy(siter_begin + shift.end + 1, siter_end, oiter);
+	} else if (shift.reloc < shift.begin) {
+	  std::copy(siter_begin, siter_begin + shift.reloc + 1, oiter);
+	  std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+	  std::copy(siter_begin + shift.reloc + 1, siter_begin + shift.begin, oiter);
+	  std::copy(siter_begin + shift.end + 1, siter_end, oiter);
+	} else if (shift.end < shift.reloc) {
+	  std::copy(siter_begin, siter_begin + shift.begin, oiter);
+	  std::copy(siter_begin + shift.end + 1, siter_begin + shift.reloc + 1, oiter);
+	  std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+	  std::copy(siter_begin + shift.reloc + 1, siter_end, oiter);
 	} else {
-	  std::copy(siter_begin, siter_begin + begin, oiter);
-	  std::copy(siter_begin + end + 1, std::min(siter_end, siter_begin + end + moveto - begin + 1), oiter);
-	  std::copy(siter_begin + begin, siter_begin + end + 1, oiter);
-	  std::copy(siter_begin + end + moveto - begin + 1, siter_end, oiter);
+	  std::copy(siter_begin, siter_begin + shift.begin, oiter);
+	  std::copy(siter_begin + shift.end + 1, std::min(siter_end, siter_begin + shift.end + shift.reloc - shift.begin + 1), oiter);
+	  std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+	  std::copy(siter_begin + shift.end + shift.reloc - shift.begin + 1, siter_end, oiter);
 	}
 
 	if (sentence.size() != shifted.size())
-	  throw std::runtime_error("size do not match: " + boost::lexical_cast<std::string>(sentence.size()) + " " + boost::lexical_cast<std::string>(shifted.size()));
+	  throw std::runtime_error(std::string("size do not match:")
+				   + " original: " + boost::lexical_cast<std::string>(sentence.size())
+				   + " shifted: "  + boost::lexical_cast<std::string>(shifted.size()));
       }
 
-      void compute_all_shifts(const sentence_type& hyp,
-			      const align_set_type& ralign,
-			      const error_set_type& herr,
-			      const error_set_type& rerr,
-			      const ngram_index_map_type& ngram_index,
-			      shift_matrix_type& shifts) const
+      void gather_all_possible_shifts(const sentence_type& hyp,
+				      const align_set_type& ralign,
+				      const error_set_type& herr,
+				      const error_set_type& rerr,
+				      const ngram_index_map_type& ngram_index,
+				      shift_matrix_type& shifts) const
       {
 	ngram_type ngram;
 	
@@ -375,9 +395,8 @@ namespace cicada
 	  bool found = false;
 	  index_set_type::const_iterator iiter_end = niter->second.end();
 	  for (index_set_type::const_iterator iiter = niter->second.begin(); iiter != iiter_end && ! found; ++ iiter) {
-	    const int rmove = ralign[*iiter];
-	    
-	    found = (start != rmove && (rmove - start < max_shift_dist) && (start - rmove - 1 < max_shift_dist));
+	    const int moveto = *iiter;
+	    found = (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist));
 	  }
 	  
 	  if (! found) continue;
@@ -387,15 +406,14 @@ namespace cicada
 	  for (int end = start; found && end != last; ++ end) {
 	    ngram.push_back(hyp[end]);
 
-	    std::cerr << "range: [" << start << ", " << end << "]" << std::endl;
+	    //std::cerr << "range: [" << start << ", " << end << "]" << std::endl;
 	    
-	    shift_set_type& sshifts = shifts[end - start];
 	    found = false;
 	    
 	    ngram_index_map_type::const_iterator niter = ngram_index.find(ngram);
 	    if (niter == ngram_index.end()) break;
 
-	    std::cerr << "found ngram: " << niter->first << std::endl;
+	    //std::cerr << "found ngram: " << niter->first << std::endl;
 	    
 	    error_set_type::const_iterator hiter_begin = herr.begin() + start;
 	    error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
@@ -407,12 +425,11 @@ namespace cicada
 	    index_set_type::const_iterator iiter_end = niter->second.end();
 	    for (index_set_type::const_iterator iiter = niter->second.begin(); iiter != iiter_end; ++ iiter) {
 	      const int moveto = *iiter;
-	      const int rmove = ralign[moveto];
 	      
-	      if (rmove != start
-		  && (rmove < start || end < rmove)
-		  && rmove - start <= max_shift_dist
-		  && start - rmove - 1 <= max_shift_dist) {
+	      if (ralign[moveto] != start
+		  && (ralign[moveto] < start || end < ralign[moveto])
+		  && ralign[moveto] - start <= max_shift_dist
+		  && start - ralign[moveto] - 1 <= max_shift_dist) {
 		
 		found = true;
 		
@@ -421,13 +438,14 @@ namespace cicada
 		
 		if (std::find(riter_begin, riter_end, true) == riter_end) continue;
 		
-		for (int roff = 0; roff <= end - start; ++ roff) {
-		  const int rmr = ralign[moveto + roff];
-		  if (start != rmr && (roff == 0 || rmr != ralign[moveto])) {
-		    sshifts.push_back(shift_type(start, end, moveto + roff));
-		    
-		    std::cerr << "shift: [" << start << ", " << end << "]: " << ralign[moveto + roff] << std::endl;
-		  }
+		shift_set_type& sshifts = shifts[end - start];
+		
+		for (int roff = -1; roff <= end - start; ++ roff) {
+		  
+		  if (roff == -1 && moveto == 0)
+		    sshifts.push_back(shift_type(start, end, -1, -1));
+		  else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
+		    sshifts.push_back(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
 		}
 	      }
 	    }
@@ -578,13 +596,14 @@ namespace cicada
       if (! impl.empty())
 	ter->references /= impl.size();
       
-
+#if 0
       std::cerr << "final: references: " << ter->references
 		<< " insertion: " << ter->insertion
 		<< " deletion: " << ter->deletion
 		<< " substitution: " << ter->substitution
 		<< " shift: " << ter->shift
 		  << std::endl;
+#endif
 
       return score_ptr_type(ter.release());
     }
