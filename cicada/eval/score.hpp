@@ -91,7 +91,7 @@ namespace cicada
       typedef boost::shared_ptr<scorer_type> scorer_ptr_type;
       
     public:
-      Scorer(bool __split=false) : split(__split) {}
+      Scorer() : split(false), lower(false) {}
       virtual ~Scorer() {}
       
       // insert a sentence for scoring
@@ -110,6 +110,7 @@ namespace cicada
       
     protected:
       bool split;
+      bool lower;
     };    
     
     class ScorerDocument

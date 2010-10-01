@@ -111,12 +111,16 @@ namespace cicada
 bleu:\n\
 \torder=<order, default=4> ngram order\n\
 \tsplit=[true|false] perform character splitting\n\
+\tlower=[true|false] perform lower casing\n\
 per:\n\
 \tsplit=[true|false] perform character splitting\n\
+\tlower=[true|false] perform lower casing\n\
 wer:\n\
 \tsplit=[true|false] perform character splitting\n\
+\tlower=[true|false] perform lower casing\n\
 ter:\n\
 \tsplit=[true|false] perform character splitting\n\
+\tlower=[true|false] perform lower casing\n\
 ";
 
       return desc;
@@ -128,10 +132,13 @@ ter:\n\
       typedef boost::filesystem::path path_type;
       
       const parameter_type param(parameter);
+
+      scorer_ptr_type scorer;
       
       if (param.name() == "bleu" || param.name() == "bleu-linear") {
 	int  order = 4;
 	bool split = false;
+	bool lower = false;
 	bool exact = false;
 
 	bool yield_source = false;
@@ -147,6 +154,8 @@ ter:\n\
 	    exact = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "split") == 0)
 	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	    lower = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	    name = piter->second;
 	  else if (strcasecmp(piter->first.c_str(), "refset") == 0)
@@ -165,43 +174,61 @@ ter:\n\
 	    std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
-	return scorer_ptr_type(new BleuScorer(order, split));
+	scorer = scorer_ptr_type(new BleuScorer(order));
+	scorer->split = split;
+	scorer->lower = lower;
       } else if (param.name() == "per") {
 	bool split = false;
+	bool lower = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "split") == 0)
 	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	    lower = utils::lexical_cast<bool>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for per: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
-	return scorer_ptr_type(new PERScorer(split));
+	scorer = scorer_ptr_type(new PERScorer());
+	scorer->split = split;
+	scorer->lower = lower;
       } else if (param.name() == "wer") {
 	bool split = false;
+	bool lower = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "split") == 0)
 	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	    lower = utils::lexical_cast<bool>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for wer: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
-	return scorer_ptr_type(new WERScorer(split));
+	scorer = scorer_ptr_type(new WERScorer());
+	scorer->split = split;
+	scorer->lower = lower;
       } else if (param.name() == "ter") {
 	bool split = false;
+	bool lower = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "split") == 0)
 	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	    lower = utils::lexical_cast<bool>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for ter: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
-	return scorer_ptr_type(new TERScorer(split));
+	scorer = scorer_ptr_type(new TERScorer());
+	scorer->split = split;
+	scorer->lower = lower;
       } else
 	throw std::runtime_error("unknown scorer" + param.name());
       
+      return scorer;
     }
     
   };

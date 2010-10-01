@@ -144,7 +144,7 @@ namespace cicada
       typedef std::vector<int, std::allocator<int> > size_set_type;
 
     public:
-      BleuScorer(int __order = 4, bool __split=false) : Scorer(__split), ngrams(word_type()), sizes(), order(__order) { }
+      BleuScorer(int __order = 4) : ngrams(word_type()), sizes(), order(__order) { }
 
       bool error_metric() const { return false; }
 
@@ -162,9 +162,15 @@ namespace cicada
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
 
 	sentence_type sentence_split;
+	sentence_type sentence_lower;
+	
 	if (split)
 	  split_non_ascii_characters(__sentence, sentence_split);
-	const sentence_type& sentence = (split ? sentence_split : __sentence);
+	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
+	
+	if (lower)
+	  lower_case(__sentence_split, sentence_lower);
+	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
 
 	counts_type counts;
 	
@@ -195,9 +201,15 @@ namespace cicada
 	typedef std::vector<counts_type, std::allocator<counts_type> > counts_set_type;
 	
 	sentence_type sentence_split;
+	sentence_type sentence_lower;
+	
 	if (split)
 	  split_non_ascii_characters(__sentence, sentence_split);
-	const sentence_type& sentence = (split ? sentence_split : __sentence);
+	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
+	
+	if (lower)
+	  lower_case(__sentence_split, sentence_lower);
+	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
 	
 	std::auto_ptr<Bleu> bleu(new Bleu(order));
 	counts_set_type counts(order);

@@ -118,7 +118,7 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      TERScorer(bool __split=false) : Scorer(__split), impl() { }
+      TERScorer() : impl() { }
       TERScorer(const TERScorer& x);
       ~TERScorer();
       TERScorer& operator=(const TERScorer& x);

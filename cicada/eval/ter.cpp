@@ -554,24 +554,35 @@ namespace cicada
       impl.clear();
     }
     
-    void TERScorer::insert(const sentence_type& sentence)
+    void TERScorer::insert(const sentence_type& __sentence)
     {
-      if (split) {
-	sentence_type sentence_split;
-	split_non_ascii_characters(sentence, sentence_split);
-	impl.push_back(new impl_type(sentence_split));
-      } else
-	impl.push_back(new impl_type(sentence));
+      sentence_type sentence_split;
+      sentence_type sentence_lower;
+      
+      if (split)
+	split_non_ascii_characters(__sentence, sentence_split);
+      const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
+      
+      if (lower)
+	lower_case(__sentence_split, sentence_lower);
+      const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
+
+      impl.push_back(new impl_type(sentence));
     }
     
     TERScorer::score_ptr_type TERScorer::score(const sentence_type& __sentence) const
     {
       sentence_type sentence_split;
+      sentence_type sentence_lower;
+      
       if (split)
 	split_non_ascii_characters(__sentence, sentence_split);
+      const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
       
-      const sentence_type& sentence = (split ? sentence_split : __sentence);
-
+      if (lower)
+	lower_case(__sentence_split, sentence_lower);
+      const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
+      
       double score_best = std::numeric_limits<double>::infinity();
 
       std::auto_ptr<TER> ter(new TER());

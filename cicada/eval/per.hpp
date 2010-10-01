@@ -112,7 +112,7 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      PERScorer(bool __split=false) : Scorer(__split), impl() { }
+      PERScorer() : impl() { }
       PERScorer(const PERScorer& x);
       ~PERScorer();
       PERScorer& operator=(const PERScorer& x);
