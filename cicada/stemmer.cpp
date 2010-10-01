@@ -4,6 +4,8 @@
 #include "stemmer/suffix.hpp"
 #include "stemmer/latin.hpp"
 #include "stemmer/digit.hpp"
+#include "stemmer/lower.hpp"
+
 #include "parameter.hpp"
 
 #include <utils/sgi_hash_map.hpp>
@@ -117,6 +119,16 @@ namespace cicada
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Latin()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (param.name() == "lower") {
+      const std::string name("lower");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Lower()))).first;
 	iter->second->__algorithm = parameter;
       }
       

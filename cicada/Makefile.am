@@ -86,12 +86,14 @@ dist_stemmer_HEADERS = \
 stemmer/prefix.hpp \
 stemmer/suffix.hpp \
 stemmer/latin.hpp \
+stemmer/lower.hpp \
 stemmer/digit.hpp
 
 libcicada_stemmer_la_SOURCES = \
 stemmer/prefix.cpp \
 stemmer/suffix.cpp \
 stemmer/latin.cpp \
+stemmer/lower.cpp \
 stemmer/digit.cpp
 libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
 
