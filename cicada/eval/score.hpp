@@ -106,6 +106,7 @@ namespace cicada
       
       
       void split_non_ascii_characters(const sentence_type& sentence, sentence_type& sentence_split) const;
+      void lower_case(const sentence_type& sentence, sentence_type& sentence_lower) const;
       
     protected:
       bool split;

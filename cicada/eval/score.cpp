@@ -7,12 +7,16 @@
 
 #include "parameter.hpp"
 
+#include <boost/thread.hpp>
+
+#include "utils/config.hpp"
 #include "utils/lexical_cast.hpp"
 
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
 #include <unicode/schriter.h>
 #include <unicode/bytestream.h>
+#include <unicode/translit.h>
 
 #include <boost/filesystem.hpp>
 
@@ -23,7 +27,8 @@ namespace cicada
 
     void Scorer::split_non_ascii_characters(const sentence_type& sentence, sentence_type& sentence_split) const
     {
-      std::vector<word_type, std::allocator<word_type> > tokens;
+      sentence_split.clear();
+
       std::string buffer;
 	
       sentence_type::const_iterator siter_end = sentence.end();
@@ -40,23 +45,64 @@ namespace cicada
 	  else {
 	    // we will split...
 	    if (! buffer.empty())
-	      tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	      sentence_split.push_back(word_type(buffer.begin(), buffer.end()));
 	    buffer.clear();
 	      
 	    StringByteSink<std::string> __sink(&buffer);
 	    UnicodeString(c).toUTF8(__sink);
 	      
-	    tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	    sentence_split.push_back(word_type(buffer.begin(), buffer.end()));
 	    buffer.clear();
 	  }
 	}
-	  
+	
 	if (! buffer.empty())
-	  tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	  sentence_split.push_back(word_type(buffer.begin(), buffer.end()));
 	buffer.clear();
       }
+    }
+    
+    void Scorer::lower_case(const sentence_type& sentence, sentence_type& sentence_lower) const
+    {
+#ifdef HAVE_TLS
+      static __thread Transliterator* __trans_tls = 0;
+      static boost::thread_specific_ptr<Transliterator> __trans;
+      if (! __trans_tls) {
+	UErrorCode status = U_ZERO_ERROR;
+	__trans.reset(Transliterator::createInstance(UnicodeString("Lower", "utf-8"), UTRANS_FORWARD, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
+	
+	__trans_tls = __trans.get();
+      }
       
-      sentence_split.assign(tokens.begin(), tokens.end());
+      Transliterator& trans = *__trans_tls;
+#else
+      static boost::thread_specific_ptr<Transliterator> __trans;
+      if (! __trans.get()) {
+	UErrorCode status = U_ZERO_ERROR;
+	__trans.reset(Transliterator::createInstance(UnicodeString("Lower", "utf-8"), UTRANS_FORWARD, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
+      }
+      
+      Transliterator& trans = *__trans;
+#endif
+
+      sentence_lower.clear();
+      
+      std::string buffer;
+      sentence_type::const_iterator siter_end = sentence.end();
+      for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
+	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*siter));
+	trans.transliterate(uword);
+	
+	buffer.clear();
+	StringByteSink<std::string> __sink(&buffer);
+	uword.toUTF8(__sink);
+
+	sentence_lower.push_back(buffer);
+      }
     }
 
     std::string Scorer::lists()
