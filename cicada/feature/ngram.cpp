@@ -767,14 +767,8 @@ namespace cicada
 			      const bool final) const
     {
       // add <s>
-      if (final) {
-	const double score = pimpl->ngram_predict_score(state);
-	
-	if (score != 0.0)
-	  features[base_type::feature_name()] = score;
-	else
-	  features.erase(base_type::feature_name());
-      }
+      if (final)
+	pimpl->ngram_predict_score(state);
     }
     
     void NGram::apply_scan(state_ptr_type& state,
