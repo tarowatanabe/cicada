@@ -684,7 +684,6 @@ namespace cicada
 
 	  std::string nodes;
 	  
-	  bool found = false;
 	  for (int pos = 0; pos != source.edges[out_edges[id].front()].tails.size(); ++ pos) {
 	    const int antecedent_id = source.edges[out_edges[id].front()].tails[pos];
 	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
