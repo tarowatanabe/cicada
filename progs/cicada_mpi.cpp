@@ -332,9 +332,10 @@ struct ReduceStdout
 	maps.erase(iter ++);
       }
       os << std::flush;
-    
+      
       if (! maps.empty())
-	throw std::runtime_error("id mismatch!");
+	throw std::runtime_error("id mismatch! expecting: " + boost::lexical_cast<std::string>(id)
+				 + " next: " + boost::lexical_cast<std::string>(maps.begin()->first));
 #if 0
     }
 #endif
