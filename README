@@ -19,7 +19,7 @@ Translation can be carried out by:
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
-      * cicada implementes cube-pruning, cube-growing and exact (and stateless) methods
+      * cicada implementes cube-pruning [4], cube-growing [4], incremental (Huang and Mi, 2010) and exact (and stateless-inside-algorithm) methods
       * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
    - Perform MBR decoding for hypergraph [12].
