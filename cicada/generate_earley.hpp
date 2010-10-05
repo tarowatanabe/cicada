@@ -630,17 +630,21 @@ namespace cicada
 	    }
 	  }
 	  
-	  std::string non_terminal_nodes = (non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip() + ';' + nodes);
-	  
-	  if (depth > 0 && depths[id] > depth) {
-	    // always strip-off the first non-terminal up-until ';'
+	  if (depth == 1)
+	    non_terminals[id] = '[' + nodes + ']';
+	  else {
+	    std::string non_terminal_nodes = (non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip() + ';' + nodes);
 	    
-	    std::string::size_type pos = non_terminal_nodes.find(';');
-	    if (pos != std::string::npos)
-	      non_terminal_nodes = non_terminal_nodes.substr(pos + 1);
+	    if (depth > 0 && depths[id] > depth) {
+	      // always strip-off the first non-terminal up-until ';'
+	      
+	      std::string::size_type pos = non_terminal_nodes.find(';', 1);
+	      if (pos != std::string::npos)
+		non_terminal_nodes = non_terminal_nodes.substr(pos + 1);
+	    }
+	    
+	    non_terminals[id] = '[' + non_terminal_nodes + ']';
 	  }
-	  
-	  non_terminals[id] = '[' + non_terminal_nodes + ']';
 	  
 	  //std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
 	}
