@@ -116,6 +116,7 @@ apply.hpp \
 apply_cube_grow.hpp \
 apply_cube_prune.hpp \
 apply_exact.hpp \
+apply_incremental.hpp \
 apply_state_less.hpp \
 binarize.hpp \
 cluster.hpp \

@@ -52,6 +52,7 @@ namespace cicada
     typedef hypergraph_type::id_type   id_type;
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
+    typedef hypergraph_type::rule_type rule_type;
 
     typedef hypergraph_type::feature_set_type feature_set_type;
 
@@ -89,9 +90,10 @@ namespace cicada
     };
     
     typedef Candidate candidate_type;
+    typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
     // hash and equal for keeping derivations
-    struct candidate_hash_type : public utils::hashmurmur<size_t>;
+    struct candidate_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
@@ -143,35 +145,22 @@ namespace cicada
 	return x->estimate < y->estimate;
       }
     };
-
-    
-    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_list_type;
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     
     typedef google::dense_hash_map<state_type, id_type, model_type::state_hash, model_type::state_equal > state_node_map_type;
-    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;
 
-    typedef std::vector<id_type, std::allocator<id_type> > node_map_type;
-
+    
     struct State
     {
       State(const size_type& hint, const size_type& state_size)
-	: nodes(hint >> 1, model_type::state_hash(state_size), model_type::state_equal(state_size)),
-	  fired(false)
+	: nodes(hint >> 1, model_type::state_hash(state_size), model_type::state_equal(state_size))
       {
 	nodes.set_empty_key(state_type());
-	
-	uniques.set_empty_key(0);
       }
       
-      candidate_heap_type cand;
       candidate_heap_type buf;
-      
-      candidate_list_type D;
-      candidate_set_unique_type uniques;
-      
       state_node_map_type nodes;
     };
     
@@ -179,8 +168,8 @@ namespace cicada
     typedef std::vector<cand_state_type, std::allocator<cand_state_type> > cand_state_set_type;
     
     ApplyIncremental(const model_type& _model,
-		  const function_type& _function,
-		  const int _pop_size_max)
+		     const function_type& _function,
+		     const int _pop_size_max)
       : model(_model),
 	function(_function),
 	pop_size_max(_pop_size_max)
@@ -204,12 +193,9 @@ namespace cicada
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
 		
-	node_maps.clear();
-	node_maps.reserve(graph_in.nodes.size() * pop_size_max);
-	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
-	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1));
+	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
 	
 	// initialization...
 	initialize_bins(graph_in);
@@ -245,8 +231,8 @@ namespace cicada
 	feature_set_type estimates;
 	model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, estimates, true);
 	
-	candidate.score     = function(stack_state.out_edge.features);
-	candidate.estiamate = function(estimates);
+	candidate.score    = function(candidate.out_edge.features);
+	candidate.estimate = function(estimates);
 	candidate.estimate *= candidate.score;
 	
 	states.front().buf.push(&candidate);
@@ -255,11 +241,9 @@ namespace cicada
     
     void process_bins(const int step, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
-      cand_state_type& cand_state = states[step];
-      
-      for (size_type num_pop = 0; ! cand_state.buf.empty() && num_pop != pop_size_max; ++ num_pop) {
-	candidate_type item = *cand_state.buf.top();
-	cand_state.buf.pop();
+      for (size_type num_pop = 0; ! states[step].buf.empty() && num_pop != pop_size_max; ++ num_pop) {
+	candidate_type item = *states[step].buf.top();
+	states[step].buf.pop();
 	
 	item.state = model.clone(item.state);
 	
@@ -273,13 +257,13 @@ namespace cicada
 	  int& dot_antecedent = item.dot_antecedent;
 	  
 	  // scan... and score... state will be updated...
-	  if (! target.empty() && target[dot].is_terminal()) {
+	  if (! target.empty() && ! target[dot].is_non_terminal()) {
 	    feature_set_type features;
 	    feature_set_type estimates;
 	    
-	    model.apply_scan(item.state, node_states, itemx.out_edge, dot, features, estimates, is_goal);
+	    model.apply_scan(item.state, node_states, item.out_edge, dot, features, estimates, is_goal);
 	    
-	    item.features += features;
+	    item.out_edge.features += features;
 	    
 	    const score_type score    = function(features);
 	    const score_type estimate = function(estimates);
@@ -290,7 +274,7 @@ namespace cicada
 	  }
 	  
 	  // proceed dot(s)
-	  for (/**/; dot != target.size() && target[dot].is_terminal(); ++ dot);
+	  for (/**/; dot != target.size() && ! target[dot].is_non_terminal(); ++ dot);
 	  
 	  if (dot == target.size()) {
 	    // complete...
@@ -300,7 +284,7 @@ namespace cicada
 	    // scoring
 	    model.apply_complete(item.state, node_states, item.out_edge, features, estimates, is_goal);
 
-	    item.features += features;
+	    item.out_edge.features += features;
 	    
 	    const score_type score    = function(features);
 	    const score_type estimate = function(estimates);
@@ -315,27 +299,27 @@ namespace cicada
 	    
 	    if (is_goal) {
 	      if (! graph_out.is_valid()) {
-		item.pupsh_back(item.state);
+		node_states.push_back(item.state);
 		graph_out.goal = graph_out.add_node().id;
 	      } else
 		model.deallocate(item.state);
 	      
-	      edge_tyep& edge_new = graph_out.add_edge(item.out_edge);
+	      edge_type& edge_new = graph_out.add_edge(item.out_edge);
 	      graph_out.connect_edge(edge_new.id, graph_out.goal);
 	      
 	      break;
 	    } else {
 	      state_node_map_type::iterator siter = states[item.in_edge->head].nodes.find(item.state);
 	      if (siter == states[item.in_edge->head].nodes.end()) {
-		node_states.pupsh_back(item.state);
+		node_states.push_back(item.state);
 		siter = states[item.in_edge->head].nodes.insert(std::make_pair(item.state, graph_out.add_node().id)).first;
 	      } else
 		model.deallocate(item.state);
 	      
-	      edge_tyep& edge_new = graph_out.add_edge(item.out_edge);
+	      edge_type& edge_new = graph_out.add_edge(item.out_edge);
 	      graph_out.connect_edge(edge_new.id, siter->second);
 	      
-	      const score_type score = item.score;
+	      const score_type score    = item.score;
 	      const score_type estimate = item.estimate;
 	      
 	      item = *(item.parent);
@@ -354,7 +338,7 @@ namespace cicada
 	      item.out_edge.tails[antecedent_index] = siter->second;
 	      
 	      ++ item.dot;
-	      ++ item.dot_ancedent;
+	      ++ item.dot_antecedent;
 	      
 	      continue;
 	    }
@@ -382,9 +366,9 @@ namespace cicada
 	      
 	      feature_set_type estimates;
 	      
-	      model.apply_predict(candidate.state, node_states, candidate.out_edges, candidate.out_edges.features, estimates, false);
+	      model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, estimates, false);
 	      
-	      const score_type score    = function(candidate.out_edges.features);
+	      const score_type score    = function(candidate.out_edge.features);
 	      const score_type estimate = function(estimates);
 	      
 	      candidate.score    = parent.score;
@@ -405,8 +389,8 @@ namespace cicada
       // clear buf... at the same time, we will clear state associated with each candidate...
       
 #if 0
-      typename candidate_heap_type::const_iterator biter_end = state.buf.end();
-      for (typename candidate_heap_type::const_iterator biter = state.buf.begin(); biter != biter_end; ++ biter) {
+      typename candidate_heap_type::const_iterator biter_end = states[step].buf.end();
+      for (typename candidate_heap_type::const_iterator biter = states[step].buf.begin(); biter != biter_end; ++ biter) {
 	model.deallocate((*biter)->state);
 	
 	// what to do with (*biter) == candidate_type* ??? 
@@ -417,19 +401,14 @@ namespace cicada
 #endif
       
       // shrink wrap...
-      state.buf.clear();
-      candidate_heap_type(state.buf).swap(state.buf);
-      
+      states[step].buf.clear();
+      candidate_heap_type(states[step].buf).swap(states[step].buf);
     };
     
   private:
     candidate_set_type  candidates;
     state_set_type      node_states;
     cand_state_set_type states;
-
-    node_map_type       node_maps;
-
-    stack_type stack;
 
     const model_type& model;
     const function_type& function;
