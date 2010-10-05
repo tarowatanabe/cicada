@@ -387,8 +387,8 @@ namespace cicada
       }
       
       // perform "estimated" coarse model application
+      feature_set_type features(candidate.out_edge.features);
       feature_set_type estimates;
-      feature_set_type features;
       const state_type node_state = model.apply_coarse(node_states_coarse, candidate.out_edge, features, estimates, is_goal);
       
       candidate.score    *= function(features);
