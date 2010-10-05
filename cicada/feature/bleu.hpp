@@ -59,6 +59,25 @@ namespace cicada
 				feature_set_type& features,
 				feature_set_type& estimates,
 				const bool final) const;
+      virtual void apply_predict(state_ptr_type& state,
+				 const state_ptr_set_type& states,
+				 const edge_type& edge,
+				 feature_set_type& features,
+				 feature_set_type& estimates,
+				 const bool final) const;
+      virtual void apply_scan(state_ptr_type& state,
+			      const state_ptr_set_type& states,
+			      const edge_type& edge,
+			      const int dot,
+			      feature_set_type& features,
+			      feature_set_type& estimates,
+			      const bool final) const;
+      virtual void apply_complete(state_ptr_type& state,
+				  const state_ptr_set_type& states,
+				  const edge_type& edge,
+				  feature_set_type& features,
+				  feature_set_type& estimates,
+				  const bool final) const;
       virtual void assign(const size_type& id,
 			  const hypergraph_type& hypergraph,
 			  const lattice_type& lattice,

@@ -467,6 +467,64 @@ namespace cicada
 	return ngram_estimate(context, citer_end);
       }
       
+      double ngram_predict_score(const state_ptr_type& state)
+      {
+	symbol_type* context = reinterpret_cast<symbol_type*>(state);
+	
+	std::fill(context, context + order * 2, vocab_type::EMPTY);
+	
+	context[0] = vocab_type::BOS;
+	
+	return 0.0;
+      }
+
+      double ngram_scan_score(state_ptr_type& state,
+			      const edge_type& edge,
+			      const int dot)
+      {
+	const int context_size = order - 1;
+	const rule_type& rule = *(edge.rule);
+	const phrase_type& phrase = (yield_source ? rule.source : rule.target);
+	
+	symbol_type* context = reinterpret_cast<symbol_type*>(state);
+	symbol_type* context_end  = std::find(context, context + order, vocab_type::EMPTY);
+	
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	buffer.clear();
+	buffer.reserve(order + phrase.size());
+	buffer.insert(buffer.end(), context, context_end);
+	
+	buffer_type::iterator biter = buffer.end();
+	
+	phrase_type::const_iterator piter_end = phrase.end();
+	for (phrase_type::const_iterator piter = phrase.begin() + dot; piter != piter_end && ! piter->is_non_terminal(); ++ piter)
+	  if (*piter != vocab_type::EPSILON)
+	    buffer.push_back(*piter);
+	
+	const double score = ngram_score(buffer.begin(), biter, buffer.end());
+	
+	std::pair<buffer_type::iterator, buffer_type::iterator> suffix = ngram.ngram_suffix(buffer.begin(), buffer.end());
+	
+	std::copy(suffix.first, suffix.second, context);
+	std::fill(context + (suffix.second - suffix.first), context + order * 2, vocab_type::EMPTY);
+	
+	return score;
+      }
+      
+      double ngram_complete_score(state_ptr_type& state)
+      {
+	symbol_type* context = reinterpret_cast<symbol_type*>(state);
+	symbol_type* context_end  = std::find(context, context + order, vocab_type::EMPTY);
+	
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
+	buffer.clear();
+	buffer.insert(buffer.end(), context, context_end);
+	buffer.push_back(vocab_type::EOS);
+	
+	return ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
+      }
+
+      
       decay_set_type decays;
       
       // caching...
@@ -698,5 +756,61 @@ namespace cicada
 	  features.erase(base_type::feature_name());
       }
     }
+
+    // temporarily assigned feature function...
+    
+    void NGram::apply_predict(state_ptr_type& state,
+			      const state_ptr_set_type& states,
+			      const edge_type& edge,
+			      feature_set_type& features,
+			      feature_set_type& estimates,
+			      const bool final) const
+    {
+      // add <s>
+      if (final) {
+	const double score = pimpl->ngram_predict_score(state);
+	
+	if (score != 0.0)
+	  features[base_type::feature_name()] = score;
+	else
+	  features.erase(base_type::feature_name());
+      }
+    }
+    
+    void NGram::apply_scan(state_ptr_type& state,
+			   const state_ptr_set_type& states,
+			   const edge_type& edge,
+			   const int dot,
+			   feature_set_type& features,
+			   feature_set_type& estimates,
+			   const bool final) const
+    {
+      const double score = pimpl->ngram_scan_score(state, edge, dot);
+      
+      if (score != 0.0)
+	features[base_type::feature_name()] = score;
+      else
+	features.erase(base_type::feature_name());
+    }
+    
+    void NGram::apply_complete(state_ptr_type& state,
+			       const state_ptr_set_type& states,
+			       const edge_type& edge,
+			       feature_set_type& features,
+			       feature_set_type& estimates,
+			       const bool final) const
+    {
+      // if final, add scoring for </s>
+      if (final) {
+	const double score = pimpl->ngram_complete_score(state);
+	
+	if (score != 0.0)
+	  features[base_type::feature_name()] = score;
+	else
+	  features.erase(base_type::feature_name());
+      }
+    }
+
+
   };
 };

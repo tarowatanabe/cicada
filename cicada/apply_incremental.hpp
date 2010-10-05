@@ -34,12 +34,7 @@ namespace cicada
   //
   // How to represent "stack"?
   // indexed-trie of pointer of candidate
-  // equality is defined by: source-edge-id, dot, j
-  //
-  //
-  
-  //
-  // we need to keep state, source-edge-id, dot and j
+  // equality is defined by: state, source-edge-id, dot and j
   //
   
   // model.apply_predict   state-less feature application
@@ -70,74 +65,54 @@ namespace cicada
     
     typedef Function function_type;
     
-    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
-
-    struct StackState
+    struct Candidate
     {
+      typedef Candidate candidate_type;
+      
+      state_type            state;
+      const candidate_type* parent;
+      
       const edge_type* in_edge;
       edge_type        out_edge;
       
       int dot;
       int dot_antecedent;
       
-      StackState() : in_edge(0), dot(0), dot_antecedent(0) {}
-      StackState(const edge_type& __edge)
-	: in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
-    };
-    
-    typedef StackState stack_state_type;
-    
-    struct stack_state_hash_type : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const stack_state_type& x) const
-      {
-	return (x.in_edge == 0
-		? size_t(0)
-		: hasher_type::operator()(x.out_edge.tails.begin(), x.out_edge.tails.end(),
-					  hasher_type::operator()(x.in_edge->id, x.dot)));
-      }
-    };
-    struct stack_state_equal_type
-    {
-      bool operator()(const stack_state_type& x, const stack_state_type& y) const
-      {
-	return x.in_edge == y.in_edge && (x.in_edge == 0 || (x.dot == y.dot && x.out_edge.tails == y.out_edge.tails));
-      }
-    };
-    typedef std::allocator<stack_state_type> stack_state_alloc_type;
-    typedef utils::indexed_trie<stack_state_type, stack_state_hash_type, stack_state_equal_type, stack_state_alloc_type> stack_type;
-    
-    struct Candidate
-    {
-      state_type state;
-      stack_type::id_type stack;
-      
-      feature_set_type features;
-      
       score_type score;
       score_type estimate;
       
-      Candidate() : stack(stack_type::npos()) {}
-      Candidate(const stack_type::id_type& __stack) : stack(__stack) {}
+      Candidate() : parent(0), in_edge(0), dot(0), dot_antecedent(0) {}
+      Candidate(const edge_type& __edge)
+	: parent(0), in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
+      Candidate(const candidate_type& __parent, const edge_type& __edge)
+	: parent(&__parent), in_edge(&__edge), out_edge(__edge), dot(0), dot_antecedent(0) {}
     };
     
     typedef Candidate candidate_type;
-    typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
     // hash and equal for keeping derivations
-    struct candidate_hash_type : public utils::hashmurmur<size_t>
+    struct candidate_hash_type : public utils::hashmurmur<size_t>;
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
-      model_type::state_hash state_hash;
+      candidate_hash_type(const model_type::state_hash& x) : hasher(x) {}
       
-      candidate_hash_type(const model_type::state_hash& __state_hash) : state_hash(__state_hash) {}
+      model_type::state_hash hasher;
+
+      size_t operator()(const candidate_type& x) const
+      {
+	return (x.in_edge == 0
+		? size_t(0)
+		: hasher_type::operator()(x.parent,
+					  hasher_type::operator()(x.out_edge.tails.begin(), x.out_edge.tails.end(),
+								  hasher_type::operator()(x.in_edge->id,
+											  hasher_type::operator()(x.dot,
+														  hasher(x.state))))));
+      }
       
       size_t operator()(const candidate_type* x) const
       {
-	return (x == 0 ? size_t(0) : hasher_type::opeator()(x->stack, state_hash(x->state)));
+	return (x == 0 ? size_t(0) : operator()(*x));
       }
     };
     
@@ -145,9 +120,18 @@ namespace cicada
     {
       candidate_equal_type(const model_type::state_equal& x) : model_type::state_equal(x) {}
       
+      bool operator()(const candidate_type& x, const candidate_type& y) const
+      {
+	return x.in_edge == y.in_edge && (x.in_edge == 0
+					  || (x.parent == y.parent
+					      && x.dot == y.dot
+					      && x.out_edge.tails == y.out_edge.tails
+					      && model_type::state_equal::operator()(x.state, y.state)));
+      }
+
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return (x == y) || (x && y && x->stack == y->stack && model_type::state_equal::operator()(x->state, y->state));
+	return (x == y) || (x && y && operator()(*x, *y));
       }
     };
     
@@ -159,6 +143,7 @@ namespace cicada
 	return x->estimate < y->estimate;
       }
     };
+
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_list_type;
     
@@ -174,11 +159,9 @@ namespace cicada
     {
       State(const size_type& hint, const size_type& state_size)
 	: nodes(hint >> 1, model_type::state_hash(state_size), model_type::state_equal(state_size)),
-	  nodes_coarse(hint, model_type::state_hash(state_size), model_type::state_equal(state_size)),
 	  fired(false)
       {
 	nodes.set_empty_key(state_type());
-	nodes_coarse.set_empty_key(state_type());
 	
 	uniques.set_empty_key(0);
       }
@@ -220,22 +203,19 @@ namespace cicada
 	
 	node_states.clear();
 	node_states.reserve(graph_in.nodes.size() * pop_size_max);
-
-	node_states_coarse.clear();
-	node_states_coarse.reserve(graph_in.nodes.size() * pop_size_max);
-
+		
 	node_maps.clear();
 	node_maps.reserve(graph_in.nodes.size() * pop_size_max);
 	
 	states.clear();
 	states.reserve(graph_in.nodes.size());
-	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1, model.state_size()));
+	states.resize(graph_in.nodes.size(), cand_state_type(pop_size_max >> 1));
 	
 	// initialization...
 	initialize_bins(graph_in);
 	
-	for (int cardinality = 0; cardinality != graph_in.nodes.size(); ++ cardinality)
-	  process_bins(cardinality, graph_in, graph_out);
+	for (int step = 0; step != graph_in.nodes.size(); ++ step)
+	  process_bins(step, graph_in, graph_out);
 	
 	//std::cerr << "topologically sort" << std::endl;
 	
@@ -257,56 +237,53 @@ namespace cicada
       node_type::edge_set_type::const_iterator eiter_end = graph.nodes[graph.goal].edges.end();
       for (node_type::edge_set_type::const_iterator eiter = graph.nodes[graph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = graph.edges[*eiter];
-	
-	candidates.push_back(candidate_type(stack.push(stack_type::npos(), stack_state_type(edge))));
-	
+
+	candidates.push_back(candidate_type(edge));
+
 	candidate_type& candidate = candidates.back();
 	
-	// perform scoring by model.apply_predict()
-	// new state is kept in candidate
-	
-	feature_set_type features(edge.features);
 	feature_set_type estimates;
-	model.apply_predict(candidate.state, node_states, stack[candidate.stack].out_edge, features, estimates, true);
+	model.apply_predict(candidate.state, node_states, candidate.out_edge, candidate.out_edge.features, estimates, true);
 	
-	candidate.score    = function(features);
-	candidate.estimate = function(estimates);
+	candidate.score     = function(stack_state.out_edge.features);
+	candidate.estiamate = function(estimates);
 	candidate.estimate *= candidate.score;
-	
-	candidate.features.swap(features);
 	
 	states.front().buf.push(&candidate);
       }
     }
     
-    void process_bins(const int cardinality, const hypergraph_type& graph_in, hypergraph_type& graph_out)
+    void process_bins(const int step, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
-      cand_state_type& cand_state = states[cardinality];
+      cand_state_type& cand_state = states[step];
       
       for (size_type num_pop = 0; ! cand_state.buf.empty() && num_pop != pop_size_max; ++ num_pop) {
-	candidate_type item = *(cand_state.buf.top());
+	candidate_type item = *cand_state.buf.top();
 	cand_state.buf.pop();
-
-	const bool is_goal = (graph_in.goal == stack[item.stack].in_edge->head);
+	
+	item.state = model.clone(item.state);
+	
+	const bool is_goal = (graph_in.goal == item.in_edge->head);
 	
 	// we will iterate until completion...
 	for (;;) {
- 	  const rule_type::symbol_set_type& target = stack[item.stack].in_edge->rule->target;
+ 	  const rule_type::symbol_set_type& target = item.in_edge->rule->target;
 	  
-	  int dot = stack[item.stack].dot;
-	  int dot_antecedent = stack[item.stack].dot_antecedent;
+	  int& dot            = item.dot;
+	  int& dot_antecedent = item.dot_antecedent;
 	  
 	  // scan... and score... state will be updated...
 	  if (! target.empty() && target[dot].is_terminal()) {
 	    feature_set_type features;
 	    feature_set_type estimates;
 	    
-	    model.apply_scan(item.state, node_states, stack[item.stack].out_edge, dot, features, estimates, is_goal);
+	    model.apply_scan(item.state, node_states, itemx.out_edge, dot, features, estimates, is_goal);
+	    
+	    item.features += features;
 	    
 	    const score_type score    = function(features);
 	    const score_type estimate = function(estimates);
 	    
-	    item.features += features;
 	    item.score    *= score;
 	    item.estimate *= score;
 	    item.estimate *= estimate;
@@ -317,17 +294,17 @@ namespace cicada
 	  
 	  if (dot == target.size()) {
 	    // complete...
-	    
 	    feature_set_type features;
 	    feature_set_type estimates;
 	    
 	    // scoring
-	    model.apply_complete(state, node_states, stack[item.stack].out_edge, features, estimates, is_goal);
+	    model.apply_complete(item.state, node_states, item.out_edge, features, estimates, is_goal);
+
+	    item.features += features;
 	    
 	    const score_type score    = function(features);
 	    const score_type estimate = function(estimates);
 	    
-	    item.features += features;
 	    item.score    *= score;
 	    item.estimate *= score;
 	    item.estimate *= estimate;
@@ -338,51 +315,46 @@ namespace cicada
 	    
 	    if (is_goal) {
 	      if (! graph_out.is_valid()) {
-		node_states.pupsh_back(state);
+		item.pupsh_back(item.state);
 		graph_out.goal = graph_out.add_node().id;
 	      } else
-		model.deallocate(state);
+		model.deallocate(item.state);
 	      
-	      edge_tyep& edge_new = graph_out.add_edge(stack[item.stack].out_edge);
-	      
-	      edge_new.features.swap(item.features);
-	      item.features.clear();
-	      
+	      edge_tyep& edge_new = graph_out.add_edge(item.out_edge);
 	      graph_out.connect_edge(edge_new.id, graph_out.goal);
 	      
 	      break;
 	    } else {
-	      state_node_map_type::iterator siter = states[stack[item.stack].in_edge->head].nodes.find(state);
-	      if (siter == states[stack[item.stack].in_edge->head].nodes.end()) {
-		node_states.pupsh_back(state);
-		siter = states[stack[item.stack].in_edge->head].nodes.insert(std::make_pair(state, graph_out.add_node().id)).first;
+	      state_node_map_type::iterator siter = states[item.in_edge->head].nodes.find(item.state);
+	      if (siter == states[item.in_edge->head].nodes.end()) {
+		node_states.pupsh_back(item.state);
+		siter = states[item.in_edge->head].nodes.insert(std::make_pair(item.state, graph_out.add_node().id)).first;
 	      } else
-		model.deallocate(state);
+		model.deallocate(item.state);
 	      
-	      edge_tyep& edge_new = graph_out.add_edge(stack[item.stack].out_edge);
-	      
-	      edge_new.features.swap(item.features);
-	      item.features.clear();
-	      
+	      edge_tyep& edge_new = graph_out.add_edge(item.out_edge);
 	      graph_out.connect_edge(edge_new.id, siter->second);
 	      
-	      // pop-stack...
-	      const stack_type::id_type stack_parent = stack.parent(item.stack);
+	      const score_type score = item.score;
+	      const score_type estimate = item.estimate;
 	      
-	      stack_state_type stack_state(stack[stack_parent]);
+	      item = *(item.parent);
 	      
-	      const rule_type::symbol_set_type& target = stack_state.in_edge->rule->target;
+	      item.state = model.clone(siter->first);
 	      
-	      int antecedent_index = target[stack_state.dot].non_terminal_index() - 1;
+	      item.score    *= score;
+	      item.estimate *= estimate;
+	      
+	      const rule_type::symbol_set_type& target = item.in_edge->rule->target;
+	      
+	      int antecedent_index = target[item.dot].non_terminal_index() - 1;
 	      if (antecedent_index < 0)
-		antecedent_index = stack_state.dot_antecedent;
+		antecedent_index = item.dot_antecedent;
 	      
-	      stack_state.out_edge.tails[antecedent_index] = siter->second;
+	      item.out_edge.tails[antecedent_index] = siter->second;
 	      
-	      ++ stack_state.dot;
-	      ++ stack_state.dot_ancedent;
-	      
-	      item.stack = stack.push(stack.parent(stack_parent), stack_state);
+	      ++ item.dot;
+	      ++ item.dot_ancedent;
 	      
 	      continue;
 	    }
@@ -393,35 +365,36 @@ namespace cicada
 	    if (antecedent_index < 0)
 	      antecedent_index = dot_antecedent;
 	    
-	    const node_type& antecedent_node = graph_in.nodes[stack[item.stack].out_edge.tails[antecedent_index]];
+	    const node_type& antecedent_node = graph_in.nodes[item.out_edge.tails[antecedent_index]];
+	    
+	    candidates.push_back(item);
+	    const candidate_type& parent = candidates.back();
 	    
 	    node_type::edge_set_type::const_iterator eiter_end = antecedent_node.edges.end();
 	    for (node_type::edge_set_type::const_iterator eiter = antecedent_node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	      const edge_type& edge = graph_in.edges[*eiter];
 	      
-	      candidates.push_back(candidate_type(stack.push(item.stack, stack_state_type(edge))));
+	      candidates.push_back(candidate_type(parent, edge));
+	      
 	      candidate_type& candidate = candidates.back();
 	      
-	      feature_set_type features(edge.features);
+	      candidate.state = model.clone(item.state);
+	      
 	      feature_set_type estimates;
 	      
-	      candidate.state = model.clone(state);
+	      model.apply_predict(candidate.state, node_states, candidate.out_edges, candidate.out_edges.features, estimates, false);
 	      
-	      model.apply_predict(candidate.state, node_states, stack[candidate.stack].out_edges, features, estimates, false);
-	      
-	      const score_type score    = function(features);
+	      const score_type score    = function(candidate.out_edges.features);
 	      const score_type estimate = function(estimates);
 	      
-	      candidate.score    = item.score;
-	      candidate.estimate = item.estimate;
+	      candidate.score    = parent.score;
+	      candidate.estimate = parent.estimate;
 	      
 	      candidate.score    *= score;
 	      candidate.estimate *= score;
 	      candidate.estimate *= estimate;
 	      
-	      candidate.features.swap(features);
-	      
-	      states[cardinality + 1].buf.push(&candidate);
+	      states[step + 1].buf.push(&candidate);
 	    }
 	    
 	    break;
@@ -431,6 +404,7 @@ namespace cicada
       
       // clear buf... at the same time, we will clear state associated with each candidate...
       
+#if 0
       typename candidate_heap_type::const_iterator biter_end = state.buf.end();
       for (typename candidate_heap_type::const_iterator biter = state.buf.begin(); biter != biter_end; ++ biter) {
 	model.deallocate((*biter)->state);
@@ -440,6 +414,7 @@ namespace cicada
 	// implement custom allocator similar to the state allocator in model?
 	
       }
+#endif
       
       // shrink wrap...
       state.buf.clear();
@@ -450,7 +425,6 @@ namespace cicada
   private:
     candidate_set_type  candidates;
     state_set_type      node_states;
-    state_set_type      node_states_coarse;
     cand_state_set_type states;
 
     node_map_type       node_maps;

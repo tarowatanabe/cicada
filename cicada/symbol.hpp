@@ -206,13 +206,14 @@ namespace cicada
     bool operator>=(const Symbol& x, const Symbol& y);
     
   private:
-    struct hasher
+    struct hasher : public utils::hashmurmur<size_t>
     {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
       size_t operator()(const symbol_type& x) const
       {
-	return __hasher(x.begin(), x.end(), size_t(0));
+	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
       }
-      utils::hashmurmur<size_t> __hasher;
     };
     typedef utils::indexed_set<symbol_type, hasher, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
 

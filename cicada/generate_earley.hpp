@@ -224,22 +224,12 @@ namespace cicada
       size_t operator()(const edge_type* x) const
       {
 	// passive edge do not care about what dot we have consumed...
-#if 1
 	if (! x)
 	  return 0;
 	else if (x->is_active())
 	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->span, x->lhs.id()));
 	else
 	  return hasher_type::operator()(x->span, x->lhs.id());
-#endif
-#if 0
-	if (! x)
-	  return 0;
-	else if (x->is_active())
-	  return hasher_type::operator()(x->dot, x->lhs.id());
-	else
-	  return hasher_type::operator()(x->lhs.id());
-#endif
       }
     };
     
@@ -292,12 +282,6 @@ namespace cicada
 
     typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
 
-#if 0
-    typedef std::vector<const edge_type*, std::allocator<const edge_type*> > edge_set_active_type;
-    typedef std::vector<const edge_type*, std::allocator<const edge_type*> > edge_set_passive_type;
-#endif
-
-#if 1
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
 					 std::allocator<const edge_type*> > edge_set_active_type;
@@ -308,7 +292,6 @@ namespace cicada
 			       std::allocator<const edge_type*> > edge_set_active_type;
     typedef sgi::hash_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
 			       std::allocator<const edge_type*> > edge_set_passive_type;
-#endif
 #endif
 
     
@@ -425,29 +408,6 @@ namespace cicada
       // we will try find actives whose last match with passive's first
       // do we group by passive's lhs?
      
-#if 0 
-      edge_set_active_type::const_iterator aiter_end = edges_active.end();
-      for (edge_set_active_type::const_iterator aiter = edges_active.begin(); aiter != aiter_end; ++ aiter) {
-	const edge_type& active = *(*aiter);
-	
-	const grammar_node_type& dot = *(active.dot);
-	id_map_type::const_iterator niter = dot.non_terminals.find(passive.lhs);
-	if (niter == dot.non_terminals.end()) continue;
-	
-	const grammar_node_type& dot_next = grammar_nodes[niter->second];
-	
-	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
-	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
-	
-	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive, dot_next.edge));
-	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive));
-	
-      }
-#endif
-      
-#if 1
       const edge_type query(passive.span.first, passive.span.first);
       
       std::pair<edge_set_active_type::const_iterator, edge_set_active_type::const_iterator> result = edges_active.equal_range(&query);
@@ -469,34 +429,11 @@ namespace cicada
 	if (has_next)
 	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive));
       }
-#endif
     }
     
     // find passives that can extend the active
     void complete_active(const edge_type& active)
     {
-#if 0
-      const grammar_node_type& dot = *(active.dot);
-
-      edge_set_passive_type::const_iterator piter_end = edges_passive.end();
-      for (edge_set_passive_type::const_iterator piter = edges_passive.begin(); piter != piter_end; ++ piter) {
-	const edge_type& passive = *(*piter);
-	
-	id_map_type::const_iterator niter = dot.non_terminals.find(passive.lhs);
-	if (niter == dot.non_terminals.end()) continue;
-	
-	const grammar_node_type& dot_next = grammar_nodes[niter->second];
-	
-	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
-	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
-	
-	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive, dot_next.edge));
-	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive));
-      }
-#endif
-#if 1
       const grammar_node_type& dot = *(active.dot);
       
       // find passives whose first match with active's last
@@ -519,7 +456,6 @@ namespace cicada
 	if (has_next)
 	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive));
       }
-#endif
     }
     
     void insert_edge(const edge_type& edge)
@@ -541,18 +477,10 @@ namespace cicada
       if (edges_unique.find(&edge) == edges_unique.end()) {
 	edges_unique.insert(&edge);
 
-#if 0
-	if (edge.is_passive())
-	  edges_passive.push_back(&edge);
-	else
-	  edges_active.push_back(&edge);
-#endif
-#if 1
 	if (edge.is_passive())
 	  edges_passive.insert(&edge);
 	else
 	  edges_active.insert(&edge);
-#endif
 	
 	agenda_finishing.push_back(&edge);
       }

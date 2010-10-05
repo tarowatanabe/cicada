@@ -98,20 +98,20 @@ namespace cicada
 			       const edge_type& edge,
 			       feature_set_type& features,
 			       feature_set_type& estimates,
-			       const bool final) const {}
+			       const bool final) const = 0;
     virtual void apply_scan(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
 			    const int dot,
 			    feature_set_type& features,
 			    feature_set_type& estimates,
-			    const bool final) const {}
+			    const bool final) const = 0;
     virtual void apply_complete(state_ptr_type& state,
 				const state_ptr_set_type& states,
 				const edge_type& edge,
 				feature_set_type& features,
 				feature_set_type& estimates,
-				const bool final) const {}
+				const bool final) const = 0;
         
     // cloning.. You should be careful for copying objects so that different threads 
     // should not access at the same object. If not sure, "always" gives deep copy.

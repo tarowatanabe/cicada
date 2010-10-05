@@ -32,7 +32,33 @@ namespace cicada
       {
 	apply_estimate(edge, features);
       }
-      
+
+      void apply_predict(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 feature_set_type& estimates,
+			 const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+
+      void apply_scan(state_ptr_type& state,
+		      const state_ptr_set_type& states,
+		      const edge_type& edge,
+		      const int dot,
+		      feature_set_type& features,
+		      feature_set_type& estimates,
+		      const bool final) const {}
+
+      void apply_complete(state_ptr_type& state,
+			  const state_ptr_set_type& states,
+			  const edge_type& edge,
+			  feature_set_type& features,
+			  feature_set_type& estimates,
+			  const bool final) const {}
+
+    private:      
       void apply_estimate(const edge_type& edge,
 			  feature_set_type& features) const
       {
@@ -72,7 +98,33 @@ namespace cicada
       {
 	apply_estimate(edge, features);
       }
+
+      void apply_predict(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 feature_set_type& estimates,
+			 const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
       
+      void apply_scan(state_ptr_type& state,
+		      const state_ptr_set_type& states,
+		      const edge_type& edge,
+		      const int dot,
+		      feature_set_type& features,
+		      feature_set_type& estimates,
+		      const bool final) const {}
+
+      void apply_complete(state_ptr_type& state,
+			  const state_ptr_set_type& states,
+			  const edge_type& edge,
+			  feature_set_type& features,
+			  feature_set_type& estimates,
+			  const bool final) const {}
+
+    private:
       void apply_estimate(const edge_type& edge,
 			  feature_set_type& features) const
       {
@@ -112,6 +164,32 @@ namespace cicada
 	apply_estimate(edge, features);
       }
       
+      void apply_predict(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 feature_set_type& estimates,
+			 const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      
+      void apply_scan(state_ptr_type& state,
+		      const state_ptr_set_type& states,
+		      const edge_type& edge,
+		      const int dot,
+		      feature_set_type& features,
+		      feature_set_type& estimates,
+		      const bool final) const {}
+      
+      void apply_complete(state_ptr_type& state,
+			  const state_ptr_set_type& states,
+			  const edge_type& edge,
+			  feature_set_type& features,
+			  feature_set_type& estimates,
+			  const bool final) const {}
+      
+    private:
       void apply_estimate(const edge_type& edge,
 			  feature_set_type& features) const
       {
