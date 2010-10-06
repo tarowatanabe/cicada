@@ -947,8 +947,10 @@ void read_tstset(const path_set_type& files,
       }
     }
   }
-  
-  
+
+  if (debug && mpi_rank == 0)
+    std::cerr << "assign BLEU scorer" << std::endl;
+    
   for (int id = 0; id < graphs.size(); ++ id) 
     if (id % mpi_size == mpi_rank) {
       if (graphs[id].goal == hypergraph_type::invalid)
