@@ -560,9 +560,14 @@ namespace cicada
 
     void initialize_grammar(const hypergraph_type& source)
     {
+      typedef std::vector<std::string, std::allocator<std::string> > node_label_set_type;
       typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
-
+      
+      typedef std::vector<int, std::allocator<int> > depth_set_type;
+      
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
+      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_set_type;
+      
       typedef std::vector<edge_set_type, std::allocator<edge_set_type> > node_map_type;
       
       edges.clear();
@@ -589,6 +594,8 @@ namespace cicada
       // max sentence length is 1.5 of max-sentence-length in the hyperraph
       max_sentence_length = sentence_length + (sentence_length >> 1);
       
+
+      // compute out-edges...
       node_map_type out_edges(source.nodes.size());
       {
 	hypergraph_type::edge_set_type::const_iterator eiter_end = source.edges.end();
@@ -601,49 +608,105 @@ namespace cicada
 	}
       }
       
-      // assigne pseudo non-terminals
-      non_terminal_set_type non_terminals(source.nodes.size());
-      std::vector<int, std::allocator<int> > depths(source.nodes.size(), 0);
-      for (int id = source.nodes.size() - 1; id >= 0; -- id)
-	if (out_edges[id].empty())
-	  non_terminals[id] = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal();
-	else {
-	  depths[id] = depths[out_edges[id].front()] + 1;
 
-	  std::string nodes;
+      // compute node labels and depth
+      // how to compute left/right items?
+      node_label_set_type labels(source.nodes.size());
+      node_set_type lefts(source.nodes.size(), hypergraph_type::invalid);
+      node_set_type rights(source.nodes.size(), hypergraph_type::invalid);
+      depth_set_type depths(source.nodes.size(), 0);
+      
+      for (int id = source.nodes.size() - 1; id >= 0; -- id) {
+	std::string& label = labels[id];
+
+	if (out_edges[id].empty())
+	  label = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip();
+	else {
+	  // compute depth
+	  depths[id] = depths[out_edges[id].front()] + 1;
 	  
-	  for (int pos = 0; pos != source.edges[out_edges[id].front()].tails.size(); ++ pos) {
-	    const int antecedent_id = source.edges[out_edges[id].front()].tails[pos];
+	  const hypergraph_type::id_type parent_id = source.edges[out_edges[id].front()].head;
+
+	  // assign label..
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = source.edges[out_edges[id].front()].tails.begin();
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = source.edges[out_edges[id].front()].tails.end();
+	  
+	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	    const int antecedent_id = *titer;
 	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
 	    
-	    if (antecedent_id == id)
-	      nodes += '@' + non_terminal.non_terminal_strip();
-	    else {
-	      if (nodes.empty())
-		nodes = non_terminal.non_terminal_strip();
-	      else
-		nodes += '|' + non_terminal.non_terminal_strip();
-	    }
-	  }
-	  
-	  if (depth == 1)
-	    non_terminals[id] = '[' + nodes + ']';
-	  else {
-	    std::string non_terminal_nodes = (non_terminals[source.edges[out_edges[id].front()].head].non_terminal_strip() + ';' + nodes);
-	    
-	    if (depth > 0 && depths[id] > depth) {
-	      // always strip-off the first non-terminal up-until ';'
+	    if (titer != titer_begin)
+	      lefts[antecedent_id] = *(titer - 1);
+	    else if (lefts[parent_id] != hypergraph_type::invalid) {
+	      // collect the right-most antecedent of the lefts[parent_id]
 	      
-	      std::string::size_type pos = non_terminal_nodes.find(';', 1);
-	      if (pos != std::string::npos)
-		non_terminal_nodes = non_terminal_nodes.substr(pos + 1);
+	      const hypergraph_type::node_type& node = source.nodes[lefts[parent_id]];
+	      
+	      if (! node.edges.empty()) {
+		if (source.edges[node.edges.front()].tails.empty())
+		  lefts[antecedent_id] = lefts[parent_id];
+		else
+		  lefts[antecedent_id] = source.edges[node.edges.front()].tails.back();
+	      }
 	    }
 	    
-	    non_terminals[id] = '[' + non_terminal_nodes + ']';
+	    if (titer + 1 != titer_end)
+	      rights[antecedent_id] = *(titer + 1);
+	    else if (rights[parent_id] != hypergraph_type::invalid) {
+	      // collect the left-most antecedent of rights[parent_id]
+	      
+	      const hypergraph_type::node_type& node = source.nodes[rights[parent_id]];
+	      
+	      if (! node.edges.empty()) {
+		if (source.edges[node.edges.front()].tails.empty())
+		  rights[antecedent_id] = rights[parent_id];
+		else
+		  rights[antecedent_id] = source.edges[node.edges.front()].tails.front();
+	      }
+	    }
+	    
+	    if (antecedent_id == id)
+	      label += '@' + non_terminal.non_terminal_strip();
+	    else {
+	      if (label.empty())
+		label = non_terminal.non_terminal_strip();
+	      else
+		label += '|' + non_terminal.non_terminal_strip();
+	    }
 	  }
 	  
-	  //std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
+	  label = labels[source.edges[out_edges[id].front()].head] + ';' + label;
+	  // always strip-off the first non-terminal up-until ';'
+	  if (depth > 0 && depths[id] > depth) {
+	    std::string::size_type pos = label.find(';', 1);
+	    if (pos != std::string::npos)
+	      label = label.substr(pos + 1);
+	  }
+	  
+	  //std::cerr << "non-terminal: " << labels[id] << std::endl;
 	}
+      }
+      
+      // finally, assign pseudo non-terminals with left/right context...
+      
+      non_terminal_set_type non_terminals(source.nodes.size());
+      for (int id = source.nodes.size() - 1; id >= 0; -- id) {
+	if (out_edges[id].empty())
+	  non_terminals[id] = '[' + labels[id] + ']';
+	else {
+	  std::string label;
+	  
+	  if (lefts[id] != hypergraph_type::invalid)
+	    label += labels[lefts[id]];
+	  label += '&' + labels[id] + '&';
+	  if (rights[id] != hypergraph_type::invalid)
+	    label += labels[rights[id]];
+	  
+	  non_terminals[id] = '[' + label + ']';
+	}
+	
+	//std::cerr << "non-terminal-final: " << non_terminals[id] << std::endl;
+      }
       
       // assign goal-symbol!
       goal_symbol = non_terminals[source.goal];
