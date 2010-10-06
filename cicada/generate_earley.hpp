@@ -838,16 +838,16 @@ namespace cicada
 	if (out_edges[id].empty())
 	  label = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip();
 	else {
-	  // compute depth
 	  depths[id] = depths[out_edges[id].front()] + 1;
 	  
 	  max_tree_depth = utils::bithack::max(max_tree_depth, depths[id]);
 	  
-	  const hypergraph_type::id_type parent_id = source.edges[out_edges[id].front()].head;
-
+	  const hypergraph_type::edge_type& edge_parent = source.edges[out_edges[id].front()];
+	  const hypergraph_type::id_type parent_id = edge_parent.head;
+	  
 	  // assign label..
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = source.edges[out_edges[id].front()].tails.begin();
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = source.edges[out_edges[id].front()].tails.end();
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = edge_parent.tails.begin();
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = edge_parent.tails.end();
 	  
 	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 	    const int antecedent_id = *titer;
@@ -863,8 +863,10 @@ namespace cicada
 	      if (! node.edges.empty()) {
 		if (source.edges[node.edges.front()].tails.empty())
 		  lefts[antecedent_id] = lefts[parent_id];
-		else
+		else {
 		  lefts[antecedent_id] = source.edges[node.edges.front()].tails.back();
+		  rights[source.edges[node.edges.front()].tails.back()] = antecedent_id;
+		}
 	      }
 	    }
 	    
@@ -878,8 +880,10 @@ namespace cicada
 	      if (! node.edges.empty()) {
 		if (source.edges[node.edges.front()].tails.empty())
 		  rights[antecedent_id] = rights[parent_id];
-		else
+		else {
 		  rights[antecedent_id] = source.edges[node.edges.front()].tails.front();
+		  lefts[source.edges[node.edges.front()].tails.front()] = antecedent_id;
+		}
 	      }
 	    }
 	    
@@ -915,6 +919,52 @@ namespace cicada
 	if (out_edges[id].empty())
 	  non_terminals[id] = '[' + labels[id] + ']';
 	else {
+	  const hypergraph_type::edge_type& edge_parent = source.edges[out_edges[id].front()];
+	  const hypergraph_type::id_type parent_id = edge_parent.head;
+	  
+	  // re-assign lefts and rights...
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = edge_parent.tails.begin();
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = edge_parent.tails.end();
+	  
+	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	    const int antecedent_id = *titer;
+	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
+	    
+	    if (titer != titer_begin)
+	      lefts[antecedent_id] = *(titer - 1);
+	    else if (lefts[parent_id] != hypergraph_type::invalid) {
+	      // collect the right-most antecedent of the lefts[parent_id]
+	      
+	      const hypergraph_type::node_type& node = source.nodes[lefts[parent_id]];
+	      
+	      if (! node.edges.empty()) {
+		if (source.edges[node.edges.front()].tails.empty())
+		  lefts[antecedent_id] = lefts[parent_id];
+		else {
+		  lefts[antecedent_id] = source.edges[node.edges.front()].tails.back();
+		  rights[source.edges[node.edges.front()].tails.back()] = antecedent_id;
+		}
+	      }
+	    }
+	    
+	    if (titer + 1 != titer_end)
+	      rights[antecedent_id] = *(titer + 1);
+	    else if (rights[parent_id] != hypergraph_type::invalid) {
+	      // collect the left-most antecedent of rights[parent_id]
+	      
+	      const hypergraph_type::node_type& node = source.nodes[rights[parent_id]];
+	      
+	      if (! node.edges.empty()) {
+		if (source.edges[node.edges.front()].tails.empty())
+		  rights[antecedent_id] = rights[parent_id];
+		else {
+		  rights[antecedent_id] = source.edges[node.edges.front()].tails.front();
+		  lefts[source.edges[node.edges.front()].tails.front()] = antecedent_id;
+		}
+	      }
+	    }
+	  }
+
 	  std::string label;
 	  
 	  if (lefts[id] != hypergraph_type::invalid)
