@@ -205,7 +205,11 @@ void options(int argc, char** argv)
 
   po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
   if (variables.count("config")) {
-    utils::compress_istream is(variables["config"].as<path_type>());
+    const path_type path_config = variables["config"].as<path_type>();
+    if (! boost::filesystem::exists(path_config))
+      throw std::runtime_error("no config file: " + path_config.file_string());
+    
+    utils::compress_istream is(path_config);
     po::store(po::parse_config_file(is, desc_config), variables);
   }
   
