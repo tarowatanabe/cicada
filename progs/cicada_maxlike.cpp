@@ -876,6 +876,9 @@ void read_tstset(const path_set_type& files,
       }
     }
   }
+
+  if (debug)
+    std::cerr << "assign BLEU scorer" << std::endl;
   
   typedef cicada::Parameter parameter_type;
     
