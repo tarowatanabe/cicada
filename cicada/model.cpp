@@ -266,6 +266,10 @@ namespace cicada
     
     for (int i = 0; i < models.size(); ++ i) {
       const feature_function_type& feature_function = *models[i];
+
+      if (feature_function.state_size())
+	for (int k = 0; k < states.size(); ++ k)
+	  states[k] = node_states[edge.tails[k]].base + offsets[i];
       
       feature_function_type::state_ptr_type state_feature = state.base + offsets[i];
       
