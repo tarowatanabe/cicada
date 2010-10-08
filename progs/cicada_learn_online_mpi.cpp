@@ -185,9 +185,6 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (input_lattice_mode && input_forest_mode)
-      throw std::runtime_error("input can be sentence, lattice or forest");
-
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
 

@@ -50,9 +50,6 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (input_lattice_mode && input_forest_mode)
-      throw std::runtime_error("input can be sentence, lattice or forest");
-    
 
     if (feature_list) {
       std::cout << cicada::FeatureFunction::lists();
