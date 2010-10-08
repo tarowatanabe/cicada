@@ -56,8 +56,7 @@ namespace cicada
 	  if (dist(i, k) != infinity && dist(k, j) != infinity)
 	    dist(i, j) = utils::bithack::min(dist(i, j), dist(i, k) + dist(k, j));
   }
-    
-    
+  
   template <typename Iterator>
   struct lattice_grammar_parser : boost::spirit::qi::grammar<Iterator, Lattice::lattice_type(), boost::spirit::standard::space_type>
   {
@@ -70,6 +69,7 @@ namespace cicada
       using qi::phrase_parse;
       using qi::lexeme;
       using qi::repeat;
+      using qi::hold;
       using qi::lit;
       using qi::attr;
       using standard::char_;
@@ -115,7 +115,7 @@ namespace cicada
       jlf_lattice_set %= '[' >> (plf_lattice_arc % ',') >> ']';
       plf_lattice_set %= '(' >> +(plf_lattice_arc >> ',') >> ')';
       
-      lattice_grammar %= (lit('(') >> *(plf_lattice_set >> ',') >> lit(')') | '[' >> -(jlf_lattice_set % ',') >> ']'); 
+      lattice_grammar %= (lit('(') >> *(plf_lattice_set >> ',') >> lit(')') | '[' >> -(jlf_lattice_set % ',') >> ']');
     }
 
 
@@ -135,6 +135,7 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), boost::spirit::standard::space_type> plf_lattice_score;
     boost::spirit::qi::rule<Iterator, Lattice::arc_type(), boost::spirit::standard::space_type>               plf_lattice_arc;
     boost::spirit::qi::rule<Iterator, Lattice::arc_set_type(), boost::spirit::standard::space_type>           plf_lattice_set;
+    
     boost::spirit::qi::rule<Iterator, Lattice::lattice_type(), boost::spirit::standard::space_type>           lattice_grammar;
   };
 
@@ -171,14 +172,29 @@ namespace cicada
 #endif
     
     clear();
+    
+    // empty lattice...
     if (iter == end) return true;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, lattice);
+    std::string::const_iterator iter_back = iter;
     
-    if (result)
+    if (boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, lattice)) {
       initialize_distance();
-    
-    return result;
+      return true;
+    } else {
+      // fallback to sentence...
+      iter = iter_back;
+      Sentence sentence;
+      
+      if (sentence.assign(iter, end)) {
+	Sentence::const_iterator iter_end = sentence.end();
+	for (Sentence::const_iterator iter = sentence.begin(); iter != iter_end; ++ iter)
+	  lattice.push_back(arc_set_type(1, arc_type(*iter)));
+	
+	return true;
+      } else
+	return false;
+    }
   }
   
   std::istream& operator>>(std::istream& is, Lattice& x)

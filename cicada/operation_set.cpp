@@ -117,6 +117,10 @@ output: kbest or hypergraph output\n\
     input_bitext  = __input_bitext;
     input_mpi     = __input_mpi;
     
+    // default to lattice input...
+    if (! input_lattice && ! input_forest)
+      input_lattice = true;
+    
     data.id = size_t(-1);
     output_data.use_buffer = false;
     
@@ -233,19 +237,23 @@ output: kbest or hypergraph output\n\
 	throw std::runtime_error("invalid id-prefixed format");
     } else
       ++ data.id;
-    
-    if (input_lattice) {
+
+
+    if (input_lattice && input_forest) {
       if (! data.lattice.assign(iter, end))
-	throw std::runtime_error("invalid lattive format");
+	throw std::runtime_error("invalid lattice format");
+
+      if (! parse_separator(iter, end))
+	throw std::runtime_error("invalid span format (separator)");
+      
+      if (! data.hypergraph.assign(iter, end))
+	throw std::runtime_error("invalid hypergraph format");
+    } else if (input_lattice) {
+      if (! data.lattice.assign(iter, end))
+	throw std::runtime_error("invalid lattice format");
     } else if (input_forest) {
       if (! data.hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
-    } else {
-      sentence_type sentence;
-      if (! sentence.assign(iter, end))
-	throw std::runtime_error("invalid sentence format");
-      
-      data.lattice = lattice_type(sentence);
     }
     
     if (input_span) {

@@ -56,6 +56,7 @@ namespace cicada
     struct arc_type
     {
       arc_type() : features(), label(), distance(0) {}
+      arc_type(const symbol_type& __label) : features(), label(__label), distance(1) {}
       arc_type(const symbol_type& __label,
 	       const feature_set_type& __features,
 	       const int& __distance)
@@ -89,7 +90,7 @@ namespace cicada
       iterator liter = lattice.begin();
       Sentence::const_iterator iter_end = x.end();
       for (Sentence::const_iterator iter = x.begin(); iter != iter_end; ++ iter, ++ liter)
-	*liter = arc_set_type(1, arc_type(*iter, feature_set_type(), 1));
+	*liter = arc_set_type(1, arc_type(*iter));
     }
     
     void assign(const std::string& x);
