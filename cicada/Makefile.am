@@ -60,6 +60,7 @@ feature/bleu.hpp \
 feature/bleu_expected.hpp \
 feature/bleu_linear.hpp \
 feature/boundary.hpp \
+feature/global_lexicon.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
 feature/ngram_tree.hpp \
@@ -74,6 +75,7 @@ feature/bleu.cpp \
 feature/bleu_expected.cpp \
 feature/bleu_linear.cpp \
 feature/boundary.cpp \
+feature/global_lexicon.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \
 feature/ngram_tree.cpp \

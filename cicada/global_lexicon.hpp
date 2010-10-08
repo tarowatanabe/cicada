@@ -75,6 +75,18 @@ namespace cicada
     
     GlobalLexicon() { clear(); }
     GlobalLexicon(const path_type& path) { open(path); }
+    GlobalLexicon(const GlobalLexicon& x)
+      : lexicon(x.lexicon),
+	vocab(x.vocab) {}
+    
+    GlobalLexicon& operator=(const GlobalLexicon& x)
+    {
+      clear();
+      
+      lexicon = x.lexicon;
+      vocab = x.vocab;
+      return *this;
+    }
     
   public:
     
