@@ -8,6 +8,7 @@
 #include "feature/bleu_expected.hpp"
 #include "feature/bleu_linear.hpp"
 #include "feature/boundary.hpp"
+#include "feature/global_lexicon.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
 #include "feature/ngram_tree.hpp"
@@ -56,6 +57,8 @@ boundary: boundary bigram feature\n\
 \tsuffix-target=[target suffix stemming size]\n\
 \tdigits-source=[source digits stemming]\n\
 \tdigits-target=[target digits stemming]\n\
+global-lexicon: global lexicon feature\n\
+\tyield=[source|target]\n\
 neighbours: neighbour words feature\n\
 \tyield=[source|target]\n\
 \tcluster=[word class file]\n\
@@ -118,6 +121,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::BleuExpected(parameter));
     else if (param.name() == "bleu-linear")
       return feature_function_ptr_type(new feature::BleuLinear(parameter));
+    else if (param.name() == "global-lexicon")
+      return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
     else if (param.name() == "span")
       return feature_function_ptr_type(new feature::Span(parameter));
     else if (param.name() == "variational")
