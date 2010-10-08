@@ -56,8 +56,8 @@ namespace cicada
 
     typedef std::pair<int, int> span_type;
     
-    GenerateEarley(const int __depth)
-      : depth(__depth)
+    GenerateEarley(const int __depth, const int __width)
+      : depth(__depth), width(__width)
     {
       edges_unique.set_empty_key(0);
 
@@ -965,15 +965,37 @@ namespace cicada
 	    }
 	  }
 
-	  std::string label;
 	  
-	  if (lefts[id] != hypergraph_type::invalid)
-	    label += labels[lefts[id]];
-	  label += '&' + labels[id] + '&';
-	  if (rights[id] != hypergraph_type::invalid)
-	    label += labels[rights[id]];
 	  
-	  non_terminals[id] = '[' + label + ']';
+	  if (width >= 2) {
+	    std::string label;
+	    
+	    if (lefts[id] != hypergraph_type::invalid && ! lefts[lefts[id]] != hypergraph_type::invalid)
+	      label += labels[lefts[lefts[id]]];
+	    label += '&';
+	    if (lefts[id] != hypergraph_type::invalid)
+	      label += labels[lefts[id]];
+	    label += '&' + labels[id] + '&';
+	    if (rights[id] != hypergraph_type::invalid)
+	      label += labels[rights[id]];
+	    label += '&';
+	    if (rights[id] != hypergraph_type::invalid && ! rights[rights[id]] != hypergraph_type::invalid)
+	      label += labels[rights[rights[id]]];
+	    
+	    non_terminals[id] = '[' + label + ']';
+
+	  } else if (width == 1) {
+	    std::string label;
+	    
+	    if (lefts[id] != hypergraph_type::invalid)
+	      label += labels[lefts[id]];
+	    label += '&' + labels[id] + '&';
+	    if (rights[id] != hypergraph_type::invalid)
+	      label += labels[rights[id]];
+	    
+	    non_terminals[id] = '[' + label + ']';
+	  } else
+	    non_terminals[id] = '[' + labels[id] + ']';
 	}
 	
 	//std::cerr << "non-terminal-final: " << non_terminals[id] << std::endl;
@@ -1041,6 +1063,7 @@ namespace cicada
     depth_set_type path_depth;
 
     int depth;
+    int width;
 
     int max_sentence_length;
     int max_tree_depth;
@@ -1062,9 +1085,9 @@ namespace cicada
   };
   
   inline
-  void generate_earley(const HyperGraph& source, HyperGraph& target, const int depth=0)
+  void generate_earley(const HyperGraph& source, HyperGraph& target, const int depth=0, const int width=0)
   {
-    GenerateEarley generater(depth);
+    GenerateEarley generater(depth, width);
       
     generater(source, target);
   }

@@ -48,6 +48,7 @@ compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
 generate-earley: re-generation from tree\n\
 \tdepth: depth of rule pattern \n\
+\twidth: width of rule pattern \n\
 apply: feature application\n\
 \tsize=<cube size>\n\
 \texact=[true|false]  no pruning feature application\n\

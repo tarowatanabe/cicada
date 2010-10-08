@@ -26,7 +26,7 @@ namespace cicada
 		     const bool __insertion,
 		     const bool __deletion,
 		     const int __debug)
-	: depth(0), debug(__debug)
+	: depth(0), width(0), debug(__debug)
       { 
 	typedef cicada::Parameter param_type;
     
@@ -37,6 +37,8 @@ namespace cicada
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "depth") == 0)
 	    depth = boost::lexical_cast<int>(piter->second);
+	  if (strcasecmp(piter->first.c_str(), "width") == 0)
+	    width = boost::lexical_cast<int>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for generator: " << piter->first << "=" << piter->second << std::endl;
 	}
@@ -52,7 +54,7 @@ namespace cicada
     
 	utils::resource start;
     
-	cicada::generate_earley(hypergraph, generated, depth);
+	cicada::generate_earley(hypergraph, generated, depth, width);
     
 	utils::resource end;
     
@@ -75,6 +77,7 @@ namespace cicada
       
       
       int depth;
+      int width;
       int debug;
     };
 
