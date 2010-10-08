@@ -129,6 +129,7 @@ feature_function.hpp \
 feature_vector.hpp \
 generate.hpp \
 generate_earley.hpp \
+global_lexicon.hpp \
 grammar.hpp \
 grammar_mutable.hpp \
 grammar_static.hpp \
@@ -170,6 +171,7 @@ libcicada_la_SOURCES = \
 cluster.cpp \
 feature.cpp \
 feature_function.cpp \
+global_lexicon.cpp \
 grammar_mutable.cpp \
 grammar_static.cpp \
 graphviz.cpp \

@@ -20,8 +20,8 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (param.name() != "ngram-tree")
-	throw std::runtime_error("is this really ngram tree feature function? " + parameter);
+      if (param.name() != "global-lexicon")
+	throw std::runtime_error("is this really a global-lexicon feature function? " + parameter);
 
       bool source = false;
       bool target = false;
