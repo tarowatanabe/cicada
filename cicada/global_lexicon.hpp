@@ -98,7 +98,7 @@ namespace cicada
       const lexicon_type::size_type node = find(target);
       
       double weight = 0.0;
-
+      
       if (lexicon.is_valid(node)) {
 	// bias term...
 	const lexicon_type::size_type node_next = find(node, vocab_type::NONE);
@@ -114,7 +114,7 @@ namespace cicada
 	}
       }
       
-      return - boost::math::log1p(utils::mathop::exp(- weight));
+      return - boost::math::log1p(std::exp(- weight));
     }
 
   private:
