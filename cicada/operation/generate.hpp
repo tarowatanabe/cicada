@@ -37,7 +37,7 @@ namespace cicada
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "depth") == 0)
 	    depth = boost::lexical_cast<int>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "width") == 0)
+	  else if (strcasecmp(piter->first.c_str(), "width") == 0)
 	    width = boost::lexical_cast<int>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for generator: " << piter->first << "=" << piter->second << std::endl;

@@ -970,7 +970,7 @@ namespace cicada
 	  if (width >= 2) {
 	    std::string label;
 	    
-	    if (lefts[id] != hypergraph_type::invalid && ! lefts[lefts[id]] != hypergraph_type::invalid)
+	    if (lefts[id] != hypergraph_type::invalid && lefts[lefts[id]] != hypergraph_type::invalid)
 	      label += labels[lefts[lefts[id]]];
 	    label += '&';
 	    if (lefts[id] != hypergraph_type::invalid)
@@ -979,7 +979,7 @@ namespace cicada
 	    if (rights[id] != hypergraph_type::invalid)
 	      label += labels[rights[id]];
 	    label += '&';
-	    if (rights[id] != hypergraph_type::invalid && ! rights[rights[id]] != hypergraph_type::invalid)
+	    if (rights[id] != hypergraph_type::invalid && rights[rights[id]] != hypergraph_type::invalid)
 	      label += labels[rights[rights[id]]];
 	    
 	    non_terminals[id] = '[' + label + ']';
