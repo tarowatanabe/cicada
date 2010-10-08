@@ -30,7 +30,7 @@ int main(int argc, char** argv)
     const std::string input_path  = variables["input"].as<std::string>();
     const std::string output_path = variables["output"].as<std::string>();
     
-    cicada::GlobalLeixcon lexicon(input_path);
+    cicada::GlobalLexicon lexicon(input_path);
     
     lexicon.write(output_path);
   }
