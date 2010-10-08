@@ -15,6 +15,7 @@
 
 #include "operation/binarize.hpp"
 #include "operation/permute.hpp"
+#include "operation/clear.hpp"
 #include "operation/compose.hpp"
 #include "operation/generate.hpp"
 #include "operation/apply.hpp"
@@ -134,6 +135,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::Binarize(*piter, debug)));
       else if (param.name() == "permute")
 	operations.push_back(operation_ptr_type(new operation::Permute(*piter, debug)));
+      else if (param.name() == "clear")
+	operations.push_back(operation_ptr_type(new operation::Clear(*piter, debug)));
       else if (param.name() == "compose-earley")
 	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "compose-cky")

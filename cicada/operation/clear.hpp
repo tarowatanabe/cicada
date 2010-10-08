@@ -54,7 +54,17 @@ namespace cicada
       {
 	if (debug)
 	  std::cerr << "clear" << std::endl;
-	
+
+	if (clear_hypergraph)
+	  data.hypergraph.clear();
+	if (clear_lattice)
+	  data.lattice.clear();
+	if (clear_spans)
+	  data.spans.clear();
+	if (clear_targets)
+	  data.targets.clear();
+	if (clear_counts)
+	  data.ngram_counts.clear();
       }
       
       bool clear_hypergraph;

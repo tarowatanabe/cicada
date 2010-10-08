@@ -102,6 +102,7 @@ libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
 dist_operation_HEADERS = \
 operation/apply.hpp \
 operation/binarize.hpp \
+operation/clear.hpp \
 operation/compose.hpp \
 operation/expected_ngram.hpp \
 operation/functional.hpp \
