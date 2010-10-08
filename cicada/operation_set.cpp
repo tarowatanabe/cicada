@@ -247,7 +247,7 @@ output: kbest or hypergraph output\n\
 	throw std::runtime_error("invalid lattice format");
 
       if (! parse_separator(iter, end))
-	throw std::runtime_error("invalid span format (separator)");
+	throw std::runtime_error("invalid lattice/hypergraph format (separator)");
       
       if (! data.hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
