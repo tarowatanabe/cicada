@@ -59,6 +59,8 @@ namespace cicada
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
 	  if (*piter != vocab_type::EPSILON && piter->is_terminal())
 	    score += lexicon(*piter, words.begin(), words.end());
+
+	return score;
       }
 
       void assign(const lattice_type& lattice,
