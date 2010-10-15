@@ -179,7 +179,7 @@ struct TranslationErrorRate : public TER
   typedef operation_set_type path_type;
 
   typedef std::vector<bool, std::allocator<bool> > error_set_type;
-  typedef std::vector<cn_index_type, std::allocator<cn_index_type> > align_set_type;
+  typedef std::vector<int, std::allocator<int> > align_set_type;
   
 
   struct Score
@@ -211,6 +211,58 @@ struct TranslationErrorRate : public TER
   
   typedef std::vector<shift_type, std::allocator<shift_type> > shift_set_type;
   typedef std::vector<shift_set_type, std::allocator<shift_set_type> > shift_matrix_type;
+
+  minimum_edit_distance_type minimum_edit_distance;
+
+  double operator()(const lattice_type& ref, const sentence_type& hyp, value_type& value, path_type& path, sentence_type& hyp_reordered)
+  {
+    hyp_reordered = hyp;
+
+    return calculate_best_shifts(ref, hyp_reordered, value, path);
+  }
+  
+  
+  double calculate_best_shifts(const lattice_type& ref, sentence_type& hyp, value_type& value, path_type& path)
+  {
+    value = value_type();
+    path.clear();
+    double        cost = minimum_edit_distance(hyp, ref, path);
+    
+    sentence_type hyp_new;
+    path_type     path_new;
+    double        cost_new;
+    
+    ngram_index_map_type ngram_index;
+    build_ngram_matches(ref, hyp, ngram_index);
+
+    while (1) {
+      hyp_new.clear();
+      path_new.clear();
+      cost_new = 0;
+      
+      if (! calculate_best_shift(ref, hyp, path, cost, hyp_new, path_new, cost_new, ngram_index))
+	break;
+
+      value.score += COSTS::shift;
+      ++ value.shift;
+      
+      hyp.swap(hyp_new);
+      path.swap(path_new);
+      cost = cost_new;
+    }
+    
+    path_type::const_iterator piter_end = path.end();
+    for (path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
+      switch (piter->op) {
+      case TRANSITION::match:        ++ value.match; break;
+      case TRANSITION::substitution: ++ value.substitution; break;
+      case TRANSITION::insertion:    ++ value.insertion; break;
+      case TRANSITION::deletion:     ++ value.deletion; break;
+      }
+    }
+    
+    return value.score;
+  }
   
   void find_alignment_error(const path_type& path,
 			    error_set_type& herr,
@@ -229,7 +281,7 @@ struct TranslationErrorRate : public TER
 	++ rpos;
 	herr.push_back(false);
 	rerr.push_back(false);
-	ralign.push_back(cn_index_type(hpos, path[i].pos));
+	ralign.push_back(hpos);
 	break;
       case TRANSITION::substitution:
 	//std::cerr << " S";
@@ -237,7 +289,7 @@ struct TranslationErrorRate : public TER
 	++ rpos;
 	herr.push_back(true);
 	rerr.push_back(true);
-	ralign.push_back(cn_index_type(hpos, path[i].pos));
+	ralign.push_back(hpos);
 	break;
       case TRANSITION::insertion:
 	//std::cerr << " I";
@@ -248,13 +300,13 @@ struct TranslationErrorRate : public TER
 	//std::cerr << " D";
 	++ rpos;
 	rerr.push_back(true);
-	ralign.push_back(cn_index_type(hpos, -1));
+	ralign.push_back(hpos);
 	break;
       case TRANSITION::epsilon:
 	//std::cerr << " E";
 	++ rpos;
 	rerr.push_back(true);
-	ralign.push_back(cn_index_type(hpos, path[i].pos));
+	ralign.push_back(hpos);
 	break;
       }
     }
@@ -284,12 +336,96 @@ struct TranslationErrorRate : public TER
 
     shift_matrix_type shifts(max_shift_size + 1);
     
+    gather_all_possible_shifts(hyp, ralign, herr, rerr, ngram_index, shifts);
     
+    double cost_shift_best = 0;
+    cost_best = cost;
+    bool found = false;
     
+    // enumerate from max-shifts
+    sentence_type hyp_shifted(hyp.size());
+    path_type     path_shifted;
+    
+    for (int i = shifts.size() - 1; i >= 0; -- i) 
+      if (! shifts[i].empty()) {
+	const double curfix = cost - (cost_shift_best + cost_best);
+	const double maxfix = 2.0 * (i + 1);
+	
+	if (curfix > maxfix || (cost_shift_best != 0 && curfix == maxfix)) break;
+	
+	for (int j = 0; j < shifts[i].size(); ++ j) {
+	  const shift_type& shift = shifts[i][j];
+	      
+	  const double curfix = cost - (cost_shift_best + cost_best);
+	      
+	  if (curfix > maxfix || (cost_shift_best != 0 && curfix == maxfix)) break;
+	    
+	  //std::cerr << "candidate shift: [" << shift.begin << ", " << shift.end << "]: " << shift.reloc << std::endl;
+	      
+	  perform_shift(hyp, shift, hyp_shifted);
+	    
+	  const double cost_shifted = minimum_edit_distance(hyp_shifted, ref, path_shifted);
+	  const double gain = (cost_best + cost_shift_best) - (cost_shifted + COSTS::shift);
+	      
+	  //std::cerr << "hyp original: " << hyp << std::endl;
+	  //std::cerr << "hyp shifted:  " << hyp_shifted << std::endl;
+	  //std::cerr << "cost shifted: " << cost_shifted << " gain: " << gain << std::endl;
+	    
+	  if (gain > 0 || (cost_shift_best == 0 && gain == 0)) {
+	    cost_best       = cost_shifted;
+	    cost_shift_best = COSTS::shift;
+		
+	    path_best.swap(path_shifted);
+	    hyp_best.swap(hyp_shifted);
+	    found = true;
+	    
+	    //std::cerr << "better shift: [" << shift.begin << ", " << shift.end << "]: " << shift.reloc << std::endl;
+	  }
+	}
+      }
+    
+    return found;
   }
 
-  void gather_all_possible_shifts(const lattice_type& ref,
-				  const sentence_type& hyp,
+  void perform_shift(const sentence_type& sentence,
+		     const shift_type& shift,
+		     sentence_type& shifted) const
+  {
+    shifted.clear();
+	
+    std::back_insert_iterator<sentence_type> oiter(shifted);
+	
+    sentence_type::const_iterator siter_begin = sentence.begin();
+    sentence_type::const_iterator siter_end = sentence.end();
+
+    if (shift.reloc == -1) {
+      std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+      std::copy(siter_begin, siter_begin + shift.begin, oiter);
+      std::copy(siter_begin + shift.end + 1, siter_end, oiter);
+    } else if (shift.reloc < shift.begin) {
+      std::copy(siter_begin, siter_begin + shift.reloc + 1, oiter);
+      std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+      std::copy(siter_begin + shift.reloc + 1, siter_begin + shift.begin, oiter);
+      std::copy(siter_begin + shift.end + 1, siter_end, oiter);
+    } else if (shift.end < shift.reloc) {
+      std::copy(siter_begin, siter_begin + shift.begin, oiter);
+      std::copy(siter_begin + shift.end + 1, siter_begin + shift.reloc + 1, oiter);
+      std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+      std::copy(siter_begin + shift.reloc + 1, siter_end, oiter);
+    } else {
+      std::copy(siter_begin, siter_begin + shift.begin, oiter);
+      std::copy(siter_begin + shift.end + 1, std::min(siter_end, siter_begin + shift.end + shift.reloc - shift.begin + 1), oiter);
+      std::copy(siter_begin + shift.begin, siter_begin + shift.end + 1, oiter);
+      std::copy(siter_begin + shift.end + shift.reloc - shift.begin + 1, siter_end, oiter);
+    }
+
+    if (sentence.size() != shifted.size())
+      throw std::runtime_error(std::string("size do not match:")
+			       + " original: " + boost::lexical_cast<std::string>(sentence.size())
+			       + " shifted: "  + boost::lexical_cast<std::string>(shifted.size()));
+  }
+
+  void gather_all_possible_shifts(const sentence_type& hyp,
 				  const align_set_type& ralign,
 				  const error_set_type& herr,
 				  const error_set_type& rerr,
@@ -300,7 +436,7 @@ struct TranslationErrorRate : public TER
 	
     for (int start = 0; start != hyp.size(); ++ start) {
       ngram.clear();
-      //ngram.push_back(ref[start].);
+      ngram.push_back(hyp[start]);
       
       ngram_index_map_type::const_iterator niter = ngram_index.find(ngram);
       if (niter == ngram_index.end()) continue;
@@ -309,12 +445,56 @@ struct TranslationErrorRate : public TER
       index_set_type::const_iterator iiter_end = niter->second.end();
       for (index_set_type::const_iterator iiter = niter->second.begin(); iiter != iiter_end && ! found; ++ iiter) {
 	const int moveto = iiter->first;
-	found = (start != ralign[moveto].first && (ralign[moveto].first - start <= max_shift_dist) && (start - ralign[moveto].first - 1 <= max_shift_dist));
+	found = (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist));
       }
       
       if (! found) continue;
       
-      
+      ngram.clear();
+      const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
+      for (int end = start; found && end != last; ++ end) {
+	ngram.push_back(hyp[end]);
+	
+	found = false;
+	
+	ngram_index_map_type::const_iterator niter = ngram_index.find(ngram);
+	if (niter == ngram_index.end()) break;
+	
+	error_set_type::const_iterator hiter_begin = herr.begin() + start;
+	error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
+	if (std::find(hiter_begin, hiter_end, true) == hiter_end) {
+	  found = true;
+	  continue;
+	}
+	
+	index_set_type::const_iterator iiter_end = niter->second.end();
+	for (index_set_type::const_iterator iiter = niter->second.begin(); iiter != iiter_end; ++ iiter) {
+	  const int moveto = iiter->first;
+	  
+	  if (ralign[moveto] != start
+	      && (ralign[moveto] < start || end < ralign[moveto])
+	      && ralign[moveto] - start <= max_shift_dist
+	      && start - ralign[moveto] - 1 <= max_shift_dist) {
+	    
+	    found = true;
+		
+	    error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
+	    error_set_type::const_iterator riter_end   = rerr.begin() + end - start + moveto + 1;
+	    
+	    if (std::find(riter_begin, riter_end, true) == riter_end) continue;
+	    
+	    shift_set_type& sshifts = shifts[end - start];
+	    
+	    for (int roff = -1; roff <= end - start; ++ roff) {
+	      
+	      if (roff == -1 && moveto == 0)
+		sshifts.push_back(shift_type(start, end, -1, -1));
+	      else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
+		sshifts.push_back(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
+	    }
+	  }
+	}
+      }
     }
   }
 
@@ -382,6 +562,11 @@ struct TranslationErrorRate : public TER
 };
 
 
+struct TERAligner : public TER
+{
+  // given the alignment, merge the reordered-hyp to the lattice...
+  
+};
 
 path_type input_file = "-";
 path_type output_file = "-";
