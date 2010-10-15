@@ -387,7 +387,7 @@ namespace cicada
 	
 	for (int start = 0; start != hyp.size(); ++ start) {
 	  ngram.clear();
-	  ngram.push_back(ref[start]);
+	  ngram.push_back(hyp[start]);
 	  
 	  ngram_index_map_type::const_iterator niter = ngram_index.find(ngram);
 	  if (niter == ngram_index.end()) continue;
