@@ -167,11 +167,17 @@ namespace cicada
 		
 		active_set_type& cell = actives[table](first, last - 1 + length);
 		
-		for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		  if (node == transducer.root()) continue;
-		  
-		  cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features));
+		// proceed by EPSILON... is this correct?
+		if (terminal == vocab_type::EPSILON) {
+		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+		    cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features));
+		} else {
+		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+		    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+		    if (node == transducer.root()) continue;
+		    
+		    cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features));
+		  }
 		}
 	      }
 	    }
