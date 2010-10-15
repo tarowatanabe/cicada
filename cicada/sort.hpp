@@ -15,6 +15,9 @@ namespace cicada
 {
   struct TopologicallySort
   {
+    // DFS to locale the ordering of hypergraph.
+    // The ordering is the same as the post-traversal order of a tree
+
     typedef HyperGraph hypergraph_type;
     
     typedef hypergraph_type::id_type id_type;

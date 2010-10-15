@@ -125,6 +125,7 @@ binarize.hpp \
 cluster.hpp \
 compose.hpp \
 compose_cky.hpp \
+edit_distance_forest.hpp \
 eval.hpp \
 expected_ngram.hpp \
 feature.hpp \
