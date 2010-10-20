@@ -503,6 +503,9 @@ struct TranslationErrorRate : public TER, public M
 				  const lattice_unique_type& lattice_unique,
 				  shift_matrix_type& shifts) const
   {
+    index_set_type indices;
+    index_set_type indices_next;
+	
     for (int start = 0; start != hyp.size(); ++ start) {
       
       for (int moveto = 0; moveto != lattice_unique.size(); ++ moveto) {
@@ -513,8 +516,8 @@ struct TranslationErrorRate : public TER, public M
 	
 	if (! found) continue;
 	
-	index_set_type indices;
-	index_set_type indices_next;
+	indices.clear();
+	indices_next.clear();
 	indices.insert(moveto);
 	
 	const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
