@@ -12,6 +12,7 @@
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/program_options.hpp"
+#include "utils/resource.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -104,9 +105,13 @@ struct MinimumEditDistance : public M
   typedef utils::vector2<operation_type, std::allocator<operation_type> > matrix_operation_type;
   typedef utils::vector2<double, std::allocator<double> > matrix_cost_type;
 
+  MinimumEditDistance(const int __debug=0) : debug(__debug) {}
+
   double operator()(const sentence_type& hyp, const lattice_type& ref, operation_set_type& operations)
   {
     // vocab_type::EPSILON is treated differently...
+
+    utils::resource start;
     
     matrix_cost_type      costs(hyp.size() + 1, ref.size() + 1, 0.0);
     matrix_operation_type ops(hyp.size() + 1, ref.size() + 1);
@@ -197,9 +202,18 @@ struct MinimumEditDistance : public M
       case TER::TRANSITION::deletion:     -- j; break;
       }
     }
+
+    utils::resource end;
+
+    if (debug >= 2)
+      std::cerr << "minimum edit distance cpu time: " << (end.cpu_time() - start.cpu_time())
+		<< " user time: " << (end.user_time() - start.user_time())
+		<< std::endl;
     
     return costs(hyp.size(), ref.size());
   }
+
+  int debug;
 };
 
 
@@ -211,16 +225,16 @@ struct TranslationErrorRate : public TER, public M
   
   typedef sentence_type ngram_type;
 
-  typedef std::pair<int, int> cn_index_type;
-  typedef std::set<cn_index_type, std::less<cn_index_type>, std::allocator<cn_index_type> > index_set_type;
+  typedef std::set<int, std::less<int>, std::allocator<int> > index_set_type;
   
 #ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-				  std::allocator<std::pair<const ngram_type, index_set_type> > > ngram_index_map_type;
+  typedef std::tr1::unordered_map<word_type, index_set_type, boost::hash<word_type>, std::equal_to<word_type>,
+				  std::allocator<std::pair<const word_type, index_set_type> > > arc_unique_set_type;
 #else
-typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type>,
-		      std::allocator<std::pair<const ngram_type, index_set_type> > > ngram_index_map_type;
+  typedef sgi::hash_map<word_type, index_set_type, boost::hash<word_type>, std::equal_to<word_type>,
+			std::allocator<std::pair<const word_type, index_set_type> > > arc_unique_set_type;
 #endif
+  typedef std::vector<arc_unique_set_type, std::allocator<arc_unique_set_type> > lattice_unique_type;
 
   typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
 
@@ -264,7 +278,7 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
   typedef std::vector<shift_set_type, std::allocator<shift_set_type> > shift_matrix_type;
 
   TranslationErrorRate(const int __debug=0)
-    : debug(__debug) {}
+    : minimum_edit_distance(debug), debug(__debug) {}
   
   med_type minimum_edit_distance;
   int debug;
@@ -287,15 +301,16 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
     path_type     path_new;
     double        cost_new;
     
-    ngram_index_map_type ngram_index;
-    build_ngram_matches(ref, hyp, ngram_index);
+    lattice_unique_type lattice_unique(ref.size());
+    
+    build_unique_lattice(ref, hyp, lattice_unique);
 
     while (1) {
       hyp_new.clear();
       path_new.clear();
       cost_new = 0;
       
-      if (! calculate_best_shift(ref, hyp, path, cost, hyp_new, path_new, cost_new, ngram_index))
+      if (! calculate_best_shift(ref, hyp, path, cost, hyp_new, path_new, cost_new, lattice_unique))
 	break;
       
       value.score += COSTS::shift;
@@ -377,7 +392,7 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
 			    sentence_type& hyp_best,
 			    path_type& path_best,
 			    double& cost_best,
-			    const ngram_index_map_type& ngram_index)
+			    const lattice_unique_type& lattice_unique)
   {
     
     error_set_type herr;
@@ -392,7 +407,7 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
     
     shift_matrix_type shifts(max_shift_size + 1);
     
-    gather_all_possible_shifts(hyp, ralign, herr, rerr, ngram_index, shifts);
+    gather_all_possible_shifts(hyp, ralign, herr, rerr, lattice_unique, shifts);
     
     double cost_shift_best = 0;
     cost_best = cost;
@@ -485,47 +500,49 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
 				  const align_set_type& ralign,
 				  const error_set_type& herr,
 				  const error_set_type& rerr,
-				  const ngram_index_map_type& ngram_index,
+				  const lattice_unique_type& lattice_unique,
 				  shift_matrix_type& shifts) const
   {
-    ngram_type ngram;
-	
     for (int start = 0; start != hyp.size(); ++ start) {
-      ngram.clear();
-      ngram.push_back(M::operator()(hyp[start]));
       
-      ngram_index_map_type::const_iterator niter = ngram_index.find(ngram);
-      if (niter == ngram_index.end()) continue;
-      
-      bool found = false;
-      index_set_type::const_iterator iiter_end = niter->second.end();
-      for (index_set_type::const_iterator iiter = niter->second.begin(); iiter != iiter_end && ! found; ++ iiter) {
-	const int moveto = iiter->first;
-	found = (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist));
-      }
-      
-      if (! found) continue;
-      
-      ngram.clear();
-      const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
-      for (int end = start; found && end != last; ++ end) {
-	ngram.push_back(M::operator()(hyp[end]));
+      for (int moveto = 0; moveto != lattice_unique.size(); ++ moveto) {
+	arc_unique_set_type::const_iterator aiter = lattice_unique[moveto].find(M::operator()(hyp[start]));
+	if (aiter == lattice_unique[moveto].end()) continue;
 	
-	found = false;
+	bool found = (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist));
 	
-	ngram_index_map_type::const_iterator niter = ngram_index.find(ngram);
-	if (niter == ngram_index.end()) break;
+	if (! found) continue;
 	
-	error_set_type::const_iterator hiter_begin = herr.begin() + start;
-	error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
-	if (std::find(hiter_begin, hiter_end, true) == hiter_end) {
-	  found = true;
-	  continue;
-	}
+	index_set_type indices;
+	index_set_type indices_next;
+	indices.insert(moveto);
 	
-	index_set_type::const_iterator iiter_end = niter->second.end();
-	for (index_set_type::const_iterator iiter = niter->second.begin(); iiter != iiter_end; ++ iiter) {
-	  const int moveto = iiter->first;
+	const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
+	for (int end = start; found && end != last; ++ end) {
+	  
+	  found = false;
+	  
+	  indices_next.clear();
+	  index_set_type::const_iterator iiter_end = indices.end();
+	  for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
+	    arc_unique_set_type::const_iterator aiter = lattice_unique[*iiter].find(M::operator()(hyp[end]));
+	    if (aiter == lattice_unique[*iiter].end()) continue;
+	    
+	    found = true;
+	    
+	    indices_next.insert(aiter->second.begin(), aiter->second.end());
+	  }
+	  indices.swap(indices_next);
+	  indices_next.clear();
+	  
+	  if (! found) break;
+	  
+	  error_set_type::const_iterator hiter_begin = herr.begin() + start;
+	  error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
+	  if (std::find(hiter_begin, hiter_end, true) == hiter_end) {
+	    found = true;
+	    continue;
+	  }
 	  
 	  if (ralign[moveto] != start
 	      && (ralign[moveto] < start || end < ralign[moveto])
@@ -533,7 +550,7 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
 	      && start - ralign[moveto] - 1 <= max_shift_dist) {
 	    
 	    found = true;
-		
+	    
 	    error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
 	    error_set_type::const_iterator riter_end   = rerr.begin() + end - start + moveto + 1;
 	    
@@ -542,7 +559,6 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
 	    shift_set_type& sshifts = shifts[end - start];
 	    
 	    for (int roff = -1; roff <= end - start; ++ roff) {
-	      
 	      if (roff == -1 && moveto == 0)
 		sshifts.push_back(shift_type(start, end, -1, -1));
 	      else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
@@ -554,64 +570,35 @@ typedef sgi::hash_map<ngram_type, index_set_type, boost::hash<ngram_type>, std::
     }
   }
 
-  void build_ngram_matches(const lattice_type& ref, const sentence_type& hyp, ngram_index_map_type& ngram_index) const
+  void build_unique_lattice(const lattice_type& ref, const sentence_type& hyp, lattice_unique_type& lattice_unique) const
   {
-    typedef std::pair<ngram_type, cn_index_type> intersected_type;
-    typedef std::vector<intersected_type, std::allocator<intersected_type> > intersected_set_type;
+    //
+    // we will build unique-reduced-lattice, lattice without epsilon | without words not in hyp
+    // here, we do not care the weights associated with each edge...
+    //
 
-    // we need to expand lattice....
-    ngram_index.clear();
+    typedef std::vector<int, std::allocator<int> > precedent_set_type;
     
     word_set_type words_intersect;
     words_intersect.set_empty_key(word_type());
     for (sentence_type::const_iterator hiter = hyp.begin(); hiter != hyp.end(); ++ hiter)
       words_intersect.insert(M::operator()(*hiter));
     
-    intersected_set_type intersected;
-    intersected_set_type intersected_next;
-    
+
     for (int start = 0; start != ref.size(); ++ start) {
-      
-      intersected.clear();
-      intersected_next.clear();
       
       const int max_length = utils::bithack::min(max_shift_size, static_cast<int>(ref.size() - start));
       
-      // we will expand in tree structure...
+      bool has_next = true;
       
-      for (int length = 0; length != max_length; ++ length) {
+      for (int length = 0; has_next && length != max_length; ++ length) {
 	
-	if (length == 0) {
-	  intersected.clear();
-	  for (int pos = 0; pos < ref[start].size(); ++ pos)
-	    if (ref[start][pos].label == vocab_type::EPSILON)
-	      intersected.push_back(intersected_type(ngram_type(), cn_index_type(start, pos)));
-	    else if (words_intersect.find(M::operator()(ref[start][pos].label)) != words_intersect.end()) {
-	      intersected.push_back(intersected_type(ngram_type(1, M::operator()(ref[start][pos].label)), cn_index_type(start, pos)));
-	      ngram_index[intersected.back().first].insert(intersected.back().second);
-	    }
-	  
-	} else {
-	  if (intersected.empty()) break;
-	  
-	  intersected_next.clear();
-	  for (int pos = 0; pos < ref[start + length].size(); ++ pos) {
-	    if (ref[start + length][pos].label == vocab_type::EPSILON)
-	      intersected_next.insert(intersected_next.end(), intersected.begin(), intersected.end());
-	    else if (words_intersect.find(M::operator()(ref[start + length][pos].label)) != words_intersect.end()) {
-	      intersected_set_type::const_iterator iiter_end = intersected.end();
-	      for (intersected_set_type::const_iterator iiter = intersected.begin(); iiter != iiter_end; ++ iiter) {
-		ngram_type ngram(iiter->first);
-		ngram.push_back(M::operator()(ref[start + length][pos].label));
-		
-		intersected_next.push_back(intersected_type(ngram, iiter->second));
-		ngram_index[intersected_next.back().first].insert(intersected_next.back().second);
-	      }
-	    }
-	  }
-	  
-	  intersected.swap(intersected_next);
-	  intersected_next.clear();
+	has_next = false;
+	for (int pos = 0; pos < ref[start + length].size(); ++ pos) {
+	  if (ref[start + length][pos].label == vocab_type::EPSILON)
+	    has_next = true;
+	  else if (words_intersect.find(M::operator()(ref[start + length][pos].label)) != words_intersect.end())
+	    lattice_unique[start][M::operator()(ref[start + length][pos].label)].insert(start + length + 1);
 	}
       }
     }
@@ -627,6 +614,8 @@ struct TERAligner : public TER, public M
 
   typedef typename ter_type::path_type  path_type;
   typedef typename ter_type::value_type value_type;
+
+  TERAligner(const int __debug=0) : ter(__debug) {}
   
   double operator()(const lattice_type& ref, const sentence_type& hyp, lattice_type& merged, const feature_set_type& features)
   {
@@ -800,6 +789,10 @@ int main(int argc, char ** argv)
       
       for (int sent = 0; sent < sentences.size(); ++ sent) 
 	if (! sentences[sent].empty()) {
+
+	  // perform merging...
+	  if (debug)
+	    std::cerr << "merging with bed sentence: " << sentences[sent] << std::endl;
 	  
 	  lattice_type  merged;
 	  lattice_type  merged_new;
@@ -827,10 +820,10 @@ int main(int argc, char ** argv)
 	    features[feature_count] = count_weight;
 	  
 	  if (match_lower) {
-	    TERAligner<MatcherLower> aligner;
+	    TERAligner<MatcherLower> aligner(debug);
 	    aligner(merged, sentences[sent], merged_new, features);
 	  } else {
-	    TERAligner<Matcher> aligner;
+	    TERAligner<Matcher> aligner(debug);
 	    aligner(merged, sentences[sent], merged_new, features);
 	  }
 	
@@ -845,6 +838,9 @@ int main(int argc, char ** argv)
 	  for (ter_sent_type::const_iterator titer = ters.begin(); titer != titer_end; ++ titer, ++ rank) {
 	    const int id = titer->second;
 
+	    if (debug)
+	      std::cerr << "merging: " << sentences[id] << std::endl;
+
 	    const double conf = 1.0 / (1.0 + rank);
 	    
 	    feature_set_type features;
@@ -857,13 +853,19 @@ int main(int argc, char ** argv)
 	    if (! feature_count.empty())
 	      features[feature_count] = count_weight;
 	    
+
+	    double score_local = 0.0;
 	    if (match_lower) {
-	      TERAligner<MatcherLower> aligner;
-	      score += aligner(merged, sentences[id], merged_new, features);
+	      TERAligner<MatcherLower> aligner(debug);
+	      score_local = aligner(merged, sentences[id], merged_new, features);
 	    } else {
-	      TERAligner<Matcher> aligner;
-	      score += aligner(merged, sentences[id], merged_new, features);
+	      TERAligner<Matcher> aligner(debug);
+	      score_local = aligner(merged, sentences[id], merged_new, features);
 	    }
+	    if (debug)
+	      std::cerr << "TER: " << score_local << std::endl;
+
+	    score += score_local;
 	    
 	    merged.swap(merged_new);
 	    merged_new.clear();
@@ -930,10 +932,10 @@ int main(int argc, char ** argv)
 	
 	
 	if (match_lower) {
-	  TERAligner<MatcherLower> aligner;
+	  TERAligner<MatcherLower> aligner(debug);
 	  aligner(merged, sentence, merged_new, features);
 	} else {
-	  TERAligner<Matcher> aligner;
+	  TERAligner<Matcher> aligner(debug);
 	  aligner(merged, sentence, merged_new, features);
 	}
 	
