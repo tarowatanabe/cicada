@@ -2,6 +2,7 @@
 #define PHOENIX_THREADSAFE 1
 
 #include "lattice.hpp"
+#include "vocab.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
 
@@ -43,7 +44,7 @@ namespace cicada
     // edge-cost for dist(i, j)
     for (int i = 0; i < lattice.size(); ++ i)
       for (int j = 0; j < lattice[i].size(); ++ j)
-	dist(i, i + lattice[i][j].distance) = 1;
+	dist(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
     
     // edge-cost dist(i, i) = 0
     for (int i = 0; i < dist_size; ++ i)

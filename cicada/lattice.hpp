@@ -102,11 +102,19 @@ namespace cicada
     inline const_reference operator[](size_type x) const { return lattice[x]; }
     inline       reference operator[](size_type x)       { return lattice[x]; }
 
+    inline const_reference front() const { return lattice.front(); }
+    inline       reference front()       { return lattice.front(); }
+
+    inline const_reference back() const { return lattice.back(); }
+    inline       reference back()       { return lattice.back(); }
+
     inline const_iterator begin() const { return lattice.begin(); }
     inline       iterator begin()       { return lattice.begin(); }
     
     inline const_iterator end() const { return lattice.end(); }
     inline       iterator end()       { return lattice.end(); }
+    
+    void push_back(const arc_set_type& arcs) { lattice.push_back(arcs); }
     
     difference_type shortest_distance() const
     {

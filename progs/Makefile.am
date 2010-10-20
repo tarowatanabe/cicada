@@ -27,6 +27,7 @@ bin_PROGRAMS = \
 	cicada_maxlike_mpi \
 	cicada_unite \
 	cicada_unite_lattice \
+	cicada_unite_sentence \
 	filter_penntreebank \
 	filter_cabocha \
 	\
@@ -75,11 +76,14 @@ cicada_maxlike_mpi_SOURCES  = cicada_maxlike_mpi.cpp lbfgs.c
 cicada_maxlike_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_unite_SOURCES = cicada_unite.cpp lbfgs.c
+cicada_unite_SOURCES = cicada_unite.cpp
 cicada_unite_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_unite_lattice_SOURCES = cicada_unite_lattice.cpp lbfgs.c
+cicada_unite_lattice_SOURCES = cicada_unite_lattice.cpp
 cicada_unite_lattice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_unite_sentence_SOURCES = cicada_unite_sentence.cpp
+cicada_unite_sentence_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cluster_index_SOURCES = cluster_index.cpp
 cluster_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
