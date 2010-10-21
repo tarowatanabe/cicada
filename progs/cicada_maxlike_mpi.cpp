@@ -107,6 +107,8 @@ bool oracle_loss = false;
 bool apply_exact = false;
 int cube_size = 200;
 bool softmax_margin = false;
+bool sgd = false;
+bool mix_optimized = false;
 
 int debug = 0;
 
@@ -120,9 +122,19 @@ void read_refset(const path_set_type& file,
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers);
-double optimize(const hypergraph_set_type& graphs,
-		const feature_function_ptr_set_type& features,
-		weight_set_type& weights);
+
+template <typename Optimize>
+double optimize_batch(const hypergraph_set_type& graphs,
+		      const feature_function_ptr_set_type& features,
+		      weight_set_type& weights);
+template <typename Optimize>
+double optimize_online(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       weight_set_type& weights);
+
+#include "cicada_maxlike_impl.hpp"
+
+struct OptimizeLBFGS;
 
 void bcast_sentences(sentence_set_type& sentences);
 void bcast_weights(const int rank, weight_set_type& weights);
@@ -201,7 +213,15 @@ int main(int argc, char ** argv)
     
     weight_set_type weights;
     
-    const double objective = optimize(graphs, features, weights);
+    double objective = 0.0;
+
+    if (sgd) {
+      if (regularize_l1)
+	objective = optimize_online<OptimizerSGDL1 >(graphs, features, weights);
+      else
+	objective = optimize_online<OptimizerSGDL2 >(graphs, features, weights);
+    } else 
+      objective = optimize_batch<OptimizeLBFGS>(graphs, features, weights);
     
     if (mpi_rank == 0 && debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -604,15 +624,126 @@ struct OptimizeLBFGS
   weight_set_type&                     weights;
 };
 
-double optimize(const hypergraph_set_type& graphs,
-		const feature_function_ptr_set_type& features,
-		weight_set_type& weights)
+
+template <typename Optimizer>
+double optimize_online(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       weight_set_type& weights)
+{
+  typedef std::vector<int, std::allocator<int> > id_set_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  id_set_type ids(graphs.size());
+  for (int id = 0; id != ids.size(); ++ id)
+    ids[id] = id;
+  
+  if (mpi_rank == 0) {
+
+    double objective = 0.0;
+    
+    Optimizer optimizer(graphs, features);
+
+    for (int iter = 0; iter < iteration; ++ iter) {
+      
+      for (int rank = 1; rank < mpi_size; ++ rank)
+	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+      
+      bcast_weights(0, optimizer.weights);
+      
+      optimizer.initialize();
+      
+      for (int id = 0; id != ids.size(); ++ id)
+	if (graphs[ids[id]].is_valid())
+	  optimizer(ids[id]);
+      
+      optimizer.finalize();
+      
+      std::random_shuffle(ids.begin(), ids.end());
+      
+      optimizer.weights *= optimizer.samples;
+      reduce_weights(optimizer.weights);
+      
+      objective = 0.0;
+      MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      size_t samples = 0;
+      MPI::COMM_WORLD.Reduce(&optimizer.samples, &samples, 1, MPI::LONG, MPI::SUM, 0);
+      
+      optimizer.weights *= (1.0 / samples);
+    }
+
+    // send termination!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+
+    weights.swap(optimizer.weights);
+    
+    return objective;
+    
+  } else {
+    enum {
+      NOTIFY = 0,
+      TERMINATION,
+    };
+    
+    MPI::Prequest requests[2];
+    
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    
+    for (int i = 0; i < 2; ++ i)
+      requests[i].Start();
+
+    Optimizer optimizer(graphs, features);
+    
+    while (1) {
+      if (MPI::Request::Waitany(2, requests))
+	break;
+      else {
+	bcast_weights(0, optimizer.weights);
+	
+	optimizer.initialize();
+	
+	for (int id = 0; id != ids.size(); ++ id)
+	  if (graphs[ids[id]].is_valid())
+	    optimizer(ids[id]);
+	
+	optimizer.finalize();
+	
+	std::random_shuffle(ids.begin(), ids.end());
+	
+	optimizer.weights *= optimizer.samples;
+	send_weights(optimizer.weights);
+	
+	double objective = 0.0;
+	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+
+	size_t samples = 0;
+	MPI::COMM_WORLD.Reduce(&optimizer.samples, &samples, 1, MPI::LONG, MPI::SUM, 0);
+      }
+    }
+    
+    
+    if (requests[NOTIFY].Test())
+      requests[NOTIFY].Cancel();
+    
+    return 0.0;
+  }
+}
+
+
+template <typename Optimize>
+double optimize_batch(const hypergraph_set_type& graphs,
+		      const feature_function_ptr_set_type& features,
+		      weight_set_type& weights)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   if (mpi_rank == 0) {
-    const double objective = OptimizeLBFGS(graphs, features, weights)();
+    const double objective = Optimize(graphs, features, weights)();
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
@@ -637,7 +768,7 @@ double optimize(const hypergraph_set_type& graphs,
       if (MPI::Request::Waitany(2, requests))
 	break;
       else {
-	typedef OptimizeLBFGS::Task task_type;
+	typedef typename Optimize::Task task_type;
 	
 	requests[NOTIFY].Start();
 	
@@ -660,6 +791,11 @@ double optimize(const hypergraph_set_type& graphs,
     return 0.0;
   }
 }
+
+
+
+
+
 
 struct TaskOracle
 {
@@ -1219,6 +1355,8 @@ void options(int argc, char** argv)
     ("cube-size",   po::value<int>(&cube_size),     "cube-pruning size")
 
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
+    ("sgd",            po::bool_switch(&sgd),            "online SGD algorithm")
+    ("mix-optimized",  po::bool_switch(& mix_optimized), "optimized weights mixing")
     ;
   
   po::options_description opts_command("command line options");
