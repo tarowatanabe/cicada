@@ -734,7 +734,7 @@ struct OptimizeOnline
       for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter)
 	objective += oiter->objective;
       if (debug >= 2)
-	std::cerr << "objectice: " << objective << std::endl;
+	std::cerr << "objective: " << objective << std::endl;
     }
     
     weights.swap(weights_mixed);

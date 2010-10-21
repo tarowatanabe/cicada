@@ -76,14 +76,12 @@ struct LineSearch
   
 };
 
-struct OptimizerSGD
+struct OptimizerBase
 {
-  OptimizerSGD(const hypergraph_set_type&           __graphs,
-	       const feature_function_ptr_set_type& __features)
+  OptimizerBase(const hypergraph_set_type&           __graphs,
+		const feature_function_ptr_set_type& __features)
     : graphs(__graphs),
       features(__features),
-      epoch(0),
-      lambda(C / __graphs.size()),
       weight_scale(1.0),
       weight_norm(0.0)
   {
@@ -332,10 +330,6 @@ struct OptimizerSGD
   const hypergraph_set_type&           graphs;
   const feature_function_ptr_set_type& features;
   
-  size_t epoch;
-  double lambda;
-  size_t samples;
-  
   weight_set_type weights;
   weight_set_type weights_bleu;
   weight_set_type::feature_type feature_bleu;
@@ -361,11 +355,14 @@ struct OptimizerSGD
   weight_type Z_correct;
 };
 
-struct OptimizerSGDL2 : public OptimizerSGD
+struct OptimizerSGDL2 : public OptimizerBase
 {
   OptimizerSGDL2(const hypergraph_set_type&           __graphs,
 		 const feature_function_ptr_set_type& __features)
-    : OptimizerSGD(__graphs, __features) {}
+    : OptimizerBase(__graphs, __features),
+      samples(0),
+      epoch(0),
+      lambda(C / __graphs.size()) {}
   
   void initialize()
   {
@@ -395,7 +392,7 @@ struct OptimizerSGDL2 : public OptimizerSGD
     ++ epoch;
     
     // we will minimize...
-    if (OptimizerSGD::operator()(segment)) {
+    if (OptimizerBase::operator()(segment)) {
       // we have gradients_correct/gradients/Z_correct/Z
       
       rescale(1.0 - eta * lambda);
@@ -450,16 +447,22 @@ struct OptimizerSGDL2 : public OptimizerSGD
       std::fill(weights.begin(), weights.end(), 0.0);
     }
   }
-    
+  
+  size_t samples;
+  size_t epoch;
+  double lambda;
 };
 
-struct OptimizerSGDL1 : public OptimizerSGD
+struct OptimizerSGDL1 : public OptimizerBase
 {
   typedef cicada::WeightVector<double> penalty_set_type;
-
+  
   OptimizerSGDL1(const hypergraph_set_type&           __graphs,
 		 const feature_function_ptr_set_type& __features)
-    : OptimizerSGD(__graphs, __features) {}
+    : OptimizerBase(__graphs, __features),
+      samples(0),
+      epoch(0),
+      lambda(C / __graphs.size()) {}
   
   void initialize()
   {
@@ -481,6 +484,7 @@ struct OptimizerSGDL1 : public OptimizerSGD
   
   void operator()(const int segment)
   {
+    //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     const double eta = 1.0 / (lambda * (epoch + 2));
     ++ epoch;
     
@@ -488,7 +492,7 @@ struct OptimizerSGDL1 : public OptimizerSGD
     penalty += eta * lambda;
     
     // we will maximize, not minimize...
-    if (OptimizerSGD::operator()(segment)) {
+    if (OptimizerBase::operator()(segment)) {
       // we have gradients_correct/gradients/Z_correct/Z
       
       gradient_type::const_iterator citer_end = gradients_correct.gradient.end();
@@ -523,6 +527,10 @@ struct OptimizerSGDL1 : public OptimizerSGD
       x = std::min(0.0, x - penalty + cummulative);
     penalty += x - x_half;
   }
+
+  size_t samples;
+  size_t epoch;
+  double lambda;
   
   penalty_set_type penalties;
   double penalty;
