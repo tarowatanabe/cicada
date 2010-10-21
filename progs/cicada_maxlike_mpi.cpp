@@ -126,10 +126,12 @@ void compute_oracles(const hypergraph_set_type& graphs,
 template <typename Optimize>
 double optimize_batch(const hypergraph_set_type& graphs,
 		      const feature_function_ptr_set_type& features,
+		      const scorer_document_type& scorers,
 		      weight_set_type& weights);
 template <typename Optimize>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
 		       weight_set_type& weights);
 
 #include "cicada_maxlike_impl.hpp"
@@ -217,11 +219,11 @@ int main(int argc, char ** argv)
 
     if (sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizerSGDL1 >(graphs, features, weights);
+	objective = optimize_online<OptimizerSGDL1 >(graphs, features, scorers, weights);
       else
-	objective = optimize_online<OptimizerSGDL2 >(graphs, features, weights);
+	objective = optimize_online<OptimizerSGDL2 >(graphs, features, scorers, weights);
     } else 
-      objective = optimize_batch<OptimizeLBFGS>(graphs, features, weights);
+      objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
     if (mpi_rank == 0 && debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -625,6 +627,7 @@ struct OptimizeLBFGS
 template <typename Optimizer>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
 		       weight_set_type& weights)
 {
   typedef std::vector<int, std::allocator<int> > id_set_type;
@@ -741,6 +744,7 @@ double optimize_online(const hypergraph_set_type& graphs,
 template <typename Optimize>
 double optimize_batch(const hypergraph_set_type& graphs,
 		      const feature_function_ptr_set_type& features,
+		      const scorer_document_type& scorers,
 		      weight_set_type& weights)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();

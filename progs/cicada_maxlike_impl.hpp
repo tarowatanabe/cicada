@@ -1,4 +1,81 @@
 
+#include <cicada/optimize/line_search.hpp>
+
+struct LineSearch
+{
+  typedef cicada::eval::Scorer         scorer_type;
+  typedef cicada::eval::ScorerDocument scorer_document_type;
+  
+  typedef scorer_type::scorer_ptr_type scorer_ptr_type;
+  typedef scorer_type::score_ptr_type  score_ptr_type;
+
+  typedef cicada::optimize::LineSearch line_search_type;
+  
+  typedef line_search_type::segment_type          segment_type;
+  typedef line_search_type::segment_set_type      segment_set_type;
+  typedef line_search_type::segment_document_type segment_document_type;
+
+  typedef line_search_type::value_type optimum_type;
+  
+  typedef cicada::semiring::Envelope envelope_type;
+  typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
+
+  typedef cicada::Sentence sentence_type;
+
+  LineSearch(const int __debug=0) : line_search(__debug), debug(__debug) {}
+
+  segment_document_type segments;
+  envelope_set_type     envelopes;
+  sentence_type         yield;
+  
+  line_search_type line_search;
+  int debug;
+  
+  template <typename HypergraphSet, typename ScorerSet>
+  double operator()(const HypergraphSet& graphs,
+		    const ScorerSet& scorers,
+		    const weight_set_type& origin,
+		    const weight_set_type& direction,
+		    const double lower,
+		    const double upper,
+		    const bool yield_source=false)
+  {
+    segments.clear();
+    segments.resize(graphs.size());
+    
+    for (int seg = 0; seg < graphs.size(); ++ seg) 
+      if (graphs[seg].is_valid()) {
+	
+	if (debug >= 4)
+	  std::cerr << "line-search segment: " << seg << std::endl;
+	
+	envelopes.clear();
+	envelopes.resize(graphs[seg].nodes.size());
+	
+	cicada::inside(graphs[seg], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
+	
+	const envelope_type& envelope = envelopes[graphs[seg].goal];
+	const_cast<envelope_type&>(envelope).sort();
+	
+	envelope_type::const_iterator eiter_end = envelope.end();
+	for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
+	  const envelope_type::line_ptr_type& line = *eiter;
+	  
+	  line->yield(yield, yield_source);
+	  
+	  scorer_type::score_ptr_type score = scorers[seg]->score(yield);
+	  
+	  segments[seg].push_back(std::make_pair(line->x, score));
+	}
+      }
+    
+    // traverse segments...
+    const optimum_type optimum = line_search(segments, lower, upper, false);
+    return (optimum.lower + optimum.upper) * 0.5;
+  }
+  
+};
+
 struct OptimizerSGD
 {
   OptimizerSGD(const hypergraph_set_type&           __graphs,

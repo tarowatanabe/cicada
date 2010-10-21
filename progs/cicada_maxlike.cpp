@@ -102,6 +102,7 @@ int cube_size = 200;
 bool softmax_margin = false;
 bool sgd = false;
 bool mix_optimized = false;
+bool yield_source = false;
 
 int threads = 4;
 
@@ -119,9 +120,16 @@ void compute_oracles(const hypergraph_set_type& graphs,
 		     const scorer_document_type& scorers);
 
 template <typename Optimizer>
-double optimize(const hypergraph_set_type& graphs,
-		const feature_function_ptr_set_type& features,
-		weight_set_type& weights);
+double optimize_online(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
+		       weight_set_type& weights);
+template <typename Optimizer>
+double optimize_batch(const hypergraph_set_type& graphs,
+		      const feature_function_ptr_set_type& features,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights);
+
 
 struct OptimizeLBFGS;
 
@@ -177,11 +185,11 @@ int main(int argc, char ** argv)
 
     if (sgd) {
       if (regularize_l1)
-	objective = optimize<OptimizeOnline<OptimizerSGDL1> >(graphs, features, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs, features, scorers, weights);
       else
-	objective = optimize<OptimizeOnline<OptimizerSGDL2> >(graphs, features, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs, features, scorers, weights);
     } else 
-      objective = optimize<OptimizeLBFGS>(graphs, features, weights);
+      objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -202,6 +210,7 @@ struct OptimizeLBFGS
 
   OptimizeLBFGS(const hypergraph_set_type&           __graphs,
 		const feature_function_ptr_set_type& __features,
+		const scorer_document_type&           __scorers,
 		weight_set_type&                      __weights)
     : graphs(__graphs),
       features(__features),
@@ -607,9 +616,11 @@ struct OptimizeOnline
   
   OptimizeOnline(const hypergraph_set_type&           __graphs,
 		 const feature_function_ptr_set_type& __features,
+		 const scorer_document_type&          __scorers,
 		 weight_set_type&                     __weights)
     : graphs(__graphs),
       features(__features),
+      scorers(__scorers),
       weights(__weights) {}
   
   struct Task
@@ -657,6 +668,8 @@ struct OptimizeOnline
 
     weight_set_type weights_mixed;
     double objective = 0.0;
+
+    LineSearch line_search(debug);
     
     for (int iter = 0; iter < iteration; ++ iter) {
       
@@ -675,25 +688,51 @@ struct OptimizeOnline
       workers.join_all();
       
       // collect weights from optimizers and perform averaging...
-      
-      weights_mixed.clear();
-      objective = 0.0;
-      size_t samples = 0;
-      
-      typename optimizer_set_type::iterator oiter_end = optimizers.end();
-      for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
-	oiter->weights *= oiter->samples;
+      if (mix_optimized) {
 	
-	weights_mixed += oiter->weights;
-	samples       += oiter->samples;
-	objective     += oiter->objective;
+	weights_mixed.clear();
+	typename optimizer_set_type::iterator oiter_end = optimizers.end();
+	for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
+	  if (weights_mixed.empty())
+	    weights_mixed = oiter->weights;
+	  else {
+	    weight_set_type direction = oiter->weights;
+	    direction -= weights_mixed;
+	    
+	    const double update = line_search(graphs, scorers, weights_mixed, direction, 1e-4, 1.0 - 1e-4, yield_source);
+	    if (update == 0.0)
+	      direction *= 0.5;
+	    else
+	      direction *= update;
+
+	    if (debug >= 2)
+	      std::cerr << "optimized update: " << update << std::endl;
+	    
+	    weights_mixed += direction;
+	  }
+	}
+      } else {
+	weights_mixed.clear();
+	size_t samples = 0;
+	
+	typename optimizer_set_type::iterator oiter_end = optimizers.end();
+	for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {
+	  oiter->weights *= oiter->samples;
+	  
+	  weights_mixed += oiter->weights;
+	  samples       += oiter->samples;
+	}
+	
+	weights_mixed *= (1.0 / samples);
       }
       
-      weights_mixed *= (1.0 / samples);
-      
+      typename optimizer_set_type::iterator oiter_end = optimizers.end();
       for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter)
 	oiter->weights = weights_mixed;
-
+      
+      objective = 0.0;
+      for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter)
+	objective += oiter->objective;
       if (debug >= 2)
 	std::cerr << "objectice: " << objective << std::endl;
     }
@@ -705,15 +744,26 @@ struct OptimizeOnline
   
   const hypergraph_set_type&           graphs;
   const feature_function_ptr_set_type& features;
+  const scorer_document_type&          scorers;
   weight_set_type&                     weights;
 };
 
 template <typename Optimizer>
-double optimize(const hypergraph_set_type& graphs,
-		const feature_function_ptr_set_type& features,
-		weight_set_type& weights)
+double optimize_online(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
+		       weight_set_type& weights)
 {
-  return Optimizer(graphs, features, weights)();
+  return Optimizer(graphs, features, scorers,  weights)();
+}
+
+template <typename Optimizer>
+double optimize_batch(const hypergraph_set_type& graphs,
+		      const feature_function_ptr_set_type& features,
+		      const scorer_document_type& scorers,
+		      weight_set_type& weights)
+{
+  return Optimizer(graphs, features, scorers,  weights)();
 }
 
 
@@ -1125,6 +1175,7 @@ void options(int argc, char** argv)
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     ("sgd",            po::bool_switch(&sgd),            "online SGD algorithm")
     ("mix-optimized",  po::bool_switch(& mix_optimized), "optimized weights mixing")
+    ("yield-source",   po::bool_switch(&yield_source),   "MERT over source-yield")
     
     ("threads", po::value<int>(&threads), "# of threads")
     ;
