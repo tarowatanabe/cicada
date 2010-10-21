@@ -434,9 +434,6 @@ struct OptimizeLBFGS
     
     void operator()()
     {
-      const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-      const int mpi_size = MPI::COMM_WORLD.Get_size();
-
       g.clear();
       objective = 0.0;
 
@@ -668,10 +665,14 @@ double optimize_online(const hypergraph_set_type& graphs,
       objective = 0.0;
       MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
       
-      size_t samples = 0;
-      MPI::COMM_WORLD.Reduce(&optimizer.samples, &samples, 1, MPI::LONG, MPI::SUM, 0);
+      int samples = 0;
+      int samples_local = optimizer.samples;
+      MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
       
       optimizer.weights *= (1.0 / samples);
+
+      if (debug >= 2)
+	std::cerr << "objective: " << objective << std::endl;
     }
 
     // send termination!
@@ -702,6 +703,8 @@ double optimize_online(const hypergraph_set_type& graphs,
       if (MPI::Request::Waitany(2, requests))
 	break;
       else {
+	requests[NOTIFY].Start();
+
 	bcast_weights(0, optimizer.weights);
 	
 	optimizer.initialize();
@@ -720,8 +723,9 @@ double optimize_online(const hypergraph_set_type& graphs,
 	double objective = 0.0;
 	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
 
-	size_t samples = 0;
-	MPI::COMM_WORLD.Reduce(&optimizer.samples, &samples, 1, MPI::LONG, MPI::SUM, 0);
+	int samples = 0;
+	int samples_local = optimizer.samples;
+	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
       }
     }
     

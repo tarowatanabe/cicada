@@ -239,6 +239,16 @@ struct OptimizerSGD
     gradients.gradient /= Z;
     gradients_correct.gradient /= Z_correct;
 
+    const double margin = log(Z_correct) - log(Z);
+
+    if (debug >= 3)
+      std::cerr << "id: " << id
+		<< " bleu: " << log(bleu_max)
+		<< " correct: " << log(Z_correct)
+		<< " partition: " << log(Z)
+		<< " margin: " << margin
+		<< std::endl;
+
     return true;
   }
   
@@ -283,7 +293,7 @@ struct OptimizerSGDL2 : public OptimizerSGD
   void initialize()
   {
     samples = 0;
-
+    
     weights[feature_bleu] = 0.0;
     
     weight_scale = 1.0;
@@ -318,7 +328,7 @@ struct OptimizerSGDL2 : public OptimizerSGD
       for (gradient_type::const_iterator citer = gradients_correct.gradient.begin(); citer != citer_end; ++ citer) 
 	if (citer->first != feature_bleu) {
 	  const double feature = citer->second;
-	  update(weights[citer->first], - feature * eta);
+	  update(weights[citer->first], feature * eta);
 	}
       
       // update wrt marginal gradients...
@@ -326,7 +336,7 @@ struct OptimizerSGDL2 : public OptimizerSGD
       for (gradient_type::const_iterator miter = gradients.gradient.begin(); miter != miter_end; ++ miter) 
 	if (miter->first != feature_bleu) {
 	  const double feature = miter->second;
-	  update(weights[miter->first], feature * eta);
+	  update(weights[miter->first], - feature * eta);
 	}
       
       // projection...
@@ -334,6 +344,14 @@ struct OptimizerSGDL2 : public OptimizerSGD
 	rescale(std::sqrt(1.0 / (lambda * weight_norm)));
       
       objective += double(log(Z_correct) - log(Z)) * weight_scale;
+      
+      if (weight_scale < 0.01 || 100 < weight_scale) {
+	weights[feature_bleu] = 0.0;
+	weights *= weight_scale;
+	weight_scale = 1.0;
+	weight_norm = std::inner_product(weights.begin(), weights.end(), weights.begin(), 0.0);
+      }
+
       ++ samples;
     }
   }  
