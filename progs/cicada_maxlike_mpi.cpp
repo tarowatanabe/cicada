@@ -109,6 +109,7 @@ int cube_size = 200;
 bool softmax_margin = false;
 bool sgd = false;
 bool mix_optimized = false;
+bool yield_source = false;
 
 int debug = 0;
 
@@ -1365,6 +1366,7 @@ void options(int argc, char** argv)
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     ("sgd",            po::bool_switch(&sgd),            "online SGD algorithm")
     ("mix-optimized",  po::bool_switch(& mix_optimized), "optimized weights mixing")
+    ("yield-source",   po::bool_switch(&yield_source),   "MERT over source-yield")
     ;
   
   po::options_description opts_command("command line options");
