@@ -845,7 +845,6 @@ int main(int argc, char ** argv)
 	    if (! feature_count.empty())
 	      features[feature_count] = count_weight;
 	    
-
 	    double score_local = 0.0;
 	    if (match_lower) {
 	      TERAligner<MatcherLower> aligner(debug);
@@ -856,12 +855,15 @@ int main(int argc, char ** argv)
 	    }
 	    if (debug)
 	      std::cerr << "TER: " << score_local << std::endl;
-
+	    
 	    score += score_local;
 	    
 	    merged.swap(merged_new);
 	    merged_new.clear();
 	  }
+	  
+	  if (debug)
+	    std::cerr << "lattice size: " << merged.size() << std::endl;
 	  
 	  // merged is now merged into meregd_all
 
