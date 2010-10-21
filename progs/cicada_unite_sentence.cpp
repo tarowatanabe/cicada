@@ -505,72 +505,61 @@ struct TranslationErrorRate : public TER, public M
   {
     index_set_type indices;
     index_set_type indices_next;
-	
-    for (int start = 0; start != hyp.size(); ++ start) {
-      
-      for (int moveto = 0; moveto != lattice_unique.size(); ++ moveto) {
-	arc_unique_set_type::const_iterator aiter = lattice_unique[moveto].find(M::operator()(hyp[start]));
-	if (aiter == lattice_unique[moveto].end()) continue;
-	
-	bool found = (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist));
-	
-	if (! found) continue;
-	
-	indices.clear();
-	indices_next.clear();
-	indices.insert(moveto);
-	
-	const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
-	for (int end = start; found && end != last; ++ end) {
+    
+    for (int start = 0; start != hyp.size(); ++ start)
+      for (int moveto = 0; moveto != lattice_unique.size(); ++ moveto) 
+	if (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist)) {
 	  
-	  found = false;
-	  
+	  indices.clear();
 	  indices_next.clear();
-	  index_set_type::const_iterator iiter_end = indices.end();
-	  for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
-	    arc_unique_set_type::const_iterator aiter = lattice_unique[*iiter].find(M::operator()(hyp[end]));
-	    if (aiter == lattice_unique[*iiter].end()) continue;
-	    
-	    found = true;
-	    
-	    indices_next.insert(aiter->second.begin(), aiter->second.end());
-	  }
-	  indices.swap(indices_next);
-	  indices_next.clear();
+	  indices.insert(moveto);
 	  
-	  if (! found) break;
+	  const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
+	  for (int end = start; end != last; ++ end) {
+	    
+	    bool found = false;
+	    
+	    indices_next.clear();
+	    index_set_type::const_iterator iiter_end = indices.end();
+	    for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
+	      arc_unique_set_type::const_iterator aiter = lattice_unique[*iiter].find(M::operator()(hyp[end]));
+	      if (aiter == lattice_unique[*iiter].end()) continue;
+	    
+	      found = true;
+	    
+	      indices_next.insert(aiter->second.begin(), aiter->second.end());
+	    }
+	    indices.swap(indices_next);
+	    indices_next.clear();
 	  
-	  error_set_type::const_iterator hiter_begin = herr.begin() + start;
-	  error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
-	  if (std::find(hiter_begin, hiter_end, true) == hiter_end) {
-	    found = true;
-	    continue;
-	  }
+	    if (! found) break;
 	  
-	  if (ralign[moveto] != start
-	      && (ralign[moveto] < start || end < ralign[moveto])
-	      && ralign[moveto] - start <= max_shift_dist
-	      && start - ralign[moveto] - 1 <= max_shift_dist) {
+	    error_set_type::const_iterator hiter_begin = herr.begin() + start;
+	    error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
+	    if (std::find(hiter_begin, hiter_end, true) == hiter_end)
+	      continue;
+	  
+	    if (ralign[moveto] != start
+		&& (ralign[moveto] < start || end < ralign[moveto])
+		&& ralign[moveto] - start <= max_shift_dist
+		&& start - ralign[moveto] - 1 <= max_shift_dist) {
 	    
-	    found = true;
+	      error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
+	      error_set_type::const_iterator riter_end   = rerr.begin() + end - start + moveto + 1;
 	    
-	    error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
-	    error_set_type::const_iterator riter_end   = rerr.begin() + end - start + moveto + 1;
+	      if (std::find(riter_begin, riter_end, true) == riter_end) continue;
 	    
-	    if (std::find(riter_begin, riter_end, true) == riter_end) continue;
+	      shift_set_type& sshifts = shifts[end - start];
 	    
-	    shift_set_type& sshifts = shifts[end - start];
-	    
-	    for (int roff = -1; roff <= end - start; ++ roff) {
-	      if (roff == -1 && moveto == 0)
-		sshifts.push_back(shift_type(start, end, -1, -1));
-	      else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
-		sshifts.push_back(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
+	      for (int roff = -1; roff <= end - start; ++ roff) {
+		if (roff == -1 && moveto == 0)
+		  sshifts.push_back(shift_type(start, end, -1, -1));
+		else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
+		  sshifts.push_back(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
+	      }
 	    }
 	  }
 	}
-      }
-    }
   }
 
   void build_unique_lattice(const lattice_type& ref, const sentence_type& hyp, lattice_unique_type& lattice_unique) const

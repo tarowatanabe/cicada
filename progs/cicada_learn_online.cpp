@@ -1107,7 +1107,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
 	  weight_set_type direction = oiter->weights;
 	  direction -= weights_mixed;
 	  
-	  const double update = oiter->line_search(oiter->hypergraphs, oiter->scorers, weights_mixed, direction, 0.1, 0.9);
+	  const double update = oiter->line_search(oiter->hypergraphs, oiter->scorers, weights_mixed, direction, 1e-4, 1.0 - 1e-4);
 	  if (update == 0.0)
 	    direction *= 0.5;
 	  else

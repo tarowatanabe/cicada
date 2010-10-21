@@ -1506,7 +1506,7 @@ void reduce_weights_optimized(const int rank, weight_set_type& weights, Optimize
   
   direction -= weights;
   
-  const double update = optimizer.line_search(optimizer.hypergraphs, optimizer.scorers, weights, direction, 0.1, 0.9);
+  const double update = optimizer.line_search(optimizer.hypergraphs, optimizer.scorers, weights, direction, 1e-4, 1.0 - 1e-4);
   if (update == 0.0)
     direction *= 0.5;
   else
