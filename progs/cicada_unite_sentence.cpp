@@ -146,8 +146,8 @@ struct MinimumEditDistance : public M
       costs(i, 0) = costs(i - 1, 0) + TER::COSTS::insertion;
       ops(i, 0) = TER::TRANSITION::insertion;
     }
-    for (int j = 1; j <= refs.size(); ++ j) {
-      
+    
+    for (int j = 1; j <= refs.size(); ++ j)
       if (refs[j - 1].find(vocab_type::EPSILON) == refs[j - 1].end()) {
 	costs(0, j) = costs(0, j - 1) + TER::COSTS::deletion;
 	ops(0, j) = TER::TRANSITION::deletion;
@@ -155,7 +155,6 @@ struct MinimumEditDistance : public M
 	costs(0, j) = costs(0, j - 1);
 	ops(0, j) = TER::TRANSITION::epsilon;
       }
-    }
     
     for (int i = 1; i <= hyp.size(); ++ i)
       for (int j = 1; j <= refs.size(); ++ j) {
@@ -180,18 +179,18 @@ struct MinimumEditDistance : public M
 	    cur_cost = eps;
 	    cur_op   = TER::TRANSITION::epsilon;
 	  }
+	} else {
+	  const double del = costs(i, j - 1) + TER::COSTS::deletion;
+	  if (cur_cost > del) {
+	    cur_cost = del;
+	    cur_op   = TER::TRANSITION::deletion;
+	  }
 	}
 	
 	const double ins = costs(i - 1, j) + TER::COSTS::insertion;
 	if (cur_cost > ins) {
 	  cur_cost = ins;
 	  cur_op   = TER::TRANSITION::insertion;
-	}
-	
-	const double del = costs(i, j - 1) + TER::COSTS::deletion;
-	if (cur_cost > del) {
-	  cur_cost = del;
-	  cur_op   = TER::TRANSITION::deletion;
 	}
       }
     
@@ -322,7 +321,7 @@ struct TranslationErrorRate : public TER, public M
     path_type     path_new;
     double        cost_new;
     
-    lattice_unique_type lattice_unique(ref.size());
+    lattice_unique_type lattice_unique(ref.size() + 1);
     
     build_unique_lattice(ref, hyp, lattice_unique);
 
@@ -369,8 +368,9 @@ struct TranslationErrorRate : public TER, public M
     int rpos = -1;
     
     //std::cerr << "edit distance: ";
-    for (int i = 0; i < path.size(); ++ i) {
-      switch (path[i]) {
+    typename path_type::const_iterator piter_end = path.end();
+    for (typename path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
+      switch (*piter) {
       case TRANSITION::match:
 	//std::cerr << " M";
 	++ hpos;
@@ -401,7 +401,7 @@ struct TranslationErrorRate : public TER, public M
       case TRANSITION::epsilon:
 	//std::cerr << " E";
 	++ rpos;
-	rerr.push_back(true);
+	rerr.push_back(false); // ???
 	ralign.push_back(hpos);
 	break;
       }
@@ -531,6 +531,15 @@ struct TranslationErrorRate : public TER, public M
 				  const lattice_unique_type& lattice_unique,
 				  shift_matrix_type& shifts) const
   {
+    if (debug >= 2)
+      std::cerr << "gather possible shifts:"
+		<< " hyp: " << hyp.size()
+		<< " ref: " << lattice_unique.size()
+		<< " raligh: " << ralign.size()
+		<< " herr: " << herr.size()
+		<< " rerr: " << rerr.size()
+		<< std::endl;
+
     utils::resource start;
 
     index_set_type indices;
@@ -539,6 +548,12 @@ struct TranslationErrorRate : public TER, public M
     for (int start = 0; start != hyp.size(); ++ start)
       for (int moveto = 0; moveto != lattice_unique.size(); ++ moveto) 
 	if (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist)) {
+
+	  if (debug >= 4)
+	    std::cerr << "start: " << start
+		      << " moveto: " << moveto
+		      << " ralign[moveto]: " << ralign[moveto]
+		      << std::endl;
 	  
 	  indices.clear();
 	  indices_next.clear();
@@ -546,24 +561,19 @@ struct TranslationErrorRate : public TER, public M
 	  
 	  const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
 	  for (int end = start; end != last; ++ end) {
-	    
-	    bool found = false;
-	    
 	    indices_next.clear();
 	    index_set_type::const_iterator iiter_end = indices.end();
 	    for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
 	      arc_unique_set_type::const_iterator aiter = lattice_unique[*iiter].find(M::operator()(hyp[end]));
 	      if (aiter == lattice_unique[*iiter].end()) continue;
-	    
-	      found = true;
-	    
+	      
 	      indices_next.insert(aiter->second.begin(), aiter->second.end());
 	    }
 	    indices.swap(indices_next);
 	    indices_next.clear();
-	  
-	    if (! found) break;
-	  
+	    
+	    if (indices.empty()) break;
+	    
 	    error_set_type::const_iterator hiter_begin = herr.begin() + start;
 	    error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
 	    if (std::find(hiter_begin, hiter_end, true) == hiter_end)
@@ -573,19 +583,24 @@ struct TranslationErrorRate : public TER, public M
 		&& (ralign[moveto] < start || end < ralign[moveto])
 		&& ralign[moveto] - start <= max_shift_dist
 		&& start - ralign[moveto] - 1 <= max_shift_dist) {
-	    
-	      error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
-	      error_set_type::const_iterator riter_end   = rerr.begin() + end - start + moveto + 1;
-	    
-	      if (std::find(riter_begin, riter_end, true) == riter_end) continue;
-	    
-	      shift_set_type& sshifts = shifts[end - start];
-	    
-	      for (int roff = -1; roff <= end - start; ++ roff) {
-		if (roff == -1 && moveto == 0)
-		  sshifts.insert(shift_type(start, end, -1, -1));
-		else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
-		  sshifts.insert(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
+	      
+	      index_set_type::const_iterator iiter_end = indices.end();
+	      for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
+		
+		error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
+		error_set_type::const_iterator riter_end   = rerr.begin() + *iiter;
+		//error_set_type::const_iterator riter_end   = rerr.begin() + end - start + 1 + moveto;
+		
+		if (std::find(riter_begin, riter_end, true) == riter_end) continue;
+		
+		shift_set_type& sshifts = shifts[end - start];
+		
+		for (int roff = -1; roff <= *iiter - moveto - 1; ++ roff) {
+		  if (roff == -1 && moveto == 0)
+		    sshifts.insert(shift_type(start, end, -1, -1));
+		  else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
+		    sshifts.insert(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
+		}
 	      }
 	    }
 	  }
