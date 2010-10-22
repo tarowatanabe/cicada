@@ -64,7 +64,7 @@ int main(int argc, char ** argv)
 	
 	for (int i = 0; i != lattice.size(); ++ i)
 	  merged_new.push_back(lattice[i]);
-
+	
 	merged.swap(merged_new);
 	merged_new.clear();
       }

@@ -225,4 +225,12 @@ namespace cicada
     
     return os;
   }
+
+
+  std::ostream& graphviz(std::ostream& os, const Lattice& lattice)
+  {
+    
+    
+    return os;
+  }
 };

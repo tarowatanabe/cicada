@@ -6,10 +6,12 @@
 #include <iostream>
 
 #include <cicada/hypergraph.hpp>
+#include <cicada/lattice.hpp>
 
 namespace cicada
 {
   std::ostream& graphviz(std::ostream& os, const HyperGraph& hypergraph);
+  std::ostream& graphviz(std::ostream& os, const Lattice& lattice);
 };
 
 #endif
