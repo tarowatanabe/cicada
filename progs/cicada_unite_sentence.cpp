@@ -547,8 +547,8 @@ struct TranslationErrorRate : public TER, public M
     
     for (int start = 0; start != hyp.size(); ++ start)
       for (int moveto = 0; moveto != lattice_unique.size(); ++ moveto) 
-	if (start != ralign[moveto] && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist)) {
-
+	if (ralign[moveto] != start && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist)) {
+	  
 	  if (debug >= 4)
 	    std::cerr << "start: " << start
 		      << " moveto: " << moveto
@@ -562,52 +562,52 @@ struct TranslationErrorRate : public TER, public M
 	  const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
 	  for (int end = start; end != last; ++ end) {
 	    indices_next.clear();
-	    index_set_type::const_iterator iiter_end = indices.end();
-	    for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
-	      arc_unique_set_type::const_iterator aiter = lattice_unique[*iiter].find(M::operator()(hyp[end]));
-	      if (aiter == lattice_unique[*iiter].end()) continue;
-	      
-	      indices_next.insert(aiter->second.begin(), aiter->second.end());
+	    {
+	      index_set_type::const_iterator iiter_end = indices.end();
+	      for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
+		arc_unique_set_type::const_iterator aiter = lattice_unique[*iiter].find(M::operator()(hyp[end]));
+		if (aiter == lattice_unique[*iiter].end()) continue;
+		
+		indices_next.insert(aiter->second.begin(), aiter->second.end());
+	      }
 	    }
 	    indices.swap(indices_next);
 	    indices_next.clear();
 	    
 	    if (indices.empty()) break;
 	    
+	    if (! (ralign[moveto] < start || end < ralign[moveto])) continue;
+	    
+	    // we will shift to position where we expect error (and then, recovered after shift)
 	    error_set_type::const_iterator hiter_begin = herr.begin() + start;
 	    error_set_type::const_iterator hiter_end   = herr.begin() + end + 1;
 	    if (std::find(hiter_begin, hiter_end, true) == hiter_end)
 	      continue;
-	  
-	    if (ralign[moveto] != start
-		&& (ralign[moveto] < start || end < ralign[moveto])
-		&& ralign[moveto] - start <= max_shift_dist
-		&& start - ralign[moveto] - 1 <= max_shift_dist) {
+	    
+	    index_set_type::const_iterator iiter_end = indices.end();
+	    for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
 	      
-	      index_set_type::const_iterator iiter_end = indices.end();
-	      for (index_set_type::const_iterator iiter = indices.begin(); iiter != iiter_end; ++ iiter) {
-		
-		error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
-		error_set_type::const_iterator riter_end   = rerr.begin() + *iiter;
-		//error_set_type::const_iterator riter_end   = rerr.begin() + end - start + 1 + moveto;
-		
-		if (std::find(riter_begin, riter_end, true) == riter_end) continue;
-		
-		shift_set_type& sshifts = shifts[end - start];
-		
-		for (int roff = -1; roff <= *iiter - moveto - 1; ++ roff) {
-		  if (roff == -1 && moveto == 0)
-		    sshifts.insert(shift_type(start, end, -1, -1));
-		  else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
-		    sshifts.insert(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
-		}
+	      error_set_type::const_iterator riter_begin = rerr.begin() + moveto;
+	      error_set_type::const_iterator riter_end   = rerr.begin() + *iiter;
+	      //error_set_type::const_iterator riter_end   = rerr.begin() + end - start + 1 + moveto;
+	      
+	      if (std::find(riter_begin, riter_end, true) == riter_end)
+		continue;
+	      
+	      shift_set_type& sshifts = shifts[end - start];
+	      
+	      for (int roff = -1; roff <= *iiter - moveto - 1; ++ roff) {
+		if (roff == -1 && moveto == 0)
+		  sshifts.insert(shift_type(start, end, -1, -1));
+		else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
+		  sshifts.insert(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
 	      }
 	    }
 	  }
 	}
-
+    
     utils::resource end;
-
+    
     if (debug >= 2)
       std::cerr << "gather all possible shifts cpu time: " << (end.cpu_time() - start.cpu_time())
 		<< " user time: " << (end.user_time() - start.user_time())
