@@ -167,7 +167,7 @@ namespace cicada
 		
 		active_set_type& cell = actives[table](first, last - 1 + length);
 		
-		// proceed by EPSILON... is this correct?
+		// handling of EPSILON rule...
 		if (terminal == vocab_type::EPSILON) {
 		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 		    cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features));

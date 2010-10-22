@@ -113,12 +113,12 @@ namespace cicada
       jlf_lattice_arc %= '[' >> jlf_label_double_quote >> ',' >> '{' >> -(jlf_lattice_score % ',') >> '}' >> ',' >> int_ >> ']';
       plf_lattice_arc %= '(' >> (plf_label_double_quote | plf_label_single_quote) >> ',' >> repeat(1)[plf_lattice_score] >> ',' >> int_ >> ')';
       
-      jlf_lattice_set %= '[' >> (plf_lattice_arc % ',') >> ']';
+      jlf_lattice_set %= '[' >> (jlf_lattice_arc % ',') >> ']';
       plf_lattice_set %= '(' >> +(plf_lattice_arc >> ',') >> ')';
-      
-      lattice_grammar %= (lit('(') >> *(plf_lattice_set >> ',') >> lit(')') | '[' >> -(jlf_lattice_set % ',') >> ']');
-    }
 
+      lattice_grammar %= hold[lit('(') >> *(plf_lattice_set >> ',') >> lit(')')] | (lit('[') >> -(jlf_lattice_set % ',') >> lit(']'));
+    }
+    
 
     boost::spirit::qi::symbols<char, char> jlf_escape_char;
     
@@ -183,6 +183,8 @@ namespace cicada
       initialize_distance();
       return true;
     } else {
+      clear();
+      
       // fallback to sentence...
       iter = iter_back;
       Sentence sentence;
@@ -193,8 +195,10 @@ namespace cicada
 	  lattice.push_back(arc_set_type(1, arc_type(*iter)));
 	
 	return true;
-      } else
+      } else {
+	clear();
 	return false;
+      }
     }
   }
   
