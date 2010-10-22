@@ -24,7 +24,6 @@
 
 #include "cicada/kbest.hpp"
 #include "cicada/parameter.hpp"
-#include "cicada/graphviz.hpp"
 
 #include "cicada/model.hpp"
 #include "cicada/grammar.hpp"
@@ -146,50 +145,6 @@ struct weight_set_function_one
   }
 };
 
-
-struct kbest_function
-{
-  typedef rule_type::feature_set_type feature_set_type;
-
-  typedef cicada::semiring::Logprob<double> value_type;
-
-  kbest_function(const weight_set_type& __weights)
-    : weights(__weights) {}
-
-  const weight_set_type& weights;
-  
-  template <typename Edge>
-  value_type operator()(const Edge& edge) const
-  {
-    return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
-  }
-
-  value_type operator()(const feature_set_type& features) const
-  {
-    return cicada::semiring::traits<value_type>::log(features.dot(weights));
-  }
-
-};
-
-struct kbest_function_one
-{
-  typedef rule_type::feature_set_type feature_set_type;
-
-  typedef cicada::semiring::Logprob<double> value_type;
-  
-  kbest_function_one(const weight_set_type& __weights) {}
-
-  template <typename Edge>
-  value_type operator()(const Edge& edge) const
-  {
-    return cicada::semiring::traits<value_type>::log(edge.features.dot());
-  }
-
-  value_type operator()(const feature_set_type& features) const
-  {
-    return cicada::semiring::traits<value_type>::log(features.dot());
-  }
-};
 
 
 template <typename Iterator>
