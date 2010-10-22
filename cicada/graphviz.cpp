@@ -318,7 +318,7 @@ namespace cicada
     std::string output_feature;
     
 
-    os << "digraph { rankdir=BT;" << '\n';
+    os << "digraph { " << '\n';
 
     int id_edge = 0;
     for (int id = 0; id != lattice.size(); ++ id) {
