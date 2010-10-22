@@ -5,6 +5,7 @@
 #include <set>
 
 #include "cicada_impl.hpp"
+#include "cicada/graphviz.hpp"
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/program_options.hpp"
@@ -15,6 +16,8 @@
 
 path_type input_file = "-";
 path_type output_file = "-";
+
+bool output_graphviz = false;
 
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
@@ -70,7 +73,10 @@ int main(int argc, char ** argv)
       }
     }
     
-    os << merged << '\n';
+    if (output_graphviz)
+      cicada::graphviz(os, merged);
+    else
+      os << merged << '\n';
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -90,6 +96,7 @@ void options(int argc, char** argv)
   desc.add_options()
     ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input lattices")
     ("output", po::value<path_type>(&output_file)->default_value("-"),  "output merged lattice")
+    ("graphviz", po::bool_switch(&output_graphviz), "output in graphviz format")
     
     ("help", "help message");
 
