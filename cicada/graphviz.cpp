@@ -30,6 +30,48 @@ BOOST_FUSION_ADAPT_STRUCT(
 
 namespace cicada
 {
+
+  template <typename Iterator>
+  struct graphviz_label_generator : boost::spirit::karma::grammar<Iterator, std::string()>
+  {
+    graphviz_label_generator() : graphviz_label_generator::base_type(label)
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using karma::omit;
+      using karma::repeat;
+      using karma::lit;
+      using karma::inf;
+      using karma::buffer;
+      using standard::char_;
+      using karma::double_;
+      using karma::int_;
+      
+      using namespace karma::labels;
+      
+      escape_char.add
+	('\\', "\\\\")
+	('\"', "\\\"")
+	('{', "\\{")
+	('}', "\\}")
+	('<', "\\<")
+	('>', "\\>")
+	('|', "\\|")
+	(' ',  "\\ ")
+	('/', "\\/")
+	('\n', "\\n")
+	('\r', "\\r")
+	('\t', "\\t");
+      
+      label %= *(escape_char | ~char_('\"'));
+    }
+    
+    boost::spirit::karma::symbols<char, const char*> escape_char;
+    
+    boost::spirit::karma::rule<Iterator, std::string()> label;
+  };
   
   template <typename Iterator>
   struct graphviz_rule_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule()>
@@ -184,8 +226,7 @@ namespace cicada
 
     std::string output_rule;
     std::string output_feature;
-
-
+    
     os << "digraph { rankdir=BT;" << '\n';
     
     hypergraph_type::node_set_type::const_iterator niter_end = hypergraph.nodes.end();
@@ -229,7 +270,85 @@ namespace cicada
 
   std::ostream& graphviz(std::ostream& os, const Lattice& lattice)
   {
+    typedef Lattice lattice_type;
     
+    typedef std::back_insert_iterator<std::string> iterator_type;
+
+    typedef graphviz_label_generator<iterator_type>   label_grammar_type;
+    typedef graphviz_feature_generator<iterator_type> feature_grammar_type;
+
+#ifdef HAVE_TLS
+    static __thread label_grammar_type* __label_grammar_tls = 0;
+    static boost::thread_specific_ptr<label_grammar_type > __label_grammar;
+    
+    if (! __label_grammar_tls) {
+      __label_grammar.reset(new label_grammar_type());
+      __label_grammar_tls = __label_grammar.get();
+    }
+    
+    label_grammar_type& label_grammar = *__label_grammar_tls;
+#else
+    static boost::thread_specific_ptr<label_grammar_type > __label_grammar;
+    if (! __label_grammar.get())
+      __label_grammar.reset(new label_grammar_type());
+    
+    label_grammar_type& label_grammar = *__label_grammar;
+#endif
+
+#ifdef HAVE_TLS
+    static __thread feature_grammar_type* __feature_grammar_tls = 0;
+    static boost::thread_specific_ptr<feature_grammar_type > __feature_grammar;
+    
+    if (! __feature_grammar_tls) {
+      __feature_grammar.reset(new feature_grammar_type());
+      __feature_grammar_tls = __feature_grammar.get();
+    }
+    
+    feature_grammar_type& feature_grammar = *__feature_grammar_tls;
+#else
+    static boost::thread_specific_ptr<feature_grammar_type > __feature_grammar;
+    if (! __feature_grammar.get())
+      __feature_grammar.reset(new feature_grammar_type());
+    
+    feature_grammar_type& feature_grammar = *__feature_grammar;
+#endif
+
+
+    std::string output_label;
+    std::string output_feature;
+    
+
+    os << "digraph { rankdir=BT;" << '\n';
+
+    int id_edge = 0;
+    for (int id = 0; id != lattice.size(); ++ id) {
+      os << " node_" << id << " [label=\"\", shape=circle, height=0.1, width=0.1];" << '\n';
+      
+      lattice_type::arc_set_type::const_iterator aiter_end = lattice[id].end();
+      for (lattice_type::arc_set_type::const_iterator aiter = lattice[id].begin(); aiter != aiter_end; ++ aiter) {
+	const lattice_type::arc_type& arc = *aiter;
+	
+	output_label.clear();
+	iterator_type iter_label(output_label);
+	
+	boost::spirit::karma::generate(iter_label, label_grammar, arc.label);
+	
+	output_feature.clear();
+	iterator_type iter_feature(output_feature);
+	
+	boost::spirit::karma::generate(iter_feature, feature_grammar, arc.features);
+	
+	os << "    edge_" << id_edge << " [label=\"" << output_label << " | " << output_feature << "\", shape=record];" << '\n';
+	
+	os << "   node_" << id << " -> edge_" << id_edge << ';' << '\n';
+	os << "   edge_" << id_edge << " -> node_" << (id + arc.distance) << ';' << '\n';
+	++ id_edge;
+      }
+    }
+    
+    os << " node_" << lattice.size() << " [label=\"\", shape=circle, height=0.1, width=0.1];" << '\n';
+    
+    os << '}' << '\n';
     
     return os;
   }
