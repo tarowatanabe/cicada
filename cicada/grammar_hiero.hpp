@@ -102,7 +102,7 @@ namespace cicada
 	  
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter) 
-	    if (siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
+	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
 	      
 	      rule_ptr_type rule(new rule_type(non_terminal,
 					       rule_type::symbol_set_type(1, *siter),
@@ -136,7 +136,7 @@ namespace cicada
 	  
 	  positions[first][last] = true;
 
-	  if (symbols.find(aiter->label) == symbols.end()) {
+	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	  
 	    rule_ptr_type rule(new rule_type(non_terminal,
 					     rule_type::symbol_set_type(1, aiter->label),
@@ -186,7 +186,7 @@ namespace cicada
 	  
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter) 
-	    if (siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
+	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
 	      
 	      rule_ptr_type rule(new rule_type(non_terminal,
 					       rule_type::symbol_set_type(1, *siter),
@@ -220,7 +220,7 @@ namespace cicada
 
 	  positions[first][last] = true;
 
-	  if (symbols.find(aiter->label) == symbols.end()) {
+	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	  
 	    rule_ptr_type rule(new rule_type(non_terminal,
 					     rule_type::symbol_set_type(1, aiter->label),
