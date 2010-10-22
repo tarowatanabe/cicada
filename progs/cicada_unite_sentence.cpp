@@ -11,6 +11,7 @@
 #include "cicada/eval/ter.hpp"
 
 #include "utils/sgi_hash_map.hpp"
+#include "utils/sgi_hash_set.hpp"
 #include "utils/program_options.hpp"
 #include "utils/resource.hpp"
 
@@ -39,17 +40,6 @@ struct TER
     };
   };
   
-  struct Operation
-  {
-    int pos;
-    TRANSITION::transition_type op;
-    
-    Operation() : pos(-1), op(TRANSITION::epsilon) {}
-    Operation(const TRANSITION::transition_type __op)
-      : pos(-1), op(__op) {}
-    Operation(const int __pos, const TRANSITION::transition_type __op)
-      : pos(__pos), op(__op) {}
-  };
   
   static const int max_shift_size = 10;
   static const int max_shift_dist = 50;
@@ -99,40 +89,66 @@ struct MatcherLower
 template <typename M>
 struct MinimumEditDistance : public M
 {
-  typedef TER::Operation operation_type;
+  typedef cicada::Sentence sentence_type;
+  typedef cicada::Symbol   word_type;
+  
+  typedef TER::TRANSITION::transition_type operation_type;
   typedef std::vector<operation_type, std::allocator<operation_type> > operation_set_type;
   
   typedef utils::vector2<operation_type, std::allocator<operation_type> > matrix_operation_type;
   typedef utils::vector2<double, std::allocator<double> > matrix_cost_type;
 
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >  word_set_type;
+#else
+  typedef sgi::hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> >  word_set_type;
+#endif
+  typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
+
   MinimumEditDistance(const int __debug=0) : debug(__debug) {}
+  
+  matrix_cost_type      costs;
+  matrix_operation_type ops;
 
-  double operator()(const sentence_type& hyp, const lattice_type& ref, operation_set_type& operations)
+  word_map_type refs;
+
+
+  void build(const lattice_type& ref)
   {
-    // vocab_type::EPSILON is treated differently...
+    refs.clear();
+    refs.reserve(ref.size());
+    refs.resize(ref.size());
 
-    utils::resource start;
-    
-    matrix_cost_type      costs(hyp.size() + 1, ref.size() + 1, 0.0);
-    matrix_operation_type ops(hyp.size() + 1, ref.size() + 1);
-    
-    for (int i = 1; i <= hyp.size(); ++ i) {
-      costs(i, 0) = costs(i - 1, 0) + TER::COSTS::insertion;
-      ops(i, 0) = TER::TRANSITION::insertion;
-    }
     for (int j = 1; j <= ref.size(); ++ j) {
-      
       lattice_type::arc_set_type::const_iterator aiter_begin   = ref[j - 1].begin();
       lattice_type::arc_set_type::const_iterator aiter_end     = ref[j - 1].end();
       
       lattice_type::arc_set_type::const_iterator aiter_epsilon = aiter_end;
       for (lattice_type::arc_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	if (aiter->label == vocab_type::EPSILON) {
-	  aiter_epsilon = aiter;
-	  break;
-	}
+	refs[j - 1].insert(M::operator()(aiter->label));
+    }
+  }
+  
+  double operator()(const sentence_type& hyp, operation_set_type& operations)
+  {
+    utils::resource start;
+    
+    costs.clear();
+    ops.clear();
+    
+    costs.reserve(hyp.size() + 1, refs.size() + 1);
+    ops.reserve(hyp.size() + 1, refs.size() + 1);
+    
+    costs.resize(hyp.size() + 1, refs.size() + 1, 0.0);
+    ops.resize(hyp.size() + 1, refs.size() + 1);
+    
+    for (int i = 1; i <= hyp.size(); ++ i) {
+      costs(i, 0) = costs(i - 1, 0) + TER::COSTS::insertion;
+      ops(i, 0) = TER::TRANSITION::insertion;
+    }
+    for (int j = 1; j <= refs.size(); ++ j) {
       
-      if (aiter_epsilon == aiter_end) {
+      if (refs[j - 1].find(vocab_type::EPSILON) == refs[j - 1].end()) {
 	costs(0, j) = costs(0, j - 1) + TER::COSTS::deletion;
 	ops(0, j) = TER::TRANSITION::deletion;
       } else {
@@ -142,59 +158,51 @@ struct MinimumEditDistance : public M
     }
     
     for (int i = 1; i <= hyp.size(); ++ i)
-      for (int j = 1; j <= ref.size(); ++ j) {
+      for (int j = 1; j <= refs.size(); ++ j) {
 	double&         cur_cost = costs(i, j);
 	operation_type& cur_op   = ops(i, j);
 	
-	lattice_type::arc_set_type::const_iterator aiter_begin   = ref[j - 1].begin();
-	lattice_type::arc_set_type::const_iterator aiter_end     = ref[j - 1].end();
-	lattice_type::arc_set_type::const_iterator aiter_match   = aiter_end;
-	lattice_type::arc_set_type::const_iterator aiter_epsilon = aiter_end;
+	word_set_type::const_iterator riter_end     = refs[j - 1].end();
+	word_set_type::const_iterator riter_match   = refs[j - 1].find(M::operator()(hyp[i - 1]));
+	word_set_type::const_iterator riter_epsilon = refs[j - 1].find(vocab_type::EPSILON);
 	
-	for (lattice_type::arc_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-	  if (M::operator()(aiter->label, hyp[i - 1]))
-	    aiter_match = aiter;
-	  else if (aiter->label == vocab_type::EPSILON)
-	    aiter_epsilon = aiter;
-	}
-	
-	if (aiter_match != aiter_end) {
+	if (riter_match != riter_end) {
 	  cur_cost = costs(i - 1, j - 1);
-	  cur_op   = operation_type(aiter_match - aiter_begin, TER::TRANSITION::match);
+	  cur_op   = TER::TRANSITION::match;
 	} else {
 	  cur_cost = costs(i - 1, j - 1) + TER::COSTS::substitution;
-	  cur_op   = operation_type(aiter_match - aiter_begin, TER::TRANSITION::substitution);
+	  cur_op   = TER::TRANSITION::substitution;
 	}
 	
-	if (aiter_epsilon != aiter_end) {
+	if (riter_epsilon != riter_end) {
 	  const double eps = costs(i, j - 1);
 	  if (cur_cost > eps) {
 	    cur_cost = eps;
-	    cur_op   = operation_type(aiter_epsilon - aiter_begin, TER::TRANSITION::epsilon);
+	    cur_op   = TER::TRANSITION::epsilon;
 	  }
 	}
 	
 	const double ins = costs(i - 1, j) + TER::COSTS::insertion;
 	if (cur_cost > ins) {
 	  cur_cost = ins;
-	  cur_op   = operation_type(TER::TRANSITION::insertion);
+	  cur_op   = TER::TRANSITION::insertion;
 	}
 	
 	const double del = costs(i, j - 1) + TER::COSTS::deletion;
 	if (cur_cost > del) {
 	  cur_cost = del;
-	  cur_op   = operation_type(TER::TRANSITION::deletion);
+	  cur_op   = TER::TRANSITION::deletion;
 	}
       }
     
     operations.clear();
     int i = hyp.size();
-    int j = ref.size();
+    int j = refs.size();
     while (i > 0 || j > 0) {
       const operation_type& op = ops(i, j);
       operations.push_back(op);
       
-      switch (op.op) {
+      switch (op) {
       case TER::TRANSITION::substitution:
       case TER::TRANSITION::match:        -- i; -- j; break;
       case TER::TRANSITION::insertion:    -- i; break;
@@ -205,12 +213,12 @@ struct MinimumEditDistance : public M
 
     utils::resource end;
 
-    if (debug >= 2)
+    if (debug >= 3)
       std::cerr << "minimum edit distance cpu time: " << (end.cpu_time() - start.cpu_time())
 		<< " user time: " << (end.user_time() - start.user_time())
 		<< std::endl;
     
-    return costs(hyp.size(), ref.size());
+    return costs(hyp.size(), refs.size());
   }
 
   int debug;
@@ -236,7 +244,8 @@ struct TranslationErrorRate : public TER, public M
 #endif
   typedef std::vector<arc_unique_set_type, std::allocator<arc_unique_set_type> > lattice_unique_type;
 
-  typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
+  typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;  
+
 
   typedef MinimumEditDistance<M> med_type;
   typedef typename med_type::operation_type     operation_type;
@@ -269,12 +278,22 @@ struct TranslationErrorRate : public TER, public M
     int end;
     int moveto;
     int reloc;
+
+    friend
+    bool operator<(const Shift& x, const Shift& y)
+    {
+      return (x.begin < y.begin
+	      || (x.begin == y.begin
+		  && (x.end < y.end
+		      || (x.end == y.end
+			  && x.reloc < y.reloc))));
+    }
   };
   
   typedef Score value_type;
   typedef Shift shift_type;
   
-  typedef std::vector<shift_type, std::allocator<shift_type> > shift_set_type;
+  typedef std::set<shift_type, std::less<shift_type>, std::allocator<shift_type> > shift_set_type;
   typedef std::vector<shift_set_type, std::allocator<shift_set_type> > shift_matrix_type;
 
   TranslationErrorRate(const int __debug=0)
@@ -293,9 +312,11 @@ struct TranslationErrorRate : public TER, public M
   
   double calculate_best_shifts(const lattice_type& ref, sentence_type& hyp, value_type& value, path_type& path)
   {
+    minimum_edit_distance.build(ref);
+
     value = value_type();
     path.clear();
-    double        cost = minimum_edit_distance(hyp, ref, path);
+    double        cost = minimum_edit_distance(hyp, path);
     
     sentence_type hyp_new;
     path_type     path_new;
@@ -321,15 +342,18 @@ struct TranslationErrorRate : public TER, public M
       cost = cost_new;
     }
     
+#if 0 
+    // we do not need this...
     typename path_type::const_iterator piter_end = path.end();
     for (typename path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
-      switch (piter->op) {
+      switch (*piter) {
       case TRANSITION::match:        ++ value.match; break;
       case TRANSITION::substitution: ++ value.substitution; break;
       case TRANSITION::insertion:    ++ value.insertion; break;
       case TRANSITION::deletion:     ++ value.deletion; break;
       }
     }
+#endif
     
     value.score += cost;
     
@@ -346,7 +370,7 @@ struct TranslationErrorRate : public TER, public M
     
     //std::cerr << "edit distance: ";
     for (int i = 0; i < path.size(); ++ i) {
-      switch (path[i].op) {
+      switch (path[i]) {
       case TRANSITION::match:
 	//std::cerr << " M";
 	++ hpos;
@@ -419,23 +443,27 @@ struct TranslationErrorRate : public TER, public M
     
     for (int i = shifts.size() - 1; i >= 0; -- i) 
       if (! shifts[i].empty()) {
+	if (debug >= 2)
+	  std::cerr << "shift phrase: " << (i + 1) << " # of shifts: " << shifts[i].size() << std::endl;
+
 	const double curfix = cost - (cost_shift_best + cost_best);
 	const double maxfix = 2.0 * (i + 1);
 	
 	if (curfix > maxfix || (cost_shift_best != 0 && curfix == maxfix)) break;
 	
-	for (int j = 0; j < shifts[i].size(); ++ j) {
-	  const shift_type& shift = shifts[i][j];
+	typename shift_set_type::const_iterator siter_end = shifts[i].end();
+	for (typename shift_set_type::const_iterator siter = shifts[i].begin(); siter != siter_end; ++ siter) {
+	  const shift_type& shift = *siter;
 	      
 	  const double curfix = cost - (cost_shift_best + cost_best);
 	      
 	  if (curfix > maxfix || (cost_shift_best != 0 && curfix == maxfix)) break;
-	    
+	  
 	  //std::cerr << "candidate shift: [" << shift.begin << ", " << shift.end << "]: " << shift.reloc << std::endl;
-	      
+	  
 	  perform_shift(hyp, shift, hyp_shifted);
-	    
-	  const double cost_shifted = minimum_edit_distance(hyp_shifted, ref, path_shifted);
+	  
+	  const double cost_shifted = minimum_edit_distance(hyp_shifted, path_shifted);
 	  const double gain = (cost_best + cost_shift_best) - (cost_shifted + COSTS::shift);
 	      
 	  //std::cerr << "hyp original: " << hyp << std::endl;
@@ -503,6 +531,8 @@ struct TranslationErrorRate : public TER, public M
 				  const lattice_unique_type& lattice_unique,
 				  shift_matrix_type& shifts) const
   {
+    utils::resource start;
+
     index_set_type indices;
     index_set_type indices_next;
     
@@ -553,13 +583,20 @@ struct TranslationErrorRate : public TER, public M
 	    
 	      for (int roff = -1; roff <= end - start; ++ roff) {
 		if (roff == -1 && moveto == 0)
-		  sshifts.push_back(shift_type(start, end, -1, -1));
+		  sshifts.insert(shift_type(start, end, -1, -1));
 		else if (start != ralign[moveto + roff] && (roff == 0 || ralign[moveto + roff] != ralign[moveto]))
-		  sshifts.push_back(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
+		  sshifts.insert(shift_type(start, end, moveto + roff, ralign[moveto + roff]));
 	      }
 	    }
 	  }
 	}
+
+    utils::resource end;
+
+    if (debug >= 2)
+      std::cerr << "gather all possible shifts cpu time: " << (end.cpu_time() - start.cpu_time())
+		<< " user time: " << (end.user_time() - start.user_time())
+		<< std::endl;
   }
 
   void build_unique_lattice(const lattice_type& ref, const sentence_type& hyp, lattice_unique_type& lattice_unique) const
@@ -631,7 +668,7 @@ struct TERAligner : public TER, public M
 
       typename path_type::const_iterator piter_end = path.end();
       for (typename path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
-	switch (piter->op) {
+	switch (*piter) {
 	case TRANSITION::match:
 	  merged.push_back(ref[rpos]);
 	  insert_unique_node(merged.back(), shifted[hpos], features);
@@ -791,7 +828,9 @@ int main(int argc, char ** argv)
 	  
 	  ter_sent_type ters;
 	  
-	  boost::shared_ptr<cicada::eval::Scorer> scorer(cicada::eval::Scorer::create("ter"));
+	  boost::shared_ptr<cicada::eval::Scorer> scorer(match_lower
+							 ? cicada::eval::Scorer::create("ter:lower=true")
+							 : cicada::eval::Scorer::create("ter"));
 	  scorer->insert(sentences[sent]);
 	  
 	  for (int id = 0; id < sentences.size(); ++ id)

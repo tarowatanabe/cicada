@@ -388,7 +388,9 @@ struct OptimizerSGDL2 : public OptimizerBase
   
   void operator()(const int segment)
   {
-    const double eta = 1.0 / (lambda * (epoch + 2));
+    //const double eta = 1.0 / (lambda * (epoch + 2));
+    //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / graphs.size());
     ++ epoch;
     
     // we will minimize...
@@ -462,7 +464,9 @@ struct OptimizerSGDL1 : public OptimizerBase
     : OptimizerBase(__graphs, __features),
       samples(0),
       epoch(0),
-      lambda(C / __graphs.size()) {}
+      lambda(C / __graphs.size()),
+      penalties(),
+      penalty(0.0) {}
   
   void initialize()
   {
@@ -473,8 +477,9 @@ struct OptimizerSGDL1 : public OptimizerBase
     weight_scale = 1.0;
     
     objective = 0.0;
-    penalties.clear();
-    penalty = 0.0;
+    
+    //penalties.clear();
+    //penalty = 0.0;
   }
   
   void finalize()
@@ -485,7 +490,8 @@ struct OptimizerSGDL1 : public OptimizerBase
   void operator()(const int segment)
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
-    const double eta = 1.0 / (lambda * (epoch + 2));
+    //const double eta = 1.0 / (lambda * (epoch + 2));
+    const double eta = 0.2 * std::pow(0.85, double(epoch) / graphs.size());
     ++ epoch;
     
     // cummulative penalty
