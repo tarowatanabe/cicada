@@ -56,8 +56,8 @@ namespace cicada
 
     typedef std::pair<int, int> span_type;
     
-    GenerateEarley(const int __depth, const int __width)
-      : depth(__depth), width(__width)
+    GenerateEarley(const int __depth, const int __width, const bool __context)
+      : depth(__depth), width(__width), context(__context)
     {
       edges_unique.set_empty_key(0);
 
@@ -279,6 +279,26 @@ namespace cicada
       }
     };
 
+    struct edge_node_hash_type : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const edge_type* x) const
+      {
+	return (x ? hasher_type::operator()(x->span, x->lhs.id()) : size_t(0));
+      }
+    };
+
+    struct edge_node_equal_type
+    {
+      bool operator()(const edge_type* x, const edge_type* y) const
+      {
+	return ((x == y) || (x && y
+			     && x->lhs == y->lhs
+			     && x->span == y->span));
+      }
+    };
+    
     typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
@@ -295,7 +315,7 @@ namespace cicada
 
     
     // edge to traversal graph mappings...
-    typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_unique_hash_type, edge_unique_equal_type > non_terminal_node_set_type;
+    typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_node_hash_type, edge_node_equal_type > non_terminal_node_set_type;
     typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > goal_node_set_type;
 
     
@@ -511,7 +531,7 @@ namespace cicada
       std::reverse(tails.begin(), tails.end());
       
       hypergraph_type::id_type head_id;
-      if (edge.lhs == goal_symbol && edge.is_passive()) {
+      if (edge.lhs == goal_symbol) {
 	if (! target.is_valid())
 	  target.goal = target.add_node().id;
 	
@@ -696,6 +716,9 @@ namespace cicada
 	    }
 	  }
 	  
+	  if (! context)
+	    label = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip();
+	  
 	  label = labels[source.edges[out_edges[id].front()].head] + ';' + label;
 	  // always strip-off the first non-terminal up-until ';'
 	  if (depth > 0 && depths[id] > depth) {
@@ -763,8 +786,6 @@ namespace cicada
 	      }
 	    }
 	  }
-
-	  
 	  
 	  if (width >= 2) {
 	    std::string label;
@@ -859,6 +880,7 @@ namespace cicada
   private:  
     int depth;
     int width;
+    bool context;
 
     int max_sentence_length;
     int max_tree_depth;
@@ -880,9 +902,9 @@ namespace cicada
   };
   
   inline
-  void generate_earley(const HyperGraph& source, HyperGraph& target, const int depth=0, const int width=0)
+  void generate_earley(const HyperGraph& source, HyperGraph& target, const int depth=0, const int width=0, const bool context=false)
   {
-    GenerateEarley generater(depth, width);
+    GenerateEarley generater(depth, width, context);
       
     generater(source, target);
   }

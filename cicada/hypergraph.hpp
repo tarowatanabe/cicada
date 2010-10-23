@@ -32,7 +32,7 @@ namespace cicada
     typedef rule_type::feature_set_type feature_set_type;
     
   public:
-    static const id_type invalid = id_type(-1);
+    static const id_type invalid;
     
   public:
     HyperGraph() : goal(invalid) {}

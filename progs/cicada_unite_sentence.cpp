@@ -692,7 +692,6 @@ struct TERAligner : public TER, public M
 	  break;
 	case TRANSITION::substitution:
 	  merged.push_back(ref[rpos]);
-	  insert_unique_epsilon(merged.back());
 	  insert_unique_node(merged.back(), shifted[hpos], features);
 	  ++ hpos;
 	  ++ rpos;

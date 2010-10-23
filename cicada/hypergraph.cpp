@@ -33,6 +33,10 @@ BOOST_FUSION_ADAPT_STRUCT(
 namespace cicada
 {
   
+  // statics...
+  const HyperGraph::id_type HyperGraph::invalid = HyperGraph::id_type(-1);
+  
+  
   void HyperGraph::topologically_sort()
   {
     cicada::topologically_sort(*this);
