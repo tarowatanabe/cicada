@@ -29,4 +29,5 @@ cicada_unite_sentence
 	merge multiple sentences into one confusion-netwokr.
 	Support incrementat merging by confusion-network-TER. (--merge flag)
 	TER-conputation by lower-cased word (--lower flag)
+	Dump in graphviz format (--graphviz flag)
 

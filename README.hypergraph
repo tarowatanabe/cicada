@@ -28,6 +28,9 @@ options:
   --leaf                collect leaf nodes only
   --help                help message
 
+You can merge multiple hypergraphs in one by:
+cicada_unite_hypergraph
+
 
 FORMAT of HYPEERGRAPH
 

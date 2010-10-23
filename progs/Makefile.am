@@ -25,7 +25,7 @@ bin_PROGRAMS = \
 	cicada_mert_mpi \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
-	cicada_unite_forest \
+	cicada_unite_hypergraph \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
 	filter_penntreebank \
@@ -76,8 +76,8 @@ cicada_maxlike_mpi_SOURCES  = cicada_maxlike_mpi.cpp lbfgs.c
 cicada_maxlike_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_maxlike_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_unite_forest_SOURCES = cicada_unite_forest.cpp
-cicada_unite_forest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_unite_hypergraph_SOURCES = cicada_unite_hypergraph.cpp
+cicada_unite_hypergraph_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_unite_lattice_SOURCES = cicada_unite_lattice.cpp
 cicada_unite_lattice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
