@@ -23,3 +23,6 @@ System combination as statitical generation
     Infinite generation: we will clip by the max-length in hypergraph
 
 rename cicada_unite_{hypergraph,lattice,sentence} to cicada_tool_{hypergraph,lattice,sentence}???
+
+Support sign-test/bootstrap for evaluation
+	Add NIST?

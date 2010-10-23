@@ -133,7 +133,6 @@ namespace cicada
 	  span(q0, q0),
 	  active(&__active), passive(0),
 	  edge(hypergraph_type::invalid) {}
-
       
       // created by scan... we will always have terminal
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
@@ -151,7 +150,6 @@ namespace cicada
 	  span(__span),
 	  active(&__active), passive(0),
 	  edge(hypergraph_type::invalid) {}
-      
       
       // construct by complete
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
@@ -186,8 +184,6 @@ namespace cicada
     
     typedef utils::chunk_vector<edge_type, 1024 * 16 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
     typedef std::deque<const edge_type*, std::allocator<const edge_type*> > agenda_type;
-    
-    
     
     // traversal structure to keep only unique edges...
     struct Traversal
@@ -316,8 +312,6 @@ namespace cicada
     
     // edge to traversal graph mappings...
     typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_node_hash_type, edge_node_equal_type > non_terminal_node_set_type;
-    typedef google::dense_hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type> > goal_node_set_type;
-
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -623,7 +617,6 @@ namespace cicada
 	}
       }
       
-
       // compute node labels and depth
       // how to compute left/right items?
       node_label_set_type labels(source.nodes.size());

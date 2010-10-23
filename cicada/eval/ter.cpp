@@ -405,7 +405,7 @@ namespace cicada
 	  const int last = utils::bithack::min(start + max_shift_size, static_cast<int>(hyp.size()));
 	  for (int end = start; found && end != last; ++ end) {
 	    ngram.push_back(hyp[end]);
-
+	    
 	    //std::cerr << "range: [" << start << ", " << end << "]" << std::endl;
 	    
 	    found = false;
@@ -461,10 +461,14 @@ namespace cicada
 	matrix_transition_type trans(hyp.size() + 1, ref.size() + 1, TRANSITION::match);
 	matrix_cost_type       costs(hyp.size() + 1, ref.size() + 1, 0.0);
 	
-	for (int i = 0; i <= hyp.size(); ++ i)
-	  costs(i, 0) = i * COSTS::insertion;
-	for (int j = 0; j <= ref.size(); ++ j)
-	  costs(0, j) = j * COSTS::deletion;
+	for (int i = 1; i <= hyp.size(); ++ i) {
+	  costs(i, 0) = costs(i - 1, 0) + COSTS::insertion;
+	  trans(i, 0) = TRANSITION::insertion;
+	}
+	for (int j = 1; j <= ref.size(); ++ j) {
+	  costs(0, j) = costs(0, j - 1) + COSTS::deletion;
+	  trans(0, j) = TRANSITION::deletion;
+	}
 	
 	for (int i = 1; i <= hyp.size(); ++ i)
 	  for (int j = 1; j <= ref.size(); ++ j) {
@@ -490,26 +494,18 @@ namespace cicada
 	      cur_tran = TRANSITION::deletion;
 	    }
 	  }
-
+	
 	path.clear();
 	int i = hyp.size();
 	int j = ref.size();
 	while (i > 0 || j > 0) {
-	  if (j == 0) {
-	    -- i;
-	    path.push_back(TRANSITION::insertion);
-	  } else if (i == 0) {
-	    -- j;
-	    path.push_back(TRANSITION::deletion);
-	  } else {
-	    const transition_type& t = trans(i, j);
-	    path.push_back(t);
-	    switch (t) {
-	    case TRANSITION::substitution:
-	    case TRANSITION::match:        -- i; -- j; break;
-	    case TRANSITION::insertion:    -- i; break;
-	    case TRANSITION::deletion:     -- j; break;
-	    }
+	  const transition_type& t = trans(i, j);
+	  path.push_back(t);
+	  switch (t) {
+	  case TRANSITION::substitution:
+	  case TRANSITION::match:        -- i; -- j; break;
+	  case TRANSITION::insertion:    -- i; break;
+	  case TRANSITION::deletion:     -- j; break;
 	  }
 	}
 	

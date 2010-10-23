@@ -18,6 +18,7 @@
 #include <boost/fusion/adapted.hpp>
 
 #include "cicada/sentence.hpp"
+#include "cicada/sentence_vector.hpp"
 #include "cicada/eval.hpp"
 
 #include "utils/program_options.hpp"
@@ -25,11 +26,13 @@
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/random.hpp>
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-typedef cicada::Sentence sentence_type;
+typedef cicada::Sentence       sentence_type;
+typedef cicada::SentenceVector sentence_set_type;
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
@@ -42,12 +45,85 @@ path_type     output_file = "-";
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
 
+bool bootstrap = false;
+int  samples = 1000;
+
 int debug = 0;
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers);
+void read_tstset(const path_set_type& files, sentence_set_type& sentences);
 
 void options(int argc, char** argv);
 
+
+int main(int argc, char** argv)
+{
+  try {
+
+    options(argc, argv);
+  
+    if (scorer_list) {
+      std::cout << cicada::eval::Scorer::lists();
+      return 0;
+    }
+  
+    // read reference set
+    scorer_document_type scorers(scorer_name);
+  
+    read_refset(refset_files, scorers);
+
+    if (tstset_files.empty())
+      tstset_files.push_back("-");
+
+    sentence_set_type sentences(scorers.size());
+    
+    read_tstset(tstset_files, sentences);
+    
+    if (bootstrap) {
+      // first, collect BLEU stats...
+      //
+      
+      
+      
+    } else {
+      score_ptr_type score;
+      
+      for (int seg = 0; seg != scorers.size(); ++ seg) 
+	if (scorers[seg]) {
+	  
+	  if (sentences[seg].empty()) {
+	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
+	    continue;
+	  }
+	  
+	  score_ptr_type score_segment = scorers[seg]->score(sentences[seg]);
+	  
+	  if (debug) {
+	    const std::pair<double, double> value = score_segment->score();
+	    std::cerr << "segment: " << seg << " score: " << value.first << " penalty: " << value.second << std::endl;
+	  }
+	  
+	  if (! score)
+	    score = score_segment;
+	  else
+	    *score += *score_segment;
+	}
+      
+      if (! score)
+	throw std::runtime_error("no statistics to compute error score");
+      
+      const std::pair<double, double> value = score->score();
+      
+      utils::compress_ostream os(output_file);
+      os << "score: " << value.first << " penalty: " << value.second << '\n';
+    }
+  }
+  catch (const std::exception& err) {
+    std::cerr << "error: " << err.what() << std::endl;
+    return 1;
+  }
+  return 0;
+}
 
 typedef std::pair<int, sentence_type> id_sentence_type;
 
@@ -72,92 +148,47 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, id_sentence_type()
     id_sentence %= int_ >> "|||" >> sentence;
   }
   
-  boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>    word;
+  boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>      word;
   boost::spirit::qi::rule<Iterator, sentence_type(), boost::spirit::standard::space_type>    sentence;
   boost::spirit::qi::rule<Iterator, id_sentence_type(), boost::spirit::standard::space_type> id_sentence;
 };
 
-int main(int argc, char** argv)
+void read_tstset(const path_set_type& files, sentence_set_type& sentences)
 {
-  try {
+  sentence_parser<std::string::const_iterator> parser;
+  id_sentence_type id_sentence;
+  std::string line;
 
-    options(argc, argv);
+  std::vector<bool, std::allocator<bool> > finished(sentences.size());
   
-    if (scorer_list) {
-      std::cout << cicada::eval::Scorer::lists();
-      return 0;
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no test file: " + fiter->file_string());
+    
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    
+    while (std::getline(is, line)) {
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+      
+      id_sentence.second.clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_sentence))
+	continue;
+      
+      const int& id = id_sentence.first;
+      const sentence_type& sentence = id_sentence.second;
+      
+      if (id >= sentences.size())
+	throw std::runtime_error("id exceeds the reference data");
+      
+      if (finished[id]) continue;
+      
+      sentences[id] = sentence;
+      finished[id] = true;
     }
-  
-    // read reference set
-    scorer_document_type scorers(scorer_name);
-  
-    read_refset(refset_files, scorers);
-  
-    std::vector<bool, std::allocator<bool> > finished(scorers.size(), false);
-    score_ptr_type score;
-
-    sentence_parser<std::string::const_iterator> parser;
-    id_sentence_type id_sentence;
-
-    if (tstset_files.empty())
-      tstset_files.push_back("-");
-  
-    for (path_set_type::const_iterator fiter = tstset_files.begin(); fiter != tstset_files.end(); ++ fiter) {
-      
-      if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-	throw std::runtime_error("no test set file: " + fiter->file_string());
-      
-      utils::compress_istream is(*fiter, 1024 * 1024);
-
-      std::string line;
-    
-      while (std::getline(is, line)) {
-	std::string::const_iterator iter = line.begin();
-	std::string::const_iterator end = line.end();
-	
-	id_sentence.second.clear();
-      
-	if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_sentence))
-	  continue;
-
-	const int& id = id_sentence.first;
-	const sentence_type& sentence = id_sentence.second;
-	
-	if (finished[id]) continue;
-
-	score_ptr_type score_segment = scorers[id]->score(sentence);
-
-	if (debug) {
-	  const std::pair<double, double> value = score_segment->score();
-	  std::cerr << "segment: " << id << " score: " << value.first << " penalty: " << value.second << std::endl;
-	}
-
-	if (! score)
-	  score = score_segment;
-	else
-	  *score += *score_segment;
-	
-	finished[id] = true;
-      }
-    }
-    
-    for (int seg = 0; seg < finished.size(); ++ seg)
-      if (scorers[seg] && ! finished[seg])
-	std::cerr << "WARNING: no translation at: " << seg << std::endl;
-
-    if (! score)
-      throw std::runtime_error("no statistics to compute error score");
-
-    const std::pair<double, double> value = score->score();
-    
-    utils::compress_ostream os(output_file);
-    os << "score: " << value.first << " penalty: " << value.second << '\n';
   }
-  catch (const std::exception& err) {
-    std::cerr << "error: " << err.what() << std::endl;
-    return 1;
-  }
-  return 0;
 }
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
@@ -169,6 +200,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
 
   sentence_parser<std::string::const_iterator> parser;
   id_sentence_type id_sentence;
+  std::string line;
 
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
@@ -176,8 +208,6 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       throw std::runtime_error("no reference file: " + fiter->file_string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
-    
-    std::string line;
     
     while (std::getline(is, line)) {
       std::string::const_iterator iter = line.begin();
@@ -216,7 +246,9 @@ void options(int argc, char** argv)
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
-    
+
+    ("bootstrap", po::bool_switch(&bootstrap), "bootstrap resampling")
+    ("samples",   po::value<int>(&samples),    "# of samples")
     ;
   
   po::options_description opts_command("command line options");
