@@ -32,6 +32,11 @@ Or, you can combine outputs from multiple systems by (New! and TODO):
       * It is performed by collecting rules from parse trees, and generate by Earley algorithm (New!)
    - Generate k-best translations after feature application etc.
 
+   Or, a conventional strategy of [14]:
+   - Create lattice from n-best list by incremental merging
+   - Construct hypergraph by linear grammar (grammar-glue-straight + grammar-insertion)
+   - Generate k-best translations after feature application etc.
+
 Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt [3]
    - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
@@ -209,4 +214,16 @@ References:
   url       = {http://www.aclweb.org/anthology/N10-1141}
 }
 
+[14]
+@InProceedings{rosti-EtAl:2009:WMT-09,
+  author    = {Rosti, Antti-Veikko  and  Zhang, Bing  and  Matsoukas, Spyros  and  Schwartz, Richard},
+  title     = {Incremental Hypothesis Alignment with Flexible Matching for Building Confusion Networks: {BBN} System Description for {WMT}09 System Combination Task},
+  booktitle = {Proceedings of the Fourth Workshop on Statistical Machine Translation},
+  month     = {March},
+  year      = {2009},
+  address   = {Athens, Greece},
+  publisher = {Association for Computational Linguistics},
+  pages     = {61--65},
+  url       = {http://www.aclweb.org/anthology/W/W09/W09-0409}
+}
 

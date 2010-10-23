@@ -30,6 +30,7 @@ options:
 
 You can merge multiple hypergraphs in one by:
 cicada_unite_hypergraph
+	This will simply merge by root...
 
 
 FORMAT of HYPEERGRAPH
