@@ -953,15 +953,15 @@ int main(int argc, char ** argv)
       int rank = 1;
       for (int id = 0; id != sentences.size(); ++ id, ++ rank) {
 	const sentence_type& sentence = sentences[id];
-	
+
 	if (sentence.empty()) continue;
-      
-	const double conf = 1.0 / (1.0 + rank);
-      
+	
 	// perform merging...
 	if (debug)
 	  std::cerr << "merging: " << sentence << std::endl;
 
+	const double conf = 1.0 / (1.0 + rank);
+	
 	feature_set_type features;
 	if (! features_confidence.empty())
 	  features[features_confidence[id]] = conf;
@@ -971,7 +971,6 @@ int main(int argc, char ** argv)
 	  features[feature_confidence] = conf;
 	if (! feature_count.empty())
 	  features[feature_count] = count_weight;
-	
 	
 	if (match_lower) {
 	  TERAligner<MatcherLower> aligner(debug);

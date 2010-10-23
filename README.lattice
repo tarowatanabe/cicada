@@ -18,5 +18,15 @@ by inserting new one in {}, such as
 Remark, the costs are interpreted as logarithmic value so that we can compute score by "weight \cdot feature-function".
 
 
-Currently, we do not directly support confusion network, but you can transform your confusion network
-by WFST via epsilon-removal (log-semiring will be prefered to tropical-semiring)
+We allow <epsilon> node which allows us to directly handle confusion nework.
+
+sentence/lattie related tools:
+
+cicada_unite_lattice
+	merge multiple lattices in one. Optionally dump output in graphviz format (--graphviz flag).
+
+cicada_unite_sentence
+	merge multiple sentences into one confusion-netwokr.
+	Support incrementat merging by confusion-network-TER. (--merge flag)
+	TER-conputation by lower-cased word (--lower flag)
+
