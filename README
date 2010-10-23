@@ -10,12 +10,12 @@ Remark: cicada is 蝉, (or セミ) in Japanese, pronounced "SEMI"
 Basically, we have three distinct structures:
    - lattice: a representation of graph implemented as a two-dimentional array.
    - grammar: a collection of WFST implemented as a trie structure.
-   - hypergraph: a compact representation of forest.
+   - hypergraph: a compact representation of set of trees (or forest).
 
 Translation can be carried out by:
    - A lattice (or sentence) is composed with a grammar by generating a hypergraph [2].
    or
-   - A hypergraph (or parse-tree) is composed with a grammar by generating another hypergraph [3].
+   - A hypergraph/forest (or parse-tree) is composed with a grammar by generating another hypergraph [3].
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
