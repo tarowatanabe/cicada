@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "cicada_impl.hpp"
+#include "cicada/graphviz.hpp"
 
 #include "utils/program_options.hpp"
 
@@ -20,6 +21,8 @@ path_type count_feature_file;
 std::string confidence;
 std::string count;
 double count_weight = 1.0;
+
+bool output_graphviz = false;
 
 int debug = 0;
 
@@ -102,7 +105,11 @@ int main(int argc, char ** argv)
     }
     
     utils::compress_ostream os(output_file, 1024 * 1024);
-    os << merged << '\n';
+    
+    if (output_graphviz)
+      cicada::graphviz(os, merged);
+    else
+      os << merged << '\n';
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -129,6 +136,8 @@ void options(int argc, char** argv)
     ("confidence",   po::value<std::string>(&confidence),    "add confidence weight feature name")
     ("count",        po::value<std::string>(&count),         "add count weight feature name")
     ("count-weight", po::value<double>(&count_weight),       "count weight")
+
+    ("graphviz", po::bool_switch(&output_graphviz), "output in graphviz format")
 
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");

@@ -6,6 +6,7 @@
 #include <map>
 
 #include "cicada_impl.hpp"
+#include "cicada/graphviz.hpp"
 
 #include "cicada/stemmer.hpp"
 #include "cicada/eval/ter.hpp"
@@ -760,6 +761,8 @@ std::string confidence;
 std::string count;
 double count_weight = 1.0;
 
+bool output_graphviz = false;
+
 int debug = 0;
 
 // input mode... use of one-line lattice input or sentence input?
@@ -944,7 +947,11 @@ int main(int argc, char ** argv)
 	}
       
       utils::compress_ostream os(output_file, 1024 * 1024);
-      os << merged_all << '\n';
+
+      if (output_graphviz)
+	cicada::graphviz(os, merged_all);
+      else
+	os << merged_all << '\n';
     } else {
       lattice_type merged;
       lattice_type merged_new;
@@ -991,7 +998,10 @@ int main(int argc, char ** argv)
       }
     
       utils::compress_ostream os(output_file, 1024 * 1024);
-      os << merged << '\n';
+      if (output_graphviz)
+	cicada::graphviz(os, merged);
+      else
+	os << merged << '\n';
     }
   }
   catch (const std::exception& err) {
@@ -1022,6 +1032,8 @@ void options(int argc, char** argv)
     ("confidence",   po::value<std::string>(&confidence),    "add confidence weight feature name")
     ("count",        po::value<std::string>(&count),         "add count weight feature name")
     ("count-weight", po::value<double>(&count_weight),       "count weight")
+
+    ("graphviz", po::bool_switch(&output_graphviz), "output in graphviz format")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
