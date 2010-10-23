@@ -12,9 +12,6 @@ Support tree-to-tree transduction:
 
 Better MIRA training
 
-Support other metrics (at least for sentence-based scoring)
-	TER/WER/PER etc.
-
 System combination as statitical generation
   Parse nbests
   Collect rules
@@ -24,3 +21,5 @@ System combination as statitical generation
     Use Earley parsing as generation?
     Do we really handle unary rules with cycles/loops?
     Infinite generation: we will clip by the max-length in hypergraph
+
+rename cicada_unite_{hypergraph,lattice,sentence} to cicada_tool_{hypergraph,lattice,sentence}???
