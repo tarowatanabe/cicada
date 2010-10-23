@@ -685,11 +685,6 @@ struct TERAligner : public TER, public M
       for (typename path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
 	switch (*piter) {
 	case TRANSITION::match:
-	  merged.push_back(ref[rpos]);
-	  insert_unique_node(merged.back(), shifted[hpos], features);
-	  ++ hpos;
-	  ++ rpos;
-	  break;
 	case TRANSITION::substitution:
 	  merged.push_back(ref[rpos]);
 	  insert_unique_node(merged.back(), shifted[hpos], features);
