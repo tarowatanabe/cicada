@@ -38,10 +38,10 @@ Or, you can combine outputs from multiple systems by (New! and TODO):
    - Generate k-best translations after feature application etc.
 
 Various learning components are implemented:
-   - Large feature set from input lattice/hypergraph on large training data via MaxEnt [3]
+   - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
    - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
    - Small feature set on small devset learned by hypergraph-MERT [8]
-   - Small/Large feature set on small devset learned by hypergraph-MaxEnt (New! But still open problems!) + softmax-margin [9]
+   - Small/Large feature set on small devset learned by hypergraph-MaxEnt(optimized by LBFGS or SGD) (New! But still open problems!) + softmax-margin [9]
 
 References:
 
