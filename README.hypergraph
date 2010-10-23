@@ -29,7 +29,7 @@ options:
   --help                help message
 
 You can merge multiple hypergraphs in one by:
-cicada_unite_hypergraph
+cicada_unite_forest
 	This will simply merge by root...
 
 
