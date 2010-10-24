@@ -128,8 +128,8 @@ sk: string kernel\n\
 \tdecay=decay factor for string kernel (default 0.8)\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
-wlcs: weighted-LCS\n\
-\te=length factor (default 1.0)\n\
+wlcs: weighted longest common subsequence\n\
+\talpha=length factor, k^alpha (default 1.0)\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
 ";
@@ -261,7 +261,7 @@ wlcs: weighted-LCS\n\
 	scorer->split = split;
 	scorer->lower = lower;
       } else if (param.name() == "wlcs") {
-	double e = 1.0;
+	double alpha = 1.0;
 	
 	bool split = false;
 	bool lower = false;
@@ -271,13 +271,13 @@ wlcs: weighted-LCS\n\
 	    split = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
 	    lower = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "e") == 0)
-	    e = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "alpha") == 0)
+	    alpha = boost::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for sk: " << piter->first << "=" << piter->second << std::endl;
 	}
-
-	scorer = scorer_ptr_type(new WLCSScorer(e));
+	
+	scorer = scorer_ptr_type(new WLCSScorer(alpha));
 	scorer->split = split;
 	scorer->lower = lower;
 	

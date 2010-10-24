@@ -6,6 +6,17 @@
 
 #include <utils/vector2.hpp>
 
+// @inproceedings{lin-och:2004:ACL,
+//  author    = {Lin, Chin-Yew  and  Och, Franz Josef},
+//  title     = {Automatic Evaluation of Machine Translation Quality Using Longest Common Subsequence and Skip-Bigram Statistics},
+//  booktitle = {Proceedings of the 42nd Meeting of the Association for Computational Linguistics (ACL'04), Main Volume},
+//  year      = 2004,
+//  month     = {July},
+//  address   = {Barcelona, Spain},
+//  pages     = {605--612}
+//}
+
+
 namespace cicada
 {
   namespace eval
@@ -16,8 +27,8 @@ namespace cicada
       typedef Sentence sentence_type;
       typedef double count_type;
       
-      typedef utils::vector2<count_type, std::allocator<count_type> > cost_matrix_type;
-      typedef utils::vector2<int, std::allocator<int> > length_matrix_type;
+      typedef utils::vector2<count_type, std::allocator<count_type> > c_matrix_type;
+      typedef utils::vector2<int, std::allocator<int> > w_matrix_type;
 
       struct Score
       {
@@ -36,11 +47,11 @@ namespace cicada
       WLCSScorerImpl(const sentence_type& __ref)
 	: ref(__ref) {}
       
-      value_type operator()(const sentence_type& hyp, const double& e)
+      value_type operator()(const sentence_type& hyp, const double& alpha)
       {
 	value_type value;
 	
-	value.match = length_weight(distance(hyp, ref, e), true);
+	value.match = length_weight(distance(hyp, ref, alpha), true);
 	value.norm_hyp = hyp.size();
 	value.norm_ref = ref.size();
 	
@@ -51,54 +62,54 @@ namespace cicada
       }
 
 
-      double length_weight(const double length, const double& e, bool reverse=false)
+      double length_weight(const double length, const double& alpha, bool reverse=false)
       {
-	return (e == 1.0 ? length : pow(length, reverse ? 1.0 / e : e));
+	return (alpha == 1.0 ? length : pow(length, reverse ? 1.0 / alpha : alpha));
       }
 
       
       double distance(const sentence_type& x,
 		      const sentence_type& y,
-		      const double& e)
+		      const double& alpha)
       {
 	const int m = x.size();
 	const int n = y.size();
 
-	costs.clear();
-	lengths.clear();
+	c.clear();
+	w.clear();
 	
-	costs.resize(m + 1, n + 1, 0.0);
-	lengths.resize(m + 1, n + 1, 0);
+	c.resize(m + 1, n + 1, 0.0);
+	w.resize(m + 1, n + 1, 0);
 	
 	for (int i = 1; i <= m; ++ i)
 	  for (int j = 1; j <= n; ++ j) {
 	    
 	    if (x[i - 1] == y[j - 1]) {
-	      const int k = lengths(i - 1, j - 1);
+	      const int k = w(i - 1, j - 1);
 	      
-	      costs(i, j) = costs(i - 1, j - 1) + length_weight(k + 1, e) - length_weight(k, e);
-	      lengths(i, j) = k + 1;
-	    } else if (costs(i - 1, j) > costs(i, j - 1)) {
-	      costs(i, j) = costs(i - 1, j);
-	      lengths(i, j) = 0;
+	      c(i, j) = c(i - 1, j - 1) + length_weight(k + 1, alpha) - length_weight(k, alpha);
+	      w(i, j) = k + 1;
+	    } else if (c(i - 1, j) > c(i, j - 1)) {
+	      c(i, j) = c(i - 1, j);
+	      w(i, j) = 0;
 	    } else {
-	      costs(i, j) = costs(i, j - 1);
-	      lengths(i, j) = 0;
+	      c(i, j) = c(i, j - 1);
+	      w(i, j) = 0;
 	    }
 	  }
 	
-	return costs(m, n);
+	return c(m, n);
       }
       
       sentence_type ref;
       
-      cost_matrix_type   costs;
-      length_matrix_type lengths;
+      c_matrix_type c;
+      w_matrix_type w;
     };
     
     WLCSScorer::WLCSScorer(const WLCSScorer& x)
       : Scorer(static_cast<const Scorer&>(*this)),
-	e(x.e)
+	alpha(x.alpha)
     {
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
@@ -118,7 +129,7 @@ namespace cicada
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
 
-      e = x.e;
+      alpha = x.alpha;
       
       return *this;
     }
@@ -170,7 +181,7 @@ namespace cicada
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));
 	
-	const impl_type::value_type value = evaluator(sentence, e);
+	const impl_type::value_type value = evaluator(sentence, alpha);
 	
 	if (value.precision > precision_max) {
 	  precision_max = value.precision;

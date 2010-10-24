@@ -30,7 +30,7 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
   
     public:
-      WLCSScorer(const double& __e) : impl(), e(__e) { }
+      WLCSScorer(const double& __alpha) : impl(), alpha(__alpha) { }
       WLCSScorer(const WLCSScorer& x);
       ~WLCSScorer();
       WLCSScorer& operator=(const WLCSScorer& x);
@@ -47,7 +47,7 @@ namespace cicada
       
     private:
       impl_set_type impl;
-      double e;
+      double alpha;
     };
     
   };
