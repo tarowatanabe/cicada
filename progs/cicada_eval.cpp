@@ -38,6 +38,7 @@ typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
 typedef scorer_type::score_ptr_type score_ptr_type;
+typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
 
 path_set_type tstset_files;
 path_set_type refset_files;
@@ -81,9 +82,44 @@ int main(int argc, char** argv)
     
     if (bootstrap) {
       // first, collect BLEU stats...
-      //
       
+      score_ptr_set_type scores;
       
+      for (int seg = 0; seg != scorers.size(); ++ seg) 
+	if (scorers[seg]) {
+	  if (sentences[seg].empty()) {
+	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
+	    continue;
+	  }
+	  
+	  scores.push_back(scorers[seg]->score(sentences[seg]));
+	}
+
+      if (scores.empty())
+	throw std::runtime_error("no error counts?");
+      
+      boost::mt19937 gen;
+      gen.seed(time(0) * getpid());
+      boost::random_number_generator<boost::mt19937> generator(gen);
+      
+      std::vector<double, std::allocator<double> > sampled;
+      for (int iter = 0; iter < samples; ++ iter) {
+	
+	score_ptr_type score(scores.front()->zero());
+	for (int i = 0; i != scores.size(); ++ i)
+	  *score += *scores[generator(scores.size())];
+	
+	sampled.push_back(score->score().first);
+      }
+
+      std::sort(sampled.begin(), sampled.end());
+      
+      const int clip_size = sampled.size()* 0.25;
+      
+      utils::compress_ostream os(output_file);
+      os << "mean: " << sampled[sampled.size() / 2]
+	 << "95%-interval: " << sampled[clip_size] << " " << sampled[sampled.size() - clip_size - 1]
+	 << '\n';
       
     } else {
       score_ptr_type score;
