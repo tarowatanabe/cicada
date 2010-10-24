@@ -5,6 +5,12 @@ namespace cicada
 {
   namespace eval
   {
+    class SSKScorerImpl
+    {
+
+
+    };
+    
     
     
   };
