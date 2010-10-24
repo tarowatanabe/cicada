@@ -3,7 +3,7 @@
 #ifndef __CICADA__EVAL__WLCS__HPP__
 #define __CICADA__EVAL__WLCS__HPP__ 1
 
-// string-kernel
+// weighted longest common subsequence, wlcs
 
 #include <cicada/eval/f.hpp>
 

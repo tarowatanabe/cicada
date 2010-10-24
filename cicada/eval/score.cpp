@@ -2,6 +2,7 @@
 #include "eval/score.hpp"
 #include "eval/per.hpp"
 #include "eval/wer.hpp"
+#include "eval/sb.hpp"
 #include "eval/sk.hpp"
 #include "eval/ter.hpp"
 #include "eval/bleu.hpp"
@@ -130,6 +131,10 @@ sk: string kernel\n\
 \tlower=[true|false] perform lower casing\n\
 wlcs: weighted longest common subsequence\n\
 \talpha=length factor, k^alpha (default 1.0)\n\
+\tsplit=[true|false] perform character splitting\n\
+\tlower=[true|false] perform lower casing\n\
+sb: skip bigram\n\
+\twindow=window size (default 4, < 0 for infinity, == 0 for non-skip bigram)\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
 ";
@@ -274,10 +279,31 @@ wlcs: weighted longest common subsequence\n\
 	  else if (strcasecmp(piter->first.c_str(), "alpha") == 0)
 	    alpha = boost::lexical_cast<double>(piter->second);
 	  else
-	    std::cerr << "WARNING: unsupported parameter for sk: " << piter->first << "=" << piter->second << std::endl;
+	    std::cerr << "WARNING: unsupported parameter for wlcs: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
 	scorer = scorer_ptr_type(new WLCSScorer(alpha));
+	scorer->split = split;
+	scorer->lower = lower;
+	
+      } else if (param.name() == "sb") {
+	int window = 4;
+	
+	bool split = false;
+	bool lower = false;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "split") == 0)
+	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	    lower = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "window") == 0)
+	    window = boost::lexical_cast<int>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for sb: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	scorer = scorer_ptr_type(new SBScorer(window));
 	scorer->split = split;
 	scorer->lower = lower;
 	

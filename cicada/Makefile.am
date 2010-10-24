@@ -37,6 +37,7 @@ eval/f.hpp \
 eval/bleu.hpp \
 eval/per.hpp \
 eval/score.hpp \
+eval/sb.hpp \
 eval/sk.hpp \
 eval/ter.hpp \
 eval/wer.hpp \
@@ -45,6 +46,7 @@ eval/wlcs.hpp
 libcicada_eval_la_SOURCES = \
 eval/per.cpp \
 eval/score.cpp \
+eval/sb.cpp \
 eval/sk.cpp \
 eval/ter.cpp \
 eval/wer.cpp \
