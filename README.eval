@@ -1,0 +1,10 @@
+MT evaluations especially for MERT purpose
+
+BLEU: IBM Bleu (TODO: implement NIST-bleu, average-bleu?)
+WER: word error rate
+PER: position independent word error rate
+TER: translation error rate
+SB: skip bigram (by default, skip size is clipped to 4)
+WLCS: (weighted) longest common subsequence (by defaut, weight is one, meaning no weight, use alpha=2 for weight?)
+SK: string kernel (by default, decay factor = 0.8, spectrum p = 4)
+

@@ -17,12 +17,9 @@ System combination as statitical generation
   Collect rules
   Generate from rules
 
-  Problems:
-    Use Earley parsing as generation?
-    Do we really handle unary rules with cycles/loops?
-    Infinite generation: we will clip by the max-length in hypergraph
-
-rename cicada_unite_{hypergraph,lattice,sentence} to cicada_tool_{hypergraph,lattice,sentence}???
+rename cicada_unite_{forest,lattice,sentence} to cicada_tool_{forest,lattice,sentence}???
 
 Support sign-test/bootstrap for evaluation
 	Add NIST?
+
+Add cicada_oracle{,_mpi}, compute oracle translations (sentence and/or forest?) from hypergraphs
