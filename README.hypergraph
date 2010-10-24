@@ -32,19 +32,20 @@ You can merge multiple hypergraphs in one by:
 cicada_unite_forest
 	This will simply merge by root...
 
-
 FORMAT of HYPEERGRAPH
 
 The hypergraph is represented by JSON data format (www.json.org)
 Strings must be escaped (see JSON specification). You may insert spaces at arbitrary positions.
 One-line-per-single-hypergraph is prefered for easier preprocessing.
+We assume topologically sorted hypergraph (or, node-id is ordered by post-traversal order), but
+input/output can handle any-ordered hypergraph.
 
 HYPERGRAPH
 
 {
  "rules" : [ RULE, RULE, ... ], (RULE position (one-based) is the rule-id inside this hypergraph. zero is reserved for no-rule (error?))
  "nodes" : [ NODE, NODE, ...],  (NODE positin (zero-based) is the node-id inside this hypergraph)
- "goal" : node-id-for-goal
+ "goal" : node-id-for-goal (usually pointing to the last-node. 0xffffffff (or unsigned int(-1)) == invalid graph)
 }
 
 RULE (rules are double quoted, thus you should perform proper escaping, i.e. " to \", \ to \\ etc.)
@@ -60,7 +61,7 @@ EDGE
 {
  "tail" : [node-id, node-id, ...],
  "featuers" : {"feature-name" : double, "feature-name2" : double, ... },
- "rule" : rule-id (zero indicating no-rule)
+ "rule" : rule-id (zero indicating no-rule == invalid hypergraph)
 }
 
 

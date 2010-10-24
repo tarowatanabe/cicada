@@ -1,6 +1,6 @@
 
-The native lattice format is JLF (JSON Lattice Format) devised in cicada,
-but we can read PLF (Python Lattice Format) used in Moses.
+The native lattice format is JLF (JSON Lattice Format) newly introduced in cicada,
+but we can "read" PLF (Python Lattice Format) used in Moses (we do not support "writing").
 
 PLF:
 ((('ein\\"en',1.0,1),),(('wettbewerbsbedingten',0.5,2),('wettbewerbs',0.25,1), ('wettbewerb',0.25, 1),),(('bedingten',1.0,1),),(('preissturz',0.5,2), ('preis',0.5,1),),(('sturz',1.0,1),),)
@@ -23,10 +23,11 @@ We allow <epsilon> node which allows us to directly handle confusion nework.
 sentence/lattie related tools:
 
 cicada_unite_lattice
-	merge multiple lattices in one. Optionally dump output in graphviz format (--graphviz flag).
+	Merge multiple lattices (or sentences) in one. Here, we simply compute the union sharing start/goal states.
+	Optionally dump output in graphviz format (--graphviz flag).
 
 cicada_unite_sentence
-	merge multiple sentences into one confusion-netwokr.
+	Merge multiple sentences into one confusion-network via TER alignment.
 	Support incrementat merging by confusion-network-TER. (--merge flag)
 	TER-conputation by lower-cased word (--lower flag)
 	Dump in graphviz format (--graphviz flag)

@@ -23,3 +23,5 @@ Support sign-test/bootstrap for evaluation
 	Add NIST?
 
 Add cicada_oracle{,_mpi}, compute oracle translations (sentence and/or forest?) from hypergraphs
+
+Add libstemmer? (and hand-coded Arabic rule?)
