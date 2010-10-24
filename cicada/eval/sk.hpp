@@ -11,9 +11,11 @@ namespace cicada
 {
   namespace eval
   {
-    class SK : protected F
+    class SKScorer;
+
+    class SK : public F
     {
-      
+      friend class SKScorer;
     };
 
     class SKScorerImpl;
@@ -28,13 +30,13 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
   
     public:
-      SKScorer() : impl() { }
+      SKScorer(const int __p, const double& __decay) : impl(), p(__p), decay(__decay) { }
       SKScorer(const SKScorer& x);
       ~SKScorer();
       SKScorer& operator=(const SKScorer& x);
 
     public:      
-      bool error_metric() const { return true; }
+      bool error_metric() const { return false; }
       
       scorer_ptr_type clone() const { return scorer_ptr_type(new SKScorer(*this)); }
       
@@ -45,6 +47,8 @@ namespace cicada
       
     private:
       impl_set_type impl;
+      int p;
+      double decay;
     };
     
   };

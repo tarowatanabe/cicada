@@ -2,6 +2,7 @@
 #include "eval/score.hpp"
 #include "eval/per.hpp"
 #include "eval/wer.hpp"
+#include "eval/sk.hpp"
 #include "eval/ter.hpp"
 #include "eval/bleu.hpp"
 
@@ -112,13 +113,18 @@ bleu:\n\
 \torder=<order, default=4> ngram order\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
-per:\n\
+per: position indenendent error rate\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
-wer:\n\
+wer: word error rate\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
-ter:\n\
+ter: translation error rate\n\
+\tsplit=[true|false] perform character splitting\n\
+\tlower=[true|false] perform lower casing\n\
+sk: string kernel\n\
+\tp=order of string kernel (default 4)\n\
+\tdecay=decay factor for string kernel (default 0.8)\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
 ";
@@ -225,6 +231,31 @@ ter:\n\
 	scorer = scorer_ptr_type(new TERScorer());
 	scorer->split = split;
 	scorer->lower = lower;
+
+      } else if (param.name() == "sk") {
+	int p = 4;
+	double decay = 0.8;
+	
+	bool split = false;
+	bool lower = false;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "split") == 0)
+	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	    lower = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "p") == 0)
+	    p = boost::lexical_cast<int>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "decay") == 0)
+	    decay = boost::lexical_cast<double>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for sk: " << piter->first << "=" << piter->second << std::endl;
+	}
+
+	scorer = scorer_ptr_type(new SKScorer(p, decay));
+	scorer->split = split;
+	scorer->lower = lower;
+	
       } else
 	throw std::runtime_error("unknown scorer" + param.name());
       

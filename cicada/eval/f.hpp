@@ -5,7 +5,7 @@
 
 #include <cicada/eval/score.hpp>
 
-namespace cicaa
+namespace cicada
 {
   namespace eval
   {

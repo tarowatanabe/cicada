@@ -44,6 +44,7 @@ eval/wer.hpp
 libcicada_eval_la_SOURCES = \
 eval/per.cpp \
 eval/score.cpp \
+eval/sk.cpp \
 eval/ter.cpp \
 eval/wer.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
