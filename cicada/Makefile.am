@@ -33,9 +33,11 @@ semiring/envelope.cpp
 libcicada_semiring_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_eval_HEADERS = \
+eval/f.hpp \
 eval/bleu.hpp \
 eval/per.hpp \
 eval/score.hpp \
+eval/sk.hpp \
 eval/ter.hpp \
 eval/wer.hpp
 
