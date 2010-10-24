@@ -39,14 +39,16 @@ eval/per.hpp \
 eval/score.hpp \
 eval/sk.hpp \
 eval/ter.hpp \
-eval/wer.hpp
+eval/wer.hpp \
+eval/wlcs.hpp
 
 libcicada_eval_la_SOURCES = \
 eval/per.cpp \
 eval/score.cpp \
 eval/sk.cpp \
 eval/ter.cpp \
-eval/wer.cpp
+eval/wer.cpp \
+eval/wlcs.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_optimize_HEADERS = \

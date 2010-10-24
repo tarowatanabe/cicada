@@ -5,6 +5,7 @@
 #include "eval/sk.hpp"
 #include "eval/ter.hpp"
 #include "eval/bleu.hpp"
+#include "eval/wlcs.hpp"
 
 #include "parameter.hpp"
 
@@ -125,6 +126,10 @@ ter: translation error rate\n\
 sk: string kernel\n\
 \tp=order of string kernel (default 4)\n\
 \tdecay=decay factor for string kernel (default 0.8)\n\
+\tsplit=[true|false] perform character splitting\n\
+\tlower=[true|false] perform lower casing\n\
+wlcs: weighted-LCS\n\
+\te=length factor (default 1.0)\n\
 \tsplit=[true|false] perform character splitting\n\
 \tlower=[true|false] perform lower casing\n\
 ";
@@ -253,6 +258,26 @@ sk: string kernel\n\
 	}
 
 	scorer = scorer_ptr_type(new SKScorer(p, decay));
+	scorer->split = split;
+	scorer->lower = lower;
+      } else if (param.name() == "wlcs") {
+	double e = 1.0;
+	
+	bool split = false;
+	bool lower = false;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "split") == 0)
+	    split = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	    lower = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "e") == 0)
+	    e = boost::lexical_cast<double>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for sk: " << piter->first << "=" << piter->second << std::endl;
+	}
+
+	scorer = scorer_ptr_type(new WLCSScorer(e));
 	scorer->split = split;
 	scorer->lower = lower;
 	
