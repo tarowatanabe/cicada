@@ -375,7 +375,7 @@ namespace cicada
       // scanning implies moving dot on terminals w/o intersecting with transducer...
       //
       
-      if (edge.span.second + 1 > max_sentence_length) return;
+      if (edge.span.second >= max_sentence_length) return;
       
       id_map_type::const_iterator titer_end = dot.terminals.end();
       for (id_map_type::const_iterator titer = dot.terminals.begin(); titer != titer_end; ++ titer) {
@@ -606,47 +606,38 @@ namespace cicada
 
       // compute out-edges...
       node_map_type out_edges(source.nodes.size());
+      node_set_type lefts(source.nodes.size(), hypergraph_type::invalid);
+      node_set_type rights(source.nodes.size(), hypergraph_type::invalid);
       {
 	hypergraph_type::edge_set_type::const_iterator eiter_end = source.edges.end();
 	for (hypergraph_type::edge_set_type::const_iterator eiter = source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge = *eiter;
-	  
-	  hypergraph_type::edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
-	    out_edges[*niter].push_back(edge.id);
-	}
-      }
-      
-      // compute node labels and depth
-      // how to compute left/right items?
-      node_label_set_type labels(source.nodes.size());
-      node_set_type lefts(source.nodes.size(), hypergraph_type::invalid);
-      node_set_type rights(source.nodes.size(), hypergraph_type::invalid);
-      depth_set_type depths(source.nodes.size(), 0);
-
-      max_tree_depth = 0;
-      
-      for (int id = source.nodes.size() - 1; id >= 0; -- id) {
-
-	const hypergraph_type::node_type& node = source.nodes[id];
-	
-	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const hypergraph_type::edge_type& edge = source.edges[*eiter];
 
 	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = edge.tails.begin();
 	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = edge.tails.end();
 	  
 	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	    out_edges[*titer].push_back(edge.id);
+	    
+	    // collect lefts and rights in bottom-up fashion...
 	    if (titer != titer_begin)
 	      lefts[*titer] = *(titer - 1);
 	    if (titer + 1 != titer_end)
 	      rights[*titer] = *(titer + 1);
 	  }
 	}
-	
-	std::string& label = labels[id];
+      }
+      
+      // compute node labels and depth
+      // how to compute left/right items?
+      node_label_set_type labels(source.nodes.size());
+      depth_set_type depths(source.nodes.size(), 0);
 
+      max_tree_depth = 0;
+      
+      for (int id = source.nodes.size() - 1; id >= 0; -- id) {
+	std::string& label = labels[id];
+	
 	if (out_edges[id].empty())
 	  label = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip();
 	else {
@@ -657,19 +648,12 @@ namespace cicada
 	  const hypergraph_type::edge_type& edge_parent = source.edges[out_edges[id].front()];
 	  const hypergraph_type::id_type parent_id = edge_parent.head;
 	  
-	  // assign label..
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = edge_parent.tails.begin();
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = edge_parent.tails.end();
-	  
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
-	    const int antecedent_id = *titer;
-	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
-	    
-	    if (titer != titer_begin)
-	      lefts[antecedent_id] = *(titer - 1);
-	    else if (lefts[parent_id] != hypergraph_type::invalid) {
+	  // lefts and rights at boundary condition...
+	  if (! edge_parent.tails.empty()) {
+	    if (lefts[parent_id] != hypergraph_type::invalid) {
 	      // collect the right-most antecedent of the lefts[parent_id]
 	      
+	      const hypergraph_type::id_type antecedent_id = edge_parent.tails.front();
 	      const hypergraph_type::node_type& node = source.nodes[lefts[parent_id]];
 	      
 	      if (! node.edges.empty()) {
@@ -682,11 +666,10 @@ namespace cicada
 	      }
 	    }
 	    
-	    if (titer + 1 != titer_end)
-	      rights[antecedent_id] = *(titer + 1);
-	    else if (rights[parent_id] != hypergraph_type::invalid) {
+	    if (rights[parent_id] != hypergraph_type::invalid) {
 	      // collect the left-most antecedent of rights[parent_id]
 	      
+	      const hypergraph_type::id_type antecedent_id = edge_parent.tails.back();
 	      const hypergraph_type::node_type& node = source.nodes[rights[parent_id]];
 	      
 	      if (! node.edges.empty()) {
@@ -698,6 +681,15 @@ namespace cicada
 		}
 	      }
 	    }
+	  }
+	  
+	  // assign label..
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = edge_parent.tails.begin();
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = edge_parent.tails.end();
+	  
+	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	    const int antecedent_id = *titer;
+	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
 	    
 	    if (antecedent_id == id)
 	      label += '@' + non_terminal.non_terminal_strip();
@@ -737,19 +729,12 @@ namespace cicada
 	  const hypergraph_type::edge_type& edge_parent = source.edges[out_edges[id].front()];
 	  const hypergraph_type::id_type parent_id = edge_parent.head;
 	  
-	  // re-assign lefts and rights...
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = edge_parent.tails.begin();
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = edge_parent.tails.end();
-	  
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
-	    const int antecedent_id = *titer;
-	    const symbol_type non_terminal = source.edges[source.nodes[antecedent_id].edges.front()].rule->lhs.non_terminal();
-	    
-	    if (titer != titer_begin)
-	      lefts[antecedent_id] = *(titer - 1);
-	    else if (lefts[parent_id] != hypergraph_type::invalid) {
+	  // assign again to make sure...
+	  if (! edge_parent.tails.empty()) {
+	    if (lefts[parent_id] != hypergraph_type::invalid) {
 	      // collect the right-most antecedent of the lefts[parent_id]
 	      
+	      const hypergraph_type::id_type antecedent_id = edge_parent.tails.front();
 	      const hypergraph_type::node_type& node = source.nodes[lefts[parent_id]];
 	      
 	      if (! node.edges.empty()) {
@@ -762,11 +747,10 @@ namespace cicada
 	      }
 	    }
 	    
-	    if (titer + 1 != titer_end)
-	      rights[antecedent_id] = *(titer + 1);
-	    else if (rights[parent_id] != hypergraph_type::invalid) {
+	    if (rights[parent_id] != hypergraph_type::invalid) {
 	      // collect the left-most antecedent of rights[parent_id]
 	      
+	      const hypergraph_type::id_type antecedent_id = edge_parent.tails.back();
 	      const hypergraph_type::node_type& node = source.nodes[rights[parent_id]];
 	      
 	      if (! node.edges.empty()) {
