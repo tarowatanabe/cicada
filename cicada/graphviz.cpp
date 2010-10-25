@@ -254,11 +254,10 @@ namespace cicada
 	} else
 	  os << "  edge_" << edge.id << " [label=\"\", shape=rect];" << '\n';
 	
-	os << "    edge_" << edge.id << " -> node_" << node.id << ';' << '\n';
-
 	edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	  os << "    node_" << *niter << " -> edge_" << edge.id << ';' << '\n';
+	os << "    edge_" << edge.id << " -> node_" << node.id << ';' << '\n';
       }
     }
     
