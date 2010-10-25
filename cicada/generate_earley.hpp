@@ -247,7 +247,7 @@ namespace cicada
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->span.second);
+	return utils::hashmurmur<size_t>::operator()(x->span.second, size_t(0));
       }
     };
     
@@ -263,7 +263,7 @@ namespace cicada
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->span.first);
+	return utils::hashmurmur<size_t>::operator()(x->span.first, size_t(0));
       }
     };
     
@@ -395,7 +395,7 @@ namespace cicada
     void predict(const edge_type& edge)
     {
       if (edge.span.second >= max_sentence_length) return;
-
+      
       const grammar_node_type& dot = *edge.dot;
       
       id_map_type::const_iterator niter_end = dot.non_terminals.end();
