@@ -233,7 +233,7 @@ namespace cicada
     for (hypergraph_type::node_set_type::const_iterator niter = hypergraph.nodes.begin(); niter != niter_end; ++ niter) {
       const node_type& node = *niter;
       
-      os << " node_" << node.id << " [label=\"\", shape=circle, height=0.1, width=0.1];" << '\n';
+      os << " node_" << node.id << " [label=\"" << node.id << "\", shape=circle, height=0.1, width=0.1];" << '\n';
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
