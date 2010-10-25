@@ -118,7 +118,7 @@ int main(int argc, char** argv)
       
       utils::compress_ostream os(output_file);
       os << "mean: " << sampled[sampled.size() / 2]
-	 << "95%-interval: " << sampled[clip_size] << " " << sampled[sampled.size() - clip_size - 1]
+	 << " 95%-interval: " << sampled[clip_size] << " " << sampled[sampled.size() - clip_size - 1]
 	 << '\n';
       
     } else {
