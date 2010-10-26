@@ -96,7 +96,7 @@ namespace utils
 	os.push(boost::iostreams::file_sink(file.file_string()), 1024 * 1024 * 4);
 	
 	std::vector<byte_type> buffer(4096, 0);
-	for (int i = 0; i < alloc_size / buffer.size(); ++ i)
+	for (size_type i = 0; i < alloc_size / buffer.size(); ++ i)
 	  os.write(&(*buffer.begin()), buffer.size());
       }
       

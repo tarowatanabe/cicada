@@ -155,7 +155,7 @@ namespace utils
       
       if (__pid >= 0) {
 	int status = 0;
-	const int result = ::waitpid(__pid, &status, 0);
+	::waitpid(__pid, &status, 0);
 	__pid = -1;
       }
     }

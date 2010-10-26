@@ -432,6 +432,8 @@ namespace utils
       const char mask = (x.test(i) - 1);
       os << char((~mask & '1') | (mask & '0'));
     }
+
+    return os;
   }
   
   template <size_t _N>

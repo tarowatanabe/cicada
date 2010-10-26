@@ -15,13 +15,13 @@ struct Task
 
     const size_t value_size = sizeof(Tp) * 8;
     
-    for (int bits = 1; bits <= value_size; ++ bits) {    
+    for (size_t bits = 1; bits <= value_size; ++ bits) {    
       vec.clear();
       vec.resize(value_size * 2, 0);
       decoded.resize(value_size * 2);      
       packed.resize(bits * 2);
       
-      for (int i = 0; i < vec.size(); ++ i)
+      for (size_t i = 0; i < vec.size(); ++ i)
 	vec[i] = random() & ((1 << bits) - 1);
       
       std::cerr << "# of bits: " << bits << std::endl;
@@ -33,7 +33,7 @@ struct Task
       utils::bitpack::unpack(&(*packed.begin()), &(*decoded.begin()), value_size * 2, bits);
     
     
-      for (int i = 0; i < vec.size(); ++ i) {
+      for (size_t i = 0; i < vec.size(); ++ i) {
 	if (vec[i] != decoded[i])
 	  std::cerr << "i = " << i << " orig: " << vec[i] << " decoded: " << decoded[i] << std::endl;
 	

@@ -22,7 +22,7 @@ int main(int argc, char** argv)
     
     size_t rank1 = 0;
     size_t rank0 = 0;
-    for (int i = 0; i < bvec.size(); ++ i) {
+    for (size_t i = 0; i < bvec.size(); ++ i) {
       if (bvec[i] != stdvec[i])
 	std::cout << "DIFFERENT" << std::endl;
       

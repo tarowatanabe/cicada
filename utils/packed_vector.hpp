@@ -81,6 +81,9 @@ namespace utils
 	case 1: return data[pos_byte] & 0x0f;
 	}
       }
+      
+      // we will never reach here...
+      return 0;
     }
   };
   
@@ -103,7 +106,6 @@ namespace utils
     {
       const size_type value_size = byte_size(value);
       const size_type pos_first = data.size();
-      const uvalue_type mask = 0xff;
       
       data.resize(data.size() + value_size);
       
@@ -163,7 +165,6 @@ namespace utils
     {
       const size_type value_size = byte_size(value);
       const size_type pos_first = data.size();
-      const uvalue_type mask = 0xff;
       
       data.resize(data.size() + value_size);
       
@@ -231,7 +232,6 @@ namespace utils
     {
       const size_type value_size = byte_size(value);
       const size_type pos_first = data.size();
-      const uvalue_type mask = 0xff;
       
       data.resize(data.size() + value_size);
       

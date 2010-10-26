@@ -79,6 +79,7 @@ namespace utils
       case impl::COMPRESS_STREAM_BZIP:
 	os.push(boost::iostreams::bzip2_compressor());
 	break;
+      default: break;
       }
       os.push(boost::iostreams::file_sink(path.file_string(), std::ios_base::out | std::ios_base::trunc), buffer_size);
     }
@@ -106,6 +107,7 @@ namespace utils
 	case impl::COMPRESS_STREAM_BZIP:
 	  is.push(boost::iostreams::bzip2_decompressor());
 	  break;
+	default: break;
 	}
       }
       is.push(boost::iostreams::file_source(path.file_string()), buffer_size);

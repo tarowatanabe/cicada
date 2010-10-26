@@ -101,7 +101,7 @@ namespace utils
     self_type& operator+=(difference_type __n)
     {
       const difference_type __offset = __n + (__curr - __first);
-      if (__offset >= 0 && __offset < __chunk_size)
+      if (__offset >= 0 && __offset < difference_type(__chunk_size))
 	__curr += __n;
       else {	
 	if (__offset > 0) {
