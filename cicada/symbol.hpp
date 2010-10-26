@@ -151,7 +151,6 @@ namespace cicada
       
       if (maps[__id] == id_type(-1)) {
 	const symbol_type& word = symbol();
-	const size_type size = word.size();
 	
 	symbol_type::size_type pos = word.find(',');
 	

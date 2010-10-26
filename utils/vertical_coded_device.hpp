@@ -122,7 +122,7 @@ namespace utils
 	
 	os_data->write((char*) &value, sizeof(byte_type));
 	
-	if (inverted.empty() || inverted.size() - 1 != invert)
+	if (inverted.empty() || value_type(inverted.size() - 1) != invert)
 	  inverted.resize(invert + 1, size);
       }
       
@@ -154,7 +154,7 @@ namespace utils
 	  
 	  os_data->write((char*) &value, sizeof(byte_type));
 	  
-	  if (inverted.empty() || inverted.size() - 1 != invert)
+	  if (inverted.empty() || value_type(inverted.size() - 1) != invert)
 	    inverted.resize(invert + 1, size);
 	}
       }
@@ -180,7 +180,7 @@ namespace utils
 	  
 	  os_data->write((char*) &value, sizeof(byte_type));
 	  
-	  if (inverted_new.empty() || inverted_new.size() - 1 != invert)
+	  if (inverted_new.empty() || value_type(inverted_new.size() - 1) != invert)
 	    inverted_new.resize(invert + 1, i);
 	}
 	

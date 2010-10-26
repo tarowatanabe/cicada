@@ -503,7 +503,7 @@ namespace utils
 	
 	compressed.push_back(value);
 	
-	if (inverted.empty() || inverted.size() - 1 != invert)
+	if (inverted.empty() || value_type(inverted.size() - 1) != invert)
 	  inverted.resize(invert + 1, i);
       }
       off.push_back(0);
@@ -520,7 +520,7 @@ namespace utils
 	  
 	  compressed.push_back(value);
 	  
-	  if (inverted_new.empty() || inverted_new.size() - 1 != invert)
+	  if (inverted_new.empty() || value_type(inverted_new.size() - 1) != invert)
 	    inverted_new.resize(invert + 1, i);
 	}
 	

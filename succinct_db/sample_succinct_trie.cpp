@@ -42,7 +42,7 @@ int main(int argc, char** argv)
   const uint8_t* data[months.size()];
   size_type length[months.size()];
   
-  for (int i = 0; i < months.size(); ++ i) {
+  for (size_t i = 0; i < months.size(); ++ i) {
     data[i] = (const uint8_t*) months[i].c_str();
     length[i] = months[i].size();
     std::cout << "i = " << i << " " << data[i] << std::endl;
@@ -72,7 +72,7 @@ int main(int argc, char** argv)
   std::cout << "size: " << succinct_trie_mapped_stream.size() << std::endl;
   std::cout << "index size: " << succinct_trie_mapped_stream.index_size() << std::endl;
 
-  for (int i = 0; i < months.size(); ++ i) {
+  for (size_t i = 0; i < months.size(); ++ i) {
     size_type node_pos = 0;
     size_type key_pos = 0;
     
