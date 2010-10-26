@@ -60,7 +60,7 @@ namespace cicada
     // vocabulary...
     __vocab.open(rep.path("vocab"));
     
-    for (int shard = 0; shard < __shards.size(); ++ shard) {
+    for (size_t shard = 0; shard != __shards.size(); ++ shard) {
       std::ostringstream stream_shard;
       stream_shard << "ngram-" << std::setfill('0') << std::setw(6) << shard;
       

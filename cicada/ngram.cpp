@@ -58,7 +58,7 @@ namespace cicada
     shards.reserve(atoi(siter->second.c_str()));
     shards.resize(atoi(siter->second.c_str()));
     
-    for (int shard = 0; shard < shards.size(); ++ shard) {
+    for (size_t shard = 0; shard != shards.size(); ++ shard) {
       std::ostringstream stream_shard;
       stream_shard << "ngram-" << std::setfill('0') << std::setw(6) << shard;
       
