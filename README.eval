@@ -8,3 +8,34 @@ SB: skip bigram (by default, skip size is clipped to 4)
 WLCS: (weighted) longest common subsequence (by defaut, weight is one, meaning no weight, use alpha=2 for weight?)
 SK: string kernel (by default, decay factor = 0.8, spectrum p = 4)
 
+
+Implemented bootstrap resampling[1] and sign test[2] in "cicada_eval"
+
+[1]
+@inproceedings{koehn:2004:EMNLP,
+  author    = {Koehn, Philipp},
+  title     = {Statistical Significance Tests for Machine Translation Evaluation },
+  booktitle = {Proceedings of EMNLP 2004},
+  editor = {Dekang Lin and Dekai Wu},
+  year      = 2004,
+  month     = {July},
+  address   = {Barcelona, Spain},
+  publisher = {Association for Computational Linguistics},
+  pages     = {388--395}
+}
+
+
+[2]
+@inproceedings{1219906,
+ author = {Collins, Michael and Koehn, Philipp and Ku\v{c}erov\'{a}, Ivona},
+ title = {Clause restructuring for statistical machine translation},
+ booktitle = {ACL '05: Proceedings of the 43rd Annual Meeting on Association for Computational Linguistics},
+ year = {2005},
+ pages = {531--540},
+ location = {Ann Arbor, Michigan},
+ doi = {http://dx.doi.org/10.3115/1219840.1219906},
+ publisher = {Association for Computational Linguistics},
+ address = {Morristown, NJ, USA},
+ }
+
+

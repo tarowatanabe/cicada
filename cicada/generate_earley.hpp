@@ -704,12 +704,14 @@ namespace cicada
 	  if (! context)
 	    label = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip();
 	  
-	  label = labels[source.edges[out_edges[id].front()].head] + ';' + label;
-	  // always strip-off the first non-terminal up-until ';'
-	  if (depth > 0 && depths[id] > depth) {
-	    std::string::size_type pos = label.find(';', 1);
-	    if (pos != std::string::npos)
-	      label = label.substr(pos + 1);
+	  if (depth != 1) {
+	    label = labels[source.edges[out_edges[id].front()].head] + ';' + label;
+	    // always strip-off the first non-terminal up-until ';'
+	    if (depth > 0 && depths[id] > depth) {
+	      std::string::size_type pos = label.find(';', 1);
+	      if (pos != std::string::npos)
+		label = label.substr(pos + 1);
+	    }
 	  }
 	  
 	  //std::cerr << "non-terminal: " << labels[id] << std::endl;

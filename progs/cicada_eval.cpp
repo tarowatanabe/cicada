@@ -41,11 +41,13 @@ typedef scorer_type::score_ptr_type score_ptr_type;
 typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
 
 path_set_type tstset_files;
+path_set_type tstset2_files;
 path_set_type refset_files;
 path_type     output_file = "-";
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
 
+bool signtest = false;
 bool bootstrap = false;
 int  samples = 1000;
 
@@ -60,13 +62,23 @@ void options(int argc, char** argv);
 int main(int argc, char** argv)
 {
   try {
-
     options(argc, argv);
   
     if (scorer_list) {
       std::cout << cicada::eval::Scorer::lists();
       return 0;
     }
+
+    if (bootstrap && samples <= 0)
+      throw std::runtime_error("invalid sample size for bootstrapping");
+    if (bootstrap && signtest)
+      throw std::runtime_error("either --bootstrap/--signtest");
+
+    if (! tstset2_files.empty() && ! signtest && ! bootstrap)
+      throw std::runtime_error("the second system is used, but what test?");
+    
+    if (signtest && tstset2_files.empty())
+      throw std::runtime_error("signtest without the second system?");
   
     // read reference set
     scorer_document_type scorers(scorer_name);
@@ -76,23 +88,142 @@ int main(int argc, char** argv)
     if (tstset_files.empty())
       tstset_files.push_back("-");
 
-    sentence_set_type sentences(scorers.size());
+    sentence_set_type hyps(scorers.size());
+    sentence_set_type hyps2;
     
-    read_tstset(tstset_files, sentences);
-    
-    if (bootstrap) {
+    read_tstset(tstset_files, hyps);
+
+    if (! tstset2_files.empty()) {
+      hyps2.reserve(scorers.size());
+      hyps2.resize(scorers.size());
+      read_tstset(tstset2_files, hyps2);
+    }
+
+    if (! hyps2.empty()) {
+      const bool error_metric = scorers.error_metric();
+      
+      const sentence_set_type& hyps1 = hyps;
+      score_ptr_set_type scores1;
+      score_ptr_set_type scores2;
+      
+      for (int seg = 0; seg != scorers.size(); ++ seg) 
+	if (scorers[seg]) {
+	  if (hyps1[seg].empty() || hyps2[seg].empty()) {
+	    if (hyps1[seg].empty())
+	      std::cerr << "WARNING: no translation for system1 at: " << seg << std::endl;
+	    if (hyps2[seg].empty())
+	      std::cerr << "WARNING: no translation for system2 at: " << seg << std::endl;
+	    
+	    continue;
+	  }
+	  
+	  scores1.push_back(scorers[seg]->score(hyps1[seg]));
+	  scores2.push_back(scorers[seg]->score(hyps2[seg]));
+	}
+
+      if (bootstrap) {
+      
+	boost::mt19937 gen;
+	gen.seed(time(0) * getpid());
+	boost::random_number_generator<boost::mt19937> generator(gen);
+      
+	int better1 = 0;
+	int better2 = 0;
+	for (int iter = 0; iter < samples; ++ iter) {
+	  score_ptr_type score1(scores1.front()->zero());
+	  score_ptr_type score2(scores2.front()->zero());
+	  for (int i = 0; i != scores1.size(); ++ i) {
+	    const int seg = generator(scores1.size());
+	  
+	    *score1 += *scores1[seg];
+	    *score2 += *scores2[seg];
+	  }
+	
+	  const double eval1 = score1->score().first;
+	  const double eval2 = score2->score().first;
+	
+	  if (error_metric) {
+	    if (eval1 < eval2)
+	      ++ better1;
+	    if (eval2 < eval1)
+	      ++ better2;
+	  } else {
+	    if (eval1 > eval2)
+	      ++ better1;
+	    if (eval2 > eval1)
+	      ++ better2;
+	  }
+	}
+      
+	utils::compress_ostream os(output_file);
+	os << "system1: " << better1 << " system2: " << better2 << std::endl;
+      } else {
+	int better = 0;
+	int worse  = 0;
+	
+	score_ptr_type score(scores1.front()->zero());
+	for (int i = 0; i != scores1.size(); ++ i)
+	  *score += *scores1[i];
+	
+	const double eval1 = score->score().first;
+
+	for (int i = 0; i != scores2.size(); ++ i) {
+	  *score -= *scores1[i];
+	  *score += *scores2[i];
+	  
+	  const double eval2 = score->score().first;
+
+	  if (error_metric) {
+	    if (eval2 < eval1)
+	      better += 1;
+	    else if (eval2 > eval1)
+	      worse += 1;
+	  } else {
+	    if (eval2 > eval1)
+	      better += 1;
+	    else if (eval2 < eval1)
+	      worse += 1;
+	  }
+
+	  *score -= *scores2[i];
+	  *score += *scores1[i];
+	}
+	
+	const double n = better + worse;
+	const double mean = double(better) / n;
+	const double se = std::sqrt(mean * (1.0 - mean) / n);
+	
+	utils::compress_ostream os(output_file);
+	os << "system2 better: " << better << " worse: " << worse << '\n'
+	   << " Pr(better|different): " << mean << '\n'
+	   << " 95%-confidence: " << (mean-1.96*se) << ' ' << (mean+1.96*se) << '\n'
+	   << " 99%-confidence: " << (mean-2.58*se) << ' ' << (mean+2.58*se) << '\n';
+	
+	if (mean - 2.58*se > 0.5)
+	  os << " system2 is significantly better (p < 0.01)";
+	else if (mean + 2.58*se < 0.5)
+	  os << " system2 is significantly worse (p < 0.01)";
+	else if (mean - 1.96*se > 0.5)
+	  os << " system2 is significantly better (p < 0.05)";
+	else if (mean + 1.96*se < 0.5)
+	  os << " system2 is significantly worse (p < 0.05)";
+	else
+	  os << " no significant difference";
+	os << '\n';
+      }
+    } else if (bootstrap) {
       // first, collect BLEU stats...
       
       score_ptr_set_type scores;
       
       for (int seg = 0; seg != scorers.size(); ++ seg) 
 	if (scorers[seg]) {
-	  if (sentences[seg].empty()) {
+	  if (hyps[seg].empty()) {
 	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
 	    continue;
 	  }
 	  
-	  scores.push_back(scorers[seg]->score(sentences[seg]));
+	  scores.push_back(scorers[seg]->score(hyps[seg]));
 	}
 
       if (scores.empty())
@@ -127,12 +258,12 @@ int main(int argc, char** argv)
       for (int seg = 0; seg != scorers.size(); ++ seg) 
 	if (scorers[seg]) {
 	  
-	  if (sentences[seg].empty()) {
+	  if (hyps[seg].empty()) {
 	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
 	    continue;
 	  }
 	  
-	  score_ptr_type score_segment = scorers[seg]->score(sentences[seg]);
+	  score_ptr_type score_segment = scorers[seg]->score(hyps[seg]);
 	  
 	  if (debug) {
 	    const std::pair<double, double> value = score_segment->score();
@@ -271,18 +402,20 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
-
+  
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("tstset",  po::value<path_set_type>(&tstset_files)->multitoken(), "test set file(s) (in hypergraph format)")
-    ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
+    ("tstset",   po::value<path_set_type>(&tstset_files)->multitoken(), "test set file(s) (in hypergraph format)")
+    ("tstset2",  po::value<path_set_type>(&tstset2_files)->multitoken(), "test set file(s) (in hypergraph format)")
+    ("refset",   po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
 
+    ("signtest",  po::bool_switch(&signtest),  "sign test")
     ("bootstrap", po::bool_switch(&bootstrap), "bootstrap resampling")
     ("samples",   po::value<int>(&samples),    "# of samples")
     ;
