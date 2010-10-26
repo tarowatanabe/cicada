@@ -641,7 +641,7 @@ namespace cicada
 	if (out_edges[id].empty())
 	  label = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip();
 	else {
-	  depths[id] = depths[out_edges[id].front()] + 1;
+	  depths[id] = depths[source.edges[out_edges[id].front()].head] + 1;
 	  
 	  max_tree_depth = utils::bithack::max(max_tree_depth, depths[id]);
 	  
