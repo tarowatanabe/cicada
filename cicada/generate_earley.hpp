@@ -107,7 +107,8 @@ namespace cicada
       symbol_type lhs; // lhs of rule
       const grammar_node_type* dot;  // earley grammar position
       
-      // terminal span...
+      // tree depth/terminal span...
+      int          depth;
       span_type    span;
       
       // backpointers
@@ -119,58 +120,58 @@ namespace cicada
       
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const int& q0)
+	   const int& __depth, const int& q0)
 	: lhs(__lhs), dot(&__dot),
-	  span(q0, q0),
+	  depth(__depth), span(q0, q0),
 	  active(0), passive(0),
 	  edge(hypergraph_type::invalid) {}
       
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const int& q0,
+	   const int& __depth, const int& q0,
 	   const edge_type& __active)
 	: lhs(__lhs), dot(&__dot),
-	  span(q0, q0),
+	  depth(__depth), span(q0, q0),
 	  active(&__active), passive(0),
 	  edge(hypergraph_type::invalid) {}
       
       // created by scan... we will always have terminal
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const span_type& __span,
+	   const int& __depth, const span_type& __span,
 	   const edge_type& __active,
 	   const hypergraph_type::id_type& __edge)
 	: lhs(__lhs), dot(&__dot),
-	  span(__span),
+	  depth(__depth), span(__span),
 	  active(&__active), passive(0),
 	  edge(__edge) {}
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const span_type& __span,
+	   const int& __depth, const span_type& __span,
 	   const edge_type& __active)
 	: lhs(__lhs), dot(&__dot),
-	  span(__span),
+	  depth(__depth), span(__span),
 	  active(&__active), passive(0),
 	  edge(hypergraph_type::invalid) {}
       
       // construct by complete
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const span_type& __span,
+	   const int& __depth, const span_type& __span,
 	   const edge_type& __active, const edge_type& __passive,
 	   const hypergraph_type::id_type& __edge)
 	: lhs(__lhs), dot(&__dot),
-	  span(__span),
+	  depth(__depth), span(__span),
 	  active(&__active), passive(&__passive),
 	  edge(__edge) {}
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
-	   const span_type& __span,
+	   const int& __depth, const span_type& __span,
 	   const edge_type& __active, const edge_type& __passive)
 	: lhs(__lhs), dot(&__dot),
-	  span(__span),
+	  depth(__depth), span(__span),
 	  active(&__active), passive(&__passive),
 	  edge(hypergraph_type::invalid) {}
       
       // for query...
-      Edge(const int& __first, const int& __last)
-	: span(__first, __last) {}
+      Edge(const int& __depth, const int& __first, const int& __last)
+	: depth(__depth), span(__first, __last) {}
       
     public:
       bool is_passive() const { return edge != hypergraph_type::invalid; }
@@ -223,9 +224,9 @@ namespace cicada
 	if (! x)
 	  return 0;
 	else if (x->is_active())
-	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->span, x->lhs.id()));
+	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->span, hasher_type::operator()(x->depth, x->lhs.id())));
 	else
-	  return hasher_type::operator()(x->span, x->lhs.id());
+	  return hasher_type::operator()(x->span, hasher_type::operator()(x->depth, x->lhs.id()));
       }
     };
     
@@ -238,6 +239,7 @@ namespace cicada
 		|| (x && y
 		    && x->is_active() == y->is_active()
 		    && x->lhs == y->lhs
+		    && x->depth == y->depth
 		    && x->span == y->span
 		    && (x->is_passive() || x->dot == y->dot)));
       }
@@ -247,7 +249,7 @@ namespace cicada
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->span.second, size_t(0));
+	return utils::hashmurmur<size_t>::operator()(x->span.second, x->depth);
       }
     };
     
@@ -255,7 +257,7 @@ namespace cicada
     {
       bool operator()(const edge_type* x, const edge_type* y) const
       {
-	return x->span.second == y->span.second;
+	return x->span.second == y->span.second && x->depth == y->depth;
       }
     };
 
@@ -263,7 +265,7 @@ namespace cicada
     {
       size_t operator()(const edge_type* x) const
       {
-	return utils::hashmurmur<size_t>::operator()(x->span.first, size_t(0));
+	return utils::hashmurmur<size_t>::operator()(x->span.first, x->depth);
       }
     };
     
@@ -271,7 +273,7 @@ namespace cicada
     {
       bool operator()(const edge_type* x, const edge_type* y) const
       {
-	return x->span.first == y->span.first;
+	return x->span.first == y->span.first && x->depth == y->depth;
       }
     };
 
@@ -281,7 +283,7 @@ namespace cicada
       
       size_t operator()(const edge_type* x) const
       {
-	return (x ? hasher_type::operator()(x->span, x->lhs.id()) : size_t(0));
+	return (x ? hasher_type::operator()(x->span, hasher_type::operator()(x->depth, x->lhs.id())) : size_t(0));
       }
     };
 
@@ -291,6 +293,7 @@ namespace cicada
       {
 	return ((x == y) || (x && y
 			     && x->lhs == y->lhs
+			     && x->depth == y->depth
 			     && x->span == y->span));
       }
     };
@@ -331,7 +334,7 @@ namespace cicada
       const grammar_node_type& dot_goal = grammar_nodes[giter->second];
       
       // initial edges for each transducer defined in grammar...
-      insert_edge(edge_type(goal_symbol, dot_goal, 0));
+      insert_edge(edge_type(goal_symbol, dot_goal, 0, 0));
       
       // forever...
       while (! agenda_exploration.empty() || ! agenda_finishing.empty()) {
@@ -386,15 +389,16 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(edge.lhs, dot_next, span_type(edge.span.first, edge.span.second + 1), edge, dot_next.edge));
+	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, span_type(edge.span.first, edge.span.second + 1), edge, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(edge.lhs, dot_next, span_type(edge.span.first, edge.span.second + 1), edge));
+	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, span_type(edge.span.first, edge.span.second + 1), edge));
       }
     }
     
     void predict(const edge_type& edge)
     {
       if (edge.span.second >= max_sentence_length) return;
+      if (edge.depth >= max_tree_depth) return;
       
       const grammar_node_type& dot = *edge.dot;
       
@@ -411,7 +415,7 @@ namespace cicada
 	
 	const grammar_node_type& dot_next = grammar_nodes[piter->second];
 	
-	insert_edge(edge_type(lhs, dot_next, edge.span.second, edge));
+	insert_edge(edge_type(lhs, dot_next, edge.depth + 1, edge.span.second, edge));
       }
     }
 
@@ -421,7 +425,7 @@ namespace cicada
       // we will try find actives whose last match with passive's first
       // do we group by passive's lhs?
 
-      const edge_type query(passive.span.first, passive.span.first);
+      const edge_type query(passive.depth - 1, passive.span.first, passive.span.first);
       
       std::pair<edge_set_active_type::const_iterator, edge_set_active_type::const_iterator> result = edges_active.equal_range(&query);
       for (edge_set_active_type::const_iterator aiter = result.first; aiter != result.second; ++ aiter) {
@@ -437,9 +441,9 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive, dot_next.edge));
+	  insert_edge(edge_type(active.lhs, dot_next, active.depth, span_type(active.span.first, passive.span.second), active, passive, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive));
+	  insert_edge(edge_type(active.lhs, dot_next, active.depth, span_type(active.span.first, passive.span.second), active, passive));
       }
     }
     
@@ -449,7 +453,7 @@ namespace cicada
       const grammar_node_type& dot = *(active.dot);
       
       // find passives whose first match with active's last
-      const edge_type query(active.span.second, active.span.second);
+      const edge_type query(active.depth + 1, active.span.second, active.span.second);
       
       std::pair<edge_set_passive_type::const_iterator, edge_set_passive_type::const_iterator> result = edges_passive.equal_range(&query);
       for (edge_set_passive_type::const_iterator piter = result.first; piter != result.second; ++ piter) {
@@ -464,9 +468,9 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive, dot_next.edge));
+	  insert_edge(edge_type(active.lhs, dot_next, active.depth, span_type(active.span.first, passive.span.second), active, passive, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, span_type(active.span.first, passive.span.second), active, passive));
+	  insert_edge(edge_type(active.lhs, dot_next, active.depth, span_type(active.span.first, passive.span.second), active, passive));
       }
     }
     
