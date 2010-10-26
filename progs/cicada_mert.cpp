@@ -296,7 +296,7 @@ int main(int argc, char ** argv)
     weight_set_type bound_lower;
     weight_set_type bound_upper;
     
-    if (! bound_lower_file.empty())
+    if (! bound_lower_file.empty()) {
       if (bound_lower_file == "-" || boost::filesystem::exists(bound_lower_file)) {
 	typedef cicada::FeatureVector<double> feature_vector_type;
 	
@@ -310,8 +310,9 @@ int main(int argc, char ** argv)
 	  bound_lower[biter->first] = biter->second;
       } else
 	throw std::runtime_error("no lower-bound file?" + bound_lower_file.file_string());
+    }
     
-    if (! bound_upper_file.empty())
+    if (! bound_upper_file.empty()) {
       if (bound_upper_file == "-" || boost::filesystem::exists(bound_upper_file)) {
 	typedef cicada::FeatureVector<double> feature_vector_type;
 	
@@ -325,6 +326,7 @@ int main(int argc, char ** argv)
 	  bound_upper[biter->first] = biter->second;
       } else
 	throw std::runtime_error("no upper-bound file?" + bound_upper_file.file_string());
+    }
     
     cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     
@@ -391,7 +393,7 @@ int main(int argc, char ** argv)
       }
     }
     
-    for (/**/; sample < samples_restarts + weights.size(); ++ sample) {
+    for (/**/; sample < static_cast<int>(samples_restarts + weights.size()); ++ sample) {
       typedef cicada::optimize::LineSearch line_search_type;
       
       double          sample_objective = std::numeric_limits<double>::infinity();
@@ -573,7 +575,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
   for (int i = 0; i < threads; ++ i)
     workers.add_thread(new boost::thread(task_type(queue, segments, origin, direction, scorers, graphs)));
   
-  for (int seg = 0; seg < graphs.size(); ++ seg)
+  for (size_t seg = 0; seg != graphs.size(); ++ seg)
     if (graphs[seg].goal != hypergraph_type::invalid)
       queue.push(seg);
   
@@ -720,9 +722,9 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   boost::thread_group workers;
   for (int i = 0; i < threads; ++ i)
     workers.add_thread(new boost::thread(task_type(weights, queue_mapper, queue_reducer)));
-
+  
   int mapped_size = 0;
-  for (int seg = 0; seg < graphs.size(); ++ seg)
+  for (size_t seg = 0; seg != graphs.size(); ++ seg)
     if (graphs[seg].goal != hypergraph_type::invalid) {
       queue_mapper.push(mapper_type(seg, &graphs[seg]));
       ++ mapped_size;
@@ -779,7 +781,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?");
 	
-	  if (id >= graphs.size())
+	  if (id >= static_cast<int>(graphs.size()))
 	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
 	
 	  graphs[id].unite(hypergraph);
@@ -801,7 +803,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	if (sep != "|||")
 	  throw std::runtime_error("format error?");
 	
-	if (id >= graphs.size())
+	if (id >= static_cast<int>(graphs.size()))
 	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id));
 	
 	graphs[id].unite(hypergraph);
@@ -809,7 +811,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
     }
   }
   
-  for (int id = 0; id < graphs.size(); ++ id)
+  for (size_t id = 0; id != graphs.size(); ++ id)
     if (graphs[id].goal == hypergraph_type::invalid)
       std::cerr << "invalid graph at: " << id << std::endl;
 }
@@ -845,9 +847,9 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       if (*iter != "|||") continue;
       ++ iter;
     
-      if (id >= scorers.size())
+      if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
-    
+      
       if (! scorers[id])
 	scorers[id] = scorers.create();
     

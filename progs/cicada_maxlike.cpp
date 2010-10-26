@@ -412,7 +412,7 @@ struct OptimizeLBFGS
       weight_set_type weights_bleu;
 
       weight_set_type::feature_type feature_bleu;
-      for (int i = 0; i < features.size(); ++ i)
+      for (size_t i = 0; i != features.size(); ++ i)
 	if (features[i]) {
 	  feature_bleu = features[i]->feature_name();
 	  break;
@@ -552,7 +552,7 @@ struct OptimizeLBFGS
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
     
     weight_set_type::feature_type feature_bleu;
-    for (int i = 0; i < optimizer.features.size(); ++ i)
+    for (size_t i = 0; i != optimizer.features.size(); ++ i)
       if (optimizer.features[i]) {
 	feature_bleu = optimizer.features[i]->feature_name();
 	break;
@@ -569,7 +569,7 @@ struct OptimizeLBFGS
       workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
     }
     
-    for (int sample = 0; sample < optimizer.graphs.size(); ++ sample)
+    for (size_t sample = 0; sample != optimizer.graphs.size(); ++ sample)
       queue.push(sample);
     
     // collect all the objective and gradients...
@@ -663,7 +663,7 @@ struct OptimizeOnline
     queue_type queue;
     
     id_set_type ids(graphs.size());
-    for (int id = 0; id != ids.size(); ++ id)
+    for (size_t id = 0; id != ids.size(); ++ id)
       ids[id] = id;
 
     weight_set_type weights_mixed;
@@ -677,7 +677,7 @@ struct OptimizeOnline
       for (int i = 0; i < threads; ++ i)
 	workers.add_thread(new boost::thread(task_type(queue, optimizers[i])));
       
-      for (int pos = 0; pos != ids.size(); ++ pos)
+      for (size_t pos = 0; pos != ids.size(); ++ pos)
 	queue.push(ids[pos]);
       
       for (int i = 0; i < threads; ++ i)
@@ -859,7 +859,7 @@ struct TaskOracle
     const double score_factor = (error_metric ? - 1.0 : 1.0);
     
     weight_set_type::feature_type feature_bleu;
-    for (int i = 0; i < features.size(); ++ i)
+    for (size_t i = 0; i != features.size(); ++ i)
       if (features[i]) {
 	feature_bleu = features[i]->feature_name();
 	break;
@@ -957,7 +957,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
       workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
     
     
-    for (int id = 0; id < graphs.size(); ++ id)
+    for (size_t id = 0; id != graphs.size(); ++ id)
       queue.push(id);
     
     for (int i = 0; i < threads; ++ i)
@@ -984,7 +984,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
     objective_optimum = objective;
   }
   
-  for (int id = 0; id < graphs.size(); ++ id)
+  for (size_t id = 0; id != graphs.size(); ++ id)
     if (features[id]) {
       if (! scores[id])
 	throw std::runtime_error("no scores?");
@@ -1032,7 +1032,7 @@ void read_tstset(const path_set_type& files,
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?: " + path.file_string());
 	
-	  if (id >= graphs.size())
+	  if (id >= static_cast<int>(graphs.size()))
 	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + path.file_string());
 	
 	  graphs[id].unite(hypergraph);
@@ -1051,7 +1051,7 @@ void read_tstset(const path_set_type& files,
 	if (sep != "|||")
 	  throw std::runtime_error("format error?: " + titer->file_string());
 	
-	if (id >= graphs.size())
+	if (id >= static_cast<int>(graphs.size()))
 	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + titer->file_string());
 	
 	graphs[id].unite(hypergraph);
@@ -1064,7 +1064,7 @@ void read_tstset(const path_set_type& files,
   
   typedef cicada::Parameter parameter_type;
     
-  for (int id = 0; id < graphs.size(); ++ id) {
+  for (size_t id = 0; id != graphs.size(); ++ id) {
     if (graphs[id].goal == hypergraph_type::invalid)
       std::cerr << "invalid graph at: " << id << std::endl;
     else {
@@ -1132,10 +1132,10 @@ void read_refset(const path_set_type& files,
       if (*iter != "|||") continue;
       ++ iter;
 
-      if (id >= scorers.size())
+      if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
       
-      if (id >= sentences.size())
+      if (id >= static_cast<int>(sentences.size()))
 	sentences.resize(id + 1);
       
       if (! scorers[id])

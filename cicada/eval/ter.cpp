@@ -461,17 +461,17 @@ namespace cicada
 	matrix_transition_type trans(hyp.size() + 1, ref.size() + 1, TRANSITION::match);
 	matrix_cost_type       costs(hyp.size() + 1, ref.size() + 1, 0.0);
 	
-	for (size_t i = 1; i <= hyp.size(); ++ i) {
+	for (int i = 1; i <= static_cast<int>(hyp.size()); ++ i) {
 	  costs(i, 0) = costs(i - 1, 0) + COSTS::insertion;
 	  trans(i, 0) = TRANSITION::insertion;
 	}
-	for (size_t j = 1; j <= ref.size(); ++ j) {
+	for (int j = 1; j <= static_cast<int>(ref.size()); ++ j) {
 	  costs(0, j) = costs(0, j - 1) + COSTS::deletion;
 	  trans(0, j) = TRANSITION::deletion;
 	}
 	
-	for (size_t i = 1; i <= hyp.size(); ++ i)
-	  for (size_t j = 1; j <= ref.size(); ++ j) {
+	for (int i = 1; i <= static_cast<int>(hyp.size()); ++ i)
+	  for (int j = 1; j <= static_cast<int>(ref.size()); ++ j) {
 	    double&          cur_cost = costs(i, j);
 	    transition_type& cur_tran = trans(i, j);
 	    

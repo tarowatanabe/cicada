@@ -81,12 +81,12 @@ int main(int argc, char ** argv)
 
       feature_set_type features;
       if (! features_confidence.empty()) {
-	if (id >= features_confidence.size())
+	if (id >= static_cast<int>(features_confidence.size()))
 	  throw std::runtime_error("# of confidence features do not match");
 	features[features_confidence[id]] = conf;
       }
       if (! features_count.empty()) {
-	if (id >= features_count.size())
+	if (id >= static_cast<int>(features_count.size()))
 	  throw std::runtime_error("# of count features do not match");
 	features[features_count[id]] = count_weight;
       }

@@ -283,12 +283,14 @@ namespace cicada
     self_type& operator+=(const T& x)
     { 
       std::for_each(begin(), end(), __apply_unary<std::plus<Tp>, T>(x));
+      return *this;
     }
 
     template <typename T>
     self_type& operator-=(const T& x)
     { 
       std::for_each(begin(), end(), __apply_unary<std::minus<Tp>, T>(x));
+      return *this;
     }
     
     template <typename T>
@@ -298,12 +300,14 @@ namespace cicada
 	__values.clear();
       else
 	std::for_each(begin(), end(), __apply_unary<std::multiplies<Tp>, T>(x));
+      return *this;
     }
     
     template <typename T>
     self_type& operator/=(const T& x)
     {
       std::for_each(begin(), end(), __apply_unary<std::divides<Tp>, T>(x));
+      return *this;
     }
     
     template <typename T, typename A>

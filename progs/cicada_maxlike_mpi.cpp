@@ -445,7 +445,7 @@ struct OptimizeLBFGS
       weight_set_type weights_bleu;
 
       weight_set_type::feature_type feature_bleu;
-      for (int i = 0; i < features.size(); ++ i)
+      for (size_t i = 0; i != features.size(); ++ i)
 	if (features[i]) {
 	  feature_bleu = features[i]->feature_name();
 	  break;
@@ -469,7 +469,7 @@ struct OptimizeLBFGS
       
       expectation_type  feature_expectations;
       
-      for (int id = 0; id < graphs.size(); ++ id)
+      for (size_t id = 0; id != graphs.size(); ++ id)
 	if (features[id] && graphs[id].is_valid()) {
 	
 	  model_type model;
@@ -577,7 +577,7 @@ struct OptimizeLBFGS
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
 
     weight_set_type::feature_type feature_bleu;
-    for (int i = 0; i < optimizer.features.size(); ++ i)
+    for (size_t i = 0; i != optimizer.features.size(); ++ i)
       if (optimizer.features[i]) {
 	feature_bleu = optimizer.features[i]->feature_name();
 	break;
@@ -637,7 +637,7 @@ double optimize_online(const hypergraph_set_type& graphs,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
   id_set_type ids(graphs.size());
-  for (int id = 0; id != ids.size(); ++ id)
+  for (size_t id = 0; id != ids.size(); ++ id)
     ids[id] = id;
   
   if (mpi_rank == 0) {
@@ -655,7 +655,7 @@ double optimize_online(const hypergraph_set_type& graphs,
       
       optimizer.initialize();
       
-      for (int id = 0; id != ids.size(); ++ id)
+      for (size_t id = 0; id != ids.size(); ++ id)
 	if (graphs[ids[id]].is_valid())
 	  optimizer(ids[id]);
       
@@ -713,7 +713,7 @@ double optimize_online(const hypergraph_set_type& graphs,
 	
 	optimizer.initialize();
 	
-	for (int id = 0; id != ids.size(); ++ id)
+	for (size_t id = 0; id != ids.size(); ++ id)
 	  if (graphs[ids[id]].is_valid())
 	    optimizer(ids[id]);
 	
@@ -896,7 +896,7 @@ struct TaskOracle
     const double score_factor = (error_metric ? - 1.0 : 1.0);
     
     weight_set_type::feature_type feature_bleu;
-    for (int i = 0; i < features.size(); ++ i)
+    for (size_t i = 0; i != features.size(); ++ i)
       if (features[i]) {
 	feature_bleu = features[i]->feature_name();
 	break;
@@ -908,7 +908,7 @@ struct TaskOracle
 
     hypergraph_type graph_oracle;
     
-    for (int id = 0; id < graphs.size(); ++ id) {
+    for (size_t id = 0; id != graphs.size(); ++ id) {
       if (! graphs[id].is_valid()) continue;
       
       score_ptr_type score_curr;
@@ -987,7 +987,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
     bcast_sentences(sentences);
     
     score_optimum.reset();
-    for (int id = 0; id < sentences.size(); ++ id)
+    for (size_t id = 0; id != sentences.size(); ++ id)
       if (! sentences[id].empty()) {
 	scores[id] = scorers[id]->score(sentences[id]);
 	
@@ -1010,7 +1010,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
     objective_optimum = objective;
   }
   
-  for (int id = 0; id < graphs.size(); ++ id)
+  for (size_t id = 0; id != graphs.size(); ++ id)
     if (features[id]) {
       if (! scores[id])
 	throw std::runtime_error("no scores?");
@@ -1061,7 +1061,7 @@ void read_tstset(const path_set_type& files,
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?: " + path.file_string());
 	
-	  if (id >= graphs.size())
+	  if (id >= static_cast<int>(graphs.size()))
 	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + path.file_string());
 	  
 	  if (id % mpi_size != mpi_rank)
@@ -1084,7 +1084,7 @@ void read_tstset(const path_set_type& files,
 	if (sep != "|||")
 	  throw std::runtime_error("format error?: " + titer->file_string());
 	
-	if (id >= graphs.size())
+	if (id >= static_cast<int>(graphs.size()))
 	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + titer->file_string());
 	
 	if (id % mpi_size == mpi_rank)
@@ -1096,8 +1096,8 @@ void read_tstset(const path_set_type& files,
   if (debug && mpi_rank == 0)
     std::cerr << "assign BLEU scorer" << std::endl;
     
-  for (int id = 0; id < graphs.size(); ++ id) 
-    if (id % mpi_size == mpi_rank) {
+  for (size_t id = 0; id != graphs.size(); ++ id) 
+    if (static_cast<int>(id % mpi_size) == mpi_rank) {
       if (graphs[id].goal == hypergraph_type::invalid)
 	std::cerr << "invalid graph at: " << id << std::endl;
       else {
@@ -1136,8 +1136,8 @@ void read_tstset(const path_set_type& files,
     weight_set_type weights;
     weights.allocate();
     
-    for (int id = 0; id < feature_type::allocated(); ++ id)
-      if (! feature_type(feature_type::id_type(id)).empty())
+    for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+      if (! feature_type(id).empty())
 	weights[feature_type(id)] = 1.0;
     
     bcast_weights(rank, weights);
@@ -1177,10 +1177,10 @@ void read_refset(const path_set_type& files,
       if (*iter != "|||") continue;
       ++ iter;
       
-      if (id >= scorers.size())
+      if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
       
-      if (id >= sentences.size())
+      if (id >= static_cast<int>(sentences.size()))
 	sentences.resize(id + 1);
       
       if (! scorers[id])
@@ -1203,8 +1203,8 @@ void bcast_sentences(sentence_set_type& sentences)
       os.push(boost::iostreams::gzip_compressor());
       os.push(utils::mpi_device_bcast_sink(rank, 4096));
       
-      for (int id = 0; id < sentences.size(); ++ id)
-	if (id % mpi_size == mpi_rank)
+      for (size_t id = 0; id != sentences.size(); ++ id)
+	if (static_cast<int>(id % mpi_size) == mpi_rank)
 	  os << id << " ||| " << sentences[id] << '\n';
       
     } else {

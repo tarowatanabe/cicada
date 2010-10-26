@@ -559,7 +559,7 @@ struct Task
     cicada::inside_outside(hypergraph_reward,  bleu_reward,  bleu_edge_reward,  bleu_function(feature_name,   1.0), bleu_function(feature_name,   1.0));
     cicada::inside_outside(hypergraph_penalty, bleu_penalty, bleu_edge_penalty, bleu_function(feature_name, - 1.0), bleu_function(feature_name, - 1.0));
     
-    for (int i = 0; i < accumulated_reward.size(); ++ i) {
+    for (size_t i = 0; i != accumulated_reward.size(); ++ i) {
       features.push_back(feature_set_type());
       features.back().assign(accumulated_reward[i].begin(), accumulated_reward[i].end());
       
@@ -579,7 +579,7 @@ struct Task
       margins.push_back(1.0);
     }
     
-    for (int i = 0; i < accumulated_penalty.size(); ++ i) {
+    for (size_t i = 0; i != accumulated_penalty.size(); ++ i) {
       features.push_back(feature_set_type());
       features.back().assign(accumulated_penalty[i].begin(), accumulated_penalty[i].end());
       
@@ -966,7 +966,7 @@ struct Task
       if (batch_current >= batch_size && ! labels.empty()) {
 	if (debug)
 	  std::cerr << "# of support vectors: " << labels.size() << std::endl;
-
+	
 	optimizer(ids, labels, margins, features, learn_optimized);
 	
 	batch_current = 0;
@@ -1415,7 +1415,7 @@ void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
   while (1) {
     bool found = false;
     
-    for (int i = 0; i < device.size(); ++ i)
+    for (size_t i = 0; i != device.size(); ++ i)
       while (stream[i] && device[i] && device[i]->test()) {
 	if (std::getline(*stream[i], line)) {
 	  tokenizer_type tokenizer(line);
@@ -1435,7 +1435,7 @@ void reduce_weights(Iterator first, Iterator last, weight_set_type& weights)
 	found = true;
       }
     
-    if (std::count(device.begin(), device.end(), device_ptr_type()) == device.size()) break;
+    if (std::count(device.begin(), device.end(), device_ptr_type()) == static_cast<int>(device.size())) break;
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }

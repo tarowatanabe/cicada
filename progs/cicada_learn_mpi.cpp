@@ -268,8 +268,6 @@ struct OptimizeLBFGS
       const int mpi_rank = MPI::COMM_WORLD.Get_rank();
       const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-      size_t id_forest;
-      size_t id_intersected;
       hypergraph_type hypergraph;
       
       std::string line;
@@ -284,7 +282,7 @@ struct OptimizeLBFGS
       g.clear();
       objective = 0.0;
       
-      for (int i = 0; i < graphs_forest.size(); ++ i) {
+      for (size_t i = 0; i != graphs_forest.size(); ++ i) {
 	const hypergraph_type& hypergraph_forest      = graphs_forest[i];
 	const hypergraph_type& hypergraph_intersected = graphs_intersected[i];
 
@@ -527,8 +525,8 @@ void read_forest(const path_type& forest_path,
     weight_set_type weights;
     weights.allocate();
     
-    for (int id = 0; id < feature_type::allocated(); ++ id)
-      if (! feature_type(feature_type::id_type(id)).empty())
+    for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+      if (! feature_type(id).empty())
 	weights[feature_type(id)] = 1.0;
     
     bcast_weights(rank, weights);

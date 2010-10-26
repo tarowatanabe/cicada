@@ -43,7 +43,7 @@ struct LineSearch
     segments.clear();
     segments.resize(graphs.size());
     
-    for (int seg = 0; seg < graphs.size(); ++ seg) 
+    for (size_t seg = 0; seg != graphs.size(); ++ seg) 
       if (graphs[seg].is_valid()) {
 	
 	if (debug >= 4)
@@ -86,7 +86,7 @@ struct OptimizerBase
       weight_norm(0.0)
   {
     // initialize weights and weights bleu...
-    for (int i = 0; i < features.size(); ++ i)
+    for (size_t i = 0; i != features.size(); ++ i)
       if (features[i]) {
 	feature_bleu = features[i]->feature_name();
 	break;

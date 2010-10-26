@@ -169,7 +169,7 @@ int main(int argc, char** argv)
 
 	    tails.clear();
 	    symbols.clear();
-	    for (int id = 0; id < nodes.size(); ++ id) {
+	    for (int id = 0; id < static_cast<int>(nodes.size()); ++ id) {
 	      if (nodes[id].pos == node_id) {
 		tails.push_back(graph.add_node().id);
 		symbols.push_back(nodes[id].cat);
@@ -182,7 +182,7 @@ int main(int argc, char** argv)
 	    }
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	    edge.rule.reset(new rule_type(parent_id == graph.goal ? symbol_type("[root]") : nodes[node_id].cat,
+	    edge.rule.reset(new rule_type(static_cast<hypergraph_type::id_type>(parent_id) == graph.goal ? symbol_type("[root]") : nodes[node_id].cat,
 					  rule_type::symbol_set_type(symbols.begin(), symbols.end()),
 					  rule_type::symbol_set_type(),
 					  symbols.size()));
@@ -205,7 +205,7 @@ int main(int argc, char** argv)
 	  throw std::runtime_error("invalid cabocha F1 format: no star");
 	
 	const int index = boost::lexical_cast<int>(tokens[1]);
-	if (index != nodes.size())
+	if (index != static_cast<int>(nodes.size()))
 	  throw std::runtime_error("invalid cabocha F1 format: node size do not match");
 	
 	nodes.push_back(node_type(atoi(tokens[2].c_str()), atoi(tokens[3].c_str())));

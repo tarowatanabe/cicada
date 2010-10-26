@@ -120,7 +120,7 @@ struct MinimumEditDistance : public M
     refs.reserve(ref.size());
     refs.resize(ref.size());
 
-    for (int j = 1; j <= ref.size(); ++ j) {
+    for (int j = 1; j <= static_cast<int>(ref.size()); ++ j) {
       lattice_type::arc_set_type::const_iterator aiter_begin   = ref[j - 1].begin();
       lattice_type::arc_set_type::const_iterator aiter_end     = ref[j - 1].end();
       
@@ -143,12 +143,12 @@ struct MinimumEditDistance : public M
     costs.resize(hyp.size() + 1, refs.size() + 1, 0.0);
     ops.resize(hyp.size() + 1, refs.size() + 1);
     
-    for (int i = 1; i <= hyp.size(); ++ i) {
+    for (int i = 1; i <= static_cast<int>(hyp.size()); ++ i) {
       costs(i, 0) = costs(i - 1, 0) + TER::COSTS::insertion;
       ops(i, 0) = TER::TRANSITION::insertion;
     }
     
-    for (int j = 1; j <= refs.size(); ++ j)
+    for (int j = 1; j <= static_cast<int>(refs.size()); ++ j)
       if (refs[j - 1].find(vocab_type::EPSILON) == refs[j - 1].end()) {
 	costs(0, j) = costs(0, j - 1) + TER::COSTS::deletion;
 	ops(0, j) = TER::TRANSITION::deletion;
@@ -157,8 +157,8 @@ struct MinimumEditDistance : public M
 	ops(0, j) = TER::TRANSITION::epsilon;
       }
     
-    for (int i = 1; i <= hyp.size(); ++ i)
-      for (int j = 1; j <= refs.size(); ++ j) {
+    for (int i = 1; i <= static_cast<int>(hyp.size()); ++ i)
+      for (int j = 1; j <= static_cast<int>(refs.size()); ++ j) {
 	double&         cur_cost = costs(i, j);
 	operation_type& cur_op   = ops(i, j);
 	
@@ -546,8 +546,8 @@ struct TranslationErrorRate : public TER, public M
     index_set_type indices;
     index_set_type indices_next;
     
-    for (int start = 0; start != hyp.size(); ++ start)
-      for (int moveto = 0; moveto != lattice_unique.size(); ++ moveto) 
+    for (int start = 0; start != static_cast<int>(hyp.size()); ++ start)
+      for (int moveto = 0; moveto != static_cast<int>(lattice_unique.size()); ++ moveto) 
 	if (ralign[moveto] != start && (ralign[moveto] - start <= max_shift_dist) && (start - ralign[moveto] - 1 <= max_shift_dist)) {
 	  
 	  if (debug >= 4)
@@ -630,7 +630,7 @@ struct TranslationErrorRate : public TER, public M
       words_intersect.insert(M::operator()(*hiter));
     
 
-    for (int start = 0; start != ref.size(); ++ start) {
+    for (int start = 0; start != static_cast<int>(ref.size()); ++ start) {
       
       const int max_length = utils::bithack::min(max_shift_size, static_cast<int>(ref.size() - start));
       
@@ -639,7 +639,7 @@ struct TranslationErrorRate : public TER, public M
       for (int length = 0; has_next && length != max_length; ++ length) {
 	
 	has_next = false;
-	for (int pos = 0; pos < ref[start + length].size(); ++ pos) {
+	for (size_t pos = 0; pos != ref[start + length].size(); ++ pos) {
 	  if (ref[start + length][pos].label == vocab_type::EPSILON)
 	    has_next = true;
 	  else if (words_intersect.find(M::operator()(ref[start + length][pos].label)) != words_intersect.end())
@@ -828,7 +828,7 @@ int main(int argc, char ** argv)
       
       lattice_type merged_all;
       
-      for (int sent = 0; sent < sentences.size(); ++ sent) 
+      for (size_t sent = 0; sent != sentences.size(); ++ sent) 
 	if (! sentences[sent].empty()) {
 
 	  // perform merging...
@@ -845,7 +845,7 @@ int main(int argc, char ** argv)
 							 : cicada::eval::Scorer::create("ter"));
 	  scorer->insert(sentences[sent]);
 	  
-	  for (int id = 0; id < sentences.size(); ++ id)
+	  for (size_t id = 0; id != sentences.size(); ++ id)
 	    if (id != sent && ! sentences[id].empty()) 
 	      ters.insert(std::make_pair(scorer->score(sentences[id])->score().first, id));
 	  
@@ -923,7 +923,7 @@ int main(int argc, char ** argv)
 	    merged_all.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), 1));
 	    merged_all.back().back().features["edit-distance"] = score / merged.size();
 	  
-	    for (int i = 0; i != merged.size(); ++ i)
+	    for (size_t i = 0; i != merged.size(); ++ i)
 	      merged_all.push_back(merged[i]);
 	  } else {
 	    merged_new.clear();
@@ -932,13 +932,13 @@ int main(int argc, char ** argv)
 	    merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), merged_all.size() + 2));
 	    merged_new.back().back().features["edit-distance"] = score / merged.size();
 	  
-	    for (int i = 0; i != merged_all.size(); ++ i)
+	    for (size_t i = 0; i != merged_all.size(); ++ i)
 	      merged_new.push_back(merged_all[i]);
 	  
 	    merged_new.push_back(lattice_type::arc_set_type());
 	    merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), merged.size() + 1));
 	  
-	    for (int i = 0; i != merged.size(); ++ i)
+	    for (size_t i = 0; i != merged.size(); ++ i)
 	      merged_new.push_back(merged[i]);
 	  
 	    merged_all.swap(merged_new);
@@ -958,7 +958,7 @@ int main(int argc, char ** argv)
       sentence_type sentence;
       
       int rank = 1;
-      for (int id = 0; id != sentences.size(); ++ id, ++ rank) {
+      for (size_t id = 0; id != sentences.size(); ++ id, ++ rank) {
 	const sentence_type& sentence = sentences[id];
 
 	if (sentence.empty()) continue;

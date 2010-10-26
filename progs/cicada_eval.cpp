@@ -106,7 +106,7 @@ int main(int argc, char** argv)
       score_ptr_set_type scores1;
       score_ptr_set_type scores2;
       
-      for (int seg = 0; seg != scorers.size(); ++ seg) 
+      for (size_t seg = 0; seg != scorers.size(); ++ seg) 
 	if (scorers[seg]) {
 	  if (hyps1[seg].empty() || hyps2[seg].empty()) {
 	    if (hyps1[seg].empty())
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
 	for (int iter = 0; iter < samples; ++ iter) {
 	  score_ptr_type score1(scores1.front()->zero());
 	  score_ptr_type score2(scores2.front()->zero());
-	  for (int i = 0; i != scores1.size(); ++ i) {
+	  for (size_t i = 0; i != scores1.size(); ++ i) {
 	    const int seg = generator(scores1.size());
 	  
 	    *score1 += *scores1[seg];
@@ -162,12 +162,12 @@ int main(int argc, char** argv)
 	int worse  = 0;
 	
 	score_ptr_type score(scores1.front()->zero());
-	for (int i = 0; i != scores1.size(); ++ i)
+	for (size_t i = 0; i != scores1.size(); ++ i)
 	  *score += *scores1[i];
 	
 	const double eval1 = score->score().first;
 
-	for (int i = 0; i != scores2.size(); ++ i) {
+	for (size_t i = 0; i != scores2.size(); ++ i) {
 	  *score -= *scores1[i];
 	  *score += *scores2[i];
 	  
@@ -216,7 +216,7 @@ int main(int argc, char** argv)
       
       score_ptr_set_type scores;
       
-      for (int seg = 0; seg != scorers.size(); ++ seg) 
+      for (size_t seg = 0; seg != scorers.size(); ++ seg) 
 	if (scorers[seg]) {
 	  if (hyps[seg].empty()) {
 	    std::cerr << "WARNING: no translation at: " << seg << std::endl;
@@ -237,7 +237,7 @@ int main(int argc, char** argv)
       for (int iter = 0; iter < samples; ++ iter) {
 	
 	score_ptr_type score(scores.front()->zero());
-	for (int i = 0; i != scores.size(); ++ i)
+	for (size_t i = 0; i != scores.size(); ++ i)
 	  *score += *scores[generator(scores.size())];
 	
 	sampled.push_back(score->score().first);
@@ -255,7 +255,7 @@ int main(int argc, char** argv)
     } else {
       score_ptr_type score;
       
-      for (int seg = 0; seg != scorers.size(); ++ seg) 
+      for (size_t seg = 0; seg != scorers.size(); ++ seg) 
 	if (scorers[seg]) {
 	  
 	  if (hyps[seg].empty()) {
@@ -347,7 +347,7 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
       const int& id = id_sentence.first;
       const sentence_type& sentence = id_sentence.second;
       
-      if (id >= sentences.size())
+      if (id >= static_cast<int>(sentences.size()))
 	throw std::runtime_error("id exceeds the reference data");
       
       if (finished[id]) continue;
@@ -388,7 +388,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       const int& id = id_sentence.first;
       const sentence_type& sentence = id_sentence.second;
       
-      if (id >= scorers.size())
+      if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
       
       if (! scorers[id])

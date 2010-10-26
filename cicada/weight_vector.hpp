@@ -107,24 +107,28 @@ namespace cicada
     self_type& operator+=(const T& x)
     {
       std::transform(begin(), end(), begin(), std::bind2nd(std::plus<Tp>(), x));
+      return *this;
     }
     
     template <typename T>
     self_type& operator-=(const T& x)
     {
       std::transform(begin(), end(), begin(), std::bind2nd(std::minus<Tp>(), x));
+      return *this;
     }
     
     template <typename T>
     self_type& operator*=(const T& x)
     {
       std::transform(begin(), end(), begin(), std::bind2nd(std::multiplies<Tp>(), x));
+      return *this;
     }
     
     template <typename T>
     self_type& operator/=(const T& x)
     {
       std::transform(begin(), end(), begin(), std::bind2nd(std::divides<Tp>(), x));
+      return *this;
     }
     
     template <typename T, typename A>
@@ -136,6 +140,7 @@ namespace cicada
       }
       
       std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::plus<Tp>());
+      return *this;
     }
     
     template <typename T, typename A>
@@ -147,6 +152,7 @@ namespace cicada
       }
       
       std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::minus<Tp>());
+      return *this;
     }
     
     template <typename T, typename A>
@@ -158,6 +164,7 @@ namespace cicada
       }
       
       std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::multiplies<Tp>());
+      return *this;
     }
     
     template <typename T, typename A>
@@ -169,6 +176,7 @@ namespace cicada
       }
       
       std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::divides<Tp>());
+      return *this;
     }
 
 
@@ -186,6 +194,8 @@ namespace cicada
       iter_type iter_end = x.end();
       for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
 	operator[](iter->first) += iter->second;
+
+      return *this;
     }
     
     template <typename T, typename A>
@@ -202,6 +212,8 @@ namespace cicada
       iter_type iter_end = x.end();
       for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
 	operator[](iter->first) -= iter->second;
+
+      return *this;
     }
     
     template <typename T, typename A>
@@ -218,6 +230,8 @@ namespace cicada
       iter_type iter_end = x.end();
       for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
 	operator[](iter->first) *= iter->second;
+
+      return *this;
     }
 
     template <typename T, typename A>
@@ -234,6 +248,8 @@ namespace cicada
       iter_type iter_end = x.end();
       for (iter_type iter = x.begin(); iter != iter_end; ++ iter)
 	operator[](iter->first) /= iter->second;
+      
+      return *this;
     }
 
 

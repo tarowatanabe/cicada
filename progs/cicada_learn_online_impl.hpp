@@ -247,7 +247,7 @@ struct LineSearch
     segments.clear();
     segments.resize(graphs.size());
     
-    for (int seg = 0; seg < graphs.size(); ++ seg) 
+    for (size_t seg = 0; seg != graphs.size(); ++ seg) 
       if (graphs[seg].is_valid()) {
 	
 	if (debug >= 4)
@@ -371,7 +371,7 @@ struct OptimizeCP
     //h_matrix<LabelSet, FeatureSet>  H(labels, features);
     
     size_t num_instance = 0;
-    for (int i = 0; i < __labels.size(); ++ i) {
+    for (size_t i = 0; i != __labels.size(); ++ i) {
       if (__margins[i] <= 0) continue;
       
       const double margin = __labels[i] * __features[i].dot(weights);
@@ -400,14 +400,14 @@ struct OptimizeCP
     const size_t model_size_prev = model_size - num_instance;
     
     H_new.resize(model_size, model_size, 0.0);
-    for (int i = 0; i < model_size_prev; ++ i)
+    for (size_t i = 0; i != model_size_prev; ++ i)
       std::copy(H.begin(i), H.end(i), H_new.begin(i));
     H.swap(H_new);
 
     // re-compute new H for  i >= size_prev || j >= size_prev
     // 
-    for (int i = 0; i < model_size; ++ i)
-      for (int j = (i >= model_size_prev ? size_type(0) : model_size_prev); j < model_size; ++ j)
+    for (int i = 0; i < static_cast<int>(model_size); ++ i)
+      for (int j = (i >= static_cast<int>(model_size_prev) ? size_type(0) : model_size_prev); j < static_cast<int>(model_size); ++ j)
 	H(i, j) = labels[i] * labels[j] * features[i].dot(features[j]);
     
     alpha.resize(model_size, 0.0);
@@ -417,7 +417,7 @@ struct OptimizeCP
     
     pos_map.clear();
     alpha_neq.clear();
-    for (int i = 0; i < model_size; ++ i) {
+    for (size_t i = 0; i != model_size; ++ i) {
       const int pos = ids[i];
       const size_t size = std::max(pos_map.size(), size_t(pos + 1));
       
@@ -428,8 +428,8 @@ struct OptimizeCP
       alpha_neq[pos] -= alpha[i];
     }
     
-    for (int i = 0; i < model_size; ++ i)
-      for (int j = 0; j < model_size; ++ j)
+    for (size_t i = 0; i != model_size; ++ i)
+      for (size_t j = 0; j != model_size; ++ j)
 	gradient[i] -= H(i, j) * alpha[j];
     
     double obj_primal = 0.0;
@@ -439,7 +439,7 @@ struct OptimizeCP
     objective.resize(pos_map.size(), 0.0);
     
     size_type num_samples = 0;
-    for (int k = 0; k < pos_map.size(); ++ k) 
+    for (size_t k = 0; k != pos_map.size(); ++ k) 
       if (! pos_map[k].empty()) {
 	++ num_samples;
 	
@@ -461,7 +461,7 @@ struct OptimizeCP
 
       bool perform_update_local = false;
       
-      for (int k = 0; k < pos_map.size(); ++ k) 
+      for (size_t k = 0; k != pos_map.size(); ++ k) 
 	if (! pos_map[k].empty()) {
 	  int u = -1;
 	  double max_obj = - std::numeric_limits<double>::infinity();
@@ -531,7 +531,7 @@ struct OptimizeCP
 		
 		alpha[u] += update;
 		alpha[v] -= update;
-		for (int i = 0; i < model_size; ++ i)
+		for (size_t i = 0; i != model_size; ++ i)
 		  gradient[i] += update * (H(i, v) - H(i, u));
 	      }
 	    } else {
@@ -544,7 +544,7 @@ struct OptimizeCP
 		
 		alpha[u] += update;
 		alpha_neq[k] -= update;
-		for (int i = 0; i < model_size; ++ i)
+		for (size_t i = 0; i != model_size; ++ i)
 		  gradient[i] -= update * H(i, u);
 	      }
 	    }
@@ -581,7 +581,7 @@ struct OptimizeCP
 		
 		alpha_neq[k] += update;
 		alpha[v] -= update;
-		for (int i = 0; i < model_size; ++ i)
+		for (size_t i = 0; i != model_size; ++ i)
 		  gradient[i] += update * H(i, v);
 	      }
 	    }
@@ -595,7 +595,7 @@ struct OptimizeCP
       // compute primal/dual
       obj_primal = 0.0;
       obj_dual   = 0.0;
-      for (int k = 0; k < pos_map.size(); ++ k) 
+      for (size_t k = 0; k != pos_map.size(); ++ k) 
 	if (! pos_map[k].empty()) {
 	  ++ num_samples;
 	  
@@ -622,7 +622,7 @@ struct OptimizeCP
       timestamp.resize(model_size, 0);
       weights_new.clear();
       
-      for (int i = 0; i < labels.size(); ++ i) {
+      for (size_t i = 0; i != labels.size(); ++ i) {
 	if (alpha[i] > 0.0) {
 	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
 	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
@@ -651,7 +651,7 @@ struct OptimizeCP
     } else {
       timestamp.resize(model_size, 0);
       weights.clear();
-      for (int i = 0; i < labels.size(); ++ i) {
+      for (size_t i = 0; i != labels.size(); ++ i) {
 	if (alpha[i] > 0.0) {
 	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
 	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {
@@ -690,7 +690,7 @@ struct OptimizeCP
       } else
 	++ pos;
     
-    if (pos_last != model_size) {
+    if (pos_last != static_cast<int>(model_size)) {
       timestamp.resize(pos_last);
       alpha.resize(pos_last);
       
@@ -710,7 +710,7 @@ struct OptimizeCP
 
     error_bound.clear();
     error_bound.resize(objective.size(), - std::numeric_limits<double>::infinity());
-    for (int i = 0; i < labels.size(); ++ i)
+    for (size_t i = 0; i != labels.size(); ++ i)
       error_bound[ids[i]] = std::max(error_bound[ids[i]], margins[i] - labels[i] * features[i].dot(weights));
   }
 
@@ -848,7 +848,7 @@ struct OptimizeMIRA
     pos_map.clear();
     
     size_t num_instance = 0;
-    for (int i = 0; i < labels.size(); ++ i) {
+    for (size_t i = 0; i != labels.size(); ++ i) {
       gradient[i] = margins[i] - labels[i] * features[i].dot(weights);
       
       const bool skipping = (gradient[i] <= 0 || margins[i] <= 0);
@@ -895,7 +895,7 @@ struct OptimizeMIRA
       bool perform_update_local = false;
       
       for (pos_map_type::iterator miter = pos_map.begin(); miter != pos_map.end(); ++ miter) {
-	const int k = miter->first;
+	//const int k = miter->first;
 	const pos_set_type& pos_set = miter->second.first;
 	double& alpha_neq = miter->second.second;
 	
@@ -966,7 +966,7 @@ struct OptimizeMIRA
 	      
 	      alpha[u] += update;
 	      alpha[v] -= update;
-	      for (int i = 0; i < model_size; ++ i)
+	      for (size_t i = 0; i != model_size; ++ i)
 		if (! skipped[i])
 		  gradient[i] += update * (H(i, v) - H(i, u));
 	    }
@@ -980,7 +980,7 @@ struct OptimizeMIRA
 		
 	      alpha[u] += update;
 	      alpha_neq -= update;
-	      for (int i = 0; i < model_size; ++ i)
+	      for (size_t i = 0; i != model_size; ++ i)
 		if (! skipped[i])
 		  gradient[i] -= update * H(i, u);
 	    }
@@ -1018,7 +1018,7 @@ struct OptimizeMIRA
 		
 	      alpha_neq += update;
 	      alpha[v] -= update;
-	      for (int i = 0; i < model_size; ++ i)
+	      for (size_t i = 0; i != model_size; ++ i)
 		if (! skipped[i])
 		  gradient[i] += update * H(i, v);
 	    }
@@ -1060,7 +1060,7 @@ struct OptimizeMIRA
     if (optimized) {
       
       direction.clear();
-      for (int i = 0; i < labels.size(); ++ i) 
+      for (size_t i = 0; i != labels.size(); ++ i) 
 	if (! skipped[i] && alpha[i] > 0.0) {
 	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
 	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter)
@@ -1087,7 +1087,7 @@ struct OptimizeMIRA
       }
     } else {
       bool perform_update = false;
-      for (int i = 0; i < labels.size(); ++ i) 
+      for (size_t i = 0; i != labels.size(); ++ i) 
 	if (! skipped[i] && alpha[i] > 0.0) {
 	  typename FeatureSet::value_type::const_iterator fiter_end = features[i].end();
 	  for (typename FeatureSet::value_type::const_iterator fiter = features[i].begin(); fiter != fiter_end; ++ fiter) {

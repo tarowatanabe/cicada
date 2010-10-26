@@ -306,7 +306,7 @@ int main(int argc, char ** argv)
       weight_set_type weights;
       weights.allocate();
       
-      for (int id = 0; id < feature_type::allocated(); ++ id)
+      for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
 	if (! feature_type(feature_type::id_type(id)).empty())
 	  weights[feature_type(id)] = 1.0;
       
@@ -365,7 +365,7 @@ int main(int argc, char ** argv)
 
       typedef cicada::FeatureVector<double> feature_vector_type;
       
-      if (! bound_lower_file.empty())
+      if (! bound_lower_file.empty()) {
 	if (bound_lower_file == "-" || boost::filesystem::exists(bound_lower_file)) {
 	  
 	  feature_vector_type bounds;
@@ -378,8 +378,9 @@ int main(int argc, char ** argv)
 	    bound_lower[biter->first] = biter->second;
 	} else
 	  throw std::runtime_error("no lower-bound file?" + bound_lower_file.file_string());
+      }
       
-      if (! bound_upper_file.empty())
+      if (! bound_upper_file.empty()) {
 	if (bound_upper_file == "-" || boost::filesystem::exists(bound_upper_file)) {
 	  feature_vector_type bounds;
 	  
@@ -392,6 +393,7 @@ int main(int argc, char ** argv)
 	  
 	} else
 	  throw std::runtime_error("no upper-bound file?" + bound_upper_file.file_string());
+      }
       
       cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     }
@@ -463,7 +465,7 @@ int main(int argc, char ** argv)
 	}
       }
     
-      for (/**/; sample < samples_restarts + weights.size(); ++ sample) {
+      for (/**/; sample < static_cast<int>(samples_restarts + weights.size()); ++ sample) {
 	typedef cicada::optimize::LineSearch line_search_type;
       
 	double          sample_objective = std::numeric_limits<double>::infinity();
@@ -588,7 +590,6 @@ int main(int argc, char ** argv)
       bool envelope_terminated = false;
       bool viterbi_terminated = false;
 
-      int non_found_iter = 0;
       while (! envelope_terminated || ! viterbi_terminated) {
 	switch (MPI::Request::Waitany(4, requests)) {
 	case ENVELOPE_NOTIFY:
@@ -707,7 +708,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	    x = utils::decode_base64<double>(x_str);
 	    sentence.assign(iter, tokenizer.end());
 	    
-	    if (id >= segments.size())
+	    if (id >= static_cast<int>(segments.size()))
 	      segments.resize(id + 1);
 	    
 	    segments[id].push_back(std::make_pair(x, scorers[id]->score(sentence)));
@@ -739,7 +740,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     os.push(odevice_type(0, envelope_tag, 1024 * 1024));
     os.precision(20);
     
-    for (int mpi_id = 0; mpi_id < graphs.size(); ++ mpi_id) {
+    for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
       const int id = mpi_id * (mpi_size - 1) + (mpi_rank - 1);
 
       envelopes.clear();
@@ -764,7 +765,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 }
 
 typedef cicada::semiring::Logprob<double> weight_type;
-  
+
 struct viterbi_function
 {
   typedef rule_type::feature_set_type feature_set_type;
@@ -925,7 +926,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     os.push(odevice_type(0, viterbi_tag, 1024 * 1024));
     os.precision(20);
     
-    for (int mpi_id = 0; mpi_id < graphs.size(); ++ mpi_id) {
+    for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
       const int id = mpi_id * (mpi_size - 1) + (mpi_rank - 1);
       
       weight_type weight;
@@ -981,7 +982,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	  
 	  const int mpi_id = id / (mpi_size - 1);
 	  
-	  if (mpi_id >= graphs.size())
+	  if (mpi_id >= static_cast<int>(graphs.size()))
 	    graphs.resize(mpi_id + 1);
 	  
 	  graphs[mpi_id].unite(hypergraph);
@@ -1007,7 +1008,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	
 	const int mpi_id = id / (mpi_size - 1);
 	
-	if (mpi_id >= graphs.size())
+	if (mpi_id >= static_cast<int>(graphs.size()))
 	  graphs.resize(mpi_id + 1);
 	
 	graphs[mpi_id].unite(hypergraph);
@@ -1015,7 +1016,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
     }
   }
   
-  for (int id = 0; id < graphs.size(); ++ id)
+  for (size_t id = 0; id != graphs.size(); ++ id)
     if (graphs[id].goal == hypergraph_type::invalid)
       std::cerr << "invalid graph at: " << id << std::endl;
 }
@@ -1051,7 +1052,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       if (*iter != "|||") continue;
       ++ iter;
     
-      if (id >= scorers.size())
+      if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
     
       if (! scorers[id])

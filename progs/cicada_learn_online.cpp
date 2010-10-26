@@ -466,7 +466,7 @@ struct Task
     cicada::inside_outside(hypergraph_reward,  bleu_reward,  bleu_edge_reward,  bleu_function(feature_name,   1.0), bleu_function(feature_name,   1.0));
     cicada::inside_outside(hypergraph_penalty, bleu_penalty, bleu_edge_penalty, bleu_function(feature_name, - 1.0), bleu_function(feature_name, - 1.0));
     
-    for (int i = 0; i < accumulated_reward.size(); ++ i) {
+    for (size_t i = 0; i != accumulated_reward.size(); ++ i) {
       features.push_back(feature_set_type());
       features.back().assign(accumulated_reward[i].begin(), accumulated_reward[i].end());
       
@@ -486,7 +486,7 @@ struct Task
       margins.push_back(1.0);
     }
     
-    for (int i = 0; i < accumulated_penalty.size(); ++ i) {
+    for (size_t i = 0; i != accumulated_penalty.size(); ++ i) {
       features.push_back(feature_set_type());
       features.back().assign(accumulated_penalty[i].begin(), accumulated_penalty[i].end());
       
@@ -1150,7 +1150,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
       oiter->initialize();
     }
 
-    if (updated == optimizers.size()) break;
+    if (updated == static_cast<int>(optimizers.size())) break;
     if (objective_max - objective_min < tolerance_objective) break;
   }
 

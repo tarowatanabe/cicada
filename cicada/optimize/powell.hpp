@@ -114,7 +114,7 @@ namespace cicada
 	  int    optimum_pos = 0;
 	  double optimum_move = optimums[0].objective - optimum_objective;
 	  
-	  for (int dir = 1; dir < directions.size(); ++ dir) {
+	  for (int dir = 1; dir < static_cast<int>(directions.size()); ++ dir) {
 	    
 	    // randomize direction...
 	    if (dir >= directions_size && dir != replaced_pos)

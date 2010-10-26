@@ -85,12 +85,12 @@ int main(int argc, char ** argv)
       
       feature_set_type features;
       if (! features_confidence.empty()) {
-	if (id >= features_confidence.size())
+	if (id >= static_cast<int>(features_confidence.size()))
 	  throw std::runtime_error("# of confidence features do not match");
 	features[features_confidence[id]] = conf;
       }
       if (! features_count.empty()) {
-	if (id >= features_count.size())
+	if (id >= static_cast<int>(features_count.size()))
 	  throw std::runtime_error("# of count features do not match");
 	features[features_count[id]] = count_weight;
       }
@@ -123,13 +123,13 @@ int main(int argc, char ** argv)
 	merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), 1));
 	merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), merged.size() + 2));
 	
-	for (int i = 0; i != merged.size(); ++ i)
+	for (size_t i = 0; i != merged.size(); ++ i)
 	  merged_new.push_back(merged[i]);
 	
 	merged_new.push_back(lattice_type::arc_set_type());
 	merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), lattice.size() + 1));
 	
-	for (int i = 0; i != lattice.size(); ++ i)
+	for (size_t i = 0; i != lattice.size(); ++ i)
 	  merged_new.push_back(lattice[i]);
 	
 	merged.swap(merged_new);
