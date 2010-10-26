@@ -42,18 +42,18 @@ namespace cicada
     dist.resize(dist_size, dist_size, infinity);
     
     // edge-cost for dist(i, j)
-    for (int i = 0; i < lattice.size(); ++ i)
-      for (int j = 0; j < lattice[i].size(); ++ j)
+    for (size_t i = 0; i != lattice.size(); ++ i)
+      for (size_t j = 0; j != lattice[i].size(); ++ j)
 	dist(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
     
     // edge-cost dist(i, i) = 0
-    for (int i = 0; i < dist_size; ++ i)
+    for (size_t i = 0; i != dist_size; ++ i)
       dist(i, i) = 0;
     
     // Floyd-Warshall algorithm to compute shortest path
-    for (int k = 0; k < dist_size; ++ k) 
-      for (int i = 0; i < dist_size; ++ i)
-	for (int j = 0; j < dist_size; ++ j)
+    for (size_t k = 0; k != dist_size; ++ k) 
+      for (size_t i = 0; i != dist_size; ++ i)
+	for (size_t j = 0; j != dist_size; ++ j)
 	  if (dist(i, k) != infinity && dist(k, j) != infinity)
 	    dist(i, j) = utils::bithack::min(dist(i, j), dist(i, k) + dist(k, j));
   }

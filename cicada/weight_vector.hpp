@@ -321,6 +321,8 @@ namespace cicada
     T value;
     while ((is >> feature) && (is >> value))
       x[cicada::Feature(feature).id()] = value;
+
+    return is;
   }
 
 };

@@ -139,7 +139,7 @@ namespace cicada
 	  index_set_type j_ends(edge.tails.size(), 0);
 	  index_set_type j(edge.tails.size(), 0);
 	  
-	  for (int i = 0; i < edge.tails.size(); ++ i)
+	  for (size_t i = 0; i != edge.tails.size(); ++ i)
 	    j_ends[i] = node_map[edge.tails[i]].size();
 
 	  edge_type::node_set_type tails(edge.tails.size());
@@ -148,7 +148,7 @@ namespace cicada
 	  for (;;) {
 	    
 	    // current tails...
-	    for (int i = 0; i < edge.tails.size(); ++ i)
+	    for (size_t i = 0; i != edge.tails.size(); ++ i)
 	      tails[i] = node_map[edge.tails[i]][j[i]];
 	    
 	    // apply various ngram cconetxt...
@@ -167,8 +167,8 @@ namespace cicada
 	    }
 	    
 	    // proceed to the next j
-	    int index = 0;
-	    for (/**/; index < edge.tails.size(); ++ index) {
+	    size_t index = 0;
+	    for (/**/; index != edge.tails.size(); ++ index) {
 	      ++ j[index];
 	      if (j[index] < j_ends[index]) break;
 	      j[index] = 0;
@@ -195,7 +195,7 @@ namespace cicada
 	
 	collect_counts(buffer.begin(), buffer.end(), weight, counts);
 
-	const state_type state(buffer.size() <= context_size
+	const state_type state(static_cast<int>(buffer.size()) <= context_size
 			       ? std::make_pair(context_type(buffer.begin(), buffer.end()),
 						context_type())
 			       : std::make_pair(context_type(buffer.begin(), buffer.begin() + context_size),
@@ -270,7 +270,7 @@ namespace cicada
 				 context_type(buffer.end() - suffix_size, buffer.end()));
 	  
 	} else {
-	  state = (buffer.size() <= context_size
+	  state = (static_cast<int>(buffer.size()) <= context_size
 		   ? std::make_pair(context_type(buffer.begin(), buffer.end()),
 				    context_type())
 		   : std::make_pair(context_type(buffer.begin(), buffer.begin() + context_size),

@@ -68,12 +68,12 @@ namespace cicada
 	  const traversal_type& __traversal,
 	  const function_type& __function,
 	  const filter_type& __filter)
-      : graph(__graph),
-	k_prime(__k_prime),
-	traversal(__traversal),
+      : traversal(__traversal),
 	function(__function),
 	filter(__filter),
-	states(__graph.nodes.size()) 
+	graph(__graph),
+	states(__graph.nodes.size()) ,
+	k_prime(__k_prime)
     {
       if (graph.goal == hypergraph_type::invalid)
 	throw std::runtime_error("invalid hypergraph...");
@@ -206,7 +206,7 @@ namespace cicada
 
       bool add_next = true;
       
-      while (D.size() <= k) {
+      while (static_cast<int>(D.size()) <= k) {
 	
 	if (add_next && D.size() > 0)
 	  lazy_next(*D.back(), state);
@@ -220,7 +220,7 @@ namespace cicada
 	  // perform traversal here...
 	  
 	  yields.clear();
-	  for (int i = 0; i < derivation->edge->tails.size(); ++ i) {
+	  for (size_t i = 0; i != derivation->edge->tails.size(); ++ i) {
 	    const derivation_type* antecedent = lazy_kth_best(derivation->edge->tails[i], derivation->j[i]);
 
 	    if (! antecedent)
@@ -243,7 +243,7 @@ namespace cicada
 	  break;
       }
       
-      return (k < D.size() ? D[k] : 0);
+      return (k < static_cast<int>(D.size()) ? D[k] : 0);
     }
     
     void lazy_next(const derivation_type& derivation, state_type& state)
@@ -251,7 +251,7 @@ namespace cicada
       derivation_type query(derivation.j);
       index_set_type& j = query.j;
       
-      for (int i = 0; i < j.size(); ++ i) {
+      for (size_t i = 0; i != j.size(); ++ i) {
 	++ j[i];
 	
 	const derivation_type* antecedent = lazy_kth_best(derivation.edge->tails[i], j[i]);

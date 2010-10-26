@@ -91,8 +91,8 @@ namespace cicada
       while (! stack.empty()) {
 	const dfs_type& dfs = stack.back();
 	id_type node_id = dfs.node;
-	int pos_edge = dfs.edge;
-	int pos_tail = dfs.tail;
+	size_t pos_edge = dfs.edge;
+	size_t pos_tail = dfs.tail;
 	
 	stack.pop_back();
 	
@@ -149,7 +149,7 @@ namespace cicada
 	  }
 	}
 	
-	for (int i = 0; i < curr_node->edges.size(); ++ i)
+	for (size_t i = 0; i != curr_node->edges.size(); ++ i)
 	  if (! filter(x.edges[curr_node->edges[i]]))
 	    reloc_edge[curr_node->edges[i]] = edge_count ++;
 	
@@ -161,7 +161,7 @@ namespace cicada
       sorted.clear();
       
       // construct edges...
-      for (int i = 0; i < reloc_edge.size(); ++ i)
+      for (size_t i = 0; i != reloc_edge.size(); ++ i)
 	if (reloc_edge[i] >= 0) {
 	  const edge_type& edge_old = x.edges[i];
 	  
@@ -183,14 +183,14 @@ namespace cicada
       
       // construct reverse node-map ...
       reloc_set_type reloc_map_node(node_count, -1);
-      for (int i = 0; i < x.nodes.size(); ++ i)
+      for (size_t i = 0; i != x.nodes.size(); ++ i)
 	if (reloc_node[i] >= 0)
 	  reloc_map_node[reloc_node[i]] = i;
 
       id_set_type nodes_empty;
       nodes_empty.set_empty_key(id_type(-1));
       
-      for (int i = 0; i < reloc_map_node.size(); ++ i) {
+      for (size_t i = 0; i != reloc_map_node.size(); ++ i) {
 	const node_type& node_old = x.nodes[reloc_map_node[i]];
 	node_type& node_new = sorted.add_node();
 	

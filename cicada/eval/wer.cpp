@@ -79,7 +79,7 @@ namespace cicada
 	    
 	    const double score_del = prev[j].score     + COSTS::deletion;
 	    const double score_ins = curr[j - 1].score + COSTS::insertion;
-	    const double score_sub = prev[j - 1].score + subst;
+	    //const double score_sub = prev[j - 1].score + subst;
 	    
 	    curr[j] = prev[j - 1];
 	    curr[j].score        += subst;

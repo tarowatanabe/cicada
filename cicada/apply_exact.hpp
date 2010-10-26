@@ -95,14 +95,14 @@ namespace cicada
 	index_set_type j_ends(edge.tails.size(), 0);
 	index_set_type j(edge.tails.size(), 0);
 
-	for (int i = 0; i < edge.tails.size(); ++ i)
+	for (size_t i = 0; i != edge.tails.size(); ++ i)
 	  j_ends[i] = node_map[edge.tails[i]].size();
 
 	edge_type::node_set_type tails(edge.tails.size());
 	
 	for (;;) {
 	  
-	  for (int i = 0; i < edge.tails.size(); ++ i)
+	  for (size_t i = 0; i != edge.tails.size(); ++ i)
 	    tails[i] = node_map[edge.tails[i]][j[i]];
 	  
 	  edge_type& edge_new = graph_out.add_edge(tails.begin(), tails.end());
@@ -142,7 +142,7 @@ namespace cicada
 	  
 	  // proceed to the next id...
 
-	  int index = 0;
+	  size_t index = 0;
 	  for (/**/; index < edge.tails.size(); ++ index) {
 	    ++ j[index];
 	    if (j[index] < j_ends[index]) break;

@@ -287,7 +287,7 @@ namespace cicada
       {
 	const symbol_type& prefix = symbol_pairs[index].first;
 
-	if (index + 1 == symbol_pairs.size() || ! prefix.empty())
+	if (index + 1 == static_cast<int>(symbol_pairs.size()) || ! prefix.empty())
 	  return prefix;
 	else
 	  return reinterpret_cast<const symbol_type*>(states[index])[2];

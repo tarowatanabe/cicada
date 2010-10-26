@@ -146,7 +146,7 @@ namespace cicada
 	}
 	    
 	// try right-substitution...
-	for (int last_super = span.second + 1; last_super < label_chart.size(); ++ last_super) {
+	for (int last_super = span.second + 1; last_super < static_cast<int>(label_chart.size()); ++ last_super) {
 	  label_map_type::const_iterator siter = label_map.find(std::make_pair(span.first, last_super));
 	  label_map_type::const_iterator riter = label_map.find(std::make_pair(span.second, last_super));
 	  

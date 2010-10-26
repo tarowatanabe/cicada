@@ -165,7 +165,7 @@ namespace cicada
       features = Rule::feature_set_type(boost::fusion::get<3>(rule_parsed).begin(), boost::fusion::get<3>(rule_parsed).end());
       arity = source.arity();
       
-      if (! target.empty() && arity != target.arity())
+      if (! target.empty() && arity != int(target.arity()))
 	throw std::runtime_error("rule parsing failed because of different arity...");
     }
 

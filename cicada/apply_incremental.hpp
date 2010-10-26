@@ -202,7 +202,7 @@ namespace cicada
 
 	//std::cerr << "graph size: " << graph_in.nodes.size() << std::endl;
 	
-	for (int step = 0; step != graph_in.nodes.size(); ++ step)
+	for (int step = 0; step != static_cast<int>(graph_in.nodes.size()); ++ step)
 	  process_bins(step, graph_in, graph_out);
 	
 	//std::cerr << "topologically sort" << std::endl;
@@ -266,7 +266,7 @@ namespace cicada
  	  const rule_type::symbol_set_type& target = item->in_edge->rule->target;
 	  
 	  // scan... and score... state will be updated...
-	  if (! target.empty() && item->dot < target.size() && ! target[item->dot].is_non_terminal()) {
+	  if (! target.empty() && item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal()) {
 	    
 	    if (item == item_top) {
 	      candidates.push_back(*item_top);
@@ -293,10 +293,10 @@ namespace cicada
 	    item->estimate *= estimate;
 	    
 	    // proceed dot(s)
-	    for (/**/; item->dot < target.size() && ! target[item->dot].is_non_terminal(); ++ item->dot);
+	    for (/**/; item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal(); ++ item->dot);
 	  }
 	  
-	  if (item->dot == target.size()) {
+	  if (item->dot == static_cast<int>(target.size())) {
 	    if (item == item_top) {
 	      candidates.push_back(*item_top);
 	      item = &candidates.back();

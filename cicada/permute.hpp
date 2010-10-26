@@ -163,7 +163,7 @@ namespace cicada
 	  hypergraph_type::edge_type& edge = target.edges[edge_source.id];
 
 	  permutation.clear();
-	  for (int i = 0; i < edge_source.tails.size(); ++ i)
+	  for (size_t i = 0; i != edge_source.tails.size(); ++ i)
 	    permutation.push_back(i);
 	  
 	  function(edge.features, *edge.rule, permutation);
@@ -196,7 +196,7 @@ namespace cicada
 	    // zero for no-permutation
 	    if (permute_size < 0 || permute_size >= 1) {
 	      
-	      if (! has_constraint && (permute_size < 0 || permutation.size() <= permute_size + 2)) {
+	      if (! has_constraint && (permute_size < 0 || static_cast<int>(permutation.size()) <= permute_size + 2)) {
 		while (std::next_permutation(permutation.begin(), permutation.end())) {
 		  
 		  if (! is_valid_permutation(permutation)) continue;
@@ -231,7 +231,7 @@ namespace cicada
     {
       const int arity = edge_source.tails.size();
 
-      if (__permutation.size() < arity) {
+      if (static_cast<int>(__permutation.size()) < arity) {
 	permutation_type permutation(__permutation);
 	coverage_type    coverage(__coverage);
 	
@@ -287,7 +287,7 @@ namespace cicada
 			    const permutation_type& permutation)
     {
       // permute nodes...
-      for (int i = 0; i < tails.size(); ++ i)
+      for (size_t i = 0; i != tails.size(); ++ i)
 	tails[i] = edge_source.tails[permutation[i]];
       
       // permute source-phrase
@@ -320,7 +320,7 @@ namespace cicada
       if (permute_size < 0) return true;
       
       int differences = 0;
-      for (int index = 0; index < permutation.size(); ++ index) {
+      for (int index = 0; index < static_cast<int>(permutation.size()); ++ index) {
 	const int abs = utils::bithack::abs(index - permutation[index]);
 	if (abs > permute_size)
 	  return false;

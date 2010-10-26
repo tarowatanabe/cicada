@@ -71,7 +71,7 @@ namespace cicada
 
       lexicon.open(lexicon_path, lexicon_type::WRITE);
       
-      for (int node = 0; node < size; ++ node) {
+      for (size_t node = 0; node < size; ++ node) {
 	typedef std::pair<word_type, weight_type> word_weight_type;
 	typedef std::vector<word_weight_type, std::allocator<word_weight_type> > word_weight_set_type;
 

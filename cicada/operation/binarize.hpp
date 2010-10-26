@@ -21,7 +21,7 @@ namespace cicada
     {
     public:
       Binarize(const std::string& parameter, const int __debug)
-	: size(0), debug(__debug)
+	: size(0), left(false), right(false), debug(__debug)
       {
 	typedef cicada::Parameter param_type;
     
@@ -46,7 +46,9 @@ namespace cicada
 	}
     
 	if (! left && ! right)
-	  right == true;
+	  throw std::runtime_error("what direction?");
+	if (left && right)
+	  throw std::runtime_error("we do not binarization in both directions!");
       }
   
   

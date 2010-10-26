@@ -331,12 +331,12 @@ namespace cicada
 
       size_t inserted = 0;
       
-      for (int i = 0; i < candidate.j.size(); ++ i) {
+      for (size_t i = 0; i != candidate.j.size(); ++ i) {
 	
 	const int j_i_prev = j[i];
 	++ j[i];
 	
-	for (/**/; j[i] < D[candidate.in_edge->tails[i]].size(); ++ j[i]) {
+	for (/**/; j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size()); ++ j[i]) {
 	  query.in_edge = candidate.in_edge;
 	  
 	  if (candidates_unique.find(&query) == candidates_unique.end()) {
@@ -370,7 +370,7 @@ namespace cicada
       
       candidate.score = semiring::traits<score_type>::one();
       candidate.estimate = semiring::traits<score_type>::one();
-      for (int i = 0; i < j.size(); ++ i) {
+      for (size_t i = 0; i != j.size(); ++ i) {
 	const node_score_type& antecedent = D[edge.tails[i]][j[i]];
 	
 	candidate.out_edge.tails[i] = antecedent.node;

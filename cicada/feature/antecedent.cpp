@@ -91,8 +91,6 @@ namespace cicada
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 	
-	const std::string& epsilon = static_cast<const std::string&>(vocab_type::EPSILON);
-	
 	const rule_type::symbol_set_type& phrase = extract_phrase(edge);
 	
 	if (states.empty()) {
@@ -192,11 +190,12 @@ namespace cicada
 	
 	const id_type id = __tree_map.insert(parent, node);
 	
-	if (__tree_map[id].empty())
+	if (__tree_map[id].empty()) {
 	  if (! __tree_map.is_root(parent))
 	    __tree_map[id] =  __tree_map[parent] + static_cast<const std::string&>(node);
 	  else
 	    __tree_map[id] = node;
+	}
 	
 	return id;
       }

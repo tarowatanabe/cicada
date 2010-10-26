@@ -405,7 +405,7 @@ namespace cicada
 	  }
 	}
       } else {
-	for (int table = 0; table < grammar.size(); ++ table) {
+	for (size_t table = 0; table != grammar.size(); ++ table) {
 	  const transducer_type& transducer = grammar[table];
 	  const transducer_type::id_type last = transducer.root();
 	  

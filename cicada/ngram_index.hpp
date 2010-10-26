@@ -416,7 +416,7 @@ namespace cicada
       case 1: return __shards.front().offsets[1];
       default:
 	size_type sum = 0;
-	for (int shard = 0; shard < __shards.size(); ++ shard)
+	for (size_t shard = 0; shard < __shards.size(); ++ shard)
 	  sum += __shards[shard].offsets[order] - __shards[shard].offsets[order - 1];
 	return sum;
       }

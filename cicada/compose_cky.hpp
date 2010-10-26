@@ -122,19 +122,19 @@ namespace cicada
       nodes.resize(lattice.size() + 1);
       
       // initialize active chart
-      for (int table = 0; table < grammar.size(); ++ table) {
+      for (size_t table = 0; table != grammar.size(); ++ table) {
 	const transducer_type::id_type root = grammar[table].root();
 	
-	for (int pos = 0; pos < lattice.size(); ++ pos)
+	for (size_t pos = 0; pos != lattice.size(); ++ pos)
 	  if (grammar[table].valid_span(pos, pos, 0))
 	    actives[table](pos, pos).push_back(active_type(root));
       }
       
-      for (int length = 1; length <= lattice.size(); ++ length)
-	for (int first = 0; first + length <= lattice.size(); ++ first) {
-	  const int last = first + length;
+      for (size_t length = 1; length <= lattice.size(); ++ length)
+	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
+	  const size_t last = first + length;
 	  
-	  for (int table = 0; table < grammar.size(); ++ table) {
+	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
 
 	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
@@ -144,7 +144,7 @@ namespace cicada
 	    // first, extend active items...
 	    active_set_type& cell = actives[table](first, last);
 	    
-	    for (int middle = first + 1; middle < last; ++ middle) {
+	    for (size_t middle = first + 1; middle < last; ++ middle) {
 	      const active_set_type&  active_arcs  = actives[table](first, middle);
 	      const passive_set_type& passive_arcs = passives(middle, last);
 	      
@@ -205,12 +205,12 @@ namespace cicada
 	  passive_set_type& passive_arcs = passives(first, last);
 	  node_map_type& node_map        = nodes(first, last);
 	  
-	  for (int table = 0; table < grammar.size(); ++ table) {
+	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
 
 	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
 	    
-	    for (int p = 0; p < passive_arcs.size(); ++ p) {
+	    for (size_t p = 0; p != passive_arcs.size(); ++ p) {
 	      const symbol_type& non_terminal = non_terminals[passive_arcs[p]];
 	      
 	      const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
@@ -230,7 +230,7 @@ namespace cicada
 	  
 	  // extend applied unary rules...
 	  
-	  for (int table = 0; table < grammar.size(); ++ table) {
+	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
 	    
 	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
@@ -248,7 +248,7 @@ namespace cicada
       // passive arcs will not be updated!
       node_map_type&    node_map     = nodes(0, lattice.size());
       passive_set_type& passive_arcs = passives(0, lattice.size());
-      for (int p = 0; p < passive_arcs.size(); ++ p)
+      for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	if (non_terminals[passive_arcs[p]] == goal)
 	  apply_rule(goal_rule, feature_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph);
       

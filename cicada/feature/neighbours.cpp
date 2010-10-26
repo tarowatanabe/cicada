@@ -186,7 +186,6 @@ namespace cicada
 		antecedent_index_next = siter + 1 - (siter_begin + 1);
 	      
 	      const id_type antecedent_id_next = *reinterpret_cast<const id_type*>(states[antecedent_index_next]);
-	      const state_type& state_next = state_map[antecedent_id_next];
 	      
 	      state_id = apply_features(features, state_id, antecedent_id, suffix, state_map[antecedent_id_next].prefix);
 	      

@@ -103,8 +103,6 @@ namespace cicada
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 	
-	const std::string& epsilon = static_cast<const std::string&>(vocab_type::EPSILON);
-	
 	const rule_type::symbol_set_type& phrase = extract_phrase(edge);
 	
 	if (states.empty()) {
@@ -452,6 +450,8 @@ namespace cicada
 	pimpl = new ngram_tree_source_type(*dynamic_cast<const ngram_tree_source_type*>(x.pimpl));
       else
 	pimpl = new ngram_tree_target_type(*dynamic_cast<const ngram_tree_target_type*>(x.pimpl));
+
+      return *this;
     }
 
 

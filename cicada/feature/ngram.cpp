@@ -139,7 +139,7 @@ namespace cicada
       inline
       bool equal_phrase(Iterator first, Iterator last, const __Phrase& x) const
       {
-	return x.size() == std::distance(first, last) && std::equal(first, last, x.begin());
+	return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
       }
       
       template <typename Iterator>
@@ -237,7 +237,7 @@ namespace cicada
 		buffer.push_back(*titer);
 	  }
 	  
-	  if (buffer.size() <= context_size) {
+	  if (static_cast<int>(buffer.size()) <= context_size) {
 	    std::copy(buffer.begin(), buffer.end(), context);
 	    return 0.0;
 	  } else {
@@ -346,7 +346,7 @@ namespace cicada
 	  // add score from prefix.second to biter_begin + context_size
 	  score += ngram_score(prefix.first, prefix.second, biter_begin + prefix_size);
 	} else {
-	  if (buffer.size() <= context_size)
+	  if (static_cast<int>(buffer.size()) <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context);
 	  else {
 	    buffer_type::const_iterator biter_begin = buffer.begin();
@@ -482,7 +482,6 @@ namespace cicada
 			      const edge_type& edge,
 			      const int dot)
       {
-	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
 	const phrase_type& phrase = (yield_source ? rule.source : rule.target);
 	

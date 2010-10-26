@@ -196,7 +196,7 @@ namespace cicada
 	
 	ngram_type ngram;
 	
-	for (int start = 0; start != ref.size(); ++ start) {
+	for (int start = 0; start != static_cast<int>(ref.size()); ++ start) {
 	  ngram.clear();
 	  const int max_length = utils::bithack::min(max_shift_size, static_cast<int>(ref.size() - start));
 	  for (int length = 0; length != max_length && words_intersect.find(ref[start + length]) != iiter_end; ++ length) {
@@ -216,7 +216,7 @@ namespace cicada
 	int rpos = -1;
 	
 	//std::cerr << "edit distance: ";
-	for (int i = 0; i < path.size(); ++ i) {
+	for (size_t i = 0; i != path.size(); ++ i) {
 	  switch (path[i]) {
 	  case TRANSITION::match:
 	    //std::cerr << " M";
@@ -304,7 +304,7 @@ namespace cicada
 	    
 	    if (curfix > maxfix || (cost_shift_best != 0 && curfix == maxfix)) break;
 	  
-	    for (int j = 0; j < shifts[i].size(); ++ j) {
+	    for (size_t j = 0; j != shifts[i].size(); ++ j) {
 	      const shift_type& shift = shifts[i][j];
 	      
 	      const double curfix = cost - (cost_shift_best + cost_best);
@@ -385,7 +385,7 @@ namespace cicada
       {
 	ngram_type ngram;
 	
-	for (int start = 0; start != hyp.size(); ++ start) {
+	for (int start = 0; start != static_cast<int>(hyp.size()); ++ start) {
 	  ngram.clear();
 	  ngram.push_back(hyp[start]);
 	  
@@ -461,17 +461,17 @@ namespace cicada
 	matrix_transition_type trans(hyp.size() + 1, ref.size() + 1, TRANSITION::match);
 	matrix_cost_type       costs(hyp.size() + 1, ref.size() + 1, 0.0);
 	
-	for (int i = 1; i <= hyp.size(); ++ i) {
+	for (size_t i = 1; i <= hyp.size(); ++ i) {
 	  costs(i, 0) = costs(i - 1, 0) + COSTS::insertion;
 	  trans(i, 0) = TRANSITION::insertion;
 	}
-	for (int j = 1; j <= ref.size(); ++ j) {
+	for (size_t j = 1; j <= ref.size(); ++ j) {
 	  costs(0, j) = costs(0, j - 1) + COSTS::deletion;
 	  trans(0, j) = TRANSITION::deletion;
 	}
 	
-	for (int i = 1; i <= hyp.size(); ++ i)
-	  for (int j = 1; j <= ref.size(); ++ j) {
+	for (size_t i = 1; i <= hyp.size(); ++ i)
+	  for (size_t j = 1; j <= ref.size(); ++ j) {
 	    double&          cur_cost = costs(i, j);
 	    transition_type& cur_tran = trans(i, j);
 	    

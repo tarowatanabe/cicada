@@ -124,7 +124,7 @@ namespace cicada
 	  
 	  collect_counts(buffer.begin(), buffer.end(), counts);
 	  
-	  if (buffer.size() <= context_size)
+	  if (static_cast<int>(buffer.size()) <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context_first);
 	  else {
 	    buffer_type::const_iterator biter_begin = buffer.begin();
@@ -269,7 +269,7 @@ namespace cicada
 	    context_first[prefix.second - prefix.first] = vocab_type::STAR;
 	    std::copy(suffix.first, suffix.second, context_first + (prefix.second - prefix.first) + 1);
 	  } else {
-	    if (buffer.size() <= context_size)
+	    if (static_cast<int>(buffer.size()) <= context_size)
 	      std::copy(buffer.begin(), buffer.end(), context_first);
 	    else {
 	      buffer_type::const_iterator biter_begin = buffer.begin();
@@ -360,7 +360,7 @@ namespace cicada
 	Iterator iter = first;
 	ngram_set_type::id_type id = ngrams.root();
 	for (/**/; iter != last; ++ iter) {
-	  const ngram_set_type::id_type id_next = ngrams.find(id, *iter);
+	  id = ngrams.find(id, *iter);
 	  if (ngrams.is_root(id)) break;
 	}
 	return std::make_pair(first, std::min(std::max(first + 1, iter), last));
@@ -455,7 +455,7 @@ namespace cicada
 	  const int bleu_order = utils::bithack::max(counts.size(), __bleu->ngrams_hypothesis.size());
 	  
 	  const double factor = 1.0 / order;
-	  for (int n = 1; n <= bleu_order; ++ n) {
+	  for (size_t n = 1; n <= bleu_order; ++ n) {
 	    const double count = (double(n <= ngram_size ? counts[n - 1] : 0.0)
 				  + (n <= __bleu->ngrams_hypothesis.size() ? double(__bleu->ngrams_hypothesis[n - 1]) : 0.0));
 	    const double norm  = (double(n <= ngram_size ? double(hypothesis_size + 1 - n) : 0.0)

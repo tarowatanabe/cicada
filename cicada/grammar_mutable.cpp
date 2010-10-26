@@ -249,7 +249,7 @@ namespace cicada
       const bool result = boost::spirit::qi::parse(iter, iter_end,
 						   "feature" >> boost::spirit::qi::int_[boost::phoenix::ref(feature_id) = boost::spirit::qi::_1]);
       if (result && iter == iter_end && feature_id >= 0) {
-	if (feature_id >= feature_names.size())
+	if (feature_id >= int(feature_names.size()))
 	  feature_names.resize(feature_id + 1);
 	feature_names[feature_id] = piter->second;
       } else
@@ -339,7 +339,7 @@ namespace cicada
       for (scores_parsed_type::const_iterator fiter = scores.begin(); fiter != fiter_end; ++ fiter) 
 	if (fiter->first.empty()) {
 	  
-	  if (feature < feature_names.size() && ! feature_names[feature].empty())
+	  if (feature < int(feature_names.size()) && ! feature_names[feature].empty())
 	    rule_ptr->features[feature_names[feature]] = fiter->second;
 	  else {
 	    // default name!

@@ -321,7 +321,7 @@ namespace cicada
     os << "digraph { " << '\n';
 
     int id_edge = 0;
-    for (int id = 0; id != lattice.size(); ++ id) {
+    for (size_t id = 0; id != lattice.size(); ++ id) {
       os << " node_" << id << " [label=\"\", shape=circle, height=0.1, width=0.1];" << '\n';
       
       lattice_type::arc_set_type::const_iterator aiter_end = lattice[id].end();

@@ -113,7 +113,6 @@ namespace cicada
 	}
 	
 	const phrase_type& target = (split ? target_split : (yield_source ? rule.source : rule.target));
-	const phrase_type& source = rule.source;
 	
 	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
 	symbol_type* context_last  = context_first + order * 2;
@@ -133,7 +132,7 @@ namespace cicada
 	  
 	  std::fill(context_first, context_last, vocab_type::EMPTY);
 	  
-	  if (buffer.size() <= context_size)
+	  if (static_cast<int>(buffer.size()) <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context_first);
 	  else {
 	    std::copy(buffer.begin(), buffer.begin() + context_size, context_first);
@@ -219,7 +218,7 @@ namespace cicada
 	    context_first[prefix_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - suffix_size, buffer.end(), context_first + prefix_size + 1);
 	  } else {
-	    if (buffer.size() <= context_size)
+	    if (static_cast<int>(buffer.size()) <= context_size)
 	      std::copy(buffer.begin(), buffer.end(), context_first);
 	    else {
 	      std::copy(buffer.begin(), buffer.begin() + context_size, context_first);
@@ -478,7 +477,7 @@ namespace cicada
 	  if (*iter != "|||") continue;
 	  ++ iter;
 	  
-	  if (id >= pimpl->refset.size())
+	  if (id >= static_cast<int>(pimpl->refset.size()))
 	    pimpl->refset.resize(id + 1);
 	  
 	  pimpl->refset[id].push_back(sentence_type(iter, tokenizer.end()));

@@ -124,7 +124,7 @@ namespace cicada
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
 
-      for (int first = 0; first < lattice.size(); ++ first) {
+      for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 	
 	if (arcs.empty())
@@ -132,7 +132,7 @@ namespace cicada
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  const int last = first + aiter->distance;
+	  const size_t last = first + aiter->distance;
 	  
 	  positions[first][last] = true;
 
@@ -208,7 +208,7 @@ namespace cicada
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
       
-      for (int first = 0; first < lattice.size(); ++ first) {
+      for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 
 	if (arcs.empty())
@@ -216,8 +216,8 @@ namespace cicada
 		
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  const int last = first + aiter->distance;
-
+	  const size_t last = first + aiter->distance;
+	  
 	  positions[first][last] = true;
 
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {

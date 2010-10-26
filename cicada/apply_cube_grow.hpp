@@ -185,7 +185,7 @@ namespace cicada
 	states.reserve(graph_in.nodes.size());
 	states.resize(graph_in.nodes.size(), cand_state_type(cube_size_max >> 1, model.state_size()));
 	
-	for (int j = 0; j < cube_size_max; ++ j) {
+	for (size_t j = 0; j != cube_size_max; ++ j) {
 	  const size_type edge_size_prev = graph_out.edges.size();
 	  lazy_jth_best(graph_in.goal, j, graph_in, graph_out);
 
@@ -231,7 +231,7 @@ namespace cicada
 	state.fired = true;
       }
       
-      while (state.D.size() <= j && state.buf.size() + state.D.size() < cube_size_max && ! state.cand.empty()) {
+      while (static_cast<int>(state.D.size()) <= j && state.buf.size() + state.D.size() < cube_size_max && ! state.cand.empty()) {
 	// pop-min
 	const candidate_type* item = state.cand.top();
 	state.cand.pop();
@@ -264,7 +264,7 @@ namespace cicada
       for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ iiter) {
 	lazy_jth_best(*niter, *iiter, graph, graph_out);
 	
-	if (states[*niter].D.size() <= *iiter) return;
+	if (int(states[*niter].D.size()) <= *iiter) return;
       }
       
       // push cand
@@ -280,7 +280,7 @@ namespace cicada
       
       // for each i in 1 ... |e|
       //   fire(e, j + b_i, cand)
-      for (int i = 0; i < item.j.size(); ++ i) {
+      for (size_t i = 0; i != item.j.size(); ++ i) {
 	const int j_i_prev = j[i];
 	++ j[i];
 	
@@ -342,7 +342,7 @@ namespace cicada
       
       candidate.score = semiring::traits<score_type>::one();
       candidate.estimate = semiring::traits<score_type>::one();
-      for (int i = 0; i < candidate.j.size(); ++ i) {
+      for (size_t i = 0; i != candidate.j.size(); ++ i) {
 	const candidate_type& antecedent = *states[candidate.in_edge->tails[i]].D[candidate.j[i]];
 	
 	// assign real-node-id!
@@ -378,7 +378,7 @@ namespace cicada
       
       candidate.score = semiring::traits<score_type>::one();
       candidate.estimate = semiring::traits<score_type>::one();
-      for (int i = 0; i < j.size(); ++ i) {
+      for (size_t i = 0; i != j.size(); ++ i) {
 	const candidate_type& antecedent = *states[edge.tails[i]].D[j[i]];
 	
 	// assign coarse node id

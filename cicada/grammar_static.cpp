@@ -291,7 +291,7 @@ namespace cicada
 	    rule_ptr_type rule(new rule_type(lhs, rule_source, rule_target, rule_arity));
 	    rule->sort_source_index();
 	    
-	    for (int feature = 0; feature < score_db.size(); ++ feature) {
+	    for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];
 	      
 	      // ignore zero score...
@@ -463,7 +463,7 @@ namespace cicada
     codebook_type    codebook;
     codemap_type     codemap;
     
-    for (int feature = 0; feature < score_db.size(); ++ feature)
+    for (size_t feature = 0; feature < score_db.size(); ++ feature)
       if (score_db[feature].score.is_open()) {
 	
 	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.score.quantized.XXXXXX");
@@ -537,7 +537,7 @@ namespace cicada
     vocab.write(rep.path("vocab"));
     
     const size_type feature_size = score_db.size();
-    for (int feature = 0; feature < feature_size; ++ feature) {
+    for (size_t feature = 0; feature < feature_size; ++ feature) {
       std::ostringstream stream_score;
       stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
       
@@ -574,7 +574,7 @@ namespace cicada
     score_db.reserve(feature_size);
     score_db.resize(feature_size);
     
-    for (int feature = 0; feature < feature_size; ++ feature) {
+    for (size_t feature = 0; feature < feature_size; ++ feature) {
       std::ostringstream stream_score;
       stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
       
@@ -864,7 +864,7 @@ namespace cicada
 	  
 	  score_streams[feature].ostream.reset(new utils::compress_ostream(score_streams[feature].path, 1024 * 1024));
 	}
-      } else if (feature_size != boost::fusion::get<3>(rule).size())
+      } else if (feature_size != int(boost::fusion::get<3>(rule).size()))
 	throw std::runtime_error("invalid # of features...");
       
       for (int feature = 0; feature < feature_size; ++ feature)

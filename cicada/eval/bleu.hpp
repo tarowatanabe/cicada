@@ -37,13 +37,12 @@ namespace cicada
       
       std::pair<double, double> score() const
       {
-	const double factor = 1.0 / ngrams_hypothesis.size();
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
 	double smooth = 0.5;
 	double score = 0.0;
 	
-	for (int n = 0; n < ngrams_hypothesis.size(); ++ n) {
+	for (size_t n = 0; n < ngrams_hypothesis.size(); ++ n) {
 	  const double p = (ngrams_reference[n] > 0
 			    ? (ngrams_hypothesis[n] > 0 ? ngrams_hypothesis[n] : smooth) / ngrams_reference[n]
 			    : 0.0);

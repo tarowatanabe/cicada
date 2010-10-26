@@ -129,7 +129,7 @@ namespace cicada
 	  if (! ngrams.empty())
 	    ngram_score(buffer.begin(), buffer.end(), features);
 	  
-	  if (buffer.size() <= context_size)
+	  if (static_cast<int>(buffer.size()) <= context_size)
 	    std::copy(buffer.begin(), buffer.end(), context);
 	  else {
 	    std::copy(buffer.begin(), buffer.begin() + context_size, context);
@@ -212,7 +212,7 @@ namespace cicada
 	    context[prefix_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - suffix_size, buffer.end(), context + prefix_size + 1);
 	  } else {
-	    if (buffer.size() <= context_size)
+	    if (static_cast<int>(buffer.size()) <= context_size)
 	      std::copy(buffer.begin(), buffer.end(), context);
 	    else {
 	      std::copy(buffer.begin(), buffer.begin() + context_size, context);

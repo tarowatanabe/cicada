@@ -253,7 +253,7 @@ namespace cicada
 	score_ptr_type stat;
 	score_set_type scores(segments.size());
 	
-	for (int seg = 0; seg < segments.size(); ++ seg)
+	for (size_t seg = 0; seg != segments.size(); ++ seg)
 	  if (! segments[seg].empty()) {
 	    
 	    if (! stat)
