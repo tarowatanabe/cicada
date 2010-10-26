@@ -641,12 +641,11 @@ namespace cicada
 	if (out_edges[id].empty())
 	  label = source.edges[source.nodes[id].edges.front()].rule->lhs.non_terminal_strip();
 	else {
-	  depths[id] = depths[source.edges[out_edges[id].front()].head] + 1;
-	  
-	  max_tree_depth = utils::bithack::max(max_tree_depth, depths[id]);
-	  
 	  const hypergraph_type::edge_type& edge_parent = source.edges[out_edges[id].front()];
 	  const hypergraph_type::id_type parent_id = edge_parent.head;
+
+	  depths[id] = depths[parent_id] + 1;
+	  max_tree_depth = utils::bithack::max(max_tree_depth, depths[id]);
 	  
 	  // lefts and rights at boundary condition...
 	  if (! edge_parent.tails.empty()) {
