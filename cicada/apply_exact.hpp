@@ -143,7 +143,7 @@ namespace cicada
 	  // proceed to the next id...
 
 	  size_t index = 0;
-	  for (/**/; index < edge.tails.size(); ++ index) {
+	  for (/**/; index != edge.tails.size(); ++ index) {
 	    ++ j[index];
 	    if (j[index] < j_ends[index]) break;
 	    j[index] = 0;
