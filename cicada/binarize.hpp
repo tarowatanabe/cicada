@@ -171,7 +171,7 @@ namespace cicada
 	  if (! edge_source.rule->target.empty())
 	    throw std::runtime_error("we do not suppor synchronous-binarization");
 	  
-	  if (edge_source.tails.size() <= 2 || edge_source.tails.size() < static_cast<size_t>(binarize_size)) continue;
+	  if (edge_source.tails.size() <= 2 || static_cast<int>(edge_source.tails.size()) < binarize_size) continue;
 	  
 	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->arity))
 	    throw std::runtime_error("we do not support terminal-mixed rules (aka Hiero rules)");
