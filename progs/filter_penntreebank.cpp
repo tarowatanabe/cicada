@@ -192,6 +192,9 @@ void transform(const treebank_type& treebank, sentence_type& sent)
 void transform_map(treebank_type& treebank, sentence_type& sent)
 {
   if (treebank.antecedents.empty()) {
+    if (sent.empty())
+      throw std::runtime_error("no words for mapping?");
+
     treebank.cat = sent.back();
     sent.pop_back();
   } else
@@ -271,8 +274,11 @@ int main(int argc, char** argv)
 	
 	std::reverse(sent.begin(), sent.end());
 	
-	if (! sent.empty())
+	if (! sent.empty()) {
 	  transform_map(parsed, sent);
+	  if (! sent.empty())
+	    throw std::runtime_error("# of words do not match?");
+	}
       }
 
       if (leaf) {
