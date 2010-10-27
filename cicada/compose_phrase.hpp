@@ -102,23 +102,24 @@ namespace cicada
 #endif
 
     
-    ComposePhrase(const grammar_type& __grammar,
+    ComposePhrase(const symbol_type& non_terminal,
+		  const grammar_type& __grammar,
 		  const int& __max_distortion)
       : grammar(__grammar),
 	max_distortion(__max_distortion)
     {
       // initializer...
       rule_goal.reset(new rule_type(vocab_type::GOAL,
-				    rule_type::symbol_set_type(1, vocab_type::X1),
-				    rule_type::symbol_set_type(1, vocab_type::X1),
+				    rule_type::symbol_set_type(1, non_terminal.non_terminal(1)),
+				    rule_type::symbol_set_type(1, non_terminal.non_terminal(1)),
 				    1));
       
       
       std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
-      sequence.front() = vocab_type::X1;
-      sequence.back()  = vocab_type::X2;
+      sequence.front() = non_terminal.non_terminal(1);
+      sequence.back()  = non_terminal.non_terminal(2);
       
-      rule_x1_x2.reset(new rule_type(vocab_type::X,
+      rule_x1_x2.reset(new rule_type(non_terminal.non_terminal(),
 				     rule_type::symbol_set_type(sequence.begin(), sequence.end()),
 				     rule_type::symbol_set_type(sequence.begin(), sequence.end()),
 				     2));
@@ -272,9 +273,9 @@ namespace cicada
   };
   
   inline
-  void compose_phrase(const Grammar& grammar, const Lattice& lattice, const int max_distortion, HyperGraph& graph)
+  void compose_phrase(const Symbol& non_terminal, const Grammar& grammar, const Lattice& lattice, const int max_distortion, HyperGraph& graph)
   {
-    ComposePhrase __composer(grammar, max_distortion);
+    ComposePhrase __composer(non_terminal, grammar, max_distortion);
     __composer(lattice, graph);
   }
 
