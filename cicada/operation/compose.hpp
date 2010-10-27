@@ -207,7 +207,7 @@ namespace cicada
 	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
 
     
-	cicada::compose_phrase(grammar_translation, lattice, distortion, composed);
+	cicada::compose_phrase(non_terminal, grammar_translation, lattice, distortion, composed);
     
 	utils::resource end;
     
