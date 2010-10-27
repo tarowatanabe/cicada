@@ -47,6 +47,7 @@ permute: permute tree (monolingual tree only)\n\
 \texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
+compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
 generate-earley: re-generation from tree\n\
 \tdepth: depth of rule pattern \n\
 \twidth: width of rule pattern \n\
@@ -141,6 +142,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "compose-cky")
 	operations.push_back(operation_ptr_type(new operation::ComposeCKY(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+      else if (param.name() == "compose-phrase")
+	operations.push_back(operation_ptr_type(new operation::ComposePhrase(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "generate-earley")
 	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "apply")

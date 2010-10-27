@@ -5,5 +5,6 @@
 
 #include <cicada/compose_cky.hpp>
 #include <cicada/compose_earley.hpp>
+#include <cicada/compose_phrase.hpp>
 
 #endif
