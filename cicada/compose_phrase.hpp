@@ -209,7 +209,7 @@ namespace cicada
 	  }
 	}
 	
-	if (state.last != lattice.size()) {
+	if (state.last != static_cast<int>(lattice.size())) {
 	  const lattice_type::arc_set_type& arcs = lattice[state.last];
 	  
 	  lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
