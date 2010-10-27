@@ -5,6 +5,7 @@
 #include "cicada/parameter.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
+#include "cicada/stemmer.hpp"
 
 #include "utils/space_separator.hpp"
 #include "utils/hashmurmur.hpp"
@@ -37,6 +38,8 @@ namespace cicada
       typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
       
       typedef cicada::FeatureFunction feature_function_type;
+
+      typedef cicada::Stemmer stemmer_type;
       
       typedef feature_function_type::state_ptr_type     state_ptr_type;
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
@@ -82,9 +85,10 @@ namespace cicada
 		     const double __precision,
 		     const double __ratio,
 		     const bool __split,
+		     const bool __lower, 
 		     const bool __yield_source)
 	: ngrams(word_type()), nodes(), sizes(), order(__order), precision(__precision), ratio(__ratio),
-	  split(__split), yield_source(__yield_source)
+	  split(__split), yield_source(__yield_source), lower(__lower ? &stemmer_type::create("lower") : 0)
       {
 	factors.clear();
 	factors.resize(order + 1, 0.0);
@@ -98,21 +102,24 @@ namespace cicada
 	}
       }
 
+
+
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
 			const edge_type& edge) const
       {
 	const rule_type& rule = *edge.rule;
 	
+	const phrase_type& __target = (yield_source ? rule.source : rule.target);
 	phrase_type target_split;
-	if (split) {
-	  if (yield_source)
-	    split_non_ascii_characters(rule.source, target_split);
-	  else
-	    split_non_ascii_characters(rule.target, target_split);
-	}
+	phrase_type target_lower;
+	if (split)
+	  split_non_ascii_characters(__target, target_split);
+	const phrase_type& __target_split = (split ? target_split : __target);
+	if (lower)
+	  lower_case(__target_split, target_lower);
 	
-	const phrase_type& target = (split ? target_split : (yield_source ? rule.source : rule.target));
+	const phrase_type& target = (lower ? target_lower : __target_split);
 	
 	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
 	symbol_type* context_last  = context_first + order * 2;
@@ -237,6 +244,21 @@ namespace cicada
       }
 
       template <typename Sentence>
+      void lower_case(const Sentence& phrase, Sentence& result) const
+      {
+	if (lower) {
+	  std::vector<word_type, std::allocator<word_type> > tokens;
+	  
+	  typename Sentence::const_iterator piter_end = phrase.end();
+	  for (typename Sentence::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
+	    tokens.push_back(lower->operator[](*piter));
+	  
+	  result.assign(tokens.begin(), tokens.end());
+	} else
+	  result = phrase;
+      }
+
+      template <typename Sentence>
       void split_non_ascii_characters(const Sentence& phrase, Sentence& result) const
       {
 	std::vector<word_type, std::allocator<word_type> > tokens;
@@ -285,9 +307,19 @@ namespace cicada
 	source_size = 0;
       }
       
-      void insert(const sentence_type& sentence)
+      void insert(const sentence_type& __sentence)
       {
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
+
+	sentence_type sentence_split;
+	sentence_type sentence_lower;
+	
+	if (split)
+	  split_non_ascii_characters(__sentence, sentence_split);
+	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
+	if (lower)
+	  lower_case(__sentence_split, sentence_lower);
+	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
 	
 	counts_type counts;
 	sentence_type::const_iterator siter_end = sentence.end();
@@ -391,6 +423,8 @@ namespace cicada
       
       bool split;
       bool yield_source;
+
+      stemmer_type* lower;
     };
     
     BleuLinear::BleuLinear(const std::string& parameter)
@@ -409,6 +443,7 @@ namespace cicada
       double ratio     = 0.6;
       
       bool split = false;
+      bool lower = false;
       
       bool yield_source = false;
       bool yield_target = false;
@@ -425,6 +460,8 @@ namespace cicada
 	  ratio = boost::lexical_cast<double>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "split") == 0)
 	  split = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "lower") == 0)
+	  lower = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "refset") == 0)
@@ -448,7 +485,7 @@ namespace cicada
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
 	throw std::runtime_error("no refset file?: " + refset_file.file_string());
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, split, yield_source));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, split, lower, yield_source));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2;
