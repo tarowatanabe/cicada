@@ -8,6 +8,7 @@
 #include "eval/bleu.hpp"
 #include "eval/wlcs.hpp"
 
+#include "stemmer.hpp"
 #include "parameter.hpp"
 
 #include <boost/thread.hpp>
@@ -67,45 +68,29 @@ namespace cicada
     
     void Scorer::lower_case(const sentence_type& sentence, sentence_type& sentence_lower) const
     {
+      typedef cicada::Stemmer stemmer_type;
+
 #ifdef HAVE_TLS
-      static __thread Transliterator* __trans_tls = 0;
-      static boost::thread_specific_ptr<Transliterator> __trans;
-      if (! __trans_tls) {
-	UErrorCode status = U_ZERO_ERROR;
-	__trans.reset(Transliterator::createInstance(UnicodeString("Lower", "utf-8"), UTRANS_FORWARD, status));
-	if (U_FAILURE(status))
-	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
-	
-	__trans_tls = __trans.get();
+      static __thread stemmer_type* __stemmer_tls = 0;
+      static boost::thread_specific_ptr<stemmer_type> __stemmer;
+      if (! __stemmer_tls) {
+	__stemmer.reset(&stemmer_type::create("lower"));
+	__stemmer_tls = __stemmer.get();
       }
       
-      Transliterator& trans = *__trans_tls;
+      stemmer_type& stemmer = *__stemmer_tls;
 #else
-      static boost::thread_specific_ptr<Transliterator> __trans;
-      if (! __trans.get()) {
-	UErrorCode status = U_ZERO_ERROR;
-	__trans.reset(Transliterator::createInstance(UnicodeString("Lower", "utf-8"), UTRANS_FORWARD, status));
-	if (U_FAILURE(status))
-	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
-      }
+      static boost::thread_specific_ptr<stemmer_type> __stemmer;
+      if (! __stemmer.get())
+	__stemmer.reset(&stemmer_type::create("lower"));
       
-      Transliterator& trans = *__trans;
+      stemmer_type& stemmer = *__stemmer;
 #endif
 
       sentence_lower.clear();
-      
-      std::string buffer;
       sentence_type::const_iterator siter_end = sentence.end();
-      for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*siter));
-	trans.transliterate(uword);
-	
-	buffer.clear();
-	StringByteSink<std::string> __sink(&buffer);
-	uword.toUTF8(__sink);
-
-	sentence_lower.push_back(buffer);
-      }
+      for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+	sentence_lower.push_back(stemmer[*siter]);
     }
 
     std::string Scorer::lists()
