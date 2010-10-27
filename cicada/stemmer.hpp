@@ -31,6 +31,7 @@ namespace cicada
     static Stemmer& create(const std::string& parameter);
     
   public:
+    symbol_type operator()(const symbol_type& x) const { return operator[](x); }
     virtual symbol_type operator[](const symbol_type& x) const = 0;
     const std::string& algorithm() const { return __algorithm; }
 
