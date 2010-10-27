@@ -115,11 +115,27 @@ namespace cicada
       
       value_type operator()(const sentence_type& sentence) const
       {
-	value_type value;
-	
-	calculate_shifts(sentence, ref, value);
-	
-	return value;
+	if (sentence.empty()) {
+	  value_type value;
+	  
+	  value.score    = COSTS::deletion * ref.size();
+	  value.deletion = ref.size();
+	  
+	  return value;
+	} else if (ref.empty()) {
+	  value_type value;
+	  
+	  value.score    = COSTS::insertion * sentence.size();
+	  value.insertion = sentence.size();
+	  
+	  return value;
+	} else {
+	  value_type value;
+	  
+	  calculate_shifts(sentence, ref, value);
+	  
+	  return value;
+	}
       }
 
     private:
