@@ -25,6 +25,8 @@ namespace cicada
     public:
       virtual ~Score() {}
       
+      
+      std::pair<double, double> operator()() const { return score(); }
       virtual std::pair<double, double> score() const = 0;
       
       virtual void assign(const score_type& score) = 0;
@@ -97,6 +99,8 @@ namespace cicada
       // insert a sentence for scoring
       virtual void clear() = 0;
       virtual void insert(const sentence_type& sentence) = 0;
+
+      score_ptr_type operator()(const sentence_type& sentence) const { return score(sentence); }
       virtual score_ptr_type score(const sentence_type& sentence) const = 0;
       virtual bool error_metric() const = 0;
       virtual scorer_ptr_type clone() const = 0;
