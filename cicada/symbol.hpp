@@ -29,6 +29,7 @@ namespace cicada
     typedef symbol_type::size_type              size_type;
     typedef symbol_type::difference_type        difference_type;
     
+    typedef symbol_type::value_type             value_type;
     typedef symbol_type::const_iterator         const_iterator;
     typedef symbol_type::const_reverse_iterator const_reverse_iterator;
     typedef symbol_type::const_reference        const_reference;

@@ -288,7 +288,7 @@ namespace cicada
     iterator_type iter(os);
     
     if (! boost::spirit::karma::generate(iter, grammar, x.lattice))
-      throw std::runtime_error("failed generation!");
+      throw std::runtime_error("failed lattice generation!");
 
     return os;
   }

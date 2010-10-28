@@ -176,6 +176,7 @@ stemmer.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 transducer.hpp \
+tree_rule.hpp \
 viterbi.hpp \
 vocab.hpp \
 weight_vector.hpp
@@ -203,6 +204,7 @@ span_vector.cpp \
 stemmer.cpp \
 symbol.cpp \
 symbol_vector.cpp \
+tree_rule.cpp \
 vocab.cpp
 
 libcicada_la_LDFLAGS = \
@@ -238,7 +240,8 @@ sentence_main \
 sentence_vector_main \
 span_vector_main \
 stemmer_main \
-symbol_main
+symbol_main \
+tree_rule_main
 
 cluster_main_SOURCES = cluster_main.cpp
 cluster_main_LDADD = libcicada.la
@@ -275,3 +278,6 @@ stemmer_main_LDADD = libcicada.la
 
 symbol_main_SOURCES = symbol_main.cpp
 symbol_main_LDADD = libcicada.la
+
+tree_rule_main_SOURCES = rule_main.cpp
+tree_rule_main_LDADD = libcicada.la
