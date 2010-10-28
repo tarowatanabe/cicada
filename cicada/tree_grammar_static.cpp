@@ -607,7 +607,7 @@ namespace cicada
   
   template <typename Options, typename Codes, typename Id>
   inline
-  void encode_options(const Options& options, Codes& codes, const Id& id_source)
+  void encode_tree_options(const Options& options, Codes& codes, const Id& id_source)
   {
     typedef Id id_type;
     
@@ -759,7 +759,7 @@ namespace cicada
 	  const id_type id_source = source_map.insert(buffer_source.c_str(), buffer_source.size(),
 						      hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
 	  
-	  encode_options(rule_options, buffer_options, id_source);
+	  encode_tree_options(rule_options, buffer_options, id_source);
 	  
 	  tree_to_hyperpath(source_prev, hyperpath);
 	  
@@ -805,7 +805,7 @@ namespace cicada
       const id_type id_source = source_map.insert(buffer_source.c_str(), buffer_source.size(),
 						  hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
       
-      encode_options(rule_options, buffer_options, id_source);
+      encode_tree_options(rule_options, buffer_options, id_source);
       
       tree_to_hyperpath(source_prev, hyperpath);
       

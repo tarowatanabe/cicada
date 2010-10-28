@@ -664,6 +664,50 @@ namespace cicada
     for (/**/; first != last; ++ first)
       buffer.push_back(first->non_terminal().id());
   }
+
+  template <typename Options, typename Codes, typename Id>
+  inline
+  void encode_options(const Options& options, Codes& codes, const Id& id_source)
+  {
+    typedef Id id_type;
+    
+    codes.clear();
+    codes.resize(options.size() * 16 + 16, 0);
+    
+    typename Codes::iterator hiter = codes.begin();
+    typename Codes::iterator citer = codes.begin();
+    size_t pos = 0;
+
+    const id_type id_feature = boost::get<0>(options.front());
+	     
+    const size_t offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
+    citer = hiter + offset_feature;
+    hiter += offset_feature & (- size_t((pos & 0x03) == 0x03));
+    ++ pos;
+	     
+    const size_t offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
+    citer = hiter + offset_source;
+    hiter += offset_source & (- size_t((pos & 0x03) == 0x03));
+    ++ pos;
+
+    typename Options::const_iterator piter_end = options.end();
+    for (typename Options::const_iterator piter = options.begin(); piter != piter_end; ++ piter) {
+      const cicada::Symbol::id_type id_lhs = boost::get<1>(*piter);
+      const id_type                 id_target = boost::get<2>(*piter);
+
+      const size_t offset_lhs = utils::group_aligned_encode(id_lhs, &(*hiter), pos);
+      citer = hiter + offset_lhs;
+      hiter += offset_lhs & (- size_t((pos & 0x03) == 0x03));
+      ++ pos;
+	       
+      const size_t offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
+      citer = hiter + offset_target;
+      hiter += offset_target & (- size_t((pos & 0x03) == 0x03));
+      ++ pos;
+    }
+    
+    codes.resize(citer - codes.begin());
+  }
   
   void GrammarStaticImpl::read_text(const std::string& parameter)
   {
@@ -760,50 +804,13 @@ namespace cicada
 	if (! rule_options.empty()) {
 	  // encode options...
 	   
-	  {
-	    codes_option.clear();
-	    codes_option.resize(rule_options.size() * 16 + 16, 0);
+	  encode_phrase(source_prev, codes_source);
 	     
-	    code_set_type::iterator hiter = codes_option.begin();
-	    code_set_type::iterator citer = codes_option.begin();
-	    size_type pos = 0;
+	  const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
+						      hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
 
-	    const id_type id_feature = boost::get<0>(rule_options.front());
-
-	    encode_phrase(source_prev, codes_source);
-	     
-	    const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
-							hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
-	     
-	    const size_type offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
-	    citer = hiter + offset_feature;
-	    hiter += offset_feature & (- size_type((pos & 0x03) == 0x03));
-	    ++ pos;
-	     
-	    const size_type offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
-	    citer = hiter + offset_source;
-	    hiter += offset_source & (- size_type((pos & 0x03) == 0x03));
-	    ++ pos;
-
-	    rule_option_set_type::const_iterator piter_end = rule_options.end();
-	    for (rule_option_set_type::const_iterator piter = rule_options.begin(); piter != piter_end; ++ piter) {
-
-	      const symbol_type::id_type id_lhs = boost::get<1>(*piter);
-	      const id_type              id_target = boost::get<2>(*piter);
-
-	      const size_type offset_lhs = utils::group_aligned_encode(id_lhs, &(*hiter), pos);
-	      citer = hiter + offset_lhs;
-	      hiter += offset_lhs & (- size_type((pos & 0x03) == 0x03));
-	      ++ pos;
-	       
-	      const size_type offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
-	      citer = hiter + offset_target;
-	      hiter += offset_target & (- size_type((pos & 0x03) == 0x03));
-	      ++ pos;
-	    }
-	     
-	    codes_option.resize(citer - codes_option.begin());
-	  }
+	  // encode options
+	  encode_options(rule_options, codes_option, id_source);
 	   
 	  // encode source.....
 	  encode_index(source_prev.begin(), source_prev.end(), source_index);
@@ -873,51 +880,14 @@ namespace cicada
      
     if (! rule_options.empty()) {
       // encode options...
-	   
-      {
-	codes_option.clear();
-	codes_option.resize(rule_options.size() * 16 + 16, 0);
+	
+      encode_phrase(source_prev, codes_source);
 	     
-	code_set_type::iterator hiter = codes_option.begin();
-	code_set_type::iterator citer = codes_option.begin();
-	size_type pos = 0;
-
-	const id_type id_feature = boost::get<0>(rule_options.front());
-
-	encode_phrase(source_prev, codes_source);
-	     
-	const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
-						    hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
-	     
-	const size_type offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
-	citer = hiter + offset_feature;
-	hiter += offset_feature & (- size_type((pos & 0x03) == 0x03));
-	++ pos;
-	     
-	const size_type offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
-	citer = hiter + offset_source;
-	hiter += offset_source & (- size_type((pos & 0x03) == 0x03));
-	++ pos;
-
-	rule_option_set_type::const_iterator piter_end = rule_options.end();
-	for (rule_option_set_type::const_iterator piter = rule_options.begin(); piter != piter_end; ++ piter) {
-
-	  const symbol_type::id_type id_lhs = boost::get<1>(*piter);
-	  const id_type              id_target = boost::get<2>(*piter);
-
-	  const size_type offset_lhs = utils::group_aligned_encode(id_lhs, &(*hiter), pos);
-	  citer = hiter + offset_lhs;
-	  hiter += offset_lhs & (- size_type((pos & 0x03) == 0x03));
-	  ++ pos;
-	       
-	  const size_type offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
-	  citer = hiter + offset_target;
-	  hiter += offset_target & (- size_type((pos & 0x03) == 0x03));
-	  ++ pos;
-	}
-	     
-	codes_option.resize(citer - codes_option.begin());
-      }
+      const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
+						  hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
+      
+      // encode options
+      encode_options(rule_options, codes_option, id_source);
 	   
       // encode source.. we will use index-stripped indexing!
       encode_index(source_prev.begin(), source_prev.end(), source_index);
