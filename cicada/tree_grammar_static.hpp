@@ -53,7 +53,6 @@ namespace cicada
   public:
     // virtual members
     transducer_ptr_type clone() const;
-    bool valid_span(int first, int last, int distance) const;
     id_type root() const;
     id_type next(const id_type& node, const symbol_type& symbol) const;
     bool has_next(const id_type& node) const;

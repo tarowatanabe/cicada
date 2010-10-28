@@ -21,11 +21,19 @@ namespace cicada
     
     typedef utils::simple_vector<TreeRule, std::allocator<TreeRule> > antecedent_set_type;
 
-    typedef antecedent_set_type::const_iterator const_iterator;
-
+    typedef antecedent_set_type::size_type       size_type;
+    typedef antecedent_set_type::difference_type difference_type;
+    
+    typedef antecedent_set_type::const_iterator  const_iterator;
+    typedef antecedent_set_type::iterator        iterator;
+    typedef antecedent_set_type::const_reference const_reference;
+    typedef antecedent_set_type::reference       reference;
+    
   public:
     TreeRule() : label(), antecedents() {}
-    explicit TreeRule(const label_type& __label) : label(__label), antecedents() {}
+    TreeRule(const label_type& __label) : label(__label), antecedents() {}
+    template <typename Iterator>
+    TreeRule(const label_type& __label, Iterator first, Iterator last) : label(__label), antecedents(first, last) {}
     explicit TreeRule(const std::string& x) : label(), antecedents() { assign(x); }
     explicit TreeRule(const char* x) : label(), antecedents() { assign(x); }
     
@@ -39,11 +47,25 @@ namespace cicada
       antecedents.clear();
     }
     
-    
   public:
     const_iterator begin() const { return antecedents.begin(); }
+    iterator begin() { return antecedents.begin(); }
+    
     const_iterator end()   const { return antecedents.end(); }
+    iterator end() { return antecedents.end(); }
+    
+    const_reference operator[](size_type pos) const { return antecedents[pos]; }
+    reference operator[](size_type pos) { return antecedents[pos]; }
+    
+    const_reference front() const { return antecedents.front(); }
+    reference front() { return antecedents.front(); }
+    
+    const_reference back() const { return antecedents.back(); }
+    reference back() { return antecedents.back(); }
+    
 
+    size_type size() const { return antecedents.size(); }
+    bool empty() const { return antecedents.empty(); }
   public:
     friend
     std::istream& operator>>(std::istream& is, TreeRule& x);

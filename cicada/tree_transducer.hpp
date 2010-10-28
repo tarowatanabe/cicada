@@ -55,7 +55,6 @@ namespace cicada
     virtual ~TreeTransducer() {}
     virtual transducer_ptr_type clone() const = 0;
 
-    virtual bool valid_span(int first, int last, int distance) const = 0;
     virtual id_type root() const = 0;
     virtual id_type next(const id_type& node, const symbol_type& symbol) const = 0;
     virtual bool has_next(const id_type& node) const = 0;

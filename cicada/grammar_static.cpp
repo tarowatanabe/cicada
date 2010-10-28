@@ -396,18 +396,6 @@ namespace cicada
     int max_span;
   };
 
-  template <typename Path, typename Data>
-  inline
-  void dump_file(const Path& file, const Data& data)
-  {
-    std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
-    os->push(boost::iostreams::file_sink(file.native_file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
-    
-    const int64_t file_size = sizeof(typename Data::value_type) * data.size();
-    for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)
-      os->write(((char*) &(*data.begin())) + offset, std::min(int64_t(1024 * 1024), file_size - offset));
-  }  
-  
 
   void GrammarStaticImpl::ScoreSet::read(const path_type& path)
   {
