@@ -446,6 +446,10 @@ namespace succinctdb
       return __succinct_trie->traverse(key_buf, node_pos, key_pos, key_size);
     }
     
+    std::pair<size_type, size_type> range(const size_type node_pos) const { return __succinct_trie->range(node_pos); }
+    size_type parent(size_type node_pos) const { return __succinct_trie->parent(node_pos); }
+    
+    bool is_next_sibling(size_type node_pos) const { return __succinct_trie->is_next_sibling(node_pos); }
     bool exists(size_type node_pos) const { return __succinct_trie->exists(node_pos); }
     bool has_children(size_type node_pos) const { return __succinct_trie->has_children(node_pos); }
     bool is_valid(size_type node_pos) const { return node_pos != succinct_trie_type::out_of_range(); }

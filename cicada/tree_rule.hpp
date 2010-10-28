@@ -66,6 +66,13 @@ namespace cicada
 
     size_type size() const { return antecedents.size(); }
     bool empty() const { return antecedents.empty(); }
+
+    void swap(TreeRule& x)
+    {
+      label.swap(x.label);
+      antecedents.swap(x.antecedents);
+    }
+
   public:
     friend
     std::istream& operator>>(std::istream& is, TreeRule& x);
@@ -73,9 +80,64 @@ namespace cicada
     std::ostream& operator<<(std::ostream& os, const TreeRule& x);
     
   public:
-    label_type         label;
+    label_type          label;
     antecedent_set_type antecedents;
   };
+  
+  inline
+  size_t hash_value(TreeRule const& x)
+  {
+    size_t seed = utils::hashmurmur<size_t>()(x.label.id());
+    for (TreeRule::const_iterator aiter = x.begin(); aiter != x.end(); ++ aiter)
+      seed = utils::hashmurmur<size_t>()(hash_value(*aiter), seed);
+    return seed;
+  }
+
+  inline
+  bool operator==(const TreeRule& x, const TreeRule& y)
+  {
+    return x.label == y.label && x.antecedents == y.antecedents;
+  }
+
+  inline
+  bool operator!=(const TreeRule& x, const TreeRule& y)
+  {
+    return x.label != y.label || x.antecedents != y.antecedents;
+  }
+
+  inline
+  bool operator<(const TreeRule& x, const TreeRule& y)
+  {
+    return x.label < y.label || (!(y.label < x.label) && x.antecedents < y.antecedents);
+  }
+  
+  inline
+  bool operator>(const TreeRule& x, const TreeRule& y)
+  {
+    return y < x;
+  }
+  
+  inline
+  bool operator<=(const TreeRule& x, const TreeRule& y)
+  {
+    return ! (y < x);
+  }
+  
+  inline
+  bool operator>=(const TreeRule& x, const TreeRule& y)
+  {
+    return ! (x < y);
+  }
+  
+};
+
+namespace std
+{
+  inline
+  void swap(cicada::TreeRule& x, cicada::TreeRule& y)
+  {
+    x.swap(y);
+  }
 };
 
 

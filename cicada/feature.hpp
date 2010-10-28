@@ -216,5 +216,14 @@ namespace cicada
 
 };
 
+namespace std
+{
+  inline
+  void swap(cicada::Feature& x, cicada::Feature& y)
+  {
+    x.swap(y);
+  }
+};
+
 #endif
 

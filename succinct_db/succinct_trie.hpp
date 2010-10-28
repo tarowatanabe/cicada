@@ -739,6 +739,11 @@ namespace succinctdb
       return base_type::__has_children(index, positions, node_pos);
     }
     
+    bool is_valid(size_type node_pos) const
+    {
+      return node_pos != out_of_range();
+    }
+    
     size_type find(const key_type* key_buf, size_type key_size, size_type node_pos) const
     {
       size_type key_pos = 0;
@@ -1110,6 +1115,11 @@ namespace succinctdb
     bool has_children(size_type node_pos) const
     {
       return base_type::__has_children(index, positions, node_pos);
+    }
+    
+    bool is_valid(size_type node_pos) const
+    {
+      return node_pos != out_of_range();
     }
 
     size_type find(const key_type* key_buf, size_type key_size, size_type node_pos) const

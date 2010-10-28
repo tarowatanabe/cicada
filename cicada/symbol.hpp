@@ -322,5 +322,14 @@ namespace cicada
 
 };
 
+namespace std
+{
+  inline
+  void swap(cicada::Symbol& x, cicada::Symbol& y)
+  {
+    x.swap(y);
+  }
+};
+
 #endif
 

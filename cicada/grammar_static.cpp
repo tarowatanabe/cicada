@@ -852,7 +852,7 @@ namespace cicada
 	  
 	  score_streams[feature].ostream.reset(new utils::compress_ostream(score_streams[feature].path, 1024 * 1024));
 	}
-      } else if (feature_size != int(boost::fusion::get<3>(rule).size()))
+      } else if (feature_size != static_cast<int>(boost::fusion::get<3>(rule).size()))
 	throw std::runtime_error("invalid # of features...");
       
       for (int feature = 0; feature < feature_size; ++ feature)
