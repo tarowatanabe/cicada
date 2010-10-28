@@ -4,3 +4,6 @@
 #ignore .la
 *.lo
 
+# libtool related stuff
+.libs
+.deps
