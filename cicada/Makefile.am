@@ -279,5 +279,5 @@ stemmer_main_LDADD = libcicada.la
 symbol_main_SOURCES = symbol_main.cpp
 symbol_main_LDADD = libcicada.la
 
-tree_rule_main_SOURCES = rule_main.cpp
+tree_rule_main_SOURCES = tree_rule_main.cpp
 tree_rule_main_LDADD = libcicada.la

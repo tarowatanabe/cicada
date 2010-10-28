@@ -106,6 +106,7 @@ namespace cicada
       using karma::lit;
       using karma::buffer;
       using karma::repeat;
+      using karma::eps;
       using standard::char_;
       using standard::space;
       
@@ -115,12 +116,14 @@ namespace cicada
 	(')',  "\\)");
       
       label %= +(escaped_char | char_);
-      tree_rule %= '(' << label << (buffer[' ' << +tree_rule] | repeat(0)[tree_rule]) << ')';
+      antecedents %= tree_rule % ' ';
+      tree_rule %= '(' << label << (buffer[' ' << antecedents] | eps) << ')';
     }
     
-    boost::spirit::karma::symbols<char, const char*>        escaped_char;
-    boost::spirit::karma::rule<Iterator, TreeRule::label_type()>  label;
-    boost::spirit::karma::rule<Iterator, TreeRule()>              tree_rule;
+    boost::spirit::karma::symbols<char, const char*>                       escaped_char;
+    boost::spirit::karma::rule<Iterator, TreeRule::label_type()>           label;
+    boost::spirit::karma::rule<Iterator, TreeRule::antecedent_set_type()>  antecedents;
+    boost::spirit::karma::rule<Iterator, TreeRule()>                       tree_rule;
   };
   
 

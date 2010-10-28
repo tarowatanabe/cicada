@@ -21,10 +21,13 @@ namespace cicada
     
     typedef utils::simple_vector<TreeRule, std::allocator<TreeRule> > antecedent_set_type;
 
+    typedef antecedent_set_type::const_iterator const_iterator;
+
   public:
     TreeRule() : label(), antecedents() {}
-    TreeRule(const label_type& __label) : label(__label), antecedents() {}
-    TreeRule(const std::string&) : label(), antacedents() { assign(x); }
+    explicit TreeRule(const label_type& __label) : label(__label), antecedents() {}
+    explicit TreeRule(const std::string& x) : label(), antecedents() { assign(x); }
+    explicit TreeRule(const char* x) : label(), antecedents() { assign(x); }
     
   public:
     void assign(const std::string& x);
@@ -35,6 +38,11 @@ namespace cicada
       label = label_type();
       antecedents.clear();
     }
+    
+    
+  public:
+    const_iterator begin() const { return antecedents.begin(); }
+    const_iterator end()   const { return antecedents.end(); }
 
   public:
     friend
