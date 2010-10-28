@@ -655,6 +655,15 @@ namespace cicada
     }
     codes.resize(citer - codes.begin());
   }
+
+  template <typename Iterator, typename Buffer>
+  inline
+  void encode_index(Iterator first, Iterator last, Buffer& buffer)
+  {
+    buffer.clear();
+    for (/**/; first != last; ++ first)
+      buffer.push_back(first->non_terminal().id());
+  }
   
   void GrammarStaticImpl::read_text(const std::string& parameter)
   {
@@ -797,13 +806,7 @@ namespace cicada
 	  }
 	   
 	  // encode source.....
-	  {
-	    source_index.clear();
-	    sequence_type::const_iterator siter_begin = source_prev.begin();
-	    sequence_type::const_iterator siter_end = source_prev.end();
-	    for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	      source_index.push_back(siter->non_terminal().id());
-	  }
+	  encode_index(source_prev.begin(), source_prev.en(), source_index);
 
 	  // insert...
 	  rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
@@ -917,13 +920,7 @@ namespace cicada
       }
 	   
       // encode source.. we will use index-stripped indexing!
-      {
-	source_index.clear();
-	sequence_type::const_iterator siter_begin = source_prev.begin();
-	sequence_type::const_iterator siter_end = source_prev.end();
-	for (sequence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
-	  source_index.push_back(siter->non_terminal().id());
-      }
+      encode_index(source_prev.begin(), source_prev.en(), source_index);
 
       // insert...
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());

@@ -60,14 +60,15 @@ namespace cicada
     typedef TreeTransducer::rule_pair_type     rule_pair_type;
     typedef TreeTransducer::rule_pair_set_type rule_pair_set_type;
     
-    typedef rule_type::feature_set_type feature_set_type;
+    typedef TreeTransducer::feature_set_type feature_set_type;
     
     
     typedef float          score_type;
     typedef uint8_t        quantized_type;
     
+    // this id_type is the same as the succinct-hash's pos_type...
     typedef uint32_t       id_type;
-
+    
     typedef uint64_t                           hash_value_type;
     typedef utils::hashmurmur<hash_value_type> hasher_type;
     
@@ -78,9 +79,8 @@ namespace cicada
     
     typedef std::allocator<std::pair<word_type::id_type, mapped_type> > rule_alloc_type;
     
-    typedef succinctdb::succinct_trie_database<word_type::id_type, mapped_type, rule_alloc_type > rule_pair_db_type;
-    typedef succinctdb::succinct_trie_database<word_type::id_type, mapped_type, rule_alloc_type > node_db_type;
     typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> >               rule_db_type;
+    typedef succinctdb::succinct_trie_database<word_type::id_type, mapped_type, rule_alloc_type > rule_pair_db_type;
     
     typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
     
@@ -138,307 +138,433 @@ namespace cicada
     typedef utils::arc_list<size_type, rule_pair_set_type, 16,
 			    std::equal_to<size_type>,
 			    std::allocator<std::pair<size_type, rule_pair_set_type> > > cache_rule_pair_set_type;
-
-  struct cache_rule_type
-  {
-    rule_ptr_type rule;
-    size_type pos;
+    
+    struct cache_rule_type
+    {
+      rule_ptr_type rule;
+      size_type pos;
       
-    cache_rule_type() : rule(), pos(size_type(-1)) {}
-  };
+      cache_rule_type() : rule(), pos(size_type(-1)) {}
+    };
     
-  typedef utils::array_power2<cache_rule_pair_type, 1024 * 16, std::allocator<cache_rule_pair_type> > cache_rule_pair_type;
-  typedef utils::array_power2<cache_rule_type,      1024 * 16, std::allocator<cache_rule_type> >      cache_rule_type;
+    typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 16, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
+    typedef utils::array_power2<cache_rule_type,          1024 * 16, std::allocator<cache_rule_type> >          cache_rule_set_type;
 
-  TreeGrammarStaticImpl(const std::string& parameter) { read(parameter); }
-  TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
-    : rule_db(x.rule_db),
-      source_db(x.source_db),
-      target_db(x.target_db),
-      score_db(x.score_db),
-      vocab(x.vocab),
-      feature_names(x.feature_names) {}
+    TreeGrammarStaticImpl(const std::string& parameter) { read(parameter); }
+    TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
+      : rule_db(x.rule_db),
+	source_db(x.source_db),
+	target_db(x.target_db),
+	score_db(x.score_db),
+	vocab(x.vocab),
+	feature_names(x.feature_names) {}
 
-  TreeGrammarStaticImpl& operator=(const TreeGrammarStaticImpl& x)
-  {
-    clear();
+    TreeGrammarStaticImpl& operator=(const TreeGrammarStaticImpl& x)
+    {
+      clear();
       
-    rule_db       = x.rule_db;
-    source_db     = x.source_db;
-    target_db     = x.target_db;
-    score_db      = x.score_db;
-    vocab         = x.vocab;
-    feature_names = x.feature_names;
+      rule_db       = x.rule_db;
+      source_db     = x.source_db;
+      target_db     = x.target_db;
+      score_db      = x.score_db;
+      vocab         = x.vocab;
+      feature_names = x.feature_names;
       
-    return *this;
-  }
+      return *this;
+    }
     
-  void clear()
-  {
-    rule_db.clear();
-    source_db.clear();
-    target_db.clear();
-    score_db.clear();
-    vocab.clear();
-    feature_names.clear();
+    void clear()
+    {
+      rule_db.clear();
+      source_db.clear();
+      target_db.clear();
+      score_db.clear();
+      vocab.clear();
+      feature_names.clear();
 
-    cache_rule.clear();
-    cache_source.clear();
-    cache_target.clear();
-  }
+      cache_rule.clear();
+      cache_source.clear();
+      cache_target.clear();
+    }
 
-public:
-  size_type feature_size() const { return score_db.size(); }
-  bool empty() const { return score_db.empty(); }
-  path_type path() const { return rule_db.path().parent_path(); }
-  bool is_open() const { return ! score_db.empty(); }
     
-  void quantize();
-  void read(const std::string& parameter);
-  void write(const path_type& path) const;
-
-  void read_text(const std::string& path);
-  void read_binary(const path_type& path);
+    size_type find(const word_type& word) const
+    {
+      size_type node = 0;
+      return find(word, node);
+    }
     
-private:
-  rule_pair_db_type     rule_db;
-  rule_db_type          source_db;
-  rule_db_type          target_db;
-  score_db_type         score_db;
-  vocab_type            vocab;
-  feature_name_set_type feature_names;
+    size_type find(const word_type& word, size_type node) const
+    {
+      const word_type::id_type id = vocab[word];
+      return rule_db.find(&id, 1, node);
+    }
     
-  // caching..
-  cache_rule_pair_type cache_rule;
-  cache_rule_type      cache_source;
-  cache_rule_type      cache_target;
-};
-
-
-void TreeGrammarStaticImpl::ScoreSet::read(const path_type& path)
-{
-  typedef utils::repository repository_type;
+    template <typename Iterator>
+    size_type find(Iterator first, Iterator last) const
+    {
+      size_type node = 0;
+      return find(first, last, node);
+    }
     
-  clear();
-
-  repository_type rep(path, repository_type::read);
+    template <typename Iterator>
+    size_type find(Iterator first, Iterator last, size_type node) const
+    {
+      for (/**/; first != last && is_valid(node); ++ first)
+	node = find(*first, node);
+      return node;
+    }
     
-  if (boost::filesystem::exists(rep.path("quantized"))) {
-    quantized.open(rep.path("quantized"));
+    // valid implies that you can continue searching from node...
+    bool is_valid(size_type node) const { return rule_db.is_valid(node); }
+    bool has_children(size_type node) const { return rule_db.has_children(node); }
+    
+    // exists implies data associated with the node exists...
+    bool exists(size_type node) const { return rule_db.exists(node); }
+    
+    const rule_pair_set_type& read_rule_set(size_type node) const
+    {
+      const size_type cache_pos = hasher_type::operator()(node) & (cache_rule.size() - 1);
       
-    const path_type score_map_file = rep.path("score-map");
+      cache_rule_pair_set_type& cache = const_cast<cache_rule_pair_set_type&>(cache_rule[cache_pos]);
       
-    if (! boost::filesystem::exists(score_map_file))
-      throw std::runtime_error(std::string("no map file? ") + score_map_file.file_string());
-      
-    std::ifstream is(score_map_file.file_string().c_str());
-    is.read((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
-  } else
-    score.open(rep.path("score"));
-}
-  
-void TreeGrammarStaticImpl::ScoreSet::write(const path_type& file) const
-{
-  typedef utils::repository repository_type;
-    
-  if (path() == file) return;
-    
-  repository_type rep(file, repository_type::write);
-    
-  if (quantized.is_open()) {
-    quantized.write(rep.path("quantized"));
-      
-    std::ofstream os(rep.path("score-map").file_string().c_str());
-    os.write((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
-  } else
-    score.write(rep.path("score"));
-}
-
-void TreeGrammarStaticImpl::quantize()
-{
-  typedef score_type base_type;
-
-  typedef std::map<base_type, size_type, std::less<base_type>, std::allocator<std::pair<const base_type, size_type> > > counts_type;
-  typedef std::map<base_type, quantized_type, std::less<base_type>, std::allocator<std::pair<const base_type, quantized_type> > > codemap_type;
-  typedef boost::array<base_type, 256> codebook_type;
-    
-  const path_type tmp_dir = utils::tempfile::tmp_dir();
-    
-  counts_type      counts;
-  codebook_type    codebook;
-  codemap_type     codemap;
-    
-  for (size_t feature = 0; feature < score_db.size(); ++ feature)
-    if (score_db[feature].score.is_open()) {
+      std::pair<cache_rule_pair_set_type::iterator, bool> result = cache.find(node);
+      if (! result.second) {
+	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
 	
-      const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.score.quantized.XXXXXX");
-      utils::tempfile::insert(path);
+	rule_pair_set_type& options = result.first->second;
+	options.clear();
 	
-      boost::iostreams::filtering_ostream os;
-      os.push(utils::packed_sink<quantized_type, std::allocator<quantized_type> >(path));
-	
-      counts.clear();
-      codemap.clear();
-      std::fill(codebook.begin(), codebook.end(), 0.0);
-	
-      score_set_type::score_set_type::const_iterator liter_end = score_db[feature].score.end();
-      for (score_set_type::score_set_type::const_iterator liter = score_db[feature].score.begin(); liter != liter_end; ++ liter)
-	++ counts[*liter];
-	
-      Quantizer::quantize(counts, codebook, codemap);
-	
-      for (score_set_type::score_set_type::const_iterator liter = score_db[feature].score.begin(); liter != liter_end; ++ liter) {
-	codemap_type::const_iterator citer = codemap.find(*liter);
-	if (citer == codemap.end())
-	  throw std::runtime_error("no codemap?");
+	rule_pair_db_type::cursor cursor_end = rule_db.cend(node);
+	for (rule_pair_db_type::cursor cursor = rule_db.cbegin(node); cursor != cursor_end; ++ cursor) {
+	  const size_type pos = cursor.node();
+	  code_set_type codes(rule_db[pos].begin(), rule_db[pos].end());
 	  
-	os.write((char*) &(citer->second), sizeof(quantized_type));
+	  code_set_type::const_iterator hiter = codes.begin();
+	  code_set_type::const_iterator citer = codes.begin();
+	  code_set_type::const_iterator citer_end = codes.end();
+	  
+	  id_type pos_feature;
+	  id_type pos_source;
+	  id_type pos_target;
+	  
+	  size_type code_pos = 0;
+	  
+	  const size_type offset_feature = utils::group_aligned_decode(pos_feature, &(*hiter), code_pos);
+	  citer = hiter + offset_feature;
+	  hiter += offset_feature & (- size_type((code_pos & 0x03) == 0x03));
+	  ++ code_pos;
+	  
+	  const size_type offset_source = utils::group_aligned_decode(pos_source, &(*hiter), code_pos);
+	  citer = hiter + offset_source;
+	  hiter += offset_source & (- size_type((code_pos & 0x03) == 0x03));
+	  ++ code_pos;
+
+	  const rule_ptr_type rule_source = read_rule(pos_source, cache_source, source_db);
+	  
+	  while (citer != citer_end) {
+	     const size_type offset_target = utils::group_aligned_decode(pos_target, &(*hiter), code_pos);
+	     citer = hiter + offset_target;
+	     hiter += offset_target & (- size_type((code_pos & 0x03) == 0x03));
+	     ++ code_pos;
+	     
+	     const rule_ptr_type rule_target = read_rule(pos_target, cache_target, target_db);
+	     
+	     options.push_back(rule_pair_type());
+	     
+	     options.back().source = rule_source;
+	     options.back().target = rule_target;
+	     
+	     for (size_t feature = 0; feature < score_db.size(); ++ feature) {
+	       const score_type score = score_db[feature][pos_feature];
+	       
+	       // ignore zero score...
+	       if (score == 0.0) continue;
+	       
+	       // when zero, we will use inifinity...
+	       options.back().features[feature_names[feature]] = (score <= boost::numeric::bounds<score_type>::lowest()
+								  ? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								  : (score >= boost::numeric::bounds<score_type>::highest()
+								     ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								     : feature_set_type::mapped_type(score)));
+	     }
+	     
+	     ++ pos_feature;
+	  }
+	}
       }
-	
-      for (int i = 0; i < 256; ++ i)
-	score_db[feature].maps[i] = codebook[i];
-	
-      os.pop();
-      utils::tempfile::permission(path);
-	
-      score_db[feature].quantized.open(path);
-      score_db[feature].score.clear();
+      
+      return result.first->second;
     }
-}
+
+  private:
+    const rule_ptr_type& read_rule(size_type pos,
+				   const cache_rule_set_type& caches,
+				   const rule_db_type& db) const
+    {
+      const size_type cache_pos = hasher_type::operator()(pos) & (caches.size() - 1);
+      
+      cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
+      if (cache.pos != pos) {
+	cache.pos = pos;
+	cache.rule.reset(new rule_type(std::string(db[pos].begin(), db[pos].end())));
+      }
+      
+      return cache.rule;
+    }
+    
+  public:
+    size_type feature_size() const { return score_db.size(); }
+    bool empty() const { return score_db.empty(); }
+    path_type path() const { return rule_db.path().parent_path(); }
+    bool is_open() const { return ! score_db.empty(); }
+    
+    void quantize();
+    void read(const std::string& parameter);
+    void write(const path_type& path) const;
+
+    void read_text(const std::string& path);
+    void read_binary(const path_type& path);
+    
+  private:
+    rule_pair_db_type     rule_db;
+    rule_db_type          source_db;
+    rule_db_type          target_db;
+    score_db_type         score_db;
+    vocab_type            vocab;
+    feature_name_set_type feature_names;
+    
+    // caching..
+    cache_rule_pair_map_type cache_rule;
+    cache_rule_set_type      cache_source;
+    cache_rule_set_type      cache_target;
+  };
+
+
+  void TreeGrammarStaticImpl::ScoreSet::read(const path_type& path)
+  {
+    typedef utils::repository repository_type;
+    
+    clear();
+
+    repository_type rep(path, repository_type::read);
+    
+    if (boost::filesystem::exists(rep.path("quantized"))) {
+      quantized.open(rep.path("quantized"));
+      
+      const path_type score_map_file = rep.path("score-map");
+      
+      if (! boost::filesystem::exists(score_map_file))
+	throw std::runtime_error(std::string("no map file? ") + score_map_file.file_string());
+      
+      std::ifstream is(score_map_file.file_string().c_str());
+      is.read((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
+    } else
+      score.open(rep.path("score"));
+  }
   
-  
-void TreeGrammarStaticImpl::read(const std::string& parameter)
-{
-  typedef cicada::Parameter parameter_type;
+  void TreeGrammarStaticImpl::ScoreSet::write(const path_type& file) const
+  {
+    typedef utils::repository repository_type;
+    
+    if (path() == file) return;
+    
+    repository_type rep(file, repository_type::write);
+    
+    if (quantized.is_open()) {
+      quantized.write(rep.path("quantized"));
+      
+      std::ofstream os(rep.path("score-map").file_string().c_str());
+      os.write((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
+    } else
+      score.write(rep.path("score"));
+  }
+
+  void TreeGrammarStaticImpl::quantize()
+  {
+    typedef score_type base_type;
+
+    typedef std::map<base_type, size_type, std::less<base_type>, std::allocator<std::pair<const base_type, size_type> > > counts_type;
+    typedef std::map<base_type, quantized_type, std::less<base_type>, std::allocator<std::pair<const base_type, quantized_type> > > codemap_type;
+    typedef boost::array<base_type, 256> codebook_type;
+    
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+    
+    counts_type      counts;
+    codebook_type    codebook;
+    codemap_type     codemap;
+    
+    for (size_t feature = 0; feature < score_db.size(); ++ feature)
+      if (score_db[feature].score.is_open()) {
+	
+	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.score.quantized.XXXXXX");
+	utils::tempfile::insert(path);
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(utils::packed_sink<quantized_type, std::allocator<quantized_type> >(path));
+	
+	counts.clear();
+	codemap.clear();
+	std::fill(codebook.begin(), codebook.end(), 0.0);
+	
+	score_set_type::score_set_type::const_iterator liter_end = score_db[feature].score.end();
+	for (score_set_type::score_set_type::const_iterator liter = score_db[feature].score.begin(); liter != liter_end; ++ liter)
+	  ++ counts[*liter];
+	
+	Quantizer::quantize(counts, codebook, codemap);
+	
+	for (score_set_type::score_set_type::const_iterator liter = score_db[feature].score.begin(); liter != liter_end; ++ liter) {
+	  codemap_type::const_iterator citer = codemap.find(*liter);
+	  if (citer == codemap.end())
+	    throw std::runtime_error("no codemap?");
 	  
-  const parameter_type param(parameter);
-    
-  const path_type path = param.name();
-    
-  if (path != "-" && ! boost::filesystem::exists(path))
-    throw std::runtime_error(std::string("no grammar file") + param.name());
-    
-  if (boost::filesystem::is_directory(path))
-    read_binary(path);
-  else
-    read_text(parameter);
-}
-
-  
-void TreeGrammarStaticImpl::write(const path_type& file) const
-{
-  typedef utils::repository repository_type;
-    
-  if (file == path()) return;
-    
-  repository_type rep(file, repository_type::write);
-    
-  rule_db.write(rep.path("rule"));
-  source_db.write(rep.path("source"));
-  target_db.write(rep.path("target"));
-    
-  vocab.write(rep.path("vocab"));
-    
-  const size_type feature_size = score_db.size();
-  for (size_t feature = 0; feature < feature_size; ++ feature) {
-    std::ostringstream stream_score;
-    stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
-      
-    score_db[feature].write(rep.path(stream_score.str()));
-
-    const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
-      
-    rep[name] = feature_names[feature];
-  }
-    
-  rep["feature-size"] = boost::lexical_cast<std::string>(feature_size);
-}
-  
-  
-void TreeGrammarStaticImpl::read_binary(const path_type& path)
-{
-  typedef utils::repository repository_type;
+	  os.write((char*) &(citer->second), sizeof(quantized_type));
+	}
 	
-  repository_type rep(path, repository_type::read);
-    
-  rule_db.open(rep.path("rule"));
-  source_db.open(rep.path("source"));
-  target_db.open(rep.path("target"));
-    
-  vocab.open(rep.path("vocab"));
-    
-  repository_type::const_iterator iter = rep.find("feature-size");
-  if (iter == rep.end())
-    throw std::runtime_error("no feature size?");
-
-  const size_type feature_size = atoi(iter->second.c_str());
-    
-  feature_names.reserve(feature_size);
-  feature_names.resize(feature_size);
-  score_db.reserve(feature_size);
-  score_db.resize(feature_size);
-    
-  for (size_t feature = 0; feature < feature_size; ++ feature) {
-    std::ostringstream stream_score;
-    stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
-      
-    score_db[feature].read(rep.path(stream_score.str()));
-      
-    const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
-    repository_type::const_iterator iter = rep.find(name);
-    if (iter == rep.end())
-      throw std::runtime_error(std::string("no feature name?: ") + name);
-      
-    feature_names[feature] = iter->second;
+	for (int i = 0; i < 256; ++ i)
+	  score_db[feature].maps[i] = codebook[i];
+	
+	os.pop();
+	utils::tempfile::permission(path);
+	
+	score_db[feature].quantized.open(path);
+	score_db[feature].score.clear();
+      }
   }
-}
   
-inline
-int tree_depth(const TreeRule& tree, const int depth)
-{
-  // pre-order traversal
-  int max_depth = depth;
-  for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-    max_depth = utils::bithack::max(max_depth, tree_depth(*aiter, depth + 1));
+  
+  void TreeGrammarStaticImpl::read(const std::string& parameter)
+  {
+    typedef cicada::Parameter parameter_type;
+	  
+    const parameter_type param(parameter);
     
-  return max_depth;
-}
+    const path_type path = param.name();
+    
+    if (path != "-" && ! boost::filesystem::exists(path))
+      throw std::runtime_error(std::string("no grammar file") + param.name());
+    
+    if (boost::filesystem::is_directory(path))
+      read_binary(path);
+    else
+      read_text(parameter);
+  }
 
-inline
-void tree_add_epsilon(TreeRule& tree, const int max_depth, const int depth)
-{
-  // pre-order traversal
-  if (tree.empty()) {
-    TreeRule* curr = &tree;
+  
+  void TreeGrammarStaticImpl::write(const path_type& file) const
+  {
+    typedef utils::repository repository_type;
+    
+    if (file == path()) return;
+    
+    repository_type rep(file, repository_type::write);
+    
+    rule_db.write(rep.path("rule"));
+    source_db.write(rep.path("source"));
+    target_db.write(rep.path("target"));
+    
+    vocab.write(rep.path("vocab"));
+    
+    const size_type feature_size = score_db.size();
+    for (size_t feature = 0; feature < feature_size; ++ feature) {
+      std::ostringstream stream_score;
+      stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
       
-    for (int i = depth; i != max_depth; ++ i) {
-      curr->antecedents = TreeRule::antecedent_set_type(1, TreeRule(Vocab::EPSILON));
-      curr = &curr->front();
+      score_db[feature].write(rep.path(stream_score.str()));
+
+      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+      
+      rep[name] = feature_names[feature];
     }
-  } else {
-    for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-      tree_add_epsilon(*aiter, max_depth, depth + 1);
+    
+    rep["feature-size"] = boost::lexical_cast<std::string>(feature_size);
   }
-}
-
-template <typename Path>
-inline
-void tree_to_hyperpath(const TreeRule& tree, Path& path, const int depth)
-{
-  path[depth].push_back(tree.label);
-
-  if (! tree.empty()) {
-    for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-      tree_to_hyperpath(*aiter, path, depth + 1);
-    path[depth + 1].push_back(Vocab::NONE);
-  }
-}
   
-template <typename Path>
-inline
-void tree_to_hyperpath(const TreeRule& rule, Path& path)
-{
-  // compute max-depth by pre-order
+  
+  void TreeGrammarStaticImpl::read_binary(const path_type& path)
+  {
+    typedef utils::repository repository_type;
+	
+    repository_type rep(path, repository_type::read);
+    
+    rule_db.open(rep.path("rule"));
+    source_db.open(rep.path("source"));
+    target_db.open(rep.path("target"));
+    
+    vocab.open(rep.path("vocab"));
+    
+    repository_type::const_iterator iter = rep.find("feature-size");
+    if (iter == rep.end())
+      throw std::runtime_error("no feature size?");
+
+    const size_type feature_size = atoi(iter->second.c_str());
+    
+    feature_names.reserve(feature_size);
+    feature_names.resize(feature_size);
+    score_db.reserve(feature_size);
+    score_db.resize(feature_size);
+    
+    for (size_t feature = 0; feature < feature_size; ++ feature) {
+      std::ostringstream stream_score;
+      stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
+      
+      score_db[feature].read(rep.path(stream_score.str()));
+      
+      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+      repository_type::const_iterator iter = rep.find(name);
+      if (iter == rep.end())
+	throw std::runtime_error(std::string("no feature name?: ") + name);
+      
+      feature_names[feature] = iter->second;
+    }
+  }
+  
+  inline
+  int tree_depth(const TreeRule& tree, const int depth)
+  {
+    // pre-order traversal
+    int max_depth = depth;
+    for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
+      max_depth = utils::bithack::max(max_depth, tree_depth(*aiter, depth + 1));
+    
+    return max_depth;
+  }
+
+  inline
+  void tree_add_epsilon(TreeRule& tree, const int max_depth, const int depth)
+  {
+    // pre-order traversal
+    if (tree.empty()) {
+      TreeRule* curr = &tree;
+      
+      for (int i = depth; i != max_depth; ++ i) {
+	curr->antecedents = TreeRule::antecedent_set_type(1, TreeRule(Vocab::EPSILON));
+	curr = &curr->front();
+      }
+    } else {
+      for (TreeRule::iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
+	tree_add_epsilon(*aiter, max_depth, depth + 1);
+    }
+  }
+
+  template <typename Path>
+  inline
+  void tree_to_hyperpath(const TreeRule& tree, Path& path, const int depth)
+  {
+    path[depth].push_back(tree.label);
+
+    if (! tree.empty()) {
+      for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
+	tree_to_hyperpath(*aiter, path, depth + 1);
+      path[depth + 1].push_back(Vocab::STAR);
+    }
+  }
+  
+  template <typename Path>
+  inline
+  void tree_to_hyperpath(const TreeRule& tree, Path& path)
+  {
+    // compute max-depth by pre-order
     const int max_depth = tree_depth(tree, 0);
     
     // add epsilon annotation by pre-order
@@ -450,7 +576,7 @@ void tree_to_hyperpath(const TreeRule& rule, Path& path)
     path.resize(max_depth + 1);
     
     tree_to_hyperpath(tree_epsilon, path, 0);
-    path[0].push_back(Vocab::NONE);
+    path[0].push_back(Vocab::STAR);
   }
   
 
@@ -496,21 +622,21 @@ void tree_to_hyperpath(const TreeRule& rule, Path& path)
     
     const size_t offset_feature = utils::group_aligned_encode(id_feature, &(*hiter), pos);
     citer = hiter + offset_feature;
-    hiter += offset_feature & (- size_type((pos & 0x03) == 0x03));
+    hiter += offset_feature & (- size_t((pos & 0x03) == 0x03));
     ++ pos;
     
     const size_t offset_source = utils::group_aligned_encode(id_source, &(*hiter), pos);
     citer = hiter + offset_source;
-    hiter += offset_source & (- size_type((pos & 0x03) == 0x03));
+    hiter += offset_source & (- size_t((pos & 0x03) == 0x03));
     ++ pos;
     
-    rule_pair_option_set_type::const_iterator piter_end = options.end();
-    for (rule_pair_option_set_type::const_iterator piter = options.begin(); piter != piter_end; ++ piter) {
+    typename Options::const_iterator piter_end = options.end();
+    for (typename Options::const_iterator piter = options.begin(); piter != piter_end; ++ piter) {
       const id_type& id_target = piter->second;
       
       const size_t offset_target = utils::group_aligned_encode(id_target, &(*hiter), pos);
       citer = hiter + offset_target;
-      hiter += offset_target & (- size_type((pos & 0x03) == 0x03));
+      hiter += offset_target & (- size_t((pos & 0x03) == 0x03));
       ++ pos;
     }
     
@@ -522,17 +648,18 @@ void tree_to_hyperpath(const TreeRule& rule, Path& path)
   void encode_path(const Path& path, Buffer& buffer)
   {
     // convert path into buffer by
-    //    removing the last NONE
+    //    removing the last STAR
     //    convert into non-indexed non-terminal
     buffer.clear();
     
     typename Path::const_iterator piter_end = path.end();
     for (typename Path::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
       typedef typename Path::value_type node_type;
-
+      
       typename node_type::const_iterator niter_end = piter->end() - 1;
       for (typename node_type::const_iterator niter = piter->begin(); niter != niter_end; ++ niter)
-	buffer.push_back(niter->non_terminal());
+	buffer.push_back(niter->non_terminal().id());
+      buffer.push_back(Vocab::NONE.id());
     }
   }
   
@@ -557,7 +684,7 @@ void tree_to_hyperpath(const TreeRule& rule, Path& path)
     typedef std::vector<byte_type, std::allocator<byte_type> >  codes_type;
     typedef std::vector<score_type, std::allocator<score_type> > scores_type;
     typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > index_type;
-    typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > node_type;
+    typedef std::vector<word_type, std::allocator<word_type> > node_type;
     typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
     
     if (path != "-" && ! boost::filesystem::exists(path))
@@ -637,6 +764,8 @@ void tree_to_hyperpath(const TreeRule& rule, Path& path)
 	  tree_to_hyperpath(source_prev, hyperpath);
 	  
 	  encode_path(hyperpath, buffer_index);
+	  
+	  rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
 	}
 	
 	rule_options.clear();
@@ -681,6 +810,8 @@ void tree_to_hyperpath(const TreeRule& rule, Path& path)
       tree_to_hyperpath(source_prev, hyperpath);
       
       encode_path(hyperpath, buffer_index);
+      
+      rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
     
     // source trees...

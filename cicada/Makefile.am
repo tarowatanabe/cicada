@@ -176,7 +176,10 @@ stemmer.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 transducer.hpp \
+tree_grammar.hpp \
+tree_grammar_static.hpp \
 tree_rule.hpp \
+tree_transducer.hpp \
 viterbi.hpp \
 vocab.hpp \
 weight_vector.hpp
@@ -204,6 +207,7 @@ span_vector.cpp \
 stemmer.cpp \
 symbol.cpp \
 symbol_vector.cpp \
+tree_grammar_static.cpp \
 tree_rule.cpp \
 vocab.cpp
 
