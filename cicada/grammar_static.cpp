@@ -806,7 +806,7 @@ namespace cicada
 	  }
 	   
 	  // encode source.....
-	  encode_index(source_prev.begin(), source_prev.en(), source_index);
+	  encode_index(source_prev.begin(), source_prev.end(), source_index);
 
 	  // insert...
 	  rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
@@ -920,7 +920,7 @@ namespace cicada
       }
 	   
       // encode source.. we will use index-stripped indexing!
-      encode_index(source_prev.begin(), source_prev.en(), source_index);
+      encode_index(source_prev.begin(), source_prev.end(), source_index);
 
       // insert...
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
