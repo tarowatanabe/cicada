@@ -55,6 +55,9 @@ namespace cicada
     transducer_ptr_type clone() const;
     id_type root() const;
     id_type next(const id_type& node, const symbol_type& symbol) const;
+    id_type next_epsilon(const id_type& node) const;
+    id_type next_comma(const id_type& node) const;
+    id_type next_delimitter(const id_type& node) const;
     bool has_next(const id_type& node) const;
     const rule_pair_set_type& rules(const id_type& node) const;
 

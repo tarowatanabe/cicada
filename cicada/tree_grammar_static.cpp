@@ -888,6 +888,21 @@ namespace cicada
     
     return (pimpl->is_valid(pos) ? id_type(pos) : id_type(0));
   }
+
+  TreeGrammarStatic::id_type TreeGrammarStatic::next_epsilon(const id_type& node) const
+  {
+    return next(node, Vocab::EPSILON);
+  }
+  
+  TreeGrammarStatic::id_type TreeGrammarStatic::next_comma(const id_type& node) const
+  {
+    return next(node, Vocab::STAR);
+  }
+
+  TreeGrammarStatic::id_type TreeGrammarStatic::next_delimitter(const id_type& node) const
+  {
+    return next(node, Vocab::NONE);
+  }
   
   bool TreeGrammarStatic::has_next(const id_type& node) const
   {

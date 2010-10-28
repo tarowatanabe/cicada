@@ -57,6 +57,9 @@ namespace cicada
 
     virtual id_type root() const = 0;
     virtual id_type next(const id_type& node, const symbol_type& symbol) const = 0;
+    virtual id_type next_epsilon(const id_type& node) const = 0;
+    virtual id_type next_comma(const id_type& node) const = 0;
+    virtual id_type next_delimitter(const id_type& node) const = 0;
     virtual bool has_next(const id_type& node) const = 0;
     virtual const rule_pair_set_type& rules(const id_type& node) const = 0;
   };
