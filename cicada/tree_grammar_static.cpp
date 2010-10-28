@@ -612,7 +612,7 @@ namespace cicada
     typedef Id id_type;
     
     codes.clear();
-    codes.resize(options.size() * 16 + 16, 0);
+    codes.resize(options.size() * 8 + 16, 0);
     
     typename Codes::iterator hiter = codes.begin();
     typename Codes::iterator citer = codes.begin();
