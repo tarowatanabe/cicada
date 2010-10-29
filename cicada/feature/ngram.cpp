@@ -42,9 +42,6 @@ namespace cicada
       
       typedef rule_type::symbol_set_type phrase_type;
       
-      typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
-      typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
-
       typedef std::vector<double, std::allocator<double> > decay_set_type;
 
       typedef utils::hashmurmur<size_t> hasher_type;
@@ -531,8 +528,6 @@ namespace cicada
       // caching...
       cache_context_set_type  cache_logprob;
       cache_ngram_set_type    cache_estimate;
-      
-      phrase_span_set_type phrase_spans_impl;
       
       // actual buffers...
       buffer_type    buffer_impl;
