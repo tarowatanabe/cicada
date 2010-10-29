@@ -33,3 +33,6 @@ Added phrasal-composer, which performs phrase-based decoding..
       HOW? 
       	   Our feature-function assumes no-information for terminal positions...
 	   Do we add some features during composition? (Ugly)
+
+Allow binarization/permutation with arbitrary rule type?
+      attach terminals to binarized rule...where?

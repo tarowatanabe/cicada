@@ -261,7 +261,7 @@ namespace cicada
 	    if (titer->is_non_terminal()) {
 	      int antecedent_index = titer->non_terminal_index() - 1;
 	      if (antecedent_index < 0)
-	      antecedent_index = non_terminal_pos;
+		antecedent_index = non_terminal_pos;
 	      ++ non_terminal_pos;
 
 	      const symbol_type* antecedent_first = reinterpret_cast<const symbol_type*>(states[antecedent_index]);

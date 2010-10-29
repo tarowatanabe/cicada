@@ -41,9 +41,6 @@ namespace cicada
 
       typedef rule_type::symbol_set_type phrase_type;
       
-      typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
-      typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
-      
       typedef utils::compact_trie_dense<symbol_type, std::string, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 					std::allocator<std::pair<const symbol_type, std::string> > > tree_map_type;
       
@@ -66,8 +63,6 @@ namespace cicada
       stemmer_type* stemmer_digits;
       
       tree_map_type  tree_map;
-      
-      phrase_span_set_type phrase_spans_impl;
 
       bool forced_feature;
       
