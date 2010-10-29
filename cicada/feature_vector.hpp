@@ -112,6 +112,16 @@ namespace cicada
       __values.erase(x);
     }
     
+    template <typename Prefix>
+    void erase_prefix(const Prefix& prefix)
+    {
+      for (iterator fiter = begin(); fiter != end(); /**/)
+	if (fiter->first.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin()))
+	  erase(fiter ++);
+	else
+	  ++ fiter;
+    }
+    
     const_iterator begin() const { return __values.begin(); }
     iterator begin() { return __values.begin(); }
     const_iterator end() const { return __values.end(); }

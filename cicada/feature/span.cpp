@@ -263,13 +263,6 @@ namespace cicada
       return *this;
     }
     
-    template <typename FeaturePrefix, typename Feature>
-    inline
-    bool equal_prefix(const FeaturePrefix& prefix, const Feature& x)
-    {
-      return x.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin());
-    }
-    
     void Span::apply(state_ptr_type& state,
 		     const state_ptr_set_type& states,
 		     const edge_type& edge,
@@ -277,13 +270,8 @@ namespace cicada
 		     feature_set_type& estimates,
 		     const bool final) const
     {
-      const std::string& __feature_prefix = base_type::feature_name();
-      for (feature_set_type::iterator fiter = features.begin(); fiter != features.end(); /**/)
-	if (equal_prefix(__feature_prefix, fiter->first))
-	  features.erase(fiter ++);
-	else
-	  ++ fiter;
-
+      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
       pimpl->span_score(state, states, edge, features);
