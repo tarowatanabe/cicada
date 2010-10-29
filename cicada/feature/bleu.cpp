@@ -55,9 +55,6 @@ namespace cicada
       
       typedef rule_type::symbol_set_type phrase_type;
 
-      typedef std::pair<phrase_type::const_iterator, phrase_type::const_iterator> phrase_span_type;
-      typedef std::vector<phrase_span_type, std::allocator<phrase_span_type> >  phrase_span_set_type;
-
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
             
       // this implementation specific...
@@ -639,7 +636,6 @@ namespace cicada
       sentence_document_type refset;
       
       buffer_type          buffer_impl;
-      phrase_span_set_type phrase_spans_impl;
 
       ngram_set_type ngrams;
       node_set_type  nodes;
