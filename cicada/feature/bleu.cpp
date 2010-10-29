@@ -278,9 +278,8 @@ namespace cicada
 	      const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
 
 	      const count_set_type& counts_antecedent = states_counts[*antecedent_count];
-	    
-	      const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, minimum_size);
-	      bleu_antecedent += bleu_ant;
+	      
+	      bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, minimum_size);
 
 	      // merge statistics...
 	      counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
@@ -347,17 +346,12 @@ namespace cicada
 	    }
 	  }
 	  
+	  *context_parsed = 0;
+	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
-
-	  const double bleu = bleu_score(counts, *context_hypothesis, minimum_size, ! final);
 	  
-	  //std::cerr << "bleu: " << bleu;
-	  //std::cerr << " antecedent: " << bleu_antecedent << ' ';
-	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
-	  //std::cerr << std::endl;
-	  
-	  return  bleu - bleu_antecedent;
+	  return bleu_score(counts, *context_hypothesis, minimum_size, ! final) - bleu_antecedent;
 	}
       }
 
