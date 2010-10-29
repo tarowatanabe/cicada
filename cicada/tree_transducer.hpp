@@ -14,6 +14,7 @@
 #include <cicada/vocab.hpp>
 #include <cicada/rule.hpp>
 #include <cicada/tree_rule.hpp>
+#include <cicada/hypergraph.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -30,7 +31,7 @@ namespace cicada
     typedef cicada::Vocab    vocab_type;
     typedef cicada::TreeRule rule_type;
     
-    typedef cicada::Rule::feature_set_type feature_set_type;
+    typedef cicada::HyperGraph::feature_set_type feature_set_type;
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
     
     struct RulePair

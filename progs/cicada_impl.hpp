@@ -61,7 +61,7 @@ typedef cicada::OperationSet operation_set_type;
 
 typedef feature_function_type::feature_function_ptr_type feature_function_ptr_type;
 
-typedef rule_type::feature_set_type    feature_set_type;
+typedef hypergraph_type::feature_set_type    feature_set_type;
 typedef feature_set_type::feature_type feature_type;
 typedef cicada::WeightVector<double>   weight_set_type;
 

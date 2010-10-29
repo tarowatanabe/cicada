@@ -547,7 +547,7 @@ namespace cicada
       const hypergraph_type::node_type* terminal = 0;
       
       if (edge.terminal.first >= 0) {
-	const grammar_type::rule_set_type& rules = grammar[edge.terminal.first].rules(edge.terminal.second);
+	const grammar_type::rule_pair_set_type& rules = grammar[edge.terminal.first].rules(edge.terminal.second);
 	
 	if (! rules.empty()) {
 	  
@@ -556,13 +556,12 @@ namespace cicada
 	    
 	    hypergraph_type::node_type& node = target.add_node();
 	    
-	    grammar_type::rule_set_type::const_iterator riter_end = rules.end();
-	    for (grammar_type::rule_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	      const rule_type& rule = *(*riter);
+	    grammar_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	    for (grammar_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	      
 	      hypergraph_type::edge_type& edge = target.add_edge();
-	      edge.rule = *riter;
-	      edge.features = rule.features;
+	      edge.rule = riter->target;
+	      edge.features = riter->features;
 	      
 	      target.connect_edge(edge.id, node.id);
 	    }
@@ -655,29 +654,22 @@ namespace cicada
       
       if (! rule_epsilon)
 	rule_epsilon.reset(new rule_type(vocab_type::X,
-					 rule_type::symbol_set_type(1, vocab_type::EPSILON),
 					 rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       
       if (! rule_goal)
 	rule_goal.reset(new rule_type(vocab_type::GOAL,
-				      rule_type::symbol_set_type(1, vocab_type::X1),
-				      rule_type::symbol_set_type(1, vocab_type::X1),
-				      1));
+				      rule_type::symbol_set_type(1, vocab_type::X1)));
       
       if (! rule_x1)
 	rule_x1.reset(new rule_type(vocab_type::X,
-				    rule_type::symbol_set_type(1, vocab_type::X1),
-				    rule_type::symbol_set_type(1, vocab_type::X1),
-				    1));
+				    rule_type::symbol_set_type(1, vocab_type::X1)));
       if (! rule_x1_x2) {
 	std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
 	sequence.front() = vocab_type::X1;
 	sequence.back() = vocab_type::X2;
 	
 	rule_x1_x2.reset(new rule_type(vocab_type::X,
-				       rule_type::symbol_set_type(sequence.begin(), sequence.end()),
-				       rule_type::symbol_set_type(sequence.begin(), sequence.end()),
-				       2));
+				       rule_type::symbol_set_type(sequence.begin(), sequence.end())));
       }
 
       
@@ -708,8 +700,8 @@ namespace cicada
 	}
 	
 	int tail_pos = 0;
-	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter) {
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
 	    const symbol_type& non_terminal = non_terminals[edge.tails[tail_pos]];
 	    

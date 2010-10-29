@@ -37,6 +37,8 @@
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
+#include <google/dense_hash_set>
+
 namespace cicada
 {
   
@@ -52,11 +54,12 @@ namespace cicada
     typedef cicada::Feature feature_type;
     typedef cicada::Vocab   vocab_type;
     
-    typedef Transducer::rule_type     rule_type;
-    typedef Transducer::rule_ptr_type rule_ptr_type;
-    typedef Transducer::rule_set_type rule_set_type;
+    typedef Transducer::rule_type          rule_type;
+    typedef Transducer::rule_ptr_type      rule_ptr_type;
+    typedef Transducer::rule_pair_type     rule_pair_type;
+    typedef Transducer::rule_pair_set_type rule_pair_set_type;
     
-    typedef rule_type::feature_set_type feature_set_type;
+    typedef Transducer::feature_set_type feature_set_type;
     
     typedef rule_type::symbol_set_type symbol_set_type;
     typedef rule_type::symbol_set_type phrase_type;
@@ -142,10 +145,16 @@ namespace cicada
       __cache_pos() : value(), pos(size_type(-1)) {}
     };
     
-    typedef utils::arc_list<size_type, rule_set_type, 16,
+    typedef utils::arc_list<size_type, rule_pair_set_type, 16,
 			    std::equal_to<size_type>,
-			    std::allocator<std::pair<size_type, rule_set_type> > > cache_rule_set_type;
-    typedef __cache_pos<phrase_type>            cache_phrase_type;
+			    std::allocator<std::pair<size_type, rule_pair_set_type> > > cache_rule_set_type;
+
+    struct cache_phrase_type
+    {
+      rule_ptr_type rule;
+      size_type     pos;
+      cache_phrase_type() : rule(), pos(size_type(-1)) {}
+    };
     
     typedef utils::array_power2<cache_rule_set_type, 1024 * 16, std::allocator<cache_rule_set_type> > cache_rule_map_type;
     typedef utils::array_power2<cache_phrase_type,   1024 * 16, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
@@ -229,8 +238,25 @@ namespace cicada
     
     // exists implies data associated with the node exists...
     bool exists(size_type node) const { return rule_db.exists(node); }
+
+    struct rule_unique_hash 
+    {
+      size_t operator()(const rule_ptr_type& x) const
+      {
+	return (x.get() ? hash_value(*x) : size_t(0));
+      }
+    };
+
+    struct rule_unique_equal
+    {
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
+      {
+	return x == y || (x.get() && y.get() && *x == *y);
+      }
+    };
+    typedef google::dense_hash_set<rule_ptr_type, rule_unique_hash, rule_unique_equal > rule_unique_map_type;
     
-    const rule_set_type& read_rule_set(size_type node) const
+    const rule_pair_set_type& read_rule_set(size_type node) const
     {
       const size_type cache_pos = hasher_type::operator()(node) & (cache_rule_sets.size() - 1);
       
@@ -239,8 +265,11 @@ namespace cicada
       std::pair<cache_rule_set_type::iterator, bool> result = cache.find(node);
       if (! result.second) {
 	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
+
+	rule_unique_map_type rules_unique;
+	rules_unique.set_empty_key(rule_ptr_type());
 	
-	rule_set_type& options = result.first->second;
+	rule_pair_set_type& options = result.first->second;
 	options.clear();
 	
 	rule_db_type::cursor cursor_end = rule_db.cend(node);
@@ -269,9 +298,6 @@ namespace cicada
 	  hiter += offset_source & (- size_type((code_pos & 0x03) == 0x03));
 	  ++ code_pos;
 	  
-	  const phrase_type rule_source = read_phrase(pos_source, cache_sources, source_db);
-	  const size_type   rule_arity = rule_source.arity();
-	  
 	  while (citer != citer_end) {
 	    
 	    id_type id_lhs;
@@ -286,10 +312,26 @@ namespace cicada
 	    ++ code_pos;
 	    
 	    const symbol_type lhs = vocab[id_lhs];
-	    const phrase_type rule_target = read_phrase(pos_target, cache_targets, target_db);
 	    
-	    rule_ptr_type rule(new rule_type(lhs, rule_source, rule_target, rule_arity));
-	    rule->sort_source_index();
+	    const rule_ptr_type rule_source = read_phrase(lhs, pos_source, cache_sources, source_db);
+	    const rule_ptr_type rule_target = read_phrase(lhs, pos_target, cache_targets, target_db);
+	    
+	    rule_ptr_type rule_sorted_source(new rule_type(*rule_source));
+	    rule_ptr_type rule_sorted_target(new rule_type(*rule_target));
+	    
+	    cicada::sort(*rule_sorted_source, *rule_sorted_target);
+	    
+	    if (*rule_source == *rule_sorted_source)
+	      rule_sorted_source = rule_source;
+	    else
+	      rule_sorted_source = *(rules_unique.insert(rule_sorted_source).first);
+	    
+	    if (*rule_target == *rule_sorted_target)
+	      rule_sorted_target = rule_target;
+	    else
+	      rule_sorted_target = *(rules_unique.insert(rule_sorted_target).first);
+	    
+	    options.push_back(rule_pair_type(rule_sorted_source, rule_sorted_target));
 	    
 	    for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];
@@ -298,16 +340,14 @@ namespace cicada
 	      if (score == 0.0) continue;
 	      
 	      // when zero, we will use inifinity...
-	      rule->features[feature_names[feature]] = (score <= boost::numeric::bounds<score_type>::lowest()
-							? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
-							: (score >= boost::numeric::bounds<score_type>::highest()
-							   ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
-							   : feature_set_type::mapped_type(score)));
+	      options.back().features[feature_names[feature]] = (score <= boost::numeric::bounds<score_type>::lowest()
+								 ? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								 : (score >= boost::numeric::bounds<score_type>::highest()
+								    ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								    : feature_set_type::mapped_type(score)));
 	    }
 	    
 	    ++ pos_feature;
-	    
-	    options.push_back(rule);
 	  }
 	}
       }
@@ -317,18 +357,19 @@ namespace cicada
 
   private:    
 
-    const phrase_type& read_phrase(size_type pos,
-				   const cache_phrase_set_type& cache_phrases,
-				   const phrase_db_type& phrase_db) const
+    const rule_ptr_type& read_phrase(const symbol_type& lhs,
+				     size_type pos,
+				     const cache_phrase_set_type& cache_phrases,
+				     const phrase_db_type& phrase_db) const
     {
-      const size_type cache_pos = hasher_type::operator()(pos) & (cache_phrases.size() - 1);
+      const size_type cache_pos = hasher_type::operator()(pos, lhs.id()) & (cache_phrases.size() - 1);
       
       cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
       if (cache.pos != pos) {
 	typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
 	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
 	typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
-
+	
 	code_set_type codes(phrase_db[pos].begin(), phrase_db[pos].end());
 	
 	code_set_type::const_iterator hiter = codes.begin();
@@ -354,9 +395,9 @@ namespace cicada
 	  *piter = vocab[*iiter];
 	
 	cache.pos = pos;
-	cache.value = phrase_type(phrase.begin(), phrase.end());
+	cache.rule.reset(new rule_type(lhs, phrase.begin(), phrase.end()));
       }
-      return cache.value;
+      return cache.rule;
     }
 
   public:
@@ -981,9 +1022,9 @@ namespace cicada
     return (pimpl->is_valid(node) && pimpl->has_children(node));
   }
   
-  const GrammarStatic::rule_set_type& GrammarStatic::rules(const id_type& node) const
+  const GrammarStatic::rule_pair_set_type& GrammarStatic::rules(const id_type& node) const
   {
-    static const rule_set_type __empty;
+    static const rule_pair_set_type __empty;
     
     return (pimpl->is_valid(node) && pimpl->exists(node) ? pimpl->read_rule_set(node) : __empty);
   }

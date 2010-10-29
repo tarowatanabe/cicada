@@ -13,6 +13,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/rule.hpp>
+#include <cicada/hypergraph.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -28,9 +29,27 @@ namespace cicada
     typedef cicada::Symbol symbol_type;
     typedef cicada::Vocab  vocab_type;
     typedef cicada::Rule   rule_type;
+
+    typedef cicada::HyperGraph::feature_set_type feature_set_type;
     
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
-    typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> > rule_set_type;
+    
+    struct RulePair
+    {
+      rule_ptr_type    source;
+      rule_ptr_type    target;
+      feature_set_type features;
+      
+      RulePair()
+	: source(), target(), features() {}
+      RulePair(const rule_ptr_type& __source, const rule_ptr_type& __target)
+	: source(__source), target(__target), features() {}
+      RulePair(const rule_ptr_type& __source, const rule_ptr_type& __target, const feature_set_type& __features)
+	: source(__source), target(__target), features(__features) {}
+    };
+
+    typedef RulePair rule_pair_type;
+    typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> > rule_pair_set_type;
     
     // 64-bit id type!
     typedef uint64_t id_type;
@@ -46,7 +65,7 @@ namespace cicada
     virtual id_type root() const = 0;
     virtual id_type next(const id_type& node, const symbol_type& symbol) const = 0;
     virtual bool has_next(const id_type& node) const = 0;
-    virtual const rule_set_type& rules(const id_type& node) const = 0;
+    virtual const rule_pair_set_type& rules(const id_type& node) const = 0;
   };
   
   

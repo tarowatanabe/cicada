@@ -29,22 +29,6 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/prune.hpp"
 
-struct source_length_function
-{
-  typedef cicada::semiring::Tropical<int> value_type;
-  
-  template <typename Edge>
-  value_type operator()(const Edge& edge) const
-  {
-    int length = 0;
-    rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-    for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
-      length += (*siter != vocab_type::EPSILON && siter->is_terminal());
-    
-    // since we will "max" at operator+, we will collect negative length
-    return cicada::semiring::traits<value_type>::log(- length);
-  }
-};
 
 template <typename Weight>
 struct weight_set_scaled_function
@@ -135,7 +119,6 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
 inline
 void encode_support_vectors(std::string& data,
 			    const size_t& id,
-			    const int& source_length,
 			    const sentence_type& viterbi,
 			    const hypergraph_type& oracle,
 			    const hypergraph_type& violated,
@@ -146,7 +129,7 @@ void encode_support_vectors(std::string& data,
   boost::iostreams::filtering_ostream os;
   os.push(boost::iostreams::back_inserter(data));
   
-  os << id << ' ' << source_length << " |||";
+  os << id << " |||";
   os << ' ' << viterbi << " |||";
   os << ' ' << oracle << " |||";
   os << ' ' << violated;
@@ -161,7 +144,6 @@ void encode_support_vectors(std::string& data,
 inline
 void decode_support_vectors(const std::string& data,
 			    size_t& id,
-			    int& source_length,
 			    sentence_type& viterbi,
 			    hypergraph_type& oracle,
 			    hypergraph_type& violated,
@@ -182,7 +164,7 @@ void decode_support_vectors(const std::string& data,
   std::string::const_iterator iter = data.begin();
   std::string::const_iterator end = data.end();
   
-  if (! phrase_parse(iter, end, ulong_ [ref(id) = _1] >> int_ [ref(source_length) = _1] >> "|||", space))
+  if (! phrase_parse(iter, end, ulong_ [ref(id) = _1] >> "|||", space))
     throw std::runtime_error("invalid id and source-length");
   
   if (! viterbi.assign(iter, end))

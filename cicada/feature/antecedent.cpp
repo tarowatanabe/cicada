@@ -53,15 +53,7 @@ namespace cicada
 	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0),
 	  tree_map(symbol_type()),
 	  forced_feature(false) {}
-
-      virtual ~AntecedentImpl() {}
       
-      virtual void antecedent_score(state_ptr_type& state,
-				    const state_ptr_set_type& states,
-				    const edge_type& edge,
-				    feature_set_type& features) const = 0;
-      virtual void antecedent_final_score(const state_ptr_type& state,
-					  feature_set_type& features) const = 0;
       
       void clear()
       {
@@ -78,20 +70,15 @@ namespace cicada
       phrase_span_set_type phrase_spans_impl;
 
       bool forced_feature;
-    };
-    
-    template <typename Extract>
-    class __AntecedentImpl : public AntecedentImpl, public Extract
-    {
       
-      virtual void antecedent_score(state_ptr_type& state,
-				    const state_ptr_set_type& states,
-				    const edge_type& edge,
-				    feature_set_type& features) const
+      void antecedent_score(state_ptr_type& state,
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features) const
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 	
-	const rule_type::symbol_set_type& phrase = extract_phrase(edge);
+	const rule_type::symbol_set_type& phrase = edge.rule->rhs;
 	
 	if (states.empty()) {
 	  // we do not add feature here, since we know nothing abount surrounding context...
@@ -169,8 +156,8 @@ namespace cicada
 	}
       }
       
-      virtual void antecedent_final_score(const state_ptr_type& state,
-					  feature_set_type& features) const
+      void antecedent_final_score(const state_ptr_type& state,
+				  feature_set_type& features) const
       {
 	// nothing to apply!
       }
@@ -262,49 +249,10 @@ namespace cicada
 				     const std::string& suffix,
 				     const int span_size) const
       {
-	return Extract::feature_prefix + node + antecedent + '|' + prefix + '|' + suffix + '|' + boost::lexical_cast<std::string>(span_size);
-      }
-
-      	  
-
-      template <typename Edge>
-      const rule_type::symbol_set_type& extract_phrase(const Edge& x) const
-      {
-	static const rule_type::symbol_set_type __tmptmp;
-
-	return Extract::operator()(x, __tmptmp);
+	return "antecedent:" + node + antecedent + '|' + prefix + '|' + suffix + '|' + boost::lexical_cast<std::string>(span_size);
       }
     };
     
-
-    struct __antecedent_extract_source
-    {
-      __antecedent_extract_source()
-	: feature_prefix("antecedent-source:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->source;
-      }
-      
-      const std::string feature_prefix;
-    };
-
-    struct __antecedent_extract_target
-    {
-      __antecedent_extract_target()
-	: feature_prefix("antecedent-target:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->target;
-      }
-      
-      const std::string feature_prefix;
-    };
-
     
     Antecedent::Antecedent(const std::string& parameter)
       : pimpl(0)
@@ -315,9 +263,6 @@ namespace cicada
 
       if (param.name() != "antecedent")
 	throw std::runtime_error("is this really antecedent feature function? " + parameter);
-
-      bool source = false;
-      bool target = false;
       
       int stemmer_prefix_size = 0;
       int stemmer_suffix_size = 0;
@@ -326,16 +271,7 @@ namespace cicada
       boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	if (strcasecmp(piter->first.c_str(), "cluster") == 0)
 	  cluster_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
 	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
@@ -347,19 +283,12 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for antecedent: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (source && target)
-	throw std::runtime_error("both source and target?");
-      if (! source && ! target)
-	throw std::runtime_error("what side are you going to use?");
-      
       if (stemmer_prefix_size < 0)
 	throw std::runtime_error("negative prefix size?");
       if (stemmer_suffix_size < 0)
 	throw std::runtime_error("negative suffix size?");
 
-      std::auto_ptr<impl_type> antecedent_impl(source
-					       ? dynamic_cast<impl_type*>(new __AntecedentImpl<__antecedent_extract_source>())
-					       : dynamic_cast<impl_type*>(new __AntecedentImpl<__antecedent_extract_target>()));
+      std::auto_ptr<impl_type> antecedent_impl(new impl_type());
 
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
@@ -379,7 +308,7 @@ namespace cicada
       
       // antecedent conext + terminal-boundary + span-size
       base_type::__state_size = sizeof(impl_type::id_type) + sizeof(symbol_type) * 2 + sizeof(int);
-      base_type::__feature_name = std::string("antecedent-") + (source ? "source" : "target");
+      base_type::__feature_name = std::string("antecedent");
       base_type::__sparse_feature = true;
       
       pimpl = antecedent_impl.release();
@@ -390,30 +319,14 @@ namespace cicada
     
     Antecedent::Antecedent(const Antecedent& x)
       : base_type(static_cast<const base_type&>(x)),
-	pimpl(0)
-    {
-      typedef __AntecedentImpl<__antecedent_extract_source> antecedent_source_type;
-      typedef __AntecedentImpl<__antecedent_extract_target> antecedent_target_type;
-      
-      if (dynamic_cast<const antecedent_source_type*>(x.pimpl))
-	pimpl = new antecedent_source_type(*dynamic_cast<const antecedent_source_type*>(x.pimpl));
-      else
-	pimpl = new antecedent_target_type(*dynamic_cast<const antecedent_target_type*>(x.pimpl));
-    }
+	pimpl(new impl_type(*x.pimpl))
+    { }
+    
     
     Antecedent& Antecedent::operator=(const Antecedent& x)
     {
-      typedef __AntecedentImpl<__antecedent_extract_source> antecedent_source_type;
-      typedef __AntecedentImpl<__antecedent_extract_target> antecedent_target_type;
-
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
-      
-      std::auto_ptr<impl_type> tmp(pimpl);
-      
-      if (dynamic_cast<const antecedent_source_type*>(x.pimpl))
-	pimpl = new antecedent_source_type(*dynamic_cast<const antecedent_source_type*>(x.pimpl));
-      else
-	pimpl = new antecedent_target_type(*dynamic_cast<const antecedent_target_type*>(x.pimpl));
+      *pimpl = *x.pimpl;
       
       return *this;
     }

@@ -63,7 +63,7 @@ typedef cicada::Rule       rule_type;
 
 typedef cicada::Model model_type;
 
-typedef rule_type::feature_set_type    feature_set_type;
+typedef hypergraph_type::feature_set_type    feature_set_type;
 typedef cicada::WeightVector<double>   weight_set_type;
 typedef feature_set_type::feature_type feature_type;
 
@@ -102,7 +102,6 @@ int cube_size = 200;
 bool softmax_margin = false;
 bool sgd = false;
 bool mix_optimized = false;
-bool yield_source = false;
 
 int threads = 4;
 
@@ -699,7 +698,7 @@ struct OptimizeOnline
 	    weight_set_type direction = oiter->weights;
 	    direction -= weights_mixed;
 	    
-	    const double update = line_search(graphs, scorers, weights_mixed, direction, 1e-4, 1.0 - 1e-4, yield_source);
+	    const double update = line_search(graphs, scorers, weights_mixed, direction, 1e-4, 1.0 - 1e-4);
 	    if (update == 0.0)
 	      direction *= 0.5;
 	    else
@@ -797,7 +796,7 @@ struct TaskOracle
   
   struct bleu_function
   {
-    typedef rule_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::feature_set_type feature_set_type;
     
     typedef cicada::semiring::Logprob<double> value_type;
 
@@ -826,8 +825,8 @@ struct TaskOracle
       
       yield.clear();
     
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
+      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	if (titer->is_non_terminal()) {
 	  const int pos = titer->non_terminal_index() - 1;
 	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
@@ -1175,7 +1174,6 @@ void options(int argc, char** argv)
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     ("sgd",            po::bool_switch(&sgd),            "online SGD algorithm")
     ("mix-optimized",  po::bool_switch(& mix_optimized), "optimized weights mixing")
-    ("yield-source",   po::bool_switch(&yield_source),   "MERT over source-yield")
     
     ("threads", po::value<int>(&threads), "# of threads")
     ;

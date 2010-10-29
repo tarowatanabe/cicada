@@ -24,8 +24,7 @@
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Rule,
 			  (cicada::Rule::symbol_type,     lhs)
-			  (cicada::Rule::symbol_set_type, target) // we swapped source/target for dot output!
-			  (cicada::Rule::symbol_set_type, source)
+			  (cicada::Rule::symbol_set_type, rhs)
 			  )
 
 namespace cicada
@@ -114,7 +113,7 @@ namespace cicada
       lhs %= *(escape_char | ~char_('\"'));
       phrase %= -(lhs % "\\ ");
       
-      rule %= lhs << " | {" << phrase << " | " << phrase << " } ";
+      rule %= lhs << " | " << phrase;
     }
     
     boost::spirit::karma::symbols<char, const char*> escape_char;
@@ -125,13 +124,13 @@ namespace cicada
   };
 
   template <typename Iterator>
-  struct graphviz_feature_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule::feature_set_type()>
+  struct graphviz_feature_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::feature_set_type()>
   {
     typedef cicada::Rule                 rule_type;
     typedef rule_type::symbol_type       symbol_type;
     typedef rule_type::symbol_set_type   symbol_set_type;
 
-    typedef rule_type::feature_set_type  feature_set_type;
+    typedef cicada::HyperGraph::feature_set_type  feature_set_type;
     typedef feature_set_type::value_type value_type;
     
     graphviz_feature_generator() : graphviz_feature_generator::base_type(features)

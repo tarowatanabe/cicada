@@ -7,7 +7,6 @@
 #include "feature/bleu.hpp"
 #include "feature/bleu_expected.hpp"
 #include "feature/bleu_linear.hpp"
-#include "feature/boundary.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
@@ -25,7 +24,6 @@ namespace cicada
   {
     static const char* desc = "\
 antecedent: antecedent feature\n\
-\tyield=[source|target]\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
@@ -37,10 +35,8 @@ bleu: BLEU\n\
 \tlower=[true|false] perform lower casing\n\
 \tname=feature-name(default: bleu)\n\
 \trefset=reference set file\n\
-\tyield=[source|target]\n\
 bleu-expected: expected-BLEU\n\
 \torder=<order>,\n\
-\tyield=[source|target]\n\
 bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
 \tprecision=<default 0.8>,\n\
@@ -49,20 +45,8 @@ bleu-linear: linear corpus-BLEU\n\
 \tlower=[true|false] perform lower casing\n\
 \tname=feature-name(default: bleu-linear)\n\
 \trefset=reference set file\n\
-\tyield=[source|target]\n\
-boundary: boundary bigram feature\n\
-\tcluster-source=[word class file for source]\n\
-\tcluster-target=[word class file for target]\n\
-\tprefix-source=[source prefix stemming size]\n\
-\tprefix-target=[target prefix stemming size]\n\
-\tsuffix-source=[source suffix stemming size]\n\
-\tsuffix-target=[target suffix stemming size]\n\
-\tdigits-source=[source digits stemming]\n\
-\tdigits-target=[target digits stemming]\n\
 global-lexicon: global lexicon feature\n\
-\tyield=[source|target]\n\
 neighbours: neighbour words feature\n\
-\tyield=[source|target]\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
@@ -71,19 +55,16 @@ ngram: ngram language model\n\
 \tfile=<file>\n\
 \torder=<order>\n\
 \tcluster=<word class>\n\
-\tyiled=[source|target yield (default target)]\n\
 \tname=feature-name(default: ngram)\n\
 \tcoarse-order=<order> ngram order for coarse heuristic\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
 ngram-tree: ngram tree feature\n\
-\tyield=[source|target]\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
 \tdigits=[perform digits stemming]\n\
 parent: parent feature\n\
-\tyield=[source|target]\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
 \tsuffix=[suffix stemming size]\n\
@@ -92,8 +73,7 @@ parent: parent feature\n\
 span: lexical span feature\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
-target-word-penalty: target word penalty feature\n\
-soruce-word-penalty: source word penalty feature\n\
+word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 ";
     return desc;
@@ -115,8 +95,6 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::Antecedent(parameter));
     else if (param.name() == "parent")
       return feature_function_ptr_type(new feature::Parent(parameter));
-    else if (param.name() == "boundary")
-      return feature_function_ptr_type(new feature::Boundary(parameter));
     else if (param.name() == "bleu")
       return feature_function_ptr_type(new feature::Bleu(parameter));
     else if (param.name() == "bleu-expected")
@@ -129,10 +107,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::Span(parameter));
     else if (param.name() == "variational")
       return feature_function_ptr_type(new feature::Variational(parameter));
-    else if (param.name() == "target-word-penalty")
-      return feature_function_ptr_type(new feature::TargetWordPenalty());
-    else if (param.name() == "source-word-penalty")
-      return feature_function_ptr_type(new feature::SourceWordPenalty());
+    else if (param.name() == "word-penalty")
+      return feature_function_ptr_type(new feature::WordPenalty());
     else if (param.name() == "rule-penalty")
       return feature_function_ptr_type(new feature::RulePenalty());
     else

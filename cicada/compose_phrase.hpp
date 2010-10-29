@@ -110,9 +110,7 @@ namespace cicada
     {
       // initializer...
       rule_goal.reset(new rule_type(vocab_type::GOAL,
-				    rule_type::symbol_set_type(1, non_terminal.non_terminal(1)),
-				    rule_type::symbol_set_type(1, non_terminal.non_terminal(1)),
-				    1));
+				    rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
       
       
       std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
@@ -120,9 +118,7 @@ namespace cicada
       sequence.back()  = non_terminal.non_terminal(2);
       
       rule_x1_x2.reset(new rule_type(non_terminal.non_terminal(),
-				     rule_type::symbol_set_type(sequence.begin(), sequence.end()),
-				     rule_type::symbol_set_type(sequence.begin(), sequence.end()),
-				     2));
+				     rule_type::symbol_set_type(sequence.begin(), sequence.end())));
     }
 
     void operator()(const lattice_type& lattice, hypergraph_type& graph)
@@ -151,7 +147,7 @@ namespace cicada
       while (! queue.empty()) {
 	const state_type& state = queue.front();
 	
-	const transducer_type::rule_set_type& rules = grammar[state.grammar_id].rules(state.node);
+	const transducer_type::rule_pair_set_type& rules = grammar[state.grammar_id].rules(state.node);
 	
 	if (! rules.empty()) {
 	  
@@ -177,13 +173,17 @@ namespace cicada
 	  
 	  hypergraph_type::node_type& node = graph.add_node();
 
-	  transducer_type::rule_set_type::const_iterator riter_end = rules.end();
-	  for (transducer_type::rule_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	    hypergraph_type::edge_type& edge = graph.add_edge();
-	    edge.rule = *riter;
-	    edge.features = (*riter)->features;
+	    edge.rule = riter->target;
+	    edge.features = riter->features;
 	    if (! state.features.empty())
 	      edge.features += state.features;
+
+	    edge.first    = state.first;
+	    edge.last     = state.last;
+	    edge.distance = lattice.shortest_distance(state.first, state.last);
 	    
 	    graph.connect_edge(edge.id, node.id);
 	  }
@@ -241,6 +241,10 @@ namespace cicada
 	
 	hypergraph_type::edge_type& edge = graph.add_edge(&(niter->second), &(niter->second) + 1);
 	edge.rule = rule_goal;
+	
+	edge.first    = 0;
+	edge.last     = lattice.size();
+	edge.distance = lattice.shortest_distance(0, lattice.size());
 	
 	hypergraph_type::node_type& node = graph.add_node();
 	

@@ -53,7 +53,7 @@ typedef cicada::Sentence sentence_type;
 typedef cicada::HyperGraph hypergraph_type;
 typedef cicada::Rule       rule_type;
 
-typedef rule_type::feature_set_type    feature_set_type;
+typedef hypergraph_type::feature_set_type    feature_set_type;
 typedef cicada::WeightVector<double>   weight_set_type;
 typedef feature_set_type::feature_type feature_type;
 
@@ -94,8 +94,6 @@ double C = 1.0; // inverse of C == 1.0 / C : where C is a constant of SVM^{light
 
 bool weight_normalize_l1 = false;
 bool weight_normalize_l2 = false;
-
-bool yield_source = false;
 
 int threads = 4;
 
@@ -538,7 +536,7 @@ struct EnvelopeTask
       for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	const envelope_type::line_ptr_type& line = *eiter;
 	
-	line->yield(yield, yield_source);
+	line->yield(yield);
 	
 	scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	
@@ -592,7 +590,7 @@ struct ViterbiTask
   
   struct viterbi_function
   {
-    typedef rule_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::feature_set_type feature_set_type;
 
     typedef weight_type value_type;
 
@@ -615,13 +613,11 @@ struct ViterbiTask
     template <typename Edge, typename Iterator>
     void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
     {
-      // extract target-yield, features
-    
       yield.clear();
     
       int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
+      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	if (titer->is_non_terminal()) {
 	  int pos = titer->non_terminal_index() - 1;
 	  if (pos < 0)
@@ -634,32 +630,6 @@ struct ViterbiTask
     }
   };
 
-
-  struct viterbi_traversal_source
-  {
-    typedef sentence_type value_type;
-  
-    template <typename Edge, typename Iterator>
-    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-    {
-      // extract source-yield, features
-      
-      yield.clear();
-    
-      int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->source.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->source.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  int pos = titer->non_terminal_index() - 1;
-	  if (pos < 0)
-	    pos = non_terminal_pos;
-	  ++ non_terminal_pos;
-	  
-	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
-	} else if (*titer != vocab_type::EPSILON)
-	  yield.push_back(*titer);
-    }
-  };
 
   
   typedef std::pair<int, const hypergraph_type*> mapper_type;
@@ -691,10 +661,7 @@ struct ViterbiTask
       
       reduced.first = mapped.first;
       
-      if (yield_source)
-	viterbi(*mapped.second, reduced.second, weight, viterbi_traversal_source(), viterbi_function(weights));
-      else
-	viterbi(*mapped.second, reduced.second, weight, viterbi_traversal(), viterbi_function(weights));
+      viterbi(*mapped.second, reduced.second, weight, viterbi_traversal(), viterbi_function(weights));
       
       queue_reducer.push(reduced);
     }
@@ -895,8 +862,6 @@ void options(int argc, char** argv)
     
     ("normalize-l1",    po::bool_switch(&weight_normalize_l1), "weight normalization via L1 (not a regularizer...)")
     ("normalize-l2",    po::bool_switch(&weight_normalize_l2), "weight normalization via L2 (not a regularizer...)")
-
-    ("yield-source", po::bool_switch(&yield_source), "MERT over source-yield")
 
     ("threads", po::value<int>(&threads), "# of threads")
     ;

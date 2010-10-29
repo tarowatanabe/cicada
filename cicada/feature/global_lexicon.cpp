@@ -46,12 +46,12 @@ namespace cicada
 #endif
 
       
-      GlobalLexiconImpl(const path_type& __path, const bool __yield_source)
-	: lexicon(__path), yield_source(__yield_source) {}
+      GlobalLexiconImpl(const path_type& __path)
+	: lexicon(__path) {}
       
       double global_lexicon_score(const edge_type& edge)
       {
-	const phrase_type& phrase = (yield_source ? edge.rule->source : edge.rule->target);
+	const phrase_type& phrase = edge.rule->rhs;
 
 	double score = 0.0;
 
@@ -68,28 +68,16 @@ namespace cicada
       {
 	words.clear();
 	
-	if (! lattice.empty()) {
-	  lattice_type::const_iterator liter_end = lattice.end();
-	  for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
-	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
-	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	      words.insert(aiter->label);
-	  }
-	} else {
-	  hypergraph_type::edge_set_type::const_iterator eiter_end = hypergraph.edges.end();
-	  for (hypergraph_type::edge_set_type::const_iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    phrase_type::const_iterator piter_end = eiter->rule->source.end();
-	    for (phrase_type::const_iterator piter = eiter->rule->source.begin(); piter != piter_end; ++ piter)
-	      if (*piter != vocab_type::EPSILON && piter->is_terminal())
-		words.insert(*piter);
-	  }
+	lattice_type::const_iterator liter_end = lattice.end();
+	for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
+	  lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	  for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+	    words.insert(aiter->label);
 	}
       }
       
       word_set_type words;
       lexicon_type  lexicon;
-
-      bool yield_source;
     };
   
   
@@ -103,22 +91,10 @@ namespace cicada
       if (param.name() != "global-lexicon")
 	throw std::runtime_error("is this really a global-lexicon feature function? " + parameter);
 
-      bool source = false;
-      bool target = false;
-      
       boost::filesystem::path path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else if (strcasecmp(piter->first.c_str(), "file") == 0)
+	if (strcasecmp(piter->first.c_str(), "file") == 0)
 	  path = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for global lexicon: " << piter->first << "=" << piter->second << std::endl;
@@ -127,14 +103,7 @@ namespace cicada
       if (path.empty())
 	throw std::runtime_error("no global lexicon file? " + path.file_string());
       
-      if (source && target)
-	throw std::runtime_error("both source and target?");
-      
-      // default to target
-      if (! source && ! target)
-	target = true;
-      
-      std::auto_ptr<impl_type> global_lexicon_impl(new impl_type(path, source));
+      std::auto_ptr<impl_type> global_lexicon_impl(new impl_type(path));
       
       // no-context...
       base_type::__state_size = 0;

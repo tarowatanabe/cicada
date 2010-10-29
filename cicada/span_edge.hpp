@@ -70,8 +70,8 @@ namespace cicada
 	spans[*eiter].first = spans_pos;
 	
 	int non_terminal_pos = 0;
-	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter) {
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
 	    int non_terminal_index = siter->non_terminal_index() - 1;
 	    if (non_terminal_index < 0)

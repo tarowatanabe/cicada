@@ -66,7 +66,6 @@ expected-ngram: expected ngram computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tscale=scaling for score\n\
-\tyield=[source|target]\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
@@ -82,7 +81,7 @@ output: kbest or hypergraph output\n\
 \tunique=[true|false] unique translation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialize weight\n\
-\tyield=[source|target|derivation|tree] yield for kbest\n\
+\tyield=[sentence|string|derivation|tree] yield for kbest\n\
 \tgraphviz=[true|false] dump in graphviz format\n\
 \tdirectory=directory for output\n\
 \tfile=file for output\n\

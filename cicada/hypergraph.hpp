@@ -29,7 +29,7 @@ namespace cicada
     typedef cicada::Rule                 rule_type;
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
 
-    typedef rule_type::feature_set_type feature_set_type;
+    typedef cicada::FeatureVector<double, std::allocator<double> > feature_set_type;
     
   public:
     static const id_type invalid;
@@ -54,10 +54,12 @@ namespace cicada
       typedef utils::simple_vector<id_type, std::allocator<id_type> > node_set_type;
       typedef cicada::Rule rule_type;
       
-      Edge() : head(invalid), tails(), rule() {}
+      Edge()
+	: head(invalid), tails(), rule(), first(0), last(0), distance(0) {}
       
       template <typename Iterator>
-      Edge(Iterator first, Iterator last) : head(invalid), tails(first, last), rule() {}
+      Edge(Iterator first, Iterator last)
+	: head(invalid), tails(first, last), rule(), first(0), last(0), distance(0) {}
       
       id_type       head;
       node_set_type tails;
@@ -65,6 +67,11 @@ namespace cicada
       feature_set_type features;
       
       rule_ptr_type rule;
+      
+      // meta data...
+      int first;
+      int last;
+      int distance;
       
       id_type id;
     };

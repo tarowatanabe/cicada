@@ -491,7 +491,7 @@ struct Task
     
     weight_type weight;
     
-    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal_target(), weight_set_function(weights, 1.0));
+    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
   }
 
   void add_support_vectors_regression(const size_t& id,
@@ -663,8 +663,7 @@ struct Task
 	} else {
 	  
 	  size_t id = size_t(-1);
-	  int source_length;
-	  decode_support_vectors(buffer, id, source_length, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
+	  decode_support_vectors(buffer, id, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
 
 	  if (id == size_t(-1))
 	    throw std::runtime_error("invalid encoded feature vector");
@@ -682,7 +681,7 @@ struct Task
 	      *score *= 0.9;
 	    
 	    norm *= 0.9;
-	    norm += source_length;
+	    norm += 1;
 	  }
 
 	  if (loss_segment)
@@ -811,19 +810,8 @@ struct Task
       if (debug)
 	std::cerr << "id: " << id << std::endl;
       
-      // compute source-length
-      int source_length = lattice.shortest_distance();
-      if (hypergraph.is_valid()) {
-	// we will enumerate forest structure... and collect min-size...
-	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(hypergraph.nodes.size());
-	
-	cicada::inside(hypergraph, lengths, source_length_function());
-	
-	source_length = - log(lengths.back());
-      }
-            
       // collect max-feature from hypergraph
-      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::kbest_traversal_target(), weight_set_function(weights, 1.0));
+      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
       
       // update scores...
       if (id >= scores.size())
@@ -839,7 +827,7 @@ struct Task
 	  *score *= 0.9;
 	
 	norm *= 0.9;
-	norm += source_length;
+	norm += 1;
       }
       
       if (loss_segment)
@@ -887,7 +875,7 @@ struct Task
 	  hypergraph_reward.swap(hypergraph_oracle);
 	  
 	  weight_type weight;
-	  cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal_target(), weight_set_function(weights, 1.0));
+	  cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
 	}
       }
       
@@ -977,7 +965,7 @@ struct Task
       }
       
       if (asynchronous_vectors) {
-	encode_support_vectors(buffer, id, source_length, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
+	encode_support_vectors(buffer, id, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
 	
 	queue_send.push_swap(buffer);
       }

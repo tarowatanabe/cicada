@@ -57,7 +57,7 @@ namespace cicada
       
     public:
       VariationalImpl(const int __order)
-	: ngrams(symbol_type()), yield_source(false), order(__order)
+	: ngrams(symbol_type()), order(__order)
       {
 	feature_names.resize(order);
 	for (int n = 0; n < order; ++ n)
@@ -108,7 +108,7 @@ namespace cicada
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
-	const phrase_type& phrase = (yield_source ? rule.source : rule.target);
+	const phrase_type& phrase = rule.rhs;
 
 	phrase_type::const_iterator titer_begin = phrase.begin();
 	phrase_type::const_iterator titer_end   = phrase.end();
@@ -270,7 +270,6 @@ namespace cicada
       feature_name_set_type feature_names;
       
     public:
-      bool yield_source;
       int order;
     };
     
@@ -286,27 +285,12 @@ namespace cicada
       
       int order = 3;
       
-      bool        yield_source = false;
-      bool        yield_target = false;
-      
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    yield_source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    yield_target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else
+	else
 	  std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
       }
-
-      if (yield_source && yield_target)
-	throw std::runtime_error("you cannot specify both source/target yield");
       
       if (order <= 0)
 	throw std::runtime_error("invalid ngram order");
@@ -315,8 +299,6 @@ namespace cicada
       base_type::__feature_name = "variational";
       
       pimpl = new impl_type(order);
-
-      pimpl->yield_source = yield_source;
     }
     
     Variational::~Variational() { std::auto_ptr<impl_type> tmp(pimpl); }

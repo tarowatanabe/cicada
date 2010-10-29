@@ -18,6 +18,29 @@ namespace cicada
 {
   namespace feature
   {
+
+    struct __extractor_none
+    {
+      template <typename Word>
+      std::string operator()(const Word& word) const
+      {
+	return word;
+      }
+    };
+
+    template <typename Extract>
+    struct __extractor
+    {
+      __extractor(const Extract& __extract) : extract(__extract) {}
+      
+      const Extract& extract;
+      
+      template <typename Word>
+      std::string operator()(const Word& word) const
+      {
+	return extract[word];
+      }
+    };
     
     class ParentImpl
     {
@@ -58,16 +81,6 @@ namespace cicada
       
       ParentImpl()
 	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), exclude_terminal(false), forced_feature(false) {}
-
-      virtual ~ParentImpl() {}
-      
-      virtual void parent_score(state_ptr_type& state,
-				const state_ptr_set_type& states,
-				const edge_type& edge,
-				feature_set_type& features) const = 0;
-      virtual void parent_final_score(const state_ptr_type& state,
-				      const edge_type& edge,
-				      feature_set_type& features) const = 0;
       
       void clear()
       {
@@ -142,45 +155,15 @@ namespace cicada
       string_map_type string_map;
       
       bool forced_feature;
-    };
-
-    struct __extractor_none
-    {
-      template <typename Word>
-      std::string operator()(const Word& word) const
-      {
-	return word;
-      }
-    };
-
-    template <typename Extract>
-    struct __extractor
-    {
-      __extractor(const Extract& __extract) : extract(__extract) {}
       
-      const Extract& extract;
-      
-      template <typename Word>
-      std::string operator()(const Word& word) const
-      {
-	return extract[word];
-      }
-    };
-    
-
-    
-    template <typename Extract>
-    class __ParentImpl : public ParentImpl, public Extract
-    {
-      
-      virtual void parent_score(state_ptr_type& state,
-				const state_ptr_set_type& states,
-				const edge_type& edge,
-				feature_set_type& features) const
+      void parent_score(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features) const
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 	
-	const rule_type::symbol_set_type& phrase = extract_phrase(edge);
+	const rule_type::symbol_set_type& phrase = edge.rule->rhs;
 	
 	if (states.empty()) {
 	  const std::string rule_string  = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());
@@ -294,9 +277,9 @@ namespace cicada
       }
       
       
-      virtual void parent_final_score(const state_ptr_type& state,
-				      const edge_type& edge,
-				      feature_set_type& features) const
+      void parent_final_score(const state_ptr_type& state,
+			      const edge_type& edge,
+			      feature_set_type& features) const
       {
 	const id_type* id = reinterpret_cast<const id_type*>(state);
 	
@@ -306,7 +289,7 @@ namespace cicada
       void apply_feature(feature_set_type& features,
 			 const std::string& rule) const
       {
-	const std::string name = Extract::feature_prefix + rule;
+	const std::string name = "parent:" + rule;
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
@@ -315,50 +298,11 @@ namespace cicada
 			 const std::string& parent,
 			 const std::string& rule) const
       {
-	const std::string name = Extract::feature_prefix + parent + '(' + rule + ')';
+	const std::string name = "parent:" + parent + '(' + rule + ')';
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
-      
-
-      template <typename Edge>
-      const rule_type::symbol_set_type& extract_phrase(const Edge& x) const
-      {
-	static const rule_type::symbol_set_type __tmptmp;
-
-	return Extract::operator()(x, __tmptmp);
-      }
     };
-    
-
-    struct __parent_extract_source
-    {
-      __parent_extract_source()
-	: feature_prefix("parent-source:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->source;
-      }
-      
-      const std::string feature_prefix;
-    };
-
-    struct __parent_extract_target
-    {
-      __parent_extract_target()
-	: feature_prefix("parent-target:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->target;
-      }
-      
-      const std::string feature_prefix;
-    };
-
     
     Parent::Parent(const std::string& parameter)
       : pimpl(0)
@@ -370,9 +314,6 @@ namespace cicada
       if (param.name() != "parent")
 	throw std::runtime_error("is this really parent feature function? " + parameter);
 
-      bool source = false;
-      bool target = false;
-      
       int stemmer_prefix_size = 0;
       int stemmer_suffix_size = 0;
       bool stemmer_digits = false;
@@ -382,16 +323,7 @@ namespace cicada
       boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	if (strcasecmp(piter->first.c_str(), "cluster") == 0)
 	  cluster_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
 	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
@@ -405,19 +337,12 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for parent: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (source && target)
-	throw std::runtime_error("both source and target?");
-      if (! source && ! target)
-	throw std::runtime_error("what side are you going to use?");
-      
       if (stemmer_prefix_size < 0)
 	throw std::runtime_error("negative prefix size?");
       if (stemmer_suffix_size < 0)
 	throw std::runtime_error("negative suffix size?");
 
-      std::auto_ptr<impl_type> parent_impl(source
-					   ? dynamic_cast<impl_type*>(new __ParentImpl<__parent_extract_source>())
-					   : dynamic_cast<impl_type*>(new __ParentImpl<__parent_extract_target>()));
+      std::auto_ptr<impl_type> parent_impl(new impl_type());
       
       
       if (! cluster_path.empty()) {
@@ -440,7 +365,7 @@ namespace cicada
       
       // parent conext (surface, cluster, prefix, suffix, digits)
       base_type::__state_size = sizeof(impl_type::id_type) * 5;
-      base_type::__feature_name = std::string("parent-") + (source ? "source" : "target");
+      base_type::__feature_name = std::string("parent");
       base_type::__sparse_feature = true;
       
       pimpl = parent_impl.release();
@@ -451,31 +376,13 @@ namespace cicada
     
     Parent::Parent(const Parent& x)
       : base_type(static_cast<const base_type&>(x)),
-	pimpl(0)
-    {
-      typedef __ParentImpl<__parent_extract_source> parent_source_type;
-      typedef __ParentImpl<__parent_extract_target> parent_target_type;
-      
-      if (dynamic_cast<const parent_source_type*>(x.pimpl))
-	pimpl = new parent_source_type(*dynamic_cast<const parent_source_type*>(x.pimpl));
-      else
-	pimpl = new parent_target_type(*dynamic_cast<const parent_target_type*>(x.pimpl));
-    }
+	pimpl(new impl_type(*x.pimpl))
+    {}
     
     Parent& Parent::operator=(const Parent& x)
     {
-      typedef __ParentImpl<__parent_extract_source> parent_source_type;
-      typedef __ParentImpl<__parent_extract_target> parent_target_type;
-
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
-      
-      std::auto_ptr<impl_type> tmp(pimpl);
-      
-      if (dynamic_cast<const parent_source_type*>(x.pimpl))
-	pimpl = new parent_source_type(*dynamic_cast<const parent_source_type*>(x.pimpl));
-      else
-	pimpl = new parent_target_type(*dynamic_cast<const parent_target_type*>(x.pimpl));
-      
+      *pimpl = *x.pimpl;
       return *this;
     }
 

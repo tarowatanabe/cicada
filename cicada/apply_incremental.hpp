@@ -263,7 +263,7 @@ namespace cicada
 	for (;;) {
 	  const bool is_goal = (graph_in.goal == item->in_edge->head);
 	  
- 	  const rule_type::symbol_set_type& target = item->in_edge->rule->target;
+ 	  const rule_type::symbol_set_type& target = item->in_edge->rule->rhs;
 	  
 	  // scan... and score... state will be updated...
 	  if (! target.empty() && item->dot < static_cast<int>(target.size()) && ! target[item->dot].is_non_terminal()) {
@@ -382,7 +382,7 @@ namespace cicada
 			<< std::endl;
 #endif
 	      
-	      const rule_type::symbol_set_type& target = item->in_edge->rule->target;
+	      const rule_type::symbol_set_type& target = item->in_edge->rule->rhs;
 	      
 	      int antecedent_index = target[item->dot].non_terminal_index() - 1;
 	      if (antecedent_index < 0)

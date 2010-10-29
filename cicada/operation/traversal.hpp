@@ -23,7 +23,7 @@ namespace cicada
       typedef cicada::HyperGraph hypergraph_type;
       typedef cicada::Rule       rule_type;
       
-      typedef rule_type::feature_set_type feature_set_type;
+      typedef hypergraph_type::feature_set_type feature_set_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
 
       typedef boost::tuple<edge_set_type, feature_set_type> value_type;
@@ -44,68 +44,27 @@ namespace cicada
       }
     };
 
-    struct kbest_traversal_source
-    {
-      typedef cicada::HyperGraph hypergraph_type;
-      typedef cicada::Rule       rule_type;
-      typedef cicada::Sentence   sentence_type;
-      typedef cicada::Vocab      vocab_type;
 
-      typedef rule_type::feature_set_type feature_set_type;
-  
-      typedef boost::tuple<sentence_type, feature_set_type> value_type;
-  
-      template <typename Edge, typename Iterator>
-      void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-      {
-	// extract source-yield, features
-
-	boost::get<0>(yield).clear();
-	boost::get<1>(yield) = edge.features;
-    
-	int non_terminal_pos = 0;
-	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
-	  if (siter->is_non_terminal()) {
-	    const int pos = siter->non_terminal_index() - 1;
-	
-	    if (pos < 0)
-	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + non_terminal_pos)).begin(), boost::get<0>(*(first + non_terminal_pos)).end());
-	    else
-	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
-
-	    ++ non_terminal_pos;
-	  } else if (*siter != vocab_type::EPSILON)
-	    boost::get<0>(yield).push_back(*siter);
-    
-	// collect features...
-	for (/**/; first != last; ++ first)
-	  boost::get<1>(yield) += boost::get<1>(*first);
-      }
-    };
-
-    struct kbest_traversal_target
+    struct kbest_traversal
     {
       typedef cicada::HyperGraph hypergraph_type;
       typedef cicada::Rule       rule_type;
       typedef cicada::Sentence   sentence_type;
       typedef cicada::Vocab      vocab_type;
       
-      typedef rule_type::feature_set_type feature_set_type;
+      typedef hypergraph_type::feature_set_type feature_set_type;
   
       typedef boost::tuple<sentence_type, feature_set_type> value_type;
   
       template <typename Edge, typename Iterator>
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
-	// extract target-yield, features
-
 	boost::get<0>(yield).clear();
 	boost::get<1>(yield) = edge.features;
     
 	int non_terminal_pos = 0;
-	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->target.end();
-	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->target.begin(); titer != titer_end; ++ titer)
+	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	  if (titer->is_non_terminal()) {
 	    const int pos = titer->non_terminal_index() - 1;
 	

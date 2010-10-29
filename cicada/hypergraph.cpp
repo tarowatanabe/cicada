@@ -25,9 +25,7 @@
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Rule,
 			  (cicada::Rule::symbol_type,     lhs)
-			  (cicada::Rule::symbol_set_type, source)
-			  (cicada::Rule::symbol_set_type, target)
-			  (cicada::Rule::feature_set_type, features)
+			  (cicada::Rule::symbol_set_type, rhs)
 			  )
 
 namespace cicada
@@ -159,13 +157,9 @@ namespace cicada
 	goal_edge_y.id = x.edges.size() - 1;
 
 	goal_edge_x.rule.reset(new rule_type(vocab_type::GOAL,
-					     rule_type::symbol_set_type(1, goal_x.non_terminal(1)),
-					     rule_type::symbol_set_type(1, goal_x.non_terminal(1)),
-					     1));
+					     rule_type::symbol_set_type(1, goal_x.non_terminal(1))));
 	goal_edge_y.rule.reset(new rule_type(vocab_type::GOAL,
-					     rule_type::symbol_set_type(1, goal_y.non_terminal(1)),
-					     rule_type::symbol_set_type(1, goal_y.non_terminal(1)),
-					     1));
+					     rule_type::symbol_set_type(1, goal_y.non_terminal(1))));
 	
 	goal_edge_x.head = goal_node.id;
 	goal_edge_y.head = goal_node.id;
@@ -192,7 +186,7 @@ namespace cicada
   typedef std::vector<int> tail_node_set_type;
   typedef std::pair<std::string, double> feature_parsed_type;
   typedef std::vector<feature_parsed_type> feature_parsed_set_type;
-  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, int> edge_parsed_type;
+  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, int, int, int, int> edge_parsed_type;
   
   typedef std::vector<edge_parsed_type> node_parsed_type;
   typedef std::vector<node_parsed_type> node_parsed_set_type;
@@ -248,7 +242,10 @@ namespace cicada
       edge %= ('{'
 	       >> lit("\"tail\"")    >> ':' >> tail_node_set >> ','
 	       >> lit("\"feature\"") >> ':' >> feature_set >> ','
-	       >> lit("\"rule\"")    >> ':' >> int_
+	       >> lit("\"rule\"")    >> ':' >> int_ >> ','
+	       >> lit("\"first\"")    >> ':' >> int_ >> ','
+	       >> lit("\"last\"")    >> ':' >> int_ >> ','
+	       >> lit("\"distance\"")    >> ':' >> int_
 	       >> '}');
       
       edge_action = edge [add_edge(graph, rules)];
@@ -317,6 +314,11 @@ namespace cicada
 	edge.tails = hypergraph_type::edge_type::node_set_type(boost::fusion::get<0>(edge_parsed).begin(), boost::fusion::get<0>(edge_parsed).end());
 	edge.features.insert(boost::fusion::get<1>(edge_parsed).begin(), boost::fusion::get<1>(edge_parsed).end());
 	edge.rule = rules[boost::fusion::get<2>(edge_parsed)];
+	
+	// meta data...
+	edge.first = boost::fusion::get<3>(edge_parsed);
+	edge.last = boost::fusion::get<4>(edge_parsed);
+	edge.distance = boost::fusion::get<5>(edge_parsed);
 	
 	graph.connect_edge(edge.id, graph.nodes.back().id);
       }
@@ -437,9 +439,7 @@ namespace cicada
     typedef cicada::Rule                 rule_type;
     typedef rule_type::symbol_type       symbol_type;
     typedef rule_type::symbol_set_type   symbol_set_type;
-    typedef rule_type::feature_set_type  feature_set_type;
-    typedef feature_set_type::value_type feature_type;
-    
+        
     rule_generator() : rule_generator::base_type(rule)
     {
       namespace karma = boost::spirit::karma;
@@ -467,37 +467,20 @@ namespace cicada
       lhs %= *(escape_char | ~char_('\"'));
       phrase %= -(lhs % ' ');
       
-      feature %= +(escape_char | ~char_('\"')) << '=' << double10;
-      
-      features %= feature % ' ';
-      
-      rule %= lhs << " ||| " << phrase << " ||| " << phrase << (buffer[ " ||| " << features] |  repeat(0)[feature]);
+      rule %= lhs << " ||| " << phrase;
     }
     
-    struct real_precision : boost::spirit::karma::real_policies<double>
-    {
-      static unsigned int precision(double) 
-      { 
-        return 10;
-      }
-    };
-    
-    boost::spirit::karma::real_generator<double, real_precision> double10;
-
     boost::spirit::karma::symbols<char, const char*> escape_char;
     
     boost::spirit::karma::rule<Iterator, symbol_type()>      lhs;
     boost::spirit::karma::rule<Iterator, symbol_set_type()>  phrase;
-    boost::spirit::karma::rule<Iterator, feature_type()>     feature;
-    boost::spirit::karma::rule<Iterator, feature_set_type()> features;
     boost::spirit::karma::rule<Iterator, rule_type()>        rule;
   };
 
   template <typename Iterator>
   struct features_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::feature_set_type()>
   {
-    typedef cicada::Rule                rule_type;
-    typedef rule_type::feature_set_type feature_set_type;
+    typedef cicada::HyperGraph::feature_set_type feature_set_type;
     
     features_generator() : features_generator::base_type(features)
     {
@@ -681,8 +664,10 @@ namespace cicada
 	  os << output_features;
 	  
 	  os << "},";
-	  os << "\"rule\":";
-	  os << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
+	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second) << ',';
+	  os << "\"first\":" << edge.first << ',';
+	  os << "\"last\":" << edge.last << ',';
+	  os << "\"distance\":" << edge.distance;
 	  os << '}';
 	}
 	

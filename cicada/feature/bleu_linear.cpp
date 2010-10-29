@@ -85,10 +85,9 @@ namespace cicada
 		     const double __precision,
 		     const double __ratio,
 		     const bool __split,
-		     const bool __lower, 
-		     const bool __yield_source)
+		     const bool __lower)
 	: ngrams(word_type()), nodes(), sizes(), order(__order), precision(__precision), ratio(__ratio),
-	  split(__split), yield_source(__yield_source), lower(__lower ? &stemmer_type::create("lower") : 0)
+	  split(__split), lower(__lower ? &stemmer_type::create("lower") : 0)
       {
 	factors.clear();
 	factors.resize(order + 1, 0.0);
@@ -110,7 +109,7 @@ namespace cicada
       {
 	const rule_type& rule = *edge.rule;
 	
-	const phrase_type& __target = (yield_source ? rule.source : rule.target);
+	const phrase_type& __target = rule.rhs;
 	phrase_type target_split;
 	phrase_type target_lower;
 	if (split)
@@ -422,7 +421,6 @@ namespace cicada
       double ratio;
       
       bool split;
-      bool yield_source;
 
       stemmer_type* lower;
     };
@@ -445,9 +443,6 @@ namespace cicada
       bool split = false;
       bool lower = false;
       
-      bool yield_source = false;
-      bool yield_target = false;
-
       std::string name;
       path_type   refset_file;
 
@@ -466,26 +461,14 @@ namespace cicada
 	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "refset") == 0)
 	  refset_file = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    yield_source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    yield_target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else
+	else
 	  std::cerr << "WARNING: unsupported parameter for bleu-linear: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (yield_source && yield_target)
-	throw std::runtime_error("you cannot specify both source/target yield");
-
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
 	throw std::runtime_error("no refset file?: " + refset_file.file_string());
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, split, lower, yield_source));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, split, lower));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2;
@@ -596,7 +579,7 @@ namespace cicada
       pimpl->clear();
     }
     
-        struct source_length_function
+    struct length_function
     {
       typedef cicada::Vocab vocab_type;
       typedef cicada::Rule rule_type;
@@ -606,8 +589,8 @@ namespace cicada
       value_type operator()(const Edge& edge) const
       {
 	int length = 0;
-	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter)
 	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
     
 	// since we will "max" at operator+, we will collect negative length
@@ -622,17 +605,14 @@ namespace cicada
 			    const sentence_set_type& targets,
 			    const ngram_count_set_type& ngram_counts)
     {
-      int source_length = lattice.shortest_distance();
-      if (hypergraph.is_valid()) {
-	// we will enumerate forest structure... and collect min-size...
-	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(hypergraph.nodes.size());
-	
-	cicada::inside(hypergraph, lengths, source_length_function());
-	
-	source_length = - log(lengths.back());
-      }
-      
       pimpl->clear();
+
+      // we will enumerate forest structure... and collect min-size...
+      std::vector<length_function::value_type, std::allocator<length_function::value_type> > lengths(hypergraph.nodes.size());
+      cicada::inside(hypergraph, lengths, length_function());
+      
+      pimpl->source_size = - log(lengths.back());
+      
       if (! targets.empty()) {
 	sentence_set_type::const_iterator titer_end = targets.end();
 	for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
@@ -645,8 +625,6 @@ namespace cicada
 	}
       } else
 	throw std::runtime_error("no reference set?");
-      
-      pimpl->source_size = source_length;
     }
     
     void BleuLinear::assign(const score_ptr_type& score)

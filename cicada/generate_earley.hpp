@@ -564,8 +564,8 @@ namespace cicada
       value_type operator()(const Edge& edge) const
       {
 	int length = 0;
-	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter)
 	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
 	
 	// since we will "max" at operator+, we will collect negative length
@@ -821,8 +821,8 @@ namespace cicada
 	}
 	
 	int tail_pos = 0;
-	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter) {
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
 	    const symbol_type& non_terminal = non_terminals[edge.tails[tail_pos]];
 	    

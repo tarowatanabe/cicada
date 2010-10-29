@@ -57,14 +57,31 @@ namespace cicada
     id_type root() const;
     id_type next(const id_type& node, const symbol_type& symbol) const;
     bool has_next(const id_type& node) const;
-    const rule_set_type& rules(const id_type& node) const;
+    const rule_pair_set_type& rules(const id_type& node) const;
     
     // mutable grammar specific members...
     void read(const std::string& parameter);
     void clear();
+    
     void insert(const std::string& pattern);
-    void insert(const rule_type& rule);
-    void insert(const rule_ptr_type& rule);
+    void insert(const rule_pair_type& rule_pair);
+    
+    void insert(const rule_type& source, const rule_type& target)
+    {
+      insert(rule_pair_type(rule_ptr_type(new rule_type(source)), rule_ptr_type(new rule_type(target))));
+    }
+    void insert(const rule_type& source, const rule_type& target, const feature_set_type& features)
+    {
+      insert(rule_pair_type(rule_ptr_type(new rule_type(source)), rule_ptr_type(new rule_type(target)), features));
+    }
+    void insert(const rule_ptr_type& source, const rule_ptr_type& target)
+    {
+      insert(rule_pair_type(source, target));
+    }
+    void insert(const rule_ptr_type& source, const rule_ptr_type& target, const feature_set_type& features)
+    {
+      insert(rule_pair_type(source, target, features));
+    }
     
   private:
     impl_type* pimpl;

@@ -37,8 +37,7 @@ struct LineSearch
 		    const weight_set_type& origin,
 		    const weight_set_type& direction,
 		    const double lower,
-		    const double upper,
-		    const bool yield_source=false)
+		    const double upper)
   {
     segments.clear();
     segments.resize(graphs.size());
@@ -61,7 +60,7 @@ struct LineSearch
 	for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	  const envelope_type::line_ptr_type& line = *eiter;
 	  
-	  line->yield(yield, yield_source);
+	  line->yield(yield);
 	  
 	  scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	  

@@ -33,8 +33,11 @@ namespace cicada
     typedef symbol_vector_impl_type::value_type             value_type;
     
     typedef symbol_vector_impl_type::const_iterator         const_iterator;
+    typedef symbol_vector_impl_type::iterator               iterator;
     typedef symbol_vector_impl_type::const_reverse_iterator const_reverse_iterator;
+    typedef symbol_vector_impl_type::reverse_iterator       reverse_iterator;
     typedef symbol_vector_impl_type::const_reference        const_reference;
+    typedef symbol_vector_impl_type::reference              reference;
 
   public:
     SymbolVector() : __impl() {}
@@ -77,14 +80,21 @@ namespace cicada
     }
     
     const_iterator begin() const { return __impl.begin(); }
+    iterator begin() { return __impl.begin(); }
     const_iterator end() const { return __impl.end(); }
-
+    iterator end() { return __impl.end(); }
+    
     const_reverse_iterator rbegin() const { return __impl.rbegin(); }
+    reverse_iterator rbegin() { return __impl.rbegin(); }
     const_reverse_iterator rend() const { return __impl.rend(); }
+    reverse_iterator rend() { return __impl.rend(); }
     
     const_reference front() const { return __impl.front(); }
+    reference front() { return __impl.front(); }
     const_reference back() const { return __impl.back(); }
+    reference back() { return __impl.back(); }
     const_reference operator[](size_type pos) const { return __impl.operator[](pos); }
+    reference operator[](size_type pos) { return __impl.operator[](pos); }
     
     size_type size() const { return __impl.size(); }
     bool empty() const { return __impl.empty(); }

@@ -22,7 +22,7 @@ namespace cicada
     {
     public:
       ExpectedNGram(const std::string& parameter, const int __debug)
-	: order(0), bos_eos(false), weights(0), weights_one(false), scale(1.0), yield_source(false), yield_target(false), debug(__debug)
+	: order(0), bos_eos(false), weights(0), weights_one(false), scale(1.0), debug(__debug)
       {
 	typedef cicada::Parameter param_type;
     
@@ -41,14 +41,7 @@ namespace cicada
 	    weights_one = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "scale") == 0)
 	    scale = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	    const std::string& value = piter->second;
-	
-	    if (strcasecmp(value.c_str(), "source") == 0)
-	      yield_source = true;
-	    else if (strcasecmp(value.c_str(), "target") == 0)
-	      yield_target = true;
-	  } else
+	  else
 	    std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
 	}
 
@@ -57,12 +50,6 @@ namespace cicada
     
 	if (weights && weights_one)
 	  throw std::runtime_error("you have weights, but specified all-one parameter");
-    
-	if (yield_source && yield_target)
-	  throw std::runtime_error("do not specify both source and target yield");
-    
-	if (! yield_source && ! yield_target)
-	  yield_target = true;
       }
 
       void operator()(data_type& data) const
@@ -80,9 +67,9 @@ namespace cicada
 	utils::resource ngram_start;
     
 	if (weights_one)
-	  cicada::expected_ngram(hypergraph, weight_scaled_function_one<weight_type>(scale), ngram_counts, order, bos_eos, yield_source);
+	  cicada::expected_ngram(hypergraph, weight_scaled_function_one<weight_type>(scale), ngram_counts, order, bos_eos);
 	else
-	  cicada::expected_ngram(hypergraph, weight_scaled_function<weight_type>(*weights_apply, scale), ngram_counts, order, bos_eos, yield_source);
+	  cicada::expected_ngram(hypergraph, weight_scaled_function<weight_type>(*weights_apply, scale), ngram_counts, order, bos_eos);
 
 	utils::resource ngram_end;
     
@@ -103,9 +90,6 @@ namespace cicada
       
       double scale;
 
-      bool yield_source;
-      bool yield_target;
-  
       int debug;
     };
 

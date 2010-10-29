@@ -79,10 +79,9 @@ namespace cicada
 
 
     public:
-      BleuExpectedImpl(const int __order,
-		       const bool __yield_source)
+      BleuExpectedImpl(const int __order)
 	: ngrams(word_type()), nodes(), unigram(0),
-	  order(__order), yield_source(__yield_source) {}
+	  order(__order) {}
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
@@ -97,8 +96,8 @@ namespace cicada
 
 	const rule_type& rule = *edge.rule;
 	
-	const phrase_type& target = (yield_source ? rule.source : rule.target);
-	const phrase_type& source = rule.source;
+	const phrase_type& target = rule.rhs;
+	const phrase_type& source = rule.rhs;
 	
 	count_set_type counts;
 
@@ -522,7 +521,6 @@ namespace cicada
       score_ptr_type score;
 
       int order;
-      bool yield_source;
     };
     
     
@@ -538,29 +536,14 @@ namespace cicada
 
       int order = 4;
       
-      bool yield_source = false;
-      bool yield_target = false;
-      
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "order") == 0)
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    yield_source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    yield_target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else
+	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (yield_source && yield_target)
-	throw std::runtime_error("you cannot specify both source/target yield");
-      
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, yield_source));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
@@ -644,7 +627,7 @@ namespace cicada
       pimpl->clear();
     }
     
-    struct source_length_function
+    struct length_function
     {
       typedef cicada::Vocab vocab_type;
       typedef cicada::Rule rule_type;
@@ -654,8 +637,8 @@ namespace cicada
       value_type operator()(const Edge& edge) const
       {
 	int length = 0;
-	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->source.end();
-	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->source.begin(); siter != siter_end; ++ siter)
+	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter)
 	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
     
 	// since we will "max" at operator+, we will collect negative length
@@ -671,27 +654,20 @@ namespace cicada
 			      const sentence_set_type& targets,
 			      const ngram_count_set_type& ngram_counts)
     {
-      int source_length = lattice.shortest_distance();
-      if (hypergraph.is_valid()) {
-	// we will enumerate forest structure... and collect min-size...
-	std::vector<source_length_function::value_type, std::allocator<source_length_function::value_type> > lengths(hypergraph.nodes.size());
-	
-	cicada::inside(hypergraph, lengths, source_length_function());
-	
-	source_length = - log(lengths.back());
-      }
-      
       pimpl->clear();
+      
+      std::vector<length_function::value_type, std::allocator<length_function::value_type> > lengths(hypergraph.nodes.size());
+      cicada::inside(hypergraph, lengths, length_function());
+      pimpl->source_size = - log(lengths.back());
+
       ngram_count_set_type::const_iterator niter_end = ngram_counts.end();
       for (ngram_count_set_type::const_iterator niter = ngram_counts.begin(); niter != niter_end; ++ niter) {
 	//std::cerr << "ngram: " << niter->first << " count: " << niter->second << std::endl;
 	
 	pimpl->insert(niter->first.begin(), niter->first.end(), niter->second);
       }
-
-      //std::cerr << "source length: " << source_length << std::endl;
       
-      pimpl->source_size = source_length;
+      //std::cerr << "source length: " << source_length << std::endl;
     }
     
 

@@ -42,9 +42,7 @@ namespace cicada
       : goal(__goal), grammar(__grammar)
     {
       goal_rule.reset(new rule_type(vocab_type::GOAL,
-				    rule_type::symbol_set_type(1, goal.non_terminal(1)),
-				    rule_type::symbol_set_type(1, goal.non_terminal(1)),
-				    1));
+				    rule_type::symbol_set_type(1, goal.non_terminal(1))));
     }
     
     struct ActiveItem
@@ -189,13 +187,14 @@ namespace cicada
 	    
 	    active_set_type::const_iterator citer_end = cell.end();
 	    for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      const transducer_type::rule_set_type& rules = transducer.rules(citer->node);
+	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
 	      
 	      if (rules.empty()) continue;
 	      
-	      transducer_type::rule_set_type::const_iterator riter_end = rules.end();
-	      for (transducer_type::rule_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(*riter, citer->features, citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph);
+	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+		apply_rule(riter->target, riter->features + citer->features, citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
+			   first, last, lattice.shortest_distance(first, last));
 	    }
 	  }
 	  
@@ -216,15 +215,16 @@ namespace cicada
 	      const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
 	      if (node == transducer.root()) continue;
 	      
-	      const transducer_type::rule_set_type& rules = transducer.rules(node);
+	      const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
 	      
 	      if (rules.empty()) continue;
 	      
 	      // passive_arcs "MAY" be modified!
 	      
-	      transducer_type::rule_set_type::const_iterator riter_end = rules.end();
-	      for (transducer_type::rule_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(*riter, feature_set_type(), &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph);
+	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+		apply_rule(riter->target, riter->features, &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+			   first, last, lattice.shortest_distance(first, last));
 	    }
 	  }
 	  
@@ -250,7 +250,8 @@ namespace cicada
       passive_set_type& passive_arcs = passives(0, lattice.size());
       for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	if (non_terminals[passive_arcs[p]] == goal)
-	  apply_rule(goal_rule, feature_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph);
+	  apply_rule(goal_rule, feature_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+		     0, lattice.size(), lattice.shortest_distance(0, lattice.size()));
       
       // we will sort to remove unreachable nodes......
       graph.topologically_sort();
@@ -265,14 +266,21 @@ namespace cicada
 		    Iterator last,
 		    node_map_type& node_map,
 		    passive_set_type& passives,
-		    hypergraph_type& graph)
+		    hypergraph_type& graph,
+		    const int lattice_first,
+		    const int lattice_last,
+		    const int lattice_distance)
     {
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
-      edge.features = rule->features;
       
       if (! features.empty())
 	edge.features += features;
+      
+      // assign metadata...
+      edge.first    = lattice_first;
+      edge.last     = lattice_last;
+      edge.distance = lattice_distance;
       
       node_map_type::iterator niter = node_map.find(rule->lhs);
       if (niter == node_map.end()) {

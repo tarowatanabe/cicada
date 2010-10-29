@@ -86,15 +86,6 @@ namespace cicada
       NeighboursImpl()
 	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0), forced_feature(false) {}
       
-      virtual ~NeighboursImpl() {}
-      
-      virtual void neighbours_score(state_ptr_type& state,
-				    const state_ptr_set_type& states,
-				    const edge_type& edge,
-				    feature_set_type& features) const = 0;
-      virtual void neighbours_final_score(const state_ptr_type& state,
-					  feature_set_type& features) const = 0;
-      
       void clear()
       {
 	state_map.clear();
@@ -110,20 +101,15 @@ namespace cicada
       phrase_span_set_type phrase_spans_impl;
 
       bool forced_feature;
-    };
-    
-    template <typename Extract>
-    class __NeighboursImpl : public NeighboursImpl, public Extract
-    {
       
-      virtual void neighbours_score(state_ptr_type& state,
-				    const state_ptr_set_type& states,
-				    const edge_type& edge,
-				    feature_set_type& features) const
+      void neighbours_score(state_ptr_type& state,
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features) const
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 
-	const rule_type::symbol_set_type& phrase = extract_phrase(edge);
+	const rule_type::symbol_set_type& phrase = edge.rule->rhs;
 	
 	if (states.empty()) {
 	  // we do not add feature here, since we know nothing abount surrounding context...
@@ -340,11 +326,11 @@ namespace cicada
       
       const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next, const int span) const
       {
-	return Extract::feature_prefix + node + '|' + prev + '|' + next + '|' + boost::lexical_cast<std::string>(span);
+	return "neighbours:" + node + '|' + prev + '|' + next + '|' + boost::lexical_cast<std::string>(span);
       }
       
-      virtual void neighbours_final_score(const state_ptr_type& __state,
-					  feature_set_type& features) const
+      void neighbours_final_score(const state_ptr_type& __state,
+				  feature_set_type& features) const
       {
 
 	apply_features(features, id_type(-1), *reinterpret_cast<const id_type*>(__state), vocab_type::BOS, vocab_type::EOS);
@@ -363,44 +349,8 @@ namespace cicada
 	  }
 	return count;
       }
-
-      template <typename Edge>
-      const rule_type::symbol_set_type& extract_phrase(const Edge& x) const
-      {
-	static const rule_type::symbol_set_type __tmptmp;
-
-	return Extract::operator()(x, __tmptmp);
-      }
     };
     
-
-    struct __neighbours_extract_source
-    {
-      __neighbours_extract_source()
-	: feature_prefix("neighbours-source:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->source;
-      }
-      
-      std::string feature_prefix;
-    };
-
-    struct __neighbours_extract_target
-    {
-      __neighbours_extract_target()
-	: feature_prefix("neighbours-target:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->target;
-      }
-      
-      std::string feature_prefix;
-    };
     
     Neighbours::Neighbours(const std::string& parameter)
       : pimpl(0)
@@ -412,9 +362,6 @@ namespace cicada
       if (param.name() != "neighbours" && param.name() != "neighbors")
 	throw std::runtime_error("is this really neighbours feature function? " + parameter);
       
-      bool source = false;
-      bool target = false;
-      
       int stemmer_prefix_size = 0;
       int stemmer_suffix_size = 0;
       bool stemmer_digits = false;
@@ -422,17 +369,7 @@ namespace cicada
       boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	  
-	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	if (strcasecmp(piter->first.c_str(), "cluster") == 0)
 	  cluster_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
 	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
@@ -444,19 +381,12 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for neighbours: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (source && target)
-	throw std::runtime_error("both source and target?");
-      if (! source && ! target)
-	throw std::runtime_error("what side are you going to use?");
-      
       if (stemmer_prefix_size < 0)
 	throw std::runtime_error("negative prefix size?");
       if (stemmer_suffix_size < 0)
 	throw std::runtime_error("negative suffix size?");
 
-      std::auto_ptr<impl_type> neighbours_impl(source
-					       ? dynamic_cast<impl_type*>(new __NeighboursImpl<__neighbours_extract_source>())
-					       : dynamic_cast<impl_type*>(new __NeighboursImpl<__neighbours_extract_target>()));
+      std::auto_ptr<impl_type> neighbours_impl(new impl_type());
 
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
@@ -477,7 +407,7 @@ namespace cicada
       
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type);
-      base_type::__feature_name = std::string("neighbours-") + (source ? "source" : "target");
+      base_type::__feature_name = std::string("neighbours");
       base_type::__sparse_feature = true;
       
       pimpl = neighbours_impl.release();
@@ -487,31 +417,13 @@ namespace cicada
     
     Neighbours::Neighbours(const Neighbours& x)
       : base_type(static_cast<const base_type&>(x)),
-	pimpl(0)
-    {
-      typedef __NeighboursImpl<__neighbours_extract_source> neighbours_source_type;
-      typedef __NeighboursImpl<__neighbours_extract_target> neighbours_target_type;
-      
-      if (dynamic_cast<const neighbours_source_type*>(x.pimpl))
-	pimpl = new neighbours_source_type(*dynamic_cast<const neighbours_source_type*>(x.pimpl));
-      else
-	pimpl = new neighbours_target_type(*dynamic_cast<const neighbours_target_type*>(x.pimpl));
-    }
+	pimpl(new impl_type(*x.pimpl))
+    { }
     
     Neighbours& Neighbours::operator=(const Neighbours& x)
     {
-      typedef __NeighboursImpl<__neighbours_extract_source> neighbours_source_type;
-      typedef __NeighboursImpl<__neighbours_extract_target> neighbours_target_type;
-
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
-      
-      std::auto_ptr<impl_type> tmp(pimpl);
-      
-      if (dynamic_cast<const neighbours_source_type*>(x.pimpl))
-	pimpl = new neighbours_source_type(*dynamic_cast<const neighbours_source_type*>(x.pimpl));
-      else
-	pimpl = new neighbours_target_type(*dynamic_cast<const neighbours_target_type*>(x.pimpl));
-      
+      *pimpl = *x.pimpl;
       return *this;
     }
     

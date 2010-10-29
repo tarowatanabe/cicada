@@ -35,9 +35,12 @@ namespace cicada
     typedef hypergraph_type::edge_type     edge_type;
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
+    typedef hypergraph_type::feature_set_type feature_set_type;
+    
+    typedef grammar_type::rule_pair_type rule_pair_type;
     
     typedef rule_type::symbol_set_type  symbol_set_type;
-    typedef rule_type::feature_set_type feature_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > yield_type;
@@ -55,53 +58,34 @@ namespace cicada
     grammar_type grammar;
     grammar.push_back(g);
 
-    yield_type yield_source;
-    yield_type yield_target;
+    yield_type yield;
     
     hypergraph_type::edge_set_type::const_iterator eiter_end = source.edges.end();
     for (hypergraph_type::edge_set_type::const_iterator eiter = source.edges.begin(); eiter != eiter_end; ++ eiter) {
       const edge_type& edge = *eiter;
       
-      // swap source and target, since we will parse lattice using the target-yield...
-      yield_source.clear();
-      yield_target.clear();
+      yield.clear();
+      yield.insert(yield.end(), edge.rule->rhs.begin(), edge.rule->rhs.end());
       
-      yield_source.insert(yield_source.end(), edge.rule->target.begin(), edge.rule->target.end());
-      yield_target.insert(yield_target.end(), edge.rule->source.begin(), edge.rule->source.end());
-
-      // sort by source-index...
+      
+      // sort...
       if (! edge.tails.empty()) {
-
-	std::vector<int, std::allocator<int> > index(edge.tails.size() + 1);
-	
-	int pos = 1;
-	yield_type::iterator siter_end = yield_source.end();
-	for (yield_type::iterator siter = yield_source.begin(); siter != siter_end; ++ siter)
+	int pos = 0;
+	yield_type::iterator siter_end = yield.end();
+	for (yield_type::iterator siter = yield.begin(); siter != siter_end; ++ siter)
 	  if (siter->is_non_terminal()) {
-	    const int non_terminal_index = siter->non_terminal_index();
-
-	    index[non_terminal_index] = pos;
-	    *siter = non_terminals[edge.tails[non_terminal_index - 1]].non_terminal(pos);
-	    ++ pos;
-	  }
-	
-	pos = 1;
-	yield_type::iterator titer_end = yield_target.end();
-	for (yield_type::iterator titer = yield_target.begin(); titer != titer_end; ++ titer) 
-	  if (titer->is_non_terminal()) {
-	    const int non_terminal_index = titer->non_terminal_index();
-	    *titer = non_terminals[edge.tails[non_terminal_index - 1]].non_terminal(index[pos]);
+	    int non_terminal_index = siter->non_terminal_index() - 1;
+	    if (non_terminal_index < 0)
+	      non_terminal_index = pos;
+	    
+	    *siter = non_terminals[edge.tails[non_terminal_index]].non_terminal(pos);
 	    ++ pos;
 	  }
       }
       
-      rule_ptr_type rule(new rule_type(non_terminals[edge.head],
-				       symbol_set_type(yield_source.begin(), yield_source.end()),
-				       symbol_set_type(yield_target.begin(), yield_target.end()),
-				       edge.tails.size()));
-      rule->features = edge.features;
+      rule_ptr_type rule(new rule_type(non_terminals[edge.head], symbol_set_type(yield.begin(), yield.end())));
       
-      g->insert(*rule);
+      g->insert(rule_pair_type(rule, rule, edge.features));
     }
     
     const symbol_type goal = non_terminals[source.goal];

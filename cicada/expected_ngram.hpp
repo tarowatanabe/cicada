@@ -69,23 +69,6 @@ namespace cicada
 
     typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
 
-    struct ExtractSource
-    {
-      template <typename Edge>
-      const context_type& operator()(const Edge& edge) const
-      {
-	return edge.rule->source;
-      }
-    };
-
-    struct ExtractTarget
-    {
-      template <typename Edge>
-      const context_type& operator()(const Edge& edge) const
-      {
-	return edge.rule->target;
-      }
-    };
     
   public:
     ExpectedNGram(Function __function,
@@ -97,8 +80,8 @@ namespace cicada
 
     
     
-    template <typename Extract>
-    void operator()(const hypergraph_type& graph, Counts& counts, Extract extract)
+
+    void operator()(const hypergraph_type& graph, Counts& counts)
     {
       node_map.clear();
       node_map.reserve(graph.nodes.size());
@@ -152,7 +135,7 @@ namespace cicada
 	      tails[i] = node_map[edge.tails[i]][j[i]];
 	    
 	    // apply various ngram cconetxt...
-	    const state_type state = apply(extract(edge), tails, weight, counts, is_goal);
+	    const state_type state = apply(edge.rule->rhs, tails, weight, counts, is_goal);
 	    
 	    if (! is_goal) {
 	      typename state_set_type::iterator biter = state_buf.find(state);
@@ -339,14 +322,11 @@ namespace cicada
   
   template <typename Function, typename Counts>
   inline
-  void expected_ngram(const HyperGraph& graph, Function function, Counts& counts, const int order, const bool bos_eos=false, const bool yield_source=false)
+  void expected_ngram(const HyperGraph& graph, Function function, Counts& counts, const int order, const bool bos_eos=false)
   {
     ExpectedNGram<Function, Counts> __expected(function, order, bos_eos);
     
-    if (yield_source)
-      __expected(graph, counts, typename ExpectedNGram<Function, Counts>::ExtractSource());
-    else
-      __expected(graph, counts, typename ExpectedNGram<Function, Counts>::ExtractTarget());
+    __expected(graph, counts);
   }
   
 };

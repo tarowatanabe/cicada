@@ -55,7 +55,7 @@ namespace cicada
       // first, copy...
       target = source;
       
-      phrase_type source_rule(2);
+      phrase_type binarized(2);
       hypergraph_type::edge_type::node_set_type tails(2);
       
       // we will traverse source-side in order to avoid confusion with newly created nodes...
@@ -69,13 +69,10 @@ namespace cicada
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node_source.edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
-	  
-	  if (! edge_source.rule->target.empty())
-	    throw std::runtime_error("we do not suppor synchronous-binarization");
-	  
+	  	  
 	  if (edge_source.tails.size() <= 2 || static_cast<int>(edge_source.tails.size()) < binarize_size) continue;
 	  
-	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->arity))
+	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->rhs.size()))
 	    throw std::runtime_error("we do not support terminal-mixed rules (aka Hiero rules)");
 	  
 	  removed[edge_source.id] = true;
@@ -91,20 +88,18 @@ namespace cicada
 	    std::string non_terminal_new = (i == 0
 					    ? '@' + edge_source.rule->lhs.non_terminal_strip() + "->"
 					    : non_terminal_head);
-	    non_terminal_new += '_' + edge_source.rule->source[i].non_terminal_strip();
+	    non_terminal_new += '_' + edge_source.rule->rhs[i].non_terminal_strip();
 	      
 	    hypergraph_type::node_type& node_new = target.add_node();
 	    tails.front() = edge_source.tails[i];
 	    tails.back() = node_new.id;
 	    
-	    source_rule.front() = edge_source.rule->source[i];
-	    source_rule.back() = '[' + non_terminal_new + ']';
+	    binarized.front() = edge_source.rule->rhs[i];
+	    binarized.back() = '[' + non_terminal_new + ']';
 	    
 	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	    edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
-					      rule_type::symbol_set_type(source_rule.begin(), source_rule.end()), 
-					      rule_type::symbol_set_type(),
-					      2));
+					      rule_type::symbol_set_type(binarized.begin(), binarized.end())));
 	    
 	    target.connect_edge(edge_new.id, head);
 	    
@@ -114,13 +109,11 @@ namespace cicada
 	  
 	  hypergraph_type::edge_type& edge_new = target.add_edge(edge_source.tails.end() - 2, edge_source.tails.end());
 	  
-	  source_rule.front() = *(edge_source.rule->source.end() - 2);
-	  source_rule.back()  = *(edge_source.rule->source.end() - 1);
+	  binarized.front() = *(edge_source.rule->rhs.end() - 2);
+	  binarized.back()  = *(edge_source.rule->rhs.end() - 1);
 	  
 	  edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
-					    rule_type::symbol_set_type(source_rule.begin(), source_rule.end()), 
-					    rule_type::symbol_set_type(),
-					    2));
+					    rule_type::symbol_set_type(binarized.begin(), binarized.end())));
 	  
 	  // assign features here...
 	  edge_new.features = edge_source.features;
@@ -153,7 +146,7 @@ namespace cicada
       // first, copy...
       target = source;
       
-      phrase_type source_rule(2);
+      phrase_type binarized(2);
       hypergraph_type::edge_type::node_set_type tails(2);
       
       // we will traverse source-side in order to avoid confusion with newly created nodes...
@@ -168,12 +161,9 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	  
-	  if (! edge_source.rule->target.empty())
-	    throw std::runtime_error("we do not suppor synchronous-binarization");
-	  
 	  if (edge_source.tails.size() <= 2 || static_cast<int>(edge_source.tails.size()) < binarize_size) continue;
 	  
-	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->arity))
+	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->rhs.size()))
 	    throw std::runtime_error("we do not support terminal-mixed rules (aka Hiero rules)");
 	  
 	  removed[edge_source.id] = true;
@@ -189,20 +179,18 @@ namespace cicada
 	    std::string non_terminal_new = (i == 0
 					    ? '@' + edge_source.rule->lhs.non_terminal_strip() + "->"
 					    : non_terminal_head);
-	    non_terminal_new += '_' + edge_source.rule->source[arity - i - 1].non_terminal_strip();
+	    non_terminal_new += '_' + edge_source.rule->rhs[arity - i - 1].non_terminal_strip();
 	      
 	    hypergraph_type::node_type& node_new = target.add_node();
 	    tails.front() =  node_new.id;
 	    tails.back() = edge_source.tails[arity - i - 1];
 	    
-	    source_rule.front() =  '[' + non_terminal_new + ']';
-	    source_rule.back() = edge_source.rule->source[arity - i - 1];
+	    binarized.front() =  '[' + non_terminal_new + ']';
+	    binarized.back() = edge_source.rule->rhs[arity - i - 1];
 	    
 	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	    edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
-					      rule_type::symbol_set_type(source_rule.begin(), source_rule.end()), 
-					      rule_type::symbol_set_type(),
-					      2));
+					      rule_type::symbol_set_type(binarized.begin(), binarized.end())));
 	    
 	    target.connect_edge(edge_new.id, head);
 	    
@@ -212,13 +200,11 @@ namespace cicada
 	  
 	  hypergraph_type::edge_type& edge_new = target.add_edge(edge_source.tails.begin(), edge_source.tails.begin() + 1);
 	  
-	  source_rule.front() = *(edge_source.rule->source.begin() + 0);
-	  source_rule.back()  = *(edge_source.rule->source.begin() + 1);
+	  binarized.front() = *(edge_source.rule->rhs.begin() + 0);
+	  binarized.back()  = *(edge_source.rule->rhs.begin() + 1);
 	  
 	  edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
-					    rule_type::symbol_set_type(source_rule.begin(), source_rule.end()), 
-					    rule_type::symbol_set_type(),
-					    2));
+					    rule_type::symbol_set_type(binarized.begin(), binarized.end())));
 	  
 	  // assign features here...
 	  edge_new.features = edge_source.features;

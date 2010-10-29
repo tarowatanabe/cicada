@@ -107,8 +107,8 @@ namespace cicada
 	graph_kbest.topologically_sort();
     
 	os << id << " ||| " << graph_kbest << " |||";
-	typename rule_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	for (typename rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
+	typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
+	for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
 	  os << ' ' << fiter->first << '=' << fiter->second;
 	os << " ||| ";
 	os << weight;
@@ -129,7 +129,7 @@ namespace cicada
     {
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
-      typedef typename rule_type::feature_set_type feature_set_type;
+      typedef typename hypergraph_type::feature_set_type feature_set_type;
       
       cicada::KBest<Traversal, Function, Filter> derivations(graph, kbest_size, traversal, function, filter);
   
@@ -141,8 +141,8 @@ namespace cicada
 	  break;
     
 	os << id << " ||| " << boost::get<0>(derivation) << " |||";
-	typename rule_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	for (typename rule_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
+	typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
+	for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
 	  os << ' ' << fiter->first << '=' << fiter->second;
 	os << " ||| ";
 	os << weight;
@@ -156,7 +156,8 @@ namespace cicada
       Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
 	: output_data(__output_data), file(), directory(), weights(0), weights_one(false),
 	  kbest_size(0), kbest_unique(false),
-	  yield_source(false), yield_target(false), yield_tree(false),
+	  yield_string(false),
+	  yield_tree(false),
 	  graphviz(false),
 	  debug(__debug)
       {
@@ -184,11 +185,9 @@ namespace cicada
 	    directory = piter->second;
 	  else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	    const std::string& value = piter->second;
-	
-	    if (strcasecmp(value.c_str(), "source") == 0)
-	      yield_source = true;
-	    else if (strcasecmp(value.c_str(), "target") == 0)
-	      yield_target = true;
+	    
+	    if (strcasecmp(value.c_str(), "sentence") == 0 || strcasecmp(value.c_str(), "string") == 0)
+	      yield_string = true;
 	    else if (strcasecmp(value.c_str(), "derivation") == 0 || strcasecmp(value.c_str(), "tree") == 0)
 	      yield_tree = true;
 	    else
@@ -208,11 +207,11 @@ namespace cicada
 	if (! directory.empty() && ! file.empty())
 	  throw std::runtime_error("you cannot output both in directory and file");
     
-	if (int(yield_source) + yield_target + yield_tree > 1)
-	  throw std::runtime_error("only source, target or tree yield for kbest");
+	if (yield_string && yield_tree)
+	  throw std::runtime_error("only string or tree yield for kbest");
     
-	if (! yield_source && ! yield_target && ! yield_tree)
-	  yield_target = true;
+	if (! yield_string && ! yield_tree)
+	  yield_string = true;
       }
 
       void assign(const weight_set_type& __weights)
@@ -272,33 +271,25 @@ namespace cicada
       
 	  if (weights_one) {
 	    if (kbest_unique) {
-	      if (yield_source)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), weight_function_one<weight_type>(), kbest_filter_unique(hypergraph));
-	      else if (yield_target)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_target(), weight_function_one<weight_type>(), kbest_filter_unique(hypergraph));
+	      if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function_one<weight_type>(), kbest_filter_unique(hypergraph));
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function_one<weight_type>(), kbest_filter());
 	    } else {
-	      if (yield_source)	  
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), weight_function_one<weight_type>(), kbest_filter());
-	      else if (yield_target)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_target(), weight_function_one<weight_type>(), kbest_filter());
+	      if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function_one<weight_type>(), kbest_filter());
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function_one<weight_type>(), kbest_filter());
 	    }
 	  } else {
 	    if (kbest_unique) {
-	      if (yield_source)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), weight_function<weight_type>(*weights_kbest), kbest_filter_unique(hypergraph));
-	      else if (yield_target)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_target(), weight_function<weight_type>(*weights_kbest), kbest_filter_unique(hypergraph));
+	      if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function<weight_type>(*weights_kbest), kbest_filter_unique(hypergraph));
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function<weight_type>(*weights_kbest), kbest_filter());
 	    } else {
-	      if (yield_source)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_source(), weight_function<weight_type>(*weights_kbest), kbest_filter());
-	      else if (yield_target)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal_target(), weight_function<weight_type>(*weights_kbest), kbest_filter());
+	      if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function<weight_type>(*weights_kbest), kbest_filter());
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function<weight_type>(*weights_kbest), kbest_filter());
 	    }
@@ -323,8 +314,7 @@ namespace cicada
       int  kbest_size;
       bool kbest_unique;
 
-      bool yield_source;
-      bool yield_target;
+      bool yield_string;
       bool yield_tree;
 
       bool graphviz;

@@ -41,8 +41,8 @@ namespace cicada
       non_terminal_symbols.clear();
       
       int non_terminal_pos = 0;
-      typename rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
-      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+      typename rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
 	if (siter->is_non_terminal()) {
 	  non_terminal_symbols.push_back('[' + static_cast<const std::string&>(*siter).substr(1, siter->size() - 2) + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
 	  ++ non_terminal_pos;
@@ -52,7 +52,7 @@ namespace cicada
       rule_string += static_cast<const std::string&>(rule.lhs) + "->";
       
       int permutation_pos = 0;
-      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
 	if (siter->is_non_terminal()) {
 	  rule_string += non_terminal_symbols[permutation[permutation_pos]];
 	  ++ permutation_pos;
@@ -82,8 +82,8 @@ namespace cicada
       non_terminal_symbols.clear();
       
       int non_terminal_pos = 0;
-      typename rule_type::symbol_set_type::const_iterator siter_end = rule.source.end();
-      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+      typename rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
 	if (siter->is_non_terminal()) {
 	  non_terminal_symbols.push_back('[' + static_cast<const std::string&>(*siter).substr(1, siter->size() - 2) + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
 	  ++ non_terminal_pos;
@@ -93,7 +93,7 @@ namespace cicada
       rule_string += static_cast<const std::string&>(rule.lhs) + "->";
       
       int permutation_pos = 0;
-      for (typename rule_type::symbol_set_type::const_iterator siter = rule.source.begin(); siter != siter_end; ++ siter)
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
 	if (siter->is_non_terminal()) {
 	  rule_string += non_terminal_symbols[permutation[permutation_pos]];
 	  ++ permutation_pos;
@@ -157,9 +157,6 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	  
-	  if (! edge_source.rule->target.empty())
-	    throw std::runtime_error("we do not suppor synchronous-permutation");
-	  
 	  hypergraph_type::edge_type& edge = target.edges[edge_source.id];
 
 	  permutation.clear();
@@ -173,11 +170,11 @@ namespace cicada
 	    
 	    bool has_constraint = false;
 	    int pos = 0;
-	    source_non_terminals.clear();
-	    rule_type::symbol_set_type::const_iterator siter_end = edge_source.rule->source.end();
-	    for (rule_type::symbol_set_type::const_iterator siter = edge_source.rule->source.begin(); siter != siter_end; ++ siter, ++ pos)
+	    permuted_non_terminals.clear();
+	    rule_type::symbol_set_type::const_iterator siter_end = edge_source.rule->rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator siter = edge_source.rule->rhs.begin(); siter != siter_end; ++ siter, ++ pos)
 	      if (siter->is_non_terminal()) {
-		source_non_terminals.push_back(*siter);
+		permuted_non_terminals.push_back(*siter);
 		
 		const bool constraint = filter(siter->non_terminal());
 		
@@ -185,8 +182,8 @@ namespace cicada
 		has_constraint |= constraint;
 	      }
 	    
-	    source_phrase.clear();
-	    source_phrase.insert(source_phrase.end(), edge_source.rule->source.begin(), edge_source.rule->source.end());
+	    permuted_phrase.clear();
+	    permuted_phrase.insert(permuted_phrase.end(), edge_source.rule->rhs.begin(), edge_source.rule->rhs.end());
 	    
 	    tails.clear();
 	    tails.insert(tails.end(), edge_source.tails.begin(), edge_source.tails.end());
@@ -292,10 +289,10 @@ namespace cicada
       
       // permute source-phrase
       int non_terminal_pos = 0;
-      phrase_type::iterator siter_end = source_phrase.end();
-      for (phrase_type::iterator siter = source_phrase.begin(); siter != siter_end; ++ siter)
+      phrase_type::iterator siter_end = permuted_phrase.end();
+      for (phrase_type::iterator siter = permuted_phrase.begin(); siter != siter_end; ++ siter)
 	if (siter->is_non_terminal()) {
-	  *siter = source_non_terminals[permutation[non_terminal_pos]];
+	  *siter = permuted_non_terminals[permutation[non_terminal_pos]];
 	  
 	  ++ non_terminal_pos;
 	}
@@ -303,7 +300,7 @@ namespace cicada
       hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
       
       edge.rule.reset(new rule_type(*edge_source.rule));
-      edge.rule->source = rule_type::symbol_set_type(source_phrase.begin(), source_phrase.end());
+      edge.rule->rhs = rule_type::symbol_set_type(permuted_phrase.begin(), permuted_phrase.end());
       
       if (*edge.rule == *edge_source.rule)
 	edge.rule = edge_source.rule;
@@ -335,8 +332,8 @@ namespace cicada
 
     int permute_size;
 
-    phrase_type source_phrase;
-    phrase_type source_non_terminals;
+    phrase_type permuted_phrase;
+    phrase_type permuted_non_terminals;
     
     tails_type tails;
   };

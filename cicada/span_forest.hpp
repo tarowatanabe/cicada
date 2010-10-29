@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__SPAN_NODE__HPP__
-#define __CICADA__SPAN_NODE__HPP__ 1
+#ifndef __CICADA__SPAN_FOREST__HPP__
+#define __CICADA__SPAN_FOREST__HPP__ 1
 
 #include <stdint.h>
 
@@ -17,7 +17,7 @@
 namespace cicada
 {
   
-  struct SpanNode
+  struct SpanForest
   {
     typedef HyperGraph hypergraph_type;
     
@@ -30,35 +30,44 @@ namespace cicada
 
     typedef Vocab vocab_type;
 
+    typedef std::pair<int, int> span_type;
+    typedef std::vector<span_type, std::allocator<span_type> > span_set_type;
+
     typedef std::vector<bool, std::allocator<bool> > visited_type;
     
-    template <typename SpanSet>
-    void operator()(const hypergraph_type& graph, SpanSet& spans)
+    void operator()(const hypergraph_type& __graph, hypergraph_type& graph)
     {
+      graph = __graph;
       if (graph.is_valid()) {
 	visited.clear();
 	visited.resize(graph.nodes.size(), false);
 	
-	spans[graph.goal] = std::make_pair(0, 0);
-	traverse(graph, spans, graph.goal);
+	spans_node.clear();
+	spans_node.reserve(graph.nodes.size());
+	spans_node.resize(graph.nodes.size());
+	
+	spans_node[graph.goal] = std::make_pair(0, 0);
+	traverse(graph, graph.goal);
       }
     }
     
     // top-down traversal to compute spans...
-    template <typename SpanSet>
-    void traverse(const hypergraph_type& graph, SpanSet& spans, id_type node_id)
+    void traverse(hypergraph_type& graph, id_type node_id)
     {
       if (visited[node_id]) return;
 
       const node_type& node = graph.nodes[node_id];
       
-      // parant-span starts from spans[node_id].first;
+      // parant-span starts from spans_node[node_id].first;
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const edge_type& edge = graph.edges[*eiter];
+	edge_type& edge = graph.edges[*eiter];
 	
-	int span_pos = spans[node_id].first;
+	int span_pos = spans_node[node_id].first;
+
+
+	edge.first = spans_pos;
 	
 	int non_terminal_pos = 0;
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
@@ -68,32 +77,35 @@ namespace cicada
 	    if (non_terminal_index < 0)
 	      non_terminal_index = non_terminal_pos;
 	    
-	    spans[edge.tails[non_terminal_index]].first = span_pos;
+	    spans_node[edge.tails[non_terminal_index]].first = span_pos;
 	    
 	    traverse(graph, spans, edge.tails[non_terminal_index]);
 	    
-	    span_pos = spans[edge.tails[non_terminal_index]].second;
+	    span_pos = spans_node[edge.tails[non_terminal_index]].second;
 	    
 	    ++ non_terminal_pos;
 	  } else if (*siter != vocab_type::EPSILON)
 	    ++ span_pos;
 	}
 	
-	spans[node_id].second = utils::bithack::max(spans[node_id].second, span_pos);
+	edge.last = span_pos;
+	edge.distance = edge.last - edge.first;
+	
+	spans_node[node_id].second = utils::bithack::max(spans_node[node_id].second, span_pos);
       }
 
       visited[node_id] = true;
     }
 
-    visited_type visited;
+    span_set_type spans_node;
+    visited_type  visited;
   };
   
-  template <typename SpanSet>
-  void span_node(const HyperGraph& graph, SpanSet& spans)
+  void span_forest(const HyperGraph& graph, HyperGraph& target)
   {
-    SpanNode __span_node;
+    SpanForest __span_forest;
     
-    __span_node(graph, spans);
+    __span_forest(graph, target);
   }
 };
 

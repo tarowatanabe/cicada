@@ -65,16 +65,6 @@ namespace cicada
 	  tree_map(symbol_type()),
 	  forced_feature(false) {}
       
-      virtual ~NGramTreeImpl() {}
-      
-      virtual void ngram_tree_score(state_ptr_type& state,
-				    const state_ptr_set_type& states,
-				    const edge_type& edge,
-				    feature_set_type& features) const = 0;
-      virtual void ngram_tree_final_score(const state_ptr_type& state,
-					  const edge_type& edge,
-					  feature_set_type& features) const = 0;
-      
       void clear()
       {
 	tree_map.clear();
@@ -90,20 +80,15 @@ namespace cicada
       phrase_span_set_type phrase_spans_impl;
 
       bool forced_feature;
-    };
-    
-    template <typename Extract>
-    class __NGramTreeImpl : public NGramTreeImpl, public Extract
-    {
       
-      virtual void ngram_tree_score(state_ptr_type& state,
-				    const state_ptr_set_type& states,
-				    const edge_type& edge,
-				    feature_set_type& features) const
+      void ngram_tree_score(state_ptr_type& state,
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features) const
       {
 	// this feature function is complicated in that we know nothing about the source-side...
 	
-	const rule_type::symbol_set_type& phrase = extract_phrase(edge);
+	const rule_type::symbol_set_type& phrase = edge.rule->rhs;
 	
 	if (states.empty()) {
 	  // we do not add feature here, since we know nothing abount surrounding context...
@@ -187,9 +172,9 @@ namespace cicada
 	}
       }
 
-      virtual void ngram_tree_final_score(const state_ptr_type& state,
-					  const edge_type& edge,
-					  feature_set_type& features) const
+      void ngram_tree_final_score(const state_ptr_type& state,
+				  const edge_type& edge,
+				  feature_set_type& features) const
       {
 	const id_type* antecedent_context = reinterpret_cast<const id_type*>(state);
 	
@@ -297,49 +282,10 @@ namespace cicada
 
       const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next) const
       {
-	return Extract::feature_prefix +  compose_tree(node, prev, next);
-      }
-
-      	  
-
-      template <typename Edge>
-      const rule_type::symbol_set_type& extract_phrase(const Edge& x) const
-      {
-	static const rule_type::symbol_set_type __tmptmp;
-
-	return Extract::operator()(x, __tmptmp);
+	return "ngram-tree:" +  compose_tree(node, prev, next);
       }
     };
-    
 
-    struct __ngram_tree_extract_source
-    {
-      __ngram_tree_extract_source()
-	: feature_prefix("ngram-tree-source:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->source;
-      }
-      
-      const std::string feature_prefix;
-    };
-
-    struct __ngram_tree_extract_target
-    {
-      __ngram_tree_extract_target()
-	: feature_prefix("ngram-tree-target:") {}
-      
-      template <typename Edge, typename Phrase>
-      const Phrase& operator()(const Edge& x, const Phrase& phrase) const
-      {
-	return x.rule->target;
-      }
-      
-      const std::string feature_prefix;
-    };
-    
     
     NGramTree::NGramTree(const std::string& parameter)
       : pimpl(0)
@@ -350,9 +296,6 @@ namespace cicada
 
       if (param.name() != "ngram-tree")
 	throw std::runtime_error("is this really ngram tree feature function? " + parameter);
-
-      bool source = false;
-      bool target = false;
       
       int stemmer_prefix_size = 0;
       int stemmer_suffix_size = 0;
@@ -361,16 +304,7 @@ namespace cicada
       boost::filesystem::path cluster_path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	if (strcasecmp(piter->first.c_str(), "cluster") == 0)
 	  cluster_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
 	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
@@ -382,19 +316,12 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (source && target)
-	throw std::runtime_error("both source and target?");
-      if (! source && ! target)
-	throw std::runtime_error("what side are you going to use?");
-
       if (stemmer_prefix_size < 0)
 	throw std::runtime_error("negative prefix size?");
       if (stemmer_suffix_size < 0)
 	throw std::runtime_error("negative suffix size?");
       
-      std::auto_ptr<impl_type> ngram_tree_impl(source
-					       ? dynamic_cast<impl_type*>(new __NGramTreeImpl<__ngram_tree_extract_source>())
-					       : dynamic_cast<impl_type*>(new __NGramTreeImpl<__ngram_tree_extract_target>()));
+      std::auto_ptr<impl_type> ngram_tree_impl(new impl_type());
 
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
@@ -415,7 +342,7 @@ namespace cicada
       
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type) * 2;
-      base_type::__feature_name = std::string("ngram-tree-") + (source ? "source" : "target");
+      base_type::__feature_name = std::string("ngram-tree");
       base_type::__sparse_feature = true;
       
       pimpl = ngram_tree_impl.release();
@@ -426,31 +353,14 @@ namespace cicada
     
     NGramTree::NGramTree(const NGramTree& x)
       : base_type(static_cast<const base_type&>(x)),
-	pimpl(0)
-    {
-      typedef __NGramTreeImpl<__ngram_tree_extract_source> ngram_tree_source_type;
-      typedef __NGramTreeImpl<__ngram_tree_extract_target> ngram_tree_target_type;
-      
-      if (dynamic_cast<const ngram_tree_source_type*>(x.pimpl))
-	pimpl = new ngram_tree_source_type(*dynamic_cast<const ngram_tree_source_type*>(x.pimpl));
-      else
-	pimpl = new ngram_tree_target_type(*dynamic_cast<const ngram_tree_target_type*>(x.pimpl));
-    }
+	pimpl(new impl_type(*x.pimpl))
+    {}
     
     NGramTree& NGramTree::operator=(const NGramTree& x)
     {
-      typedef __NGramTreeImpl<__ngram_tree_extract_source> ngram_tree_source_type;
-      typedef __NGramTreeImpl<__ngram_tree_extract_target> ngram_tree_target_type;
-
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
+      *pimpl = *x.pimpl;
       
-      std::auto_ptr<impl_type> tmp(pimpl);
-      
-      if (dynamic_cast<const ngram_tree_source_type*>(x.pimpl))
-	pimpl = new ngram_tree_source_type(*dynamic_cast<const ngram_tree_source_type*>(x.pimpl));
-      else
-	pimpl = new ngram_tree_target_type(*dynamic_cast<const ngram_tree_target_type*>(x.pimpl));
-
       return *this;
     }
 

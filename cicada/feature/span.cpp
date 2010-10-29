@@ -45,17 +45,16 @@ namespace cicada
 
       typedef rule_type::symbol_set_type phrase_type;
       
-      typedef std::pair<int, int> span_node_type;
-      typedef std::vector<span_node_type, std::allocator<span_node_type> > span_node_set_type;
+      typedef std::pair<int, int> span_type;
 
       typedef utils::chart<std::string, std::allocator<std::string> > label_chart_type;
       
 #ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<span_node_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_node_type>,
-				      std::allocator<std::pair<const span_node_type, std::string> > > label_map_type;
+      typedef std::tr1::unordered_map<span_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+				      std::allocator<std::pair<const span_type, std::string> > > label_map_type;
 #else
-      typedef sgi::hash_map<span_node_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_node_type>,
-			    std::allocator<std::pair<const span_node_type, std::string> > > label_map_type;
+      typedef sgi::hash_map<span_type, std::string, utils::hashmurmur<size_t>, std::equal_to<span_type>,
+			    std::allocator<std::pair<const span_type, std::string> > > label_map_type;
       
 #endif
 
@@ -68,24 +67,19 @@ namespace cicada
 		      const edge_type& edge,
 		      feature_set_type& features) const
       {
-	if (label_map.empty() || spans_node.empty()) return;
-	
-	if (edge.head >= spans_node.size()) {
-	  std::cerr << "WARNING: node id exceeds our limit!" << std::endl;
-	  return;
-	}
+	if (label_map.empty()) return;
 
+	span_type span(edge.first, edge.last);
 	
-	span_node_type span = spans_node[edge.head];
 	int* context = reinterpret_cast<int*>(state);
-	context[0] = span.first;
-	context[1] = span.second;
+	context[0] = edge.first;
+	context[1] = edge.last;
 	
 	std::string rule_string = "span:" + span_label(span) + '(';
 	
 	int pos_non_terminal = 0;
-	phrase_type::const_iterator piter_end = edge.rule->source.end();
-	for (phrase_type::const_iterator piter = edge.rule->source.begin(); piter != piter_end; ++ piter)
+	phrase_type::const_iterator piter_end = edge.rule->rhs.end();
+	for (phrase_type::const_iterator piter = edge.rule->rhs.begin(); piter != piter_end; ++ piter)
 	  if (piter->is_non_terminal()) {
 	    int antecedent_index = piter->non_terminal_index() - 1;
 	    if (antecedent_index < 0)
@@ -120,7 +114,7 @@ namespace cicada
 	  return label;
       }
 
-      const std::string& span_label(const span_node_type& span) const
+      const std::string& span_label(const span_type& span) const
       {
 	std::string& label = const_cast<std::string&>(label_chart(span.first, span.second));
 	
@@ -206,13 +200,15 @@ namespace cicada
 		  const lattice_type& lattice,
 		  const span_set_type& spans)
       {
-	spans_node.clear();
-	spans_node.reserve(hypergraph.nodes.size());
-	spans_node.resize(hypergraph.nodes.size());
+	span_type span_goal(std::numeric_limits<int>::max(), std::numeric_limits<int>::min());
 	
-	cicada::span_node(hypergraph, spans_node);
-	
-	const span_node_type& span_goal = spans_node[hypergraph.goal];
+	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = hypergraph.nodes[hypergraph.goal].edges.end();
+	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = hypergraph.nodes[hypergraph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const hypergraph_type::edge_type& edge = hypergraph.edges[*eiter];
+	  
+	  span_goal.first  = utils::bithack::min(span_goal.first, edge.first);
+	  span_goal.second = utils::bithack::max(span_goal.second, edge.last);
+	}
 	
 	label_chart.clear();
 	label_chart.reserve(span_goal.second + 1);
@@ -227,8 +223,6 @@ namespace cicada
 
       label_chart_type label_chart;
       label_map_type   label_map;
-      
-      span_node_set_type spans_node;
 
       bool forced_feature;
     };

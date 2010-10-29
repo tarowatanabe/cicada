@@ -158,7 +158,6 @@ void transform(const hypergraph_type::id_type node_id,
       nodes.push_back(graph.add_node().id);
     }
   }
-  rule += " |||";
   
   hypergraph_type::edge_type& edge = graph.add_edge(nodes.begin(), nodes.end());
   edge.rule.reset(new rule_type(rule));

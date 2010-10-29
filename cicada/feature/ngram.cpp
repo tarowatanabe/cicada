@@ -81,7 +81,7 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
       NGramImpl(const path_type& __path, const int __order)
-	: ngram(__path), order(__order), cluster(0), yield_source(false), coarse(false)
+	: ngram(__path), order(__order), cluster(0), coarse(false)
       {
 	order = utils::bithack::min(order, ngram.index.order());
 	
@@ -92,7 +92,7 @@ namespace cicada
       }
 
       NGramImpl(const NGramImpl& x)
-	: ngram(x.ngram), order(x.order), cluster(x.cluster), yield_source(x.yield_source), coarse(x.coarse)
+	: ngram(x.ngram), order(x.order), cluster(x.cluster), coarse(x.coarse)
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -105,7 +105,6 @@ namespace cicada
 	ngram = x.ngram;
 	order = x.order;
 	cluster = x.cluster;
-	yield_source = x.yield_source;
 	coarse = x.coarse;
 	
 	cache_logprob.clear();
@@ -211,7 +210,7 @@ namespace cicada
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
-	const phrase_type& target = (yield_source ? rule.source : rule.target);
+	const phrase_type& target = rule.rhs;
 	
 	phrase_type::const_iterator titer_begin = target.begin();
 	phrase_type::const_iterator titer_end   = target.end();
@@ -371,7 +370,7 @@ namespace cicada
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
-	const phrase_type& target = (yield_source ? rule.source : rule.target);
+	const phrase_type& target = rule.rhs;
 	
 	phrase_type::const_iterator titer_begin = target.begin();
 	phrase_type::const_iterator titer_end   = target.end();
@@ -483,7 +482,7 @@ namespace cicada
 			      const int dot)
       {
 	const rule_type& rule = *(edge.rule);
-	const phrase_type& phrase = (yield_source ? rule.source : rule.target);
+	const phrase_type& phrase = rule.rhs;
 	
 	symbol_type* context = reinterpret_cast<symbol_type*>(state);
 	symbol_type* context_end  = std::find(context, context + order, vocab_type::EMPTY);
@@ -544,7 +543,6 @@ namespace cicada
       cluster_type* cluster;
       
       // yield/coarse
-      bool yield_source;
       bool coarse;
     };
     
@@ -567,8 +565,6 @@ namespace cicada
       int         coarse_order = 0;
       path_type   coarse_cluster_path;
       
-      bool        yield_source = false;
-      bool        yield_target = false;
       std::string name;
 
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -586,16 +582,7 @@ namespace cicada
 	  coarse_cluster_path = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	  name = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& yield = piter->second;
-	  
-	  if (strcasecmp(yield.c_str(), "source") == 0)
-	    yield_source = true;
-	  else if (strcasecmp(yield.c_str(), "target") == 0)
-	    yield_target = true;
-	  else
-	    throw std::runtime_error("unknown parameter: " + parameter);
-	} else
+	else
 	  std::cerr << "WARNING: unsupported parameter for ngram: " << piter->first << "=" << piter->second << std::endl;
       }
       
@@ -605,9 +592,6 @@ namespace cicada
       if (order <= 0)
 	throw std::runtime_error("invalid ngram order: " + boost::lexical_cast<std::string>(order));
 
-      if (yield_source && yield_target)
-	throw std::runtime_error("you cannot specify both source/target yield");
-      
       if (coarse_order > order)
 	throw std::runtime_error("invalid coarse order: coarse-order <= order");
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
@@ -615,9 +599,6 @@ namespace cicada
       
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
-      
-      // set up yield..
-      ngram_impl->yield_source = yield_source;
       
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
@@ -641,9 +622,6 @@ namespace cicada
 	
 	if (! coarse_path.empty()) {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
-	  
-	  // set up yield..
-	  ngram_impl->yield_source = yield_source;
 	  
 	  if (! coarse_cluster_path.empty()) {
 	    if (! boost::filesystem::exists(coarse_cluster_path))

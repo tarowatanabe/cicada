@@ -20,9 +20,10 @@ namespace cicada
     typedef Transducer transducer_type;
     typedef boost::shared_ptr<transducer_type> transducer_ptr_type;
 
-    typedef transducer_type::rule_type     rule_type;
-    typedef transducer_type::rule_ptr_type rule_ptr_type;
-    typedef transducer_type::rule_set_type rule_set_type;
+    typedef transducer_type::rule_type          rule_type;
+    typedef transducer_type::rule_ptr_type      rule_ptr_type;
+    typedef transducer_type::rule_pair_type     rule_pair_type;
+    typedef transducer_type::rule_pair_set_type rule_pair_set_type;
 
   private:
     typedef std::vector<transducer_ptr_type, std::allocator<transducer_ptr_type> > transducer_ptr_set_type;

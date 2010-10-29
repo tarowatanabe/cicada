@@ -48,13 +48,13 @@ namespace cicada
     typedef cicada::Feature feature_type;
     typedef cicada::Vocab   vocab_type;
 
-    typedef Transducer::rule_type     rule_type;
-    typedef Transducer::rule_ptr_type rule_ptr_type;
-    typedef Transducer::rule_set_type rule_set_type;
+    typedef Transducer::rule_type          rule_type;
+    typedef Transducer::rule_ptr_type      rule_ptr_type;
+    typedef Transducer::rule_pair_type     rule_pair_type;
+    typedef Transducer::rule_pair_set_type rule_pair_set_type;
     
-
-    typedef utils::compact_trie_dense<symbol_type, rule_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				      std::allocator<std::pair<const symbol_type, rule_set_type> > > trie_type;
+    typedef utils::compact_trie_dense<symbol_type, rule_pair_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				      std::allocator<std::pair<const symbol_type, rule_pair_set_type> > > trie_type;
     typedef trie_type::id_type id_type;
 
     GrammarMutableImpl() : trie(symbol_type()) {}
@@ -64,33 +64,18 @@ namespace cicada
     id_type root() const { return trie.root(); }
     id_type next(id_type node, const symbol_type& symbol) const { return trie.find(node, symbol); }
     bool has_next(id_type node) const { return ! trie.empty(node); }
-    const rule_set_type& rules(id_type node) { return trie[node]; }
+    const rule_pair_set_type& rules(id_type node) { return trie[node]; }
 
     void insert(const std::string& pattern);
-    void insert(const rule_type& rule)
+    void insert(const rule_pair_type& rule)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
       
-      if (rule.source.empty()) return;
+      if (rule.source->rhs.empty()) return;
       
-      sequence_type source_index(rule.source.begin(), rule.source.end());
-      sequence_type::iterator siter_end = source_index.end();
-      for (sequence_type::iterator siter = source_index.begin(); siter != siter_end; ++ siter)
-	*siter = siter->non_terminal();      
+      // no checking for non-terminal index!
       
-      const id_type id = trie.insert(source_index.begin(), source_index.end());
-      
-      trie[id].push_back(boost::shared_ptr<rule_type>(new rule_type(rule)));
-      trie[id].back()->sort_source_index();
-    }
-
-    void insert(const rule_ptr_type& rule)
-    {
-      typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
-      
-      if (rule->source.empty()) return;
-      
-      sequence_type source_index(rule->source.begin(), rule->source.end());
+      sequence_type source_index(rule.source->rhs.begin(), rule.source->rhs.end());
       sequence_type::iterator siter_end = source_index.end();
       for (sequence_type::iterator siter = source_index.begin(); siter != siter_end; ++ siter)
 	*siter = siter->non_terminal();
@@ -99,6 +84,7 @@ namespace cicada
       
       trie[id].push_back(rule);
     }
+    
     
     void clear() { trie.clear(); }
 
@@ -154,9 +140,6 @@ namespace cicada
   {
     typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
     
-
-    rule_parsed_type rule;
-    
     typedef rule_grammar_parser_mutable<std::string::const_iterator> rule_parser_type;
 #ifdef HAVE_TLS
     static __thread rule_parser_type* __rule_parser_tls = 0;
@@ -175,41 +158,42 @@ namespace cicada
     
     rule_parser_type& rule_parser = *__rule_parser;
 #endif
-
+    
+    rule_parsed_type rule_parsed;
 
     std::string::const_iterator iter_begin = pattern.begin();
     std::string::const_iterator iter_end = pattern.end();
     std::string::const_iterator iter = iter_begin;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
+    const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule_parsed);
     
     if (! result || iter != iter_end)
       throw std::runtime_error(std::string("rule parsing failed: ") + pattern);    
     
-    const symbol_type lhs(boost::fusion::get<0>(rule).empty() ? vocab_type::X : symbol_type(boost::fusion::get<0>(rule)));
-    const rule_type::symbol_set_type source(boost::fusion::get<1>(rule).begin(), boost::fusion::get<1>(rule).end());
-    const rule_type::symbol_set_type target(boost::fusion::get<2>(rule).begin(), boost::fusion::get<2>(rule).end());
+    const symbol_type lhs(boost::fusion::get<0>(rule_parsed).empty() ? vocab_type::X : symbol_type(boost::fusion::get<0>(rule_parsed)));
     
-    const size_type arity = source.arity();
-    if (! target.empty() && arity != target.arity())
+    rule_pair_type rule(rule_ptr_type(new rule_type(lhs, boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end())),
+			rule_ptr_type(new rule_type(lhs, boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end())));
+    
+    if (! rule.target->rhs.empty() && rule.source->rhs.arity() != rule.target->rhs.arity())
       throw std::runtime_error("arity do not match");
 
-    rule_ptr_type rule_ptr(new rule_type(lhs, source, target, arity));
-    rule_ptr->sort_source_index();
+    cicada::sort(*rule.source, *rule.target);
     
     // we will transform into "plain" non-terminal, so that we can query!
-    sequence_type source_index(source.size());
+    sequence_type source_index(rule.source->rhs.size());
     sequence_type::iterator iiter = source_index.begin();
-    rule_type::symbol_set_type::const_iterator siter_end = source.end();
-    for (rule_type::symbol_set_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter, ++ iiter)
+    rule_type::symbol_set_type::const_iterator siter_end = rule.source->rhs.end();
+    for (rule_type::symbol_set_type::const_iterator siter = rule.source->rhs.begin(); siter != siter_end; ++ siter, ++ iiter)
       *iiter = siter->non_terminal();
     
     // we do not check duplicates!
-    trie[trie.insert(source_index.begin(), source_index.end())].push_back(rule_ptr);
+    rule_pair_set_type& rules = trie[trie.insert(source_index.begin(), source_index.end())];
+    rules.push_back(rule);
     
     // add features...
-    const scores_parsed_type& scores = boost::fusion::get<3>(rule);
-      
+    const scores_parsed_type& scores = boost::fusion::get<3>(rule_parsed);
+    
     int feature = 0;
     scores_parsed_type::const_iterator fiter_end = scores.end();
     for (scores_parsed_type::const_iterator fiter = scores.begin(); fiter != fiter_end; ++ fiter)
@@ -217,11 +201,11 @@ namespace cicada
 	// default name!
 	const std::string name = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
 	
-	rule_ptr->features[name] = fiter->second;
+	rules.back().features[name] = fiter->second;
 	
 	++ feature;
       } else
-	rule_ptr->features[fiter->first] = fiter->second;
+	rules.back().features[fiter->first] = fiter->second;
   }
   
   void GrammarMutableImpl::read(const std::string& parameter)
@@ -279,60 +263,49 @@ namespace cicada
     
     utils::compress_istream is(param.name(), 1024 * 1024);
     std::string line;
-    rule_parsed_type rule;
+    rule_parsed_type rule_parsed;
     
     sequence_type source_index;
 
     while (std::getline(is, line)) {
       if (line.empty()) continue;
       
-      boost::fusion::get<0>(rule).clear();
-      boost::fusion::get<1>(rule).clear();
-      boost::fusion::get<2>(rule).clear();
-      boost::fusion::get<3>(rule).clear();
+      boost::fusion::get<0>(rule_parsed).clear();
+      boost::fusion::get<1>(rule_parsed).clear();
+      boost::fusion::get<2>(rule_parsed).clear();
+      boost::fusion::get<3>(rule_parsed).clear();
       
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator iter_end = line.end();
 
-      const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
+      const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule_parsed);
       
       if (! result || iter != iter_end)
 	throw std::runtime_error("rule parsing failed: " + line);
       
-      const symbol_type lhs(boost::fusion::get<0>(rule).empty() ? vocab_type::X : symbol_type(boost::fusion::get<0>(rule)));
-      const rule_type::symbol_set_type source(boost::fusion::get<1>(rule).begin(), boost::fusion::get<1>(rule).end());
-      const rule_type::symbol_set_type target(boost::fusion::get<2>(rule).begin(), boost::fusion::get<2>(rule).end());
-
-#if 0
-      // debug...
-      std::cerr << "lhs: " << lhs;
-      std::cerr << " source: ";
-      std::copy(source.begin(), source.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
-      std::cerr << "target: ";
-      std::copy(target.begin(), target.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
-      std::cerr << "features: ";
-      std::copy(boost::fusion::get<3>(rule).begin(), boost::fusion::get<3>(rule).end(), std::ostream_iterator<std::pair<std::string, double> >(std::cerr, " "));
-      std::cerr << std::endl;
-#endif
+      const symbol_type lhs(boost::fusion::get<0>(rule_parsed).empty() ? vocab_type::X : symbol_type(boost::fusion::get<0>(rule_parsed)));
       
-      const size_type arity = source.arity();
-      if (! target.empty() && arity != target.arity())
+      rule_pair_type rule(rule_ptr_type(new rule_type(lhs, boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end())),
+			  rule_ptr_type(new rule_type(lhs, boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end())));
+      
+      if (! rule.target->rhs.empty() && rule.source->rhs.arity() != rule.target->rhs.arity())
 	throw std::runtime_error("arity do not match");
       
-      rule_ptr_type rule_ptr(new rule_type(lhs, source, target, arity));
-      rule_ptr->sort_source_index();
+      cicada::sort(*rule.source, *rule.target);
       
-      source_index.resize(source.size());
+      source_index.resize(rule.source->rhs.size());
       sequence_type::iterator iiter = source_index.begin();
-      rule_type::symbol_set_type::const_iterator siter_end = source.end();
-      for (rule_type::symbol_set_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter, ++ iiter)
+      rule_type::symbol_set_type::const_iterator siter_end = rule.source->rhs.end();
+      for (rule_type::symbol_set_type::const_iterator siter = rule.source->rhs.begin(); siter != siter_end; ++ siter, ++ iiter)
 	*iiter = siter->non_terminal();
 
+
       // we do not check duplicates!
-      trie[trie.insert(source_index.begin(), source_index.end())].push_back(rule_ptr);
+      rule_pair_set_type& rules = trie[trie.insert(source_index.begin(), source_index.end())];
+      rules.push_back(rule);
       
       // add features...
-      const scores_parsed_type& scores = boost::fusion::get<3>(rule);
+      const scores_parsed_type& scores = boost::fusion::get<3>(rule_parsed);
       
       int feature = 0;
       scores_parsed_type::const_iterator fiter_end = scores.end();
@@ -340,17 +313,17 @@ namespace cicada
 	if (fiter->first.empty()) {
 	  
 	  if (feature < int(feature_names.size()) && ! feature_names[feature].empty())
-	    rule_ptr->features[feature_names[feature]] = fiter->second;
+	    rules.back().features[feature_names[feature]] = fiter->second;
 	  else {
 	    // default name!
 	    const std::string name = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
 	    
-	    rule_ptr->features[name] = fiter->second;
+	    rules.back().features[name] = fiter->second;
 	  }
 	  
 	  ++ feature;
 	} else
-	  rule_ptr->features[fiter->first] = fiter->second;
+	  rules.back().features[fiter->first] = fiter->second;
     }
   }
   
@@ -369,16 +342,10 @@ namespace cicada
     pimpl->insert(pattern);
   }
 
-  void GrammarMutable::insert(const rule_type& rule)
+  void GrammarMutable::insert(const rule_pair_type& rule)
   {
     pimpl->insert(rule);
   }
-
-  void GrammarMutable::insert(const rule_ptr_type& rule)
-  {
-    pimpl->insert(rule);
-  }
-  
   
   GrammarMutable::GrammarMutable()
     : pimpl(new impl_type()) {}
@@ -419,9 +386,9 @@ namespace cicada
     return pimpl->has_next(node);
   }
   
-  const GrammarMutable::rule_set_type& GrammarMutable::rules(const id_type& node) const
+  const GrammarMutable::rule_pair_set_type& GrammarMutable::rules(const id_type& node) const
   {
-    static const rule_set_type __empty;
+    static const rule_pair_set_type __empty;
     return (node == pimpl->root() ? __empty : pimpl->rules(node));
   }
   

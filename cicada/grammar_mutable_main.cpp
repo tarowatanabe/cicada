@@ -1,9 +1,13 @@
 
+#include "hypergraph.hpp"
 #include "grammar_mutable.hpp"
 
 #include <boost/tokenizer.hpp>
 
 #include <utils/space_separator.hpp>
+
+typedef cicada::HyperGraph hypergraph_type;
+
 
 int main(int argc, char** argv)
 {
@@ -28,10 +32,15 @@ int main(int argc, char** argv)
       node = grammar.next(node, *iter);
     
     if (! grammar.rules(node).empty()) {
-      const cicada::GrammarMutable::rule_set_type& rules = grammar.rules(node);
+      const cicada::GrammarMutable::rule_pair_set_type& rules = grammar.rules(node);
       
-      for (cicada::GrammarMutable::rule_set_type::const_iterator riter = rules.begin(); riter != rules.end(); ++ riter)
-	std::cout << *(*riter) << std::endl;
+      for (cicada::GrammarMutable::rule_pair_set_type::const_iterator riter = rules.begin(); riter != rules.end(); ++ riter) {
+	std::cout << "source: " << riter->source << " target: " << riter->target;
+	
+	for (hypergraph_type::feature_set_type::const_iterator fiter = riter->features.begin(); fiter != riter->features.end(); ++ fiter)
+	  std::cout << ' ' << fiter->first << '=' << fiter->second;
+	std::cout << std::endl;
+      }
     }
   }
 }
