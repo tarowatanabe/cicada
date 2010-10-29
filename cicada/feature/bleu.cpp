@@ -131,32 +131,38 @@ namespace cicada
 	
 	typename Sentence::const_iterator piter_end = phrase.end();
 	for (typename Sentence::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
+
+	  const size_t word_size = piter->size();
 	  
-	  UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*piter));
+	  if (piter->is_non_terminal() || (word_size >= 3 && piter->operator[](0) == '<' && piter->operator[](word_size - 1) == '>'))
+	    tokens.push_back(*piter);
+	  else {
+	    UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*piter));
 	  
-	  StringCharacterIterator iter(uword);
-	  for (iter.setToStart(); iter.hasNext(); /**/) {
-	    const UChar32 c = iter.next32PostInc();
+	    StringCharacterIterator iter(uword);
+	    for (iter.setToStart(); iter.hasNext(); /**/) {
+	      const UChar32 c = iter.next32PostInc();
 	    
-	    if (c < 128)
-	      buffer.push_back(c);
-	    else {
-	      // we will split...
-	      if (! buffer.empty())
+	      if (c < 128)
+		buffer.push_back(c);
+	      else {
+		// we will split...
+		if (! buffer.empty())
+		  tokens.push_back(word_type(buffer.begin(), buffer.end()));
+		buffer.clear();
+	      
+		StringByteSink<std::string> __sink(&buffer);
+		UnicodeString(c).toUTF8(__sink);
+	      
 		tokens.push_back(word_type(buffer.begin(), buffer.end()));
-	      buffer.clear();
-	      
-	      StringByteSink<std::string> __sink(&buffer);
-	      UnicodeString(c).toUTF8(__sink);
-	      
-	      tokens.push_back(word_type(buffer.begin(), buffer.end()));
-	      buffer.clear();
+		buffer.clear();
+	      }
 	    }
-	  }
 	  
-	  if (! buffer.empty())
-	    tokens.push_back(word_type(buffer.begin(), buffer.end()));
-	  buffer.clear();
+	    if (! buffer.empty())
+	      tokens.push_back(word_type(buffer.begin(), buffer.end()));
+	    buffer.clear();
+	  }
 	}
 	
 	result.assign(tokens.begin(), tokens.end());
