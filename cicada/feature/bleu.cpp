@@ -250,95 +250,72 @@ namespace cicada
 	  buffer.clear();
 	  buffer.reserve(target.size() + (order * 2) * states.size());
 	  
-	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
-	  phrase_spans.clear();
-	  target.terminals(std::back_inserter(phrase_spans));
-	  
 	  int star_first = -1;
 	  int star_last  = -1;
 	  
-	  *context_parsed = 0;
-	  
-	  for (phrase_type::const_iterator iter = phrase_spans.front().first; iter != phrase_spans.front().second; ++ iter)
-	    if (*iter != vocab_type::EPSILON)
-	      buffer.push_back(*iter);
-	  
-	  *context_hypothesis = buffer.size();
-	  
-	  collect_counts(buffer.begin(), buffer.end(), counts);
-	  
+	  buffer_type::iterator biter_first = buffer.begin();
+	  buffer_type::iterator biter       = buffer.begin();
+
 	  double bleu_antecedent = 0.0;
-
-	  buffer_type::const_iterator biter_first = buffer.begin();
 	  
-	  phrase_span_set_type::const_iterator siter_begin = phrase_spans.begin();
-	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
-	  for (phrase_span_set_type::const_iterator siter = siter_begin + 1; siter != siter_end; ++ siter) {
-	    const phrase_span_type& span = *siter;
-	    
-	    int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
-	    if (antecedent_index < 0)
-	      antecedent_index = siter - (siter_begin + 1);
-	    
-	    const symbol_type* antecedent_first = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
-	    const symbol_type* antecedent_last  = antecedent_first + order * 2;
-	    
-	    const symbol_type* antecedent_end  = std::find(antecedent_first, antecedent_last, vocab_type::EMPTY);
-	    const symbol_type* antecedent_star = std::find(antecedent_first, antecedent_end, vocab_type::STAR);
-	    
-	    const int*     antecedent_parsed     = reinterpret_cast<const int*>(antecedent_last);
-	    const int*     antecedent_hypothesis = antecedent_parsed + 1;
-	    const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
+	  int non_terminal_pos = 0;
+	  phrase_type::const_iterator titer_end = target.end();
+	  for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
+	    if (titer->is_non_terminal()) {
+	      int antecedent_index = titer->non_terminal_index() - 1;
+	      if (antecedent_index < 0)
+	      antecedent_index = non_terminal_pos;
+	      ++ non_terminal_pos;
 
-	    const count_set_type& counts_antecedent = states_counts[*antecedent_count];
-	    
-	    const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, minimum_size);
-	    
-	    //std::cerr << "bleu antecedent: " << bleu_ant << ' ';
-	    //std::copy(antecedent_first, antecedent_end, std::ostream_iterator<symbol_type>(std::cerr, " "));
-	    //std::cerr << std::endl;
-	    
-	    bleu_antecedent += bleu_ant;
-	    
-	    // merge statistics...
-	    counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
-	    std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
-	    
-	    *context_hypothesis += *antecedent_hypothesis;
-	    
-	    buffer_type::const_iterator biter = buffer.end();
-	    
-	    buffer.insert(buffer.end(), antecedent_first, antecedent_star);
-	    
-	    buffer_type::const_iterator biter_end = buffer.end();
-	    
-	    collect_counts(biter_first, biter, biter_end, counts);
-	    
-	    // insert context after star
-	    if (antecedent_star != antecedent_end) {
-	      biter_first = buffer.end() + 1;
+	      const symbol_type* antecedent_first = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
+	      const symbol_type* antecedent_last  = antecedent_first + order * 2;
 	      
-	      star_last = buffer.size() + 1;
-	      if (star_first < 0)
-		star_first = buffer.size() + 1;
+	      const symbol_type* antecedent_end  = std::find(antecedent_first, antecedent_last, vocab_type::EMPTY);
+	      const symbol_type* antecedent_star = std::find(antecedent_first, antecedent_end, vocab_type::STAR);
 	      
-	      buffer.insert(buffer.end(), antecedent_star, antecedent_end);
+	      const int*     antecedent_parsed     = reinterpret_cast<const int*>(antecedent_last);
+	      const int*     antecedent_hypothesis = antecedent_parsed + 1;
+	      const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
+
+	      const count_set_type& counts_antecedent = states_counts[*antecedent_count];
+	    
+	      const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, minimum_size);
+	      bleu_antecedent += bleu_ant;
+
+	      // merge statistics...
+	      counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
+	      std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
+
+	      *context_hypothesis += *antecedent_hypothesis;
+	      
+	      buffer.insert(buffer.end(), antecedent_first, antecedent_star);
+	      if (biter_first == biter)
+		collect_counts(biter_first, buffer.end(), counts);
+	      else
+		collect_counts(biter_first, biter, buffer.end(), counts);
+	      biter = buffer.end();
+	      
+	      if (antecedent_star != antecedent_end) {
+		star_last = buffer.size() + 1;
+		if (star_first < 0)
+		  star_first = buffer.size() + 1;
+		
+		biter_first = buffer.end() + 1;
+		buffer.insert(buffer.end(), antecedent_star, antecedent_end);
+		biter = buffer.end();
+	      }
+	      
+	    } else if (*titer != vocab_type::EPSILON) {
+	      buffer.push_back(*titer);
+	      *context_hypothesis += 1;
 	    }
-	    
-	    // collect counts from edge's terminals
-	    {
-	      buffer_type::const_iterator biter = buffer.end();
-	      
-	      for (phrase_type::const_iterator iter = span.first; iter != span.second; ++ iter)
-		if (*iter != vocab_type::EPSILON)
-		  buffer.push_back(*iter);
-	      
-	      buffer_type::const_iterator biter_end = buffer.end();
-	      
-	      collect_counts(biter_first, biter, biter_end, counts);
-	      
-	      *context_hypothesis += biter_end - biter;
-	    }
+	  }
+
+	  if (biter != buffer.end()) {
+	    if (biter_first == biter)
+	      collect_counts(biter_first, buffer.end(), counts);
+	    else
+	      collect_counts(biter_first, biter, buffer.end(), counts);
 	  }
 	  
 	  if (star_first >= 0) {
