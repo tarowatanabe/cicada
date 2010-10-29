@@ -105,7 +105,7 @@ namespace cicada
     
     const bool result = assign(iter, end);
     if (! result || iter != end)
-      throw std::runtime_error("rule format parsing failed..." + x);
+      throw std::runtime_error("rule format parsing failed...\"" + x + "\"");
   }
   
   std::istream& operator>>(std::istream& is, Rule& x)
