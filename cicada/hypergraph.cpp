@@ -244,7 +244,7 @@ namespace cicada
 	       >> lit("\"feature\"") >> ':' >> feature_set >> ','
 	       >> lit("\"rule\"")    >> ':' >> int_ >> ','
 	       >> lit("\"first\"")    >> ':' >> int_ >> ','
-	       >> lit("\"last\"")    >> ':' >> int_ >> ','
+	       >> lit("\"last\"")    >> ':' >> int_
 	       >> '}');
       
       edge_action = edge [add_edge(graph, rules)];
@@ -664,7 +664,7 @@ namespace cicada
 	  os << "},";
 	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second) << ',';
 	  os << "\"first\":" << edge.first << ',';
-	  os << "\"last\":" << edge.last << ',';
+	  os << "\"last\":" << edge.last;
 	  os << '}';
 	}
 	
