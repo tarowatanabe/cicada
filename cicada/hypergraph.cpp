@@ -186,7 +186,7 @@ namespace cicada
   typedef std::vector<int> tail_node_set_type;
   typedef std::pair<std::string, double> feature_parsed_type;
   typedef std::vector<feature_parsed_type> feature_parsed_set_type;
-  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, int, int, int, int> edge_parsed_type;
+  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, int, int, int> edge_parsed_type;
   
   typedef std::vector<edge_parsed_type> node_parsed_type;
   typedef std::vector<node_parsed_type> node_parsed_set_type;
@@ -245,7 +245,6 @@ namespace cicada
 	       >> lit("\"rule\"")    >> ':' >> int_ >> ','
 	       >> lit("\"first\"")    >> ':' >> int_ >> ','
 	       >> lit("\"last\"")    >> ':' >> int_ >> ','
-	       >> lit("\"distance\"")    >> ':' >> int_
 	       >> '}');
       
       edge_action = edge [add_edge(graph, rules)];
@@ -318,7 +317,6 @@ namespace cicada
 	// meta data...
 	edge.first = boost::fusion::get<3>(edge_parsed);
 	edge.last = boost::fusion::get<4>(edge_parsed);
-	edge.distance = boost::fusion::get<5>(edge_parsed);
 	
 	graph.connect_edge(edge.id, graph.nodes.back().id);
       }
@@ -667,7 +665,6 @@ namespace cicada
 	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second) << ',';
 	  os << "\"first\":" << edge.first << ',';
 	  os << "\"last\":" << edge.last << ',';
-	  os << "\"distance\":" << edge.distance;
 	  os << '}';
 	}
 	

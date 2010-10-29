@@ -87,7 +87,6 @@ namespace cicada
 	}
 	
 	edge.last = span_pos;
-	edge.distance = edge.last - edge.first;
 	
 	spans_node[node_id].second = utils::bithack::max(spans_node[node_id].second, span_pos);
       }

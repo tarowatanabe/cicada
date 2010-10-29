@@ -194,7 +194,7 @@ namespace cicada
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
 		apply_rule(riter->target, riter->features + citer->features, citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
-			   first, last, lattice.shortest_distance(first, last));
+			   first, last);
 	    }
 	  }
 	  
@@ -224,7 +224,7 @@ namespace cicada
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
 		apply_rule(riter->target, riter->features, &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-			   first, last, lattice.shortest_distance(first, last));
+			   first, last);
 	    }
 	  }
 	  
@@ -251,7 +251,7 @@ namespace cicada
       for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	if (non_terminals[passive_arcs[p]] == goal)
 	  apply_rule(goal_rule, feature_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-		     0, lattice.size(), lattice.shortest_distance(0, lattice.size()));
+		     0, lattice.size());
       
       // we will sort to remove unreachable nodes......
       graph.topologically_sort();
@@ -268,8 +268,7 @@ namespace cicada
 		    passive_set_type& passives,
 		    hypergraph_type& graph,
 		    const int lattice_first,
-		    const int lattice_last,
-		    const int lattice_distance)
+		    const int lattice_last)
     {
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
@@ -280,7 +279,6 @@ namespace cicada
       // assign metadata...
       edge.first    = lattice_first;
       edge.last     = lattice_last;
-      edge.distance = lattice_distance;
       
       node_map_type::iterator niter = node_map.find(rule->lhs);
       if (niter == node_map.end()) {

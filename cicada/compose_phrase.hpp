@@ -183,7 +183,6 @@ namespace cicada
 
 	    edge.first    = state.first;
 	    edge.last     = state.last;
-	    edge.distance = lattice.shortest_distance(state.first, state.last);
 	    
 	    graph.connect_edge(edge.id, node.id);
 	  }
@@ -244,7 +243,6 @@ namespace cicada
 	
 	edge.first    = 0;
 	edge.last     = lattice.size();
-	edge.distance = lattice.shortest_distance(0, lattice.size());
 	
 	hypergraph_type::node_type& node = graph.add_node();
 	
