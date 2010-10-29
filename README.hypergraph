@@ -50,7 +50,7 @@ HYPERGRAPH
 
 RULE (rules are double quoted, thus you should perform proper escaping, i.e. " to \", \ to \\ etc.)
 
-"lhs ||| rhs-source ||| rhs-target ||| list-of-features"
+"lhs ||| rhs"
 
 NODE (contains list of edge)
 
@@ -61,7 +61,10 @@ EDGE
 {
  "tail" : [node-id, node-id, ...],
  "featuers" : {"feature-name" : double, "feature-name2" : double, ... },
- "rule" : rule-id (zero indicating no-rule == invalid hypergraph)
+ "rule" : rule-id, (zero indicating no-rule == invalid hypergraph)
+ "first" : first-span-position, (assigned by cky-composer, phrase-composer etc.)
+ "last" : last-span-position,
+ "distance" : distance
 }
 
 

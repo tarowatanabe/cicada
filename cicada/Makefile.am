@@ -117,6 +117,7 @@ operation/normalize.hpp \
 operation/output.hpp \
 operation/permute.hpp \
 operation/prune.hpp \
+operation/span_forest.hpp \
 operation/traversal.hpp
 
 libcicadainclude_HEADERS = \

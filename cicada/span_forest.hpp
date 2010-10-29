@@ -44,9 +44,8 @@ namespace cicada
 	
 	spans_node.clear();
 	spans_node.reserve(graph.nodes.size());
-	spans_node.resize(graph.nodes.size());
+	spans_node.resize(graph.nodes.size(), span_type(0, 0));
 	
-	spans_node[graph.goal] = std::make_pair(0, 0);
 	traverse(graph, graph.goal);
       }
     }
@@ -65,9 +64,8 @@ namespace cicada
 	edge_type& edge = graph.edges[*eiter];
 	
 	int span_pos = spans_node[node_id].first;
-
-
-	edge.first = spans_pos;
+	
+	edge.first = span_pos;
 	
 	int non_terminal_pos = 0;
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
@@ -79,7 +77,7 @@ namespace cicada
 	    
 	    spans_node[edge.tails[non_terminal_index]].first = span_pos;
 	    
-	    traverse(graph, spans, edge.tails[non_terminal_index]);
+	    traverse(graph, edge.tails[non_terminal_index]);
 	    
 	    span_pos = spans_node[edge.tails[non_terminal_index]].second;
 	    

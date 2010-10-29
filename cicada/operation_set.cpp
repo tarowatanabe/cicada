@@ -21,6 +21,7 @@
 #include "operation/apply.hpp"
 #include "operation/expected_ngram.hpp"
 #include "operation/prune.hpp"
+#include "operation/span_forest.hpp"
 #include "operation/intersect.hpp"
 #include "operation/normalize.hpp"
 #include "operation/output.hpp"
@@ -76,6 +77,7 @@ prune: pruning\n\
 intersect: compute intersection\n\
 normalize: feature value normalizer\n\
 \tprefix=feature name prefix\n\
+span-forest: annotate terminal span\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
 \tunique=[true|false] unique translation\n\
@@ -149,6 +151,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
       else if (param.name() == "prune")
 	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
+      else if (param.name() == "span-forest")
+	operations.push_back(operation_ptr_type(new operation::SpanForest(*piter, debug)));
       else if (param.name() == "intersect")
 	operations.push_back(operation_ptr_type(new operation::Intersect(debug)));
       else if (param.name() == "normalize")
