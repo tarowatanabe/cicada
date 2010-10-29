@@ -137,67 +137,46 @@ namespace cicada
 	    std::copy(buffer.end() - context_size, buffer.end(), context + order);
 	  }
 	} else {
-	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
-	  phrase_spans.clear();
-	  phrase.terminals(std::back_inserter(phrase_spans));
-	
+	  
 	  int star_first = -1;
 	  int star_last  = -1;
 	  
-	  for (phrase_type::const_iterator titer = phrase_spans.front().first; titer != phrase_spans.front().second; ++ titer)
-	    if (*titer != vocab_type::EPSILON)
-	      buffer.push_back(*titer);
+	  buffer_type::iterator biter_first = buffer.begin();
+	  buffer_type::iterator biter       = buffer.begin();
 	  
-	  if (! ngrams.empty())
-	    ngram_score(buffer.begin(), buffer.end(), features);
-	  
-	  buffer_type::const_iterator biter_first = buffer.begin();
-	  
-	  phrase_span_set_type::const_iterator siter_begin = phrase_spans.begin();
-	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
-	  for (phrase_span_set_type::const_iterator siter = siter_begin + 1; siter != siter_end; ++ siter) {
-	    const phrase_span_type& span = *siter;
-	    
-	    int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
-	    if (antecedent_index < 0)
-	      antecedent_index = siter - (siter_begin + 1);
-	    
-	    const symbol_type* context = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
-	    const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
-	    const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
-	    
-	    buffer_type::const_iterator biter = buffer.end();
-	    
-	    buffer.insert(buffer.end(), context, context_star);
-	    
-	    buffer_type::const_iterator biter_end = buffer.end();
-	    
-	    if (! ngrams.empty())
-	      ngram_score(biter_first, biter, biter_end, features);
-	    
-	    // insert star!
-	    if (context_star != context_end) {
+	  int non_terminal_pos = 0;
+	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	    if (titer->is_non_terminal()) {
+	      int antecedent_index = titer->non_terminal_index() - 1;
+	      if (antecedent_index < 0)
+		antecedent_index = non_terminal_pos;
+	      ++ non_terminal_pos;
 	      
-	      biter_first = buffer.end() + 1;
+	      const symbol_type* context = reinterpret_cast<const symbol_type*>(states[antecedent_index]);
+	      const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
+	      const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
 	      
-	      star_last = buffer.size() + 1;
-	      if (star_first < 0)
-		star_first = buffer.size() + 1;
-	      
-	      buffer.insert(buffer.end(), context_star, context_end);
-	    }
-	    
-	    // use of this edge's terminals
-	    {
-	      buffer_type::const_iterator biter = buffer.end();
-	      
-	      buffer.insert(buffer.end(), span.first, span.second);
-	      
-	      buffer_type::const_iterator biter_end = buffer.end();
-	      
+	      buffer.insert(buffer.end(), context, context_star);
 	      if (! ngrams.empty())
-		ngram_score(biter_first, biter, biter_end, features);
-	    }
+		ngram_score(biter_first, biter, buffer.end(), features);
+	      biter = buffer.end();
+	      
+	      if (context_star != context_end) {
+		if (star_first < 0)
+		  star_first = buffer.size() + 1;
+		star_last = buffer.size() + 1;
+		
+		biter_first = buffer.end() + 1;
+		buffer.insert(buffer.end(), context_star, context_end);
+		biter = buffer.end();
+	      }
+	    } else if (*titer != vocab_type::EPSILON)
+	      buffer.push_back(*titer);
+	  }
+	  
+	  if (biter != buffer.end()) {
+	    if (! ngrams.empty())
+	      ngram_score(biter_first, biter, buffer.end(), features);
 	  }
 	  
 	  // construct state vector..
