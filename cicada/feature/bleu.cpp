@@ -186,7 +186,6 @@ namespace cicada
 	  lower_case(__target_split, target_lower);
 	
 	const phrase_type& target = (lower ? target_lower : __target_split);
-	const phrase_type& source = rule.rhs;
 	
 	count_set_type counts;
 
@@ -227,16 +226,12 @@ namespace cicada
 	  }
 	  
 	  *context_parsed = 0;
-	  phrase_type::const_iterator siter_end = source.end();
-	  for (phrase_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	    *context_parsed += (*siter != vocab_type::EPSILON);
-	  
 	  *context_hypothesis = buffer.size();
 	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 
-	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size, ! final);
+	  const double bleu = bleu_score(counts, *context_hypothesis, minimum_size, ! final);
 	  
 	  //std::cerr << "bleu: " << bleu << ' ';
 	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
@@ -257,8 +252,6 @@ namespace cicada
 	  int star_last  = -1;
 	  
 	  *context_parsed = 0;
-	  for (phrase_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter)
-	    *context_parsed += (*siter != vocab_type::EPSILON && siter->is_terminal());
 	  
 	  for (phrase_type::const_iterator iter = phrase_spans.front().first; iter != phrase_spans.front().second; ++ iter)
 	    if (*iter != vocab_type::EPSILON)
@@ -293,7 +286,7 @@ namespace cicada
 
 	    const count_set_type& counts_antecedent = states_counts[*antecedent_count];
 	    
-	    const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, source_size);
+	    const double bleu_ant = bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, minimum_size);
 	    
 	    //std::cerr << "bleu antecedent: " << bleu_ant << ' ';
 	    //std::copy(antecedent_first, antecedent_end, std::ostream_iterator<symbol_type>(std::cerr, " "));
@@ -305,7 +298,6 @@ namespace cicada
 	    counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
 	    std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
 	    
-	    *context_parsed     += *antecedent_parsed;
 	    *context_hypothesis += *antecedent_hypothesis;
 	    
 	    buffer_type::const_iterator biter = buffer.end();
@@ -375,7 +367,7 @@ namespace cicada
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 
-	  const double bleu = bleu_score(counts, *context_hypothesis, *context_parsed, source_size, ! final);
+	  const double bleu = bleu_score(counts, *context_hypothesis, minimum_size, ! final);
 	  
 	  //std::cerr << "bleu: " << bleu;
 	  //std::cerr << " antecedent: " << bleu_antecedent << ' ';
@@ -401,7 +393,7 @@ namespace cicada
 	// for count set representation
 	states_counts.clear();
 	
-	source_size = 0;
+	minimum_size = 0;
 
 	score.reset();
       }
@@ -578,7 +570,7 @@ namespace cicada
 	  return std::min(1.0 - reference_size / hypothesis_size, 0.0);
       }
       
-      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int parsed_size, const int source_size, const bool scaling=true) const
+      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int minimum_size, const bool scaling=true) const
       {
 	count_set_type counts_bleu(order, count_type(0));
 	if (exact)
@@ -591,7 +583,7 @@ namespace cicada
 	
 	if (__bleu && __bleu->length_reference > 0) {
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size, scaling);
+	  const double hypothesis_length = tst_size(hypothesis_size, minimum_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
 	  
 	  double smooth = 0.5;
@@ -616,7 +608,7 @@ namespace cicada
 	} else {
 	  if (hypothesis_size == 0 || counts.empty()) return 0.0;
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, parsed_size, source_size, scaling);
+	  const double hypothesis_length = tst_size(hypothesis_size, minimum_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
 	  
 	  double smooth = 0.5;
@@ -636,14 +628,14 @@ namespace cicada
 	}
       }
 
-      double tst_size(int length, int parsed, int source_size, const bool scaling=true) const
+      double tst_size(int length, int minimum_size, const bool scaling=true) const
       {
-	if (length == 0 || parsed == 0) return 0.0;
+	if (length == 0) return 0.0;
 	
-	// we will scale hypothesis length by the # of parsed words
+	// we will scale hypothesis length by the minimum size
 	
-	return (parsed < source_size && scaling
-		? (double(source_size) / parsed) * length
+	return (length < minimum_size && scaling
+		? double(minimum_size)
 		: double(length));
       }
       
@@ -678,7 +670,7 @@ namespace cicada
       
       states_count_set_type states_counts;
       
-      int source_size;
+      int minimum_size;
 
       score_ptr_type score;
 
@@ -731,7 +723,7 @@ namespace cicada
       
       std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, split, lower));
       
-      // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
+      // two-side context + length (hypothesis/parsed-unused...) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
       base_type::__feature_name = (name.empty() ? std::string("bleu") : name);
       
@@ -872,7 +864,7 @@ namespace cicada
 
       std::vector<length_function::value_type, std::allocator<length_function::value_type> > lengths(hypergraph.nodes.size());
       cicada::inside(hypergraph, lengths, length_function());
-      pimpl->source_size = - log(lengths.back());
+      pimpl->minimum_size = - log(lengths.back());
       
       if (! targets.empty()) {
 	sentence_set_type::const_iterator titer_end = targets.end();

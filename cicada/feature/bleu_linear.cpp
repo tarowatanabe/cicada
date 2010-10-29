@@ -302,8 +302,6 @@ namespace cicada
 	ngrams.clear();
 	nodes.clear();
 	sizes.clear();
-	
-	source_size = 0;
       }
       
       void insert(const sentence_type& __sentence)
@@ -411,8 +409,6 @@ namespace cicada
       ngram_set_type ngrams;
       node_set_type  nodes;
       size_set_type  sizes;
-      
-      int source_size;
 
       ngram_factor_type factors;
 
@@ -606,12 +602,6 @@ namespace cicada
 			    const ngram_count_set_type& ngram_counts)
     {
       pimpl->clear();
-
-      // we will enumerate forest structure... and collect min-size...
-      std::vector<length_function::value_type, std::allocator<length_function::value_type> > lengths(hypergraph.nodes.size());
-      cicada::inside(hypergraph, lengths, length_function());
-      
-      pimpl->source_size = - log(lengths.back());
       
       if (! targets.empty()) {
 	sentence_set_type::const_iterator titer_end = targets.end();
