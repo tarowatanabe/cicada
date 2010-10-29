@@ -116,7 +116,7 @@ namespace cicada
     void erase_prefix(const Prefix& prefix)
     {
       for (iterator fiter = begin(); fiter != end(); /**/)
-	if (fiter->first.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), x.begin()))
+	if (fiter->first.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), fiter->first.begin()))
 	  erase(fiter ++);
 	else
 	  ++ fiter;
