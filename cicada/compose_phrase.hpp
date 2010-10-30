@@ -215,19 +215,27 @@ namespace cicada
 	  for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
 	    const symbol_type& terminal = aiter->label;
 	    const int length = aiter->distance;
-	    
-	    const transducer_type& transducer = grammar[state.grammar_id];
-	    const transducer_type::id_type node = transducer.next(state.node, terminal);
-	    if (node == transducer.root()) continue;
-	    
-	    // check if we can use this phrase...
-	    // we can check by rank_1(pos) to see whether the number of 1s are equal
-	    
-	    const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
-	    const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
-	    
-	    if (rank_first == rank_last)
-	      queue.push_back(state_type(state.coverage, state.grammar_id, node, state.first, state.last + length, state.features + aiter->features));
+
+	    if (terminal == vocab_type::EPSILON) {
+	      const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
+	      const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
+	      
+	      if (rank_first == rank_last)
+		queue.push_back(state_type(state.coverage, state.grammar_id, state.node, state.first, state.last + length, state.features + aiter->features));
+	    } else {
+	      const transducer_type& transducer = grammar[state.grammar_id];
+	      const transducer_type::id_type node = transducer.next(state.node, terminal);
+	      if (node == transducer.root()) continue;
+	      
+	      // check if we can use this phrase...
+	      // we can check by rank_1(pos) to see whether the number of 1s are equal
+	      
+	      const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
+	      const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
+	      
+	      if (rank_first == rank_last)
+		queue.push_back(state_type(state.coverage, state.grammar_id, node, state.first, state.last + length, state.features + aiter->features));
+	    }
 	  }
 	}
 	
