@@ -2,7 +2,7 @@ cicada
 
 A statistical machine translation toolkit based on a semiring parsing framework[1].
 Based on the generic framework, we can
-   - learn model(s): tree-to-string, string-to-tree, string-to-string (with latent tree)
+   - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree)
    - translate sentence, lattice and/or parse tree
 
 Remark: cicada is 蝉, (or セミ) in Japanese, pronounced "SEMI"
@@ -14,7 +14,7 @@ Basically, we have three distinct structures:
 
 Translation can be carried out by:
    - A lattice (or sentence) is composed with a grammar by generating a hypergraph [2].
-   or
+   - A lattice (or sentence) is composed with a phrasal grammar by generating a phrasal hypergraph [4].
    - A hypergraph/forest (or parse-tree) is composed with a grammar by generating another hypergraph [3].
 
 After the hypergraph generation, you can:
