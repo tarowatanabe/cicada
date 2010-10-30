@@ -37,13 +37,13 @@ namespace cicada
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "hypergraph") == 0)
 	    clear_hypergraph = utils::lexical_cast<bool>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "lattice") == 0)
+	  else if (strcasecmp(piter->first.c_str(), "lattice") == 0)
 	    clear_lattice = utils::lexical_cast<bool>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "spans") == 0 || strcasecmp(piter->first.c_str(), "span") == 0)
+	  else if (strcasecmp(piter->first.c_str(), "spans") == 0 || strcasecmp(piter->first.c_str(), "span") == 0)
 	    clear_spans = utils::lexical_cast<bool>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "targets") == 0 || strcasecmp(piter->first.c_str(), "bitext") == 0)
+	  else if (strcasecmp(piter->first.c_str(), "targets") == 0 || strcasecmp(piter->first.c_str(), "bitext") == 0)
 	    clear_targets = utils::lexical_cast<bool>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "counts") == 0 || strcasecmp(piter->first.c_str(), "ngram-counts") == 0)
+	  else if (strcasecmp(piter->first.c_str(), "counts") == 0 || strcasecmp(piter->first.c_str(), "ngram-counts") == 0)
 	    clear_counts = utils::lexical_cast<bool>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for generator: " << piter->first << "=" << piter->second << std::endl;
