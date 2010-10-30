@@ -66,6 +66,7 @@ feature/antecedent.hpp \
 feature/bleu.hpp \
 feature/bleu_expected.hpp \
 feature/bleu_linear.hpp \
+feature/distortion.hpp \
 feature/global_lexicon.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
@@ -80,6 +81,7 @@ feature/antecedent.cpp \
 feature/bleu.cpp \
 feature/bleu_expected.cpp \
 feature/bleu_linear.cpp \
+feature/distortion.cpp \
 feature/global_lexicon.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \

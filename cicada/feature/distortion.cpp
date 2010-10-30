@@ -33,8 +33,6 @@ namespace cicada
       
       typedef feature_function_type::edge_type edge_type;
 
-      typedef rule_type::symbol_set_type phrase_type;
-
       DistortionImpl() : lattice(0) {}
       DistortionImpl(const DistortionImpl& x) : lattice(0) {}
       DistortionImpl& operator=(const DistortionImpl& x)
@@ -49,17 +47,52 @@ namespace cicada
 	int* span = reinterpret_cast<int*>(state);
 	
 	if (states.empty()) {
+	  // How do we capture initial phrase....???
 	  span[0] = edge.first;
 	  span[1] = edge.last;
-	  return 0.0;
-	} else {
 	  
-	}
+	  if (lattice)
+	    return - lattice->shortest_distance(0, span[0]);
+	  else
+	    return - span[0];
+	} else if (states.size() == 1) {
+	  // it is only for the goal state...
+	  const int* span_antecedent = reinterpret_cast<const int*>(states[0]);
+
+	  span[0] = span_antecedent[0];
+	  span[1] = span_antecedent[1];
+	  return 0.0;
+	} else if (states.size() == 2) {
+	  const int* span_antecedent = reinterpret_cast<const int*>(states[0]);
+	  const int* span_phrase = reinterpret_cast<const int*>(states[1]);
+	  
+	  span[0] = span_phrase[0];
+	  span[1] = span_phrase[1];
+	  
+	  // make adjustment, since this span-phrase is not a initial phrase..
+	  const int score_adjust = (lattice ? lattice->shortest_distance(0, span[0]) : span[0]);
+
+	  if (lattice) {
+	    if (span_antecedent[1] == span_phrase[0])
+	      return score_adjust;
+	    else if (span_antecedent[1] < span_phrase[0])
+	      return - lattice->shortest_distance(span_antecedent[1], span_phrase[0]) + score_adjust;
+	    else
+	      return - lattice->shortest_distance(span_phrase[0], span_antecedent[1]) + score_adjust;
+	  } else
+	    return - utils::bithack::abs(span_antecedent[1] - span_phrase[0]) + score_adjust;
+	} else
+	  throw std::runtime_error("we do not support non-phrasal composed hypergraph");
       }
 
       double distortion_final_score(const state_ptr_type& state) const
       {
+	const int* span = reinterpret_cast<const int*>(state);
 	
+	if (lattice)
+	  return - lattice->shortest_distance(span[1], lattice->size());
+	else
+	  return 0.0;
       }
       
       void assign(const lattice_type& __lattice)
