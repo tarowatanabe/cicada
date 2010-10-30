@@ -61,7 +61,7 @@ namespace cicada
 	  return 0.0;
 	} else if (states.size() == 2) {
 	  const int* span_antecedent = reinterpret_cast<const int*>(states[0]);
-	  const int* span_phrase = reinterpret_cast<const int*>(states[1]);
+	  const int* span_phrase     = reinterpret_cast<const int*>(states[1]);
 	  
 	  span[0] = span_phrase[0];
 	  span[1] = span_phrase[1];
@@ -160,7 +160,7 @@ namespace cicada
 				  feature_set_type& estimates,
 				  const bool final) const
     {
-      
+      apply(state, states, edge, features, estimates, final);
     }
     
     void Distortion::apply_predict(state_ptr_type& state,

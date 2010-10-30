@@ -7,6 +7,7 @@
 #include "feature/bleu.hpp"
 #include "feature/bleu_expected.hpp"
 #include "feature/bleu_linear.hpp"
+#include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
@@ -45,7 +46,9 @@ bleu-linear: linear corpus-BLEU\n\
 \tlower=[true|false] perform lower casing\n\
 \tname=feature-name(default: bleu-linear)\n\
 \trefset=reference set file\n\
+distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
+\tfile=global lexicon file\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
@@ -101,6 +104,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::BleuExpected(parameter));
     else if (param.name() == "bleu-linear")
       return feature_function_ptr_type(new feature::BleuLinear(parameter));
+    else if (param.name() == "distortion")
+      return feature_function_ptr_type(new feature::Distortion(parameter));
     else if (param.name() == "global-lexicon")
       return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
     else if (param.name() == "span")
