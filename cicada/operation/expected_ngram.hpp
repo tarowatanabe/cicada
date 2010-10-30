@@ -81,6 +81,11 @@ namespace cicada
 	if (debug)
 	  std::cerr << "expected ngram counts: size: " << ngram_counts.size() << std::endl;
       }
+
+      void assign(const weight_set_type& __weights)
+      {
+	weights = &__weights;
+      }
   
       int order;
       bool bos_eos;

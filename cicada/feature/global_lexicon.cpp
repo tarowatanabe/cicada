@@ -63,8 +63,7 @@ namespace cicada
 	return score;
       }
 
-      void assign(const lattice_type& lattice,
-		  const hypergraph_type& hypergraph)
+      void assign(const lattice_type& lattice)
       {
 	words.clear();
 	
@@ -188,7 +187,7 @@ namespace cicada
 			       const sentence_set_type& targets,
 			       const ngram_count_set_type& ngram_counts)
     {
-      pimpl->assign(lattice, hypergraph);
+      pimpl->assign(lattice);
     }
 
   };
