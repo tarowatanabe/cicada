@@ -7,7 +7,6 @@
 
 #include <cicada/operation.hpp>
 #include <cicada/parameter.hpp>
-#include <cicada/generate.hpp>
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
@@ -31,8 +30,8 @@ namespace cicada
 	typedef cicada::Parameter param_type;
     
 	param_type param(parameter);
-	if (param.name() != "generate-earley")
-	  throw std::runtime_error("this is not a Earley generator");
+	if (param.name() != "clear")
+	  throw std::runtime_error("this is not data clearer");
 	
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "hypergraph") == 0)
@@ -46,7 +45,7 @@ namespace cicada
 	  else if (strcasecmp(piter->first.c_str(), "counts") == 0 || strcasecmp(piter->first.c_str(), "ngram-counts") == 0)
 	    clear_counts = utils::lexical_cast<bool>(piter->second);
 	  else
-	    std::cerr << "WARNING: unsupported parameter for generator: " << piter->first << "=" << piter->second << std::endl;
+	    std::cerr << "WARNING: unsupported parameter for clear: " << piter->first << "=" << piter->second << std::endl;
 	}
       }
   
