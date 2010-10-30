@@ -49,6 +49,7 @@ permute: permute tree (monolingual tree only)\n\
 compose-earley: composition from tree with grammar\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
+\tdistortion=[distortion limit] default: 0 (== monotone)\n\
 generate-earley: re-generation from tree\n\
 \tdepth: depth of rule pattern \n\
 \twidth: width of rule pattern \n\

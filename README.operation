@@ -15,6 +15,7 @@ permute: permute tree (monolingual tree only)
 	exclude=[a non-terminal] to prohibit permutation. You can supply multiple
 compose-earley: composition from tree with grammar
 compose-cky: composition from lattice (or sentence) with grammar
+compose-phrase: phrasal composition from lattice (or sentence)
 generate-earley: re-generation from tree
 apply: feature application
 	size=<cube size>
