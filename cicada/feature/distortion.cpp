@@ -51,10 +51,7 @@ namespace cicada
 	  span[0] = edge.first;
 	  span[1] = edge.last;
 	  
-	  if (lattice)
-	    return - lattice->shortest_distance(0, span[0]);
-	  else
-	    return - span[0];
+	  return (lattice ? - lattice->shortest_distance(0, span[0]) : - span[0]);
 	} else if (states.size() == 1) {
 	  // it is only for the goal state...
 	  const int* span_antecedent = reinterpret_cast<const int*>(states[0]);
@@ -89,10 +86,7 @@ namespace cicada
       {
 	const int* span = reinterpret_cast<const int*>(state);
 	
-	if (lattice)
-	  return - lattice->shortest_distance(span[1], lattice->size());
-	else
-	  return 0.0;
+	return (lattice ? - lattice->shortest_distance(span[1], lattice->size()) : 0);
       }
       
       void assign(const lattice_type& __lattice)
