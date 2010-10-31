@@ -289,7 +289,7 @@ namespace cicada
     id_type id_phrase = 0;
     int     feature_size = -1;
     
-    if (monotonicity) {
+    if (! fe) {
       utils::compress_istream is(path, 1024 * 1024);
       std::string line;
       
@@ -318,6 +318,24 @@ namespace cicada
 	
 	if (feature_size < 0) {
 	  feature_size = boost::fusion::get<1>(parsed).size();
+	  
+	  if (bidirectional) {
+	    if (monotonicity) {
+	      if (feature_size != 4)
+		throw std::runtime_error("we are bidirectional-monotonicity and expecting 4 features");
+	    } else {
+	      if (feature_size != 6)
+		throw std::runtime_error("we are bidirectional and expecting 6 features");
+	    }
+	  } else {
+	    if (monotonicity) {
+	      if (feature_size != 4)
+		throw std::runtime_error("we are monotonicity and expecting 2 features");
+	    } else {
+	      if (feature_size != 6)
+		throw std::runtime_error("we are expecting 3 features");
+	    }
+	  }
 	  
 	  score_streams.reserve(feature_size);
 	  score_streams.resize(feature_size);
@@ -373,6 +391,24 @@ namespace cicada
 	
 	if (feature_size < 0) {
 	  feature_size = boost::fusion::get<2>(parsed).size();
+	  
+	  if (bidirectional) {
+	    if (monotonicity) {
+	      if (feature_size != 4)
+		throw std::runtime_error("we are bidirectional-monotonicity and expecting 4 features");
+	    } else {
+	      if (feature_size != 6)
+		throw std::runtime_error("we are bidirectional and expecting 6 features");
+	    }
+	  } else {
+	    if (monotonicity) {
+	      if (feature_size != 4)
+		throw std::runtime_error("we are monotonicity and expecting 2 features");
+	    } else {
+	      if (feature_size != 6)
+		throw std::runtime_error("we are expecting 3 features");
+	    }
+	  }
 	  
 	  score_streams.reserve(feature_size);
 	  score_streams.resize(feature_size);
