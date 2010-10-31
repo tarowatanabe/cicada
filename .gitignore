@@ -1,8 +1,7 @@
 #ignore objects and archives.
 *.[oa]
-
-#ignore .la
 *.lo
+*.la
 
 # libtool related stuff
 .libs
