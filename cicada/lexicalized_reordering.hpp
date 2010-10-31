@@ -7,6 +7,7 @@
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
+#include <cicada/symbol_vector.hpp>
 
 #include <succinct_db/succinct_trie_db.hpp>
 
@@ -25,146 +26,250 @@ namespace cicada
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
-    typedef Symbol             word_type;
-    typedef Vocab              vocab_type;
-    typedef word_type::id_type word_id_type;
+    typedef Symbol  word_type;
+    typedef Vocab   vocab_type;
+    
+    typedef SymbolVector                        phrase_type;
+    typedef std::pair<phrase_type, phrase_type> phrase_pair_type;
+    typedef std::pair<phrase_type, size_type>   phrase_node_type;
     
     typedef boost::filesystem::path path_type;
     
-    typedef float weight_type;
-    
     typedef uint64_t                           hash_value_type;
     typedef utils::hashmurmur<hash_value_type> hasher_type;
+
+    typedef float          score_type;
+    typedef uint8_t        quantized_type;
+    typedef uint32_t       id_type;
+
+    typedef utils::simple_vector<score_type, std::allocator<score_type> > feature_set_type;
     
   private:
-    typedef word_id_type key_type;
-    typedef weight_type  mapped_type;
+    typedef word_type::id_type key_type;
+    typedef id_type            mapped_type;
     
-    typedef std::allocator<std::pair<key_type, mapped_type> >  lexicon_alloc_type;
-    typedef succinctdb::succinct_trie_db<key_type, mapped_type, lexicon_alloc_type > lexicon_type;
+    typedef std::allocator<std::pair<key_type, mapped_type> >  phrase_alloc_type;
+    typedef succinctdb::succinct_trie_db<key_type, mapped_type, phrase_alloc_type > phrase_db_type;
     
-    struct NodeCache
+    class ScoreSet
     {
-      word_type::id_type      word;
-      lexicon_type::size_type node;
+    public:
+      typedef utils::map_file<score_type, std::allocator<score_type> >                     score_set_type;
+      typedef utils::packed_vector_mapped<quantized_type, std::allocator<quantized_type> > quantized_set_type;
+      typedef boost::array<score_type, 256>                                                score_map_type;
       
-      NodeCache()
-	: word(word_type::id_type(-1)), node(0) {}
-    };
-    typedef NodeCache node_cache_type;
-    
-    typedef utils::array_power2<node_cache_type, 1024 * 8, std::allocator<node_cache_type> > node_cache_set_type;
-    
-    struct LexiconCache
-    {
-      word_type::id_type word;
-      lexicon_type::size_type prev;
-      lexicon_type::size_type next;
+      ScoreSet() {}
+      ScoreSet(const path_type& path) { read(path); }
       
-      LexiconCache()
-	: word(word_type::id_type(-1)), prev(0), next(0) {}
+      void read(const path_type& path);
+      void write(const path_type& file) const;
+      
+      void clear()
+      {
+	score.clear();
+	quantized.clear();
+      }
+      void close() { clear(); }
+      
+      score_type operator[](size_type pos) const
+      {
+	return (quantized.is_open()
+		? maps[quantized[pos]]
+		: score[pos]);
+      }
+      
+      path_type path() const
+      {
+	return (quantized.is_open()
+		? quantized.path().parent_path()
+		: score.path().parent_path());
+      }
+      bool empty() const { return quantized.empty() && score.empty(); }
+      size_type size() const
+      {
+	return (quantized.is_open()
+		? quantized.size()
+		: score.size());
+      }
+      
+      score_set_type     score;
+      quantized_set_type quantized;
+      score_map_type     maps;
     };
-    typedef LexiconCache lexicon_cache_type;
-    typedef utils::array_power2<lexicon_cache_type, 1024 * 64, std::allocator<lexicon_cache_type> > lexicon_cache_set_type;
+    
+    typedef ScoreSet score_set_type;
+    typedef std::vector<score_set_type, std::allocator<score_set_type> > score_db_type;
 
+    template <typename Tp>
+    struct __cache
+    {
+      Tp        value;
+      size_type index;
+      
+      __cache() : value(), index(size_type(-1)) {}
+    };
+
+    typedef __cache<feature_set_type> cache_feature_type;
+    typedef __cache<phrase_type>      cache_phrase_type;
+    typedef __cache<phrase_node_type> cache_phrase_node_type;
+
+    typedef utils::array_power2<cache_feature_type,     1024 * 16, std::allocator<cache_feature_type> >     cache_feature_set_type;
+    typedef utils::array_power2<cache_phrase_type,      1024 * 8,  std::allocator<cache_phrase_type> >      cache_phrase_set_type;
+    typedef utils::array_power2<cache_phrase_node_type, 1024 * 16, std::allocator<cache_phrase_node_type> > cache_phrase_node_set_type;
+    
   public:
     
     LexicalizedReordering() { clear(); }
-    LexicalizedReordering(const path_type& path) { open(path); }
+    LexicalizedReordering(const std::string& parameter) { open(parameter); }
     LexicalizedReordering(const LexicalizedReordering& x)
-      : lexicon(x.lexicon),
-	vocab(x.vocab) {}
+      : phrases(x.phrases),
+	scores(x.scores),
+	vocab(x.vocab),
+	fe(x.fe),
+	bidirectional(x.bidirectional),
+	monotonicity(x.monotonicity) {}
     
     LexicalizedReordering& operator=(const LexicalizedReordering& x)
     {
       clear();
       
-      lexicon = x.lexicon;
-      vocab = x.vocab;
+      phrases = x.phrases;
+      scores  = x.scores;
+      vocab   = x.vocab;
+      
+      fe            = x.fe;
+      bidirectional = x.bidirectional;
+      monotonicity  = x.monotonicity;
+
       return *this;
     }
     
   public:
-    
-    template <typename Iterator>
-    weight_type operator()(const word_type& target, Iterator first, Iterator last) const
+    const feature_set_type& operator[](size_type pos) const
     {
-      if (empty()) return 0.0;
-      
-      const lexicon_type::size_type node = find(target);
-      
-      double weight = 0.0;
-      
-      if (lexicon.is_valid(node)) {
-	// bias term...
-	const lexicon_type::size_type node_next = find(node, vocab_type::NONE);
-	if (lexicon.is_valid(node_next) && lexicon.exists(node_next))
-	  weight += lexicon[node_next];
+      if (! phrases.is_valid(pos) || ! phrases.exists(pos)) {
+	if (none_features.empty())
+	  const_cast<feature_set_type&>(none_features).resize(scores.size(), 0.0);
 	
-	// others...
-	for (/**/; first != last; ++ first) {
-	  const lexicon_type::size_type node_next = find(node, *first);
+	return none_features;
+      } else {
+	const size_type cache_pos = hasher_type::operator()(pos) & (cache_features.size() - 1);
+	cache_feature_type& cache = const_cast<cache_feature_type&>(cache_features[cache_pos]);
+	
+	if (cache.index != pos) {
+	  cache.value.resize(scores.size());
+	  for (size_t feature = 0; feature < scores.size(); ++ feature)
+	    cache.value[feature] = scores[feature][pos];
 	  
-	  if (lexicon.is_valid(node_next) && lexicon.exists(node_next))
-	    weight += lexicon[node_next];
+	  cache.index = pos;
 	}
+	
+	return cache.value;
       }
-      
-      return - boost::math::log1p(std::exp(- weight));
     }
 
-  private:
-    lexicon_type::size_type find(const word_type& word) const
+    template <typename Iterator>
+    size_type find(Iterator first, Iterator last) const
     {
-      const size_type cache_pos = hash_value(word) & (cache_node.size() - 1);
-      node_cache_type& cache = const_cast<node_cache_type&>(cache_node[cache_pos]);
+      const size_type cache_pos = hasher_type::operator()(first, last, 0) & (cache_phrases.size() - 1);
+      cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
       
-      if (cache.word != word.id()) {
-	const word_id_type word_id = vocab[word];
+      if (! equal_phrase(first, last, cache.value)) {
+	cache.value.assign(first, last);
 	
-	cache.word = word.id();
-	cache.node = lexicon.find(&word_id, 1);
+	size_type node = 0;
+	for (Iterator iter = first; iter != last && phrases.is_valid(node); ++ iter) {
+	  const word_type::id_type id = vocab[*iter];
+	  node = phrases.find(&id, 1, node);
+	}
+	
+	cache.index = node;
       }
       
-      return cache.node;
+      return cache.index;
     }
     
-    lexicon_type::size_type find(const lexicon_type::size_type& node, const word_type& word) const
+    template <typename IteratorSource, typename IteratorTarget>
+    size_type find(IteratorSource first_source, IteratorSource last_source,
+		   IteratorTarget first_target, IteratorTarget last_target) const
     {
-      const size_type cache_pos = hasher_type::operator()(word.id(), node) & (cache_lexicon.size() - 1);
-      lexicon_cache_type& cache = const_cast<lexicon_cache_type&>(cache_lexicon[cache_pos]);
-      if (cache.word != word.id() || cache.prev != node) {
-	const word_id_type word_id = vocab[word];
+      size_type node = find(first_source, last_source);
+      
+      if (! phrases.is_valid(node))
+	return node;
+      
+      const size_type cache_pos = hasher_type::operator()(first_target, last_target, node) & (cache_phrase_nodes.size() - 1);
+      cache_phrase_node_type& cache = const_cast<cache_phrase_node_type&>(cache_phrase_nodes[cache_pos]);
+      if (cache.value.second != node || ! equal_phrase(first_target, first_target, cache.value.first)) {
 	
-	cache.word = word.id();
-	cache.prev = node;
-	cache.next = lexicon.find(&word_id, 1, node);
+	cache.value.first.assign(first_target, last_target);
+	cache.value.second = node;
+	
+	const word_type::id_type id = vocab[vocab_type::EMPTY];
+	node = phrases.find(&id, 1, node);
+	
+	if (phrases.is_valid(node)) {
+	  for (IteratorTarget iter = first_target; iter != last_target && phrases.is_valid(node); ++ iter) {
+	    const word_type::id_type id = vocab[*iter];
+	    node = phrases.find(&id, 1, node);
+	  }
+	}
+	
+	cache.index = node;
       }
-      return cache.next;
+      
+      return cache.index;
+    }
+    
+  private:
+    
+    template <typename Iterator, typename __Phrase>
+    inline
+    bool equal_phrase(Iterator first, Iterator last, const __Phrase& x) const
+    {
+      return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
     }
 
   public:
-    void open(const path_type& path);
+    void open(const std::string& parameter);
     void write(const path_type& file) const;
+    void quantize();
     
     void close() { clear(); }
     void clear()
     {
-      cache_lexicon.clear();
-      cache_node.clear();
-      lexicon.clear();
+      none_features.clear();
+      cache_features.clear();
+      cache_phrases.clear();
+      cache_phrase_nodes.clear();
+      
+      phrases.clear();
+      scores.clear();
+		    
       vocab.clear();
+
+      fe = false;
+      bidirectional = false;
+      monotonicity = false;
     }
     
-    path_type path() const { return lexicon.path().parent_path(); }
-    bool empty() const { return lexicon.empty(); }
+    path_type path() const { return phrases.path().parent_path(); }
+    bool empty() const { return phrases.empty(); }
 
   private:
-    lexicon_cache_set_type cache_lexicon;
-    node_cache_set_type    cache_node;
+    feature_set_type           none_features;
+    cache_feature_set_type     cache_features;
+    cache_phrase_set_type      cache_phrases;
+    cache_phrase_node_set_type cache_phrase_nodes;
 
-    lexicon_type lexicon;
-    vocab_type   vocab;
+    phrase_db_type phrases;
+    score_db_type  scores;
+
+    vocab_type vocab;
+    
+    bool fe;
+    bool bidirectional;
+    bool monotonicity;
   };
   
 };

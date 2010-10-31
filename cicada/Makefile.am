@@ -152,6 +152,7 @@ hypergraph.hpp \
 inside_outside.hpp \
 kbest.hpp \
 lattice.hpp \
+lexicalized_reordering.hpp \
 model.hpp \
 ngram.hpp \
 ngram_index.hpp \
@@ -196,6 +197,7 @@ grammar_static.cpp \
 graphviz.cpp \
 hypergraph.cpp \
 lattice.cpp \
+lexicalized_reordering.cpp \
 ngram.cpp \
 ngram_index.cpp \
 model.cpp \
