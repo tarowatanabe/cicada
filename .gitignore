@@ -7,3 +7,7 @@
 # libtool related stuff
 .libs
 .deps
+
+
+## ignore backup
+*~
