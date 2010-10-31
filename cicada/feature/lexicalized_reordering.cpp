@@ -44,11 +44,61 @@ namespace cicada
 	model = x.model;
 	return *this;
       }
+
+      double reordering_score_next(const int prev_first, const int prev_last,
+				   const int next_first, const int next_last,
+				   const size_type node) const
+      {
+	const model_type::feature_set_type& features = model[node];
+
+	if (! model.bidirectional)
+	  return 0.0;
+	else {
+	  if (model.monotonicity) {
+	    if (prev_last == next_first)
+	      return features[2];
+	    else
+	      return features[3];
+	  } else {
+	    if (prev_last == next_first)
+	      return features[3];
+	    else if (next_last == prev_first)
+	      return features[4];
+	    else
+	      return features[5];
+	  }
+	}
+      }
       
-      double lexicalizedreordering_score(state_ptr_type& state,
+      double reordering_score(const int prev_first, const int prev_last,
+			      const int next_first, const int next_last,
+			      const size_type node) const
+      {
+	const model_type::feature_set_type& features = model[node];
+	
+	if (model.monotonicity) {
+	  if (prev_last == next_first)
+	    return features[0];
+	  else
+	    return features[1];
+	} else {
+	  if (prev_last == next_first)
+	    return features[0];
+	  else if (next_last == prev_first)
+	    return features[1];
+	  else
+	    return features[2];
+	}
+      }
+      
+      
+      double lexicalized_reordering_score(state_ptr_type& state,
 					 const state_ptr_set_type& states,
 					 const edge_type& edge) const
       {
+	if (! lattice)
+	  throw std::runtime_error("no input lattice?");
+
 	int* span       = reinterpret_cast<int*>(state);
 	size_type* node = reinterpret_cast<size_type*>(span + 2);
 	
@@ -66,7 +116,7 @@ namespace cicada
 		   ? model.find(phrase.begin(), phrase.end(), edge.rule->rhs.begin(), edge.rule->rhs.end())
 		   : model.find(phrase.begin(), phrase.end()));
 	  
-	  return (lattice ? - lattice->shortest_distance(0, span[0]) : - span[0]);
+	  return reordering_score(0, 0, edge.first, edge.last, *node);
 	} else if (states.size() == 1) {
 	  // it is only for the goal state...
 	  const int*       span_antecedent = reinterpret_cast<const int*>(states[0]);
@@ -88,22 +138,22 @@ namespace cicada
 	  *node   = *node_phrase;
 	  
 	  // make adjustment, since this span-phrase is not a initial phrase..
-	  const int score_adjust = (lattice ? lattice->shortest_distance(0, span[0]) : span[0]);
-
-	  if (lattice) {
-	    if (span_antecedent[1] == span_phrase[0])
-	      return score_adjust;
-	    else if (span_antecedent[1] < span_phrase[0])
-	      return - lattice->shortest_distance(span_antecedent[1], span_phrase[0]) + score_adjust;
-	    else
-	      return - lattice->shortest_distance(span_phrase[0], span_antecedent[1]) + score_adjust;
-	  } else
-	    return - utils::bithack::abs(span_antecedent[1] - span_phrase[0]) + score_adjust;
+	  const double score_adjust = reordering_score(0, 0,
+						       span_phrase[0], span_phrase[1],
+						       *node_phrase);
+	  const double score        = reordering_score(span_antecedent[0], span_antecedent[1],
+						       span_phrase[0], span_phrase[1],
+						       *node_phrase);
+	  const double score_next   = reordering_score_next(span_antecedent[0], span_antecedent[1],
+							    span_phrase[0], span_phrase[1],
+							    *node_antecedent);
+	  
+	  return score + score_next - score_adjust;
 	} else
 	  throw std::runtime_error("we do not support non-phrasal composed hypergraph");
       }
 
-      double lexicalizedreordering_final_score(const state_ptr_type& state) const
+      double lexicalized_reordering_final_score(const state_ptr_type& state) const
       {
 	const int* span = reinterpret_cast<const int*>(state);
 	
@@ -180,10 +230,10 @@ namespace cicada
 				      feature_set_type& estimates,
 				      const bool final) const
     {
-      double score = pimpl->lexicalizedreordering_score(state, states, edge);
+      double score = pimpl->lexicalized_reordering_score(state, states, edge);
       
       if (final)
-	score += pimpl->lexicalizedreordering_final_score(state);
+	score += pimpl->lexicalized_reordering_final_score(state);
       
       if (score != 0.0)
 	features[base_type::feature_name()] = score;
