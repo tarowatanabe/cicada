@@ -56,10 +56,15 @@ namespace cicada
 	  // How do we capture initial phrase....???
 	  span[0] = edge.first;
 	  span[1] = edge.last;
+
+	  sentence_type& phrase = const_cast<sentence_type&>(phrase_impl);
+	  phrase.clear();
+	  for (int pos = edge.first; pos != edge.last; ++ pos)
+	    phrase.push_back(lattice->operator[](pos).front().label);
 	  
-	  if (model.bidirectional) {
-	    
-	  }
+	  *node = (model.fe
+		   ? model.find(phrase.begin(), phrase.end(), edge.rule->rhs.begin(), edge.rule->rhs.end())
+		   : model.find(phrase.begin(), phrase.end()));
 	  
 	  return (lattice ? - lattice->shortest_distance(0, span[0]) : - span[0]);
 	} else if (states.size() == 1) {
@@ -80,6 +85,7 @@ namespace cicada
 	  
 	  span[0] = span_phrase[0];
 	  span[1] = span_phrase[1];
+	  *node   = *node_phrase;
 	  
 	  // make adjustment, since this span-phrase is not a initial phrase..
 	  const int score_adjust = (lattice ? lattice->shortest_distance(0, span[0]) : span[0]);
@@ -107,9 +113,15 @@ namespace cicada
       void assign(const lattice_type& __lattice)
       {
 	lattice = &__lattice;
+	
+	lattice_type::const_iterator liter_end = lattice->end();
+	for (lattice_type::const_iterator liter = lattice->begin(); liter != liter_end; ++ liter)
+	  if (liter->size() != 1)
+	    throw std::runtime_error("we do not support non-linear lattice!");
       }
       
       model_type model;
+      sentence_type phrase_impl;
       
       const lattice_type* lattice;
     };
