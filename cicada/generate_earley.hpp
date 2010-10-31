@@ -15,7 +15,6 @@
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort.hpp>
-#include <cicada/span_node.hpp>
 #include <cicada/span_vector.hpp>
 #include <cicada/sentence.hpp>
 

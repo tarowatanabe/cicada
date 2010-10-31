@@ -6,7 +6,6 @@
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
-#include "cicada/span_node.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/lexical_cast.hpp"
