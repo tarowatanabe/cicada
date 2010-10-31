@@ -28,11 +28,8 @@ Add libstemmer? (and hand-coded Arabic rule?)
 
 
 Added phrasal-composer, which performs phrase-based decoding..
-      add distortion cost
-      add lexicalized reordering
-      HOW? 
-      	   Our feature-function assumes no-information for terminal positions...
-	   Do we add some features during composition? (Ugly)
+      add lexicalized reordering... but difficult since we do not presesrve source-side phrases!!!
+      
 
 Allow binarization/permutation with arbitrary rule type?
       attach terminals to binarized rule...where?
