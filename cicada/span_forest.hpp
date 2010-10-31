@@ -97,7 +97,19 @@ namespace cicada
     span_set_type spans_node;
     visited_type  visited;
   };
+
+  inline
+  void span_forest(HyperGraph& graph)
+  {
+    HyperGraph target;
+    SpanForest __span_forest;
+    
+    __span_forest(graph, target);
+    
+    graph.swap(target);
+  }
   
+  inline
   void span_forest(const HyperGraph& graph, HyperGraph& target)
   {
     SpanForest __span_forest;

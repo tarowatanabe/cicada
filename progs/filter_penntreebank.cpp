@@ -25,6 +25,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "cicada/hypergraph.hpp"
+#include "cicada/span_forest.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -296,10 +297,13 @@ int main(int argc, char** argv)
 	
 	transform(parsed, graph);
 
-	if (! graph.edges.empty())
+	if (! graph.edges.empty()) {
 	  graph.topologically_sort();
-	else
+	  cicada::span_forest(graph);
+	} else
 	  graph.clear();
+
+	
 
 	if (rule) {
 	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();

@@ -12,6 +12,7 @@
 
 #include "cicada/hypergraph.hpp"
 #include "cicada/sentence.hpp"
+#include "cicada/span_forest.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/space_separator.hpp"
@@ -182,9 +183,13 @@ int main(int argc, char** argv)
 	    graph.connect_edge(edge.id, parent_id);
 	  }
 	  
-	  if (! graph.nodes.empty() && graph.goal != hypergraph_type::invalid)
+	  if (! graph.nodes.empty() && graph.goal != hypergraph_type::invalid) {
 	    graph.topologically_sort();
+	    cicada::span_forest(graph);
+	  }
 	  
+	  
+
 	  os << graph << '\n';
 	}
 	
