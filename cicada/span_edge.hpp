@@ -101,6 +101,7 @@ namespace cicada
   };
   
   template <typename SpanSet>
+  inline
   void span_edge(const HyperGraph& graph, SpanSet& spans)
   {
     SpanEdge __span_edge;
