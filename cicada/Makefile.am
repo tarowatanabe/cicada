@@ -68,6 +68,7 @@ feature/bleu_expected.hpp \
 feature/bleu_linear.hpp \
 feature/distortion.hpp \
 feature/global_lexicon.hpp \
+feature/lexicalized_reordering.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
 feature/ngram_tree.hpp \
@@ -83,6 +84,7 @@ feature/bleu_expected.cpp \
 feature/bleu_linear.cpp \
 feature/distortion.cpp \
 feature/global_lexicon.cpp \
+feature/lexicalized_reordering.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \
 feature/ngram_tree.cpp \
