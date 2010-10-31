@@ -266,7 +266,8 @@ namespace cicada
     score_db_type  scores;
 
     vocab_type vocab;
-    
+
+  public:    
     bool fe;
     bool bidirectional;
     bool monotonicity;
