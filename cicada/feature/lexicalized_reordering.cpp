@@ -65,18 +65,18 @@ namespace cicada
 	} else if (states.size() == 1) {
 	  // it is only for the goal state...
 	  const int*       span_antecedent = reinterpret_cast<const int*>(states[0]);
-	  const size_type* node_antecedent = reinterpret_cast<size_type*>(span_antecedent + 2);
+	  const size_type* node_antecedent = reinterpret_cast<const size_type*>(span_antecedent + 2);
 
 	  span[0] = span_antecedent[0];
 	  span[1] = span_antecedent[1];
-	  node    = node_antecedent;
+	  *node   = *node_antecedent;
 	  return 0.0;
 	} else if (states.size() == 2) {
 	  const int*       span_antecedent = reinterpret_cast<const int*>(states[0]);
-	  const size_type* node_antecedent = reinterpret_cast<size_type*>(span_antecedent + 2);
+	  const size_type* node_antecedent = reinterpret_cast<const size_type*>(span_antecedent + 2);
 	  
 	  const int*       span_phrase     = reinterpret_cast<const int*>(states[1]);
-	  const size_type* node_phrase     = reinterpret_cast<size_type*>(span_phrase + 2);
+	  const size_type* node_phrase     = reinterpret_cast<const size_type*>(span_phrase + 2);
 	  
 	  span[0] = span_phrase[0];
 	  span[1] = span_phrase[1];
