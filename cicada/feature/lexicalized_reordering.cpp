@@ -53,10 +53,10 @@ namespace cicada
 	  } else {
 	    feature_names.push_back("lexicalized-reordering:forward-monotone");
 	    feature_names.push_back("lexicalized-reordering:forward-swap");
-	    feature_names.push_back("lexicalized-reordering:forward-discontiguous");
+	    feature_names.push_back("lexicalized-reordering:forward-discontinuous");
 	    feature_names.push_back("lexicalized-reordering:backward-monotone");
 	    feature_names.push_back("lexicalized-reordering:backward-swap");
-	    feature_names.push_back("lexicalized-reordering:backward-discontiguous");
+	    feature_names.push_back("lexicalized-reordering:backward-discontinuous");
 	  }
 	} else {
 	  if (model.monotonicity) {
@@ -65,7 +65,7 @@ namespace cicada
 	  } else {
 	    feature_names.push_back("lexicalized-reordering:forward-monotone");
 	    feature_names.push_back("lexicalized-reordering:forward-swap");
-	    feature_names.push_back("lexicalized-reordering:forward-discontiguous");
+	    feature_names.push_back("lexicalized-reordering:forward-discontinuous");
 	  }
 	}
       }
