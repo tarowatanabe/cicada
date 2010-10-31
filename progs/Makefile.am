@@ -34,6 +34,7 @@ bin_PROGRAMS = \
 	cluster_index \
 	grammar_index \
 	global_lexicon_index \
+	lexicalized_reordering_index \
 	\
 	mpish \
 	mpipe
@@ -93,6 +94,9 @@ grammar_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDAD
 
 global_lexicon_index_SOURCES = global_lexicon_index.cpp
 global_lexicon_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+lexicalized_reordering_index_SOURCES = lexicalized_reordering_index.cpp
+lexicalized_reordering_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 filter_penntreebank_SOURCES = filter_penntreebank.cpp
 filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

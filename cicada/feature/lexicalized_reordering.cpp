@@ -236,7 +236,10 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (param.name() != "lexicalized-reordering")
+      if (param.name() != "lexicalized-reordering"
+	  && param.name() != "lexicalized-reorder"
+	  && param.name() != "lexical-reordering"
+	  && param.name() != "lexical-reorder")
 	throw std::runtime_error("is this really lexicalized reordering feature function? " + parameter);
       
       std::string file;

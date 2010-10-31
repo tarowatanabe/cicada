@@ -9,6 +9,7 @@
 #include "feature/bleu_linear.hpp"
 #include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
+#include "feature/lexicalized_reordering.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
 #include "feature/ngram_tree.hpp"
@@ -49,6 +50,8 @@ bleu-linear: linear corpus-BLEU\n\
 distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
+lexicalized-reordering: lexicalized reordering for phrase-based\n\
+\tfile=model file\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
@@ -108,6 +111,11 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::Distortion(parameter));
     else if (param.name() == "global-lexicon")
       return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
+    else if (param.name() == "lexicalized-reordering"
+	     || param.name() == "lexicalized-reorder"
+	     || param.name() == "lexical-reordering"
+	     || param.name() == "lexical-reorder")
+      return feature_function_ptr_type(new feature::LexicalizedReordering(parameter));
     else if (param.name() == "span")
       return feature_function_ptr_type(new feature::Span(parameter));
     else if (param.name() == "variational")
