@@ -137,6 +137,7 @@ compose.hpp \
 compose_cky.hpp \
 compose_earley.hpp \
 compose_phrase.hpp \
+compose_tree.hpp \
 edit_distance_forest.hpp \
 eval.hpp \
 expected_ngram.hpp \
