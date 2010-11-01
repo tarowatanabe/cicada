@@ -13,9 +13,10 @@ Basically, we have three distinct structures:
    - hypergraph: a compact representation of set of trees (or forest).
 
 Translation can be carried out by:
-   - A lattice (or sentence) is composed with a grammar by generating a hypergraph [2].
-   - A lattice (or sentence) is composed with a phrasal grammar by generating a phrasal hypergraph [4].
-   - A hypergraph/forest (or parse-tree) is composed with a grammar by generating another hypergraph [3].
+   - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2].
+   - A lattice (or sentence) is composed with a phrasal grammar, generating a phrasal hypergraph [4].
+   - A hypergraph/forest (or parse-tree) is composed with a phrasal grammar, generating another hypergraph [3].
+   - A hypergraph/forest (or parse-tree) is composed with a tree grammar, generating another hypergraph [4]. (experimental)
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].

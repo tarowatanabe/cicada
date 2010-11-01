@@ -15,6 +15,7 @@
 #include <cicada/span_vector.hpp>
 #include <cicada/weight_vector.hpp>
 #include <cicada/grammar.hpp>
+#include <cicada/tree_grammar.hpp>
 #include <cicada/model.hpp>
 
 #include <boost/filesystem/path.hpp>
@@ -41,6 +42,7 @@ namespace cicada
     typedef cicada::Symbol word_type;
 
     typedef cicada::Grammar         grammar_type;
+    typedef cicada::TreeGrammar     tree_grammar_type;
     typedef cicada::Model           model_type;
     typedef cicada::FeatureFunction feature_function_type;
     

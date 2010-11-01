@@ -19,10 +19,12 @@ namespace cicada
     typedef operation_type::data_type        data_type;
     typedef operation_type::output_data_type output_data_type;
     
-    typedef operation_type::weight_set_type weight_set_type;
-    typedef operation_type::grammar_type    grammar_type;
-    typedef operation_type::model_type      model_type;
-    typedef operation_type::path_type       path_type;
+    typedef operation_type::weight_set_type   weight_set_type;
+    typedef operation_type::grammar_type      grammar_type;
+    typedef operation_type::tree_grammar_type tree_grammar_type;
+    typedef operation_type::model_type        model_type;
+    
+    typedef operation_type::path_type         path_type;
     
     typedef operation_type::hypergraph_type      hypergraph_type;
     typedef operation_type::lattice_type         lattice_type;
