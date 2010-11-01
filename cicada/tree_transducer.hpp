@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <cicada/symbol.hpp>
+#include <cicada/symbol_vector.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/rule.hpp>
 #include <cicada/tree_rule.hpp>
@@ -30,6 +31,8 @@ namespace cicada
     typedef cicada::Symbol   symbol_type;
     typedef cicada::Vocab    vocab_type;
     typedef cicada::TreeRule rule_type;
+
+    typedef cicada::SymbolVector symbol_set_type;
     
     typedef cicada::HyperGraph::feature_set_type feature_set_type;
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
@@ -41,6 +44,10 @@ namespace cicada
       feature_set_type features;
       
       RulePair() : source(), target(), features() {}
+      RulePair(const rule_ptr_type& __source, const rule_ptr_type& __target)
+	: source(__source), target(__target), features() {}
+      RulePair(const rule_ptr_type& __source, const rule_ptr_type& __target, const feature_set_type& __features)
+	: source(__source), target(__target), features(__features) {}
     };
     
     typedef RulePair rule_pair_type;
@@ -48,6 +55,7 @@ namespace cicada
     
     // 64-bit id type!
     typedef uint64_t id_type;
+    typedef uint32_t edge_id_type;
 
     typedef TreeTransducer transducer_type;
     typedef boost::shared_ptr<transducer_type> transducer_ptr_type;
@@ -56,11 +64,14 @@ namespace cicada
     virtual ~TreeTransducer() {}
     virtual transducer_ptr_type clone() const = 0;
 
+    // operation over edges...
+    virtual edge_id_type edge(const symbol_type& symbol) const = 0;
+    virtual edge_id_type edge(const symbol_set_type& symbols) const = 0;
+    virtual edge_id_type edge(const symbol_type* first, const symbol_type* last) const = 0;
+    
+    // operation over nodes...
     virtual id_type root() const = 0;
-    virtual id_type next(const id_type& node, const symbol_type& symbol) const = 0;
-    virtual id_type next_epsilon(const id_type& node) const = 0;
-    virtual id_type next_comma(const id_type& node) const = 0;
-    virtual id_type next_delimitter(const id_type& node) const = 0;
+    virtual id_type next(const id_type& node, const edge_id_type& edge) const = 0;
     virtual bool has_next(const id_type& node) const = 0;
     virtual const rule_pair_set_type& rules(const id_type& node) const = 0;
   };

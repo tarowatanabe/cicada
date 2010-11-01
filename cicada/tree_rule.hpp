@@ -93,6 +93,8 @@ namespace cicada
     return seed;
   }
 
+  void sort(TreeRule& x, TreeRule& y);
+  
   inline
   bool operator==(const TreeRule& x, const TreeRule& y)
   {

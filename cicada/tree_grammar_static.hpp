@@ -53,11 +53,13 @@ namespace cicada
   public:
     // virtual members
     transducer_ptr_type clone() const;
+    
+    edge_id_type edge(const symbol_type& symbol) const;
+    edge_id_type edge(const symbol_set_type& symbols) const;
+    edge_id_type edge(const symbol_type* first, const symbol_type* last) const;
+    
     id_type root() const;
-    id_type next(const id_type& node, const symbol_type& symbol) const;
-    id_type next_epsilon(const id_type& node) const;
-    id_type next_comma(const id_type& node) const;
-    id_type next_delimitter(const id_type& node) const;
+    id_type next(const id_type& node, const edge_id_type& edge) const;
     bool has_next(const id_type& node) const;
     const rule_pair_set_type& rules(const id_type& node) const;
 

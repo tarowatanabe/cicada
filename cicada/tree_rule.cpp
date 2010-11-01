@@ -215,4 +215,58 @@ namespace cicada
     
     return os;
   }
+  
+  template <typename Index>
+  inline
+  void sort_source(TreeRule& rule, Index& index, int& pos)
+  {
+    if (rule.label.is_non_terminal() && rule.antecedents.empty()) {
+      int non_terminal_pos = rule.label.non_terminal_index();
+      if (non_terminal_pos == 0)
+	non_terminal_pos = pos;
+      
+      if (non_terminal_pos >= static_cast<int>(index.size()))
+	index.resize(non_terminal_pos + 1);
+      index[non_terminal_pos] = pos;
+      
+      rule.label = rule.label.non_terminal(pos);
+      
+      ++ pos;
+    }
+    
+    TreeRule::antecedent_set_type::iterator iter_end = rule.antecedents.end();
+    for (TreeRule::antecedent_set_type::iterator iter = rule.antecedents.begin(); iter != iter_end; ++ iter)
+      sort_source(*iter, index, pos);
+  }
+  
+  template <typename Index>
+  inline
+  void sort_target(TreeRule& rule, const Index& index, int& pos)
+  {
+    if (rule.label.is_non_terminal() && rule.antecedents.empty()) {
+      if (pos >= static_cast<int>(index.size()))
+	throw std::runtime_error("sort tree failed: output index");
+      
+      rule.label = rule.label.non_terminal(index[pos]);
+      ++ pos;
+    }
+    
+    TreeRule::antecedent_set_type::iterator iter_end = rule.antecedents.end();
+    for (TreeRule::antecedent_set_type::iterator iter = rule.antecedents.begin(); iter != iter_end; ++ iter)
+      sort_target(*iter, index, pos);
+  }
+
+  void sort(TreeRule& x, TreeRule& y)
+  {
+    typedef std::vector<int, std::allocator<int> > index_type;
+    
+    // we will sort in pre-order traversal...
+    index_type index;
+    
+    int pos = 1;
+    sort_source(x, index, pos);
+    
+    pos = 1;
+    sort_target(y, index, pos);
+  }
 };

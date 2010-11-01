@@ -9,6 +9,7 @@
 #include "quantizer.hpp"
 
 #include "succinct_db/succinct_trie_database.hpp"
+#include "succinct_db/succinct_trie_db.hpp"
 #include "succinct_db/succinct_hash.hpp"
 
 #include "utils/bithack.hpp"
@@ -41,11 +42,14 @@
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
+#include <google/dense_hash_set>
 
 namespace cicada
 {
   struct TreeGrammarStaticImpl : public utils::hashmurmur<uint64_t>
   {
+    friend class TreeGrammarStatic;
+
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
@@ -77,10 +81,12 @@ namespace cicada
     typedef char byte_type;
     typedef char mapped_type;
     
-    typedef std::allocator<std::pair<word_type::id_type, mapped_type> > rule_alloc_type;
+    typedef std::allocator<std::pair<id_type, mapped_type> > rule_alloc_type;
     
     typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> >               rule_db_type;
-    typedef succinctdb::succinct_trie_database<word_type::id_type, mapped_type, rule_alloc_type > rule_pair_db_type;
+    
+    typedef succinctdb::succinct_trie_db<word_type::id_type, id_type, std::allocator<std::pair<word_type::id_type, id_type> > > edge_db_type;
+    typedef succinctdb::succinct_trie_database<id_type, mapped_type, rule_alloc_type > rule_pair_db_type;
     
     typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
     
@@ -152,7 +158,8 @@ namespace cicada
 
     TreeGrammarStaticImpl(const std::string& parameter) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
-      : rule_db(x.rule_db),
+      : edge_db(x.edge_db), 
+	rule_db(x.rule_db),
 	source_db(x.source_db),
 	target_db(x.target_db),
 	score_db(x.score_db),
@@ -163,6 +170,7 @@ namespace cicada
     {
       clear();
       
+      edge_db       = x.edge_db;
       rule_db       = x.rule_db;
       source_db     = x.source_db;
       target_db     = x.target_db;
@@ -175,6 +183,7 @@ namespace cicada
     
     void clear()
     {
+      edge_db.clear();
       rule_db.clear();
       source_db.clear();
       target_db.clear();
@@ -187,41 +196,54 @@ namespace cicada
       cache_target.clear();
     }
 
-    
-    size_type find(const word_type& word) const
+    size_type find_edge(const word_type& word) const
     {
       size_type node = 0;
-      return find(word, node);
+      return find_edge(word, node);
     }
     
-    size_type find(const word_type& word, size_type node) const
+    size_type find_edge(const word_type& word, size_type node) const
     {
       const word_type::id_type id = vocab[word];
+      return edge_db.find(&id, 1, node);
+    }
+    
+    size_type find(const id_type& id) const
+    {
+      size_type node = 0;
+      return find(id, node);
+    }
+    
+    size_type find(const id_type& id, size_type node) const
+    {
       return rule_db.find(&id, 1, node);
     }
     
-    template <typename Iterator>
-    size_type find(Iterator first, Iterator last) const
-    {
-      size_type node = 0;
-      return find(first, last, node);
-    }
+    bool is_valid_edge(size_type node) const { return edge_db.is_valid(node); }
+    bool has_children_edge(size_type node) const { return edge_db.has_children(node); }
+    bool exists_edge(size_type node) const { return edge_db.exists(node); }
     
-    template <typename Iterator>
-    size_type find(Iterator first, Iterator last, size_type node) const
-    {
-      for (/**/; first != last && is_valid(node); ++ first)
-	node = find(*first, node);
-      return node;
-    }
-    
-    // valid implies that you can continue searching from node...
     bool is_valid(size_type node) const { return rule_db.is_valid(node); }
     bool has_children(size_type node) const { return rule_db.has_children(node); }
-    
-    // exists implies data associated with the node exists...
     bool exists(size_type node) const { return rule_db.exists(node); }
     
+        struct rule_unique_hash 
+    {
+      size_t operator()(const rule_ptr_type& x) const
+      {
+	return (x.get() ? hash_value(*x) : size_t(0));
+      }
+    };
+
+    struct rule_unique_equal
+    {
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
+      {
+	return x == y || (x.get() && y.get() && *x == *y);
+      }
+    };
+    typedef google::dense_hash_set<rule_ptr_type, rule_unique_hash, rule_unique_equal > rule_unique_map_type;
+
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
       const size_type cache_pos = hasher_type::operator()(node) & (cache_rule.size() - 1);
@@ -231,6 +253,9 @@ namespace cicada
       std::pair<cache_rule_pair_set_type::iterator, bool> result = cache.find(node);
       if (! result.second) {
 	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
+
+	rule_unique_map_type rules_unique;
+	rules_unique.set_empty_key(rule_ptr_type());
 	
 	rule_pair_set_type& options = result.first->second;
 	options.clear();
@@ -270,10 +295,22 @@ namespace cicada
 	     
 	     const rule_ptr_type rule_target = read_rule(pos_target, cache_target, target_db);
 	     
-	     options.push_back(rule_pair_type());
+	     rule_ptr_type rule_sorted_source(new rule_type(*rule_source));
+	     rule_ptr_type rule_sorted_target(new rule_type(*rule_target));
 	     
-	     options.back().source = rule_source;
-	     options.back().target = rule_target;
+	     cicada::sort(*rule_sorted_source, *rule_sorted_target);
+	     
+	     if (*rule_source == *rule_sorted_source)
+	       rule_sorted_source = rule_source;
+	     else
+	       rule_sorted_source = *(rules_unique.insert(rule_sorted_source).first);
+	     
+	     if (*rule_target == *rule_sorted_target)
+	      rule_sorted_target = rule_target;
+	    else
+	      rule_sorted_target = *(rules_unique.insert(rule_sorted_target).first);
+	     
+	     options.push_back(rule_pair_type(rule_sorted_source, rule_sorted_target));
 	     
 	     for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	       const score_type score = score_db[feature][pos_feature];
@@ -298,6 +335,7 @@ namespace cicada
     }
 
   private:
+    
     const rule_ptr_type& read_rule(size_type pos,
 				   const cache_rule_set_type& caches,
 				   const rule_db_type& db) const
@@ -327,6 +365,7 @@ namespace cicada
     void read_binary(const path_type& path);
     
   private:
+    edge_db_type          edge_db;
     rule_pair_db_type     rule_db;
     rule_db_type          source_db;
     rule_db_type          target_db;
@@ -459,6 +498,7 @@ namespace cicada
     
     repository_type rep(file, repository_type::write);
     
+    edge_db.write(rep.path("edge"));
     rule_db.write(rep.path("rule"));
     source_db.write(rep.path("source"));
     target_db.write(rep.path("target"));
@@ -487,6 +527,7 @@ namespace cicada
 	
     repository_type rep(path, repository_type::read);
     
+    edge_db.open(rep.path("edge"));
     rule_db.open(rep.path("rule"));
     source_db.open(rep.path("source"));
     target_db.open(rep.path("target"));
@@ -556,7 +597,7 @@ namespace cicada
     if (! tree.empty()) {
       for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
 	tree_to_hyperpath(*aiter, path, depth + 1);
-      path[depth + 1].push_back(Vocab::STAR);
+      path[depth + 1].push_back(Vocab::NONE);
     }
   }
   
@@ -576,7 +617,7 @@ namespace cicada
     path.resize(max_depth + 1);
     
     tree_to_hyperpath(tree_epsilon, path, 0);
-    path[0].push_back(Vocab::STAR);
+    path[0].push_back(Vocab::NONE);
   }
   
 
@@ -643,25 +684,45 @@ namespace cicada
     codes.resize(citer - codes.begin());
   }
 
-  template <typename Path, typename Buffer>
+  template <typename Path, typename Buffer, typename EdgeDb>
   inline
-  void encode_path(const Path& path, Buffer& buffer)
+  void encode_path(const Path& path, Buffer& buffer, EdgeDb& edge_db)
   {
-    // convert path into buffer by
-    //    removing the last STAR
-    //    convert into non-indexed non-terminal
+    typedef std::vector<char, std::allocator<char> > codes_type;
+    typedef typename codes_type::size_type size_type;
+    
+    typedef uint64_t                           hash_value_type;
+    typedef utils::hashmurmur<hash_value_type> hasher_type;
+
     buffer.clear();
+    codes_type codes;
+
+    char buf[8];
+    const size_type buf_size = utils::byte_aligned_encode(Vocab::NONE.id(), buf);
+    const typename Buffer::value_type id_none = edge_db.insert(buf, buf_size, hasher_type()(buf, buf + buf_size, 0));
     
     typename Path::const_iterator piter_end = path.end();
     for (typename Path::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
       typedef typename Path::value_type node_type;
       
-      typename node_type::const_iterator niter_end = piter->end() - 1;
-      for (typename node_type::const_iterator niter = piter->begin(); niter != niter_end; ++ niter)
-	buffer.push_back(niter->non_terminal().id());
-      buffer.push_back(Vocab::NONE.id());
+      codes.clear();
+      codes.reserve(piter->size() * 8);
+      
+      typename node_type::const_iterator niter_end = piter->end();
+      for (typename node_type::const_iterator niter = piter->begin(); niter != niter_end; ++ niter) {
+	if (*niter == Vocab::NONE) {
+	  buffer.push_back(edge_db.insert(&(*codes.begin()), codes.size(), hasher_type()(codes.begin(), codes.end(), 0)));
+	  codes.clear();
+	} else {
+	  const size_type buf_size = utils::byte_aligned_encode(niter->id(), buf);
+	  codes.insert(codes.end(), buf, buf + buf_size);
+	}
+      }
+      
+      buffer.push_back(id_none);
     }
   }
+  
   
   // how do we store single-tree...? use raw string? perform compression? (quicklz etc. ... currently NO...)
   
@@ -673,6 +734,7 @@ namespace cicada
     const path_type path = param.name();
     
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > rule_map_type;
+    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > edge_map_type;
     
     typedef TreeScoreSetStream score_stream_type;
     typedef std::vector<score_stream_type, std::allocator<score_stream_type> > score_stream_set_type;
@@ -683,7 +745,7 @@ namespace cicada
     
     typedef std::vector<byte_type, std::allocator<byte_type> >  codes_type;
     typedef std::vector<score_type, std::allocator<score_type> > scores_type;
-    typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > index_type;
+    typedef std::vector<id_type, std::allocator<id_type> > index_type;
     typedef std::vector<word_type, std::allocator<word_type> > node_type;
     typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
     
@@ -692,19 +754,23 @@ namespace cicada
     
     const path_type tmp_dir = utils::tempfile::tmp_dir();
     
+    const path_type path_edge   = utils::tempfile::directory_name(tmp_dir / "cicada.edge.XXXXXX");
     const path_type path_rule   = utils::tempfile::directory_name(tmp_dir / "cicada.rule.XXXXXX");
     const path_type path_source = utils::tempfile::directory_name(tmp_dir / "cicada.source.XXXXXX");
     const path_type path_target = utils::tempfile::directory_name(tmp_dir / "cicada.target.XXXXXX");
     const path_type path_vocab  = utils::tempfile::directory_name(tmp_dir / "cicada.vocab.XXXXXX");
     
+    utils::tempfile::insert(path_edge);
     utils::tempfile::insert(path_rule);
     utils::tempfile::insert(path_source);
     utils::tempfile::insert(path_target);
     utils::tempfile::insert(path_vocab);
     
     rule_db.open(path_rule, rule_pair_db_type::WRITE);
-    rule_map_type        source_map(1024 * 1024 * 4);
-    rule_map_type        target_map(1024 * 1024 * 4);
+    edge_map_type edge_map(1024 * 1024 * 4);
+    
+    rule_map_type source_map(1024 * 1024 * 4);
+    rule_map_type target_map(1024 * 1024 * 4);
     
     score_stream_set_type score_streams;
     
@@ -763,7 +829,7 @@ namespace cicada
 	  
 	  tree_to_hyperpath(source_prev, hyperpath);
 	  
-	  encode_path(hyperpath, buffer_index);
+	  encode_path(hyperpath, buffer_index, edge_map);
 	  
 	  rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
 	}
@@ -809,7 +875,7 @@ namespace cicada
       
       tree_to_hyperpath(source_prev, hyperpath);
       
-      encode_path(hyperpath, buffer_index);
+      encode_path(hyperpath, buffer_index, edge_map);
       
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
@@ -827,6 +893,37 @@ namespace cicada
     // rules....
     rule_db.close();
     rule_db.open(path_rule);
+    
+    // uncover edge_db from edge_map...
+    {
+      typedef std::vector<char, std::allocator<char> > codes_type;
+      typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > buffer_type;
+      
+      edge_db.open(path_edge, edge_db_type::WRITE);
+
+      codes_type codes;
+      buffer_type buffer;
+      for (id_type id = 0; id != edge_map.size(); ++ id) {
+	codes.clear();
+	codes.insert(codes.end(), edge_map[id].begin(), edge_map[id].end());
+	
+	word_type::id_type word_id;
+
+	buffer.clear();
+	codes_type::const_iterator citer = codes.begin();
+	codes_type::const_iterator citer_end = codes.end();
+	
+	while (citer != citer_end) {
+	  citer += utils::byte_aligned_decode(word_id, &(*citer));
+	  buffer.push_back(word_id);
+	}
+	
+	edge_db.insert(&(*buffer.begin()), buffer.size(), id);
+      }
+      
+      edge_db.close();
+      edge_db.open(path_edge);;
+    }
     
     // vocabulary...
     word_type::write(path_vocab);
@@ -876,32 +973,44 @@ namespace cicada
   {
     return transducer_ptr_type(new TreeGrammarStatic(*this));
   }
+  
+  TreeGrammarStatic::edge_id_type TreeGrammarStatic::edge(const symbol_type& symbol) const
+  {
+    const id_type node = pimpl->find_edge(symbol.non_terminal(), 0);
+    
+    return (pimpl->is_valid_edge(node) && pimpl->exists_edge(node) ? pimpl->edge_db[node] : edge_id_type(-1));
+  }
+
+  
+  
+  TreeGrammarStatic::edge_id_type TreeGrammarStatic::edge(const symbol_set_type& symbols) const
+  {
+    return edge(&(*symbols.begin()), &(*symbols.end()));
+  }
+  
+  TreeGrammarStatic::edge_id_type TreeGrammarStatic::edge(const symbol_type* first, const symbol_type* last) const
+  {
+    id_type node = 0;
+    for (/**/; first != last; ++ first) {
+      node = pimpl->find_edge(first->non_terminal(), node);
+      
+      if (! pimpl->is_valid_edge(node)) break;
+    }
+    
+    return (pimpl->is_valid_edge(node) && pimpl->exists_edge(node) ? pimpl->edge_db[node] : edge_id_type(-1));
+  }
+
 
   TreeGrammarStatic::id_type TreeGrammarStatic::root() const
   {
     return 0;
   }
   
-  TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const symbol_type& symbol) const
+  TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const edge_id_type& edge) const
   {
-    const impl_type::size_type pos = pimpl->find(symbol.non_terminal(), node);
+    const impl_type::size_type pos = pimpl->find(edge, node);
     
     return (pimpl->is_valid(pos) ? id_type(pos) : id_type(0));
-  }
-
-  TreeGrammarStatic::id_type TreeGrammarStatic::next_epsilon(const id_type& node) const
-  {
-    return next(node, Vocab::EPSILON);
-  }
-  
-  TreeGrammarStatic::id_type TreeGrammarStatic::next_comma(const id_type& node) const
-  {
-    return next(node, Vocab::STAR);
-  }
-
-  TreeGrammarStatic::id_type TreeGrammarStatic::next_delimitter(const id_type& node) const
-  {
-    return next(node, Vocab::NONE);
   }
   
   bool TreeGrammarStatic::has_next(const id_type& node) const
