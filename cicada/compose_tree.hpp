@@ -71,15 +71,22 @@ namespace cicada
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       graph_out.clear();
+
+      if (! graph_in.is_valid()) return;
       
-      for (int id = graph_in.nodes.size() - 1; id >= 0; -- id)
+      // bottom-up topological order
+      for (size_t id = 0; id != graph_in.size(); ++ id)
 	match_tree(id, graph_in, graph_out);
+      
+      node_map_type::const_iterator niter = node_map.find(graph_in.goal);
+      if (niter != node_map.end())
+	graph_out.goal = niter->second;
     }
     
     void match_tree(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       if (graph_in.nodes[id].edges.empty()) return;
-
+      
       for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ id) {
 	const transducer_type& transducer = grammar[grammar_id];
 	
@@ -196,9 +203,71 @@ namespace cicada
       //
       // collect frontiers...
       
-      // construct graph_out in pre-order traversal 
+      //
+      // construct graph_out in pre-order...
+      //
       
+      node_map_type::iterator niter = node_map.find(root);
+      if (niter == node_map.end())
+	niter->second = node_map.insert(std::make_pair(root, graph_out.add_node().id())).first;
       
+      const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.target, niter->second, frontiers, graph_in, graph_out);
+      
+      graph_out.edges[edge_id].features += rule_pair.features;
+    }
+    
+    hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
+					     const hypergraph_type::id_type root,
+					     const node_set_type& frontiers,
+					     const hypergraph_type& graph_in,
+					     hypergraph_type& graph_out)
+    {
+      typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
+      typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
+      
+      rhs_type rhs;
+      tails_type tails;
+      
+      int pos = 1;
+      tree_rule_type::const_iterator aiter_end = rule.end();
+      for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
+	if (aiter->label.is_non_terminal()) {
+	  if (aiter->antecedents.empty()) {
+	    const int non_terminal_index = aiter->label.non_terminal_index();
+	    
+	    if (non_terminal_index == 0)
+	      throw std::runtime_error("invalid non-terminal index");
+	    
+	    const hypergraph_type::id_type node = frontiers[non_terminal_index - 1];
+	    
+	    node_map_type::iterator niter = node_map.find(node);
+	    if (niter == node_map.end())
+	      niter->second = node_map.insert(std::make_pair(node, graph_out.add_node().id())).first;
+	    
+	    tails.push_back(niter->second);
+	  } else
+	    tails.push_back(graph_out.add_node().id());
+	  
+	  rhs.push_back(aiter->label.non_terminal(pos));
+	  
+	  ++ pos;
+	} else
+	  rhs.push_back(aiter->label);
+      
+      const hypegraph_type::id_type edge_id = graph_out.add_edge(tails.begin(), tails.end()).id;
+      graph_out.edges[edge_id].rule.reset(new rule_type(rule.label, rule_type::symbol_set_type(rhs.begin(), rhs.end())));
+      graph_out.connect_edge(edge_id, root);
+      
+      tails_type::const_iterator titer = tails.begin();
+      tree_rule_type::const_iterator aiter_end = rule.end();
+      for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter) {
+	if (aiter->label.is_non_terminal() && ! aiter->antecedents.empty()) {
+	  construct_graph(*aiter, *titer, frontiers, graph_in, graph_out);
+	  ++ titer;
+	}
+      }
+      
+      return edge_id;
     }
     
     const grammar_type& grammar;
