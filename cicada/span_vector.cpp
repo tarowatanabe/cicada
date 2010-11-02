@@ -57,7 +57,6 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, Container(), boost::spirit::standard::space_type> spans;
   };
   
-
   bool SpanVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
     typedef span_vector_parser<std::string::const_iterator, spans_type> grammar_type;
@@ -80,12 +79,25 @@ namespace cicada
     grammar_type& grammar = *__grammar;
 #endif
     
+    clear();
+
     return phrase_parse(iter, end,
 			grammar,
 			boost::spirit::standard::space,
 			__spans);
   }
-
+  
+  void SpanVector::assign(const std::string& line)
+  {
+    clear();
+    
+    std::string::const_iterator iter = line.begin();
+    std::string::const_iterator end = line.end();
+    
+    const bool result = assign(iter, end);
+    if (! result || iter != end)
+      throw std::runtime_error("span vector parsing failed");
+  }
 
   std::ostream& operator<<(std::ostream& os, const SpanVector::span_type& x)
   {

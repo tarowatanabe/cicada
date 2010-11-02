@@ -75,6 +75,7 @@ namespace cicada
       using qi::lit;
       using qi::lexeme;
       using qi::hold;
+      using qi::eps;
       using qi::repeat;
       using standard::char_;
       using standard::space;
@@ -85,7 +86,7 @@ namespace cicada
 	("\\)", ')');
       
       label %= lexeme[+(escaped_char | (char_ - space - '(' - ')' - '\\'))];
-      tree_rule %= '(' >> label >> *tree_rule >> ')';
+      tree_rule %= hold[label >> '(' >> +tree_rule >> ')'] | label >> eps;
     }
     
     boost::spirit::qi::symbols<char, char>        escaped_char;
@@ -116,7 +117,7 @@ namespace cicada
       
       label %= +(escaped_char | char_);
       antecedents %= tree_rule % ' ';
-      tree_rule %= '(' << label << (buffer[' ' << antecedents] | eps) << ')';
+      tree_rule %= label << (buffer['(' << antecedents << ')'] | eps);
     }
     
     boost::spirit::karma::symbols<char, const char*>                       escaped_char;

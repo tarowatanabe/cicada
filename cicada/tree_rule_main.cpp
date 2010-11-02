@@ -35,8 +35,8 @@ void process(const std::string& rule_str)
 
 int main(int argc, char** argv)
 {
-  process("(a)");
-  process("(a (b) (c) (d))");
-  process("(a (b (e)) (c (f) (g)) (d))");
-  process("(a (b (e)) (c (f) (g)) (\\())");
+  process("a");
+  process("a(b c d)");
+  process("a(b(e) c(f g) d)");
+  process("a(b(e) c(f g) \\()");
 }
