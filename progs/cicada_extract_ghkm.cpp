@@ -68,11 +68,6 @@ struct ExtractGHKM
     {
       span.insert(x.span.begin(), x.span.end());
     }
-
-    void swap(Span& x)
-    {
-      span.swap(x.span);
-    }
     
     std::pair<int, int> range() const
     {
@@ -86,23 +81,7 @@ struct ExtractGHKM
     {
       span.insert(i);
     }
-
-    void reset(int i)
-    {
-      span.erase(i);
-    }
-
-    void closure()
-    {
-      if (span.empty()) return;
     
-      const int min = *span.begin();
-      const int max = *(-- span.end());
-    
-      for (int i = min; i <= max; ++ i)
-	span.insert(i);
-    }
-  
     void clear() { span.clear(); }
 
     bool intersect(const std::pair<int, int>& range) const
@@ -128,15 +107,81 @@ struct ExtractGHKM
   {
     span_set_type spans(graph.nodes.size());
     span_set_type complements(graph.nodes.size());
+    span_set_type unaligned(graph.nodes.size());
     
     admissible_set_type admissibles(graph.nodes.size());
     
     admissible_nodes(graph, sentence, alignment, spans, admissibles);
+
     
-    for (sizse_t id = 0; id != graph.nodes.size(); ++ id) {
-      
-    }
+    minimal_rules(graph, spans, admissibles)
     
+  }
+  
+  void minimal_rules(const hypergraph_type& graph,
+		     const span_set_type& spans,
+		     const admissible_set_type& admissibles)
+  {
+    for (sizse_t id = 0; id != graph.nodes.size(); ++ id) 
+      if (admissibles[id]) {
+	const hypergraph_type::node_type& node = graph.nodes[id];
+	
+	queue_type queue;
+	
+	// construct initial frontiers...
+	
+	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+
+	  queue.resize(queue.size() + 1);
+	  frontier_type& frontier = queue.back();
+	  
+	  frontier.first.push_back(*eiter);
+	  
+	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	    if (! admissible[*titer])
+	      frontier.second.push_back(*titer);
+	}
+	
+	while (! queue.empty()) {
+	  const frontier_type& frontier = queue.front();
+	  
+	  if (frontier.second.empty()) {
+	    // construct rule from "fragment", frontier.first
+	    // by enumerating edge and its tails in depth-first manner...
+	    // use recursive call for simplicity...
+	    
+	    // construct derivation graph... ignoring non-aligned words...
+	    // how to handle non-aligned words...?
+	    
+	  } else {
+	    // incomplete... futher expand!
+	    const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
+	    
+	    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+	      
+	      queue.resize(queue.size() + 1);
+	      frontier_type& frontier_next = queue.back();
+	      
+	      frontier_next.first = frontier.first;
+	      frontier_next.first.push_back(*eiter);
+	      
+	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+		if (! admissible[*titer])
+		  frontier_next.second.push_back(*titer);
+	      
+	      frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
+	    }
+	  }
+	  
+	  queue.pop_front();
+	}
+      }
   }
   
   void admissible_nodes(const hypergraph_type& graph,
