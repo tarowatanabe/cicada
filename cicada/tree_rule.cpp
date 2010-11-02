@@ -76,7 +76,6 @@ namespace cicada
       using qi::lexeme;
       using qi::hold;
       using qi::eps;
-      using qi::repeat;
       using standard::char_;
       using standard::space;
       
