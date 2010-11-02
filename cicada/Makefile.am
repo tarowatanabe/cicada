@@ -125,6 +125,7 @@ operation/span_forest.hpp \
 operation/traversal.hpp
 
 libcicadainclude_HEADERS = \
+alignment.hpp \
 apply.hpp \
 apply_cube_grow.hpp \
 apply_cube_prune.hpp \
@@ -191,6 +192,7 @@ vocab.hpp \
 weight_vector.hpp
 
 libcicada_la_SOURCES = \
+alignment.cpp \
 cluster.cpp \
 feature.cpp \
 feature_function.cpp \
