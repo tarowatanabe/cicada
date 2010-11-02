@@ -19,21 +19,15 @@
 
 #include "tree_rule.hpp"
 
-BOOST_FUSION_ADAPT_STRUCT(
-			  cicada::TreeRule,
-			  (cicada::TreeRule::label_type, label)
-			  (cicada::TreeRule::antecedent_set_type, antecedents)
-			  )
-
-struct treebank_type
+struct cicada_treebank_type
 {
-  typedef std::vector<treebank_type, std::allocator<treebank_type> > antecedents_type;
+  typedef std::vector<cicada_treebank_type, std::allocator<cicada_treebank_type> > antecedents_type;
   
   std::string label;
   antecedents_type antecedents;
   
-  treebank_type() {}
-  treebank_type(const std::string& __label) : label(__label) {}
+  cicada_treebank_type() {}
+  cicada_treebank_type(const std::string& __label) : label(__label) {}
   
   void clear()
   {
@@ -55,16 +49,22 @@ struct treebank_type
 
 
 BOOST_FUSION_ADAPT_STRUCT(
-			  treebank_type,
+			  cicada_treebank_type,
 			  (std::string, label)
-			  (treebank_type::antecedents_type, antecedents)
+			  (cicada_treebank_type::antecedents_type, antecedents)
+			  )
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  cicada::TreeRule,
+			  (cicada::TreeRule::label_type, label)
+			  (cicada::TreeRule::antecedent_set_type, antecedents)
 			  )
 
 namespace cicada
 {
   
   template <typename Iterator>
-  struct tree_rule_parser_grammar : boost::spirit::qi::grammar<Iterator, treebank_type(), boost::spirit::standard::space_type>
+  struct tree_rule_parser_grammar : boost::spirit::qi::grammar<Iterator, cicada_treebank_type(), boost::spirit::standard::space_type>
   {
     tree_rule_parser_grammar() : tree_rule_parser_grammar::base_type(tree_rule)
     {
@@ -85,12 +85,12 @@ namespace cicada
 	("\\)", ')');
       
       label %= lexeme[+(escaped_char | (char_ - space - '(' - ')' - '\\'))];
-      tree_rule %= hold[label >> '(' >> +tree_rule >> ')'] | label >> eps;
+      tree_rule %= label >> (hold['(' >> +tree_rule >> ')'] | eps);
     }
     
     boost::spirit::qi::symbols<char, char>        escaped_char;
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   label;
-    boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> tree_rule;
+    boost::spirit::qi::rule<Iterator, cicada_treebank_type(), boost::spirit::standard::space_type> tree_rule;
   };
 
   template <typename Iterator>
@@ -150,7 +150,7 @@ namespace cicada
     
     clear();
 
-    treebank_type treebank;
+    cicada_treebank_type treebank;
     
     if (boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, treebank)) {
       treebank.transform(*this);
