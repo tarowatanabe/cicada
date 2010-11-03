@@ -1,0 +1,29 @@
+Phrase/Rule/Tree-fragment extraction
+
+cicada_extract_score{,_mpi} 
+        From extracted files, compute:
+	     p(lhs | rhs)
+	     p(rhs | lhs)
+	     p(root(lhs) | lhs, rhs)
+	     p(root(rhs) | lhs, rhs)
+	     lex(lhs | rhs)
+	     lex(rhs | lhs)
+
+	Counts file format:
+
+	     root phrase/rule/tree-fragment ||| root phrase/rule/tree-fragment ||| word alignment ||| count
+
+
+cicada_extract_phrase{,_mpi}
+	Extract phrase
+
+cicada_extract_rule{,_mpi}
+	Extract synchronous-CFG + support syntax augmentation.
+
+cicada_extract_ghkm{,_mpi}
+	Extract GHKM rules, tree-to-string or string-to-tree rules
+
+
+TODO:
+	How to support lexicalized reordering in extract_phrase?
+	How to handle lexical weight for complex structures, i.e.  GHKM rules?

@@ -20,7 +20,8 @@ Translation can be carried out by:
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
-      * cicada implementes cube-pruning [4], cube-growing [4], incremental (Huang and Mi, 2010) and exact (and stateless-inside-algorithm) methods
+      * cicada implementes cube-pruning [4], cube-growing [4], incremental (Huang and Mi, 2010)
+        and exact (and stateless-inside-algorithm) methods
       * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
    - Perform MBR decoding for hypergraph [12].
@@ -42,7 +43,8 @@ Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
    - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
    - Small feature set on small devset learned by hypergraph-MERT [8]
-   - Small/Large feature set on small devset learned by hypergraph-MaxEnt(optimized by LBFGS or SGD) (New! But still open problems!) + softmax-margin [9]
+   - Small/Large feature set on small devset learned by hypergraph-MaxEnt(optimized by LBFGS or SGD) (New! But still open problems!)
+     + softmax-margin [9]
 
 References:
 
