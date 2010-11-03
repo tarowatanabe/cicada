@@ -33,3 +33,11 @@ Added phrasal-composer, which performs phrase-based decoding..
 
 Allow binarization/permutation with arbitrary rule type?
       attach terminals to binarized rule...where?
+
+
+
+GHKM extraction:
+     handle forest (easy...)
+     handle unaligned words... difficult.
+     	    Do we construct new hypergraph?
+	    or implement our own?

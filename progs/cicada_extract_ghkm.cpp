@@ -123,30 +123,50 @@ struct ExtractGHKM
     unaligned.clear();
     admissibles.clear();
     derivations.clear();
+    node_map.clear();
     
     spans.resize(graph.nodes.size());
     complements.resize(graph.nodes.size());
     unaligned.resize(graph.nodes.size());
-    admissibles.resize(graph.nodes.size());
+    node_map.resize(graph.nodes.size());
     
     admissible_nodes(graph, sentence, alignment);
     
-    
     minimal_rules(graph);
+    
   }
   
-  void minimal_rules(const hypergraph_type& graph)
+  void minimal_rules(const hypergraph_type& graph,
+		     const sentence_type& sentence)
   {
-    // How do we attach non-aligned words...?
+    // construc derivations wrt non-aligned words...
+
+    size_t goal_node = size_t(-1);
     
-    for (sizse_t id = 0; id != graph.nodes.size(); ++ id) 
+    for (size_t id = 0; id != graph.nodes.size(); ++ id) 
       if (admissibles[id]) {
 	const hypergraph_type::node_type& node = graph.nodes[id];
+
+	//
+	// compute minimal range and maximum outer-range
+	//
+	
+	const range_type range_min(spans[id].range());
+	
+	span_type::const_iterator riter_first = complements[id].lower_bound(range_min.first);
+	span_type::const_iterator riter_last  = complements[id].lower_bound(range_min.second);
+	
+	const range_type range_max(riter_first == complements[id].begin() ? 0 : *(-- riter_first) + 1,
+				   riter_last != complements[id].end() ? *riter_last : static_cast<int>(sentence.size()));
+	
+	const bool is_goal(id == graph.goal);
+	
+	range_node_map_type buf;
+	buf.set_empty_key(range_type(0, 0));
 	
 	queue_type queue;
 	
 	// construct initial frontiers...
-	
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
@@ -161,7 +181,7 @@ struct ExtractGHKM
 	    if (! admissible[*titer])
 	      frontier.second.push_back(*titer);
 	}
-	
+
 	while (! queue.empty()) {
 	  const frontier_type& frontier = queue.front();
 	  
@@ -170,9 +190,98 @@ struct ExtractGHKM
 	    // by enumerating edge and its tails in depth-first manner...
 	    // use recursive call for simplicity...
 	    
-	    // construct derivation graph... ignoring non-aligned words...
-	    // how to handle non-aligned words...?
+	    // compute "tails" for the fragment
 	    
+	    node_set_type tails;
+	    edge_set_type::const_iterator eiter_end = frontier.first.end();
+	    for (edge_set_type::const_iterator eiter = frontier.first.begin(); eiter != eiter_end; ++ eiter) {
+	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+	      
+	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+		if (admissibles[*titer])
+		  tails.push_back(*titer);
+	    }
+	    
+	    // iterate over tails and compute span...
+	    // code taken from apply_exact...
+	    
+	    index_set_type j_ends(tails.size(), 0);
+	    index_set_type j(tails.size(), 0);
+	    
+	    for (size_t i = 0; i != tails.size(); ++ i)
+	      j_ends[i] = node_map[tails[i]].size();
+	    
+	    node_set_type tails_next(tails.size());
+	    
+	    for (;;) {
+	      bool is_valid = true;
+	      
+	      range_type range(range_min);
+	      range_set_type ranges;
+	      for (size_t i = 0; is_valid && i != edge.tails.size(); ++ i) {
+		tails_next[i] = node_map[tails[i]][j[i]];
+		
+		const range_type& range_antecedent = derivations[tails_next[i]].range;
+		
+		if (! ranges.empty()) {
+		  range_set_type::const_iterator riter_end = ranges.end();
+		  for (range_set_type::const_iterator riter = ranges.begin(); is_valid && riter != riter_end; ++ riter)
+		    is_valid = range_antecedent.second <= riter->first || riter->second <= range_antecedent.first;
+		}
+		
+		if (is_valid) {
+		  ranges.insert(range_antecedent);
+		  
+		  range.first  = utils::bithack::min(range.first, range_antecedent.first);
+		  range.second = utils::bithack::max(range.second, range_antecedent.second);
+		}
+	      }
+	      
+	      if (is_valid) {
+		// our tail-ranges are valid... and we will consider alternatives from range to range_max...
+		
+		if (is_goal) {
+		  if (goal_node == size_t(-1)) {
+		    goal_node = derivations.size();
+		    derivations.resize(goal_node + 1);
+		    
+		    // range is always [0, sentence.size())
+		    derivations.back().range = range_type(0, sentence.size());
+		  }
+		  
+		  derivations[goal_node].edges.push_back(derivation_type(frontier.first, tails_next));
+		} else {
+		  // we will compute all possible ranges...
+		  for (int first = range.first; first <= range_max.first; ++ first)
+		    for (int last = range.second; last <= range_max.second; ++ last) {
+		      const range_type range_next(first, last);
+		      
+		      range_node_map_type::iterator biter = buf.find(range_next);
+		      if (biter == buf.end()) {
+			derivatoins.resize(derivations.size() + 1);
+			derivations.back().range = range_next;
+			
+			node_map[id].push_back(derivations.size() - 1);
+			
+			biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
+		      }
+		      
+		      derivations[biter->second].edges.push_back(derivation_type(frontier.first, tails_next));
+		    }
+		}
+	      }
+	      
+	      size_t index = 0;
+	      for (/**/; index != tails.size(); ++ index) {
+		++ j[index];
+		if (j[index] < j_ends[index]) break;
+		j[index] = 0;
+	      }
+	      
+	      // finished!
+	      if (index == tails.size()) break;
+	    }
 	    
 	  } else {
 	    // incomplete... futher expand!
@@ -248,38 +357,8 @@ struct ExtractGHKM
 
     // check whether admissible or not...
     // do we also compute non-aligned words...?
-    for (size_t id = 0; id != graph.nodes.size(); ++ id) {
-      const std::pair<int, int> range = spans[id].range();
-      
-      admissibles[id] = ! spans[id].empty() && ! complements[id].intersect(range);
-      
-      if (! admissibles[id]) continue;
-      
-      // compute unaliged....
-      
-      span_type::const_iterator citer_first = complements[id].lower_bound(range.first);
-      if (citer_first != complements[id].begin())
-	-- citer_first;
-      const int first = (citer_first != complements[id].end() ? *citer_first + 1: 0);
-      for (int i = first; i < range.first; ++ i)
-	unaligned[id].insert(i);
-      
-      span_type::const_iterator siter_prev = spans[id].begin();
-      span_type::const_iterator siter_end = spans[id].end();
-      span_type::const_iterator siter = spans[id].begin();
-      ++ siter;
-      
-      for (/**/; siter != siter_end; ++ siter) {
-	for (int i = *siter_prev + 1; i != *siter; ++ i)
-	  unaligned[id].insert(i);
-	siter_prev = siter;
-      }
-      
-      span_type::const_iterator citer_last = complements[id].lower_bound(range.second);
-      const int last = (citer_last != complements[id].end() ? *citer_last : sentence.size());
-      for (int i = range.last; i != last; ++ i)
-	unaligned[id].insert(i);
-    }
+    for (size_t id = 0; id != graph.nodes.size(); ++ id)
+      admissibles[id] = ! spans[id].empty() && ! complements[id].intersect(spans[id].range());
   }
   
   span_set_type spans;
