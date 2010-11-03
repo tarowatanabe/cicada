@@ -56,6 +56,9 @@ struct ExtractGHKM
   struct Span
   {
     typedef std::set<int, std::less<int>, std::allocator<int> > span_type;
+
+    typedef span_type::const_iterator const_iterator;
+    typedef span_type::iterator       iterator;
   
     Span() : span() {}
     Span(const int first, const int last) : span()
@@ -68,6 +71,11 @@ struct ExtractGHKM
     {
       span.insert(x.span.begin(), x.span.end());
     }
+
+    const_iterator begin() const { return span.begin(); }
+    const_iterator end() const { return span.end(); }
+
+    const_iterator lower_bound(int pos) const { return span.lower_bound(pos); }
     
     std::pair<int, int> range() const
     {
@@ -86,11 +94,16 @@ struct ExtractGHKM
 
     bool intersect(const std::pair<int, int>& range) const
     {
+      if (range.first == range.last)
+	return false;
+      
       if (span.empty())
 	return false;
       else
 	return span.lower_bound(range.first) != span.lower_bound(range.last);
     }
+
+    bool empty() const { return span.empty(); }
   
     span_type span;
   };
@@ -105,23 +118,27 @@ struct ExtractGHKM
 		  const alignment_type& alignment,
 		  rule_pair_set_type& rules) const
   {
-    span_set_type spans(graph.nodes.size());
-    span_set_type complements(graph.nodes.size());
-    span_set_type unaligned(graph.nodes.size());
+    spans.clear();
+    complements.clear();
+    unaligned.clear();
+    admissibles.clear();
+    derivations.clear();
     
-    admissible_set_type admissibles(graph.nodes.size());
+    spans.resize(graph.nodes.size());
+    complements.resize(graph.nodes.size());
+    unaligned.resize(graph.nodes.size());
+    admissibles.resize(graph.nodes.size());
     
-    admissible_nodes(graph, sentence, alignment, spans, admissibles);
-
+    admissible_nodes(graph, sentence, alignment);
     
-    minimal_rules(graph, spans, admissibles)
     
+    minimal_rules(graph);
   }
   
-  void minimal_rules(const hypergraph_type& graph,
-		     const span_set_type& spans,
-		     const admissible_set_type& admissibles)
+  void minimal_rules(const hypergraph_type& graph)
   {
+    // How do we attach non-aligned words...?
+    
     for (sizse_t id = 0; id != graph.nodes.size(); ++ id) 
       if (admissibles[id]) {
 	const hypergraph_type::node_type& node = graph.nodes[id];
@@ -133,7 +150,7 @@ struct ExtractGHKM
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-
+	  
 	  queue.resize(queue.size() + 1);
 	  frontier_type& frontier = queue.back();
 	  
@@ -155,6 +172,7 @@ struct ExtractGHKM
 	    
 	    // construct derivation graph... ignoring non-aligned words...
 	    // how to handle non-aligned words...?
+	    
 	    
 	  } else {
 	    // incomplete... futher expand!
@@ -186,10 +204,7 @@ struct ExtractGHKM
   
   void admissible_nodes(const hypergraph_type& graph,
 			const sentence_type& sentence,
-			const alignment_type& alignment,
-			span_set_type& spans,
-			span_set_type& complements,
-			admissible_set_type& admissibles)
+			const alignment_type& alignment)
   {
     typedef std::multimap<int, int, std::less<int>, std::allocator<std::pair<const int, int> > > alignment_map_type;
     
@@ -230,9 +245,48 @@ struct ExtractGHKM
 	}
       }
     }
-    
+
     // check whether admissible or not...
-    for (size_t id = 0; id != graph.nodes.size(); ++ id)
-      admissibles[id] = ! complements[id].intersect(spans[id].range());
+    // do we also compute non-aligned words...?
+    for (size_t id = 0; id != graph.nodes.size(); ++ id) {
+      const std::pair<int, int> range = spans[id].range();
+      
+      admissibles[id] = ! spans[id].empty() && ! complements[id].intersect(range);
+      
+      if (! admissibles[id]) continue;
+      
+      // compute unaliged....
+      
+      span_type::const_iterator citer_first = complements[id].lower_bound(range.first);
+      if (citer_first != complements[id].begin())
+	-- citer_first;
+      const int first = (citer_first != complements[id].end() ? *citer_first + 1: 0);
+      for (int i = first; i < range.first; ++ i)
+	unaligned[id].insert(i);
+      
+      span_type::const_iterator siter_prev = spans[id].begin();
+      span_type::const_iterator siter_end = spans[id].end();
+      span_type::const_iterator siter = spans[id].begin();
+      ++ siter;
+      
+      for (/**/; siter != siter_end; ++ siter) {
+	for (int i = *siter_prev + 1; i != *siter; ++ i)
+	  unaligned[id].insert(i);
+	siter_prev = siter;
+      }
+      
+      span_type::const_iterator citer_last = complements[id].lower_bound(range.second);
+      const int last = (citer_last != complements[id].end() ? *citer_last : sentence.size());
+      for (int i = range.last; i != last; ++ i)
+	unaligned[id].insert(i);
+    }
   }
+  
+  span_set_type spans;
+  span_set_type complements;
+  span_set_type unaligned;
+
+  admissible_set_type admissibles;
+
+  derivation_graph_type derivations;
 };
