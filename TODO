@@ -41,3 +41,14 @@ GHKM extraction:
      handle unaligned words... difficult.
      	    Do we construct new hypergraph?
 	    or implement our own?
+
+Unified phrase/rule/tree extractions?
+	We can treat source/target sides as merely std::string for score computation,
+	but differ in lexical weights (how to distinguish tokens from non-terminals etc.)
+	In general, we will extract weighted score in any methods, and produce:
+	   p(lhs | rhs)
+	   p(rhs | lhs)
+	   p(root(lhs) | lhs rhs)
+	   p(root(rhs) | lhs rhs)
+	   lex(lhs | rhs)
+	   lex(rhs | lhs)
