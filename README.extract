@@ -1,29 +1,52 @@
 Phrase/Rule/Tree-fragment extraction
 
-cicada_extract_score{,_mpi} 
-        From extracted files, compute:
-	     p(lhs | rhs)
-	     p(rhs | lhs)
-	     p(root(lhs) | lhs, rhs)
-	     p(root(rhs) | lhs, rhs)
-	     lex(lhs | rhs)
-	     lex(rhs | lhs)
+We (will) support various phrase/rule/tree extraction. Basically, we will run in two steps:
+   Collect counts by mapping input sentences/parse trees/alignmeent etc.
+   Map/Reduce to collect target-side counts
+   Map/Reduce to collect source/target counts and produce various scores
 
-	Counts file format:
-
-	     root phrase/rule/tree-fragment ||| root phrase/rule/tree-fragment ||| word alignment ||| count
+   They can operate similarly with underlying extraction specific map/reduce framework.
 
 
 cicada_extract_phrase{,_mpi}
 	Extract phrase
+	Output scores:
+	       p(lhs | rhs)
+	       p(rhs | lhs)
+	       lex(lhs | rhs)
+	       lex(rhs | lhs)
+	       count(lhs, rhs)
+	       count(lhs)
+	       count(rhs)
+	       count(prev, mono | lhs, rhs)
+	       count(prev, swap | lhs, rhs)
+	       count(next, mono | lhs, rhs)
+	       count(next, swap | lhs, rhs)
+	       count(prev, mono | lhs)
+	       count(prev, swap | lhs)
+	       count(next, mono | lhs)
+	       count(next, swap | lhs)
 
 cicada_extract_rule{,_mpi}
 	Extract synchronous-CFG + support syntax augmentation.
+	Output scores:
+	       p(lhs | rhs)
+	       p(rhs | lhs)
+	       lex(lhs | rhs)
+	       lex(rhs | lhs)
+	       count(lhs, rhs)
+	       count(lhs)
+	       count(rhs)
 
 cicada_extract_ghkm{,_mpi}
 	Extract GHKM rules, tree-to-string or string-to-tree rules
-
-
-TODO:
-	How to support lexicalized reordering in extract_phrase?
-	How to handle lexical weight for complex structures, i.e.  GHKM rules?
+	Output scores:
+	       p(lhs | rhs)
+	       p(rhs | lhs)
+	       p(root(lhs) | lhs, rhs)
+	       p(root(rhs) | lhs, rhs)
+	       lex(lhs | rhs)
+	       lex(rhs | lhs)
+	       count(lhs, rhs)
+	       count(lhs)
+	       count(rhs)
