@@ -132,12 +132,148 @@ struct ExtractGHKM
     
     admissible_nodes(graph, sentence, alignment);
     
-    minimal_rules(graph);
+    construct_derivations(graph, sentence);
     
+    // compute reachable nodes and edges from root...
+    prune_derivations();
+    
+    
+    // perform extraction
+    extract_minimum(graph, sentence, alignment);
+    
+    // perform compounds extraction
+    extract_composed(graph, sentence, alignment);
   }
   
-  void minimal_rules(const hypergraph_type& graph,
-		     const sentence_type& sentence)
+  
+  void extract_minimum(const hypergraph_type& graph,
+		       const sentence_type& sentence,
+		       const alignment_type& alignment)
+  {
+    // easy...! but do we keep extracted rules?
+    
+    
+    
+  }
+
+  enum color_type {
+    white,
+    gray,
+    black
+  };
+  
+  struct dfs_type
+  {
+    int node;
+    int edge;
+    int tail;
+    
+    dfs_type(const int& _node, const int& _edge, const int& _tail) 
+      : node(_node), edge(_edge), tail(_tail) {}
+  };
+
+  typedef std::vector<int, std::allocator<int> > reloc_set_type;
+  typedef std::vector<color_type, std::allocator<color_type> > color_set_type;
+  typedef std::vector<dfs_type, std::allocator<dfs_type> > stack_type;
+  
+  void prune_derivations()
+  {
+    // topologically sort...
+    // I'm not sure whether we need this... but this is simply to make sure 
+    // the extracted GHKM rules are reachable from root of the parse forest
+    
+    reloc_set_type reloc_node(derivations.size(), -1);
+    color_set_type color(derivations.size(), white);
+    stack_type stack;
+    
+    stack.reserv(derivations.size());
+    stack.push_back(dfs_type(derivations.size() - 1, 0, 0));
+    
+    int node_count = 0;
+    
+    while (! stack.empty()) {
+      const dfs_type& dfs = stack.back();
+      
+      int node_id     = dfs.node;
+      size_t pos_edge = dfs.edge;
+      size_t pos_tail = dfs.tail;
+      
+      stack.pop_back();
+      
+      const derivation_node_type* curr_node = &(derivations[node_id]);
+      
+      while (pos_edge != curr_node->edges.size()) {
+	const derivation_edge_type& curr_edge = curr_ode.edges[pos_edge];
+	
+	if (pos_tail == curr_edge.tails.size()) {
+	  // reach end...
+	  ++ pos_edge;
+	  pos_tail = 0;
+	  continue;
+	}
+	
+	const int        tail_node  = curr_edge.second[pos_tail];
+	const color_type tail_color = color[tail_node];
+	
+	switch (tail_color) {
+	case white:
+	  ++ pos_tail;
+	  stack.push_back(dfs_type(node_id, pos_edge, pos_tail));
+	  
+	  node_id = tail_node;
+	  curr_node = &(derivations[node_id]);
+	  
+	  color[node_id] = gray;
+	  pos_edge = 0;
+	  pos_tail = 0;
+	  
+	  break;
+	case black:
+	  ++ pos_tail;
+	  break;
+	case gray:
+	  ++ pos_tail;
+	  // loop!!!!
+	  break;
+	}
+      }
+      
+      color[node_id] = black;
+      reloc_node[node_id] = node_count ++;
+    }
+    
+    // construct new derivations...
+    derivation_set_type derivations_new(node_count);
+    for (size_t i = 0; i != derivations.size(); ++ i)
+      if (reloc_node[i] >= 0) {
+	const derivation_node_type& node_old = derivations[i];
+	derivation_node_type& node_new = derivations_new[reloc_node[i]];
+	
+	node_new.range = node_old.range;
+	
+	derivation_edge_set_type::const_iterator eiter_end = node_old.edges.end();
+	for (derivation_edge_set_type::const_iterator eiter = node_old.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  
+	  node_set_type tails;
+	  bool is_valid = true;
+	  
+	  node_set_type::const_iterator titer_end = eiter->second.end();
+	  for (node_set_type::const_iterator titer = eiter->second.begin(); is_valid && titer != titer_end; ++ titer) {
+	    tails.push_back(reloc_node[*titer]);
+	    is_valid = tails.back() >= 0;
+	  }
+	  
+	  if (is_valid)
+	    node_new.edges.push_back(derivation_edge_type(eiter->first, tails));
+	}
+      }
+    
+    derivations.swap(derivations_new);
+    derivations_new.clear();
+  }
+  
+  void construct_derivations(const hypergraph_type& graph,
+			     const sentence_type& sentence)
   {
     // construc derivations wrt non-aligned words...
 
@@ -250,7 +386,7 @@ struct ExtractGHKM
 		    derivations.back().range = range_type(0, sentence.size());
 		  }
 		  
-		  derivations[goal_node].edges.push_back(derivation_type(frontier.first, tails_next));
+		  derivations[goal_node].edges.push_back(derivation_edge_type(frontier.first, tails_next));
 		} else {
 		  // we will compute all possible ranges...
 		  for (int first = range.first; first <= range_max.first; ++ first)
@@ -267,7 +403,7 @@ struct ExtractGHKM
 			biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
 		      }
 		      
-		      derivations[biter->second].edges.push_back(derivation_type(frontier.first, tails_next));
+		      derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next));
 		    }
 		}
 	      }
