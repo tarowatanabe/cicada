@@ -46,6 +46,19 @@ namespace cicada
       label = label_type();
       antecedents.clear();
     }
+
+    template <typename Iterator>
+    void frontier(Iterator iter) const
+    {
+      if (antecedents.empty()) {
+	*iter = label;
+	++ iter;
+      }
+      
+      const_iterator aiter_end = antecedents.end();
+      for (const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
+	aiter->frontier(iter);
+    }
     
   public:
     const_iterator begin() const { return antecedents.begin(); }

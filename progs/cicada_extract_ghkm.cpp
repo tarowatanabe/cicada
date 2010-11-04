@@ -52,6 +52,7 @@ typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> > rule_pair_s
 // we assume that the hypergraph is parse forest
 struct ExtractGHKM
 {
+  typedef std::pair<int, int> range_type;
 
   struct Span
   {
@@ -77,7 +78,7 @@ struct ExtractGHKM
 
     const_iterator lower_bound(int pos) const { return span.lower_bound(pos); }
     
-    std::pair<int, int> range() const
+    range_type range() const
     {
       if (span.empty())
 	return std::make_pair(0, 0);
@@ -92,7 +93,7 @@ struct ExtractGHKM
     
     void clear() { span.clear(); }
 
-    bool intersect(const std::pair<int, int>& range) const
+    bool intersect(const range_type& range) const
     {
       if (range.first == range.last)
 	return false;

@@ -10,35 +10,23 @@ We (will) support various phrase/rule/tree extraction. Basically, we will run in
 cicada_extract_phrase{,_mpi}
 	Extract phrase
 	Output scores:
-	       count(lhs, rhs)
-	       count(lhs)
-	       count(rhs)
-	       count(prev, mono | lhs, rhs)
-	       count(prev, swap | lhs, rhs)
-	       count(next, mono | lhs, rhs)
-	       count(next, swap | lhs, rhs)
-	       count(prev, mono | lhs)
-	       count(prev, swap | lhs)
-	       count(next, mono | lhs)
-	       count(next, swap | lhs)
+	       lhs ||| rhs ||| count(lhs, rhs) count(prev, mono, lhs, rhs) count(prev, swap, lhs, rhs) count(next, mono, lhs, rhs) count(next, swap, lhs, rhs)
 
 cicada_extract_rule{,_mpi}
 	Extract synchronous-CFG + support syntax augmentation.
 	Output scores:
-	       count(lhs, rhs)
-	       count(lhs)
-	       count(rhs)
-	       count(root(lhs))
-	       count(root(rhs))
+	       root lhs ||| root rhs ||| count(lhs, rhs)
 
 cicada_extract_ghkm{,_mpi}
 	Extract GHKM rules, tree-to-string or string-to-tree rules
 	Output scores:
-	       count(lhs, rhs)
-	       count(lhs)
-	       count(rhs)
-	       count(root(lhs))
-	       count(root(rhs))
+	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
 
-Addition of lexical weight and normalized counts will be controlled by "filters"
+After counts collection, you can summarize them by cicada_extract_counts{,_mpi}
+Which will output:
+
+lhs ||| rhs ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| counts(root(lhs)) ||| counts(root(rhs)) ||| observed(lhs) observed(rhs) (||| lex(lhs | rhs) lex(rhs | lhs))
+
+where lexical weights are optional. You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
+to perform smoothing.
 

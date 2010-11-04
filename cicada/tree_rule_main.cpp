@@ -1,4 +1,4 @@
-
+#include <iterator>
 #include <iostream>
 
 #include "tree_rule.hpp"
@@ -31,6 +31,11 @@ void process(const std::string& rule_str)
   pre_order(rule);
   std::cout << "post-order" << std::endl;
   post_order(rule);
+  
+  std::cout << "frontier: ";
+  std::ostream_iterator<std::string> iter(std::cout, " ");
+  rule.frontier(iter);
+  std::cout << std::endl;
 }
 
 int main(int argc, char** argv)
