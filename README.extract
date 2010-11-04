@@ -25,8 +25,8 @@ cicada_extract_ghkm{,_mpi}
 After counts collection, you can summarize them by cicada_extract_counts{,_mpi}
 Which will output:
 
-lhs ||| rhs ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| counts(root(lhs)) ||| counts(root(rhs)) ||| observed(lhs) observed(rhs) (||| lex(lhs | rhs) lex(rhs | lhs))
+lhs ||| rhs ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| counts(root(lhs)) ||| counts(root(rhs)) ||| observed(lhs) observed(rhs) ||| lex(lhs | rhs) lex(rhs | lhs)
 
-where lexical weights are optional. You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
+You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
 to perform smoothing.
 
