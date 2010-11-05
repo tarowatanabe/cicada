@@ -1207,14 +1207,14 @@ struct PhrasePairModifyMapper
 	}
 	
 	if ((iter & mask_full) == mask_full) {
-	  for (int shard = 0; shard < queues.size(); ++ shard)
+	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 256) {
 	      queues[shard]->push_swap(modified[shard]);
 	      modified[shard].clear();
 	    }
-	} else if ((iter & mask_partial == mask_partial)) {
+	} else if ((iter & mask_partial) == mask_partial) {
 	  bool found = false;
-	  for (int shard = 0; shard < queues.size(); ++ shard)
+	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 256) {
 	      const bool no_wait = (modified[shard].size() < 1024 * 4);
 	      if (queues[shard]->push_swap(modified[shard], no_wait)) {
@@ -1254,7 +1254,7 @@ struct PhrasePairModifyMapper
     }
     
     // send remaining...
-    for (int shard = 0; shard < queues.size(); ++ shard)
+    for (size_t shard = 0; shard != queues.size(); ++ shard)
       if (! modified[shard].empty()) {
 	queues[shard]->push_swap(modified[shard]);
 	modified[shard].clear();
