@@ -7,8 +7,9 @@ Do we allow state-less features applied during composition???
 	such as shift-reduce etc.
 
 Support tree-to-tree transduction:
-	We need different ids for target side's lhs. Do we preserve in rule-struct?
-	What is the format for tree-fragment? use lisp-like struct?
+	Support non-tree transducer matching:
+	match with phrases or hierarchical phrases whose spans match with
+	syntactic spans.
 
 Better MIRA training
 

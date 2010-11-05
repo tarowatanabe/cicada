@@ -43,6 +43,9 @@
 //  We can uncover output hypergraph by enumerating matched rules.
 //  Book-keep the matched input-hypergraph in a chart so that we can construct translational packed forest.
 // 
+// TODO
+// support phrasal/synchronous-CFG style rules:
+//   We will rune CKY and try match syntactically constrained phrases indicated by source spans...
 
 namespace cicada
 {
@@ -74,27 +77,29 @@ namespace cicada
     typedef std::pair<frontier_type, transducer_type::id_type> frontier_pair_type;
     typedef std::deque<frontier_pair_type, std::allocator<frontier_pair_type> > queue_type;
     
-    typedef google::dense_hash_map<hypergraph_type::id_type, hypergraph_type::id_type,
-				   boost::hash<hypergraph_type::id_type>, std::equal_to<hypergraph_type::id_type> > node_map_type;
+    typedef std::pair<hypergraph_type::id_type, symbol_type> node_label_type;
     
-    ComposeTree(const grammar_type& __grammar)
-      : grammar(__grammar) 
+    typedef google::dense_hash_map<node_label_type, hypergraph_type::id_type,
+				   utils::hashmurmur<size_t>, std::equal_to<node_label_type> > node_map_type;
+    
+    ComposeTree(const symbol_type& __goal, const grammar_type& __grammar)
+      : goal(__goal), grammar(__grammar) 
     {
-      node_map.set_empty_key(hypergraph_type::invalid);
+      node_map.set_empty_key(std::make_pair(hypergraph_type::invalid, symbol_type()));
     }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       graph_out.clear();
       node_map.clear();
-
+      
       if (! graph_in.is_valid()) return;
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id)
 	match_tree(id, graph_in, graph_out);
       
-      node_map_type::const_iterator niter = node_map.find(graph_in.goal);
+      node_map_type::const_iterator niter = node_map.find(std::make_pair(graph_in.goal, goal.non_terminal()));
       if (niter != node_map.end())
 	graph_out.goal = niter->second;
 
@@ -233,9 +238,9 @@ namespace cicada
       // construct graph_out in pre-order...
       //
       
-      node_map_type::iterator niter = node_map.find(root_in);
+      node_map_type::iterator niter = node_map.find(std::make_pair(root_in, rule_pair.target->label.non_terminal()));
       if (niter == node_map.end())
-	niter = node_map.insert(std::make_pair(root_in, graph_out.add_node().id)).first;
+	niter = node_map.insert(std::make_pair(std::make_pair(root_in, rule_pair.target->label.non_terminal()), graph_out.add_node().id)).first;
       
       const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.target, niter->second, frontiers, graph_in, graph_out);
       
@@ -268,9 +273,9 @@ namespace cicada
 	    
 	    const hypergraph_type::id_type node = frontiers[non_terminal_index - 1];
 	    
-	    node_map_type::iterator niter = node_map.find(node);
+	    node_map_type::iterator niter = node_map.find(std::make_pair(node, aiter->label.non_terminal()));
 	    if (niter == node_map.end())
-	      niter = node_map.insert(std::make_pair(node, graph_out.add_node().id)).first;
+	      niter = node_map.insert(std::make_pair(std::make_pair(node, aiter->label.non_terminal()), graph_out.add_node().id)).first;
 	    
 	    tails.push_back(niter->second);
 	  } else
@@ -299,14 +304,15 @@ namespace cicada
 
     node_map_type node_map;
     
+    symbol_type goal;
     const grammar_type& grammar;
   };
   
   
   inline
-  void compose_tree(const TreeGrammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out)
+  void compose_tree(const Symbol& goal, const TreeGrammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out)
   {
-    ComposeTree __composer(grammar);
+    ComposeTree __composer(goal, grammar);
     __composer(graph_in, graph_out);
   }
 };
