@@ -1548,7 +1548,7 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
   typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
   
   
-  PhraseCounts(const path_set_type& paths, const size_type __counts_size) : counts_size(__counts_size) { open(paths); }
+  PhraseCounts(const path_set_type& paths) : counts_size(size_type(-1)) { open(paths); }
   PhraseCounts(const path_type& path) { open(path); }
   
   const count_set_type& operator[](const phrase_type& phrase) const
@@ -1603,9 +1603,7 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
       throw std::runtime_error("no counts size...");
     counts_size = boost::lexical_cast<size_type>(iter->second);
     
-    
     index.open(rep.path("index"));
-    
     
     counts.reserve(counts_size + 1);
     counts.resize(counts_size + 1);
@@ -1669,17 +1667,10 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
     const path_type path_index = utils::tempfile::directory_name(tmp_dir / "cicada.extract.index.XXXXXX");
 
     index.open(path_index, index_db_type::WRITE);
-    
+
+    counts_size = size_type(-1);
     path_set_type        paths_counts;
     ostream_ptr_set_type os_counts;
-    for (size_t i = 0; i != counts_size + 1; ++ i) {
-      paths_counts.push_back(utils::tempfile::directory_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
-      
-      std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
-      os->push(boost::iostreams::file_sink(paths_counts.back().file_string()), 1024 * 1024);
-      
-      os_counts.push_back(ostream_ptr_type(os.release()));
-    }
     
     pqueue_type pqueue;
     istream_ptr_set_type istreams;
@@ -1713,9 +1704,21 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
 	  index.insert(modified.source.c_str(), modified.source.size(), id);
 	  ++ id;
 	  
+	  if (os_counts.empty()) {
+	    counts_size = modified.counts.size();
+	    for (size_t i = 0; i != counts_size + 1; ++ i) {
+	      paths_counts.push_back(utils::tempfile::directory_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
+	      
+	      std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
+	      os->push(boost::iostreams::file_sink(paths_counts.back().file_string()), 1024 * 1024);
+	      
+	      os_counts.push_back(ostream_ptr_type(os.release()));
+	    }
+	  } else if (counts_size != modified.counts.size())
+	    throw std::runtime_error("# of counts do not match");
+	  
 	  for (size_t i = 0; i != os_counts.size() - 1; ++ i)
 	    os_counts[id]->write((char*) &(modified.counts[i]), sizeof(count_type));
-	  
 	  os_counts.back()->write((char*) &observed, sizeof(count_type));
 	}
 	
@@ -1740,16 +1743,28 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
     if (! modified.source.empty() && ! modified.counts.empty()) {
       index.insert(modified.source.c_str(), modified.source.size(), id);
       ++ id;
+
+      if (os_counts.empty()) {
+	counts_size = modified.counts.size();
+	for (size_t i = 0; i != counts_size + 1; ++ i) {
+	  paths_counts.push_back(utils::tempfile::directory_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
+	      
+	  std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
+	  os->push(boost::iostreams::file_sink(paths_counts.back().file_string()), 1024 * 1024);
+	      
+	  os_counts.push_back(ostream_ptr_type(os.release()));
+	}
+      } else if (counts_size != modified.counts.size())
+	throw std::runtime_error("# of counts do not match");
       
       for (size_t i = 0; i != os_counts.size() - 1; ++ i)
 	os_counts[id]->write((char*) &(modified.counts[i]), sizeof(count_type));
-      
       os_counts.back()->write((char*) &observed, sizeof(count_type));
     }
     
     index.close();
     index.open(path_index);
-
+    
     counts.reserve(os_counts.size());
     counts.resize(os_counts.size());
     
