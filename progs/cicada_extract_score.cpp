@@ -59,6 +59,14 @@ void modify_counts(const path_set_type& counts_files,
 		   root_count_set_type& root_targets);
 void index_counts(const path_map_type& modified_files,
 		  modified_counts_set_type& modified_counts);
+template <typename Extractor, typename Lexicon>
+void score_counts(const path_type& output_file,
+		  const path_set_type& counts_files,
+		  const modified_counts_set_type& modified,
+		  const root_count_set_type& root_sources,
+		  const root_count_set_type& root_targets,
+		  const Lexicon& lexicon);
+
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
@@ -95,7 +103,6 @@ int main(int argc, char** argv)
       modify_counts<ExtractRootSCFG>(counts_files, modified_files, root_sources, root_targets);
     else
       modify_counts<ExtractRootTree>(counts_files, modified_files, root_sources, root_targets);
-    
     utils::resource end_modify;
     
     if (debug)
@@ -104,14 +111,46 @@ int main(int argc, char** argv)
     
     // indexing...
     modified_counts_set_type modified_counts(threads);
+    
+    utils::resource start_index;
     index_counts(modified_files, modified_counts);
-    
+    utils::resource end_index;
+ 
+    if (debug)
+      std::cerr << "index counts cpu time:  " << end_index.cpu_time() - start_index.cpu_time() << std::endl
+		<< "index counts user time: " << end_index.user_time() - start_index.user_time() << std::endl;
+   
     // scoring...
-    const LexiconModel lexicon_source_taregt(lexicon_source_target_file);
-    const LexiconModel lexicon_taregt_source(lexicon_target_source_file);
+    const LexiconModel lexicon_source_target(lexicon_source_target_file);
+    const LexiconModel lexicon_target_source(lexicon_target_source_file);
     
-    
-    
+    utils::resource start_score;
+    if (score_phrase)
+      score_counts<ExtractRootPhrase, LexiconPhrase>(output_file,
+						     counts_files,
+						     modified_counts,
+						     root_sources,
+						     root_targets,
+						     LexiconPhrase(lexicon_source_target, lexicon_target_source));
+      
+    else if (score_scfg)
+      score_counts<ExtractRootSCFG, LexiconSCFG>(output_file,
+						 counts_files,
+						 modified_counts,
+						 root_sources,
+						 root_targets,
+						 LexiconSCFG(lexicon_source_target, lexicon_target_source));
+    else
+      score_counts<ExtractRootTree, LexiconTree>(output_file,
+						 counts_files,
+						 modified_counts,
+						 root_sources,
+						 root_targets,
+						 LexiconTree(lexicon_source_target, lexicon_target_source));
+    utils::resource end_score;
+    if (debug)
+      std::cerr << "score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
+		<< "score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
     
   }
   catch (const std::exception& err) {
@@ -136,6 +175,17 @@ struct IndexTask
     counts.open(paths);
   }
 };
+
+template <typename Extractor, typename Lexicon>
+void score_counts(const path_type& output_file,
+		  const path_set_type& counts_files,
+		  const modified_counts_set_type& modified,
+		  const root_count_set_type& root_sources,
+		  const root_count_set_type& root_targets,
+		  const Lexicon& lexicon)
+{
+
+}
 
 
 void index_counts(const path_map_type& modified_files,
