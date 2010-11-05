@@ -57,6 +57,7 @@ struct RootCount
   label_type  label;
   counts_type counts;
 
+  RootCount(const label_type& __label) : label(__label), counts() {}
   RootCount() : label(), counts() {}
 
   void clear()
@@ -679,7 +680,9 @@ struct RootCountParser
   
   typedef root_count_type::label_type  label_type;
   typedef root_count_type::counts_type counts_type;
-  
+
+  RootCountParser() : grammar() {}
+  RootCountParser(const RootCountParser& x) : grammar() {}
   
   template <typename Iterator>
   struct root_count_parser : boost::spirit::qi::grammar<Iterator, root_count_type(), boost::spirit::standard::space_type>
@@ -738,7 +741,9 @@ struct RootCountGenerator
   
   typedef root_count_type::label_type  label_type;
   typedef root_count_type::counts_type counts_type;
-  
+ 
+  RootCountGenerator() : grammar() {}
+  RootCountGenerator(const RootCountGenerator& x) : grammar() {}
   
   template <typename Iterator>
   struct root_count_generator : boost::spirit::karma::grammar<Iterator, root_count_type()>
@@ -797,6 +802,8 @@ struct PhrasePairParser
   typedef phrase_pair_type::alignment_type alignment_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
+  PhrasePairParser() : grammar() {}
+  PhrasePairParser(const PhrasePairParser& x) : grammar() {}
   
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -860,6 +867,9 @@ struct PhrasePairGenerator
   typedef phrase_pair_type::alignment_type alignment_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
+  PhrasePairGenerator() : grammar() {}
+  PhrasePairGenerator(const PhrasePairGenerator& x) : grammar() {}
+
   
   template <typename Iterator>
   struct phrase_pair_generator : boost::spirit::karma::grammar<Iterator, phrase_pair_type()>
@@ -921,6 +931,8 @@ struct PhrasePairModifiedParser
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
+  PhrasePairModifiedParser() : grammar() {}
+  PhrasePairModifiedParser(const PhrasePairModifiedParser& x) : grammar() {}
   
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -977,6 +989,9 @@ struct PhrasePairModifiedGenerator
   
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::counts_type    counts_type;
+
+  PhrasePairModifiedGenerator() : grammar() {}
+  PhrasePairModifiedGenerator(const PhrasePairModifiedGenerator& x) : grammar() {}
   
   
   template <typename Iterator>
