@@ -1139,7 +1139,7 @@ struct PhrasePairModifyMapper
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
       
-      if (counts.empty() || counts.back().first.source != phrase_pair.source || counts.back().first.target != phrase_pair.target) {
+      if (counts.empty() || counts.back().source != phrase_pair.source || counts.back().target != phrase_pair.target) {
 	counts.resize(counts.size() + 1);
 	counts.back().source.swap(phrase_pair.source);
 	counts.back().target.swap(phrase_pair.target);
@@ -1159,7 +1159,7 @@ struct PhrasePairModifyMapper
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
     typedef boost::shared_ptr<buffer_stream_type> buffer_stream_ptr_type;
     typedef std::vector<buffer_stream_ptr_type, std::allocator<buffer_stream_ptr_type> > pqueue_base_type;
-    typedef std::priority_queue<buffer_stream_ptr_type, pqueue_base_type, greater_buffer<buffer_stream_ptr_type> > pqueue_type;
+    typedef std::priority_queue<buffer_stream_ptr_type, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
     
     typedef std::vector<modified_set_type, std::allocator<modified_set_type> > modified_map_type;
     
@@ -1273,7 +1273,7 @@ struct PhrasePairModifyMapper
 	  }
 	}
       
-      if (std::count(queues.begin(), queues.end(), queue_ptr_type()) == queues.size()) break;
+      if (std::count(queues.begin(), queues.end(), queue_ptr_type()) == static_cast<int>(queues.size())) break;
       
       boost::thread::yield();
     }
