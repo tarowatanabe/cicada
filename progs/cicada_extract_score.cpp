@@ -9,6 +9,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
+#include <boost/bind.hpp>
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
@@ -30,6 +31,9 @@ struct less_file_size
 };
 
 
+typedef PhraseCounts modified_counts_type;
+typedef std::vector<modified_counts_type, std::allocator<modified_counts_type> > modified_counts_set_type;
+
 path_set_type counts_files;
 
 path_type lexicon_source_target_file;
@@ -50,7 +54,11 @@ int debug = 0;
 
 template <typename Extractor>
 void modify_counts(const path_set_type& counts_files,
-		   path_map_type& modified_files);
+		   path_map_type& modified_files,
+		   root_count_set_type& root_sources,
+		   root_count_set_type& root_targets);
+void index_counts(const path_map_type& modified_files,
+		  modified_counts_set_type& modified_counts);
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
@@ -77,15 +85,17 @@ int main(int argc, char** argv)
     
     // modify counts...
     path_map_type modified_files;
+    root_count_set_type root_sources;
+    root_count_set_type root_targets;
     
     utils::resource start_modify;
     if (score_phrase)
-      modify_counts<ExtractRootPhrase>(counts_files, modified_files);
+      modify_counts<ExtractRootPhrase>(counts_files, modified_files, root_sources, root_targets);
     else if (score_scfg)
-      modify_counts<ExtractRootSCFG>(counts_files, modified_files);
+      modify_counts<ExtractRootSCFG>(counts_files, modified_files, root_sources, root_targets);
     else
-      modify_counts<ExtractRootTree>(counts_files, modified_files);
-      
+      modify_counts<ExtractRootTree>(counts_files, modified_files, root_sources, root_targets);
+    
     utils::resource end_modify;
     
     if (debug)
@@ -93,6 +103,8 @@ int main(int argc, char** argv)
 		<< "modify counts user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
     
     // indexing...
+    modified_counts_set_type modified_counts(threads);
+    index_counts(modified_files, modified_counts);
     
     // scoring...
     const LexiconModel lexicon_source_taregt(lexicon_source_target_file);
@@ -109,9 +121,44 @@ int main(int argc, char** argv)
   return 0;
 }
 
+
+struct IndexTask
+{
+  const path_set_type&  paths;
+  modified_counts_type& counts;
+
+  IndexTask(const path_set_type& __paths,
+	    modified_counts_type& __counts)
+    : paths(__paths), counts(__counts) {}
+  
+  void operator()()
+  {
+    counts.open(paths);
+  }
+};
+
+
+void index_counts(const path_map_type& modified_files,
+		  modified_counts_set_type& modified_counts)
+{
+  if (static_cast<int>(modified_files.size()) != threads)
+    throw std::runtime_error("# of threads differ");
+  if (static_cast<int>(modified_counts.size()) != threads)
+    throw std::runtime_error("# of threads differ");
+  
+  boost::thread_group workers;
+  
+  for (size_t shard = 0; shard != modified_counts.size(); ++ shard)
+    workers.add_thread(new boost::thread(IndexTask(modified_files[shard], modified_counts[shard])));
+  
+  workers.join_all();
+}
+
 template <typename Extractor>
 void modify_counts(const path_set_type& counts_files,
-		   path_map_type& modified_files)
+		   path_map_type& modified_files,
+		   root_count_set_type& root_source,
+		   root_count_set_type& root_target)
 {
   typedef PhrasePairModify map_reduce_type;
   
@@ -158,6 +205,26 @@ void modify_counts(const path_set_type& counts_files,
   
   mappers.join_all();
   reducers.join_all();
+
+  root_source.clear();
+  root_target.clear();
+  
+  for (size_t shard = 0; shard != queues.size(); ++ shard) {
+    root_count_set_type::const_iterator siter_end = root_sources[shard].end();
+    for (root_count_set_type::const_iterator siter = root_sources[shard].begin(); siter != siter_end; ++ siter) {
+      std::pair<root_count_set_type::iterator, bool> result = root_source.insert(*siter);
+      if (! result.second)
+	const_cast<root_count_type&>(*result.first).increment(siter->counts.begin(), siter->counts.end());
+    }
+    
+    root_count_set_type::const_iterator titer_end = root_targets[shard].end();
+    for (root_count_set_type::const_iterator titer = root_targets[shard].begin(); titer != titer_end; ++ titer) {
+      std::pair<root_count_set_type::iterator, bool> result = root_target.insert(*titer);
+      if (! result.second)
+	const_cast<root_count_type&>(*result.first).increment(titer->counts.begin(), titer->counts.end());
+    }
+  }
+  
 }
 
 void options(int argc, char** argv)

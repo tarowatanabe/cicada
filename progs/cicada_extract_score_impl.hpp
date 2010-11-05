@@ -1562,7 +1562,7 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
   };
   typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
   
-  
+  PhraseCounts() : counts_size(size_type(-1)) {}
   PhraseCounts(const path_set_type& paths) : counts_size(size_type(-1)) { open(paths); }
   PhraseCounts(const path_type& path) { open(path); }
   
