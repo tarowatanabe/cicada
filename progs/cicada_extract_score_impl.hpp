@@ -1508,7 +1508,8 @@ struct PhrasePairModifyReducer
       }
       
       modified.clear();
-
+      modified_set_type(modified).swap(modified);
+      
       if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))) {
 	dump_counts(paths, counts);
 	counts.clear();
@@ -1819,7 +1820,6 @@ struct PhrasePairScore
   typedef RootCount          root_count_type;
   
   typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
-  
   
   typedef utils::lockfree_list_queue<phrase_pair_type, std::allocator<phrase_pair_type> > queue_type;
   
