@@ -1,0 +1,5 @@
+#ifndef __CICADA__EXTRACT_SCFG_IMPL__HPP__
+#define __CICADA__EXTRACT_SCFG_IMPL__HPP__ 1
+
+
+#endif

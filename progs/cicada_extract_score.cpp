@@ -52,7 +52,7 @@ path_type output_file = "";
 
 bool score_phrase = false;
 bool score_scfg   = false;
-bool score_tree   = false;
+bool score_ghkm   = false;
 
 double discount_dp = 0.0;
 
@@ -92,8 +92,8 @@ int main(int argc, char** argv)
     if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
       throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.file_string());
 
-    if (int(score_phrase) + score_scfg + score_tree != 1)
-      throw std::runtime_error("specify either one of --score-phrase|scfg|tree");
+    if (int(score_phrase) + score_scfg + score_ghkm != 1)
+      throw std::runtime_error("specify either one of --score-phrase|scfg|ghkm");
     
     threads = utils::bithack::max(1, threads);
 
@@ -130,7 +130,7 @@ int main(int argc, char** argv)
     else if (score_scfg)
       modify_counts<ExtractRootSCFG>(counts_files, modified_files, root_sources, root_targets);
     else
-      modify_counts<ExtractRootTree>(counts_files, modified_files, root_sources, root_targets);
+      modify_counts<ExtractRootGHKM>(counts_files, modified_files, root_sources, root_targets);
     utils::resource end_modify;
     
     if (debug)
@@ -169,12 +169,12 @@ int main(int argc, char** argv)
 						 root_targets,
 						 LexiconSCFG(lexicon_source_target, lexicon_target_source));
     else
-      score_counts<ExtractRootTree, LexiconTree>(output_file,
+      score_counts<ExtractRootGHKM, LexiconGHKM>(output_file,
 						 counts_files,
 						 modified_counts,
 						 root_sources,
 						 root_targets,
-						 LexiconTree(lexicon_source_target, lexicon_target_source));
+						 LexiconGHKM(lexicon_source_target, lexicon_target_source));
     utils::resource end_score;
     if (debug)
       std::cerr << "score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
@@ -386,7 +386,7 @@ void options(int argc, char** argv)
     
     ("score-phrase", po::bool_switch(&score_phrase), "score phrase pair counts")
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")
-    ("score-tree",   po::bool_switch(&score_tree),   "score tree fragment counts")
+    ("score-ghkm",   po::bool_switch(&score_ghkm),   "score ghkm fragment counts")
     
     ("discount-dp", po::value<double>(&discount_dp), "Dirichlet Prior discount")
     

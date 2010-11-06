@@ -331,7 +331,7 @@ struct ExtractRootSCFG
   }
 };
 
-struct ExtractRootTree
+struct ExtractRootGHKM
 {
   // extract the first word...
   std::string operator()(const std::string& phrase) const
@@ -584,7 +584,7 @@ struct LexiconSCFG
   }
 };
 
-struct LexiconTree
+struct LexiconGHKM
 {
   typedef PhrasePair::point_type     point_type;
   typedef PhrasePair::alignment_type alignment_type;
@@ -597,7 +597,7 @@ struct LexiconTree
   
   typedef LexiconModel lexicon_model_type;
 
-  LexiconTree(const lexicon_model_type& __lexicon_source_target,
+  LexiconGHKM(const lexicon_model_type& __lexicon_source_target,
 	      const lexicon_model_type& __lexicon_target_source)
     : lexicon_source_target(__lexicon_source_target),
       lexicon_target_source(__lexicon_target_source) {}

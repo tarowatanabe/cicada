@@ -58,7 +58,7 @@ path_type output_file = "";
 
 bool score_phrase = false;
 bool score_scfg   = false;
-bool score_tree   = false;
+bool score_ghkm   = false;
 
 double discount_dp = 0.0;
 
@@ -113,8 +113,8 @@ int main(int argc, char** argv)
     if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
       throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.file_string());
         
-    if (int(score_phrase) + score_scfg + score_tree != 1)
-      throw std::runtime_error("specify either one of --score-phrase|scfg|tree");
+    if (int(score_phrase) + score_scfg + score_ghkm != 1)
+      throw std::runtime_error("specify either one of --score-phrase|scfg|ghkm");
 
     if (! prog_name.empty() && ! boost::filesystem::exists(prog_name))
       throw std::runtime_error(std::string("no binary? ") + prog_name.file_string());
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
       else if (score_scfg)
 	modify_counts_reducer<ExtractRootSCFG>(comm_parent, modified_files, root_sources, root_targets);
       else
-	modify_counts_reducer<ExtractRootTree>(comm_parent, modified_files, root_sources, root_targets);
+	modify_counts_reducer<ExtractRootGHKM>(comm_parent, modified_files, root_sources, root_targets);
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
@@ -170,12 +170,12 @@ int main(int argc, char** argv)
 							   root_targets,
 							   LexiconSCFG(lexicon_source_target, lexicon_target_source));
       else
-	score_counts_reducer<ExtractRootTree, LexiconTree>(comm_parent,
+	score_counts_reducer<ExtractRootGHKM, LexiconGHKM>(comm_parent,
 							   output_file,
 							   modified_counts,
 							   root_sources,
 							   root_targets,
-							   LexiconTree(lexicon_source_target, lexicon_target_source));
+							   LexiconGHKM(lexicon_source_target, lexicon_target_source));
       utils::resource end_score;
       if (debug && mpi_rank == 0)
 	std::cerr << "reducer score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
@@ -215,7 +215,7 @@ int main(int argc, char** argv)
       else if (score_scfg)
 	modify_counts_mapper<ExtractRootSCFG>(comm_child, counts_files);
       else
-	modify_counts_mapper<ExtractRootTree>(comm_child, counts_files);
+	modify_counts_mapper<ExtractRootGHKM>(comm_child, counts_files);
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
@@ -800,7 +800,7 @@ void options(int argc, char** argv)
     
     ("score-phrase", po::bool_switch(&score_phrase), "score phrase pair counts")
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")
-    ("score-tree",   po::bool_switch(&score_tree),   "score tree fragment counts")
+    ("score-ghkm",   po::bool_switch(&score_ghkm),   "score ghkm fragment counts")
     
     ("discount-dp", po::value<double>(&discount_dp), "Dirichlet Prior discount")
     
