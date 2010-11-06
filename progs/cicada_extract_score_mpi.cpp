@@ -49,6 +49,7 @@ typedef PhraseCounts modified_counts_type;
 typedef std::vector<modified_counts_type, std::allocator<modified_counts_type> > modified_counts_set_type;
 
 path_set_type counts_files;
+path_type     list_file;
 
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
@@ -103,7 +104,7 @@ int main(int argc, char** argv)
     
     options(argc, argv);
     
-    if (counts_files.empty())
+    if (counts_files.empty() && (list_file.empty() || (! boost::filesystem::exists(list_file) && list_file != "-")))
       throw std::runtime_error("no count files?");
     if (output_file.empty())
       throw std::runtime_error("no output file?");
@@ -121,7 +122,7 @@ int main(int argc, char** argv)
     if (MPI::Comm::Get_parent() != MPI::COMM_NULL) {
       utils::mpi_intercomm comm_parent(MPI::Comm::Get_parent());
       
-      path_set_type modfied_files;
+      path_set_type modified_files;
       root_count_set_type root_sources;
       root_count_set_type root_targets;
       
@@ -185,8 +186,25 @@ int main(int argc, char** argv)
       utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, MPI::INFO_NULL, 0));
       
       // sort input files by its size...
-      if (mpi_rank == 0)
+      if (mpi_rank == 0) {
+	if (! list_file.empty()) {
+	  const path_type dirname = (list_file == "-" ? path_type() : list_file.parent_path());
+	  
+	  utils::compress_istream is(list_file, 1024 * 1024);
+	  std::string line;
+	  while (std::getline(is, line)) 
+	    if (! line.empty()) {
+	      const path_type path(line);
+	      
+	      if (boost::filesystem::exists(path))
+		counts_files.push_back(path);
+	      else if (! dirname.empty() && boost::filesystem::exists(dirname / path))
+		counts_files.push_back(dirname / path);
+	    }
+	}
+	
 	std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
+      }
       
       utils::resource start_modify;
       if (score_phrase)
@@ -262,6 +280,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+
+  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
   
   typedef PhrasePairGenerator generator_type;
   
@@ -292,7 +312,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   phrase_pair_type phrase_pair;
   generator_type   generator;
   
-  boost::thead mapper(mapper_type(mapped_files, queues, debug));
+  boost::thread mapper(mapper_type(mapped_files, queues, debug));
   
   int non_found_iter = 0;
   for (;;) {
@@ -331,14 +351,6 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const root_count_set_type& root_targets,
 			  const Lexicon& lexicon)
 {
-  typedef PhrasePairScore map_reduce_type;
-  
-  typedef PhrasePairScoreReducer<Extractor, Lexicon> reducer_type;
-  
-  typedef map_reduce_type::queue_type         queue_type;
-  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
-  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
-
   typedef boost::iostreams::filtering_istream istream_type;
   typedef utils::mpi_device_source            idevice_type;
 
@@ -347,6 +359,16 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   
   typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
+
+  typedef PhrasePairScore map_reduce_type;
+  
+  typedef PhrasePairScoreReducer<Extractor, Lexicon> reducer_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+
+  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
   
   typedef PhrasePairParser parser_type;
   
@@ -383,7 +405,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
   
-  utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(shard) + ".gz"), 1024 * 1024);
+  utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
   
   boost::thread reducer(reducer_type(modified,
 				     root_sources,
@@ -439,7 +461,7 @@ void index_counts(const path_set_type& modified_files,
   
   path_type path_index;
   if (mpi_rank == 0) {
-    path_index = utils::tempfile::directory_name("cicada.extract.index.XXXXXX");
+    path_index = utils::tempfile::directory_name(std::string("cicada.extract.index.XXXXXX"));
     repository_type rep(path_index, repository_type::write);
     
     boost::iostreams::filtering_ostream os;
@@ -522,7 +544,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   root_count_set_type root_sources;
   
-  boost::thead mapper(mapper_type(mapped_files, queues, root_source, Extractor(), debug));
+  boost::thread mapper(mapper_type(mapped_files, queues, root_sources, Extractor(), debug));
   
   modified_set_type       modified;
   modified_generator_type generator;
@@ -596,6 +618,9 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
   typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
 
+  typedef map_reduce_type::modified_type     modified_type;
+  typedef map_reduce_type::modified_set_type modified_set_type;
+  
   typedef PhrasePairModifiedParser modified_parser_type;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
@@ -614,7 +639,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   
   const size_t queue_size = mpi_size * 128;
   queue_type queue(queue_size);
-  boost::thread reducer(reducer_type(queue, modified_files, root_targets, Extractor(), 1, max_malloc, debug));
+  boost::thread reducer(reducer_type(queue, modified_files, root_target, Extractor(), 1, max_malloc, debug));
   
   modified_set_type modified;
   modified_type     parsed;
@@ -678,7 +703,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	
  	std::pair<root_count_set_type::iterator, bool> result = root_source.insert(root_count);
 	if (! result.second)
-	  const_cast<root_count_type&>(*result.first).increment(root_count.begin(), root_count.counts.end());
+	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
       }
     }
     
@@ -688,7 +713,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     
     root_count_set_type::const_iterator siter_end = root_source.end();
     for (root_count_set_type::const_iterator siter = root_source.begin(); siter != siter_end; ++ siter)
-      generator(os, *siter) << '\n';
+      generator(os_src, *siter) << '\n';
     
     for (int rank = 0; rank != mpi_size; ++ rank) {
       istream_type is;
@@ -699,7 +724,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	
 	std::pair<root_count_set_type::iterator, bool> result = root_target.insert(root_count);
 	if (! result.second)
-	  const_cast<root_count_type&>(*result.first).increment(root_count.begin(), root_count.counts.end());
+	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
       }
     }
     
@@ -719,7 +744,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     
     // bcast root-count for source from root
     root_source.clear();
-    boost::iostreams::filtering_istream os_src;
+    boost::iostreams::filtering_istream is_src;
     is_src.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
     
     while (std::getline(is_src, line)) {
@@ -727,7 +752,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       
       std::pair<root_count_set_type::iterator, bool> result = root_source.insert(root_count);
       if (! result.second)
-	const_cast<root_count_type&>(*result.first).increment(root_count.begin(), root_count.counts.end());
+	const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
     }
     
     // send root-target to root...
@@ -740,7 +765,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     
     // bcast root-count for target from root
     root_target.clear();
-    boost::iostreams::filtering_istream os_trg;
+    boost::iostreams::filtering_istream is_trg;
     is_trg.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
     
     while (std::getline(is_trg, line)) {
@@ -748,7 +773,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       
       std::pair<root_count_set_type::iterator, bool> result = root_target.insert(root_count);
       if (! result.second)
-	const_cast<root_count_type&>(*result.first).increment(root_count.begin(), root_count.counts.end());
+	const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
     }
   }
 }
@@ -765,6 +790,7 @@ void options(int argc, char** argv)
   
   opts_config.add_options()
     ("counts",                 po::value<path_set_type>(&counts_files)->multitoken(), "counts files")
+    ("list",                   po::value<path_type>(&list_file),                      "count file list")
     ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),     "lexicon model for lex(target | source)")
     ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
     ("output",                 po::value<path_type>(&output_file),                    "output directory")

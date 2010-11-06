@@ -43,6 +43,7 @@ typedef PhraseCounts modified_counts_type;
 typedef std::vector<modified_counts_type, std::allocator<modified_counts_type> > modified_counts_set_type;
 
 path_set_type counts_files;
+path_type     list_file;
 
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
@@ -82,7 +83,7 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    if (counts_files.empty())
+    if (counts_files.empty() && (list_file.empty() || (! boost::filesystem::exists(list_file) && list_file != "-")))
       throw std::runtime_error("no count files?");
     if (output_file.empty())
       throw std::runtime_error("no output file?");
@@ -97,6 +98,22 @@ int main(int argc, char** argv)
     threads = utils::bithack::max(1, threads);
 
     // sort input files by its size...
+    if (! list_file.empty()) {
+      const path_type dirname = (list_file == "-" ? path_type() : list_file.parent_path());
+      
+      utils::compress_istream is(list_file, 1024 * 1024);
+      std::string line;
+      while (std::getline(is, line)) 
+	if (! line.empty()) {
+	  const path_type path(line);
+	  
+	  if (boost::filesystem::exists(path))
+	    counts_files.push_back(path);
+	  else if (! dirname.empty() && boost::filesystem::exists(dirname / path))
+	    counts_files.push_back(dirname / path);
+	}
+    }
+    
     std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
     
     // modify counts...
@@ -359,6 +376,7 @@ void options(int argc, char** argv)
   
   opts_config.add_options()
     ("counts",                 po::value<path_set_type>(&counts_files)->multitoken(), "counts files")
+    ("list",                   po::value<path_type>(&list_file),                      "count file list")
     ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),     "lexicon model for lex(target | source)")
     ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
     ("output",                 po::value<path_type>(&output_file),                    "output directory")
