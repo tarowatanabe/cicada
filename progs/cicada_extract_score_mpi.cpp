@@ -201,6 +201,9 @@ int main(int argc, char** argv)
 	      else if (! dirname.empty() && boost::filesystem::exists(dirname / path))
 		counts_files.push_back(dirname / path);
 	    }
+
+	  if (counts_files.empty())
+	    throw std::runtime_error("no count files?");
 	}
 	
 	std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
