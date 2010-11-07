@@ -1114,7 +1114,11 @@ struct PhrasePairModifyMapper
 			 root_count_set_type& __root_counts,
 			 const extract_root_type& __extract_root,
 			 const int __debug)
-    : paths(__paths), queues(__queues), root_counts(__root_counts), extract_root(__extract_root), debug(__debug) {}
+    : paths(__paths),
+      queues(__queues),
+      root_counts(__root_counts),
+      extract_root(__extract_root),
+      debug(__debug) {}
 
   template <typename Tp>
   struct greater_buffer
@@ -1139,9 +1143,14 @@ struct PhrasePairModifyMapper
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
       
-      if (counts.empty() || counts.back().source != phrase_pair.source || counts.back().target != phrase_pair.target) {
+      if (counts.empty() || counts.back().source != phrase_pair.source) {
 	counts.resize(counts.size() + 1);
 	counts.back().source.swap(phrase_pair.source);
+	counts.back().target.swap(phrase_pair.target);
+	counts.back().counts.swap(phrase_pair.counts);
+      } else if (counts.back().target != phrase_pair.target) {
+	counts.resize(counts.size() + 1);
+	counts.back().source = counts[counts.size() - 2].source;
 	counts.back().target.swap(phrase_pair.target);
 	counts.back().counts.swap(phrase_pair.counts);
       } else
@@ -1184,7 +1193,7 @@ struct PhrasePairModifyMapper
     
     modified_map_type modified(queues.size());
     modified_type counts;
-
+    
     int iter = 0;
     const int mask_full    = (1 << 12) - 1;
     const int mask_partial = (1 << 10) - 1;
@@ -1193,11 +1202,23 @@ struct PhrasePairModifyMapper
       buffer_stream_ptr_type buffer_stream(pqueue.top());
       pqueue.pop();
       
-      if (counts != buffer_stream->first.front()) {
+      bool differ = false;
+      if (counts.source != buffer_stream->first.front().source) {
+	//increment root_observed(lhs)
+	differ = true;
+      } else if (counts.target != buffer_stream->first.front().target) {
+	//increment root_observed(lhs, rhs)
+	differ = true;
+      }
+      
+      
+      if (differ) {
+	
 	if (! counts.counts.empty()) {
-	  std::pair<root_count_set_type::iterator, bool> result_root = root_counts.insert(extract_root(counts.source));
-	  if (! result_root.second)
-	    const_cast<root_count_type&>(*result_root.first).increment(counts.counts.begin(), counts.counts.end());
+	  const std::string root_label = extract_root(counts.source);
+	  
+	  std::pair<root_count_set_type::iterator, bool> result_count = root_counts.insert(root_label);
+	  const_cast<root_count_type&>(*result_count.first).increment(counts.counts.begin(), counts.counts.end());
 	  
 	  // swap source and target!
 	  
@@ -1243,9 +1264,9 @@ struct PhrasePairModifyMapper
     }
     
     if (! counts.counts.empty()) {
-      std::pair<root_count_set_type::iterator, bool> result_root = root_counts.insert(extract_root(counts.source));
-      if (! result_root.second)
-	const_cast<root_count_type&>(*result_root.first).increment(counts.counts.begin(), counts.counts.end());
+      const std::string root_label = extract_root(counts.source);
+      std::pair<root_count_set_type::iterator, bool> result_count = root_counts.insert(root_label);
+      const_cast<root_count_type&>(*result_count.first).increment(counts.counts.begin(), counts.counts.end());
 
       // swap source and target!
       counts.source.swap(counts.target);
@@ -1502,9 +1523,9 @@ struct PhrasePairModifyReducer
 	if (! result.second)
 	  const_cast<modified_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
 	
-	std::pair<root_count_set_type::iterator, bool> result_root = root_counts.insert(extract_root(citer->source));
-	if (! result_root.second)
-	  const_cast<root_count_type&>(*result_root.first).increment(citer->counts.begin(), citer->counts.end());
+	const std::string root_label = extract_root(citer->source);
+	std::pair<root_count_set_type::iterator, bool> result_count = root_counts.insert(root_label);
+	const_cast<root_count_type&>(*result_count.first).increment(citer->counts.begin(), citer->counts.end());
       }
       
       modified.clear();
@@ -1737,10 +1758,15 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
 	    os_counts[id]->write((char*) &(modified.counts[i]), sizeof(count_type));
 	  os_counts.back()->write((char*) &observed, sizeof(count_type));
 	}
+
+	// increment root_observed(lhs)
 	
 	modified.swap(buffer_stream->first.front());
 	observed = 1;
       } else if (buffer_stream->first.front().target != modified.target) {
+	
+	// increment root_observed(lhs, rhs)
+
 	modified.target.swap(buffer_stream->first.front().target);
 	modified.increment(buffer_stream->first.front().counts.begin(), buffer_stream->first.front().counts.end());
 	++ observed;
@@ -2166,18 +2192,17 @@ struct PhrasePairScoreReducer
 
       phrase_pair_type& curr = buffer_queue->first;
       
-      if (counts.empty())
-	counts.push_back(curr);
-      else if (counts.back() == curr)
-	counts.back().increment(curr.counts.begin(), curr.counts.end());
-      else {
-	if (counts.back().source != curr.source) {
+      if (counts.empty() || counts.back().source != curr.source) {
+	if (! counts.empty()) {
 	  dump_phrase_pair(counts);
 	  counts.clear();
 	}
 	
 	counts.push_back(curr);
-      }
+      } else if (counts.back().target != curr.target || counts.back().alignment != curr.alignment)
+	counts.push_back(curr);
+      else
+	counts.back().increment(curr.counts.begin(), curr.counts.end());
       
       buffer_queue->second->pop_swap(buffer_queue->first);
       if (! buffer_queue->first.source.empty())
