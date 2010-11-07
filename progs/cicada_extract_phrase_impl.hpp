@@ -1,6 +1,18 @@
 #ifndef __CICADA__EXTRACT_PHRASE_IMPL__HPP__
 #define __CICADA__EXTRACT_PHRASE_IMPL__HPP__ 1
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
 #include <string>
 #include <vector>
 
@@ -11,6 +23,102 @@
 
 #include "utils/sgi_hash_set.hpp"
 #include "utils/chart.hpp"
+
+struct Bitext
+{
+  typedef cicada::Sentence  sentence_type;
+  typedef cicada::Alignment alignment_type;
+
+  sentence_type  source;
+  sentence_type  target;
+  alignment_type alignment;
+  
+  Bitext() : source(), target(), alignment() {}
+  Bitext(const sentence_type& __source,
+	 const sentence_type& __target,
+	 const alignment_type& __alignment)
+    : source(__source), target(__target), alignment(__alignment) {}
+  
+  void swap(Bitext& x)
+  {
+    source.swap(x.source);
+    target.swap(x.target);
+    alignment.swap(x.alignment);
+  }
+
+  void clear()
+  {
+    source.clear();
+    target.clear();
+    alignment.clear();
+  }
+  
+  friend
+  std::istream& operator>>(std::istream& is, Bitext& bitext)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    namespace phoenix = boost::phoenix;
+    
+    using qi::phrase_parse;
+    using standard::space;
+
+    bitext.clear();
+    std::string line;
+    if (std::getline(is, line)) {
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end  = line.end();
+      
+      if (! bitext.source.assign(iter, end)) {
+	bitext.clear();
+	return is;
+      }
+      
+      if (! phrase_parse(iter, end, "|||", space)) {
+	bitext.clear();
+	return is;
+      }
+      
+      if (! bitext.target.assign(iter, end)) {
+	bitext.clear();
+	return is;
+      }
+      
+      if (! phrase_parse(iter, end, "|||", space)) {
+	bitext.clear();
+	return is;
+      }
+      
+      if (! bitext.alignment.assign(iter, end)) {
+	bitext.clear();
+	return is;
+      }
+      
+      if (iter != end) {
+	bitext.clear();
+	return is;
+      }
+    }
+    return is;
+  }
+  
+  friend
+  std::ostream& operator<<(std::ostream& os, const Bitext& bitext)
+  {
+    os << bitext.source << " ||| " << bitext.target << " ||| " << bitext.alignment;
+    return os;
+  }
+  
+};
+
+namespace std
+{
+  inline
+  void swap(Bitext& x, Bitext& y)
+  {
+    x.swap(y);
+  }
+};
 
 struct ExtractPhrase
 {

@@ -8,14 +8,18 @@
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 
+#include <utils/lockfree_list_queue.hpp>
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/compress_stream.hpp>
+#include <utils/malloc_stats.hpp>
 
 typedef boost::filesystem::path path_type;
 
 typedef cicada::Sentence  sentence_type;
 typedef cicada::Alignment alignment_type;
+
+typedef Bitext bitext_type;
 
 typedef ExtractPhrase::phrase_pair_type     phrase_pair_type;
 typedef ExtractPhrase::phrase_pair_set_type phrase_pair_set_type;
@@ -88,6 +92,38 @@ int main(int argc, char** argv)
   }
   return 0;
 }
+
+struct Task
+{
+  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_type;
+  
+  queue_type& queue;
+  
+  void operator()()
+  {
+    bitext_type bitext;
+    phrase_pair_set_type phrase_pairs;
+    
+    ExtractPhrase extractor;
+
+    const int iteration_mask = (1 << 10) - 1;
+    
+    for (int iter = 0;/**/; ++ iter) {
+      queue.pop_swap(bitext);
+      if (bitext.source.empty()) break;
+      
+      extractor(bitext.source, bitext.target, bitext.alignment, phrase_pairs);
+      
+      if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))) {
+	
+      }
+    }
+    
+    if (! phrase_pairs.empty()) {
+      
+    }
+  }
+};
 
 void options(int argc, char** argv)
 {
