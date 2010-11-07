@@ -191,7 +191,7 @@ namespace cicada
   inline
   bool operator!=(const Alignment::point_type& x, const Alignment::point_type& y) { return x.source != y.source || x.target != y.target; }
   inline
-  bool operator<(const Alignment::point_type& x, const Alignment::point_type& y) { return (x.target < y.target || (!(y.target < x.target) && x.source < y.source)); }
+  bool operator<(const Alignment::point_type& x, const Alignment::point_type& y) { return (x.source < y.source || (!(y.source < x.source) && x.target < y.target)); }
   inline
   bool operator>(const Alignment::point_type& x, const Alignment::point_type& y) { return y < x; }
   inline

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/array.hpp>
+
 #include "cicada/sentence.hpp"
 #include "cicada/alignment.hpp"
 
@@ -38,6 +40,46 @@ struct ExtractPhrase
     phrase_type    target;
     alignment_type alignment;
     counts_type    counts;
+
+    phrase_pair_type() {}
+
+    friend
+    size_t hash_value(phrase_pair_type const& x)
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+    
+      return hasher_type()(x.source.begin(), x.source.end(),
+			   hasher_type()(x.target.begin(), x.target.end(),
+					 hasher_type()(x.alignment.begin(), x.alignment.end(), 0)));
+    }
+
+    friend
+    bool operator==(const phrase_pair_type& x, const phrase_pair_type& y) 
+    {
+      return x.source == y.source && x.target == y.target && x.alignment == y.alignment;
+    }
+  
+    friend
+    bool operator!=(const phrase_pair_type& x, const phrase_pair_type& y) 
+    {
+      return x.source != y.source || x.target != y.target || x.alignment != y.alignment;
+    }
+  
+    friend
+    bool operator<(const phrase_pair_type& x, const phrase_pair_type& y)
+    {
+      return (x.source < y.source
+	      || (!(y.source < x.source)
+		  && (x.target < y.target
+		      || (!(y.target < x.target)
+			  && x.alignment < y.alignment))));
+    }
+
+    friend
+    bool operator>(const phrase_pair_type& x, const phrase_pair_type& y)
+    {
+      return y < x;
+    }
   };
   
 
@@ -49,7 +91,7 @@ struct ExtractPhrase
 			std::allocator<phrase_pair_type> > phrase_pair_set_type;
 #endif
   
-  typedef utils::chart<phrase_type, std::allocator<phrase_tyep> >      phrase_chart_type;
+  typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
   typedef std::vector<span_type, std::allocator<span_type> >           span_set_type;
@@ -72,7 +114,7 @@ struct ExtractPhrase
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
 		  const alignment_type& alignment,
-		  phrase_pair_set_tyep& phrase_pairs)
+		  phrase_pair_set_type& phrase_pairs)
   {
     // first, extract spans...
     const size_type source_size = source.size();
@@ -142,7 +184,7 @@ struct ExtractPhrase
 	  
 	const int span_count_source = alignment_count_source[source_last] - alignment_count_source[source_first];
 	
-	if (span_count_source > 0 && span_target.size() > 0) {
+	if (span_count_source > 0 && span_target.second - span_target.first > 0) {
 	  
 	  const int span_count_target = alignment_count_target[span_target.second] - alignment_count_target[span_target.first];
 	  
@@ -184,7 +226,7 @@ struct ExtractPhrase
 		for (int src = source_first; src != source_last; ++ src) {
 		  point_set_type::const_iterator titer_end = alignment_source_target[src].end();
 		  for (point_set_type::const_iterator titer = alignment_source_target[src].begin(); titer != titer_end; ++ titer)
-		    phrase_pair.alignment.push_back(std::pair_pair(src - source_first, *titer - target_first));
+		    phrase_pair.alignment.push_back(std::make_pair(src - source_first, *titer - target_first));
 		}
 		
 		const bool connected_left_top     = is_aligned(source_first - 1, target_first - 1);

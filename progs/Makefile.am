@@ -17,6 +17,7 @@ bin_PROGRAMS = \
 	cicada \
 	cicada_mpi \
 	cicada_eval \
+	cicada_extract_phrase \
 	cicada_extract_score \
 	cicada_extract_score_mpi \
 	cicada_learn \
@@ -50,6 +51,9 @@ cicada_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 
 cicada_eval_SOURCES = cicada_eval.cpp
 cicada_eval_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_extract_phrase_SOURCES = cicada_extract_phrase.cpp
+cicada_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_score_SOURCES = cicada_extract_score.cpp
 cicada_extract_score_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

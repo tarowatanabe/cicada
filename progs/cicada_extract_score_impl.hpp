@@ -31,6 +31,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/sentence.hpp>
+#include <cicada/alignment.hpp>
 #include <cicada/tree_rule.hpp>
 
 #include <utils/tempfile.hpp>
@@ -119,8 +120,10 @@ struct PhrasePair
 {
   typedef std::string phrase_type;
   typedef std::vector<double, std::allocator<double> > counts_type;
-  typedef std::pair<int, int> point_type;
-  typedef std::vector<point_type, std::allocator<point_type> > alignment_type;
+  //typedef std::pair<int, int> point_type;
+  //typedef std::vector<point_type, std::allocator<point_type> > alignment_type;
+  typedef cicada::Alignment alignment_type;
+  typedef alignment_type::point_type point_type;
 
   phrase_type    source;
   phrase_type    target;
@@ -300,6 +303,10 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  (PhrasePairModified::counts_type, counts)
 			  )
 
+BOOST_FUSION_ADAPT_STRUCT(PhrasePair::point_type,
+			  (PhrasePair::alignment_type::index_type, source)
+			  (PhrasePair::alignment_type::index_type, target)
+			  )
 
 struct ExtractRootPhrase
 {
@@ -467,8 +474,8 @@ struct LexiconPhrase
     
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      aligns_source[aiter->first].push_back(aiter->second);
-      aligns_target[aiter->second].push_back(aiter->first);
+      aligns_source[aiter->source].push_back(aiter->target);
+      aligns_target[aiter->target].push_back(aiter->source);
     }
     
     for (size_t trg = 0; trg != target_size; ++ trg) {
@@ -548,8 +555,8 @@ struct LexiconSCFG
     
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      aligns_source[aiter->first].push_back(aiter->second);
-      aligns_target[aiter->second].push_back(aiter->first);
+      aligns_source[aiter->source].push_back(aiter->target);
+      aligns_target[aiter->target].push_back(aiter->source);
     }
     
     for (size_t trg = 0; trg != target_size; ++ trg) 
@@ -637,8 +644,8 @@ struct LexiconGHKM
     
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      aligns_source[aiter->first].push_back(aiter->second);
-      aligns_target[aiter->second].push_back(aiter->first);
+      aligns_source[aiter->source].push_back(aiter->target);
+      aligns_target[aiter->target].push_back(aiter->source);
     }
     
     for (size_t trg = 0; trg != target_size; ++ trg) 
