@@ -188,9 +188,14 @@ int main(int argc, char** argv)
       // sort input files by its size...
       if (mpi_rank == 0) {
 	if (! list_file.empty()) {
-	  const path_type dirname = (list_file == "-" ? path_type() : list_file.parent_path());
+	  const path_type path = (boost::filesystem::is_directory(list_file) ? list_file / "files" : list_file);
 	  
-	  utils::compress_istream is(list_file, 1024 * 1024);
+	  if (! boost::filesystem::exists(path) && path != "-")
+	    throw std::runtime_error("no file? " + path.file_string());
+	  
+	  const path_type dirname = (path == "-" ? path_type() : path.parent_path());
+	  
+	  utils::compress_istream is(path, 1024 * 1024);
 	  std::string line;
 	  while (std::getline(is, line)) 
 	    if (! line.empty()) {
@@ -207,6 +212,22 @@ int main(int argc, char** argv)
 	}
 	
 	std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(utils::mpi_device_bcast_sink(0, 4096));
+
+	path_set_type::const_iterator citer_end = counts_files.end();
+	for (path_set_type::const_iterator citer = counts_files.begin(); citer != citer_end; ++ citer)
+	  os << citer->file_string() << '\n';
+      } else {
+	counts_files.clear();
+	
+	boost::iostreams::filtering_istream is;
+	is.push(utils::mpi_device_bcast_source(0, 4096));
+	
+	std::string line;
+	while (std::getline(is, line))
+	  counts_files.push_back(line);
       }
       
       utils::resource start_modify;
@@ -293,7 +314,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   path_set_type mapped_files;
-  for (size_t i = 0; i != counts_files.size(); ++ i)
+  for (int i = 0; i != static_cast<int>(counts_files.size()); ++ i)
     if (i % mpi_size == mpi_rank)
       mapped_files.push_back(counts_files[i]);
   
@@ -337,7 +358,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	found = true;
       }
     
-    found != utils::mpi_terminate_devices(stream, device);
+    found |= utils::mpi_terminate_devices(stream, device);
     
     if (std::count(device.begin(), device.end(), odevice_ptr_type()) == mpi_size) break;
     
@@ -436,6 +457,9 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
 	    queues[rank]->push_swap(phrase_pair);
 	  
 	} else {
+	  phrase_pair.clear();
+	  queues[rank]->push_swap(phrase_pair);
+	  
 	  stream[rank].reset();
 	  device[rank].reset();
 	}
@@ -480,7 +504,9 @@ void index_counts(const path_set_type& modified_files,
     if (std::getline(is, line))
       path_index = line;
   }
-
+  
+  utils::tempfile::insert(path_index);
+  
   if (path_index.empty() || ! boost::filesystem::exists(path_index))
     throw std::runtime_error("no index path? " + path_index.file_string());
   
@@ -488,11 +514,11 @@ void index_counts(const path_set_type& modified_files,
   
   modified_counts[mpi_rank].write(rep.path(boost::lexical_cast<std::string>(mpi_rank)));
   
-  // synchronize here...
-  MPI::COMM_WORLD.Barrier();
-  
-  for (int rank = 0; rank != mpi_size; ++ rank)
-    modified_counts[mpi_rank].open(rep.path(boost::lexical_cast<std::string>(rank)));
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    MPI::COMM_WORLD.Barrier();
+    
+    modified_counts[rank].open(rep.path(boost::lexical_cast<std::string>(rank)));
+  }
 }
 
 
@@ -526,7 +552,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   path_set_type mapped_files;
-  for (size_t i = 0; i != counts_files.size(); ++ i)
+  for (int i = 0; i != static_cast<int>(counts_files.size()); ++ i)
     if (i % mpi_size == mpi_rank)
       mapped_files.push_back(counts_files[i]);
   
@@ -576,7 +602,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	found = true;
       }
     
-    found != utils::mpi_terminate_devices(stream, device);
+    found |= utils::mpi_terminate_devices(stream, device);
     
     if (std::count(device.begin(), device.end(), odevice_ptr_type()) == mpi_size) break;
     
@@ -650,7 +676,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   
   modified_parser_type parser;
   std::string line;
-
+  
   int non_found_iter = 0;
   for (;;) {
     bool found = false;
@@ -691,7 +717,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   queue.push_swap(modified);
   
   reducer.join();
-
+  
   if (mpi_rank == 0) {
     root_count_type    root_count;
     RootCountParser    parser;
@@ -711,15 +737,17 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       }
     }
     
-    // bcast root-count for sources
-    boost::iostreams::filtering_ostream os_src;
-    os_src.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
-    
-    root_count_set_type::const_iterator siter_end = root_source.end();
-    for (root_count_set_type::const_iterator siter = root_source.begin(); siter != siter_end; ++ siter)
-      generator(os_src, *siter) << '\n';
-    
-    for (int rank = 0; rank != mpi_size; ++ rank) {
+    {
+      // bcast root-count for sources
+      boost::iostreams::filtering_ostream os_src;
+      os_src.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
+      
+      root_count_set_type::const_iterator siter_end = root_source.end();
+      for (root_count_set_type::const_iterator siter = root_source.begin(); siter != siter_end; ++ siter)
+	generator(os_src, *siter) << '\n';
+    }
+
+    for (int rank = 1; rank != mpi_size; ++ rank) {
       istream_type is;
       is.push(idevice_type(MPI::COMM_WORLD, rank, root_count_tag, 1024 * 1024));
       
@@ -732,52 +760,60 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       }
     }
     
-    // bcast root-count for targets
-    boost::iostreams::filtering_ostream os_trg;
-    os_trg.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
-    
-    root_count_set_type::const_iterator titer_end = root_target.end();
-    for (root_count_set_type::const_iterator titer = root_target.begin(); titer != titer_end; ++ titer)
-      generator(os_trg, *titer) << '\n';
+    {
+      // bcast root-count for targets
+      boost::iostreams::filtering_ostream os_trg;
+      os_trg.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
+      
+      root_count_set_type::const_iterator titer_end = root_target.end();
+      for (root_count_set_type::const_iterator titer = root_target.begin(); titer != titer_end; ++ titer)
+	generator(os_trg, *titer) << '\n';
+    }
     
   } else {
     root_count_type    root_count;
     RootCountParser    parser;
     RootCountGenerator generator;
     std::string line;
-    
-    // bcast root-count for source from root
-    root_source.clear();
-    boost::iostreams::filtering_istream is_src;
-    is_src.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
-    
-    while (std::getline(is_src, line)) {
-      if (! parser(line, root_count)) continue;
+
+    {
+      // bcast root-count for source from root
+      root_source.clear();
+      boost::iostreams::filtering_istream is_src;
+      is_src.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
       
-      std::pair<root_count_set_type::iterator, bool> result = root_source.insert(root_count);
-      if (! result.second)
-	const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+      while (std::getline(is_src, line)) {
+	if (! parser(line, root_count)) continue;
+	
+	std::pair<root_count_set_type::iterator, bool> result = root_source.insert(root_count);
+	if (! result.second)
+	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+      }
     }
     
-    // send root-target to root...
-    boost::iostreams::filtering_ostream os;
-    os.push(utils::mpi_device_sink(MPI::COMM_WORLD, 0, root_count_tag, 1024 * 1024));
-    
-    root_count_set_type::const_iterator titer_end = root_target.end();
-    for (root_count_set_type::const_iterator titer = root_target.begin(); titer != titer_end; ++ titer)
-      generator(os, *titer) << '\n';
-    
-    // bcast root-count for target from root
-    root_target.clear();
-    boost::iostreams::filtering_istream is_trg;
-    is_trg.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
-    
-    while (std::getline(is_trg, line)) {
-      if (! parser(line, root_count)) continue;
+    {
+      // send root-target to root...
+      boost::iostreams::filtering_ostream os;
+      os.push(utils::mpi_device_sink(MPI::COMM_WORLD, 0, root_count_tag, 1024 * 1024));
       
-      std::pair<root_count_set_type::iterator, bool> result = root_target.insert(root_count);
-      if (! result.second)
-	const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+      root_count_set_type::const_iterator titer_end = root_target.end();
+      for (root_count_set_type::const_iterator titer = root_target.begin(); titer != titer_end; ++ titer)
+	generator(os, *titer) << '\n';
+    }
+     
+    {
+      // bcast root-count for target from root
+      root_target.clear();
+      boost::iostreams::filtering_istream is_trg;
+      is_trg.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
+      
+      while (std::getline(is_trg, line)) {
+	if (! parser(line, root_count)) continue;
+	
+	std::pair<root_count_set_type::iterator, bool> result = root_target.insert(root_count);
+	if (! result.second)
+	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+      }
     }
   }
 }

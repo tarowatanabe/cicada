@@ -216,7 +216,7 @@ int main(int argc, char** argv)
 	os << piter->filename() << '\n';
       }
       
-      for (int rank = 0; rank != mpi_size; ++ rank) {
+      for (int rank = 1; rank != mpi_size; ++ rank) {
 	boost::iostreams::filtering_istream is;
 	is.push(utils::mpi_device_source(rank, file_tag, 4096));
 	

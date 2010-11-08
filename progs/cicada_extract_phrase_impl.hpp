@@ -76,35 +76,13 @@ struct Bitext
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator end  = line.end();
       
-      if (! bitext.source.assign(iter, end)) {
+      if((!bitext.source.assign(iter, end))
+	 || (!phrase_parse(iter, end, lit("|||"), space))
+	 || (!bitext.target.assign(iter, end))
+	 || (!phrase_parse(iter, end, lit("|||"), space))
+	 || (!bitext.alignment.assign(iter, end))
+	 || iter != end)
 	bitext.clear();
-	return is;
-      }
-      
-      if (! phrase_parse(iter, end, lit("|||"), space)) {
-	bitext.clear();
-	return is;
-      }
-      
-      if (! bitext.target.assign(iter, end)) {
-	bitext.clear();
-	return is;
-      }
-      
-      if (! phrase_parse(iter, end, lit("|||"), space)) {
-	bitext.clear();
-	return is;
-      }
-      
-      if (! bitext.alignment.assign(iter, end)) {
-	bitext.clear();
-	return is;
-      }
-      
-      if (iter != end) {
-	bitext.clear();
-	return is;
-      }
     }
     return is;
   }
@@ -130,7 +108,7 @@ struct PhrasePair
   alignment_type alignment;
   counts_type    counts;
 
-  PhrasePair() {}
+  PhrasePair() : source(), target(), alignment(), counts() {}
 
   friend
   size_t hash_value(PhrasePair const& x)
@@ -433,7 +411,7 @@ struct ExtractPhrase
 		// work with this span!
 		phrase_pair.source = phrases_source(source_first, source_last);
 		phrase_pair.target = phrases_target(target_first, target_last);
-		
+
 		phrase_pair.alignment.clear();
 		for (int src = source_first; src != source_last; ++ src) {
 		  point_set_type::const_iterator titer_end = alignment_source_target[src].end();
@@ -545,7 +523,7 @@ struct Task
     sorted_type::const_iterator siter_end = sorted.end();
     for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
       generator(os, *(*siter)) << '\n';
-
+    
     paths.push_back(path);
   }
   

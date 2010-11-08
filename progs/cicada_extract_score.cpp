@@ -99,9 +99,14 @@ int main(int argc, char** argv)
 
     // sort input files by its size...
     if (! list_file.empty()) {
-      const path_type dirname = (list_file == "-" ? path_type() : list_file.parent_path());
+      const path_type path = (boost::filesystem::is_directory(list_file) ? list_file / "files" : list_file);
       
-      utils::compress_istream is(list_file, 1024 * 1024);
+      if (! boost::filesystem::exists(path) && path != "-")
+	throw std::runtime_error("no file? " + path.file_string());
+
+      const path_type dirname = (path == "-" ? path_type() : path.parent_path());
+      
+      utils::compress_istream is(path, 1024 * 1024);
       std::string line;
       while (std::getline(is, line)) 
 	if (! line.empty()) {
@@ -237,20 +242,21 @@ void score_counts(const path_type& output_file,
   ostream_ptr_set_type ostreams(threads);
   
   // construct queue matrix...
-  for (size_t i = 0; i != threads; ++ i)
-    for (size_t j = 0; j != threads; ++ j) {
+  for (int i = 0; i != threads; ++ i)
+    for (int j = 0; j != threads; ++ j) {
       queues_mapper[i][j].reset(new queue_type(1024 * 1024));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
   
-  for (size_t shard = 0; shard != threads; ++ shard)
+  for (int shard = 0; shard != threads; ++ shard)
     mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
 						     queues_mapper[shard],
 						     debug)));
-  for (size_t shard = 0; shard != threads; ++ shard) {
+  for (int shard = 0; shard != threads; ++ shard) {
     const path_type path = output_file / (boost::lexical_cast<std::string>(shard) + ".gz");
-
-    ostreams[shard].reset(new utils::compress_ostream(path, 1024 * 1024));
+    
+    // TODO: ZERO BUFFER!
+    ostreams[shard].reset(new utils::compress_ostream(path, 0));
     
     reducers.add_thread(new boost::thread(reducer_type(modified,
 						       root_sources,
@@ -354,6 +360,8 @@ void modify_counts(const path_set_type& counts_files,
   root_target.clear();
   
   for (size_t shard = 0; shard != queues.size(); ++ shard) {
+    std::cerr << "shard: " << modified_files[shard].size() << std::endl;
+
     root_count_set_type::const_iterator siter_end = root_sources[shard].end();
     for (root_count_set_type::const_iterator siter = root_sources[shard].begin(); siter != siter_end; ++ siter) {
       std::pair<root_count_set_type::iterator, bool> result = root_source.insert(*siter);

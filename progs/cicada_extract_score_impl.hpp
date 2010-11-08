@@ -43,6 +43,7 @@
 #include <utils/map_file.hpp>
 #include <utils/alloc_vector.hpp>
 #include <utils/sgi_hash_set.hpp>
+#include <utils/sgi_hash_map.hpp>
 #include <utils/malloc_stats.hpp>
 #include <utils/lexical_cast.hpp>
 
@@ -408,8 +409,11 @@ struct LexiconModel
       
       const bool result = boost::spirit::qi::phrase_parse(iter, end, lexicon, boost::spirit::standard::space, parsed);
       if (! result || iter != end) continue;
+
       
       tables[word_type(boost::fusion::get<1>(parsed)).id()].table[boost::fusion::get<0>(parsed)] = boost::fusion::get<2>(parsed);
+
+      smooth = std::min(smooth, boost::fusion::get<2>(parsed));
     }
     
   }
@@ -1017,7 +1021,7 @@ struct PhrasePairModifiedGenerator
       
       phrase %= +char_;
       counts %= double20 % ' ';
-      phrase_pair %= phrase << " ||| " << phrase << " ||| " << " ||| " << counts;
+      phrase_pair %= phrase << " ||| " << phrase << " ||| " << counts;
     }
 
     struct real_precision : boost::spirit::karma::real_policies<double>
@@ -1113,7 +1117,7 @@ struct PhrasePairModifyMapper
   path_set_type paths;
   queue_ptr_set_type& queues;
   root_count_set_type& root_counts;
-  const extract_root_type& extract_root;
+  extract_root_type extract_root;
   int debug;
 
   PhrasePairModifyMapper(const path_set_type& __paths,
@@ -1289,19 +1293,16 @@ struct PhrasePairModifyMapper
       }
     
     // termination...
+    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     
     while (1) {
       for (size_t shard = 0; shard != queues.size(); ++ shard) 
-	if (queues[shard]) {
+	if (! terminated[shard]) {
 	  modified[shard].clear();
-	  
-	  if (queues[shard]->push_swap(modified[shard], true)) {
-	    queues[shard].reset();
-	    modified[shard].clear();
-	  }
+	  terminated[shard] = queues[shard]->push_swap(modified[shard], true);
 	}
       
-      if (std::count(queues.begin(), queues.end(), queue_ptr_type()) == static_cast<int>(queues.size())) break;
+      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
       boost::thread::yield();
     }
@@ -1352,7 +1353,7 @@ struct PhrasePairModifyReducer
   queue_type&    queue;
   path_set_type& paths;
   root_count_set_type& root_counts;
-  const extract_root_type& extract_root;
+  extract_root_type extract_root;
   
   int            shard_size;
   double         max_malloc;
@@ -1613,8 +1614,8 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
       }
       return cache.counts;
     } else {
-      static count_set_type __counts;
-      return __counts;
+      const_cast<count_set_type&>(counts_empty).resize(counts.size(), 0.0);
+      return counts_empty;
     }
   }
 
@@ -1642,7 +1643,7 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
 
     repository_type rep(path, repository_type::read);
 
-    repository_type::const_iterator iter = rep.find("counts-sizse");
+    repository_type::const_iterator iter = rep.find("counts-size");
     if (iter == rep.end())
       throw std::runtime_error("no counts size...");
     counts_size = boost::lexical_cast<size_type>(iter->second);
@@ -1710,6 +1711,8 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
     const path_type tmp_dir = utils::tempfile::tmp_dir();
     const path_type path_index = utils::tempfile::directory_name(tmp_dir / "cicada.extract.index.XXXXXX");
 
+    utils::tempfile::insert(path_index);
+    
     index.open(path_index, index_db_type::WRITE);
 
     counts_size = size_type(-1);
@@ -1722,7 +1725,7 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
     for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter) {
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->file_string());
-      
+
       istreams.push_back(istream_ptr_type(new istream_type(*piter, 1024 * 1024)));
       
       buffer_stream_ptr_type buffer_stream(new buffer_stream_type());
@@ -1751,7 +1754,8 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
 	  if (os_counts.empty()) {
 	    counts_size = modified.counts.size();
 	    for (size_t i = 0; i != counts_size + 1; ++ i) {
-	      paths_counts.push_back(utils::tempfile::directory_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
+	      paths_counts.push_back(utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
+	      utils::tempfile::insert(paths_counts.back());
 	      
 	      std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
 	      os->push(boost::iostreams::file_sink(paths_counts.back().file_string()), 1024 * 1024);
@@ -1762,7 +1766,7 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
 	    throw std::runtime_error("# of counts do not match");
 	  
 	  for (size_t i = 0; i != os_counts.size() - 1; ++ i)
-	    os_counts[id]->write((char*) &(modified.counts[i]), sizeof(count_type));
+	    os_counts[i]->write((char*) &(modified.counts[i]), sizeof(count_type));
 	  os_counts.back()->write((char*) &observed, sizeof(count_type));
 	}
 
@@ -1796,8 +1800,9 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
       if (os_counts.empty()) {
 	counts_size = modified.counts.size();
 	for (size_t i = 0; i != counts_size + 1; ++ i) {
-	  paths_counts.push_back(utils::tempfile::directory_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
-	      
+	  paths_counts.push_back(utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
+	  utils::tempfile::insert(paths_counts.back());
+	  
 	  std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
 	  os->push(boost::iostreams::file_sink(paths_counts.back().file_string()), 1024 * 1024);
 	      
@@ -1807,13 +1812,14 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
 	throw std::runtime_error("# of counts do not match");
       
       for (size_t i = 0; i != os_counts.size() - 1; ++ i)
-	os_counts[id]->write((char*) &(modified.counts[i]), sizeof(count_type));
+	os_counts[i]->write((char*) &(modified.counts[i]), sizeof(count_type));
       os_counts.back()->write((char*) &observed, sizeof(count_type));
     }
     
     index.close();
     index.open(path_index);
     
+    counts.clear();
     counts.reserve(os_counts.size());
     counts.resize(os_counts.size());
     
@@ -1828,6 +1834,8 @@ struct PhraseCounts : public utils::hashmurmur<uint64_t>
   
   index_db_type  index;
   counts_db_type counts;
+
+  count_set_type counts_empty;
 
   cache_set_type caches;
 };
@@ -1920,7 +1928,7 @@ struct PhrasePairScoreMapper
     
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
-      
+
       if (counts.empty() || counts.back() != phrase_pair)
 	counts.push_back(phrase_pair);
       else
@@ -1992,16 +2000,16 @@ struct PhrasePairScoreMapper
     // termination...
     // we will terminate asynchronously...
     
+    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+    
     while (1) {
       for (size_t shard = 0; shard != queues.size(); ++ shard) 
-	if (queues[shard]) {
+	if (! terminated[shard]) {
 	  counts.clear();
-	  
-	  if (queues[shard]->push_swap(counts, true))
-	    queues[shard].reset();
+	  terminated[shard] = queues[shard]->push_swap(counts, true);
 	}
       
-      if (std::count(queues.begin(), queues.end(), queue_ptr_type()) == static_cast<int>(queues.size())) break;
+      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
       boost::thread::yield();
     }
@@ -2047,8 +2055,10 @@ struct PhrasePairScoreReducer
   const modified_counts_set_type& modified_counts;
   const root_count_set_type& root_counts_source;
   const root_count_set_type& root_counts_target;
-  const extract_root_type& extract_root;
-  const lexicon_type& lexicon;
+  
+  extract_root_type extract_root;
+  lexicon_type      lexicon;
+  
   queue_ptr_set_type& queues;
   std::ostream& os;
   int debug;
@@ -2062,11 +2072,11 @@ struct PhrasePairScoreReducer
 			 std::ostream& __os,
 			 int __debug)
     : modified_counts(__modified_counts),
-      queues(__queues),
       root_counts_source(__root_counts_source),
       root_counts_target(__root_counts_target),
       extract_root(__extract_root),
       lexicon(__lexicon),
+      queues(__queues),
       os(__os),
       debug(__debug) {}
   
@@ -2093,7 +2103,6 @@ struct PhrasePairScoreReducer
     //
     // compute source counts and merged counts (ignoring difference of word alignment)
     //
-    
     phrase_pair_type counts_source;
     count_type       observed_source(0);
     
@@ -2118,7 +2127,7 @@ struct PhrasePairScoreReducer
     
     phrase_pair_type counts_pair;
     
-    iterators_type::const_iterator iiter_end = iterators.end();
+    iterators_type::const_iterator iiter_end = iterators.end() - 1;
     for (iterators_type::const_iterator iiter = iterators.begin(); iiter != iiter_end; ++ iiter) {
       phrase_pair_set_type::const_iterator first = *iiter;
       phrase_pair_set_type::const_iterator last  = *(iiter + 1);
@@ -2177,6 +2186,8 @@ struct PhrasePairScoreReducer
     typedef boost::shared_ptr<buffer_queue_type> buffer_queue_ptr_type;
     typedef std::vector<buffer_queue_ptr_type, std::allocator<buffer_queue_ptr_type> > pqueue_base_type;
     typedef std::priority_queue<buffer_queue_ptr_type, pqueue_base_type, greater_buffer<buffer_queue_type> > pqueue_type;
+
+    os.precision(20);
     
     pqueue_type pqueue;
     for (queue_ptr_set_type::iterator qiter = queues.begin(); qiter != queues.end(); ++ qiter) {
