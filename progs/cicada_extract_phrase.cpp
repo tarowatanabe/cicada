@@ -8,13 +8,7 @@
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 
-#include <utils/lockfree_list_queue.hpp>
 #include <utils/resource.hpp>
-#include <utils/bithack.hpp>
-#include <utils/compress_stream.hpp>
-#include <utils/malloc_stats.hpp>
-
-typedef boost::filesystem::path path_type;
 
 typedef cicada::Sentence  sentence_type;
 typedef cicada::Alignment alignment_type;
@@ -23,6 +17,11 @@ typedef Bitext bitext_type;
 
 typedef ExtractPhrase::phrase_pair_type     phrase_pair_type;
 typedef ExtractPhrase::phrase_pair_set_type phrase_pair_set_type;
+typedef Task task_type;
+typedef task_type::queue_type queue_type;
+typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+
+typedef boost::filesystem::path path_type;
 
 path_type source_file;
 path_type target_file;
@@ -30,10 +29,14 @@ path_type alignment_file;
 
 path_type output_file;
 
+int max_length = 7;
+int max_fertility = 10;
+
 double max_malloc = 8; // 8 GB
 int threads = 1;
 
 int debug = 0;
+
 
 void options(int argc, char** argv);
 
@@ -62,29 +65,49 @@ int main(int argc, char** argv)
     boost::filesystem::directory_iterator iter_end;
     for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
       boost::filesystem::remove_all(*iter);
+
+    
+    queue_type queue(1024 * threads);
+    task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_malloc));
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);
     utils::compress_istream is_alg(alignment_file, 1024 * 1024);
     
-    sentence_type  source;
-    sentence_type  target;
-    alignment_type alignment;
+    bitext_type bitext;
     
     for (;;) {
-      is_src >> source;
-      is_trg >> target;
-      is_alg >> alignment;
+      is_src >> bitext.source;
+      is_trg >> bitext.target;
+      is_alg >> bitext.alignment;
       
       if (! is_src || ! is_trg || ! is_alg) break;
       
-      
-      
+      if (! bitext.source.empty() && ! bitext.target.empty())
+	queue.push_swap(bitext);
     }
     
     if (is_src || is_trg || is_alg)
       throw std::runtime_error("# of lines do not match");
     
+    for (int i = 0; i != threads; ++ i) {
+      bitext.clear();
+      queue.push_swap(bitext);
+    }
+    
+    workers.join_all();
+    
+    utils::compress_ostream os(output_file / "files");
+    for (int i = 0; i != threads; ++ i) {
+      task_type::path_set_type::const_iterator piter_end = tasks[i].paths.end();
+      for (task_type::path_set_type::const_iterator piter = tasks[i].paths.begin(); piter != piter_end; ++ piter) {
+	utils::tempfile::erase(*piter);
+	os << piter->filename() << '\n';
+      }
+    }
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -92,38 +115,6 @@ int main(int argc, char** argv)
   }
   return 0;
 }
-
-struct Task
-{
-  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_type;
-  
-  queue_type& queue;
-  
-  void operator()()
-  {
-    bitext_type bitext;
-    phrase_pair_set_type phrase_pairs;
-    
-    ExtractPhrase extractor;
-
-    const int iteration_mask = (1 << 10) - 1;
-    
-    for (int iter = 0;/**/; ++ iter) {
-      queue.pop_swap(bitext);
-      if (bitext.source.empty()) break;
-      
-      extractor(bitext.source, bitext.target, bitext.alignment, phrase_pairs);
-      
-      if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))) {
-	
-      }
-    }
-    
-    if (! phrase_pairs.empty()) {
-      
-    }
-  }
-};
 
 void options(int argc, char** argv)
 {
@@ -136,6 +127,9 @@ void options(int argc, char** argv)
     ("target",    po::value<path_type>(&target_file),    "target file")
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     ("output",    po::value<path_type>(&output_file),    "output directory")
+    
+    ("max-length",    po::value<int>(&max_length)->default_value(max_length),       "maximum phrase length")
+    ("max-fertility", po::value<int>(&max_fertility)->default_value(max_fertility), "maximum phrase fertility ratio")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ("threads",    po::value<int>(&threads),       "# of threads")
