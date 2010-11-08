@@ -65,7 +65,6 @@ int main(int argc, char** argv)
     boost::filesystem::directory_iterator iter_end;
     for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
       boost::filesystem::remove_all(*iter);
-
     
     queue_type queue(1024 * threads);
     task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_malloc));
@@ -79,6 +78,7 @@ int main(int argc, char** argv)
     
     bitext_type bitext;
     
+    size_t num_samples = 0;
     for (;;) {
       is_src >> bitext.source;
       is_trg >> bitext.target;
@@ -86,9 +86,13 @@ int main(int argc, char** argv)
       
       if (! is_src || ! is_trg || ! is_alg) break;
       
-      if (! bitext.source.empty() && ! bitext.target.empty())
+      if (! bitext.source.empty() && ! bitext.target.empty()) {
 	queue.push_swap(bitext);
+	++ num_samples;
+      }
     }
+    if (debug)
+      std::cerr << "# of samples: " << num_samples << std::endl;
     
     if (is_src || is_trg || is_alg)
       throw std::runtime_error("# of lines do not match");
