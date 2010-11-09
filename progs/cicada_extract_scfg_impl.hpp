@@ -102,28 +102,32 @@ struct Bitext
   friend
   std::ostream& operator<<(std::ostream& os, const Bitext& bitext)
   {
-    os << bitext.source << " ||| " << bitext.target << " ||| " << bitext.alignment;
+    os << bitext.source
+       << " ||| " << bitext.target
+       << " ||| " << bitext.alignment
+       << " ||| " << bitext.spans_source
+       << " ||| " << bitext.spans_target;
     return os;
   }
   
 };
 
 
-struct PhrasePair
+struct RulePair
 {
   typedef std::string phrase_type;
   typedef cicada::Alignment alignment_type;
   typedef boost::array<double, 5> counts_type;
-
+  
   phrase_type    source;
   phrase_type    target;
   alignment_type alignment;
   counts_type    counts;
 
-  PhrasePair() : source(), target(), alignment(), counts() {}
+  RulePair() : source(), target(), alignment(), counts() {}
 
   friend
-  size_t hash_value(PhrasePair const& x)
+  size_t hash_value(RulePair const& x)
   {
     typedef utils::hashmurmur<size_t> hasher_type;
     
@@ -133,19 +137,19 @@ struct PhrasePair
   }
 
   friend
-  bool operator==(const PhrasePair& x, const PhrasePair& y) 
+  bool operator==(const RulePair& x, const RulePair& y) 
   {
     return x.source == y.source && x.target == y.target && x.alignment == y.alignment;
   }
   
   friend
-  bool operator!=(const PhrasePair& x, const PhrasePair& y) 
+  bool operator!=(const RulePair& x, const RulePair& y) 
   {
     return x.source != y.source || x.target != y.target || x.alignment != y.alignment;
   }
   
   friend
-  bool operator<(const PhrasePair& x, const PhrasePair& y)
+  bool operator<(const RulePair& x, const RulePair& y)
   {
     return (x.source < y.source
 	    || (!(y.source < x.source)
@@ -155,34 +159,34 @@ struct PhrasePair
   }
   
   friend
-  bool operator>(const PhrasePair& x, const PhrasePair& y)
+  bool operator>(const RulePair& x, const RulePair& y)
   {
     return y < x;
   }
 };
 
-BOOST_FUSION_ADAPT_STRUCT(PhrasePair::alignment_type::point_type,
-			  (PhrasePair::alignment_type::index_type, source)
-			  (PhrasePair::alignment_type::index_type, target)
+BOOST_FUSION_ADAPT_STRUCT(RulePair::alignment_type::point_type,
+			  (RulePair::alignment_type::index_type, source)
+			  (RulePair::alignment_type::index_type, target)
 			  )
 BOOST_FUSION_ADAPT_STRUCT(
-			  PhrasePair,
-			  (PhrasePair::phrase_type, source)
-			  (PhrasePair::phrase_type, target)
-			  (PhrasePair::alignment_type, alignment)
-			  (PhrasePair::counts_type, counts)
+			  RulePair,
+			  (RulePair::phrase_type, source)
+			  (RulePair::phrase_type, target)
+			  (RulePair::alignment_type, alignment)
+			  (RulePair::counts_type, counts)
 			  )
 
-struct PhrasePairGenerator
+struct RulePairGenerator
 {
-  typedef PhrasePair phrase_pair_type;
+  typedef RulePair phrase_pair_type;
   
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::alignment_type alignment_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
-  PhrasePairGenerator() : grammar() {}
-  PhrasePairGenerator(const PhrasePairGenerator& x) : grammar() {}
+  RulePairGenerator() : grammar() {}
+  RulePairGenerator(const RulePairGenerator& x) : grammar() {}
 
   
   template <typename Iterator>
@@ -247,7 +251,7 @@ namespace std
   }
 };
 
-struct ExtractPhrase
+struct ExtractSCFG
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
@@ -259,7 +263,7 @@ struct ExtractPhrase
   typedef boost::array<double, 5> counts_type;
 
   typedef std::pair<int, int> span_type;
-
+  
   struct span_pair_type
   {
     span_type source;
@@ -267,34 +271,71 @@ struct ExtractPhrase
     
     span_pair_type() : source(), target() {}
     span_pair_type(const span_type& __source, const span_type& __target) : source(__source), target(__target) {}
+
+    friend
+    size_t hash_value(span_pair_type const& x)
+    {
+      return utils::hashmurmur<size_t>()(x, 0);
+    }
+    
+    friend
+    bool operator==(const span_pair_type& x, const span_pair_type& y)
+    {
+      return x.source == y.source && x.taret == y.target;
+    }
+    
+    friend
+    bool operator!=(const span_pair_type& x, const span_pair_type& y)
+    {
+      return x.source != y.source || x.taret != y.target;
+    }
+
+    friend
+    bool operator<(const span_pair_type& x, const span_pair_type& y)
+    {
+      return x.source < y.source || (!(y.source < x.source) && x.target < y.target);
+    }
+    
+    friend
+    bool operator>(const span_pair_type& x, const span_pair_type& y)
+    {
+      return y < x;
+    }
+    
   };
 
-  typedef PhrasePair phrase_pair_type;
+  typedef RulePair rule_pair_type;
   
 
 #ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-				  std::allocator<phrase_pair_type> > phrase_pair_set_type;
+  typedef std::tr1::unordered_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+				  std::allocator<rule_pair_type> > rule_pair_set_type;
 #else
-  typedef sgi::hash_set<phrase_pair_type, boost::hash<phrase_pair_type>, std::equal_to<phrase_pair_type>,
-			std::allocator<phrase_pair_type> > phrase_pair_set_type;
+  typedef sgi::hash_set<rule_pair_type, boost::hash<rule_pair_type>, std::equal_to<rule_pair_type>,
+			std::allocator<rule_pair_type> > rule_pair_set_type;
 #endif
   
   typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
-  typedef std::vector<span_type, std::allocator<span_type> >           span_set_type;
+  typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
   
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_multiple_type;
 
-  ExtractPhrase(const int __max_length,
-		const int __max_fertility)
+  ExtractSCFG(const int __max_length,
+	      const int __max_fertility,
+	      const int __max_span,
+	      const int __min_hole)
     : max_length(__max_length),
-      max_fertility(__max_fertility) {}
+      max_fertility(__max_fertility),
+      max_span(__max_span),
+      min_hole(__min_hole) {}
 		
   int max_length;
   int max_fertility;
+  int max_span;
+  int min_hole;
 
   phrase_chart_type phrases_source;
   phrase_chart_type phrases_target;
@@ -308,10 +349,13 @@ struct ExtractPhrase
   alignment_count_set_type alignment_count_source;
   alignment_count_set_type alignment_count_target;
   
+  span_pair_set_type        spans;
+  span_pair_set_type        spans_unique;
+  
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
 		  const alignment_type& alignment,
-		  phrase_pair_set_type& phrase_pairs)
+		  rule_pair_set_type& rule_pairs)
   {
     // first, extract spans...
     const size_type source_size = source.size();
@@ -333,6 +377,9 @@ struct ExtractPhrase
     alignment_count_source.resize(source_size + 1, 0);
     alignment_count_target.resize(target_size + 1, 0);
     
+    spans.clear();
+    spans_unique.clear();
+    
     alignment_type::const_iterator aiter_end = alignment.end();
     for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
       alignment_source_target[aiter->source].push_back(aiter->target);
@@ -352,7 +399,7 @@ struct ExtractPhrase
     span_target_chart.clear();
     span_target_chart.resize(target_size + 1, span_type(source_size, 0));
     
-    
+    // first, collect alignment count only for the target side
     for (int target_first = 0; target_first < static_cast<int>(target_size); ++ target_first) {
       span_type span_source(source_size, 0);
 	
@@ -366,8 +413,8 @@ struct ExtractPhrase
 	span_target_chart(target_first, target_last) = span_source;
       }
     }
-    
-    phrase_pair_type phrase_pair;
+
+    // then, collect for source-target
     
     for (int source_first = 0; source_first < static_cast<int>(source_size); ++ source_first) {
       span_type span_target(target_size, 0);
@@ -388,68 +435,108 @@ struct ExtractPhrase
 	  if (span_count_source == span_count_target) {
 	    
 	    // unique span-pair
-	    //const span_type& span_source = span_target_chart(span_target.first, span_target.second);
+	    const span_type& span_source = span_target_chart(span_target.first, span_target.second);
+	    if (span_source.first == source_first && span_source.second == source_last)
+	      spans_unique.push_back(span_pair_type(span_source, span_target));
 	    
 	    // enlarge the target-span...
 	    for (int target_first = span_target.first; target_first >= 0; -- target_first)
 	      for (int target_last = span_target.second; target_last <= static_cast<int>(target_size); ++ target_last) {
-		  
+		
 		const int span_count_target = alignment_count_target[target_last] - alignment_count_target[target_first];
 		
 		if (span_count_source != span_count_target)
 		  break;
 		
-		if (max_length > 0 && source_last - source_first > max_length) continue;
-		if (max_fertility > 0
-		    && (double(utils::bithack::max(source_last - source_first, target_last - target_first))
-			/ double(utils::bithack::min(source_last - source_first, target_last - target_first))) >= max_fertility) continue;
-
-
-		if (phrases_source(source_first, source_last).empty()) {
-		  phrase_type& phrase = phrases_source(source_first, source_last);
-		  for (int i = source_first; i != source_last - 1; ++ i)
-		    phrase += static_cast<const std::string&>(source[i]) + ' ';
-		  phrase += static_cast<const std::string&>(source[source_last - 1]);
-		}
-		
-		if (phrases_target(target_first, target_last).empty()) {
-		  phrase_type& phrase = phrases_target(target_first, target_last);
-		  for (int i = target_first; i != target_last - 1; ++ i)
-		    phrase += static_cast<const std::string&>(target[i]) + ' ';
-		  phrase += static_cast<const std::string&>(target[target_last - 1]);
-		}
-		
-		
-		// work with this span!
-		phrase_pair.source = phrases_source(source_first, source_last);
-		phrase_pair.target = phrases_target(target_first, target_last);
-
-		phrase_pair.alignment.clear();
-		for (int src = source_first; src != source_last; ++ src) {
-		  point_set_type::const_iterator titer_end = alignment_source_target[src].end();
-		  for (point_set_type::const_iterator titer = alignment_source_target[src].begin(); titer != titer_end; ++ titer)
-		    phrase_pair.alignment.push_back(std::make_pair(src - source_first, *titer - target_first));
-		}
-		
-		const bool connected_left_top     = is_aligned(source_first - 1, target_first - 1);
-		const bool connected_right_top    = is_aligned(source_last,      target_first - 1);
-		const bool connected_left_bottom  = is_aligned(source_first - 1, target_last);
-		const bool connected_right_bottom = is_aligned(source_last,      target_last);
-
-		counts_type& counts = const_cast<counts_type&>(phrase_pairs.insert(phrase_pair).first->counts);
-		
-		counts[0] += 1;
-		counts[1] += (  connected_left_top && ! connected_right_top);
-		counts[2] += (! connected_left_top &&   connected_right_top);
-		counts[3] += (  connected_left_bottom && ! connected_right_bottom);
-		counts[4] += (! connected_left_bottom &&   connected_right_bottom);
-		
-		//spans.push_back(span_pair_type(span_type(source_first, source_last), span_type(target_first, target_last)));
+		spans.push_back(span_pair_type(span_type(source_first, source_last), span_type(target_first, target_last)));
 	      }
 	  }
 	}
       }
     }
+    
+    // now, iterate again...
+    span_pair_set_type::const_iterator iter_end = spans.end();
+    for (span_pair_set_type::const_iterator iter = spans.begin(); iter != iter_end; ++ iter) {
+      
+      const int source_length = iter->source.second - iter->source.first;
+      const int target_length = iter->target.second - iter->target.first;
+
+      const int source_count = alignment_count_source[iter->source.second] - alignment_count_source[iter->source.first];
+      const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
+      
+      if (max_length <= 0 || source_length <= max_length)
+	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
+	  // extract rule...
+	  
+	}
+      
+      // consider hole!
+      if (max_span <= 0 || source_length <= max_span) {
+	span_pair_set_type::const_iterator niter_end = spans_unique.end();
+	
+	// first non-terminal...
+	for (span_pair_set_type::const_iterator niter1 = spans_unique.begin(); niter1 != niter_end; ++ niter1) 
+	  if (*iter != *niter1
+	      && is_parent(iter->source, niter1->source)
+	      && is_parent(iter->target, niter1->target)) {
+	    
+	    const int source_count1 = alignment_count_source[niter1->source.second] - alignment_count_source[niter1->source.first];
+	    const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
+	    
+	    if (source_count1 == source_count) continue;
+	    
+	    const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
+	    const int target_length1 = target_length - (niter1->target.second - niter1->target.first);
+	    
+	    if (max_length <= 0 || source_length1 <= max_length)
+	      if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
+		// extract rule...
+		
+		
+	      }
+	    
+	    // second non-terminal...
+	    for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
+	      if (*iter != *niter2
+		  && is_parent(iter->source, niter2->source)
+		  && is_parent(iter->target, niter2->target)
+		  && is_disjoint(niter1->source, niter2->source)
+		  && is_disjoint(niter1->taregt, niter2->target)) {
+		
+		const int source_count2 = alignment_count_source[niter2->source.second] - alignment_count_source[niter2->source.first];
+		const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
+		
+		if (source_count == source_count1 + source_count2) continue;
+		
+		const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
+		const int target_length2 = target_length1 - (niter2->target.second - niter2->target.first);
+		
+		if (max_length <= 0 || source_length2 <= max_length)
+		  if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
+		    // extract rule...
+		    
+		    
+		  }
+	      }
+	  }
+      }
+    }
+  }
+  
+  bool is_parent(const span_type& parent, const span_type& child)
+  {
+    return parent.first <= child.first && child.second <= parent.second;
+  }
+  
+  bool is_disjoint(const span_type& child1, const span_type& child2)
+  {
+    return child1.second <= child2.first || child2.second <= child1.first;
+  }
+  
+  double fertility(int length1, int length2)
+  {
+    return double(utils::bithack::max(length1, length2)) / utils::bithacl::min(length1, length2);
   }
   
   bool is_aligned(const int source, const int target) const
@@ -479,8 +566,8 @@ struct Task
 
   typedef Bitext bitext_type;
   
-  typedef ExtractPhrase::phrase_pair_type     phrase_pair_type;
-  typedef ExtractPhrase::phrase_pair_set_type phrase_pair_set_type;
+  typedef ExtractPhrase::rule_pair_type     rule_pair_type;
+  typedef ExtractPhrase::rule_pair_set_type rule_pair_set_type;
   
   typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_type;
   
@@ -499,7 +586,7 @@ struct Task
   path_set_type paths;
   
   ExtractPhrase extractor;
-  PhrasePairGenerator generator;
+  RulePairGenerator generator;
   
   double max_malloc;
   
@@ -512,19 +599,19 @@ struct Task
     }
   };
   
-  void dump(const phrase_pair_set_type& phrase_pairs)
+  void dump(const rule_pair_set_type& rule_pairs)
   {
-    typedef std::vector<const phrase_pair_type*, std::allocator<const phrase_pair_type*> > sorted_type;
+    typedef std::vector<const rule_pair_type*, std::allocator<const rule_pair_type*> > sorted_type;
     
     // sorting...
-    sorted_type sorted(phrase_pairs.size());
+    sorted_type sorted(rule_pairs.size());
     {
       sorted_type::iterator siter = sorted.begin();
-      phrase_pair_set_type::const_iterator citer_end = phrase_pairs.end();
-      for (phrase_pair_set_type::const_iterator citer = phrase_pairs.begin(); citer != citer_end; ++ citer, ++ siter)
+      rule_pair_set_type::const_iterator citer_end = rule_pairs.end();
+      for (rule_pair_set_type::const_iterator citer = rule_pairs.begin(); citer != citer_end; ++ citer, ++ siter)
 	*siter = &(*citer);
     }
-    std::sort(sorted.begin(), sorted.end(), less_ptr<phrase_pair_type>());
+    std::sort(sorted.begin(), sorted.end(), less_ptr<rule_pair_type>());
     
     const path_type path_tmp = utils::tempfile::file_name(output / "counts-XXXXXX");
     utils::tempfile::insert(path_tmp);
@@ -542,7 +629,7 @@ struct Task
   void operator()()
   {
     bitext_type bitext;
-    phrase_pair_set_type phrase_pairs;
+    rule_pair_set_type rule_pairs;
     
     const int iteration_mask = (1 << 10) - 1;
     
@@ -550,17 +637,17 @@ struct Task
       queue.pop_swap(bitext);
       if (bitext.source.empty()) break;
       
-      extractor(bitext.source, bitext.target, bitext.alignment, phrase_pairs);
+      extractor(bitext.source, bitext.target, bitext.alignment, rule_pairs);
       
       if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))) {
-	dump(phrase_pairs);
-	phrase_pairs.clear();
+	dump(rule_pairs);
+	rule_pairs.clear();
       }
     }
     
-    if (! phrase_pairs.empty()) {
-      dump(phrase_pairs);
-      phrase_pairs.clear();
+    if (! rule_pairs.empty()) {
+      dump(rule_pairs);
+      rule_pairs.clear();
     }
   }
 };

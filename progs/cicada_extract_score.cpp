@@ -61,19 +61,18 @@ int    threads = 1;
 
 int debug = 0;
 
-template <typename Extractor>
+
 void modify_counts(const path_set_type& counts_files,
-		   path_map_type& modified_files,
-		   root_count_set_type& root_sources,
-		   root_count_set_type& root_targets);
+		   path_map_type& modified_files);
+template <typename Extractor>
 void index_counts(const path_map_type& modified_files,
-		  modified_counts_set_type& modified_counts);
+		  modified_counts_set_type& modified_counts,
+		  root_count_set_type& root_targets);
 template <typename Extractor, typename Lexicon>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
 		  const modified_counts_set_type& modified,
-		  const root_count_set_type& root_sources,
-		  const root_count_set_type& root_targets,
+		  root_count_set_type& root_sources,
 		  const Lexicon& lexicon);
 
 void options(int argc, char** argv);
@@ -130,12 +129,7 @@ int main(int argc, char** argv)
     root_count_set_type root_targets;
     
     utils::resource start_modify;
-    if (score_phrase)
-      modify_counts<ExtractRootPhrase>(counts_files, modified_files, root_sources, root_targets);
-    else if (score_scfg)
-      modify_counts<ExtractRootSCFG>(counts_files, modified_files, root_sources, root_targets);
-    else
-      modify_counts<ExtractRootGHKM>(counts_files, modified_files, root_sources, root_targets);
+    modify_counts(counts_files, modified_files);
     utils::resource end_modify;
     
     if (debug)
@@ -146,7 +140,12 @@ int main(int argc, char** argv)
     modified_counts_set_type modified_counts(threads);
     
     utils::resource start_index;
-    index_counts(modified_files, modified_counts);
+    if (score_phrase)
+      index_counts<ExtractRootPhrase>(modified_files, modified_counts, root_targets);
+    else if (score_scfg)
+      index_counts<ExtractRootSCFG>(modified_files, modified_counts, root_targets);
+    else
+      index_counts<ExtractRootGHKM>(modified_files, modified_counts, root_targets);
     utils::resource end_index;
  
     if (debug)
@@ -163,7 +162,6 @@ int main(int argc, char** argv)
 						     counts_files,
 						     modified_counts,
 						     root_sources,
-						     root_targets,
 						     LexiconPhrase(lexicon_source_target, lexicon_target_source));
       
     else if (score_scfg)
@@ -171,20 +169,34 @@ int main(int argc, char** argv)
 						 counts_files,
 						 modified_counts,
 						 root_sources,
-						 root_targets,
 						 LexiconSCFG(lexicon_source_target, lexicon_target_source));
     else
       score_counts<ExtractRootGHKM, LexiconGHKM>(output_file,
 						 counts_files,
 						 modified_counts,
 						 root_sources,
-						 root_targets,
 						 LexiconGHKM(lexicon_source_target, lexicon_target_source));
     utils::resource end_score;
     if (debug)
       std::cerr << "score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		<< "score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
     
+    // finally, dump root-sources and root-targets...
+    {
+      utils::compress_ostream os_src(output_file / "root-source.gz");
+      utils::compress_ostream os_trg(output_file / "root-target.gz");
+      
+      os_src.precision(20);
+      os_trg.precision(20);
+      
+      root_count_set_type::const_iterator siter_end = root_sources.end();
+      for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
+	os_src << *siter << '\n';
+	
+      root_count_set_type::const_iterator titer_end = root_targets.end();
+      for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
+	os_trg << *titer << '\n';
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -198,8 +210,7 @@ template <typename Extractor, typename Lexicon>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
 		  const modified_counts_set_type& modified,
-		  const root_count_set_type& root_sources,
-		  const root_count_set_type& root_targets,
+		  root_count_set_type& root_sources,
 		  const Lexicon& lexicon)
 {
   typedef PhrasePairScore map_reduce_type;
@@ -234,6 +245,8 @@ void score_counts(const path_type& output_file,
   for (size_t i = 0; i != counts_files.size(); ++ i)
     mapped_files[i % threads].push_back(counts_files[i]);
   
+  root_count_map_type root_counts(threads);
+  
   boost::thread_group mappers;
   boost::thread_group reducers;
   
@@ -259,8 +272,7 @@ void score_counts(const path_type& output_file,
     ostreams[shard].reset(new utils::compress_ostream(path, 0));
     
     reducers.add_thread(new boost::thread(reducer_type(modified,
-						       root_sources,
-						       root_targets,
+						       root_counts[shard],
 						       Extractor(),
 						       lexicon,
 						       queues_reducer[shard],
@@ -270,9 +282,24 @@ void score_counts(const path_type& output_file,
   
   mappers.join_all();
   reducers.join_all();
+  
+  
+  // merge root_sources...
+  for (size_t shard = 0; shard != root_counts.size(); ++ shard) {
+    root_count_set_type::const_iterator citer_end = root_counts[shard].end();
+    for (root_count_set_type::const_iterator citer = root_counts[shard].begin(); citer != citer_end; ++ citer) {
+      std::pair<root_count_set_type::iterator, bool> result = root_sources.insert(*citer);
+      if (! result.second) {
+	const_cast<root_count_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
+	const_cast<root_count_type&>(*result.first).observed_joint += citer->observed_joint;
+	const_cast<root_count_type&>(*result.first).observed       += citer->observed;
+      }
+    }
+  }
 }
 
 
+template <typename Extractor>
 struct IndexTask
 {
   const path_set_type&  paths;
@@ -284,12 +311,14 @@ struct IndexTask
   
   void operator()()
   {
-    counts.open(paths);
+    counts.open(paths, Extractor());
   }
 };
 
+template <typename Extractor>
 void index_counts(const path_map_type& modified_files,
-		  modified_counts_set_type& modified_counts)
+		  modified_counts_set_type& modified_counts,
+		  root_count_set_type& root_targets)
 {
   if (static_cast<int>(modified_files.size()) != threads)
     throw std::runtime_error("# of threads differ");
@@ -299,21 +328,31 @@ void index_counts(const path_map_type& modified_files,
   boost::thread_group workers;
   
   for (size_t shard = 0; shard != modified_counts.size(); ++ shard)
-    workers.add_thread(new boost::thread(IndexTask(modified_files[shard], modified_counts[shard])));
+    workers.add_thread(new boost::thread(IndexTask<Extractor>(modified_files[shard], modified_counts[shard])));
   
   workers.join_all();
+  
+  // merge root counts...
+  for (size_t shard = 0; shard != modified_counts.size(); ++ shard) {
+    root_count_set_type::const_iterator citer_end = modified_counts[shard].root_counts.end();
+    for (root_count_set_type::const_iterator citer = modified_counts[shard].root_counts.begin(); citer != citer_end; ++ citer) {
+      std::pair<root_count_set_type::iterator, bool> result = root_targets.insert(*citer);
+      if (! result.second) {
+	const_cast<root_count_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
+	const_cast<root_count_type&>(*result.first).observed_joint += citer->observed_joint;
+	const_cast<root_count_type&>(*result.first).observed       += citer->observed;
+      }
+    }
+  }
 }
 
-template <typename Extractor>
 void modify_counts(const path_set_type& counts_files,
-		   path_map_type& modified_files,
-		   root_count_set_type& root_source,
-		   root_count_set_type& root_target)
+		   path_map_type& modified_files)
 {
   typedef PhrasePairModify map_reduce_type;
   
-  typedef PhrasePairModifyMapper<Extractor>  mapper_type;
-  typedef PhrasePairModifyReducer<Extractor> reducer_type;
+  typedef PhrasePairModifyMapper  mapper_type;
+  typedef PhrasePairModifyReducer reducer_type;
 
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -331,17 +370,12 @@ void modify_counts(const path_set_type& counts_files,
   boost::thread_group reducers;
   queue_ptr_set_type  queues(threads);
   
-  root_count_map_type root_sources(threads);
-  root_count_map_type root_targets(threads);
-
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     queues[shard].reset(new queue_type(threads * 64));
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
 						       modified_files[shard],
-						       root_targets[shard],
-						       Extractor(),
 						       threads,
 						       max_malloc,
 						       debug)));
@@ -349,34 +383,10 @@ void modify_counts(const path_set_type& counts_files,
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
 						     queues,
-						     root_sources[shard],
-						     Extractor(),
 						     debug)));
   
   mappers.join_all();
   reducers.join_all();
-
-  root_source.clear();
-  root_target.clear();
-  
-  for (size_t shard = 0; shard != queues.size(); ++ shard) {
-    std::cerr << "shard: " << modified_files[shard].size() << std::endl;
-
-    root_count_set_type::const_iterator siter_end = root_sources[shard].end();
-    for (root_count_set_type::const_iterator siter = root_sources[shard].begin(); siter != siter_end; ++ siter) {
-      std::pair<root_count_set_type::iterator, bool> result = root_source.insert(*siter);
-      if (! result.second)
-	const_cast<root_count_type&>(*result.first).increment(siter->counts.begin(), siter->counts.end());
-    }
-    
-    root_count_set_type::const_iterator titer_end = root_targets[shard].end();
-    for (root_count_set_type::const_iterator titer = root_targets[shard].begin(); titer != titer_end; ++ titer) {
-      std::pair<root_count_set_type::iterator, bool> result = root_target.insert(*titer);
-      if (! result.second)
-	const_cast<root_count_type&>(*result.first).increment(titer->counts.begin(), titer->counts.end());
-    }
-  }
-  
 }
 
 void options(int argc, char** argv)

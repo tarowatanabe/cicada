@@ -73,19 +73,16 @@ template <typename Extractor, typename Lexicon>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
 			  const modified_counts_set_type& modified,
-			  const root_count_set_type& root_sources,
-			  const root_count_set_type& root_targets,
+			  root_count_set_type& root_sources,
 			  const Lexicon& lexicon);
-void index_counts(const path_set_type& modified_files,
-		  modified_counts_set_type& modified_counts);
 template <typename Extractor>
+void index_counts(const path_set_type& modified_files,
+		  modified_counts_set_type& modified_counts,
+		  root_count_set_type& root_targets);
 void modify_counts_mapper(utils::mpi_intercomm& reducer,
 			  const path_set_type& counts_files);
-template <typename Extractor>
 void modify_counts_reducer(utils::mpi_intercomm& mapper,
-			   path_set_type& modified_files,
-			   root_count_set_type& root_source,
-			   root_count_set_type& root_target);
+			   path_set_type& modified_files);
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
@@ -127,12 +124,7 @@ int main(int argc, char** argv)
       root_count_set_type root_targets;
       
       utils::resource start_modify;
-      if (score_phrase)
-	modify_counts_reducer<ExtractRootPhrase>(comm_parent, modified_files, root_sources, root_targets);
-      else if (score_scfg)
-	modify_counts_reducer<ExtractRootSCFG>(comm_parent, modified_files, root_sources, root_targets);
-      else
-	modify_counts_reducer<ExtractRootGHKM>(comm_parent, modified_files, root_sources, root_targets);
+      modify_counts_reducer(comm_parent, modified_files);
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
@@ -142,7 +134,13 @@ int main(int argc, char** argv)
       modified_counts_set_type modified_counts(mpi_size);
       
       utils::resource start_index;
-      index_counts(modified_files, modified_counts);
+      if (score_phrase)
+	index_counts<ExtractRootPhrase>(modified_files, modified_counts, root_targets);
+      else if (score_scfg)
+	index_counts<ExtractRootSCFG>(modified_files, modified_counts, root_targets);
+      else
+	index_counts<ExtractRootGHKM>(modified_files, modified_counts, root_targets);
+      
       utils::resource end_index;
       
       if (debug && mpi_rank == 0)
@@ -159,7 +157,6 @@ int main(int argc, char** argv)
 							       output_file,
 							       modified_counts,
 							       root_sources,
-							       root_targets,
 							       LexiconPhrase(lexicon_source_target, lexicon_target_source));
       
       else if (score_scfg)
@@ -167,20 +164,34 @@ int main(int argc, char** argv)
 							   output_file,
 							   modified_counts,
 							   root_sources,
-							   root_targets,
 							   LexiconSCFG(lexicon_source_target, lexicon_target_source));
       else
 	score_counts_reducer<ExtractRootGHKM, LexiconGHKM>(comm_parent,
 							   output_file,
 							   modified_counts,
 							   root_sources,
-							   root_targets,
 							   LexiconGHKM(lexicon_source_target, lexicon_target_source));
       utils::resource end_score;
       if (debug && mpi_rank == 0)
 	std::cerr << "reducer score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		  << "reducer score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
       
+      // finally, dump root-sources and root-targets...
+      if (mpi_rank == 0) {
+	utils::compress_ostream os_src(output_file / "root-source.gz");
+	utils::compress_ostream os_trg(output_file / "root-target.gz");
+      
+	os_src.precision(20);
+	os_trg.precision(20);
+      
+	root_count_set_type::const_iterator siter_end = root_sources.end();
+	for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
+	  os_src << *siter << '\n';
+	
+	root_count_set_type::const_iterator titer_end = root_targets.end();
+	for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
+	  os_trg << *titer << '\n';
+      }
     } else {
       const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.file_string() : std::string(argv[0]));
       utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, MPI::INFO_NULL, 0));
@@ -231,12 +242,7 @@ int main(int argc, char** argv)
       }
       
       utils::resource start_modify;
-      if (score_phrase)
-	modify_counts_mapper<ExtractRootPhrase>(comm_child, counts_files);
-      else if (score_scfg)
-	modify_counts_mapper<ExtractRootSCFG>(comm_child, counts_files);
-      else
-	modify_counts_mapper<ExtractRootGHKM>(comm_child, counts_files);
+      modify_counts_mapper(comm_child, counts_files);
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
@@ -372,8 +378,7 @@ template <typename Extractor, typename Lexicon>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
 			  const modified_counts_set_type& modified,
-			  const root_count_set_type& root_sources,
-			  const root_count_set_type& root_targets,
+			  root_count_set_type& root_sources,
 			  const Lexicon& lexicon)
 {
   typedef boost::iostreams::filtering_istream istream_type;
@@ -434,7 +439,6 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   
   boost::thread reducer(reducer_type(modified,
 				     root_sources,
-				     root_targets,
 				     Extractor(),
 				     lexicon,
 				     queues,
@@ -474,18 +478,51 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   }
   
   reducer.join();
+  
+  // merge root-sources...
+  if (mpi_rank == 0) {
+    RootCountParser parser;
+    root_count_type root_count;
+    std::string line;
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
+      
+      while (std::getline(is, line)) {
+	if (! parser(line, root_count)) continue;
+	
+	std::pair<root_count_set_type::iterator, bool> result = root_sources.insert(root_count);
+	if (! result.second) {
+	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+	  const_cast<root_count_type&>(*result.first).observed_joint += root_count.observed_joint;
+	  const_cast<root_count_type&>(*result.first).observed       += root_count.observed;
+	}
+      }
+    }
+    
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
+    
+    RootCountGenerator generator;
+    root_count_set_type::const_iterator siter_end = root_sources.end();
+    for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
+      generator(os, *siter) << '\n';
+  }
+  
 }
 
-
+template <typename Extractor>
 void index_counts(const path_set_type& modified_files,
-		  modified_counts_set_type& modified_counts)
+		  modified_counts_set_type& modified_counts,
+		  root_count_set_type& root_targets)
 {
   typedef utils::repository repository_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  modified_counts[mpi_rank].open(modified_files);
+  modified_counts[mpi_rank].open(modified_files, Extractor());
   
   path_type path_index;
   if (mpi_rank == 0) {
@@ -514,15 +551,49 @@ void index_counts(const path_set_type& modified_files,
   
   modified_counts[mpi_rank].write(rep.path(boost::lexical_cast<std::string>(mpi_rank)));
   
-  for (int rank = 0; rank != mpi_size; ++ rank) {
-    MPI::COMM_WORLD.Barrier();
+  // merge root-targets.
+  if (mpi_rank == 0) {
+    root_targets = modified_counts[0].root_counts;
     
+    RootCountParser parser;
+    root_count_type root_count;
+    std::string line;
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
+      
+      while (std::getline(is, line)) {
+	if (! parser(line, root_count)) continue;
+	
+	std::pair<root_count_set_type::iterator, bool> result = root_targets.insert(root_count);
+	if (! result.second) {
+	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+	  const_cast<root_count_type&>(*result.first).observed_joint += root_count.observed_joint;
+	  const_cast<root_count_type&>(*result.first).observed       += root_count.observed;
+	}
+      }
+    }
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
+    
+    RootCountGenerator generator;
+    root_count_set_type::const_iterator titer_end = modified_counts[mpi_rank].root_counts.end();
+    for (root_count_set_type::const_iterator titer = modified_counts[mpi_rank].root_counts.begin(); titer != titer_end; ++ titer)
+      generator(os, *titer) << '\n';
+  }
+  
+  // re-open with barrier...
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    int value = 0;
+    int value_reduced = 0;
+    MPI::COMM_WORLD.Reduce(&value, &value_reduced, 1, MPI::INT, MPI::SUM, rank);
+
     modified_counts[rank].open(rep.path(boost::lexical_cast<std::string>(rank)));
   }
 }
 
 
-template <typename Extractor>
 void modify_counts_mapper(utils::mpi_intercomm& reducer,
 			  const path_set_type& counts_files)
 {
@@ -537,7 +608,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 
   typedef PhrasePairModify map_reduce_type;
   
-  typedef PhrasePairModifyMapper<Extractor>  mapper_type;
+  typedef PhrasePairModifyMapper  mapper_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -571,10 +642,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     
     stream[rank]->precision(20);
   }
-
-  root_count_set_type root_sources;
   
-  boost::thread mapper(mapper_type(mapped_files, queues, root_sources, Extractor(), debug));
+  boost::thread mapper(mapper_type(mapped_files, queues, debug));
   
   modified_set_type       modified;
   modified_generator_type generator;
@@ -610,26 +679,10 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   }
   
   mapper.join();
-  
-  // send to root of reducer...
-  {
-    ostream_type os;
-    os.push(odevice_type(reducer.comm, 0, root_count_tag, 1024 * 1024));
-
-    RootCountGenerator generator;
-    
-    root_count_set_type::const_iterator siter_end = root_sources.end();
-    for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
-      generator(os, *siter) << '\n';
-  }
 }
 
-
-template <typename Extractor>
 void modify_counts_reducer(utils::mpi_intercomm& mapper,
-			   path_set_type& modified_files,
-			   root_count_set_type& root_source,
-			   root_count_set_type& root_target)
+			   path_set_type& modified_files)
 {
   typedef boost::iostreams::filtering_istream istream_type;
   typedef utils::mpi_device_source            idevice_type;
@@ -642,7 +695,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   
   typedef PhrasePairModify map_reduce_type;
   
-  typedef PhrasePairModifyReducer<Extractor> reducer_type;
+  typedef PhrasePairModifyReducer reducer_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -669,7 +722,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   
   const size_t queue_size = mpi_size * 128;
   queue_type queue(queue_size);
-  boost::thread reducer(reducer_type(queue, modified_files, root_target, Extractor(), 1, max_malloc, debug));
+  boost::thread reducer(reducer_type(queue, modified_files, 1, max_malloc, debug));
   
   modified_set_type modified;
   modified_type     parsed;
@@ -710,112 +763,10 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  if (! modified.empty())
-    queue.push_swap(modified);
-  
   modified.clear();
   queue.push_swap(modified);
   
   reducer.join();
-  
-  if (mpi_rank == 0) {
-    root_count_type    root_count;
-    RootCountParser    parser;
-    RootCountGenerator generator;
-    std::string line;
-    
-    for (int rank = 0; rank != mpi_size; ++ rank) {
-      istream_type is;
-      is.push(idevice_type(mapper.comm, rank, root_count_tag, 1024 * 1024));
-      
-      while (std::getline(is, line)) {
-	if (! parser(line, root_count)) continue;
-	
- 	std::pair<root_count_set_type::iterator, bool> result = root_source.insert(root_count);
-	if (! result.second)
-	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-      }
-    }
-    
-    {
-      // bcast root-count for sources
-      boost::iostreams::filtering_ostream os_src;
-      os_src.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
-      
-      root_count_set_type::const_iterator siter_end = root_source.end();
-      for (root_count_set_type::const_iterator siter = root_source.begin(); siter != siter_end; ++ siter)
-	generator(os_src, *siter) << '\n';
-    }
-
-    for (int rank = 1; rank != mpi_size; ++ rank) {
-      istream_type is;
-      is.push(idevice_type(MPI::COMM_WORLD, rank, root_count_tag, 1024 * 1024));
-      
-      while (std::getline(is, line)) {
-	if (! parser(line, root_count)) continue;
-	
-	std::pair<root_count_set_type::iterator, bool> result = root_target.insert(root_count);
-	if (! result.second)
-	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-      }
-    }
-    
-    {
-      // bcast root-count for targets
-      boost::iostreams::filtering_ostream os_trg;
-      os_trg.push(utils::mpi_device_bcast_sink(0, 1024 * 1024));
-      
-      root_count_set_type::const_iterator titer_end = root_target.end();
-      for (root_count_set_type::const_iterator titer = root_target.begin(); titer != titer_end; ++ titer)
-	generator(os_trg, *titer) << '\n';
-    }
-    
-  } else {
-    root_count_type    root_count;
-    RootCountParser    parser;
-    RootCountGenerator generator;
-    std::string line;
-
-    {
-      // bcast root-count for source from root
-      root_source.clear();
-      boost::iostreams::filtering_istream is_src;
-      is_src.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
-      
-      while (std::getline(is_src, line)) {
-	if (! parser(line, root_count)) continue;
-	
-	std::pair<root_count_set_type::iterator, bool> result = root_source.insert(root_count);
-	if (! result.second)
-	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-      }
-    }
-    
-    {
-      // send root-target to root...
-      boost::iostreams::filtering_ostream os;
-      os.push(utils::mpi_device_sink(MPI::COMM_WORLD, 0, root_count_tag, 1024 * 1024));
-      
-      root_count_set_type::const_iterator titer_end = root_target.end();
-      for (root_count_set_type::const_iterator titer = root_target.begin(); titer != titer_end; ++ titer)
-	generator(os, *titer) << '\n';
-    }
-     
-    {
-      // bcast root-count for target from root
-      root_target.clear();
-      boost::iostreams::filtering_istream is_trg;
-      is_trg.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
-      
-      while (std::getline(is_trg, line)) {
-	if (! parser(line, root_count)) continue;
-	
-	std::pair<root_count_set_type::iterator, bool> result = root_target.insert(root_count);
-	if (! result.second)
-	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-      }
-    }
-  }
 }
 
 

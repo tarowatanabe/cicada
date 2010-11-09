@@ -248,15 +248,6 @@ struct ExtractPhrase
 
   typedef std::pair<int, int> span_type;
 
-  struct span_pair_type
-  {
-    span_type source;
-    span_type target;
-    
-    span_pair_type() : source(), target() {}
-    span_pair_type(const span_type& __source, const span_type& __target) : source(__source), target(__target) {}
-  };
-
   typedef PhrasePair phrase_pair_type;
   
 
@@ -271,7 +262,6 @@ struct ExtractPhrase
   typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
-  typedef std::vector<span_type, std::allocator<span_type> >           span_set_type;
   
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_multiple_type;
@@ -424,15 +414,17 @@ struct ExtractPhrase
 		const bool connected_left_bottom  = is_aligned(source_first - 1, target_last);
 		const bool connected_right_bottom = is_aligned(source_last,      target_last);
 
-		counts_type& counts = const_cast<counts_type&>(phrase_pairs.insert(phrase_pair).first->counts);
+		phrase_pair_set_type::iterator iter = phrase_pairs.find(phrase_pair);
+		if (iter == phrase_pairs.end())
+		  iter = phrase_pairs.insert(phrase_pair).first;
+		
+		counts_type& counts = const_cast<counts_type&>(iter->counts);
 		
 		counts[0] += 1;
 		counts[1] += (  connected_left_top && ! connected_right_top);
 		counts[2] += (! connected_left_top &&   connected_right_top);
 		counts[3] += (  connected_left_bottom && ! connected_right_bottom);
 		counts[4] += (! connected_left_bottom &&   connected_right_bottom);
-		
-		//spans.push_back(span_pair_type(span_type(source_first, source_last), span_type(target_first, target_last)));
 	      }
 	  }
 	}
