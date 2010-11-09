@@ -587,8 +587,11 @@ void index_counts(const path_set_type& modified_files,
   for (int rank = 0; rank != mpi_size; ++ rank) {
     int value = 0;
     int value_reduced = 0;
-    MPI::COMM_WORLD.Reduce(&value, &value_reduced, 1, MPI::INT, MPI::SUM, rank);
-
+    MPI::COMM_WORLD.Allreduce(&value, &value_reduced, 1, MPI::INT, MPI::SUM, rank);
+    
+    while (! boost::filesystem::exists(rep.path(boost::lexical_cast<std::string>(rank))))
+      boost::thread::yield();
+    
     modified_counts[rank].open(rep.path(boost::lexical_cast<std::string>(rank)));
   }
 }
