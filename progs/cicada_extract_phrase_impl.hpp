@@ -31,9 +31,8 @@
 #include <utils/tempfile.hpp>
 #include <utils/malloc_stats.hpp>
 
-class Bitext
+struct Bitext
 {
-public:
   typedef cicada::Sentence  sentence_type;
   typedef cicada::Alignment alignment_type;
 
@@ -98,9 +97,8 @@ public:
 };
 
 
-class PhrasePair
+struct PhrasePair
 {
-public:
   typedef std::string phrase_type;
   typedef cicada::Alignment alignment_type;
   typedef boost::array<double, 5> counts_type;
@@ -415,7 +413,7 @@ struct ExtractPhrase
 		const bool connected_right_top    = is_aligned(source_last,      target_first - 1);
 		const bool connected_left_bottom  = is_aligned(source_first - 1, target_last);
 		const bool connected_right_bottom = is_aligned(source_last,      target_last);
-
+		
 		phrase_pair_set_type::iterator iter = phrase_pairs.find(phrase_pair);
 		if (iter == phrase_pairs.end())
 		  iter = phrase_pairs.insert(phrase_pair).first;

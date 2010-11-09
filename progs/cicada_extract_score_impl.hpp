@@ -1540,11 +1540,10 @@ struct PhrasePairModifyReducer
       
       modified_set_type::const_iterator citer_end = modified.end();
       for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
-	modified_unique_type::iterator riter = counts.find(*citer);
-	if (riter == counts.end())
-	  counts.insert(*citer);
-	else
-	  const_cast<modified_type&>(*riter).increment(citer->counts.begin(), citer->counts.end());
+	
+	std::pair<modified_unique_type::iterator, bool> result = counts.insert(*citer);
+	if (! result.second)
+	  const_cast<modified_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
       }
       
       modified.clear();
