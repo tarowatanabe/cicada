@@ -60,8 +60,6 @@ bool score_phrase = false;
 bool score_scfg   = false;
 bool score_ghkm   = false;
 
-double discount_dp = 0.0;
-
 double max_malloc = 8; // 8 GB
 path_type prog_name;
 
@@ -791,8 +789,6 @@ void options(int argc, char** argv)
     ("score-phrase", po::bool_switch(&score_phrase), "score phrase pair counts")
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")
     ("score-ghkm",   po::bool_switch(&score_ghkm),   "score ghkm fragment counts")
-    
-    ("discount-dp", po::value<double>(&discount_dp), "Dirichlet Prior discount")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ("prog",       po::value<path_type>(&prog_name),   "this binary")
