@@ -179,13 +179,17 @@ int main(int argc, char** argv)
       std::cerr << "score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		<< "score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
     
-    // finally, dump root-sources and root-targets...
+    // finally, dump files, root-sources and root-targets...
     {
+      utils::compress_ostream os_file(output_file / "files");
       utils::compress_ostream os_src(output_file / "root-source.gz");
       utils::compress_ostream os_trg(output_file / "root-target.gz");
       
       os_src.precision(20);
       os_trg.precision(20);
+
+      for (int shard = 0; shard != threads; ++ shard)
+	os_file << (boost::lexical_cast<std::string>(shard) + ".gz") << '\n';
       
       root_count_set_type::const_iterator siter_end = root_sources.end();
       for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)

@@ -176,12 +176,16 @@ int main(int argc, char** argv)
       
       // finally, dump root-sources and root-targets...
       if (mpi_rank == 0) {
+	utils::compress_ostream os_file(output_file / "files");
 	utils::compress_ostream os_src(output_file / "root-source.gz");
 	utils::compress_ostream os_trg(output_file / "root-target.gz");
       
 	os_src.precision(20);
 	os_trg.precision(20);
       
+	for (int shard = 0; shard != mpi_size; ++ shard)
+	  os_file << (boost::lexical_cast<std::string>(shard) + ".gz") << '\n';
+	
 	root_count_set_type::const_iterator siter_end = root_sources.end();
 	for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
 	  os_src << *siter << '\n';
