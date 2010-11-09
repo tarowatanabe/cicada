@@ -31,8 +31,9 @@
 #include <utils/tempfile.hpp>
 #include <utils/malloc_stats.hpp>
 
-struct Bitext
+class Bitext
 {
+public:
   typedef cicada::Sentence  sentence_type;
   typedef cicada::Alignment alignment_type;
 
@@ -97,8 +98,9 @@ struct Bitext
 };
 
 
-struct PhrasePair
+class PhrasePair
 {
+public:
   typedef std::string phrase_type;
   typedef cicada::Alignment alignment_type;
   typedef boost::array<double, 5> counts_type;

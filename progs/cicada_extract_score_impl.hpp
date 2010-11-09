@@ -1587,7 +1587,7 @@ public:
   typedef RootCount root_count_type;
   typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
   
-  typedef char key_type;
+  typedef char     key_type;
   typedef uint64_t id_type;
   typedef double   count_type;
   
@@ -1606,15 +1606,6 @@ public:
   };
   typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
   
-
-  struct string_hash : public utils::hashmurmur<size_t>
-  {
-    size_t operator()(const std::string& x) const
-    {
-      return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
-    }
-  };
-
   PhraseCounts() : counts_size(size_type(-1)) {}
   
   template <typename ExtractRoot>
@@ -1669,6 +1660,11 @@ public:
     typedef utils::repository repository_type;
 
     clear();
+
+    while (! boost::filesystem::exists(path))
+      boost::thread::yield();
+    while (! boost::filesystem::exists(path / "prop.list"))
+      boost::thread::yield();
 
     repository_type rep(path, repository_type::read);
 
@@ -1752,7 +1748,7 @@ public:
     
     utils::tempfile::insert(path_index);
 
-    const path_type path_raw_tmp = utils::tempfile::directory_name(tmp_dir / "cicada.extract.counts-modified.XXXXXX");
+    const path_type path_raw_tmp = utils::tempfile::file_name(tmp_dir / "cicada.extract.counts-modified.XXXXXX");
     utils::tempfile::insert(path_raw_tmp);
     const path_type path_raw = path_raw_tmp.file_string() + ".gz";
     utils::tempfile::insert(path_raw);
@@ -1883,6 +1879,9 @@ public:
       os_counts.back()->write((char*) &observed, sizeof(count_type));
     }
     
+    index.clear();
+    index.open(path_index);
+    
     counts.clear();
     counts.reserve(os_counts.size());
     counts.resize(os_counts.size());
@@ -1899,9 +1898,6 @@ public:
       if (id != counts[i].size())
 	throw std::runtime_error("counts size differ from id!");
     }
-    
-    index.close();
-    index.open(path_index, index_db_type::READ);
   }
 
   void clear()
@@ -1921,9 +1917,8 @@ public:
   index_db_type  index;
   counts_db_type counts;
   root_count_set_type root_counts;
-
+  
   count_set_type counts_empty;
-  count_set_type counts_hit;
 
   cache_set_type caches;
 };
@@ -2140,7 +2135,7 @@ struct PhrasePairScoreReducer
 
   hasher_type hasher;
   
-  const modified_counts_set_type& modified_counts;
+  modified_counts_set_type modified_counts;
   root_count_set_type& root_counts;
   
   extract_root_type extract_root;
@@ -2215,9 +2210,6 @@ struct PhrasePairScoreReducer
       phrase_pair_set_type::const_iterator first = *iiter;
       phrase_pair_set_type::const_iterator last  = *(iiter + 1);
       
-      const int shard = hasher(first->target.begin(), first->target.end(), 0) % modified_counts.size();
-      const modified_counts_type::count_set_type& counts_target = modified_counts[shard][first->target];
-      
       // compute lexical weights from [first, last)... we will take "max"
       
       counts_pair.clear();
@@ -2235,6 +2227,9 @@ struct PhrasePairScoreReducer
 	
 	counts_pair.increment(iter->counts.begin(), iter->counts.end());
       }
+      
+      const int shard = hasher(first->target.begin(), first->target.end(), 0) % modified_counts.size();
+      const modified_counts_type::count_set_type& counts_target = modified_counts[shard][first->target];
       
       os << first->source << " ||| " << first->target << ' ';
       
