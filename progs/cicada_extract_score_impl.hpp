@@ -143,8 +143,6 @@ struct PhrasePair
 {
   typedef std::string phrase_type;
   typedef std::vector<double, std::allocator<double> > counts_type;
-  //typedef std::pair<int, int> point_type;
-  //typedef std::vector<point_type, std::allocator<point_type> > alignment_type;
   typedef cicada::Alignment alignment_type;
   typedef alignment_type::point_type point_type;
 
