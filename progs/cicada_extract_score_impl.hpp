@@ -1747,14 +1747,6 @@ public:
     
     utils::tempfile::insert(path_index);
 
-    const path_type path_raw_tmp = utils::tempfile::file_name(tmp_dir / "cicada.extract.counts-modified.XXXXXX");
-    utils::tempfile::insert(path_raw_tmp);
-    const path_type path_raw = path_raw_tmp.file_string() + ".gz";
-    utils::tempfile::insert(path_raw);
-
-    utils::compress_ostream os_raw(path_raw, 1024 * 1024);
-    os_raw.precision(20);
-    
     index.open(path_index, index_db_type::WRITE);
 
     counts_size = size_type(-1);
@@ -1793,10 +1785,6 @@ public:
       if (buffer_stream->first.front().source != modified.source) {
 	
 	if (! modified.source.empty() && ! modified.counts.empty()) {
-	  os_raw << modified.source << " ||| " << id << " ||| ";
-	  std::copy(modified.counts.begin(), modified.counts.end(), std::ostream_iterator<double>(os_raw, " "));
-	  os_raw << observed << '\n';
-
 	  index.insert(modified.source.c_str(), modified.source.size(), id);
 	  ++ id;
 	  
@@ -1852,10 +1840,6 @@ public:
     }
     
     if (! modified.source.empty() && ! modified.counts.empty()) {
-      os_raw << modified.source << " ||| " << id << " ||| ";
-      std::copy(modified.counts.begin(), modified.counts.end(), std::ostream_iterator<double>(os_raw, " "));
-      os_raw << observed << '\n';
-
       index.insert(modified.source.c_str(), modified.source.size(), id);
       ++ id;
 
