@@ -461,7 +461,7 @@ struct LexiconModel
   table_set_type tables;
 };
 
-struct LexiconPhrase
+struct LexiconBase
 {
   typedef PhrasePair::point_type     point_type;
   typedef PhrasePair::alignment_type alignment_type;
@@ -472,12 +472,12 @@ struct LexiconPhrase
   typedef std::vector<align_set_type, std::allocator<align_set_type> > align_map_type;
   
   typedef LexiconModel lexicon_model_type;
-
-  LexiconPhrase(const lexicon_model_type& __lexicon_source_target,
-		const lexicon_model_type& __lexicon_target_source)
+  
+  LexiconBase(const lexicon_model_type& __lexicon_source_target,
+	      const lexicon_model_type& __lexicon_target_source)
     : lexicon_source_target(__lexicon_source_target),
       lexicon_target_source(__lexicon_target_source) {}
-  
+
   const lexicon_model_type& lexicon_source_target;
   const lexicon_model_type& lexicon_target_source;
 
@@ -487,16 +487,6 @@ struct LexiconPhrase
   sentence_type source;
   sentence_type target;
 
-  void assign_source(const std::string& phrase)
-  {
-    source.assign(phrase);
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.assign(phrase);
-  }
-  
   std::pair<double, double> operator()(const alignment_type& alignment) const
   {
     const size_t source_size = source.size();
@@ -508,191 +498,6 @@ struct LexiconPhrase
     align_map_type& aligns_source = const_cast<align_map_type&>(aligns_source_impl);
     align_map_type& aligns_target = const_cast<align_map_type&>(aligns_target_impl);
     
-    aligns_source.clear();
-    aligns_target.clear();
-    
-    aligns_source.resize(source_size);
-    aligns_target.resize(target_size);
-    
-    alignment_type::const_iterator aiter_end = alignment.end();
-    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      aligns_source[aiter->source].push_back(aiter->target);
-      aligns_target[aiter->target].push_back(aiter->source);
-    }
-    
-    for (size_t trg = 0; trg != target_size; ++ trg) {
-      if (aligns_target[trg].empty())
-	lex_source_target *= lexicon_source_target(lexicon_model_type::vocab_type::NONE, target[trg]);
-      else {
-	double score = 0.0;
-	align_set_type::const_iterator aiter_end = aligns_target[trg].end();
-	for (align_set_type::const_iterator aiter = aligns_target[trg].begin(); aiter != aiter_end; ++ aiter)
-	  score += lexicon_source_target(source[*aiter], target[trg]);
-	
-	lex_source_target *= score / aligns_target[trg].size();
-      }
-    }
-    
-    for (size_t src = 0; src != source_size; ++ src) {
-      if (aligns_source[src].empty())
-	lex_target_source *= lexicon_target_source(lexicon_model_type::vocab_type::NONE, source[src]);
-      else {
-	double score = 0.0;
-	align_set_type::const_iterator aiter_end = aligns_source[src].end();
-	for (align_set_type::const_iterator aiter = aligns_source[src].begin(); aiter != aiter_end; ++ aiter)
-	  score += lexicon_target_source(target[*aiter], source[src]);
-	
-	lex_target_source *= score / aligns_source[src].size();
-      }
-    }
-    
-    return std::make_pair(lex_source_target, lex_target_source);
-  }
-};
-
-struct LexiconSCFG
-{
-  typedef PhrasePair::point_type     point_type;
-  typedef PhrasePair::alignment_type alignment_type;
-  
-  typedef cicada::Sentence sentence_type;
-
-  typedef std::vector<int, std::allocator<int> > align_set_type;
-  typedef std::vector<align_set_type, std::allocator<align_set_type> > align_map_type;
-  
-  typedef LexiconModel lexicon_model_type;
-
-  LexiconSCFG(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
-    : lexicon_source_target(__lexicon_source_target),
-      lexicon_target_source(__lexicon_target_source) {}
-  
-  const lexicon_model_type& lexicon_source_target;
-  const lexicon_model_type& lexicon_target_source;
-  
-  align_map_type aligns_source_impl;
-  align_map_type aligns_target_impl;
-
-  sentence_type source;
-  sentence_type target;
-
-  void assign_source(const std::string& phrase)
-  {
-    source.assign(phrase);
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.assign(phrase);
-  }
-  
-  std::pair<double, double> operator()(const alignment_type& alignment) const
-  {
-    // major difference to LexiconPhrase is the addition of root-symbol (but we will keep the same alignment structure...)
-    const size_t source_size = source.size() - 1;
-    const size_t target_size = target.size() - 1;
-    
-    double lex_source_target = 1.0;
-    double lex_target_source = 1.0;
-
-    align_map_type& aligns_source = const_cast<align_map_type&>(aligns_source_impl);
-    align_map_type& aligns_target = const_cast<align_map_type&>(aligns_target_impl);
-    
-    aligns_source.clear();
-    aligns_target.clear();
-    
-    aligns_source.resize(source_size);
-    aligns_target.resize(target_size);
-    
-    alignment_type::const_iterator aiter_end = alignment.end();
-    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      aligns_source[aiter->source].push_back(aiter->target);
-      aligns_target[aiter->target].push_back(aiter->source);
-    }
-    
-    for (size_t trg = 0; trg != target_size; ++ trg) 
-      if (target[trg].is_terminal()) {
-	if (aligns_target[trg].empty())
-	  lex_source_target *= lexicon_source_target(lexicon_model_type::vocab_type::NONE, target[trg + 1]);
-	else {
-	  double score = 0.0;
-	  align_set_type::const_iterator aiter_end = aligns_target[trg].end();
-	  for (align_set_type::const_iterator aiter = aligns_target[trg].begin(); aiter != aiter_end; ++ aiter)
-	    score += lexicon_source_target(source[*aiter + 1], target[trg + 1]);
-	  
-	  lex_source_target *= score / aligns_target[trg].size();
-	}
-      }
-    
-    for (size_t src = 0; src != source_size; ++ src) 
-      if (source[src].is_terminal()) {
-	if (aligns_source[src].empty())
-	  lex_target_source *= lexicon_target_source(lexicon_model_type::vocab_type::NONE, source[src + 1]);
-	else {
-	  double score = 0.0;
-	  align_set_type::const_iterator aiter_end = aligns_source[src].end();
-	  for (align_set_type::const_iterator aiter = aligns_source[src].begin(); aiter != aiter_end; ++ aiter)
-	    score += lexicon_target_source(target[*aiter + 1], source[src + 1]);
-	  
-	  lex_target_source *= score / aligns_source[src].size();
-	}
-      }
-    
-    return std::make_pair(lex_source_target, lex_target_source);
-  }
-};
-
-struct LexiconGHKM
-{
-  typedef PhrasePair::point_type     point_type;
-  typedef PhrasePair::alignment_type alignment_type;
-  
-  typedef cicada::Sentence sentence_type;
-  typedef cicada::TreeRule rule_type;
-
-  typedef std::vector<int, std::allocator<int> > align_set_type;
-  typedef std::vector<align_set_type, std::allocator<align_set_type> > align_map_type;
-  
-  typedef LexiconModel lexicon_model_type;
-
-  LexiconGHKM(const lexicon_model_type& __lexicon_source_target,
-	      const lexicon_model_type& __lexicon_target_source)
-    : lexicon_source_target(__lexicon_source_target),
-      lexicon_target_source(__lexicon_target_source) {}
-
-  const lexicon_model_type& lexicon_source_target;
-  const lexicon_model_type& lexicon_target_source;
-  
-  align_map_type aligns_source_impl;
-  align_map_type aligns_target_impl  ;
-  
-  sentence_type source;
-  sentence_type target;
-
-  void assign_source(const std::string& phrase)
-  {
-    source.clear();
-    rule_type(phrase).frontier(std::back_inserter(source));
-  }
-
-  void assign_target(const std::string& phrase)
-  {
-    target.clear();
-    rule_type(phrase).frontier(std::back_inserter(target));
-  }
-
-  
-  std::pair<double, double> operator()(const alignment_type& alignment) const
-  {
-    const size_t source_size = source.size();
-    const size_t target_size = target.size();
-    
-    double lex_source_target = 1.0;
-    double lex_target_source = 1.0;
-    
-    align_map_type& aligns_source = const_cast<align_map_type&>(aligns_source_impl);
-    align_map_type& aligns_target = const_cast<align_map_type&>(aligns_target_impl);
-
     aligns_source.clear();
     aligns_target.clear();
     
@@ -734,6 +539,65 @@ struct LexiconGHKM
       }
     
     return std::make_pair(lex_source_target, lex_target_source);
+  }
+};
+
+struct LexiconPhrase : public LexiconBase
+{
+  
+  LexiconPhrase(const lexicon_model_type& __lexicon_source_target,
+		const lexicon_model_type& __lexicon_target_source)
+    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
+  
+  void assign_source(const std::string& phrase)
+  {
+    source.assign(phrase);
+  }
+
+  void assign_target(const std::string& phrase)
+  {
+    target.assign(phrase);
+  }
+  
+};
+
+struct LexiconSCFG : public LexiconBase
+{
+
+  LexiconSCFG(const lexicon_model_type& __lexicon_source_target,
+	      const lexicon_model_type& __lexicon_target_source)
+    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
+  
+  void assign_source(const std::string& phrase)
+  {
+    source.assign(phrase);
+    source.erase(source.begin());
+  }
+
+  void assign_target(const std::string& phrase)
+  {
+    target.assign(phrase);
+    target.erase(target.begin());
+  }
+};
+
+struct LexiconGHKM : public LexiconBase
+{
+  
+  LexiconGHKM(const lexicon_model_type& __lexicon_source_target,
+	      const lexicon_model_type& __lexicon_target_source)
+    : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
+  
+  void assign_source(const std::string& phrase)
+  {
+    source.clear();
+    cicada::TreeRule(phrase).frontier(std::back_inserter(source));
+  }
+
+  void assign_target(const std::string& phrase)
+  {
+    target.clear();
+    cicada::TreeRule(phrase).frontier(std::back_inserter(target));
   }
 };
 
@@ -1206,9 +1070,12 @@ struct PhrasePairModifyMapper
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
       
-      if (counts.empty() || counts.back().source != phrase_pair.source || counts.back().target != phrase_pair.target)
+      if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
-      else
+      else if (counts.back().target != phrase_pair.target) {
+	phrase_pair.source = counts.back().source;
+	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
+      } else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
@@ -1221,23 +1088,25 @@ struct PhrasePairModifyMapper
     
     typedef std::deque<modified_type, std::allocator<modified_type> > buffer_type;
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
-    typedef boost::shared_ptr<buffer_stream_type> buffer_stream_ptr_type;
-    typedef std::vector<buffer_stream_ptr_type, std::allocator<buffer_stream_ptr_type> > pqueue_base_type;
-    typedef std::priority_queue<buffer_stream_ptr_type, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
+    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
+    typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
     
     typedef std::vector<modified_set_type, std::allocator<modified_set_type> > modified_map_type;
     
     pqueue_type          pqueue;
     istream_ptr_set_type istreams;
+
+    std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_streams(paths.size());
     
+    size_t pos = 0;
     path_set_type::const_iterator piter_end = paths.end();
-    for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter) {
+    for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->file_string());
-
+      
       istreams.push_back(istream_ptr_type(new istream_type(*piter, 1024 * 1024)));
       
-      buffer_stream_ptr_type buffer_stream(new buffer_stream_type());
+      buffer_stream_type* buffer_stream = &buffer_streams[pos];
       buffer_stream->second = &(*istreams.back());
       
       read_phrase_pair(*istreams.back(), buffer_stream->first);
@@ -1254,7 +1123,7 @@ struct PhrasePairModifyMapper
     const int mask_partial = (1 << 10) - 1;
     
     while (! pqueue.empty()) {
-      buffer_stream_ptr_type buffer_stream(pqueue.top());
+      buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
       
       if (counts != buffer_stream->first.front()) {
@@ -1714,9 +1583,12 @@ public:
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
       
-      if (counts.empty() || counts.back() != phrase_pair)
+      if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(phrase_pair);
-      else
+      else if (counts.back().target != phrase_pair.target) {
+	phrase_pair.source = counts.back().source;
+	counts.push_back(phrase_pair);
+      } else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
@@ -1734,9 +1606,8 @@ public:
     
     typedef std::deque<modified_type, std::allocator<modified_type> > buffer_type;
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
-    typedef boost::shared_ptr<buffer_stream_type> buffer_stream_ptr_type;
-    typedef std::vector<buffer_stream_ptr_type, std::allocator<buffer_stream_ptr_type> > pqueue_base_type;
-    typedef std::priority_queue<buffer_stream_ptr_type, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
+    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
+    typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
 
     clear();
     
@@ -1753,14 +1624,16 @@ public:
     
     pqueue_type pqueue;
     istream_ptr_set_type istreams;
+    std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_streams(paths.size());
     
-    for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter) {
+    size_t pos = 0;
+    for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->file_string());
       
       istreams.push_back(istream_ptr_type(new istream_type(*piter, 1024 * 1024)));
       
-      buffer_stream_ptr_type buffer_stream(new buffer_stream_type());
+      buffer_stream_type* buffer_stream = &buffer_streams[pos];
       buffer_stream->second = &(*istreams.back());
       
       read_phrase_pair(*istreams.back(), buffer_stream->first);
@@ -1777,7 +1650,7 @@ public:
     id_type id = 0;
     
     while (! pqueue.empty()) {
-      buffer_stream_ptr_type buffer_stream(pqueue.top());
+      buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
       
       if (buffer_stream->first.front().source != modified.source) {
@@ -1993,9 +1866,16 @@ struct PhrasePairScoreMapper
     while (counts.size() < 256 && std::getline(is, line)) {
       if (! phrase_pair_parser(line, phrase_pair)) continue;
 
-      if (counts.empty() || counts.back() != phrase_pair)
+      if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(phrase_pair);
-      else
+      else if (counts.back().target != phrase_pair.target) {
+	phrase_pair.source = counts.back().source;
+	counts.push_back(phrase_pair);
+      } else if (counts.back().alignment != phrase_pair.alignment) {
+	phrase_pair.source = counts.back().source;
+	phrase_pair.target = counts.back().target;
+	counts.push_back(phrase_pair);
+      } else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
@@ -2008,21 +1888,22 @@ struct PhrasePairScoreMapper
     
     typedef std::deque<phrase_pair_type, std::allocator<phrase_pair_type> > buffer_type;
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
-    typedef boost::shared_ptr<buffer_stream_type> buffer_stream_ptr_type;
-    typedef std::vector<buffer_stream_ptr_type, std::allocator<buffer_stream_ptr_type> > pqueue_base_type;
-    typedef std::priority_queue<buffer_stream_ptr_type, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
+    typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
+    typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
     
     pqueue_type          pqueue;
     istream_ptr_set_type istreams;
+    std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_streams(paths.size());
     
+    size_t pos = 0;
     path_set_type::const_iterator piter_end = paths.end();
-    for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter) {
+    for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->file_string());
       
       istreams.push_back(istream_ptr_type(new istream_type(*piter, 1024 * 1024)));
       
-      buffer_stream_ptr_type buffer_stream(new buffer_stream_type());
+      buffer_stream_type* buffer_stream = &buffer_streams[pos];
       buffer_stream->second = &(*istreams.back());
       
       read_phrase_pair(*istreams.back(), buffer_stream->first);
@@ -2034,7 +1915,7 @@ struct PhrasePairScoreMapper
     phrase_pair_type counts;
     
     while (! pqueue.empty()) {
-      buffer_stream_ptr_type buffer_stream(pqueue.top());
+      buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
       
       if (counts != buffer_stream->first.front()) {
@@ -2235,17 +2116,19 @@ struct PhrasePairScoreReducer
   void operator()()
   {
     typedef std::pair<phrase_pair_type, queue_type*> buffer_queue_type;
-    typedef boost::shared_ptr<buffer_queue_type> buffer_queue_ptr_type;
-    typedef std::vector<buffer_queue_ptr_type, std::allocator<buffer_queue_ptr_type> > pqueue_base_type;
-    typedef std::priority_queue<buffer_queue_ptr_type, pqueue_base_type, greater_buffer<buffer_queue_type> > pqueue_type;
+    typedef std::vector<buffer_queue_type*, std::allocator<buffer_queue_type*> > pqueue_base_type;
+    typedef std::priority_queue<buffer_queue_type*, pqueue_base_type, greater_buffer<buffer_queue_type> > pqueue_type;
 
     os.precision(20);
     
     pqueue_type pqueue;
-    for (queue_ptr_set_type::iterator qiter = queues.begin(); qiter != queues.end(); ++ qiter) {
+    std::vector<buffer_queue_type, std::allocator<buffer_queue_type> > buffer_queues(queues.size());
+      
+    size_t pos = 0;
+    for (queue_ptr_set_type::iterator qiter = queues.begin(); qiter != queues.end(); ++ qiter, ++ pos) {
       queue_ptr_type& queue = *qiter;
       
-      buffer_queue_ptr_type buffer_queue(new buffer_queue_type());
+      buffer_queue_type* buffer_queue = &buffer_queues[pos];
       
       queue->pop_swap(buffer_queue->first);
       buffer_queue->second = &(*queue);
@@ -2259,7 +2142,7 @@ struct PhrasePairScoreReducer
     root_count_set_type::iterator riter;
     
     while (! pqueue.empty()) {
-      buffer_queue_ptr_type buffer_queue(pqueue.top());
+      buffer_queue_type* buffer_queue(pqueue.top());
       pqueue.pop();
 
       phrase_pair_type& curr = buffer_queue->first;
