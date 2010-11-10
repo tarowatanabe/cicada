@@ -431,7 +431,7 @@ struct ExtractSCFG
 	label_map_type::const_iterator liter = label_map.find(std::make_pair(first_super, span.first));
 	
 	if (siter != label_map.end() && liter != label_map.end()) { 
-	  label = '[' + siter->second.non_terminal_strip() + '\\' + liter->second.non_terminal_strip() + ']';
+	  label = '[' + liter->second.non_terminal_strip() + '\\' + siter->second.non_terminal_strip() + ']';
 	  return label;
 	}
       }

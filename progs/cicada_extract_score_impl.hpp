@@ -1458,8 +1458,7 @@ public:
   typedef double   count_type;
   
   typedef succinctdb::succinct_trie_db<key_type, id_type, std::allocator<std::pair<key_type, id_type> > > index_db_type;
-  typedef utils::map_file<count_type, std::allocator<count_type> > counts_type;
-  typedef std::vector<counts_type, std::allocator<counts_type> > counts_db_type;
+  typedef utils::map_file<count_type, std::allocator<count_type> > counts_db_type;
   
   typedef phrase_pair_type::counts_type count_set_type;
   
@@ -1491,10 +1490,9 @@ public:
 	const id_type id = index[node];
 	
 	cache.counts.clear();
-	cache.counts.reserve(counts.size());
-	cache.counts.resize(counts.size(), 0.0);
-	for (size_t i = 0; i != counts.size(); ++ i)
-	  cache.counts[i] = counts[i][id];
+	cache.counts.reserve(counts_size + 1);
+	cache.counts.resize(counts_size + 1, 0.0);
+	std::copy(counts.begin() + id * (counts_size + 1), counts.begin() + (id + 1) * (counts_size + 1), cache.counts.begin());
       }
       return cache.counts;
     } else {
@@ -1510,13 +1508,7 @@ public:
     repository_type rep(path, repository_type::write);
     
     index.write(rep.path("index"));
-    
-    for (size_t i = 0; i != counts.size(); ++ i) {
-      std::ostringstream stream_count;
-      stream_count << "count-" << std::setfill('0') << std::setw(6) << i;
-      
-      counts[i].write(rep.path(stream_count.str()));
-    }
+    counts.write(rep.path("counts"));
     
     rep["counts-size"] = boost::lexical_cast<std::string>(counts_size);
   }
@@ -1540,22 +1532,7 @@ public:
     counts_size = boost::lexical_cast<size_type>(iter->second);
     
     index.open(rep.path("index"));
-
-    size_type score_size(size_type(-1));
-    
-    counts.reserve(counts_size + 1);
-    counts.resize(counts_size + 1);
-    for (size_t i = 0; i != counts.size(); ++ i) {
-      std::ostringstream stream_count;
-      stream_count << "count-" << std::setfill('0') << std::setw(6) << i;
-      
-      counts[i].open(rep.path(stream_count.str()));
-
-      if (score_size == size_type(-1))
-	score_size = counts[i].size();
-      else if (score_size != counts[i].size())
-	throw std::runtime_error("counts size differ!");
-    }
+    counts.open(rep.path("counts"));
   }
 
   template <typename Tp>
@@ -1598,8 +1575,7 @@ public:
   {
     typedef std::ostream ostream_type;
     typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
-    typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
-
+    
     typedef utils::compress_istream         istream_type;
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
     typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
@@ -1613,14 +1589,16 @@ public:
     
     const path_type tmp_dir = utils::tempfile::tmp_dir();
     const path_type path_index = utils::tempfile::directory_name(tmp_dir / "cicada.extract.index.XXXXXX");
+    const path_type path_counts = utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX");
     
     utils::tempfile::insert(path_index);
+    utils::tempfile::insert(path_counts);
 
     index.open(path_index, index_db_type::WRITE);
 
     counts_size = size_type(-1);
-    path_set_type        paths_counts;
-    ostream_ptr_set_type os_counts;
+    boost::iostreams::filtering_ostream os_counts;
+    os_counts.push(boost::iostreams::file_sink(path_counts.file_string()), 1024 * 1024);
     
     pqueue_type pqueue;
     istream_ptr_set_type istreams;
@@ -1658,25 +1636,14 @@ public:
 	if (! modified.source.empty() && ! modified.counts.empty()) {
 	  index.insert(modified.source.c_str(), modified.source.size(), id);
 	  ++ id;
-	  
-	  if (os_counts.empty()) {
+
+	  if (counts_size == size_type(-1))
 	    counts_size = modified.counts.size();
-	    for (size_t i = 0; i != counts_size + 1; ++ i) {
-	      paths_counts.push_back(utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
-	      
-	      utils::tempfile::insert(paths_counts.back());
-	      
-	      std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
-	      os->push(boost::iostreams::file_sink(paths_counts.back().file_string()), 1024 * 1024);
-	      
-	      os_counts.push_back(ostream_ptr_type(os.release()));
-	    }
-	  } else if (counts_size != modified.counts.size())
+	  else if (counts_size != modified.counts.size())
 	    throw std::runtime_error("# of counts do not match");
 	  
-	  for (size_t i = 0; i != os_counts.size() - 1; ++ i)
-	    os_counts[i]->write((char*) &(modified.counts[i]), sizeof(count_type));
-	  os_counts.back()->write((char*) &observed, sizeof(count_type));
+	  os_counts.write((char*) &(*modified.counts.begin()), sizeof(count_type) * modified.counts.size());
+	  os_counts.write((char*) &observed, sizeof(count_type));
 	}
 	
 	modified.swap(buffer_stream->first.front());
@@ -1713,47 +1680,24 @@ public:
     if (! modified.source.empty() && ! modified.counts.empty()) {
       index.insert(modified.source.c_str(), modified.source.size(), id);
       ++ id;
-
-      if (os_counts.empty()) {
+      
+      if (counts_size == size_type(-1))
 	counts_size = modified.counts.size();
-	for (size_t i = 0; i != counts_size + 1; ++ i) {
-	  paths_counts.push_back(utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX"));
-	  utils::tempfile::insert(paths_counts.back());
-	  
-	  std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
-	  os->push(boost::iostreams::file_sink(paths_counts.back().file_string()), 1024 * 1024);
-	  
-	  os_counts.push_back(ostream_ptr_type(os.release()));
-	}
-      } else if (counts_size != modified.counts.size())
+      else if (counts_size != modified.counts.size())
 	throw std::runtime_error("# of counts do not match");
       
-      for (size_t i = 0; i != os_counts.size() - 1; ++ i)
-	os_counts[i]->write((char*) &(modified.counts[i]), sizeof(count_type));
-      os_counts.back()->write((char*) &observed, sizeof(count_type));
+      os_counts.write((char*) &(*modified.counts.begin()), sizeof(count_type) * modified.counts.size());
+      os_counts.write((char*) &observed, sizeof(count_type));
     }
     
     index.clear();
     index.open(path_index);
     
     counts.clear();
-    counts.reserve(os_counts.size());
-    counts.resize(os_counts.size());
-    
-    os_counts.clear();
-    size_type score_size(size_type(-1));
-    for (size_t i = 0; i != counts.size(); ++ i) {
-      counts[i].open(paths_counts[i]);
-      
-      if (score_size == size_type(-1))
-	score_size = counts[i].size();
-      else if (score_size != counts[i].size())
-	throw std::runtime_error("counts size differ!");
-      if (id != counts[i].size())
-	throw std::runtime_error("counts size differ from id!");
-    }
+    os_counts.pop();
+    counts.open(path_counts);
   }
-
+  
   void clear()
   {
     counts_size = size_type(-1);

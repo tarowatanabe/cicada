@@ -155,7 +155,7 @@ namespace cicada
 	  label_map_type::const_iterator liter = label_map.find(std::make_pair(first_super, span.first));
 	  
 	  if (siter != label_map.end() && liter != label_map.end()) { 
-	    label = '[' + strip_label(siter->second) + '\\' + strip_label(liter->second) + ']';
+	    label = '[' + strip_label(liter->second) + '\\' + strip_label(siter->second) + ']';
 	    return label;
 	  }
 	}

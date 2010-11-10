@@ -39,6 +39,15 @@ Or, you can combine outputs from multiple systems by (New! and TODO):
    - Construct hypergraph by linear grammar (grammar-glue-straight + grammar-insertion)
    - Generate k-best translations after feature application etc.
 
+Phrase/synchronou-rule/tree-to-string/string-to-tree extractions are implemented:
+   - A conventional phrase extract algorithm in Moses
+   - A conventional hierarchical phrase extraction algorithm in Hiero
+      + syntax augmented rule extraction is also supported [15]
+   - Tree-to-string/strint-to-tree extractin from forest [16]
+   
+   - After count extraction, you can perform map/reduce to compute model scores
+     TODO: create "filers" to perform max-like estimation (with smoothing).
+
 Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
    - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
@@ -228,5 +237,31 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {61--65},
   url       = {http://www.aclweb.org/anthology/W/W09/W09-0409}
+}
+
+[15]
+@InProceedings{zollmann-vogel:2010:SSST,
+  author    = {Zollmann, Andreas  and  Vogel, Stephan},
+  title     = {New Parameterizations and Features for PSCFG-Based Machine Translation},
+  booktitle = {Proceedings of the 4th Workshop on Syntax and Structure in Statistical Translation},
+  month     = {August},
+  year      = {2010},
+  address   = {Beijing, China},
+  publisher = {Coling 2010 Organizing Committee},
+  pages     = {110--117},
+  url       = {http://www.aclweb.org/anthology/W10-3814}
+}
+
+[16]
+@InProceedings{mi-huang:2008:EMNLP,
+  author    = {Mi, Haitao  and  Huang, Liang},
+  title     = {Forest-based Translation Rule Extraction},
+  booktitle = {Proceedings of the 2008 Conference on Empirical Methods in Natural Language Processing},
+  month     = {October},
+  year      = {2008},
+  address   = {Honolulu, Hawaii},
+  publisher = {Association for Computational Linguistics},
+  pages     = {206--214},
+  url       = {http://www.aclweb.org/anthology/D08-1022}
 }
 
