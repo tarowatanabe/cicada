@@ -21,8 +21,6 @@ typedef cicada::Alignment alignment_type;
 
 typedef Bitext bitext_type;
 
-typedef ExtractPhrase::phrase_pair_type     phrase_pair_type;
-typedef ExtractPhrase::phrase_pair_set_type phrase_pair_set_type;
 typedef Task task_type;
 typedef task_type::queue_type queue_type;
 typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -126,6 +124,8 @@ int main(int argc, char** argv)
 	stream[rank]->push(boost::iostreams::gzip_compressor());
 	stream[rank]->push(*device[rank]);
       }
+
+      utils::resource start_extract;
       
       utils::compress_istream is_src(source_file, 1024 * 1024);
       utils::compress_istream is_trg(target_file, 1024 * 1024);
@@ -191,6 +191,12 @@ int main(int argc, char** argv)
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
+
+      utils::resource end_extract;
+
+      if (debug)
+	std::cerr << "extract counts cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time() << std::endl
+		  << "extract counts user time: " << end_extract.user_time() - start_extract.user_time() << std::endl;
       
     } else {
       boost::iostreams::filtering_istream stream;

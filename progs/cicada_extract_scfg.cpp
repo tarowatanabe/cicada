@@ -32,7 +32,7 @@ path_type output_file;
 int max_length = 7;
 int max_fertility = 10;
 int max_span = 15;
-int min_hole = 2;
+int min_hole = 1;
 
 double max_malloc = 8; // 8 GB
 int threads = 1;
@@ -67,6 +67,8 @@ int main(int argc, char** argv)
     boost::filesystem::directory_iterator iter_end;
     for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
       boost::filesystem::remove_all(*iter);
+
+    utils::resource start_extract;
     
     queue_type queue(1024 * threads);
     task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_span, min_hole, max_malloc));
@@ -116,6 +118,12 @@ int main(int argc, char** argv)
     }
     
     workers.join_all();
+
+    utils::resource end_extract;
+    
+    if (debug)
+      std::cerr << "extract counts cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time() << std::endl
+		<< "extract counts user time: " << end_extract.user_time() - start_extract.user_time() << std::endl;
     
     utils::compress_ostream os(output_file / "files");
     for (int i = 0; i != threads; ++ i) {

@@ -378,6 +378,7 @@ struct ExtractPhrase
 		  break;
 		
 		if (max_length > 0 && source_last - source_first > max_length) continue;
+		if (max_length > 0 && target_last - target_first > max_length) continue;
 		if (max_fertility > 0
 		    && (double(utils::bithack::max(source_last - source_first, target_last - target_first))
 			/ double(utils::bithack::min(source_last - source_first, target_last - target_first))) >= max_fertility) continue;

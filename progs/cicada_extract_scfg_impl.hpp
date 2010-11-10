@@ -318,13 +318,17 @@ struct ExtractSCFG
 			std::allocator<rule_pair_type> > rule_pair_set_type;
 #endif
   
-  typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
   typedef utils::chart<span_type, std::allocator<span_type> >          span_chart_type;
   typedef std::vector<int, std::allocator<int> >                       alignment_count_set_type;
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
   
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_multiple_type;
+
+  typedef utils::chart<phrase_type, std::allocator<phrase_type> >      phrase_chart_type;
+  
+  typedef std::pair<span_type, span_type> span_parent_type;
+
 
   ExtractSCFG(const int __max_length,
 	      const int __max_fertility,
@@ -339,9 +343,6 @@ struct ExtractSCFG
   int max_fertility;
   int max_span;
   int min_hole;
-
-  phrase_chart_type phrases_source;
-  phrase_chart_type phrases_target;
   
   alignment_multiple_type alignment_source_target;
   alignment_multiple_type alignment_target_source;
@@ -355,7 +356,9 @@ struct ExtractSCFG
   span_pair_set_type        spans;
   span_pair_set_type        spans_unique;
 
-  
+  phrase_chart_type phrases_source;
+  phrase_chart_type phrases_target;
+
   struct ExtractCategory
   {
     symbol_type operator()(const span_pair_type& spans) const
@@ -517,28 +520,31 @@ struct ExtractSCFG
 
     const size_type source_size = source.size();
     const size_type target_size = target.size();
-      
+
+    phrases_source.clear();
+    phrases_target.clear();
+    
+    phrases_source.resize(source_size + 1);
+    phrases_target.resize(target_size + 1);
+    
     rule_pair_list_type rule_pair_list;
     rule_pair_type rule_pair;
     
     span_pair_set_type::const_iterator iter_end = spans.end();
     for (span_pair_set_type::const_iterator iter = spans.begin(); iter != iter_end; ++ iter) {
-      
       const int source_length = iter->source.second - iter->source.first;
       const int target_length = iter->target.second - iter->target.first;
       
       const int source_count = alignment_count_source[iter->source.second] - alignment_count_source[iter->source.first];
-      const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
+      //const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
       
-      if (max_length <= 0 || source_length <= max_length)
+      if (max_length <= 0 || source_length <= max_length || target_length <= max_length)
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
 	  // extract rule...
 	  
 	  extract_rule(source, target, *iter, category, rule_pair);
 	  
-	  // we will simply increment for phrasal pairs...
-	  rule_pair_set_type::iterator citer = rule_pairs.insert(rule_pair).first;
-	  const_cast<rule_pair_type&>(*citer).count += 1;
+	  const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
 	}
       
       // consider hole!
@@ -550,21 +556,22 @@ struct ExtractSCFG
 	// first non-terminal...
 	for (span_pair_set_type::const_iterator niter1 = spans_unique.begin(); niter1 != niter_end; ++ niter1) 
 	  if (*iter != *niter1
+	      && (min_hole <= 1 || (niter1->source.second - niter1->source.first) >= min_hole)
 	      && is_parent(iter->source, niter1->source)
 	      && is_parent(iter->target, niter1->target)) {
 	    
 	    const int source_count1 = alignment_count_source[niter1->source.second] - alignment_count_source[niter1->source.first];
-	    const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
+	    //const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
 	    
 	    if (source_count1 == source_count) continue;
 	    
 	    const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
 	    const int target_length1 = target_length - (niter1->target.second - niter1->target.first);
 	    
-	    if (max_length <= 0 || source_length1 <= max_length)
+	    if (max_length <= 0 || source_length1 <= max_length || target_length1 <= max_length)
 	      if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
 		// extract rule...
-		
+
 		extract_rule(source, target, *iter, *niter1, category, rule_pair);
 		
 		rule_pair_list.push_back(rule_pair);
@@ -573,20 +580,22 @@ struct ExtractSCFG
 	    // second non-terminal...
 	    for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
 	      if (*iter != *niter2
+		  && (min_hole <= 2 || (niter1->source.second - niter2->source.first) >= min_hole)
 		  && is_parent(iter->source, niter2->source)
 		  && is_parent(iter->target, niter2->target)
 		  && is_disjoint(niter1->source, niter2->source)
-		  && is_disjoint(niter1->target, niter2->target)) {
+		  && is_disjoint(niter1->target, niter2->target)
+		  && ! is_adjacent(niter1->source, niter2->source)) {
 		
 		const int source_count2 = alignment_count_source[niter2->source.second] - alignment_count_source[niter2->source.first];
-		const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
+		//const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
 		
 		if (source_count == source_count1 + source_count2) continue;
 		
 		const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
 		const int target_length2 = target_length1 - (niter2->target.second - niter2->target.first);
 		
-		if (max_length <= 0 || source_length2 <= max_length)
+		if (max_length <= 0 || source_length2 <= max_length || target_length2 <= max_length)
 		  if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
 		    // extract rule...
 		    
@@ -602,10 +611,8 @@ struct ExtractSCFG
 	  const double count = 1.0 / rule_pair_list.size();
 	  
 	  rule_pair_list_type::const_iterator riter_end = rule_pair_list.end();
-	  for (rule_pair_list_type::const_iterator riter = rule_pair_list.begin(); riter != riter_end; ++ riter) {
-	    rule_pair_set_type::iterator citer = rule_pairs.insert(*riter).first;
-	    const_cast<rule_pair_type&>(*citer).count += count;
-	  }
+	  for (rule_pair_list_type::const_iterator riter = rule_pair_list.begin(); riter != riter_end; ++ riter)
+	    const_cast<rule_pair_type&>(*(rule_pairs.insert(*riter).first)).count += count;
 
 	  rule_pair_list.clear();
 	}
@@ -622,13 +629,23 @@ struct ExtractSCFG
   {
     const symbol_type& lhs = category(spans);
     
-    rule_pair.source = static_cast<const std::string&>(lhs);
-    for (int src = spans.source.first; src != spans.source.second; ++ src)
-      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    if (phrases_source(spans.source.first, spans.source.second).empty()) {
+      phrase_type& phrase = phrases_source(spans.source.first, spans.source.second);
+      
+      phrase = static_cast<const std::string&>(lhs);
+      for (int src = spans.source.first; src != spans.source.second; ++ src)
+	phrase += ' ' + static_cast<const std::string&>(source[src]);
+    }
+    rule_pair.source = phrases_source(spans.source.first, spans.source.second);
     
-    rule_pair.target = static_cast<const std::string&>(lhs);
-    for (int trg = spans.target.first; trg != spans.target.second; ++ trg)
-      rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
+    if (phrases_target(spans.target.first, spans.target.second).empty()) {
+      phrase_type& phrase = phrases_target(spans.target.first, spans.target.second);
+      
+      phrase = static_cast<const std::string&>(lhs);
+      for (int trg = spans.target.first; trg != spans.target.second; ++ trg)
+	phrase += ' ' + static_cast<const std::string&>(target[trg]);
+    }
+    rule_pair.target = phrases_target(spans.target.first, spans.target.second);
     
     rule_pair.alignment.clear();
     for (int src = spans.source.first; src != spans.source.second; ++ src) {
@@ -650,7 +667,7 @@ struct ExtractSCFG
   {
     const symbol_type lhs = category(spans);
     const symbol_type nt1 = category(spans_nt1);
-    
+
     rule_pair.source = static_cast<const std::string&>(lhs);
     for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
       rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
@@ -698,7 +715,7 @@ struct ExtractSCFG
 		    rule_pair_type& rule_pair)
   {
     // we will reorder wrt source side spans...
-    const bool __is_ordered = is_ordered(__spans_nt1.source, __spans_nt2.target);
+    const bool __is_ordered = is_ordered(__spans_nt1.source, __spans_nt2.source);
     const span_pair_type& spans_nt1 = (__is_ordered ? __spans_nt1 : __spans_nt2);
     const span_pair_type& spans_nt2 = (__is_ordered ? __spans_nt2 : __spans_nt1);
     
@@ -754,11 +771,13 @@ struct ExtractSCFG
 	    
 	    // we shift -1, since we have to take into account the <x1> token... (also for <x2>)
 	    const int shift_source = ((mask_source1 & (spans_nt1.source.second - spans_nt1.source.first - 1))
-				      + (mask_source2 & (spans_nt2.source.second - spans_nt2.source.first - 1)));
+				      + (mask_source2 & (spans_nt2.source.second - spans_nt2.source.first - 1))
+				      + spans.source.first);
 	    const int shift_target = ((mask_target1 & (spans_nt1.target.second - spans_nt1.target.first - 1))
-				      + (mask_target2 & (spans_nt2.target.second - spans_nt2.target.first - 1)));
+				      + (mask_target2 & (spans_nt2.target.second - spans_nt2.target.first - 1))
+				      + spans.target.first);
 	    
-	    rule_pair.alignment.push_back(std::make_pair(src - spans.source.first - shift_source, *aiter - spans.target.first - shift_target));
+	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
       }
   }
@@ -776,6 +795,11 @@ struct ExtractSCFG
   bool is_ordered(const span_type& span1, const span_type& span2) const 
   {
     return span1.second <= span2.first;
+  }
+
+  bool is_adjacent(const span_type& span1, const span_type& span2) const 
+  {
+    return span1.second == span2.first || span2.second == span1.first;
   }
   
   bool is_disjoint(const span_type& span1, const span_type& span2) const 
@@ -811,12 +835,6 @@ struct ExtractSCFG
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
-    
-    phrases_source.clear();
-    phrases_target.clear();
-    
-    phrases_source.resize(source_size + 1);
-    phrases_target.resize(target_size + 1);
     
     alignment_source_target.clear();
     alignment_target_source.clear();
@@ -898,7 +916,7 @@ struct ExtractSCFG
 		
 		if (span_count_source != span_count_target)
 		  break;
-		
+
 		spans.push_back(span_pair_type(span_type(source_first, source_last), span_type(target_first, target_last)));
 	      }
 	  }

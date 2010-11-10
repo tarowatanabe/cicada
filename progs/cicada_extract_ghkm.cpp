@@ -1,508 +1,170 @@
 
-#include <set>
+#include <stdexcept>
 
-#include "cidada/symbol.hpp"
-#include "cicada/alignment.hpp"
-#inlcude "cicada/hypergraph.hpp"
-#include "cicada/sentence.hpp"
+#include "cicada_extract_ghkm_impl.hpp"
 
-typedef cicada::HyperGraph hypergraph_type;
-typedef cicada::Symbol     word_type;
-typedef cicada::Symbol     symbol_type;
-typedef cicada::Vocab      vocab_type;
-typedef cicada::Sentence   sentence_type;
-typedef cicada::Alignment  alignment_type;
-typedef cicada::TreeRule   tree_rule_type;
-typedef cicada::Rule       rule_type;
+#include <boost/thread.hpp>
+#include <boost/program_options.hpp>
+#include <boost/bind.hpp>
+#include <boost/filesystem.hpp>
 
-typedef alignment_type::point_type point_type;
+#include <utils/resource.hpp>
 
-struct RulePair
+typedef cicada::Sentence  sentence_type;
+typedef cicada::Alignment alignment_type;
+
+typedef Bitext bitext_type;
+
+typedef Task task_type;
+typedef task_type::queue_type queue_type;
+typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+
+typedef boost::filesystem::path path_type;
+
+path_type source_file;
+path_type target_file;
+path_type alignment_file;
+
+path_type output_file;
+
+int max_nodes = 7;
+int max_height = 10;
+
+double max_malloc = 8; // 8 GB
+int threads = 1;
+
+int debug = 0;
+
+
+void options(int argc, char** argv);
+
+int main(int argc, char** argv)
 {
-  tree_rule_type source;
-  tree_rule_type target;
-  alignment_type alignment;
-  double count;
-  
-  RulePair() : source(), target(), alignment(), count(0) {}
-  RulePair(const tree_rule_type& __source, const tree_rule_type& __target, const alignment_type& __alignment, const double& __count)
-    : source(__source), target(__target), alignment(__alignment), count(__count) {}
-};
+  try {
+    options(argc, argv);
+    
+    if (source_file.empty() || (! boost::filesystem::exists(source_file) && source_file != "-"))
+      throw std::runtime_error("no source file? " + source_file.file_string());
+    if (target_file.empty() || (! boost::filesystem::exists(target_file) && target_file != "-"))
+      throw std::runtime_error("no target file? " + target_file.file_string());
+    if (alignment_file.empty() || (! boost::filesystem::exists(alignment_file) && alignment_file != "-"))
+      throw std::runtime_error("no alignment file? " + alignment_file.file_string());
+    if (output_file.empty())
+      throw std::runtime_error("no output directory?");
 
-typedef RulePair rule_pair_type;
-typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> > rule_pair_set_type;
+    threads = utils::bithack::max(threads, 1);
+    
+    // create directories for output
+    if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
+      boost::filesystem::remove_all(output_file);
+    
+    boost::filesystem::create_directories(output_file);
+    
+    boost::filesystem::directory_iterator iter_end;
+    for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
+      boost::filesystem::remove_all(*iter);
 
+    utils::resource start_extract;
+    
+    queue_type queue(1024 * threads);
+    task_set_type tasks(threads, task_type(queue, output_file, max_nodes, max_height, max_malloc));
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
+    utils::compress_istream is_src(source_file, 1024 * 1024);
+    utils::compress_istream is_trg(target_file, 1024 * 1024);
+    utils::compress_istream is_alg(alignment_file, 1024 * 1024);
+    
+    bitext_type bitext;
+    
+    size_t num_samples = 0;
+    for (;;) {
+      is_src >> bitext.source;
+      is_trg >> bitext.target;
+      is_alg >> bitext.alignment;
+      
+      if (! is_src || ! is_trg || ! is_alg) break;
+      
+      if (bitext.source.is_valid() && ! bitext.target.empty()) {
+	queue.push_swap(bitext);
+	++ num_samples;
+      }
+    }
+    if (debug)
+      std::cerr << "# of samples: " << num_samples << std::endl;
+    
+    if (is_src || is_trg || is_alg)
+      throw std::runtime_error("# of lines do not match");
+    
+    for (int i = 0; i != threads; ++ i) {
+      bitext.clear();
+      queue.push_swap(bitext);
+    }
+    
+    workers.join_all();
 
-//
-// forest-based translation rule extraction based on
-//
-// @InProceedings{mi-huang:2008:EMNLP,
-//   author    = {Mi, Haitao  and  Huang, Liang},
-//   title     = {Forest-based Translation Rule Extraction},
-//   booktitle = {Proceedings of the 2008 Conference on Empirical Methods in Natural Language Processing},
-//   month     = {October},
-//   year      = {2008},
-//   address   = {Honolulu, Hawaii},
-//   publisher = {Association for Computational Linguistics},
-//   pages     = {206--214},
-//   url       = {http://www.aclweb.org/anthology/D08-1022}
-// }
+    utils::resource end_extract;
+    
+    if (debug)
+      std::cerr << "extract counts cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time() << std::endl
+		<< "extract counts user time: " << end_extract.user_time() - start_extract.user_time() << std::endl;
+    
+    utils::compress_ostream os(output_file / "files");
+    for (int i = 0; i != threads; ++ i) {
+      task_type::path_set_type::const_iterator piter_end = tasks[i].paths.end();
+      for (task_type::path_set_type::const_iterator piter = tasks[i].paths.begin(); piter != piter_end; ++ piter) {
+	utils::tempfile::erase(*piter);
+	os << piter->filename() << '\n';
+      }
+    }
+  }
+  catch (std::exception& err) {
+    std::cerr << "error: " << err.what() << std::endl;
+    return 1;
+  }
+  return 0;
+}
 
-
-// we assume that the hypergraph is parse forest
-struct ExtractGHKM
+void options(int argc, char** argv)
 {
-  typedef std::pair<int, int> range_type;
-
-  struct Span
-  {
-    typedef std::set<int, std::less<int>, std::allocator<int> > span_type;
-
-    typedef span_type::const_iterator const_iterator;
-    typedef span_type::iterator       iterator;
+  namespace po = boost::program_options;
   
-    Span() : span() {}
-    Span(const int first, const int last) : span()
-    {
-      for (int i = first; i < last; ++ i)
-	span.insert(i);
-    }
-
-    Span& operator|=(const Span& x)
-    {
-      span.insert(x.span.begin(), x.span.end());
-    }
-
-    const_iterator begin() const { return span.begin(); }
-    const_iterator end() const { return span.end(); }
-
-    const_iterator lower_bound(int pos) const { return span.lower_bound(pos); }
-    
-    range_type range() const
-    {
-      if (span.empty())
-	return std::make_pair(0, 0);
-      else
-	return std::make_pair(*(span.begin()), *(-- span.end()) + 1);
-    }
+  po::options_description opts_config("configuration options");
   
-    void set(int i)
-    {
-      span.insert(i);
-    }
+  opts_config.add_options()
+    ("source",    po::value<path_type>(&source_file),    "source hypergraph file")
+    ("target",    po::value<path_type>(&target_file),    "target file")
+    ("alignment", po::value<path_type>(&alignment_file), "alignment file")
+    ("output",    po::value<path_type>(&output_file),    "output directory")
     
-    void clear() { span.clear(); }
-
-    bool intersect(const range_type& range) const
-    {
-      if (range.first == range.last)
-	return false;
-      
-      if (span.empty())
-	return false;
-      else
-	return span.lower_bound(range.first) != span.lower_bound(range.last);
-    }
-
-    bool empty() const { return span.empty(); }
+    ("max-nodes",  po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in composed rule")
+    ("max-height", po::value<int>(&max_height)->default_value(max_height), "maximum height of composed rule")
+    
+    ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
+    ("threads",    po::value<int>(&threads),       "# of threads")
+    ;
   
-    span_type span;
-  };
-
-  typedef Span span_type;
-  typedef std::vector<span_type, std::allocator<span_type> > span_set_type;
-
-  typedef std::vector<bool, std::allocator<bool> > admissible_set_type;
+  po::options_description opts_command("command line options");
+  opts_command.add_options()
+    ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
+    ("help", "help message");
   
-  void operator()(const hypergraph_type& graph,
-		  const sentence_type& sentence,
-		  const alignment_type& alignment,
-		  rule_pair_set_type& rules) const
-  {
-    spans.clear();
-    complements.clear();
-    unaligned.clear();
-    admissibles.clear();
-    derivations.clear();
-    node_map.clear();
-    
-    spans.resize(graph.nodes.size());
-    complements.resize(graph.nodes.size());
-    unaligned.resize(graph.nodes.size());
-    node_map.resize(graph.nodes.size());
-    
-    admissible_nodes(graph, sentence, alignment);
-    
-    construct_derivations(graph, sentence);
-    
-    // compute reachable nodes and edges from root...
-    prune_derivations();
-    
-    
-    // perform extraction
-    extract_minimum(graph, sentence, alignment);
-    
-    // perform compounds extraction
-    extract_composed(graph, sentence, alignment);
+  po::options_description desc_config;
+  po::options_description desc_command;
+  
+  desc_config.add(opts_config);
+  desc_command.add(opts_config).add(opts_command);
+  
+  po::variables_map variables;
+
+  po::store(po::parse_command_line(argc, argv, desc_command, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
+  
+  po::notify(variables);
+
+  if (variables.count("help")) {
+    std::cout << argv[0] << " [options]\n"
+	      << desc_command << std::endl;
+    exit(0);
   }
-  
-  
-  void extract_minimum(const hypergraph_type& graph,
-		       const sentence_type& sentence,
-		       const alignment_type& alignment)
-  {
-    // easy...! but do we keep extracted rules?
-    
-    
-    
-  }
-
-  enum color_type {
-    white,
-    gray,
-    black
-  };
-  
-  struct dfs_type
-  {
-    int node;
-    int edge;
-    int tail;
-    
-    dfs_type(const int& _node, const int& _edge, const int& _tail) 
-      : node(_node), edge(_edge), tail(_tail) {}
-  };
-
-  typedef std::vector<int, std::allocator<int> > reloc_set_type;
-  typedef std::vector<color_type, std::allocator<color_type> > color_set_type;
-  typedef std::vector<dfs_type, std::allocator<dfs_type> > stack_type;
-  
-  void prune_derivations()
-  {
-    // topologically sort...
-    // I'm not sure whether we need this... but this is simply to make sure 
-    // the extracted GHKM rules are reachable from root of the parse forest
-    
-    reloc_set_type reloc_node(derivations.size(), -1);
-    color_set_type color(derivations.size(), white);
-    stack_type stack;
-    
-    stack.reserv(derivations.size());
-    stack.push_back(dfs_type(derivations.size() - 1, 0, 0));
-    
-    int node_count = 0;
-    
-    while (! stack.empty()) {
-      const dfs_type& dfs = stack.back();
-      
-      int node_id     = dfs.node;
-      size_t pos_edge = dfs.edge;
-      size_t pos_tail = dfs.tail;
-      
-      stack.pop_back();
-      
-      const derivation_node_type* curr_node = &(derivations[node_id]);
-      
-      while (pos_edge != curr_node->edges.size()) {
-	const derivation_edge_type& curr_edge = curr_ode.edges[pos_edge];
-	
-	if (pos_tail == curr_edge.tails.size()) {
-	  // reach end...
-	  ++ pos_edge;
-	  pos_tail = 0;
-	  continue;
-	}
-	
-	const int        tail_node  = curr_edge.second[pos_tail];
-	const color_type tail_color = color[tail_node];
-	
-	switch (tail_color) {
-	case white:
-	  ++ pos_tail;
-	  stack.push_back(dfs_type(node_id, pos_edge, pos_tail));
-	  
-	  node_id = tail_node;
-	  curr_node = &(derivations[node_id]);
-	  
-	  color[node_id] = gray;
-	  pos_edge = 0;
-	  pos_tail = 0;
-	  
-	  break;
-	case black:
-	  ++ pos_tail;
-	  break;
-	case gray:
-	  ++ pos_tail;
-	  // loop!!!!
-	  break;
-	}
-      }
-      
-      color[node_id] = black;
-      reloc_node[node_id] = node_count ++;
-    }
-    
-    // construct new derivations...
-    derivation_set_type derivations_new(node_count);
-    for (size_t i = 0; i != derivations.size(); ++ i)
-      if (reloc_node[i] >= 0) {
-	const derivation_node_type& node_old = derivations[i];
-	derivation_node_type& node_new = derivations_new[reloc_node[i]];
-	
-	node_new.range = node_old.range;
-	
-	derivation_edge_set_type::const_iterator eiter_end = node_old.edges.end();
-	for (derivation_edge_set_type::const_iterator eiter = node_old.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  
-	  node_set_type tails;
-	  bool is_valid = true;
-	  
-	  node_set_type::const_iterator titer_end = eiter->second.end();
-	  for (node_set_type::const_iterator titer = eiter->second.begin(); is_valid && titer != titer_end; ++ titer) {
-	    tails.push_back(reloc_node[*titer]);
-	    is_valid = tails.back() >= 0;
-	  }
-	  
-	  if (is_valid)
-	    node_new.edges.push_back(derivation_edge_type(eiter->first, tails));
-	}
-      }
-    
-    derivations.swap(derivations_new);
-    derivations_new.clear();
-  }
-  
-  void construct_derivations(const hypergraph_type& graph,
-			     const sentence_type& sentence)
-  {
-    // construc derivations wrt non-aligned words...
-
-    size_t goal_node = size_t(-1);
-    
-    for (size_t id = 0; id != graph.nodes.size(); ++ id) 
-      if (admissibles[id]) {
-	const hypergraph_type::node_type& node = graph.nodes[id];
-
-	//
-	// compute minimal range and maximum outer-range
-	//
-	
-	const range_type range_min(spans[id].range());
-	
-	span_type::const_iterator riter_first = complements[id].lower_bound(range_min.first);
-	span_type::const_iterator riter_last  = complements[id].lower_bound(range_min.second);
-	
-	const range_type range_max(riter_first == complements[id].begin() ? 0 : *(-- riter_first) + 1,
-				   riter_last != complements[id].end() ? *riter_last : static_cast<int>(sentence.size()));
-	
-	const bool is_goal(id == graph.goal);
-	
-	range_node_map_type buf;
-	buf.set_empty_key(range_type(0, 0));
-	
-	queue_type queue;
-	
-	// construct initial frontiers...
-	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	  
-	  queue.resize(queue.size() + 1);
-	  frontier_type& frontier = queue.back();
-	  
-	  frontier.first.push_back(*eiter);
-	  
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	    if (! admissible[*titer])
-	      frontier.second.push_back(*titer);
-	}
-
-	while (! queue.empty()) {
-	  const frontier_type& frontier = queue.front();
-	  
-	  if (frontier.second.empty()) {
-	    // construct rule from "fragment", frontier.first
-	    // by enumerating edge and its tails in depth-first manner...
-	    // use recursive call for simplicity...
-	    
-	    // compute "tails" for the fragment
-	    
-	    node_set_type tails;
-	    edge_set_type::const_iterator eiter_end = frontier.first.end();
-	    for (edge_set_type::const_iterator eiter = frontier.first.begin(); eiter != eiter_end; ++ eiter) {
-	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	      
-	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-		if (admissibles[*titer])
-		  tails.push_back(*titer);
-	    }
-	    
-	    // iterate over tails and compute span...
-	    // code taken from apply_exact...
-	    
-	    index_set_type j_ends(tails.size(), 0);
-	    index_set_type j(tails.size(), 0);
-	    
-	    for (size_t i = 0; i != tails.size(); ++ i)
-	      j_ends[i] = node_map[tails[i]].size();
-	    
-	    node_set_type tails_next(tails.size());
-	    
-	    for (;;) {
-	      bool is_valid = true;
-	      
-	      range_type range(range_min);
-	      range_set_type ranges;
-	      for (size_t i = 0; is_valid && i != edge.tails.size(); ++ i) {
-		tails_next[i] = node_map[tails[i]][j[i]];
-		
-		const range_type& range_antecedent = derivations[tails_next[i]].range;
-		
-		if (! ranges.empty()) {
-		  range_set_type::const_iterator riter_end = ranges.end();
-		  for (range_set_type::const_iterator riter = ranges.begin(); is_valid && riter != riter_end; ++ riter)
-		    is_valid = range_antecedent.second <= riter->first || riter->second <= range_antecedent.first;
-		}
-		
-		if (is_valid) {
-		  ranges.insert(range_antecedent);
-		  
-		  range.first  = utils::bithack::min(range.first, range_antecedent.first);
-		  range.second = utils::bithack::max(range.second, range_antecedent.second);
-		}
-	      }
-	      
-	      if (is_valid) {
-		// our tail-ranges are valid... and we will consider alternatives from range to range_max...
-		
-		if (is_goal) {
-		  if (goal_node == size_t(-1)) {
-		    goal_node = derivations.size();
-		    derivations.resize(goal_node + 1);
-		    
-		    // range is always [0, sentence.size())
-		    derivations.back().range = range_type(0, sentence.size());
-		  }
-		  
-		  derivations[goal_node].edges.push_back(derivation_edge_type(frontier.first, tails_next));
-		} else {
-		  // we will compute all possible ranges...
-		  for (int first = range.first; first <= range_max.first; ++ first)
-		    for (int last = range.second; last <= range_max.second; ++ last) {
-		      const range_type range_next(first, last);
-		      
-		      range_node_map_type::iterator biter = buf.find(range_next);
-		      if (biter == buf.end()) {
-			derivatoins.resize(derivations.size() + 1);
-			derivations.back().range = range_next;
-			
-			node_map[id].push_back(derivations.size() - 1);
-			
-			biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
-		      }
-		      
-		      derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next));
-		    }
-		}
-	      }
-	      
-	      size_t index = 0;
-	      for (/**/; index != tails.size(); ++ index) {
-		++ j[index];
-		if (j[index] < j_ends[index]) break;
-		j[index] = 0;
-	      }
-	      
-	      // finished!
-	      if (index == tails.size()) break;
-	    }
-	    
-	  } else {
-	    // incomplete... futher expand!
-	    const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
-	    
-	    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	      
-	      queue.resize(queue.size() + 1);
-	      frontier_type& frontier_next = queue.back();
-	      
-	      frontier_next.first = frontier.first;
-	      frontier_next.first.push_back(*eiter);
-	      
-	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-		if (! admissible[*titer])
-		  frontier_next.second.push_back(*titer);
-	      
-	      frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
-	    }
-	  }
-	  
-	  queue.pop_front();
-	}
-      }
-  }
-  
-  void admissible_nodes(const hypergraph_type& graph,
-			const sentence_type& sentence,
-			const alignment_type& alignment)
-  {
-    typedef std::multimap<int, int, std::less<int>, std::allocator<std::pair<const int, int> > > alignment_map_type;
-    
-    alignment_map_type aligns(alignment.begin(), alignment.end());
-    
-    // first, bottom-up traversal to compute span...
-    for (size_t id = 0; id != graph.nodes.size(); ++ id) {
-      const hypergraph_type::node_type& node = graph.nodes[id];
-      
-      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	
-	alignment_map_type::const_iterator liter = alignment_map.lower_bound(edge.first);
-	alignment_map_type::const_iterator uiter = alignment_map.lower_bound(edge.last);
-	
-	for (alignment_map_type::const_iterator iter = liter; iter != uiter; ++ iter)
-	  spans[id].set(iter->target);
-      }
-    }
-    
-    // second, top-down traversal to compute complement
-    for (int id = graph.nodes.size(); id >= 0; -- id) {
-      const hypergraph_type::node_type& node = graph.nodes[id];
-      
-      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	
-	hypergraph_type::edge_type::node_set_type::const_iterator titer_begin = edge.tails.begin();
-	hypergraph_type::edge_type::node_set_type::const_iterator titer_end   = edge.tails.end();
-	
-	for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
-	  complements[*titer] |= complements[id];
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator iiter = titer_begin; iiter != titer_end; ++ iiter)
-	    if (iiter != titer)
-	      complements[*titer] |= spans[*iiter];
-	}
-      }
-    }
-
-    // check whether admissible or not...
-    // do we also compute non-aligned words...?
-    for (size_t id = 0; id != graph.nodes.size(); ++ id)
-      admissibles[id] = ! spans[id].empty() && ! complements[id].intersect(spans[id].range());
-  }
-  
-  span_set_type spans;
-  span_set_type complements;
-  span_set_type unaligned;
-
-  admissible_set_type admissibles;
-
-  derivation_graph_type derivations;
-};
+}

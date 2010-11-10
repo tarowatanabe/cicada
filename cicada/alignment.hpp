@@ -24,7 +24,7 @@ namespace cicada
   class Alignment
   {
   public:
-    typedef int16_t index_type;
+    typedef int32_t index_type;
     struct Point
     {
       index_type source;
@@ -35,7 +35,7 @@ namespace cicada
       Point(const std::pair<Integral, Integral>& x) : source(x.first), target(x.second) {}
       Point(const std::string& x) { assign(x); }
       Point(const index_type& _source, const index_type& _target) : source(_source), target(_target) {}
-      
+
       template <typename Integral>
       void assign(const std::pair<Integral, Integral>& x)
       {

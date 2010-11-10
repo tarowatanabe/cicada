@@ -38,7 +38,7 @@ path_type output_file;
 int max_length = 7;
 int max_fertility = 10;
 int max_span = 15;
-int min_hole = 2;
+int min_hole = 1;
 
 double max_malloc = 8; // 8 GB
 
@@ -128,6 +128,8 @@ int main(int argc, char** argv)
 	stream[rank]->push(boost::iostreams::gzip_compressor());
 	stream[rank]->push(*device[rank]);
       }
+
+      utils::resource start_extract;
       
       utils::compress_istream is_src(source_file, 1024 * 1024);
       utils::compress_istream is_trg(target_file, 1024 * 1024);
@@ -208,6 +210,12 @@ int main(int argc, char** argv)
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
+
+      utils::resource end_extract;
+
+      if (debug)
+	std::cerr << "extract counts cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time() << std::endl
+		  << "extract counts user time: " << end_extract.user_time() - start_extract.user_time() << std::endl;
       
     } else {
       boost::iostreams::filtering_istream stream;

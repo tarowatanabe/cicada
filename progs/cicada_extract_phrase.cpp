@@ -15,8 +15,6 @@ typedef cicada::Alignment alignment_type;
 
 typedef Bitext bitext_type;
 
-typedef ExtractPhrase::phrase_pair_type     phrase_pair_type;
-typedef ExtractPhrase::phrase_pair_set_type phrase_pair_set_type;
 typedef Task task_type;
 typedef task_type::queue_type queue_type;
 typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -65,6 +63,8 @@ int main(int argc, char** argv)
     boost::filesystem::directory_iterator iter_end;
     for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
       boost::filesystem::remove_all(*iter);
+
+    utils::resource start_extract;
     
     queue_type queue(1024 * threads);
     task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_malloc));
@@ -103,6 +103,12 @@ int main(int argc, char** argv)
     }
     
     workers.join_all();
+
+    utils::resource end_extract;
+    
+    if (debug)
+      std::cerr << "extract counts cpu time:  " << end_extract.cpu_time() - start_extract.cpu_time() << std::endl
+		<< "extract counts user time: " << end_extract.user_time() - start_extract.user_time() << std::endl;
     
     utils::compress_ostream os(output_file / "files");
     for (int i = 0; i != threads; ++ i) {
