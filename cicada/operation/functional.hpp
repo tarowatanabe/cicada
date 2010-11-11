@@ -3,6 +3,7 @@
 #ifndef __CICADA__OPERATION__FUNCTIONAL__HPP__
 #define __CICADA__OPERATION__FUNCTIONAL__HPP__ 1
 
+#include <cicada/operation.hpp>
 #include <cicada/semiring.hpp>
 
 namespace cicada

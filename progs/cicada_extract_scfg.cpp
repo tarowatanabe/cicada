@@ -104,8 +104,17 @@ int main(int argc, char** argv)
       if (! bitext.source.empty() && ! bitext.target.empty()) {
 	queue.push_swap(bitext);
 	++ num_samples;
+	
+	if (debug) {
+	  if (num_samples % 10000 == 0)
+	    std::cerr << '.';
+	  if (num_samples % 1000000 == 0)
+	    std::cerr << std::endl;
+	}
       }
     }
+    if (debug)
+      std::cerr << std::endl;
     if (debug)
       std::cerr << "# of samples: " << num_samples << std::endl;
     

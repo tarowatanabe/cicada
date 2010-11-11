@@ -45,4 +45,5 @@ int main(int argc, char** argv)
   process("a(b(e) c(f g) d)");
   process("a(b(e) c(f g) \\()");
   process("a(b(e) \\)(f g) \\()");
+  process(" ||| ");
 }

@@ -26,6 +26,9 @@
 #include "cicada/vocab.hpp"
 #include "cicada/tree_rule.hpp"
 #include "cicada/hypergraph.hpp"
+#include "cicada/operation/functional.hpp"
+#include "cicada/semiring.hpp"
+#include "cicada/inside_outside.hpp"
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/sgi_hash_set.hpp"
@@ -259,7 +262,22 @@ struct RulePairGenerator
 //   pages     = {206--214},
 //   url       = {http://www.aclweb.org/anthology/D08-1022}
 // }
-
+//
+// and
+//
+// @InProceedings{galley-EtAl:2006:COLACL,
+//    author    = {Galley, Michel  and  Graehl, Jonathan  and  Knight, Kevin  and  Marcu, Daniel  and  DeNeefe, Steve  and  Wang, Wei  and  Thayer, Ignacio},
+//    title     = {Scalable Inference and Training of Context-Rich Syntactic Translation Models},
+//    booktitle = {Proceedings of the 21st International Conference on Computational Linguistics and 44th Annual Meeting of the Association for Computational Linguistics},
+//    month     = {July},
+//    year      = {2006},
+//    address   = {Sydney, Australia},
+//    publisher = {Association for Computational Linguistics},
+//    pages     = {961--968},
+//    url       = {http://www.aclweb.org/anthology/P06-1121},
+//    doi       = {10.3115/1220175.1220296}
+// }
+//
 
 struct ExtractGHKM
 {
@@ -362,6 +380,9 @@ struct ExtractGHKM
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
   typedef std::pair<edge_set_type, node_set_type> frontier_type;
+
+  typedef cicada::semiring::Logprob<double> weight_type;
+  typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
   
   struct DerivationEdge
   {
@@ -389,6 +410,24 @@ struct ExtractGHKM
 
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
+
+  typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> >  rule_pair_list_type;
+
+  struct node_set_hash : public utils::hashmurmur<size_t>
+  {
+    size_t operator()(const node_set_type& nodes) const
+    {
+      return utils::hashmurmur<size_t>::operator()(nodes.begin(), nodes.end(), 0);
+    }
+  };
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<node_set_type, rule_pair_list_type, node_set_hash, std::equal_to<node_set_type>,
+				  std::allocator<std::pair<const node_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+#else
+  typedef sgi::hash_map<node_set_type, rule_pair_list_type, node_set_hash, std::equal_to<node_set_type>,
+			std::allocator<std::pair<const node_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+#endif
   
   
   ExtractGHKM(const symbol_type& __non_terminal,
@@ -414,34 +453,60 @@ struct ExtractGHKM
 
   alignment_map_type alignment_source_target;
   alignment_map_type alignment_target_source;
+
+  weight_set_type weights_inside;
+  weight_set_type weights_outside;
   
   void operator()(const hypergraph_type& graph,
 		  const sentence_type& sentence,
 		  const alignment_type& alignment,
 		  rule_pair_set_type& rules)
   {
+#if 0
+    std::cerr << "hypergraph: " << graph << std::endl
+	      << "sentence: " << sentence << std::endl
+	      << "alignment: " << alignment << std::endl;
+#endif
+
+    for (size_t i = 0; i != graph.edges.size(); ++ i)
+      if (graph.edges[i].rule->lhs == vocab_type::NONE) {
+	std::cerr << "hypergraph: " << graph << std::endl
+		  << "sentence: " << sentence << std::endl
+		  << "alignment: " << alignment << std::endl;
+	
+	break;
+      }
+
     ranges.clear();
     spans.clear();
     complements.clear();
     unaligned.clear();
     admissibles.clear();
-    derivations.clear();
     node_map.clear();
+
+    derivations.clear();
     
     ranges.resize(graph.nodes.size());
     spans.resize(graph.nodes.size());
     complements.resize(graph.nodes.size());
     unaligned.resize(graph.nodes.size());
+    admissibles.resize(graph.nodes.size());
     node_map.resize(graph.nodes.size());
     
+
+    //std::cerr << "admissible nodes" << std::endl;
     admissible_nodes(graph, sentence, alignment);
     
+    //std::cerr << "construct derivations" << std::endl;
     construct_derivations(graph, sentence);
     
     // compute reachable nodes and edges from root...
+
+    //std::cerr << "prune derivations" << std::endl;
     prune_derivations();
     
     // perform extraction
+    //std::cerr << "extract minimum" << std::endl;
     extract_minimum(graph, sentence, alignment, rules);
     
     // perform compounds extraction
@@ -469,6 +534,8 @@ struct ExtractGHKM
     typedef std::vector<range_pos_type, std::allocator<range_pos_type> > range_pos_set_type;
     typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
     typedef std::vector<bool, std::allocator<bool> > covered_type;
+
+    rule_pair_set_local_type rule_pairs_local;
     
     range_pos_set_type range_pos;
     tree_rule_set_type trees;
@@ -481,7 +548,7 @@ struct ExtractGHKM
     boost::iostreams::filtering_ostream os_target;
 
     rule_pair_type rule_pair;
-    
+
     for (size_t id = 0; id != derivations.size(); ++ id) {
       const derivation_node_type& node = derivations[id];
       
@@ -493,6 +560,10 @@ struct ExtractGHKM
 	// we will re-construct composed rule from edges...
 	// edges is ordered by pre-traversal order...
 	tree_rule_type rule_source;
+	
+	weight_type weight = weights_outside[node.node];
+	node_set_type tails_graph(1, node.node);
+	
 	{
 	  positions_source.clear();
 	  std::fill(covered.begin(), covered.end(), false);
@@ -500,8 +571,12 @@ struct ExtractGHKM
 	  int index = 1;
 	  edge_set_type::const_iterator iter = edges.begin();
 	  edge_set_type::const_iterator iter_end = edges.end();
-	  construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, covered);
+	  construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, covered, tails_graph, weight);
 	}
+	
+	std::sort(tails_graph.begin(), tails_graph.end());
+
+	rule_pair.count = weight;
 	
 	// construct target side rule...
 	// tails is ordered by graph... thus, reordering is already replresented by derivations[tails[i]].range...
@@ -579,13 +654,28 @@ struct ExtractGHKM
 	os_source.pop();
 	os_target.pop();
 	
-	// increment by one... actually, we need to normalize...
-	const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
+	rule_pairs_local[tails_graph].push_back(rule_pair);
+      }
+    }
+    
+    rule_pair_set_local_type::iterator riter_end = rule_pairs_local.end();
+    for (rule_pair_set_local_type::iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
+      rule_pair_list_type& rule_list = riter->second;
+      
+      const double factor = 1.0 / rule_list.size();
+      
+      rule_pair_list_type::iterator liter_end = rule_list.end();
+      for (rule_pair_list_type::iterator liter = rule_list.begin(); liter != liter_end; ++ liter) {
+	liter->count *= factor;
+	
+	std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
+	if (! result.second)
+	  const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
       }
     }
   }
   
-  template <typename Iterator, typename PosMap, typename Covered>
+  template <typename Iterator, typename PosMap, typename Covered, typename Tails>
   void construct_rule(const hypergraph_type& graph,
 		      Iterator& iter,
 		      Iterator last,
@@ -593,7 +683,9 @@ struct ExtractGHKM
 		      int& index,
 		      int& frontier_pos,
 		      PosMap& pos_map,
-		      Covered& covered)
+		      Covered& covered,
+		      Tails& tails_graph,
+		      weight_type& weight)
   {
     // pre-order traversal...
     
@@ -607,50 +699,38 @@ struct ExtractGHKM
     for (int pos = edge.first; pos != edge.last; ++ pos)
       covered[pos] = true;
     
+    weight *= cicada::operation::weight_function_one<weight_type>()(edge);
+    
     tree_rule = tree_rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end());
     
     ++ iter;
     
-    if (iter != last) {
-      const hypergraph_type::edge_type& edge_next = graph.edges[*iter];
-      
-      size_t tail_pos = 0;
-      tree_rule_type::iterator titer_end = tree_rule.end();
-      for (tree_rule_type::iterator titer = tree_rule.begin(); titer != titer_end; ++ titer) {
-	if (titer->label.is_non_terminal()) {
-
-	  const id_type node_id = edge.tails[tail_pos];
-	  
-	  if (node_id == edge_next.head)
-	    construct_rule(graph, iter, last, *titer, index, frontier_pos, pos_map, covered);
-	  else {
-	    for (int pos = ranges[node_id].first; pos != ranges[node_id].second; ++ pos)
-	      covered[pos] = false;
-	    
-	    titer->label = titer->label.non_terminal(index ++);
-	    ++ frontier_pos;
-	  }
-	  
-	  ++ tail_pos;
-	} else {
-	  pos_map.push_back(frontier_pos);
-	  ++ frontier_pos;
-	}
-      }
-    } else {
-      size_t tail_pos = 0;
-      tree_rule_type::iterator titer_end = tree_rule.end();
-      for (tree_rule_type::iterator titer = tree_rule.begin(); titer != titer_end; ++ titer, ++ frontier_pos) {
-	if (titer->label.is_non_terminal()) {
-	  const id_type node_id = edge.tails[tail_pos];
-	  
+    
+    size_t tail_pos = 0;
+    tree_rule_type::iterator titer_end = tree_rule.end();
+    for (tree_rule_type::iterator titer = tree_rule.begin(); titer != titer_end; ++ titer) {
+      if (titer->label.is_non_terminal()) {
+	
+	const id_type node_id = edge.tails[tail_pos];
+	
+	if (iter != last && node_id == graph.edges[*iter].head)
+	  construct_rule(graph, iter, last, *titer, index, frontier_pos, pos_map, covered, tails_graph, weight);
+	else {
 	  for (int pos = ranges[node_id].first; pos != ranges[node_id].second; ++ pos)
 	    covered[pos] = false;
-
+	  
+	  tails_graph.push_back(node_id);
+	  
+	  weight *= weights_inside[node_id];
+	  
 	  titer->label = titer->label.non_terminal(index ++);
-	  ++ tail_pos;
-	} else
-	  pos_map.push_back(frontier_pos);
+	  ++ frontier_pos;
+	}
+	
+	++ tail_pos;
+      } else {
+	pos_map.push_back(frontier_pos);
+	++ frontier_pos;
       }
     }
   }
@@ -800,6 +880,7 @@ struct ExtractGHKM
       if (admissibles[id]) {
 	const hypergraph_type::node_type& node = graph.nodes[id];
 
+	//std::cerr << "admissible node: " << id << std::endl;
 	//
 	// compute minimal range and maximum outer-range
 	//
@@ -811,6 +892,12 @@ struct ExtractGHKM
 	
 	const range_type range_max(riter_first == complements[id].begin() ? 0 : *(-- riter_first) + 1,
 				   riter_last != complements[id].end() ? *riter_last : static_cast<int>(sentence.size()));
+
+#if 0
+	std::cerr << "range min: " << range_min.first << ".." << range_min.second
+		  << " range max: " << range_max.first << ".." << range_max.second
+		  << std::endl;
+#endif
 	
 	const bool is_goal(id == graph.goal);
 	
@@ -839,6 +926,24 @@ struct ExtractGHKM
 	  const frontier_type& frontier = queue.front();
 	  
 	  if (frontier.second.empty()) {
+#if 0
+	    std::cerr << "completed frontier: ";
+	    std::copy(frontier.first.begin(), frontier.first.end(), std::ostream_iterator<int>(std::cerr, " "));
+	    std::cerr << std::endl;
+	    {
+	      edge_set_type::const_iterator eiter_end = frontier.first.end();
+	      for (edge_set_type::const_iterator eiter = frontier.first.begin(); eiter != eiter_end; ++ eiter) {
+		const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+		
+		std::cerr << "rule: " << *(edge.rule)
+			  << " head: " << edge.head
+			  << " tails: ";
+		std::copy(edge.tails.begin(), edge.tails.end(), std::ostream_iterator<int>(std::cerr, " "));
+		std::cerr << std::endl;
+	      }
+	    }
+#endif
+	    
 	    // construct rule from "fragment", frontier.first
 	    // by enumerating edge and its tails in depth-first manner...
 	    // use recursive call for simplicity...
@@ -846,15 +951,17 @@ struct ExtractGHKM
 	    // compute "tails" for the fragment
 	    
 	    node_set_type tails;
-	    edge_set_type::const_iterator eiter_end = frontier.first.end();
-	    for (edge_set_type::const_iterator eiter = frontier.first.begin(); eiter != eiter_end; ++ eiter) {
-	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	      
-	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-		if (admissibles[*titer])
-		  tails.push_back(*titer);
+	    {
+	      edge_set_type::const_iterator eiter = frontier.first.begin();
+	      edge_set_type::const_iterator eiter_end = frontier.first.end();
+	      construct_tails(graph, eiter, eiter_end, tails);
 	    }
+
+#if 0
+	    std::cerr << "tails: ";
+	    std::copy(tails.begin(), tails.end(), std::ostream_iterator<int>(std::cerr, " "));
+	    std::cerr << std::endl;
+#endif
 	    
 	    // iterate over tails and compute span...
 	    // code taken from apply_exact...
@@ -862,8 +969,10 @@ struct ExtractGHKM
 	    index_set_type j_ends(tails.size(), 0);
 	    index_set_type j(tails.size(), 0);
 	    
-	    for (size_t i = 0; i != tails.size(); ++ i)
+	    for (size_t i = 0; i != tails.size(); ++ i) {
 	      j_ends[i] = node_map[tails[i]].size();
+	      //std::cerr << "tail: " << tails[i] << " node size: " << j_ends[i] << std::endl;
+	    }
 	    
 	    node_set_type tails_next(tails.size());
 
@@ -898,6 +1007,13 @@ struct ExtractGHKM
 	      if (is_valid) {
 		// our tail-ranges are valid... and we will consider alternatives from range to range_max...
 		
+#if 0
+		std::cerr << "re-computed range min: " << range.first << ".." << range.second
+			  << " range max: " << range_max.first << ".." << range_max.second
+			  << std::endl;
+#endif
+
+		
 		if (is_goal) {
 		  if (goal_node == size_t(-1)) {
 		    goal_node = derivations.size();
@@ -911,9 +1027,11 @@ struct ExtractGHKM
 		  derivations[goal_node].edges.push_back(derivation_edge_type(frontier.first, tails_next));
 		} else {
 		  // we will compute all possible ranges...
-		  for (int first = range.first; first <= range_max.first; ++ first)
+		  for (int first = range_max.first; first <= range.first; ++ first)
 		    for (int last = range.second; last <= range_max.second; ++ last) {
 		      const range_type range_next(first, last);
+
+		      //std::cerr << "constructing for range: " << first << ".." << last << std::endl;
 		      
 		      range_node_map_type::iterator biter = buf.find(range_next);
 		      if (biter == buf.end()) {
@@ -970,11 +1088,43 @@ struct ExtractGHKM
 	}
       }
   }
+
+  template <typename Iterator, typename Tails>
+  void construct_tails(const hypergraph_type& graph,
+		       Iterator& iter,
+		       Iterator last,
+		       Tails& tails)
+  {
+    if (iter == last) return;
+
+    const hypergraph_type::edge_type& edge = graph.edges[*iter];
+    ++ iter;
+    
+    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+      if (iter != last && *titer == graph.edges[*iter].head)
+	construct_tails(graph, iter, last, tails);
+      else
+	tails.push_back(*titer);
+    }
+  }
   
   void admissible_nodes(const hypergraph_type& graph,
 			const sentence_type& sentence,
 			const alignment_type& alignment)
   {
+    // compute inside/outside score
+
+    //std::cerr << "compute inside outside score" << std::endl;
+    weights_inside.clear();
+    weights_outside.clear();
+
+    weights_inside.resize(graph.nodes.size());
+    weights_outside.resize(graph.nodes.size());
+    
+    cicada::inside(graph, weights_inside, cicada::operation::weight_function_one<weight_type>());
+    cicada::outside(graph, weights_inside, weights_outside, cicada::operation::weight_function_one<weight_type>());
+    
     alignment_source_target.clear();
     alignment_target_source.clear();
     
@@ -990,10 +1140,14 @@ struct ExtractGHKM
       alignment_target_source[aiter->target].push_back(aiter->source);
     }
     
+    // inside-outside!
+    
     // first, bottom-up traversal to compute span...
     // we assume that every edge is annoated with its corresponding span information...
     // do we compute by span-forest again...?
     // we also assume that hypergrpah is parse-forest in that the each node share the same span and category...
+
+    //std::cerr << "compute target spans" << std::endl;
     for (size_t id = 0; id != graph.nodes.size(); ++ id) {
       const hypergraph_type::node_type& node = graph.nodes[id];
       
@@ -1018,7 +1172,10 @@ struct ExtractGHKM
     }
     
     // second, top-down traversal to compute complement
-    for (int id = graph.nodes.size(); id >= 0; -- id) {
+    //std::cerr << "compute target complements" << std::endl;
+    for (int id = graph.nodes.size() - 1; id >= 0; -- id) {
+
+      //std::cerr << "complement: " << id << std::endl;
       const hypergraph_type::node_type& node = graph.nodes[id];
       
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -1039,6 +1196,8 @@ struct ExtractGHKM
 
     // check whether admissible or not...
     // do we also compute non-aligned words...?
+    
+    //std::cerr << "check admissible" << std::endl;
     for (size_t id = 0; id != graph.nodes.size(); ++ id)
       admissibles[id] = ! spans[id].empty() && ! complements[id].intersect(spans[id].range());
   }

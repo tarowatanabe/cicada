@@ -66,7 +66,7 @@ namespace cicada
   template <typename Iterator>
   struct tree_rule_parser_grammar : boost::spirit::qi::grammar<Iterator, cicada_treebank_type(), boost::spirit::standard::space_type>
   {
-    tree_rule_parser_grammar() : tree_rule_parser_grammar::base_type(tree_rule)
+    tree_rule_parser_grammar() : tree_rule_parser_grammar::base_type(root)
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
@@ -84,13 +84,15 @@ namespace cicada
 	("\\(", '(')
 	("\\)", ')');
       
-      label %= lexeme[+(escaped_char | (char_ - space - '(' - ')' - '\\'))];
+      label %= lexeme[+(escaped_char | (char_ - space - '(' - ')' - '\\')) - "|||"];
       tree_rule %= label >> (hold['(' >> +tree_rule >> ')'] | eps);
+      root %= -tree_rule;
     }
     
     boost::spirit::qi::symbols<char, char>        escaped_char;
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   label;
     boost::spirit::qi::rule<Iterator, cicada_treebank_type(), boost::spirit::standard::space_type> tree_rule;
+    boost::spirit::qi::rule<Iterator, cicada_treebank_type(), boost::spirit::standard::space_type> root;
   };
 
   template <typename Iterator>
@@ -114,7 +116,7 @@ namespace cicada
 	('(',  "\\(")
 	(')',  "\\)");
       
-      label %= +(escaped_char | char_);
+      label %= *(escaped_char | char_);
       antecedents %= tree_rule % ' ';
       tree_rule %= label << (buffer['(' << antecedents << ')'] | eps);
     }

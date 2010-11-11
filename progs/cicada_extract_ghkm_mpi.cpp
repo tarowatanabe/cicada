@@ -154,6 +154,12 @@ int main(int argc, char** argv)
 	    
 	    *stream[rank] << bitext << '\n';
 	    ++ num_samples;
+	    if (debug) {
+	      if (num_samples % 10000 == 0)
+		std::cerr << '.';
+	      if (num_samples % 1000000 == 0)
+		std::cerr << std::endl;
+	    }
 	    found = true;
 	  }
 	
@@ -170,6 +176,12 @@ int main(int argc, char** argv)
 	  
 	  queue.push_swap(bitext);
 	  ++ num_samples;
+	  if (debug) {
+	    if (num_samples % 10000 == 0)
+	      std::cerr << '.';
+	    if (num_samples % 1000000 == 0)
+	      std::cerr << std::endl;
+	  }
 	  found = true;
 	}
 	
@@ -179,6 +191,8 @@ int main(int argc, char** argv)
       if (is_src || is_trg || is_alg)
 	throw std::runtime_error("# of lines do not match");
 
+      if (debug)
+	std::cerr << std::endl;
       if (debug)
 	std::cerr << "# of samples: " << num_samples << std::endl;
       
