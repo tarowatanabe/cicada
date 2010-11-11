@@ -611,6 +611,12 @@ struct RootCountParser
   RootCountParser() : grammar() {}
   RootCountParser(const RootCountParser& x) : grammar() {}
   
+  class double_base64_type : public std::string
+  {
+  public:
+    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
+  };
+
   template <typename Iterator>
   struct root_count_parser : boost::spirit::qi::grammar<Iterator, root_count_type(), boost::spirit::standard::space_type>
   {
@@ -628,11 +634,17 @@ struct RootCountParser
       using standard::space;
       
       label %= lexeme[+(char_ - (space >> "|||" >> space))];
-      counts %= +double_;
+      
+      token %= lexeme[+(char_ - space)];
+      count_base64 %= token;
+      
+      counts %= +('B' >> count_base64 | double_);
       root_count %= label >> "|||" >> counts >> "|||" >> double_ >> double_;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
+    boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
+    boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, root_count_type(), boost::spirit::standard::space_type> root_count;
   };
@@ -668,57 +680,22 @@ struct RootCountGenerator
   
   typedef root_count_type::label_type  label_type;
   typedef root_count_type::counts_type counts_type;
- 
-  RootCountGenerator() : grammar() {}
-  RootCountGenerator(const RootCountGenerator& x) : grammar() {}
   
-  template <typename Iterator>
-  struct root_count_generator : boost::spirit::karma::grammar<Iterator, root_count_type()>
-  {
-    root_count_generator() : root_count_generator::base_type(root_count)
-    {
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::repeat;
-      using standard::char_;
-      using karma::double_;
-      using standard::space;
-      
-      label  %= +char_;
-      counts %= double20 % ' ';
-      root_count %= label << " ||| " << counts << " ||| " << double20 << " " << double20;
-    }
-
-    struct real_precision : boost::spirit::karma::real_policies<double>
-    {
-      static unsigned int precision(double) 
-      { 
-        return 20;
-      }
-    };
-    
-    boost::spirit::karma::real_generator<double, real_precision> double20;
-    
-    boost::spirit::karma::rule<Iterator, std::string()> label;
-    boost::spirit::karma::rule<Iterator, counts_type()> counts;
-    boost::spirit::karma::rule<Iterator, root_count_type()> root_count;
-  };
-
-  typedef std::ostream_iterator<char> iterator_type;
   
   std::ostream& operator()(std::ostream& os, const root_count_type& root_count)
   {
-    iterator_type iter(os);
+    os << root_count.label << " |||";
     
-    if (! boost::spirit::karma::generate(iter, grammar, root_count))
-      throw std::runtime_error("failed generation!");
+    counts_type::const_iterator citer_end = root_count.counts.end();
+    for (counts_type::const_iterator citer = root_count.counts.begin(); citer != citer_end; ++ citer)
+      os << " B" << utils::encode_base64(*citer);
+    
+    os << " |||"
+       << " B" << utils::encode_base64(root_count.observed_joint)
+       << " B" << utils::encode_base64(root_count.observed);
     
     return os;
   }
-  
-  root_count_generator<iterator_type> grammar;
 };
 
 struct PhrasePairParser
@@ -756,10 +733,6 @@ struct PhrasePairParser
       
       using standard::char_;
       using standard::space;
-      
-      using phoenix::begin;
-      using phoenix::end;
-      using phoenix::construct;
       
       phrase %= lexeme[+(char_ - (space >> "|||" >> space))];
       alignment %= *(int_ >> '-' >> int_);
