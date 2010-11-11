@@ -468,6 +468,8 @@ struct ExtractGHKM
 	      << "alignment: " << alignment << std::endl;
 #endif
 
+#if 0
+    // spurious checking...
     for (size_t i = 0; i != graph.edges.size(); ++ i)
       if (graph.edges[i].rule->lhs == vocab_type::NONE) {
 	std::cerr << "hypergraph: " << graph << std::endl
@@ -476,6 +478,7 @@ struct ExtractGHKM
 	
 	break;
       }
+#endif
 
     ranges.clear();
     spans.clear();
