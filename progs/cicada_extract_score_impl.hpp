@@ -8,9 +8,7 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
+#include <boost/spirit/include/phoenix.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -48,6 +46,7 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/malloc_stats.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/base64.hpp>
 
 #include <succinct_db/succinct_trie_db.hpp>
 
@@ -732,7 +731,13 @@ struct PhrasePairParser
   
   PhrasePairParser() : grammar() {}
   PhrasePairParser(const PhrasePairParser& x) : grammar() {}
-  
+
+  class double_base64_type : public std::string
+  {
+  public:
+    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
+  };
+
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
   {
@@ -743,21 +748,34 @@ struct PhrasePairParser
       namespace phoenix = boost::phoenix;
       
       using qi::lexeme;
+      using qi::lit;
       using qi::hold;
       using qi::repeat;
-      using standard::char_;
       using qi::double_;
       using qi::int_;
+      
+      using standard::char_;
       using standard::space;
+      
+      using phoenix::begin;
+      using phoenix::end;
+      using phoenix::construct;
       
       phrase %= lexeme[+(char_ - (space >> "|||" >> space))];
       alignment %= *(int_ >> '-' >> int_);
-      counts %= +double_;
+      
+      token %= lexeme[+(char_ - space)];
+      count_base64 %= token;
+      
+      counts %= +('B' >> count_base64 | double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> alignment >> "|||" >> counts;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
     boost::spirit::qi::rule<Iterator, alignment_type(), boost::spirit::standard::space_type> alignment;
+    
+    boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
+    boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };
@@ -801,60 +819,19 @@ struct PhrasePairGenerator
   typedef phrase_pair_type::alignment_type alignment_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
-  PhrasePairGenerator() : grammar() {}
-  PhrasePairGenerator(const PhrasePairGenerator& x) : grammar() {}
-
-  
-  template <typename Iterator>
-  struct phrase_pair_generator : boost::spirit::karma::grammar<Iterator, phrase_pair_type()>
-  {
-    phrase_pair_generator() : phrase_pair_generator::base_type(phrase_pair)
-    {
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::repeat;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      using standard::space;
-      
-      phrase %= +char_;
-      alignment %= -((int_ << '-' << int_) % ' ');
-      counts %= double20 % ' ';
-      phrase_pair %= phrase << " ||| " << phrase << " ||| " << alignment << " ||| " << counts;
-    }
-
-    struct real_precision : boost::spirit::karma::real_policies<double>
-    {
-      static unsigned int precision(double) 
-      { 
-        return 20;
-      }
-    };
-    
-    boost::spirit::karma::real_generator<double, real_precision> double20;
-    
-    boost::spirit::karma::rule<Iterator, std::string()> phrase;
-    boost::spirit::karma::rule<Iterator, alignment_type()> alignment;
-    boost::spirit::karma::rule<Iterator, counts_type()> counts;
-    boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
-  };
-
-  typedef std::ostream_iterator<char> iterator_type;
-  
   std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair)
   {
-    iterator_type iter(os);
+    os << phrase_pair.source
+       << " ||| " << phrase_pair.target
+       << " ||| " << phrase_pair.alignment
+       << " |||";
     
-    if (! boost::spirit::karma::generate(iter, grammar, phrase_pair))
-      throw std::runtime_error("failed generation!");
+    counts_type::const_iterator citer_end = phrase_pair.counts.end();
+    for (counts_type::const_iterator citer = phrase_pair.counts.begin(); citer != citer_end; ++ citer)
+      os << " B" << utils::encode_base64(*citer);
     
     return os;
   }
-  
-  phrase_pair_generator<iterator_type> grammar;
 };
 
 
@@ -867,6 +844,12 @@ struct PhrasePairModifiedParser
   
   PhrasePairModifiedParser() : grammar() {}
   PhrasePairModifiedParser(const PhrasePairModifiedParser& x) : grammar() {}
+
+  class double_base64_type : public std::string
+  {
+  public:
+    operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
+  };
   
   template <typename Iterator>
   struct phrase_pair_parser : boost::spirit::qi::grammar<Iterator, phrase_pair_type(), boost::spirit::standard::space_type>
@@ -884,11 +867,17 @@ struct PhrasePairModifiedParser
       using standard::space;
       
       phrase %= lexeme[+(char_ - (space >> "|||" >> space))];
-      counts %= +double_;
+
+      token %= lexeme[+(char_ - space)];
+      count_base64 %= token;
+      
+      counts %= +('B' >> count_base64 | double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> counts;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
+    boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
+    boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, phrase_pair_type(), boost::spirit::standard::space_type> phrase_pair;
   };
@@ -929,57 +918,16 @@ struct PhrasePairModifiedGenerator
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::counts_type    counts_type;
 
-  PhrasePairModifiedGenerator() : grammar() {}
-  PhrasePairModifiedGenerator(const PhrasePairModifiedGenerator& x) : grammar() {}
-  
-  
-  template <typename Iterator>
-  struct phrase_pair_generator : boost::spirit::karma::grammar<Iterator, phrase_pair_type()>
-  {
-    phrase_pair_generator() : phrase_pair_generator::base_type(phrase_pair)
-    {
-      namespace karma = boost::spirit::karma;
-      namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::repeat;
-      using standard::char_;
-      using karma::double_;
-      using standard::space;
-      
-      phrase %= +char_;
-      counts %= double20 % ' ';
-      phrase_pair %= phrase << " ||| " << phrase << " ||| " << counts;
-    }
-
-    struct real_precision : boost::spirit::karma::real_policies<double>
-    {
-      static unsigned int precision(double) 
-      { 
-        return 20;
-      }
-    };
-    
-    boost::spirit::karma::real_generator<double, real_precision> double20;
-    
-    boost::spirit::karma::rule<Iterator, std::string()> phrase;
-    boost::spirit::karma::rule<Iterator, counts_type()> counts;
-    boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
-  };
-
-  typedef std::ostream_iterator<char> iterator_type;
-  
   std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair)
   {
-    iterator_type iter(os);
+    os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
     
-    if (! boost::spirit::karma::generate(iter, grammar, phrase_pair))
-      throw std::runtime_error("failed generation!");
+    counts_type::const_iterator citer_end = phrase_pair.counts.end();
+    for (counts_type::const_iterator citer = phrase_pair.counts.begin(); citer != citer_end; ++ citer)
+      os << " B" << utils::encode_base64(*citer);
     
     return os;
   }
-  
-  phrase_pair_generator<iterator_type> grammar;
 };
 
 

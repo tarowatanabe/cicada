@@ -101,7 +101,7 @@ struct PhrasePair
 {
   typedef std::string phrase_type;
   typedef cicada::Alignment alignment_type;
-  typedef boost::array<double, 5> counts_type;
+  typedef boost::array<int, 5> counts_type;
 
   phrase_type    source;
   phrase_type    target;
@@ -184,25 +184,14 @@ struct PhrasePairGenerator
       
       using karma::repeat;
       using standard::char_;
-      using karma::double_;
       using karma::int_;
       using standard::space;
       
       phrase %= +char_;
       alignment %= -((int_ << '-' << int_) % ' ');
-      counts %= double20 % ' ';
+      counts %= int_ % ' ';
       phrase_pair %= phrase << " ||| " << phrase << " ||| " << alignment << " ||| " << counts;
     }
-
-    struct real_precision : boost::spirit::karma::real_policies<double>
-    {
-      static unsigned int precision(double) 
-      { 
-        return 20;
-      }
-    };
-    
-    boost::spirit::karma::real_generator<double, real_precision> double20;
     
     boost::spirit::karma::rule<Iterator, std::string()> phrase;
     boost::spirit::karma::rule<Iterator, alignment_type()> alignment;
@@ -244,7 +233,7 @@ struct ExtractPhrase
   typedef cicada::Alignment alignment_type;
   
   typedef std::string phrase_type;
-  typedef boost::array<double, 5> counts_type;
+  typedef boost::array<int, 5> counts_type;
 
   typedef std::pair<int, int> span_type;
 

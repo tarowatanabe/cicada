@@ -27,8 +27,9 @@ path_type alignment_file;
 
 path_type output_file;
 
-int max_nodes = 7;
-int max_height = 10;
+std::string non_terminal = "[x]";
+int max_nodes = 15;
+int max_height = 3;
 
 double max_malloc = 8; // 8 GB
 int threads = 1;
@@ -67,7 +68,7 @@ int main(int argc, char** argv)
     utils::resource start_extract;
     
     queue_type queue(1024 * threads);
-    task_set_type tasks(threads, task_type(queue, output_file, max_nodes, max_height, max_malloc));
+    task_set_type tasks(threads, task_type(queue, output_file, non_terminal, max_nodes, max_height, max_malloc));
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -137,6 +138,8 @@ void options(int argc, char** argv)
     ("target",    po::value<path_type>(&target_file),    "target file")
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     ("output",    po::value<path_type>(&output_file),    "output directory")
+    
+    ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal for target side")
     
     ("max-nodes",  po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in composed rule")
     ("max-height", po::value<int>(&max_height)->default_value(max_height), "maximum height of composed rule")
