@@ -406,7 +406,7 @@ struct ExtractGHKM
   typedef DerivationEdge derivation_edge_type;
   typedef DerivationNode derivation_node_type;
   
-  typedef std::deque<derivation_node_type, std::allocator<derivation_node_type> > derivation_set_type;
+  typedef utils::chunk_vector<derivation_node_type, 4096 / sizeof(derivation_node_type), std::allocator<derivation_node_type> > derivation_set_type;
 
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
@@ -415,18 +415,18 @@ struct ExtractGHKM
 
   struct node_set_hash : public utils::hashmurmur<size_t>
   {
-    size_t operator()(const node_set_type& nodes) const
+    size_t operator()(const edge_set_type& edges) const
     {
-      return utils::hashmurmur<size_t>::operator()(nodes.begin(), nodes.end(), 0);
+      return utils::hashmurmur<size_t>::operator()(edges.begin(), edges.end(), 0);
     }
   };
 
 #ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<node_set_type, rule_pair_list_type, node_set_hash, std::equal_to<node_set_type>,
-				  std::allocator<std::pair<const node_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+  typedef std::tr1::unordered_map<edge_set_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_type>,
+				  std::allocator<std::pair<const edge_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
 #else
-  typedef sgi::hash_map<node_set_type, rule_pair_list_type, node_set_hash, std::equal_to<node_set_type>,
-			std::allocator<std::pair<const node_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+  typedef sgi::hash_map<edge_set_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_type>,
+			std::allocator<std::pair<const edge_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
 #endif
   
   
@@ -525,6 +525,30 @@ struct ExtractGHKM
     }
   };
   
+
+  void extract_composed(const hypergraph_type& graph,
+			const sentence_type& sentence,
+			const alignment_type& alignment,
+			rule_pair_set_type& rule_pairs)
+  {
+    // difficult...
+    // we need to keep track of how many nodes / maximum height in the composed rules...
+    
+    //
+    // bottom-up traversal to construct composed rules...
+    // actually, we will construct new "composed edges" into new edge set, then, 
+    // replace this new edge set with current one, so that we can easily enumerate
+    // combination...
+    //
+    // first, we will implement naive enumeration...
+    
+    for (size_t id = 0; id != derivations.size(); ++ id) {
+      const derivation_node_type& node = derivations[id];
+      
+      
+    }
+  }
+
   
   void extract_minimum(const hypergraph_type& graph,
 		       const sentence_type& sentence,
@@ -537,21 +561,10 @@ struct ExtractGHKM
     typedef std::vector<range_pos_type, std::allocator<range_pos_type> > range_pos_set_type;
     typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
     typedef std::vector<bool, std::allocator<bool> > covered_type;
-
-    rule_pair_set_local_type rule_pairs_local;
     
-    range_pos_set_type range_pos;
-    tree_rule_set_type trees;
-
-    point_set_type positions_source(alignment_source_target.size());
-    point_set_type positions_target(alignment_target_source.size());
-    covered_type covered(alignment_source_target.size());
-
-    boost::iostreams::filtering_ostream os_source;
-    boost::iostreams::filtering_ostream os_target;
-
+    rule_pair_set_local_type rule_pairs_local;
     rule_pair_type rule_pair;
-
+    
     for (size_t id = 0; id != derivations.size(); ++ id) {
       const derivation_node_type& node = derivations[id];
       
@@ -560,107 +573,14 @@ struct ExtractGHKM
 	const edge_set_type& edges = eiter->edges;
 	const node_set_type& tails = eiter->tails;
 	
-	// we will re-construct composed rule from edges...
-	// edges is ordered by pre-traversal order...
-	tree_rule_type rule_source;
+	construct_rule_pair(graph, sentence, node, edges, tails, rule_pair);
 	
-	weight_type weight = weights_outside[node.node];
-	node_set_type tails_graph(1, node.node);
-	
-	{
-	  positions_source.clear();
-	  std::fill(covered.begin(), covered.end(), false);
-	  int frontier_pos = 0;
-	  int index = 1;
-	  edge_set_type::const_iterator iter = edges.begin();
-	  edge_set_type::const_iterator iter_end = edges.end();
-	  construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, covered, tails_graph, weight);
-	}
-	
-	std::sort(tails_graph.begin(), tails_graph.end());
-
-	rule_pair.count = weight;
-	
-	// construct target side rule...
-	// tails is ordered by graph... thus, reordering is already replresented by derivations[tails[i]].range...
-	
-	trees.clear();
-	
-	if (tails.empty()) {
-	  trees.insert(trees.end(), sentence.begin() + node.range.first, sentence.begin() + node.range.second);
-	  for (int i = node.range.first; i != node.range.second; ++ i)
-	    positions_target[i] = i - node.range.first;
-	} else {
-	  range_pos.clear();
-	  int index = 1;
-	  node_set_type::const_iterator titer_end = tails.end();
-	  for (node_set_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer, ++ index)
-	    range_pos.push_back(std::make_pair(derivations[*titer].range, index));
-	  
-	  std::sort(range_pos.begin(), range_pos.end(), less_first<range_pos_type>());
-
-	  int pos_first = node.range.first;
-	  range_pos_set_type::const_iterator riter_end = range_pos.end();
-	  for (range_pos_set_type::const_iterator riter = range_pos.begin(); riter != riter_end; ++ riter) {
-	    const int pos_last = riter->first.first;
-
-	    int mapped_pos = trees.size();
-	    for (int i = pos_first; i != pos_last; ++ i, ++ mapped_pos)
-	      positions_target[i] = mapped_pos;
-	    
-	    trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
-	    trees.push_back(non_terminal.non_terminal(riter->second));
-	    
-	    pos_first = riter->first.second;
-	  }
-	  
-	  const int pos_last = node.range.second;
-	  
-	  int mapped_pos = trees.size();
-	  for (int i = pos_first; i != pos_last; ++ i, ++ mapped_pos)
-	    positions_target[i] = mapped_pos;
-	  
-	  trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
-	}
-	
-	tree_rule_type rule_target(non_terminal, trees.begin(), trees.end());
-	
-	//
-	// construct word alignment...
-	// we can easily reconsruct from positions_{source, target} + covered
-	//
-	
-	rule_pair.alignment.clear();
-	int pos_src = 0;
-
-	for (size_t src = 0; src != covered.size(); ++ src)
-	  if (covered[src]) {
-	    
-	    point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
-	    point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
-	    
-	    for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	      rule_pair.alignment.push_back(std::make_pair(positions_source[pos_src], positions_target[*aiter]));
-	    
-	    ++ pos_src;
-	  }
-	
-	rule_pair.source.clear();
-	rule_pair.target.clear();
-	
-	os_source.push(boost::iostreams::back_inserter(rule_pair.source));
-	os_target.push(boost::iostreams::back_inserter(rule_pair.target));
-	
-	os_source << rule_source;
-	os_target << rule_target;
-	
-	os_source.pop();
-	os_target.pop();
-	
-	rule_pairs_local[tails_graph].push_back(rule_pair);
+	rule_pairs_local[edges].push_back(rule_pair);
       }
     }
     
+    // if we share the same edge set, then, we can easily conclude that it is
+    // caused by unaligned word ambiguity...
     rule_pair_set_local_type::iterator riter_end = rule_pairs_local.end();
     for (rule_pair_set_local_type::iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
       rule_pair_list_type& rule_list = riter->second;
@@ -677,8 +597,111 @@ struct ExtractGHKM
       }
     }
   }
+
+  void construct_rule_pair(const hypergraph_type& graph,
+			   const sentence_type& sentence,
+			   const derivation_node_type& node,
+			   const edge_set_type& edges,
+			   const node_set_type& tails,
+			   rule_pair_type& rule_pair)
+  {
+    typedef std::pair<range_type, int> range_pos_type;
+    typedef std::vector<range_pos_type, std::allocator<range_pos_type> > range_pos_set_type;
+    typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
+    typedef std::vector<bool, std::allocator<bool> > covered_type;
+    
+    point_set_type positions_source;
+    covered_type covered(alignment_source_target.size(), false);
+    
+    tree_rule_type rule_source;
+    weight_type weight = weights_outside[node.node];
+    
+    {
+      int frontier_pos = 0;
+      int index = 1;
+      edge_set_type::const_iterator iter = edges.begin();
+      edge_set_type::const_iterator iter_end = edges.end();
+      construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, covered, weight);
+    }
+    
+    rule_pair.count = weight;
+    
+    tree_rule_set_type trees;
+    point_set_type positions_target(alignment_target_source.size());
+    
+    if (tails.empty()) {
+      trees.insert(trees.end(), sentence.begin() + node.range.first, sentence.begin() + node.range.second);
+      for (int i = node.range.first; i != node.range.second; ++ i)
+	positions_target[i] = i - node.range.first;
+    } else {
+      range_pos_set_type range_pos;
+      
+      int index = 1;
+      range_pos.reserve(tails.size());
+      node_set_type::const_iterator titer_end = tails.end();
+      for (node_set_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer, ++ index)
+	range_pos.push_back(std::make_pair(derivations[*titer].range, index));
+      
+      std::sort(range_pos.begin(), range_pos.end(), less_first<range_pos_type>());
+      
+      int pos_first = node.range.first;
+      range_pos_set_type::const_iterator riter_end = range_pos.end();
+      for (range_pos_set_type::const_iterator riter = range_pos.begin(); riter != riter_end; ++ riter) {
+	const int pos_last = riter->first.first;
+	
+	int mapped_pos = trees.size();
+	for (int i = pos_first; i != pos_last; ++ i, ++ mapped_pos)
+	  positions_target[i] = mapped_pos;
+	
+	trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
+	trees.push_back(non_terminal.non_terminal(riter->second));
+	
+	pos_first = riter->first.second;
+      }
+      
+      const int pos_last = node.range.second;
+      int mapped_pos = trees.size();
+      for (int i = pos_first; i != pos_last; ++ i, ++ mapped_pos)
+	positions_target[i] = mapped_pos;
+      
+      trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
+    }
+    
+    tree_rule_type rule_target(non_terminal, trees.begin(), trees.end());
+
+    //
+    // construct word alignment...
+    // we can easily reconsruct from positions_{source, target} + covered
+    //
+    
+    rule_pair.alignment.clear();
+    int pos_src = 0;
+    
+    for (size_t src = 0; src != covered.size(); ++ src)
+      if (covered[src]) {
+	point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
+	point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
+	
+	for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	  rule_pair.alignment.push_back(std::make_pair(positions_source[pos_src], positions_target[*aiter]));
+	
+	++ pos_src;
+      }
+
+    rule_pair.source.clear();
+    rule_pair.target.clear();
+    
+    boost::iostreams::filtering_ostream os_source;
+    boost::iostreams::filtering_ostream os_target;
+    
+    os_source.push(boost::iostreams::back_inserter(rule_pair.source));
+    os_target.push(boost::iostreams::back_inserter(rule_pair.target));
+    
+    os_source << rule_source;
+    os_target << rule_target;
+  }
   
-  template <typename Iterator, typename PosMap, typename Covered, typename Tails>
+  template <typename Iterator, typename PosMap, typename Covered>
   void construct_rule(const hypergraph_type& graph,
 		      Iterator& iter,
 		      Iterator last,
@@ -687,7 +710,6 @@ struct ExtractGHKM
 		      int& frontier_pos,
 		      PosMap& pos_map,
 		      Covered& covered,
-		      Tails& tails_graph,
 		      weight_type& weight)
   {
     // pre-order traversal...
@@ -717,12 +739,10 @@ struct ExtractGHKM
 	const id_type node_id = edge.tails[tail_pos];
 	
 	if (iter != last && node_id == graph.edges[*iter].head)
-	  construct_rule(graph, iter, last, *titer, index, frontier_pos, pos_map, covered, tails_graph, weight);
+	  construct_rule(graph, iter, last, *titer, index, frontier_pos, pos_map, covered, weight);
 	else {
 	  for (int pos = ranges[node_id].first; pos != ranges[node_id].second; ++ pos)
 	    covered[pos] = false;
-	  
-	  tails_graph.push_back(node_id);
 	  
 	  weight *= weights_inside[node_id];
 	  
@@ -738,18 +758,6 @@ struct ExtractGHKM
     }
   }
   
-  void extract_composed(const hypergraph_type& graph,
-			const sentence_type& sentence,
-			const alignment_type& alignment,
-			rule_pair_set_type& rule_pairs)
-  {
-    // difficult...
-    // we need to keep track of how many nodes / maximum height in the composed ruels.
-    
-    
-    
-  }
-
   enum color_type {
     white,
     gray,
