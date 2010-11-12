@@ -25,6 +25,10 @@ bin_PROGRAMS = \
 	cicada_extract_scfg_mpi \
 	cicada_extract_score \
 	cicada_extract_score_mpi \
+	cicada_index_cluster \
+	cicada_index_grammar \
+	cicada_index_global_lexicon \
+	cicada_index_lexicalized_reordering \
 	cicada_learn \
 	cicada_learn_mpi \
 	cicada_learn_online \
@@ -36,13 +40,9 @@ bin_PROGRAMS = \
 	cicada_unite_forest \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
+	\
 	filter_penntreebank \
 	filter_cabocha \
-	\
-	cluster_index \
-	grammar_index \
-	global_lexicon_index \
-	lexicalized_reordering_index \
 	\
 	mpish \
 	mpipe
@@ -122,17 +122,17 @@ cicada_unite_lattice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftoo
 cicada_unite_sentence_SOURCES = cicada_unite_sentence.cpp
 cicada_unite_sentence_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cluster_index_SOURCES = cluster_index.cpp
-cluster_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_index_cluster_SOURCES = cicada_index_cluster.cpp
+cicada_index_cluster_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-grammar_index_SOURCES = grammar_index.cpp
-grammar_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_index_grammar_SOURCES = cicada_index_grammar.cpp
+cicada_index_grammar_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-global_lexicon_index_SOURCES = global_lexicon_index.cpp
-global_lexicon_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_index_global_lexicon_SOURCES = cicada_index_global_lexicon.cpp
+cicada_index_global_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-lexicalized_reordering_index_SOURCES = lexicalized_reordering_index.cpp
-lexicalized_reordering_index_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_index_lexicalized_reordering_SOURCES = cicada_index_lexicalized_reordering.cpp
+cicada_index_lexicalized_reordering_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 filter_penntreebank_SOURCES = filter_penntreebank.cpp
 filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
