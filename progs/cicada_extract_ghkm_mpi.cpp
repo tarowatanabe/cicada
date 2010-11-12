@@ -285,8 +285,9 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file),    "output directory")
     
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal for target side")
-    ("max-nodes",  po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in composed rule")
-    ("max-height", po::value<int>(&max_height)->default_value(max_height), "maximum height of composed rule")
+    
+    ("max-nodes",  po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in a rule")
+    ("max-height", po::value<int>(&max_height)->default_value(max_height), "maximum height of a rule")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ;
