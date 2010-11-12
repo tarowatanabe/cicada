@@ -25,6 +25,8 @@ bin_PROGRAMS = \
 	cicada_extract_scfg_mpi \
 	cicada_extract_score \
 	cicada_extract_score_mpi \
+	cicada_filter_penntreebank \
+	cicada_filter_cabocha \
 	cicada_index_cluster \
 	cicada_index_grammar \
 	cicada_index_global_lexicon \
@@ -40,9 +42,6 @@ bin_PROGRAMS = \
 	cicada_unite_forest \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
-	\
-	filter_penntreebank \
-	filter_cabocha \
 	\
 	mpish \
 	mpipe
@@ -134,11 +133,11 @@ cicada_index_global_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(
 cicada_index_lexicalized_reordering_SOURCES = cicada_index_lexicalized_reordering.cpp
 cicada_index_lexicalized_reordering_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-filter_penntreebank_SOURCES = filter_penntreebank.cpp
-filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_filter_penntreebank_SOURCES = cicada_filter_penntreebank.cpp
+cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-filter_cabocha_SOURCES = filter_cabocha.cpp
-filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_filter_cabocha_SOURCES = cicada_filter_cabocha.cpp
+cicada_filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 
 mpish_SOURCES = mpish.cpp
