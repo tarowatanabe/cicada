@@ -694,6 +694,7 @@ struct ExtractGHKM
 	  -- j[i];
 	}
       }
+
       
       // allocate new derivations!
       node.edges.swap(derivation_edges_new);
