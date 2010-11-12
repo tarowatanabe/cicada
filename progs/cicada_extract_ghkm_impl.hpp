@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <deque>
 
 #include <boost/array.hpp>
 
@@ -405,7 +406,7 @@ struct ExtractGHKM
   struct DerivationNode
   {
     typedef DerivationEdge derivation_edge_type;
-    typedef std::vector<derivation_edge_type, std::allocator<derivation_edge_type> > edge_set_type;
+    typedef std::deque<derivation_edge_type, std::allocator<derivation_edge_type> > edge_set_type;
 
     id_type       node;
     range_type    range;
@@ -546,6 +547,9 @@ struct ExtractGHKM
     
     rule_pair_set_local_type rule_pairs_local;
     rule_pair_type rule_pair;
+
+    edge_set_type edges_new;
+    node_set_type tails_new;
     
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
@@ -578,8 +582,8 @@ struct ExtractGHKM
 	for (;;) {
 	  // we will extract minimal rule + composed rule for simplicity...
 	  
-	  edge_set_type edges_new;
-	  node_set_type tails_new;
+	  edges_new.clear();
+	  tails_new.clear();
 	  std::pair<int, int> rule_stat;
 	  {
 	    index_set_type::const_iterator jiter_begin = j.begin();
