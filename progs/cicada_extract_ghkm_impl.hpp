@@ -645,7 +645,7 @@ struct ExtractGHKM
 	
 	rule_pairs_local[edge_composed.edges].push_back(rule_pair);
 	
-	if (edge_composed.height < max_height && edge_composed.internal < max_nodes)
+	if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
 	  derivation_edges_new.push_back(edge_composed);
 	
 	// push-successor...
@@ -666,7 +666,7 @@ struct ExtractGHKM
 	      
 	    const std::pair<int, bool> composed_stat = compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
 	      
-	    if (composed_stat.first <= max_nodes) {
+	    if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
 	      index_set_type::const_iterator jiter_begin = j.begin();
 	      index_set_type::const_iterator jiter_end   = j.end();
 	      node_set_type::const_iterator  titer_begin = edge.tails.begin();
@@ -675,7 +675,7 @@ struct ExtractGHKM
 		
 	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
 		
-	      if (rule_stat.first <= max_height) {
+	      if (max_height <= 0 || rule_stat.first <= max_height) {
 		candidates.push_back(candidate_type(edge, j, true));
 		  
 		candidate_type& item = candidates.back();
@@ -783,7 +783,7 @@ struct ExtractGHKM
 	composed_rule = true;
 	
 	// early termination...
-	if (internal > max_nodes)
+	if (max_nodes > 0 && internal > max_nodes)
 	  return std::make_pair(internal, composed_rule);
       }
     }
