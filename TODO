@@ -27,7 +27,6 @@ Add cicada_oracle{,_mpi}, compute oracle translations (sentence and/or forest?) 
 
 Add libstemmer? (and hand-coded Arabic rule?)
 
-
 Added phrasal-composer, which performs phrase-based decoding..
       add lexicalized reordering... but difficult since we do not presesrve source-side phrases!!!
       
@@ -36,18 +35,21 @@ Allow binarization/permutation with arbitrary rule type?
       attach terminals to binarized rule...where?
 
 
-
-GHKM extraction:
-     handle forest (easy...)
-     handle unaligned words... difficult.
-     	    Do we construct new hypergraph?
-	    or implement our own?
-
-Unified phrase/rule/tree extractions?
-	We can treat source/target sides as merely std::string for score computation,
-	but differ in lexical weights (how to distinguish tokens from non-terminals etc.)
-
 Use source side tree-fragment as a rule, and parse "lattice"
     Simply convert source side into a flat structure and parse via CKY
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
+
+Add filters for extracted scores...
+    Differentiate phrase/scfg/ghkm etc.
+    Default to cicada format: expect log-prob, not prob!
+
+Tree-to-Tree rule extraction from forest:
+    Given GHKM rule extraction from forest, it is very trivial...
+    Do we share some codes?
+    Outline:
+	Construct derivational hypergraph in both sides
+	  - consider the other side's span when checking for admissibility
+	Extract rule pairs by traversing both graphs at the same time
+	  - Cube pruning like procedure to enumerate in depth-first order to
+	    generate paired graph...?

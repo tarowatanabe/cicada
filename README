@@ -44,6 +44,7 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extractions are implemented
    - A conventional hierarchical phrase extraction algorithm in Hiero
       + syntax augmented rule extraction is also supported [15]
    - Tree-to-string/strint-to-tree extractin from forest [16]
+   - Tree-to-tree rule extraction from forest [17] (TODO!)
    
    - After count extraction, you can perform map/reduce to compute model scores
      TODO: create "filers" to perform max-like estimation (with smoothing).
@@ -265,3 +266,15 @@ References:
   url       = {http://www.aclweb.org/anthology/D08-1022}
 }
 
+[17]
+@InProceedings{liu-lu-liu:2009:ACLIJCNLP,
+  author    = {Liu, Yang  and  L{\"{u}}, Yajuan  and  Liu, Qun},
+  title     = {Improving Tree-to-Tree Translation with Packed Forests},
+  booktitle = {Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP},
+  month     = {August},
+  year      = {2009},
+  address   = {Suntec, Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {558--566},
+  url       = {http://www.aclweb.org/anthology/P/P09/P09-1063}
+}

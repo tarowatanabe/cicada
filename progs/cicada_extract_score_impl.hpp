@@ -1046,8 +1046,10 @@ struct PhrasePairModifyMapper
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
+
+      modified_type& curr = buffer_stream->first.front();
       
-      if (counts != buffer_stream->first.front()) {
+      if (counts != curr) {
 	
 	if (! counts.counts.empty()) {
 	  // swap source and target!
@@ -1079,9 +1081,9 @@ struct PhrasePairModifyMapper
 	
 	++ iter;
 	
-	counts.swap(buffer_stream->first.front());
+	counts.swap(curr);
       } else
-	counts.increment(buffer_stream->first.front().counts.begin(), buffer_stream->first.front().counts.end());
+	counts.increment(curr.counts.begin(), curr.counts.end());
       
       buffer_stream->first.pop_front();
       
@@ -1551,8 +1553,10 @@ public:
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
+
+      modified_type& curr = buffer_stream->first.front();
       
-      if (buffer_stream->first.front().source != modified.source) {
+      if (curr.source != modified.source) {
 	
 	if (! modified.source.empty() && ! modified.counts.empty()) {
 	  index.insert(modified.source.c_str(), modified.source.size(), id);
@@ -1567,7 +1571,7 @@ public:
 	  os_counts.write((char*) &observed, sizeof(count_type));
 	}
 	
-	modified.swap(buffer_stream->first.front());
+	modified.swap(curr);
 	observed = 1;
 	
 	// increment root_observed(lhs)
@@ -1576,17 +1580,17 @@ public:
 	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	const_cast<root_count_type&>(*riter).observed += 1;
 	
-      } else if (buffer_stream->first.front().target != modified.target) {
+      } else if (curr.target != modified.target) {
 	// increment root_observed(lhs, rhs)
-	const_cast<root_count_type&>(*riter).increment(buffer_stream->first.front().counts.begin(), buffer_stream->first.front().counts.end());
+	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	
-	modified.target.swap(buffer_stream->first.front().target);
-	modified.increment(buffer_stream->first.front().counts.begin(), buffer_stream->first.front().counts.end());
+	modified.target.swap(curr.target);
+	modified.increment(curr.counts.begin(), curr.counts.end());
 	observed += 1;
       } else {
-	const_cast<root_count_type&>(*riter).increment(buffer_stream->first.front().counts.begin(), buffer_stream->first.front().counts.end());
-	modified.increment(buffer_stream->first.front().counts.begin(), buffer_stream->first.front().counts.end());
+	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
+	modified.increment(curr.counts.begin(), curr.counts.end());
       }
       
       buffer_stream->first.pop_front();
@@ -1782,16 +1786,18 @@ struct PhrasePairScoreMapper
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
+
+      phrase_pair_type& curr = buffer_stream->first.front();
       
-      if (counts != buffer_stream->first.front()) {
+      if (counts != curr) {
 	if (! counts.counts.empty()) {
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
 	
-	counts.swap(buffer_stream->first.front());
+	counts.swap(curr);
       } else
-	counts.increment(buffer_stream->first.front().counts.begin(), buffer_stream->first.front().counts.end());
+	counts.increment(curr.counts.begin(), curr.counts.end());
       
       buffer_stream->first.pop_front();
       
