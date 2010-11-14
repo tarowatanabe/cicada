@@ -150,9 +150,9 @@ struct ScorerCICADA
       root_count_set_type::const_iterator titer = root_count_target.find(phrase_target.first);
       
       if (siter == root_count_source.end())
-	throw std::runtime_error("no root count for " + phrase_source.first);
+	throw std::runtime_error("no root count for source: " + phrase_source.first);
       if (titer == root_count_target.end())
-	throw std::runtime_error("no root count for " + phrase_target.first);
+	throw std::runtime_error("no root count for target: " + phrase_target.first);
       
       if (siter->counts.size() != 1)
 	throw std::runtime_error("invalid root count for source: " + phrase_source.first);
