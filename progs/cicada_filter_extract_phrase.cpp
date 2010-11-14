@@ -56,7 +56,7 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
-
+    
     if (! boost::filesystem::exists(root_source_file))
       throw std::runtime_error("no root count file for source side");
     if (! boost::filesystem::exists(root_target_file))
@@ -67,6 +67,10 @@ int main(int argc, char** argv)
     if (int(mode_cicada) + mode_moses + mode_linparse == 0)
       mode_cicada = true;
 
+    if (mode_reordering)
+      if (mode_source_only && mode_target_only)
+	throw std::runtime_error("you cannot specify both of source-only and target-only");
+    
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
     
     root_count_type root_source;
