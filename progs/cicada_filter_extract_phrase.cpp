@@ -47,6 +47,7 @@ void process(std::istream& is,
 
 struct ScorerCICADA;
 struct ScorerMOSES;
+struct ScorerMOSESReordering;
 
 void options(int argc, char** argv);
 
@@ -64,8 +65,9 @@ int main(int argc, char** argv)
       throw std::runtime_error("specify either --{cicada,moses,linparse} (default to cicada)");
     if (int(mode_cicada) + mode_moses + mode_linparse == 0)
       mode_cicada = true;
-      
 
+    dirichlet_prior = std::max(dirichlet_prior, 0.0);
+    
     root_count_type root_source;
     root_count_type root_target;
     
@@ -91,8 +93,12 @@ int main(int argc, char** argv)
     
     if (mode_cicada)
       process<ScorerCICADA>(is, os, root_source, root_target);
-    else if (mode_moses)
-      process<ScorerMOSES>(is, os, root_source, root_target);
+    else if (mode_moses) {
+      if (mode_reordering)
+	process<ScorerMOSESReordering>(is, os, root_source, root_target);
+      else
+	process<ScorerMOSES>(is, os, root_source, root_target);
+    }
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -140,16 +146,8 @@ struct ScorerCICADA
     const double& count_source = phrase_pair.counts_source.front();
     const double& count_target = phrase_pair.counts_target.front();
     
-    double prob_source_target;
-    double prob_target_source;
-    
-    if (dirichlet_prior > 0.0) {
-      prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
-      prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
-    } else {
-      prob_source_target = count / count_source;
-      prob_target_source = count / count_target;
-    }
+    const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
+    const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
 
     os << phrase_pair.source
        << " ||| " << phrase_pair.target
@@ -179,16 +177,8 @@ struct ScorerMOSES
     const double& count_source = phrase_pair.counts_source.front();
     const double& count_target = phrase_pair.counts_target.front();
     
-    double prob_source_target;
-    double prob_target_source;
-    
-    if (dirichlet_prior > 0.0) {
-      prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
-      prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
-    } else {
-      prob_source_target = count / count_source;
-      prob_target_source = count / count_target;
-    }
+    const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
+    const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
 
     os << phrase_pair.source
        << " ||| " << phrase_pair.target
@@ -197,6 +187,83 @@ struct ScorerMOSES
        << ' ' << prob_target_source << ' ' << phrase_pair.lexicon_target_source
        << ' ' << boost::math::constants::e<double>()
        << '\n';
+  }
+  
+};
+
+struct ScorerMOSESReordering
+{
+  void operator()(const phrase_pair_type& phrase_pair,
+		  const root_count_type& root_source,
+		  const root_count_type& root_target,
+		  std::ostream& os)
+  {
+    if (phrase_pair.counts.size() != 5)
+      throw std::runtime_error("counts size do not match");
+    if (phrase_pair.counts_source.size() != 5)
+      throw std::runtime_error("source counts size do not match");
+    if (phrase_pair.counts_target.size() != 5)
+      throw std::runtime_error("target counts size do not match");
+    
+    if (mode_source_only)
+      os << phrase_pair.source << " |||";
+      
+    else if (mode_target_only)
+      os << phrase_pair.target << " |||";
+    else
+      os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
+
+    const phrase_pair_type::counts_type& counts = (mode_source_only 
+						   ? phrase_pair.counts_source
+						   : (mode_target_only
+						      ? phrase_pair.counts_target
+						      : phrase_pair.counts));
+    const double count = counts[0];
+    const double count_prev_mono   = counts[1];
+    const double count_prev_swap   = counts[2];
+    const double count_prev_others = count - (count_prev_mono + count_prev_swap);
+    const double count_next_mono   = counts[3];
+    const double count_next_swap   = counts[4];
+    const double count_next_others = count - (count_next_mono + count_next_swap);
+    
+    if (mode_monotonicity) {
+      if (mode_bidirectional) {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
+	const double prob_next_mono   = (dirichlet_prior + count_next_mono) / (dirichlet_prior * 2 + count);
+	const double prob_next_others = (dirichlet_prior + count_next_swap + count_next_others) / (dirichlet_prior * 2 + count);
+	
+	os << ' ' << prob_prev_mono << ' ' << prob_prev_others
+	   << ' ' << prob_next_mono << ' ' << prob_next_others
+	   << '\n';
+      } else {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
+	
+	os << ' ' << prob_prev_mono << ' ' << prob_prev_others << '\n';
+      }
+    } else {
+      if (mode_bidirectional) {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
+	
+	const double prob_next_mono   = (dirichlet_prior + count_next_mono)   / (dirichlet_prior * 3 + count);
+	const double prob_next_swap   = (dirichlet_prior + count_next_swap)   / (dirichlet_prior * 3 + count);
+	const double prob_next_others = (dirichlet_prior + count_next_others) / (dirichlet_prior * 3 + count);
+	
+	os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others
+	   << ' ' << prob_next_mono << ' ' << prob_next_swap << ' ' << prob_next_others
+	   << '\n';
+      } else {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
+	
+	os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others
+	   << '\n';
+      }
+    }
   }
   
 };

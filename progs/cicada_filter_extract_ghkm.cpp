@@ -53,6 +53,8 @@ int main(int argc, char** argv)
       throw std::runtime_error("no root count file for source side");
     if (! boost::filesystem::exists(root_target_file))
       throw std::runtime_error("no root count file for target side");
+    
+    dirichlet_prior = std::max(dirichlet_prior, 0.0);
 
     root_count_set_type root_source;
     root_count_set_type root_target;
@@ -132,17 +134,9 @@ struct ScorerCICADA
     const double& count_source = phrase_pair.counts_source.front();
     const double& count_target = phrase_pair.counts_target.front();
     
-    double prob_source_target;
-    double prob_target_source;
+    const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
+    const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
     
-    if (dirichlet_prior > 0.0) {
-      prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
-      prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
-    } else {
-      prob_source_target = count / count_source;
-      prob_target_source = count / count_target;
-    }
-
     const std::string root_source = root_extractor(phrase_pair.source);
     const std::string root_target = root_extractor(phrase_pair.target);
     
@@ -159,16 +153,8 @@ struct ScorerCICADA
     if (titer->counts.size() != 1)
       throw std::runtime_error("invalid root count for target: " + root_target);
     
-    double prob_root_source;
-    double prob_root_target;
-    
-    if (dirichlet_prior > 0.0) {
-      prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
-      prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
-    } else {
-      prob_root_source = count_source / siter->counts.front();
-      prob_root_target = count_target / titer->counts.front();
-    }
+    const double prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
+    const double prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
     
     os << phrase_pair.source
        << " ||| " << phrase_pair.target
