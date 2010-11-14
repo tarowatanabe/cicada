@@ -32,7 +32,6 @@ path_type root_target_file;
 
 double dirichlet_prior = 0.1;
 
-bool mode_cicada = false;
 bool feature_root = false;
 
 int debug = 0;
@@ -57,7 +56,6 @@ int main(int argc, char** argv)
     if (! boost::filesystem::exists(root_target_file))
       throw std::runtime_error("no root count file for target side");
 
-    mode_cicada = true;
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
 
     root_count_set_type root_source;
@@ -88,8 +86,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
     
-    if (mode_cicada)
-      process<ScorerCICADA>(is, os, root_source, root_target);
+    process<ScorerCICADA>(is, os, root_source, root_target);
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -201,7 +198,6 @@ void options(int argc, char** argv)
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
-    ("cicada",       po::bool_switch(&mode_cicada),   "output in cicada format")
     ("feature-root", po::bool_switch(&feature_root),  "output feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
     ;
   
