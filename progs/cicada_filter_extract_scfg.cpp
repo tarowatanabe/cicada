@@ -126,7 +126,7 @@ void process(std::istream& is,
 
 struct ScorerCICADA
 {
-  ExtractRootSCFG root_extractor;
+  ExtractPhraseSCFG phrase_extractor;
 
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_set_type& root_count_source,
@@ -147,28 +147,32 @@ struct ScorerCICADA
     const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
     const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
 
+    const std::pair<std::string, std::string> phrase_source = phrase_extractor(phrase_pair.source);
+    const std::pair<std::string, std::string> phrase_target = phrase_extractor(phrase_pair.target);
+
+    if (phrase_source.first != phrase_target.first)
+      throw std::runtime_error("synchronous-CFG, but different lh?");
+
     if (feature_root) {
-      const std::string root_source = root_extractor(phrase_pair.source);
-      const std::string root_target = root_extractor(phrase_pair.target);
-      
-      root_count_set_type::const_iterator siter = root_count_source.find(root_source);
-      root_count_set_type::const_iterator titer = root_count_target.find(root_target);
+      root_count_set_type::const_iterator siter = root_count_source.find(phrase_source.first);
+      root_count_set_type::const_iterator titer = root_count_target.find(phrase_target.first);
       
       if (siter == root_count_source.end())
-	throw std::runtime_error("no root count for " + root_source);
+	throw std::runtime_error("no root count for " + phrase_source.first);
       if (titer == root_count_target.end())
-	throw std::runtime_error("no root count for " + root_target);
+	throw std::runtime_error("no root count for " + phrase_target.first);
       
       if (siter->counts.size() != 1)
-	throw std::runtime_error("invalid root count for source: " + root_source);
+	throw std::runtime_error("invalid root count for source: " + phrase_source.first);
       if (titer->counts.size() != 1)
-	throw std::runtime_error("invalid root count for target: " + root_target);
+	throw std::runtime_error("invalid root count for target: " + phrase_target.first);
       
       const double prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
       const double prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
       
-      os << phrase_pair.source
-	 << " ||| " << phrase_pair.target
+      os << phrase_source.first
+	 << " ||| " << phrase_source.second
+	 << " ||| " << phrase_target.second
 	 << " |||"
 	 << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
 	 << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
@@ -176,8 +180,9 @@ struct ScorerCICADA
 	 << ' ' << std::log(prob_root_target)
 	 << '\n';
     } else 
-      os << phrase_pair.source
-	 << " ||| " << phrase_pair.target
+      os << phrase_source.first
+	 << " ||| " << phrase_source.second
+	 << " ||| " << phrase_target.second
 	 << " |||"
 	 << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
 	 << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)

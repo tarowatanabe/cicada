@@ -378,19 +378,47 @@ struct ExtractRootSCFG
   // extract the first word...
   std::string operator()(const std::string& phrase) const
   {
+    using boost::spirit::standard::char_;
+    using boost::spirit::standard::space;
+    
     std::string::const_iterator iter = phrase.begin();
     std::string::const_iterator end = phrase.end();
 
     std::string label;
-
+    
     const bool result = boost::spirit::qi::phrase_parse(iter, end,
-							boost::spirit::qi::lexeme[+(boost::spirit::standard::char_ - boost::spirit::standard::space)],
-							boost::spirit::standard::space,
+							boost::spirit::qi::lexeme[+(char_ - space)],
+							space,
 							label);
     if (! result)
       throw std::runtime_error("no label?");
     
     return label;
+  }
+};
+
+struct ExtractPhraseSCFG
+{
+  // extract the non-first word...
+  std::pair<std::string, std::string> operator()(const std::string& phrase) const
+  {
+    using boost::spirit::standard::char_;
+    using boost::spirit::standard::space;
+    using boost::spirit::qi::lexeme;
+    
+    std::string::const_iterator iter = phrase.begin();
+    std::string::const_iterator end = phrase.end();
+    
+    std::pair<std::string, std::string> label_pair;
+    
+    const bool result = boost::spirit::qi::phrase_parse(iter, end,
+							lexeme[+(char_ - space)] >> lexeme[+(char_ - space) >> *char_],
+							space,
+							label_pair);
+    if (! result || iter != end)
+      throw std::runtime_error("no label?");
+    
+    return label_pair;
   }
 };
 
@@ -399,14 +427,17 @@ struct ExtractRootGHKM
   // extract the first word...
   std::string operator()(const std::string& phrase) const
   {
+    using boost::spirit::standard::char_;
+    using boost::spirit::standard::space;
+    
     std::string::const_iterator iter = phrase.begin();
     std::string::const_iterator end = phrase.end();
     
     std::string label;
     
     const bool result = boost::spirit::qi::phrase_parse(iter, end,
-							boost::spirit::qi::lexeme[+((boost::spirit::standard::char_ - boost::spirit::standard::space - '(') | "\\(")],
-							boost::spirit::standard::space,
+							boost::spirit::qi::lexeme[+((char_ - space - '(') | "\\(")],
+							space,
 							label);
     if (! result)
       throw std::runtime_error("no label?");
@@ -414,8 +445,6 @@ struct ExtractRootGHKM
     return label;
   }
 };
-
-
 
 #endif
 
