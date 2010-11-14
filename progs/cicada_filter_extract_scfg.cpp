@@ -9,16 +9,21 @@
 #include <cmath>
 
 #include <boost/program_options.hpp>
+#include <boost/functional/hash.hpp>
 #include <boost/math/constants/constants.hpp>
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
 #include <utils/compress_stream.hpp>
 
+#include <google/dense_hash_set>
+
 typedef boost::filesystem::path path_type;
 
 typedef RootCount  root_count_type;
 typedef PhrasePair phrase_pair_type;
+
+typedef google::dense_hash_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type> > root_count_set_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
@@ -28,25 +33,18 @@ path_type root_target_file;
 double dirichlet_prior = 0.1;
 
 bool mode_cicada = false;
-bool mode_moses = false;
 bool mode_linparse = false;
-
-bool mode_reordering = false;
-bool mode_monotonicity = false;
-bool mode_bidirectional = false;
-bool mode_source_only = false;
-bool mode_target_only = false;
+bool feature_root = false;
 
 int debug = 0;
 
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
-	     const root_count_type& root_source,
-	     const root_count_type& root_target);
+	     const root_count_set_type& root_source,
+	     const root_count_set_type& root_target);
 
 struct ScorerCICADA;
-struct ScorerMOSES;
 
 void options(int argc, char** argv);
 
@@ -60,26 +58,31 @@ int main(int argc, char** argv)
     if (! boost::filesystem::exists(root_target_file))
       throw std::runtime_error("no root count file for target side");
 
-    if (int(mode_cicada) + mode_moses + mode_linparse > 1)
-      throw std::runtime_error("specify either --{cicada,moses,linparse} (default to cicada)");
-    if (int(mode_cicada) + mode_moses + mode_linparse == 0)
+    if (int(mode_cicada) + mode_linparse > 1)
+      throw std::runtime_error("specify either --{cicada,linparse} (default to cicada)");
+    if (int(mode_cicada) + mode_linparse == 0)
       mode_cicada = true;
       
 
-    root_count_type root_source;
-    root_count_type root_target;
+    root_count_set_type root_source;
+    root_count_set_type root_target;
+    root_source.set_empty_key(root_count_type());
+    root_target.set_empty_key(root_count_type());
     
     {
+      root_count_type root_count;
       RootCountParser parser;
       std::string line;
       
       utils::compress_istream is_source(root_source_file);
       while (std::getline(is_source, line))
-	if (parser(line, root_source)) break;
+	if (parser(line, root_count))
+	  root_source.insert(root_count);
       
       utils::compress_istream is_target(root_target_file);
       while (std::getline(is_target, line))
-	if (parser(line, root_target)) break;
+	if (parser(line, root_count))
+	  root_target.insert(root_count);
     }
 
     const bool flush_output = (output_file == "-"
@@ -91,8 +94,6 @@ int main(int argc, char** argv)
     
     if (mode_cicada)
       process<ScorerCICADA>(is, os, root_source, root_target);
-    else if (mode_moses)
-      process<ScorerMOSES>(is, os, root_source, root_target);
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -104,8 +105,8 @@ int main(int argc, char** argv)
 template <typename Scorer>
 void process(std::istream& is,
 	     std::ostream& os,
-	     const root_count_type& root_source,
-	     const root_count_type& root_target)
+	     const root_count_set_type& root_source,
+	     const root_count_set_type& root_target)
 {
   Scorer scorer;
 
@@ -124,16 +125,18 @@ void process(std::istream& is,
 
 struct ScorerCICADA
 {
+  ExtractRootSCFG root_extractor;
+
   void operator()(const phrase_pair_type& phrase_pair,
-		  const root_count_type& root_source,
-		  const root_count_type& root_target,
+		  const root_count_set_type& root_count_source,
+		  const root_count_set_type& root_count_target,
 		  std::ostream& os)
   {
-    if (phrase_pair.counts.size() != 5)
+    if (phrase_pair.counts.size() != 1)
       throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5)
+    if (phrase_pair.counts_source.size() != 1)
       throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5)
+    if (phrase_pair.counts_target.size() != 1)
       throw std::runtime_error("target counts size do not match");
     
     const double& count = phrase_pair.counts.front();
@@ -151,55 +154,53 @@ struct ScorerCICADA
       prob_target_source = count / count_target;
     }
 
-    os << phrase_pair.source
-       << " ||| " << phrase_pair.target
-       << " |||"
-       << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
-       << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
-       << '\n';
+    if (feature_root) {
+      const std::string root_source = root_extractor(phrase_pair.source);
+      const std::string root_target = root_extractor(phrase_pair.target);
+      
+      root_count_set_type::const_iterator siter = root_count_source.find(root_source);
+      root_count_set_type::const_iterator titer = root_count_target.find(root_target);
+      
+      if (siter == root_count_source.end())
+	throw std::runtime_error("no root count for " + root_source);
+      if (titer == root_count_target.end())
+	throw std::runtime_error("no root count for " + root_target);
+      
+      if (siter->counts.size() != 1)
+	throw std::runtime_error("invalid root count for source: " + root_source);
+      if (titer->counts.size() != 1)
+	throw std::runtime_error("invalid root count for target: " + root_target);
+      
+      double prob_root_source;
+      double prob_root_target;
+
+      if (dirichlet_prior > 0.0) {
+	prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
+	prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
+      } else {
+	prob_root_source = count_source / siter->counts.front();
+	prob_root_target = count_target / titer->counts.front();
+      }
+      
+      os << phrase_pair.source
+	 << " ||| " << phrase_pair.target
+	 << " |||"
+	 << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
+	 << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
+	 << ' ' << std::log(prob_root_source)
+	 << ' ' << std::log(prob_root_target)
+	 << '\n';
+    } else 
+      os << phrase_pair.source
+	 << " ||| " << phrase_pair.target
+	 << " |||"
+	 << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
+	 << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
+	 << '\n';
   }
   
 };
 
-struct ScorerMOSES
-{
-  void operator()(const phrase_pair_type& phrase_pair,
-		  const root_count_type& root_source,
-		  const root_count_type& root_target,
-		  std::ostream& os)
-  {
-    if (phrase_pair.counts.size() != 5)
-      throw std::runtime_error("counts size do not match");
-    if (phrase_pair.counts_source.size() != 5)
-      throw std::runtime_error("source counts size do not match");
-    if (phrase_pair.counts_target.size() != 5)
-      throw std::runtime_error("target counts size do not match");
-    
-    const double& count = phrase_pair.counts.front();
-    const double& count_source = phrase_pair.counts_source.front();
-    const double& count_target = phrase_pair.counts_target.front();
-    
-    double prob_source_target;
-    double prob_target_source;
-    
-    if (dirichlet_prior > 0.0) {
-      prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
-      prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
-    } else {
-      prob_source_target = count / count_source;
-      prob_target_source = count / count_target;
-    }
-
-    os << phrase_pair.source
-       << " ||| " << phrase_pair.target
-       << " |||"
-       << ' ' << prob_source_target << ' ' << phrase_pair.lexicon_source_target
-       << ' ' << prob_target_source << ' ' << phrase_pair.lexicon_target_source
-       << ' ' << boost::math::constants::e<double>()
-       << '\n';
-  }
-  
-};
 
 void options(int argc, char** argv)
 {
@@ -216,15 +217,9 @@ void options(int argc, char** argv)
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
-    ("cicada",   po::bool_switch(&mode_cicada),   "output in cicada format")
-    ("moses",    po::bool_switch(&mode_moses),    "output in moses format")
-    ("linparse", po::bool_switch(&mode_linparse), "output in linparse format")
-    
-    ("reordering",    po::bool_switch(&mode_reordering),    "reordering table")
-    ("monotonicity",  po::bool_switch(&mode_monotonicity),  "monotonicity")
-    ("bidirectional", po::bool_switch(&mode_bidirectional), "bidirectional")
-    ("source-only",   po::bool_switch(&mode_source_only),   "source only")
-    ("target-only",   po::bool_switch(&mode_target_only),   "target only")
+    ("cicada",       po::bool_switch(&mode_cicada),   "output in cicada format")
+    ("linparse",     po::bool_switch(&mode_linparse), "output in linparse format")
+    ("feature-root", po::bool_switch(&feature_root),  "output feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
     ;
   
   po::options_description opts_command("command line options");
