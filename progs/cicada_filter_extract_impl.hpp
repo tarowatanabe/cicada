@@ -102,6 +102,40 @@ struct PhrasePair
     lexicon_target_source = 0;
     lexicon_source_target = 0;
   }
+
+  friend
+  size_t  hash_value(PhrasePair const& x)
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+   
+    return hasher_type()(x.source.begin(), x.source.end(), hasher_type()(x.target.begin(), x.target.end(), 0));
+  }
+
+
+  friend
+  bool operator==(const PhrasePair& x, const PhrasePair& y) 
+  {
+    return x.source == y.source && x.target == y.target;
+  }
+  
+  friend
+  bool operator!=(const PhrasePair& x, const PhrasePair& y) 
+  {
+    return x.source != y.source || x.target != y.target;
+  }
+  
+  friend
+  bool operator<(const PhrasePair& x, const PhrasePair& y)
+  {
+    return (x.source < y.source || (!(y.source < x.source) && x.target < y.target));
+  }
+
+  friend
+  bool operator>(const PhrasePair& x, const PhrasePair& y)
+  {
+    return y < x;
+  }
+
 };
 
 BOOST_FUSION_ADAPT_STRUCT(
@@ -260,6 +294,75 @@ struct PhrasePairParser
   
   phrase_pair_parser<std::string::const_iterator> grammar;
 };
+
+struct PhrasePairGenerator
+{
+  typedef PhrasePair phrase_pair_type;
+  
+  typedef phrase_pair_type::phrase_type    phrase_type;
+  typedef phrase_pair_type::counts_type    counts_type;
+  
+  PhrasePairGenerator() : grammar() {}
+  PhrasePairGenerator(const PhrasePairGenerator& x) : grammar() {}
+
+  
+  template <typename Iterator>
+  struct phrase_pair_generator : boost::spirit::karma::grammar<Iterator, phrase_pair_type()>
+  {
+    phrase_pair_generator() : phrase_pair_generator::base_type(phrase_pair)
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using karma::repeat;
+      using standard::char_;
+      using karma::int_;
+      using standard::space;
+      
+      phrase %= +char_;
+      counts %= double20 % ' ';
+      phrase_pair %= (phrase
+		      << " ||| " << phrase
+		      << " ||| " << counts
+		      << " ||| " << counts
+		      << " ||| " << counts
+		      << " ||| " << double20 << ' ' << double20
+		      << " ||| " << double20 << ' ' << double20);
+    }
+
+    struct real_precision : boost::spirit::karma::real_policies<double>
+    {
+      static unsigned int precision(double) 
+      { 
+        return 20;
+      }
+    };
+    
+    boost::spirit::karma::real_generator<double, real_precision> double20;
+    
+    boost::spirit::karma::rule<Iterator, std::string()> phrase;
+    boost::spirit::karma::rule<Iterator, counts_type()> counts;
+    boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
+  };
+
+  typedef std::ostream_iterator<char> iterator_type;
+  
+  std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair)
+  {
+    iterator_type iter(os);
+    
+    if (! boost::spirit::karma::generate(iter, grammar, phrase_pair))
+      throw std::runtime_error("failed generation!");
+    
+    return os;
+  }
+  
+  phrase_pair_generator<iterator_type> grammar;
+};
+
+
+
 
 struct ExtractRootPhrase
 {
