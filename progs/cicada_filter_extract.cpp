@@ -19,7 +19,8 @@
 typedef boost::filesystem::path path_type;
 
 typedef PhrasePair phrase_pair_type;
-typedef std::multimap<double, std::string, std::greater<double>, std::allocator<std::pair<const double, std::string> > > phrase_pair_set_type;
+typedef std::multimap<double, std::string, std::greater<double>,
+		      std::allocator<std::pair<const double, std::string> > > phrase_pair_set_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
