@@ -46,6 +46,7 @@ void process(std::istream& is,
 	     const root_count_type& root_target);
 
 struct ScorerCICADA;
+struct ScorerCICADAReordering;
 struct ScorerMOSES;
 struct ScorerMOSESReordering;
 
@@ -91,9 +92,12 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
     
-    if (mode_cicada)
-      process<ScorerCICADA>(is, os, root_source, root_target);
-    else if (mode_moses) {
+    if (mode_cicada) {
+      if (mode_reordering)
+	process<ScorerCICADA>(is, os, root_source, root_target);
+      else
+	process<ScorerCICADAReordering>(is, os, root_source, root_target);
+    } else if (mode_moses) {
       if (mode_reordering)
 	process<ScorerMOSESReordering>(is, os, root_source, root_target);
       else
@@ -159,6 +163,82 @@ struct ScorerCICADA
   
 };
 
+struct ScorerCICADAReordering
+{
+  void operator()(const phrase_pair_type& phrase_pair,
+		  const root_count_type& root_source,
+		  const root_count_type& root_target,
+		  std::ostream& os)
+  {
+    if (phrase_pair.counts.size() != 5)
+      throw std::runtime_error("counts size do not match");
+    if (phrase_pair.counts_source.size() != 5)
+      throw std::runtime_error("source counts size do not match");
+    if (phrase_pair.counts_target.size() != 5)
+      throw std::runtime_error("target counts size do not match");
+    
+    if (mode_source_only)
+      os << phrase_pair.source << " |||";
+    else if (mode_target_only)
+      os << phrase_pair.target << " |||";
+    else
+      os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
+
+    const phrase_pair_type::counts_type& counts = (mode_source_only 
+						   ? phrase_pair.counts_source
+						   : (mode_target_only
+						      ? phrase_pair.counts_target
+						      : phrase_pair.counts));
+    const double count = counts[0];
+    const double count_prev_mono   = counts[1];
+    const double count_prev_swap   = counts[2];
+    const double count_prev_others = count - (count_prev_mono + count_prev_swap);
+    const double count_next_mono   = counts[3];
+    const double count_next_swap   = counts[4];
+    const double count_next_others = count - (count_next_mono + count_next_swap);
+    
+    if (mode_monotonicity) {
+      if (mode_bidirectional) {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
+	const double prob_next_mono   = (dirichlet_prior + count_next_mono) / (dirichlet_prior * 2 + count);
+	const double prob_next_others = (dirichlet_prior + count_next_swap + count_next_others) / (dirichlet_prior * 2 + count);
+	
+	os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_others)
+	   << ' ' << std::log(prob_next_mono) << ' ' << std::log(prob_next_others)
+	   << '\n';
+      } else {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
+	
+	os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_others) << '\n';
+      }
+    } else {
+      if (mode_bidirectional) {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
+	
+	const double prob_next_mono   = (dirichlet_prior + count_next_mono)   / (dirichlet_prior * 3 + count);
+	const double prob_next_swap   = (dirichlet_prior + count_next_swap)   / (dirichlet_prior * 3 + count);
+	const double prob_next_others = (dirichlet_prior + count_next_others) / (dirichlet_prior * 3 + count);
+	
+	os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others)
+	   << ' ' << std::log(prob_next_mono) << ' ' << std::log(prob_next_swap) << ' ' << std::log(prob_next_others)
+	   << '\n';
+      } else {
+	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
+	const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
+	
+	os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others)
+	   << '\n';
+      }
+    }
+  }
+  
+};
+
 struct ScorerMOSES
 {
   void operator()(const phrase_pair_type& phrase_pair,
@@ -207,7 +287,6 @@ struct ScorerMOSESReordering
     
     if (mode_source_only)
       os << phrase_pair.source << " |||";
-      
     else if (mode_target_only)
       os << phrase_pair.target << " |||";
     else
@@ -264,8 +343,7 @@ struct ScorerMOSESReordering
 	   << '\n';
       }
     }
-  }
-  
+  }  
 };
 
 void options(int argc, char** argv)
