@@ -164,7 +164,6 @@ struct ScorerCICADA
        << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
        << '\n';
   }
-  
 };
 
 struct ScorerCICADAReordering
@@ -235,12 +234,10 @@ struct ScorerCICADAReordering
 	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
 	const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
 	
-	os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others)
-	   << '\n';
+	os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others) << '\n';
       }
     }
   }
-  
 };
 
 struct ScorerMOSES
@@ -272,7 +269,6 @@ struct ScorerMOSES
        << ' ' << boost::math::constants::e<double>()
        << '\n';
   }
-  
 };
 
 struct ScorerMOSESReordering
@@ -343,8 +339,7 @@ struct ScorerMOSESReordering
 	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
 	const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
 	
-	os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others
-	   << '\n';
+	os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others << '\n';
       }
     }
   }  
