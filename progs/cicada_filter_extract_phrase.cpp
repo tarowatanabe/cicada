@@ -29,7 +29,6 @@ double dirichlet_prior = 0.1;
 
 bool mode_cicada = false;
 bool mode_moses = false;
-bool mode_linparse = false;
 
 bool mode_reordering = false;
 bool mode_monotonicity = false;
@@ -62,9 +61,9 @@ int main(int argc, char** argv)
     if (! boost::filesystem::exists(root_target_file))
       throw std::runtime_error("no root count file for target side");
 
-    if (int(mode_cicada) + mode_moses + mode_linparse > 1)
-      throw std::runtime_error("specify either --{cicada,moses,linparse} (default to cicada)");
-    if (int(mode_cicada) + mode_moses + mode_linparse == 0)
+    if (mode_cicada && mode_moses)
+      throw std::runtime_error("specify either --{cicada,moses} (default to cicada)");
+    if (int(mode_cicada) + mode_moses == 0)
       mode_cicada = true;
 
     if (mode_reordering)
@@ -362,7 +361,6 @@ void options(int argc, char** argv)
     
     ("cicada",   po::bool_switch(&mode_cicada),   "output in cicada format")
     ("moses",    po::bool_switch(&mode_moses),    "output in moses format")
-    ("linparse", po::bool_switch(&mode_linparse), "output in linparse format")
     
     ("reordering",    po::bool_switch(&mode_reordering),    "reordering table")
     ("monotonicity",  po::bool_switch(&mode_monotonicity),  "monotonicity")

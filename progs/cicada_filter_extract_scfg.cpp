@@ -33,7 +33,6 @@ path_type root_target_file;
 double dirichlet_prior = 0.1;
 
 bool mode_cicada = false;
-bool mode_linparse = false;
 bool feature_root = false;
 
 int debug = 0;
@@ -58,11 +57,7 @@ int main(int argc, char** argv)
     if (! boost::filesystem::exists(root_target_file))
       throw std::runtime_error("no root count file for target side");
 
-    if (int(mode_cicada) + mode_linparse > 1)
-      throw std::runtime_error("specify either --{cicada,linparse} (default to cicada)");
-    if (int(mode_cicada) + mode_linparse == 0)
-      mode_cicada = true;
-    
+    mode_cicada = true;
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
 
     root_count_set_type root_source;
@@ -207,7 +202,6 @@ void options(int argc, char** argv)
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
     ("cicada",       po::bool_switch(&mode_cicada),   "output in cicada format")
-    ("linparse",     po::bool_switch(&mode_linparse), "output in linparse format")
     ("feature-root", po::bool_switch(&feature_root),  "output feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
     ;
   
