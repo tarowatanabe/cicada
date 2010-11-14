@@ -253,15 +253,14 @@ namespace cicada
 			    : *output_data.os);
 
 	utils::resource start;
-    
-	if (kbest_size <= 0) {
+
+	if (graphviz)
+	  cicada::graphviz(os, hypergraph);
+	else if (kbest_size <= 0) {
 	  if (debug)
 	    std::cerr << "output graph: " << data.id << std::endl;
-
-	  if (graphviz)
-	    cicada::graphviz(os, hypergraph);
-	  else
-	    os << id << " ||| " << hypergraph << '\n';
+	  
+	  os << id << " ||| " << hypergraph << '\n';
 	} else {
 	  if (debug)
 	    std::cerr << "output " << kbest_size << "-best for graph: "<< data.id << std::endl;
