@@ -96,14 +96,20 @@ namespace cicada
     label_type          label;
     antecedent_set_type antecedents;
   };
+
+  inline
+  size_t __hash_value_tree_rule(TreeRule const& x, size_t seed)
+  {
+    for (TreeRule::const_iterator aiter = x.begin(); aiter != x.end(); ++ aiter)
+      seed = __hash_value_tree_rule(*aiter, seed);
+    
+    return utils::hashmurmur<size_t>()(x.label.id(), seed);
+  }
   
   inline
   size_t hash_value(TreeRule const& x)
   {
-    size_t seed = utils::hashmurmur<size_t>()(x.label.id());
-    for (TreeRule::const_iterator aiter = x.begin(); aiter != x.end(); ++ aiter)
-      seed = utils::hashmurmur<size_t>()(hash_value(*aiter), seed);
-    return seed;
+    return __hash_value_tree_rule(x, 0);
   }
 
   void sort(TreeRule& x, TreeRule& y);

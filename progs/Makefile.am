@@ -25,8 +25,9 @@ bin_PROGRAMS = \
 	cicada_extract_scfg_mpi \
 	cicada_extract_score \
 	cicada_extract_score_mpi \
-	cicada_filter_penntreebank \
 	cicada_filter_cabocha \
+	cicada_filter_extract_phrase \
+	cicada_filter_penntreebank \
 	cicada_index_cluster \
 	cicada_index_grammar \
 	cicada_index_global_lexicon \
@@ -138,6 +139,9 @@ cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 
 cicada_filter_cabocha_SOURCES = cicada_filter_cabocha.cpp
 cicada_filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_extract_phrase_SOURCES = cicada_filter_extract_phrase.cpp
+cicada_filter_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 
 mpish_SOURCES = mpish.cpp
