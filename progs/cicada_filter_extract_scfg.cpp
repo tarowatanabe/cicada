@@ -183,7 +183,6 @@ struct ScorerCICADA
 	 << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
 	 << '\n';
   }
-  
 };
 
 
