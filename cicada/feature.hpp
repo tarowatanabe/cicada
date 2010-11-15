@@ -10,7 +10,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
 #include <utils/indexed_set.hpp>
@@ -32,8 +31,6 @@ namespace cicada
     typedef feature_type::const_iterator         const_iterator;
     typedef feature_type::const_reverse_iterator const_reverse_iterator;
     typedef feature_type::const_reference        const_reference;
-
-    typedef boost::filesystem::path path_type;
     
   private:
     typedef utils::spinlock              mutex_type;
