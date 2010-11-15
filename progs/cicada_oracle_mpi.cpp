@@ -371,7 +371,9 @@ void compute_oracles(const hypergraph_set_type& graphs,
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
   
-  for (int iter = 0; iter < 5; ++ iter) {
+  for (int iter = 0; iter < iteration; ++ iter) {
+    if (debug && mpi_rank == 0)
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
     
     task_type(graphs, features, scorers, scores, sentences)();
 

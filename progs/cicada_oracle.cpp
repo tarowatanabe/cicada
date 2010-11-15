@@ -341,6 +341,9 @@ void compute_oracles(const hypergraph_set_type& graphs,
   const double score_factor = (error_metric ? - 1.0 : 1.0);
   
   for (int iter = 0; iter < iteration; ++ iter) {
+    if (debug)
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
+
     queue_type queue(graphs.size());
     
     task_set_type tasks(threads);
