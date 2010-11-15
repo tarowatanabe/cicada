@@ -43,6 +43,7 @@ bin_PROGRAMS = \
 	cicada_mert_mpi \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
+	cicada_oracle \
 	cicada_unite_forest \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
@@ -155,6 +156,8 @@ cicada_filter_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $
 cicada_filter_extract_scfg_SOURCES = cicada_filter_extract_scfg.cpp
 cicada_filter_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
+cicada_oracle_SOURCES = cicada_oracle.cpp
+cicada_oracle_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 mpish_SOURCES = mpish.cpp
 mpish_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
