@@ -333,17 +333,20 @@ struct ExtractSCFG
   ExtractSCFG(const int __max_length,
 	      const int __max_fertility,
 	      const int __max_span,
-	      const int __min_hole)
+	      const int __min_hole,
+	      const bool __inverse)
     : max_length(__max_length),
       max_fertility(__max_fertility),
       max_span(__max_span),
-      min_hole(__min_hole) {}
+      min_hole(__min_hole),
+      inverse(__inverse) {}
 		
   int max_length;
   int max_fertility;
   int max_span;
   int min_hole;
-  
+  bool inverse;
+
   alignment_multiple_type alignment_source_target;
   alignment_multiple_type alignment_target_source;
   
@@ -849,10 +852,18 @@ struct ExtractSCFG
     spans.clear();
     spans_unique.clear();
     
-    alignment_type::const_iterator aiter_end = alignment.end();
-    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      alignment_source_target[aiter->source].push_back(aiter->target);
-      alignment_target_source[aiter->target].push_back(aiter->source);
+    if (inverse) {
+      alignment_type::const_iterator aiter_end = alignment.end();
+      for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+	alignment_source_target[aiter->target].push_back(aiter->source);
+	alignment_target_source[aiter->source].push_back(aiter->target);
+      }
+    } else {
+      alignment_type::const_iterator aiter_end = alignment.end();
+      for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+	alignment_source_target[aiter->source].push_back(aiter->target);
+	alignment_target_source[aiter->target].push_back(aiter->source);
+      }
     }
     
     for (size_type src = 0; src != source_size; ++ src) {
@@ -946,10 +957,11 @@ struct Task
        const int max_fertility,
        const int max_span,
        const int min_hole,
+       const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_length, max_fertility, max_span, min_hole),
+      extractor(max_length, max_fertility, max_span, min_hole, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

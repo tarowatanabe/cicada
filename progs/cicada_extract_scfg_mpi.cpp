@@ -39,6 +39,7 @@ int max_length = 7;
 int max_fertility = 10;
 int max_span = 15;
 int min_hole = 1;
+bool inverse = false;
 
 double max_malloc = 8; // 8 GB
 
@@ -105,7 +106,7 @@ int main(int argc, char** argv)
     }
     
     queue_type queue(1024);
-    task_type task(queue, output_file, max_length, max_fertility, max_span, min_hole, max_malloc);
+    task_type task(queue, output_file, max_length, max_fertility, max_span, min_hole, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
     if (mpi_rank == 0) {
@@ -307,6 +308,7 @@ void options(int argc, char** argv)
     ("max-fertility", po::value<int>(&max_fertility)->default_value(max_fertility), "maximum terminal fertility ratio")
     ("max-span",      po::value<int>(&max_span)->default_value(max_span),           "maximum span for rule")
     ("min-hole",      po::value<int>(&min_hole)->default_value(min_hole),           "minimum hole for antecedent non-terminals")
+    ("inverse",       po::bool_switch(&inverse),                                    "inversed word alignment")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ;

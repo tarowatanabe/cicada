@@ -473,6 +473,7 @@ struct ExtractGHKM
   symbol_type non_terminal;
   int max_nodes;
   int max_height;
+  bool inverse;
   
   range_set_type ranges;
   span_set_type spans;

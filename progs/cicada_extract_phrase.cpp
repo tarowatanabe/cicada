@@ -29,6 +29,7 @@ path_type output_file;
 
 int max_length = 7;
 int max_fertility = 10;
+bool inverse = false;
 
 double max_malloc = 8; // 8 GB
 int threads = 1;
@@ -67,7 +68,7 @@ int main(int argc, char** argv)
     utils::resource start_extract;
     
     queue_type queue(1024 * threads);
-    task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_malloc));
+    task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, inverse, max_malloc));
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -149,6 +150,7 @@ void options(int argc, char** argv)
     
     ("max-length",    po::value<int>(&max_length)->default_value(max_length),       "maximum phrase length")
     ("max-fertility", po::value<int>(&max_fertility)->default_value(max_fertility), "maximum phrase fertility ratio")
+    ("inverse",       po::bool_switch(&inverse),                                    "inversed word alignment")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ("threads",    po::value<int>(&threads),       "# of threads")

@@ -256,12 +256,15 @@ struct ExtractPhrase
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_multiple_type;
 
   ExtractPhrase(const int __max_length,
-		const int __max_fertility)
+		const int __max_fertility,
+		const bool __inverse)
     : max_length(__max_length),
-      max_fertility(__max_fertility) {}
+      max_fertility(__max_fertility),
+      inverse(__inverse) {}
 		
   int max_length;
   int max_fertility;
+  bool inverse;
 
   phrase_chart_type phrases_source;
   phrase_chart_type phrases_target;
@@ -300,10 +303,18 @@ struct ExtractPhrase
     alignment_count_source.resize(source_size + 1, 0);
     alignment_count_target.resize(target_size + 1, 0);
     
-    alignment_type::const_iterator aiter_end = alignment.end();
-    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
-      alignment_source_target[aiter->source].push_back(aiter->target);
-      alignment_target_source[aiter->target].push_back(aiter->source);
+    if (inverse) {
+      alignment_type::const_iterator aiter_end = alignment.end();
+      for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+	alignment_source_target[aiter->target].push_back(aiter->source);
+	alignment_target_source[aiter->source].push_back(aiter->target);
+      }
+    } else {
+      alignment_type::const_iterator aiter_end = alignment.end();
+      for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter) {
+	alignment_source_target[aiter->source].push_back(aiter->target);
+	alignment_target_source[aiter->target].push_back(aiter->source);
+      }
     }
     
     for (size_type src = 0; src != source_size; ++ src) {
@@ -458,10 +469,11 @@ struct Task
        const path_type& __output,
        const int max_length,
        const int max_fertility,
+       const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_length, max_fertility),
+      extractor(max_length, max_fertility, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

@@ -35,6 +35,7 @@ path_type output_file;
 
 int max_length = 7;
 int max_fertility = 10;
+bool inverse = false;
 
 double max_malloc = 8; // 8 GB
 
@@ -101,7 +102,7 @@ int main(int argc, char** argv)
     }
     
     queue_type queue(1024);
-    task_type task(queue, output_file, max_length, max_fertility, max_malloc);
+    task_type task(queue, output_file, max_length, max_fertility, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
     if (mpi_rank == 0) {
@@ -193,7 +194,9 @@ int main(int argc, char** argv)
       
       if (is_src || is_trg || is_alg)
 	throw std::runtime_error("# of lines do not match");
-
+      
+      if (debug)
+	std::cerr << std::endl;
       if (debug)
 	std::cerr << "# of samples: " << num_samples << std::endl;
       
@@ -287,6 +290,7 @@ void options(int argc, char** argv)
     
     ("max-length",    po::value<int>(&max_length)->default_value(max_length),       "maximum phrase length")
     ("max-fertility", po::value<int>(&max_fertility)->default_value(max_fertility), "maximum phrase fertility ratio")
+    ("inverse",       po::bool_switch(&inverse),                                    "inversed word alignment")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ;
