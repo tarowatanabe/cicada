@@ -1071,7 +1071,6 @@ void read_tstset(const path_set_type& files,
 	  throw std::runtime_error("format error?: " + path.file_string());
       }
     } else {
-      
       utils::compress_istream is(*titer, 1024 * 1024);
       
       int id;

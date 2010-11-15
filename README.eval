@@ -8,8 +8,9 @@ SB: skip bigram (by default, skip size is clipped to 4)
 WLCS: (weighted) longest common subsequence (by defaut, weight is one, meaning no weight, use alpha=2 for weight?)
 SK: string kernel (by default, decay factor = 0.8, spectrum p = 4)
 
-
 Implemented bootstrap resampling[1] and sign test[2] in "cicada_eval"
+
+Also, you can compute oracle-BLEU from hypergraph(s) by cicada_oracle{,_mpi}
 
 [1]
 @inproceedings{koehn:2004:EMNLP,

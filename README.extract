@@ -10,7 +10,11 @@ We (will) support various phrase/rule/tree extraction. Basically, we will run in
 cicada_extract_phrase{,_mpi}
 	Extract phrase
 	Output scores:
-	       lhs ||| rhs ||| count(lhs, rhs) count(prev, mono, lhs, rhs) count(prev, swap, lhs, rhs) count(next, mono, lhs, rhs) count(next, swap, lhs, rhs)
+	       lhs ||| rhs ||| count(lhs, rhs) \
+	       	   count(prev, mono, lhs, rhs) \
+		   count(prev, swap, lhs, rhs) \
+		   count(next, mono, lhs, rhs) \
+		   count(next, swap, lhs, rhs)
 
 cicada_extract_rule{,_mpi}
 	Extract synchronous-CFG + support syntax augmentation.
@@ -22,10 +26,16 @@ cicada_extract_ghkm{,_mpi}
 	Output scores:
 	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
 
+cicada_extract_tree{,_mpi}
+	Extract GHKM rules, tree-to-tree rules
+	Output scores:
+	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
+
 After counts collection, you can summarize them by cicada_extract_counts{,_mpi}
 Which will output:
 
-lhs ||| rhs ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| observed(lhs) observed(rhs) ||| lex(lhs | rhs) lex(rhs | lhs)
+lhs ||| rhs ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| observed(lhs) observed(rhs) \
+    	||| lex(lhs | rhs) lex(rhs | lhs)
 
 In addtion, we will dump rule-source.gz and rule-target.gz which looks like
 
@@ -36,5 +46,9 @@ for rule-source.gz and rule-target.gz looks like:
 root(rhs) ||| counts(root(rhs)) ||| observed(hs,rhs) observed(rhs)
 
 You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
-to perform Dirichlet prior smoothing.
+to perform Dirichlet prior smoothing. Following filers are implemented:
+
+   cicada_filter_extract_phrase
+   cicada_filter_extract_scfg
+   cicada_filter_extract_ghkm
 

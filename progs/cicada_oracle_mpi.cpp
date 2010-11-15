@@ -115,8 +115,6 @@ void compute_oracles(const hypergraph_set_type& graphs,
 
 void bcast_sentences(sentence_set_type& sentences);
 void bcast_weights(const int rank, weight_set_type& weights);
-void send_weights(const weight_set_type& weights);
-void reduce_weights(weight_set_type& weights);
 void options(int argc, char** argv);
 
 enum {
@@ -465,7 +463,6 @@ void read_tstset(const path_set_type& files,
 	  throw std::runtime_error("format error?: " + path.file_string());
       }
     } else {
-      
       utils::compress_istream is(*titer, 1024 * 1024);
       
       int id;
@@ -608,79 +605,6 @@ void bcast_sentences(sentence_set_type& sentences)
   }
 }
 
-
-void reduce_weights(weight_set_type& weights)
-{
-  typedef utils::mpi_device_source            device_type;
-  typedef boost::iostreams::filtering_istream stream_type;
-
-  typedef boost::shared_ptr<device_type> device_ptr_type;
-  typedef boost::shared_ptr<stream_type> stream_ptr_type;
-
-  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
-  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
-
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  device_ptr_set_type device(mpi_size);
-  stream_ptr_set_type stream(mpi_size);
-
-  for (int rank = 1; rank < mpi_size; ++ rank) {
-    device[rank].reset(new device_type(rank, weights_tag, 1024 * 1024));
-    stream[rank].reset(new stream_type());
-    
-    stream[rank]->push(boost::iostreams::gzip_decompressor());
-    stream[rank]->push(*device[rank]);
-  }
-
-  std::string line;
-  
-  int non_found_iter = 0;
-  while (1) {
-    bool found = false;
-    
-    for (int rank = 1; rank < mpi_size; ++ rank)
-      while (stream[rank] && device[rank] && device[rank]->test()) {
-	if (std::getline(*stream[rank], line)) {
-	  tokenizer_type tokenizer(line);
-	  
-	  tokenizer_type::iterator iter = tokenizer.begin();
-	  if (iter == tokenizer.end()) continue;
-	  std::string feature = *iter;
-	  ++ iter;
-	  if (iter == tokenizer.end()) continue;
-	  std::string value = *iter;
-	  
-	  weights[feature] += utils::decode_base64<double>(value);
-	} else {
-	  stream[rank].reset();
-	  device[rank].reset();
-	}
-	found = true;
-      }
-    
-    if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
-    
-    non_found_iter = loop_sleep(found, non_found_iter);
-  }
-}
-
-void send_weights(const weight_set_type& weights)
-{
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  boost::iostreams::filtering_ostream os;
-  os.push(boost::iostreams::gzip_compressor());
-  os.push(utils::mpi_device_sink(0, weights_tag, 1024 * 1024));
-  
-  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
-    if (! feature_type(id).empty() && weights[id] != 0.0)
-      os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
-}
 
 void bcast_weights(const int rank, weight_set_type& weights)
 {

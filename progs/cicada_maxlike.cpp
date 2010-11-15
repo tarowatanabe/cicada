@@ -1038,7 +1038,6 @@ void read_tstset(const path_set_type& files,
 	}
       }
     } else {
-      
       utils::compress_istream is(*titer, 1024 * 1024);
       
       int id;
