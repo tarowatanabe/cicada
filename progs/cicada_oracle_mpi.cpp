@@ -23,7 +23,6 @@
 #include "cicada/weight_vector.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/viterbi.hpp"
-#include "cicada/sentence_vector.hpp"
 
 #include "cicada/apply.hpp"
 #include "cicada/model.hpp"
@@ -48,6 +47,15 @@
 #include <boost/lexical_cast.hpp>
 
 #include <boost/thread.hpp>
+
+#include "lbfgs.h"
+
+#include "utils/base64.hpp"
+#include "utils/mpi.hpp"
+#include "utils/mpi_device.hpp"
+#include "utils/mpi_device_bcast.hpp"
+#include "utils/mpi_stream.hpp"
+#include "utils/mpi_stream_simple.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -88,11 +96,9 @@ path_set_type refset_files;
 path_type     output_file = "-";
 
 std::string scorer_name = "bleu:order=4,exact=true";
+
 int iteration = 10;
 int cube_size = 200;
-
-int threads = 4;
-
 int debug = 0;
 
 void read_tstset(const path_set_type& files,
@@ -107,15 +113,53 @@ void compute_oracles(const hypergraph_set_type& graphs,
 		     const scorer_document_type& scorers,
 		     sentence_set_type& sentences);
 
-
+void bcast_sentences(sentence_set_type& sentences);
+void bcast_weights(const int rank, weight_set_type& weights);
+void send_weights(const weight_set_type& weights);
+void reduce_weights(weight_set_type& weights);
 void options(int argc, char** argv);
+
+enum {
+  weights_tag = 1000,
+  sentence_tag,
+  gradients_tag,
+  notify_tag,
+  termination_tag,
+};
+
+inline
+int loop_sleep(bool found, int non_found_iter)
+{
+  if (! found) {
+    boost::thread::yield();
+    ++ non_found_iter;
+  } else
+    non_found_iter = 0;
+    
+  if (non_found_iter >= 64) {
+    struct timespec tm;
+    tm.tv_sec = 0;
+    tm.tv_nsec = 2000001; // above 2ms
+    nanosleep(&tm, NULL);
+    
+    non_found_iter = 0;
+  }
+  return non_found_iter;
+}
 
 int main(int argc, char ** argv)
 {
+  utils::mpi_world mpi_world(argc, argv);
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
   try {
     options(argc, argv);
     
-    threads = utils::bithack::max(threads, 1);
+    // read test set
+    if (tstset_files.empty())
+      throw std::runtime_error("no test set?");
     
     // read reference set
     scorer_document_type   scorers(scorer_name);
@@ -123,56 +167,50 @@ int main(int argc, char ** argv)
     
     read_refset(refset_files, scorers, sentences);
     
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "# of references: " << sentences.size() << std::endl;
-
-    // read test set
-    if (tstset_files.empty())
-      tstset_files.push_back("-");
-
-    if (debug)
+    
+    if (mpi_rank == 0 && debug)
       std::cerr << "reading hypergraphs" << std::endl;
-
+    
     hypergraph_set_type       graphs(sentences.size());
     feature_function_ptr_set_type features(sentences.size());
     
     read_tstset(tstset_files, graphs, sentences, features);
-    
-    if (debug)
+
+    if (mpi_rank == 0 && debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
     
     sentence_set_type oracles(sentences.size());
     compute_oracles(graphs, features, scorers, oracles);
     
-    utils::compress_ostream os(output_file, 1024 * 1024);
-    for (size_t id = 0; id != oracles.size(); ++ id)
-      if (! oracles[id].empty())
-	os << id << " ||| " << oracles[id] << '\n';
+    if (mpi_rank == 0) {
+      utils::compress_ostream os(output_file, 1024 * 1024);
+      for (size_t id = 0; id != oracles.size(); ++ id)
+	if (! oracles[id].empty())
+	  os << id << " ||| " << oracles[id] << '\n';
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
+    MPI::COMM_WORLD.Abort(1);
     return 1;
   }
   return 0;
 }
 
-
 struct TaskOracle
 {
-  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
-  
-  TaskOracle(queue_type&                          __queue,
-	     const hypergraph_set_type&           __graphs,
+  TaskOracle(const hypergraph_set_type&           __graphs,
 	     const feature_function_ptr_set_type& __features,
 	     const scorer_document_type&          __scorers,
-	     sentence_set_type&                   __sentences,
-	     score_ptr_set_type&                  __scores)
-    : queue(__queue),
-      graphs(__graphs),
+	     score_ptr_set_type&                  __scores,
+	     sentence_set_type&                   __sentences)
+    : graphs(__graphs),
       features(__features),
       scorers(__scorers),
-      sentences(__sentences),
-      scores(__scores)
+      scores(__scores),
+      sentences(__sentences)
   {
     score_optimum.reset();
     
@@ -185,6 +223,7 @@ struct TaskOracle
 	  *score_optimum += *(*siter);
       } 
   }
+  
   
   struct bleu_function
   {
@@ -204,22 +243,6 @@ struct TaskOracle
       return cicada::semiring::traits<value_type>::log(edge.features[name] * factor);
     }
     
-  };
-
-  struct weight_bleu_function
-  {
-    typedef cicada::semiring::Logprob<double> value_type;
-    
-    weight_bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
-      : name(__name), factor(__factor) {}
-    
-    weight_set_type::feature_type name;
-    double factor;
-    
-    value_type operator()(const feature_set_type& x) const
-    {
-      return cicada::semiring::traits<value_type>::log(x[name] * factor);
-    }
   };
   
   struct kbest_traversal
@@ -243,6 +266,21 @@ struct TaskOracle
     }
   };
 
+  struct weight_bleu_function
+  {
+    typedef cicada::semiring::Logprob<double> value_type;
+    
+    weight_bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
+      : name(__name), factor(__factor) {}
+    
+    weight_set_type::feature_type name;
+    double factor;
+    
+    value_type operator()(const feature_set_type& x) const
+    {
+      return cicada::semiring::traits<value_type>::log(x[name] * factor);
+    }
+  };
   
   void operator()()
   {
@@ -263,13 +301,9 @@ struct TaskOracle
 
     hypergraph_type graph_oracle;
     
-    int id = 0;
-    while (1) {
-      queue.pop(id);
-      if (id < 0) break;
-      
+    for (size_t id = 0; id != graphs.size(); ++ id) {
       if (! graphs[id].is_valid()) continue;
-
+      
       score_ptr_type score_curr;
       if (score_optimum)
 	score_curr = score_optimum->clone();
@@ -313,67 +347,58 @@ struct TaskOracle
   
   score_ptr_type score_optimum;
   
-  queue_type&                          queue;
   const hypergraph_set_type&           graphs;
   const feature_function_ptr_set_type& features;
   const scorer_document_type&          scorers;
-  sentence_set_type&                   sentences;
   score_ptr_set_type&                  scores;
+  sentence_set_type&                   sentences;
 };
+
 
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers,
 		     sentence_set_type& sentences)
 {
-  typedef TaskOracle            task_type;
-  typedef task_type::queue_type queue_type;
-  
-  typedef boost::shared_ptr<task_type> task_ptr_type;
-  typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_set_type;
+  typedef TaskOracle task_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   score_ptr_set_type scores(graphs.size());
-
+  
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
   
-  for (int iter = 0; iter < iteration; ++ iter) {
-    queue_type queue(graphs.size());
+  for (int iter = 0; iter < 5; ++ iter) {
     
-    task_set_type tasks(threads);
-    for (int i = 0; i < threads; ++ i)
-      tasks[i].reset(new task_type(queue, graphs, features, scorers, sentences, scores));
-    
-    boost::thread_group workers;
-    for (int i = 0; i < threads; ++ i)
-      workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
-    
-    for (size_t id = 0; id != graphs.size(); ++ id)
-      queue.push(id);
-    
-    for (int i = 0; i < threads; ++ i)
-      queue.push(-1);
-    
-    workers.join_all();
+    task_type(graphs, features, scorers, scores, sentences)();
+
+    bcast_sentences(sentences);
     
     score_optimum.reset();
-    score_ptr_set_type::const_iterator siter_end = scores.end();
-    for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter) 
-      if (*siter) {
+    for (size_t id = 0; id != sentences.size(); ++ id)
+      if (! sentences[id].empty()) {
+	scores[id] = scorers[id]->score(sentences[id]);
+	
 	if (! score_optimum)
-	  score_optimum = (*siter)->clone();
+	  score_optimum = scores[id]->clone();
 	else
-	  *score_optimum += *(*siter);
-      } 
+	  *score_optimum += *scores[id];
+      }
     
     const double objective = score_optimum->score().first * score_factor;
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "oracle score: " << objective << std::endl;
+
+    int terminate = (objective <= objective_optimum);
     
-    if (objective <= objective_optimum) break;
+    MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
+    
+    if (terminate) break;
     
     objective_optimum = objective;
   }
@@ -394,6 +419,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
       else
 	__bleu_linear->assign(score_curr);
     }
+
 }
 
 
@@ -402,15 +428,18 @@ void read_tstset(const path_set_type& files,
 		 const sentence_document_type& sentences,
 		 feature_function_ptr_set_type& features)
 {
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
     
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "file: " << *titer << std::endl;
-    
-    if (boost::filesystem::is_directory(*titer)) {
       
-      for (int i = 0; /**/; ++ i) {
+    if (boost::filesystem::is_directory(*titer)) {
+
+      for (int i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*titer) / (boost::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
@@ -420,17 +449,20 @@ void read_tstset(const path_set_type& files,
 	int id;
 	std::string sep;
 	hypergraph_type hypergraph;
-	
-	while (is >> id >> sep >> hypergraph) {
-	
+            
+	if (is >> id >> sep >> hypergraph) {
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?: " + path.file_string());
 	
 	  if (id >= static_cast<int>(graphs.size()))
 	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + path.file_string());
-	
+	  
+	  if (id % mpi_size != mpi_rank)
+	    throw std::runtime_error("difference it?");
+	  
 	  graphs[id].unite(hypergraph);
-	}
+	} else
+	  throw std::runtime_error("format error?: " + path.file_string());
       }
     } else {
       
@@ -439,7 +471,7 @@ void read_tstset(const path_set_type& files,
       int id;
       std::string sep;
       hypergraph_type hypergraph;
-      
+            
       while (is >> id >> sep >> hypergraph) {
 	
 	if (sep != "|||")
@@ -448,37 +480,49 @@ void read_tstset(const path_set_type& files,
 	if (id >= static_cast<int>(graphs.size()))
 	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + titer->file_string());
 	
-	graphs[id].unite(hypergraph);
+	if (id % mpi_size == mpi_rank)
+	  graphs[id].unite(hypergraph);
       }
     }
   }
 
-  if (debug)
+  if (debug && mpi_rank == 0)
     std::cerr << "assign BLEU scorer" << std::endl;
-  
-  typedef cicada::Parameter parameter_type;
     
-  for (size_t id = 0; id != graphs.size(); ++ id) {
-    if (graphs[id].goal == hypergraph_type::invalid)
-      std::cerr << "invalid graph at: " << id << std::endl;
-    else {
-      features[id] = feature_function_type::create(scorer_name);
-      
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
-      
-      if (! __bleu && ! __bleu_linear)
-	throw std::runtime_error("invalid bleu feature function...");
+  for (size_t id = 0; id != graphs.size(); ++ id) 
+    if (static_cast<int>(id % mpi_size) == mpi_rank) {
+      if (graphs[id].goal == hypergraph_type::invalid)
+	std::cerr << "invalid graph at: " << id << std::endl;
+      else {
+	features[id] = feature_function_type::create(scorer_name);
+	
+	cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
+	cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
+	
+	if (! __bleu && ! __bleu_linear)
+	  throw std::runtime_error("invalid bleu feature function...");
 
-      static const cicada::Lattice       __lattice;
-      static const cicada::SpanVector    __spans;
-      static const cicada::NGramCountSet __ngram_counts;
-      
-      if (__bleu)
-	__bleu->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
-      else
-	__bleu_linear->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	static const cicada::Lattice       __lattice;
+	static const cicada::SpanVector    __spans;
+	static const cicada::NGramCountSet __ngram_counts;
+	
+	if (__bleu)
+	  __bleu->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+	else
+	  __bleu_linear->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
+      }
     }
+  
+  // collect weights...
+  for (int rank = 0; rank < mpi_size; ++ rank) {
+    weight_set_type weights;
+    weights.allocate();
+    
+    for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+      if (! feature_type(id).empty())
+	weights[feature_type(id)] = 1.0;
+    
+    bcast_weights(rank, weights);
   }
 }
 
@@ -514,7 +558,7 @@ void read_refset(const path_set_type& files,
       if (iter == tokenizer.end()) continue;
       if (*iter != "|||") continue;
       ++ iter;
-
+      
       if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
       
@@ -530,6 +574,152 @@ void read_refset(const path_set_type& files,
   }  
 }
 
+void bcast_sentences(sentence_set_type& sentences)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  for (int rank = 0; rank < mpi_size; ++ rank) {
+    if (rank == mpi_rank) {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::gzip_compressor());
+      os.push(utils::mpi_device_bcast_sink(rank, 4096));
+      
+      for (size_t id = 0; id != sentences.size(); ++ id)
+	if (static_cast<int>(id % mpi_size) == mpi_rank)
+	  os << id << " ||| " << sentences[id] << '\n';
+      
+    } else {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_device_bcast_source(rank, 4096));
+      
+      int id;
+      std::string sep;
+      sentence_type sentence;
+      
+      while (is >> id >> sep >> sentence) {
+	if (sep != "|||")
+	  throw std::runtime_error("invalid sentence format");
+	
+	sentences[id] = sentence;
+      }
+    }
+  }
+}
+
+
+void reduce_weights(weight_set_type& weights)
+{
+  typedef utils::mpi_device_source            device_type;
+  typedef boost::iostreams::filtering_istream stream_type;
+
+  typedef boost::shared_ptr<device_type> device_ptr_type;
+  typedef boost::shared_ptr<stream_type> stream_ptr_type;
+
+  typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
+  typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+
+  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  device_ptr_set_type device(mpi_size);
+  stream_ptr_set_type stream(mpi_size);
+
+  for (int rank = 1; rank < mpi_size; ++ rank) {
+    device[rank].reset(new device_type(rank, weights_tag, 1024 * 1024));
+    stream[rank].reset(new stream_type());
+    
+    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(*device[rank]);
+  }
+
+  std::string line;
+  
+  int non_found_iter = 0;
+  while (1) {
+    bool found = false;
+    
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      while (stream[rank] && device[rank] && device[rank]->test()) {
+	if (std::getline(*stream[rank], line)) {
+	  tokenizer_type tokenizer(line);
+	  
+	  tokenizer_type::iterator iter = tokenizer.begin();
+	  if (iter == tokenizer.end()) continue;
+	  std::string feature = *iter;
+	  ++ iter;
+	  if (iter == tokenizer.end()) continue;
+	  std::string value = *iter;
+	  
+	  weights[feature] += utils::decode_base64<double>(value);
+	} else {
+	  stream[rank].reset();
+	  device[rank].reset();
+	}
+	found = true;
+      }
+    
+    if (std::count(device.begin(), device.end(), device_ptr_type()) == mpi_size) break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+}
+
+void send_weights(const weight_set_type& weights)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::gzip_compressor());
+  os.push(utils::mpi_device_sink(0, weights_tag, 1024 * 1024));
+  
+  for (feature_type::id_type id = 0; id < weights.size(); ++ id)
+    if (! feature_type(id).empty() && weights[id] != 0.0)
+      os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
+}
+
+void bcast_weights(const int rank, weight_set_type& weights)
+{
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == rank) {
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_bcast_sink(rank, 1024));
+    
+    static const weight_set_type::feature_type __empty;
+    
+    weight_set_type::const_iterator witer_begin = weights.begin();
+    weight_set_type::const_iterator witer_end = weights.end();
+    
+    for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
+      if (*witer != 0.0) {
+	const weight_set_type::feature_type feature(witer - witer_begin);
+	if (feature != __empty)
+	  os << feature << ' ' << utils::encode_base64(*witer) << '\n';
+      }
+  } else {
+    weights.clear();
+    weights.allocate();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(utils::mpi_device_bcast_source(rank, 1024));
+    
+    std::string feature;
+    std::string value;
+    
+    while ((is >> feature) && (is >> value))
+      weights[feature] = utils::decode_base64<double>(value);
+  }
+}
+
+
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
@@ -542,12 +732,10 @@ void options(int argc, char** argv)
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
-    ("scorer",    po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
+    ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     
     ("iteration", po::value<int>(&iteration), "# of hill-climbing iteration")
     ("cube-size", po::value<int>(&cube_size), "cube-pruning size")
-    
-    ("threads", po::value<int>(&threads), "# of threads")
     ;
   
   po::options_description opts_command("command line options");

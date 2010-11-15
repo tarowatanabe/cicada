@@ -44,6 +44,7 @@ bin_PROGRAMS = \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
 	cicada_oracle \
+	cicada_oracle_mpi \
 	cicada_unite_forest \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
@@ -89,6 +90,36 @@ cicada_extract_score_mpi_SOURCES  = cicada_extract_score_mpi.cpp
 cicada_extract_score_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_score_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
+cicada_filter_penntreebank_SOURCES = cicada_filter_penntreebank.cpp
+cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_cabocha_SOURCES = cicada_filter_cabocha.cpp
+cicada_filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_extract_SOURCES = cicada_filter_extract.cpp
+cicada_filter_extract_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_extract_ghkm_SOURCES = cicada_filter_extract_ghkm.cpp
+cicada_filter_extract_ghkm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_extract_phrase_SOURCES = cicada_filter_extract_phrase.cpp
+cicada_filter_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_extract_scfg_SOURCES = cicada_filter_extract_scfg.cpp
+cicada_filter_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_index_cluster_SOURCES = cicada_index_cluster.cpp
+cicada_index_cluster_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_index_grammar_SOURCES = cicada_index_grammar.cpp
+cicada_index_grammar_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_index_global_lexicon_SOURCES = cicada_index_global_lexicon.cpp
+cicada_index_global_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_index_lexicalized_reordering_SOURCES = cicada_index_lexicalized_reordering.cpp
+cicada_index_lexicalized_reordering_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
 cicada_learn_SOURCES = cicada_learn.cpp lbfgs.c
 cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
@@ -126,38 +157,12 @@ cicada_unite_lattice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftoo
 cicada_unite_sentence_SOURCES = cicada_unite_sentence.cpp
 cicada_unite_sentence_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_index_cluster_SOURCES = cicada_index_cluster.cpp
-cicada_index_cluster_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_index_grammar_SOURCES = cicada_index_grammar.cpp
-cicada_index_grammar_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_index_global_lexicon_SOURCES = cicada_index_global_lexicon.cpp
-cicada_index_global_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_index_lexicalized_reordering_SOURCES = cicada_index_lexicalized_reordering.cpp
-cicada_index_lexicalized_reordering_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_penntreebank_SOURCES = cicada_filter_penntreebank.cpp
-cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_cabocha_SOURCES = cicada_filter_cabocha.cpp
-cicada_filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_extract_SOURCES = cicada_filter_extract.cpp
-cicada_filter_extract_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_extract_ghkm_SOURCES = cicada_filter_extract_ghkm.cpp
-cicada_filter_extract_ghkm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_extract_phrase_SOURCES = cicada_filter_extract_phrase.cpp
-cicada_filter_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_filter_extract_scfg_SOURCES = cicada_filter_extract_scfg.cpp
-cicada_filter_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
 cicada_oracle_SOURCES = cicada_oracle.cpp
 cicada_oracle_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_oracle_mpi_SOURCES  = cicada_oracle_mpi.cpp
+cicada_oracle_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_oracle_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 mpish_SOURCES = mpish.cpp
 mpish_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
