@@ -367,6 +367,8 @@ void compute_oracles(const hypergraph_set_type& graphs,
   
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
+
+  sentence_set_type sentences_optimum;
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -374,6 +376,8 @@ void compute_oracles(const hypergraph_set_type& graphs,
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
+    
+    sentences_optimum = sentences;
     
     task_type(graphs, features, scorers, scores, sentences)();
 
@@ -395,10 +399,12 @@ void compute_oracles(const hypergraph_set_type& graphs,
       std::cerr << "oracle score: " << objective << std::endl;
 
     int terminate = (objective <= objective_optimum);
-    
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
-    if (terminate) break;
+    if (terminate) {
+      sentences.swap(sentences_optimum);
+      break;
+    }
     
     objective_optimum = objective;
   }

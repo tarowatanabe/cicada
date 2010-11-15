@@ -336,6 +336,8 @@ void compute_oracles(const hypergraph_set_type& graphs,
 
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
+
+  sentence_set_type sentences_optimum;
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -344,6 +346,8 @@ void compute_oracles(const hypergraph_set_type& graphs,
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
 
+    sentences_optimum = sentences;
+    
     queue_type queue(graphs.size());
     
     task_set_type tasks(threads);
@@ -376,27 +380,13 @@ void compute_oracles(const hypergraph_set_type& graphs,
     if (debug)
       std::cerr << "oracle score: " << objective << std::endl;
     
-    if (objective <= objective_optimum) break;
+    if (objective <= objective_optimum) {
+      sentences.swap(sentences_optimum);
+      break;
+    }
     
     objective_optimum = objective;
   }
-  
-  for (size_t id = 0; id != graphs.size(); ++ id)
-    if (features[id]) {
-      if (! scores[id])
-	throw std::runtime_error("no scores?");
-      
-      score_ptr_type score_curr = score_optimum->clone();
-      *score_curr -= *scores[id];
-      
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
-      
-      if (__bleu)
-	__bleu->assign(score_curr);
-      else
-	__bleu_linear->assign(score_curr);
-    }
 }
 
 
