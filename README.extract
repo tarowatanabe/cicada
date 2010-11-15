@@ -25,6 +25,9 @@ cicada_extract_ghkm{,_mpi}
 	Extract GHKM rules, tree-to-string or string-to-tree rules
 	Output scores:
 	       lhs-xRS ||| rhs-xRS ||| count(lhs, rhs)
+	TODO: How to support dumping in string-to-tree?
+	      add --inverse option for inversed alignment,
+	      add --swap option for swapping source and target?
 
 cicada_extract_tree{,_mpi}
 	Extract GHKM rules, tree-to-tree rules
@@ -48,7 +51,18 @@ root(rhs) ||| counts(root(rhs)) ||| observed(hs,rhs) observed(rhs)
 You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
 to perform Dirichlet prior smoothing. Following filers are implemented:
 
-   cicada_filter_extract_phrase
-   cicada_filter_extract_scfg
-   cicada_filter_extract_ghkm
+   cicada_filter_extract:
+	extract only nbet of target variation for each source side,
+   	measured by its joint frequency of lhs and rhs.
+
+   cicada_filter_extract_phrase:
+	Dump in moses or cicada format. Also, you can dump
+	lexicalied reordering table.
+   				 
+   cicada_filter_extract_scfg:
+	Dump in cicada format for synchronous-CFG. You can also 
+	add features for lhs given root(lhs) and rhs given root(rhs)
+
+   cicada_filter_extract_ghkm:
+	Dump in cicada format for tree-to-string, string-to-tree, tree-to-tree.
 
