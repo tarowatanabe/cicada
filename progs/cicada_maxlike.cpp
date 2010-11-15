@@ -824,11 +824,16 @@ struct TaskOracle
       // extract target-yield, features
       
       yield.clear();
-    
+      
+      int non_terminal_pos = 0;
       rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
       for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	if (titer->is_non_terminal()) {
-	  const int pos = titer->non_terminal_index() - 1;
+	  int pos = titer->non_terminal_index() - 1;
+	  if (pos < 0)
+	    pos = non_terminal_pos;
+	  ++ non_terminal_pos;
+	  
 	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
 	} else if (*titer != vocab_type::EPSILON)
 	  yield.push_back(*titer);
