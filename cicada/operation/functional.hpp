@@ -102,6 +102,7 @@ namespace cicada
 	return cicada::semiring::traits<value_type>::log(x.dot());
       }
     };
+    
   };
 };
 

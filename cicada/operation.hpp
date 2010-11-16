@@ -10,6 +10,7 @@
 #include <cicada/lattice.hpp>
 #include <cicada/sentence.hpp>
 #include <cicada/sentence_vector.hpp>
+#include <cicada/vocab.hpp>
 #include <cicada/span_vector.hpp>
 #include <cicada/ngram_count_set.hpp>
 #include <cicada/span_vector.hpp>
@@ -40,6 +41,7 @@ namespace cicada
     
     typedef cicada::Symbol symbol_type;
     typedef cicada::Symbol word_type;
+    typedef cicada::Vocab  vocab_type;
 
     typedef cicada::Grammar         grammar_type;
     typedef cicada::TreeGrammar     tree_grammar_type;

@@ -86,6 +86,7 @@ output: kbest or hypergraph output\n\
 \tweights-one=[true|false] one initialize weight\n\
 \tyield=[sentence|string|derivation|tree] yield for kbest\n\
 \tgraphviz=[true|false] dump in graphviz format\n\
+\tstatistics=[true|fals] dump various statistics (size etc.)\n\
 \tdirectory=directory for output\n\
 \tfile=file for output\n\
 ";

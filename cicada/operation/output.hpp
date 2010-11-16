@@ -159,6 +159,7 @@ namespace cicada
 	  yield_string(false),
 	  yield_tree(false),
 	  graphviz(false),
+	  statistics(false),
 	  debug(__debug)
       {
 	typedef cicada::Parameter param_type;
@@ -179,6 +180,8 @@ namespace cicada
 	    weights_one = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "graphviz") == 0)
 	    graphviz = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "statistics") == 0)
+	    statistics = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "file") == 0)
 	    file = piter->second;
 	  else if (strcasecmp(piter->first.c_str(), "directory") == 0)
@@ -212,6 +215,9 @@ namespace cicada
     
 	if (! yield_string && ! yield_tree)
 	  yield_string = true;
+	
+	if (graphviz && statistics)
+	  throw std::runtime_error("only one of graphviz or statistics can be specified...");
       }
 
       void assign(const weight_set_type& __weights)
@@ -230,6 +236,44 @@ namespace cicada
 	    *output_data.os << std::flush;
 	}
       }
+
+      struct shortest_length_function
+      {
+	typedef cicada::Vocab vocab_type;
+	typedef cicada::Rule rule_type;
+	typedef cicada::semiring::Tropical<int> value_type;
+	
+	template <typename Edge>
+	value_type operator()(const Edge& edge) const
+	{
+	  int length = 0;
+	  rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter)
+	    length += (*siter != vocab_type::EPSILON && siter->is_terminal());
+	  
+	  // since we will "max" at operator+, we will collect negative length
+	  return cicada::semiring::traits<value_type>::log(- length);
+	}
+      };
+
+      struct longest_length_function
+      {
+	typedef cicada::Vocab vocab_type;
+	typedef cicada::Rule rule_type;
+	typedef cicada::semiring::Tropical<int> value_type;
+	
+	template <typename Edge>
+	value_type operator()(const Edge& edge) const
+	{
+	  int length = 0;
+	  rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter)
+	    length += (*siter != vocab_type::EPSILON && siter->is_terminal());
+	  
+	  // since we will "max" at operator+, we will collect positive length
+	  return cicada::semiring::traits<value_type>::log(length);
+	}
+      };
   
       void operator()(data_type& data) const
       {
@@ -237,9 +281,7 @@ namespace cicada
 
 	const size_type& id = data.id;
 	const hypergraph_type& hypergraph = data.hypergraph;
-    
-	if (! hypergraph.is_valid()) return;
-	
+    	
 	boost::iostreams::filtering_ostream os_buffer;
 	if (output_data.use_buffer)
 	  os_buffer.push(boost::iostreams::back_inserter(const_cast<std::string&>(output_data.buffer)));
@@ -254,14 +296,51 @@ namespace cicada
 
 	utils::resource start;
 
-	if (graphviz)
+	if (statistics) {
+	  if (! data.lattice.empty()) {
+	    const size_t num_nodes = data.lattice.size() + 1;
+	    size_t num_edges = 0;
+	    size_t num_epsilon = 0;
+	    
+	    lattice_type::const_iterator liter_end = data.lattice.end();
+	    for (lattice_type::const_iterator liter = data.lattice.begin(); liter != liter_end; ++ liter) {
+	      num_edges += liter->size();
+	      
+	      lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
+	      for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
+		num_epsilon += aiter->label == vocab_type::EPSILON;
+	    }
+	    
+	    os << id << " ||| lattice-num-node: "    << num_nodes << '\n'
+	       << id << " ||| lattice-num-edge: "    << num_edges << '\n'
+	       << id << " ||| lattice-num-epsilon: " << num_epsilon << '\n'
+	       << id << " ||| lattice-shortest-distance: " << data.lattice.shortest_distance() << '\n'
+	       << id << " ||| lattice-longest-distance: "  << data.lattice.longest_distance() << '\n';
+	  }
+	  
+	  if (data.hypergraph.is_valid()) {
+	    std::vector<shortest_length_function::value_type, std::allocator<shortest_length_function::value_type> > lengths_shortest(data.hypergraph.nodes.size());
+	    std::vector<longest_length_function::value_type, std::allocator<longest_length_function::value_type> >   lengths_longest(data.hypergraph.nodes.size());
+	    
+	    cicada::inside(data.hypergraph, lengths_shortest, shortest_length_function());
+	    cicada::inside(data.hypergraph, lengths_longest, longest_length_function());
+	    
+	    const int length_shortest = - log(lengths_shortest.back());
+	    const int length_longest  =   log(lengths_longest.back());
+	    
+	    os << id << " ||| hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
+	       << id << " ||| hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
+	       << id << " ||| hypergraph-shortest-leaf: " << length_shortest << '\n'
+	       << id << " ||| hypergraph-longest-leaf: "  << length_longest << '\n';
+	  }
+	} else if (graphviz)
 	  cicada::graphviz(os, hypergraph);
 	else if (kbest_size <= 0) {
 	  if (debug)
 	    std::cerr << "output graph: " << data.id << std::endl;
 	  
 	  os << id << " ||| " << hypergraph << '\n';
-	} else {
+	} else if (hypergraph.is_valid()) {
 	  if (debug)
 	    std::cerr << "output " << kbest_size << "-best for graph: "<< data.id << std::endl;
 
@@ -317,6 +396,7 @@ namespace cicada
       bool yield_tree;
 
       bool graphviz;
+      bool statistics;
   
       int debug;
     };
