@@ -170,21 +170,19 @@ namespace cicada
 	  
 	  positions[first][last] = true;
 	  
-	  if (aiter->label != vocab_type::EPSILON) {
-	    epsilon_set_type::const_iterator hiter_begin = epsilons_head[first].begin();
-	    epsilon_set_type::const_iterator hiter_end   = epsilons_head[first].end();
-	    
-	    epsilon_set_type::const_iterator titer_begin = epsilons_tail[last].begin();
-	    epsilon_set_type::const_iterator titer_end   = epsilons_tail[last].end();
-	    
-	    for (epsilon_set_type::const_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter) {
-	      positions[*hiter][last] = true;
-	      for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-		positions[*hiter][*titer] = true;
-	    }
+	  epsilon_set_type::const_iterator hiter_begin = epsilons_head[first].begin();
+	  epsilon_set_type::const_iterator hiter_end   = epsilons_head[first].end();
+	  
+	  epsilon_set_type::const_iterator titer_begin = epsilons_tail[last].begin();
+	  epsilon_set_type::const_iterator titer_end   = epsilons_tail[last].end();
+	  
+	  for (epsilon_set_type::const_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter) {
+	    positions[*hiter][last] = true;
 	    for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	      positions[first][*titer] = true;
+	      positions[*hiter][*titer] = true;
 	  }
+	  for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+	    positions[first][*titer] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    
@@ -308,21 +306,19 @@ namespace cicada
 	  
 	  positions[first][last] = true;
 	  
-	  if (aiter->label != vocab_type::EPSILON) {
-	    epsilon_set_type::const_iterator hiter_begin = epsilons_head[first].begin();
-	    epsilon_set_type::const_iterator hiter_end   = epsilons_head[first].end();
-	    
-	    epsilon_set_type::const_iterator titer_begin = epsilons_tail[last].begin();
-	    epsilon_set_type::const_iterator titer_end   = epsilons_tail[last].end();
-	    
-	    for (epsilon_set_type::const_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter) {
-	      positions[*hiter][last] = true;
-	      for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-		positions[*hiter][*titer] = true;
-	    }
+	  epsilon_set_type::const_iterator hiter_begin = epsilons_head[first].begin();
+	  epsilon_set_type::const_iterator hiter_end   = epsilons_head[first].end();
+	  
+	  epsilon_set_type::const_iterator titer_begin = epsilons_tail[last].begin();
+	  epsilon_set_type::const_iterator titer_end   = epsilons_tail[last].end();
+	  
+	  for (epsilon_set_type::const_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter) {
+	    positions[*hiter][last] = true;
 	    for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	      positions[first][*titer] = true;
+	      positions[*hiter][*titer] = true;
 	  }
+	  for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
+	    positions[first][*titer] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	  
