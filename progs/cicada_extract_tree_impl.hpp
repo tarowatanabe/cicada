@@ -313,7 +313,6 @@ struct ExtractTree
   typedef std::pair<int, int> range_type;
   typedef std::vector<range_type, std::allocator<range_type> > range_set_type;
   
-  
 
   struct Span
   {
@@ -390,6 +389,10 @@ struct ExtractTree
 			std::allocator<std::pair<const range_type, node_set_type> > > range_map_type;
 #endif
   
+  typedef std::vector<bool, std::allocator<bool> > covered_type;
+
+  typedef std::vector<int, std::allocator<int> > point_set_type;
+  typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
 
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
@@ -406,16 +409,18 @@ struct ExtractTree
     int height;
     int internal;
 
-    std::string rule;
+    std::string    rule;
+    point_set_type positions;
+    double count;
 
     DerivationEdge()
-      : edges(), tails(), height(0), internal(0), rule() {}
+      : edges(), tails(), height(0), internal(0) {}
     DerivationEdge(const edge_set_type& __edges, const node_set_type& __tails)
-      : edges(__edges), tails(__tails), height(0), internal(0), rule() {}
+      : edges(__edges), tails(__tails), height(0), internal(0) {}
     DerivationEdge(const edge_set_type& __edges, const node_set_type& __tails,
 		   const int __height,
 		   const int __internal)
-      : edges(__edges), tails(__tails), height(__height), internal(__internal), rule() {}
+      : edges(__edges), tails(__tails), height(__height), internal(__internal) {}
     
     void swap(DerivationEdge& x)
     {
@@ -423,7 +428,10 @@ struct ExtractTree
       tails.swap(x.tails);
       std::swap(height, x.height);
       std::swap(internal, x.internal);
+      
       rule.swap(x.rule);
+      positions.swap(x.positions);
+      std::swap(count, x.count);
     }
   };
   
@@ -431,7 +439,7 @@ struct ExtractTree
   {
     typedef DerivationEdge derivation_edge_type;
     typedef std::deque<derivation_edge_type, std::allocator<derivation_edge_type> > edge_set_type;
-
+    
     id_type       node;
     range_type    range;
     edge_set_type edges;
@@ -451,15 +459,11 @@ struct ExtractTree
   typedef utils::chunk_vector<derivation_node_type, 4096 / sizeof(derivation_node_type), std::allocator<derivation_node_type> > derivation_set_type;
 
   typedef std::vector<int, std::allocator<int> > index_set_type;
-  typedef std::vector<bool, std::allocator<bool> > covered_type;
-  typedef std::vector<int, std::allocator<int> > point_set_type;
-  typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
+  
+  
   typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> >  rule_pair_list_type;
   typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
   
-  typedef std::pair<range_type, int> range_pos_type;
-  typedef std::vector<range_pos_type, std::allocator<range_pos_type> > range_pos_set_type;
-
   struct node_set_hash : public utils::hashmurmur<size_t>
   {
     size_t operator()(const edge_set_type& edges) const
@@ -533,7 +537,7 @@ struct ExtractTree
       }
     };
     
-    void construct_subtrees(const hypergraph_type& graph)
+    void construct_subtrees(const hypergraph_type& graph, const int max_nodes, const int max_height)
     {
       typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
       typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
@@ -579,11 +583,11 @@ struct ExtractTree
 	  
 	  const derivation_edge_type& edge_composed = item->edge_composed;
 	  
-	  if (! item->composed || (max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes)) {
-	    derivations_new[id].push_back(edge_composed);
+	  if (! item->composed || ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))) {
+	    derivations_new[id].edges.push_back(edge_composed);
 	    
 	    if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
-	      derivations_next[id].push_back(edge_composed);
+	      derivations_next[id].edges.push_back(edge_composed);
 	  }
 	  
 	  // push-successor...
@@ -597,11 +601,11 @@ struct ExtractTree
 	  for (size_t i = 0; i != j.size(); ++ i) {
 	    ++ j[i];
 	    
-	    if (j[i] < derivations_next[edge.tails[i]].edges.size() && cand_unique.find(&query) == cand_unique.end()) {
+	    if (j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()) && cand_unique.find(&query) == cand_unique.end()) {
 	      edges_new.clear();
 	      tails_new.clear();
 	      
-	      const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
+	      const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new, max_nodes);
 	      
 	      if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
 		index_set_type::const_iterator jiter_begin = j.begin();
@@ -689,7 +693,8 @@ struct ExtractTree
 				       IndexIterator first, IndexIterator last,
 				       TailIterator tail_iter,
 				       int internal,
-				       Tails& tails_new)
+				       Tails& tails_new,
+				       const int max_nodes)
     {
       bool composed_rule = false;
       for (/**/; first != last; ++ first, ++ tail_iter) {
@@ -835,11 +840,14 @@ struct ExtractTree
       derivations_new.clear();
     }
     
-    void construct_derivations(const DerivationGraph& counterpart)
+    void construct_derivations(const hypergraph_type& graph, const DerivationGraph& counterpart)
     {
       typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
       typedef google::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_node_map_type;
       typedef google::dense_hash_set<range_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_set_type;
+      typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
+
+      node_map_type node_map(graph.nodes.size());
       
       size_type goal_node = size_type(-1);
 
@@ -1058,7 +1066,7 @@ struct ExtractTree
       return std::make_pair(max_height, num_tails);
     }
 
-    void admissible_nodes(const DerivationGraph& counterpart)
+    void admissible_nodes(const hypergraph_type& graph, const DerivationGraph& counterpart)
     {
       const int cspan_max = counterpart.alignment_map.size();
       
@@ -1185,21 +1193,23 @@ struct ExtractTree
     }
     
   };
+
+  typedef DerivationGraph derivation_graph_type;
   
   
-  ExtractTree(const symbol_type& __non_terminal,
-	      const int __max_nodes,
+  ExtractTree(const int __max_nodes,
 	      const int __max_height,
 	      const bool __inverse)
-    : non_terminal(__non_terminal),
-      max_nodes(__max_nodes),
+    : max_nodes(__max_nodes),
       max_height(__max_height),
       inverse(__inverse) {}
 
-  symbol_type non_terminal;
   int max_nodes;
   int max_height;
   bool inverse;
+  
+  derivation_graph_type graph_source;
+  derivation_graph_type graph_target;
   
   void operator()(const hypergraph_type& source,
 		  const hypergraph_type& target,
@@ -1217,24 +1227,48 @@ struct ExtractTree
     graph_target.construct_spans(target, alignment, ! inverse);
     
     // construct admissible nodes
-    graph_source.admissible_nodes(graph_target);
-    graph_target.admissible_nodes(graph_source);
+    graph_source.admissible_nodes(source, graph_target);
+    graph_target.admissible_nodes(target, graph_source);
     
     // construct derivations... here, we will create minimal rules wrt single side
-    graph_source.construct_derivations(graph_target);
-    graph_target.construct_derivations(graph_source);
+    graph_source.construct_derivations(source, graph_target);
+    graph_target.construct_derivations(target, graph_source);
     
     // prune...
-    derivations_source.prune_derivations();
-    derivations_target.prune_derivations();
+    graph_source.prune_derivations();
+    graph_target.prune_derivations();
     
     // construct subtrees...
-    graph_source.construct_subtrees(source);
-    graph_target.construct_subtrees(target);
+    graph_source.construct_subtrees(source, max_nodes, max_height);
+    graph_target.construct_subtrees(target, max_nodes, max_height);
     
     // perform subtree pair extractions...
     extract_pairs(source, target, rules);
   }
+  
+  typedef std::pair<range_type, range_set_type> range_tail_type;
+  
+  struct range_tail_hash : public utils::hashmurmur<size_t>
+  {
+    size_t operator()(const range_tail_type& x) const
+    {
+      return utils::hashmurmur<size_t>::operator()(x.second.begin(), x.second.end(), x.first.first + x.first.second);
+    }
+  };
+
+  typedef std::pair<id_type, id_type> node_edge_type;
+  typedef std::vector<node_edge_type, std::allocator<node_edge_type> > node_edge_set_type;
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<range_tail_type, node_edge_set_type, range_tail_hash, std::equal_to<range_tail_type>,
+				  std::allocator<std::pair<const range_tail_type, node_edge_set_type> > > range_tail_map_type;
+#else
+  typedef sgi::hash_map<range_tail_type, node_edge_set_type, range_tail_hash, std::equal_to<range_tail_type>,
+			std::allocator<std::pair<const range_tail_type, node_edge_set_type> > > range_tail_map_type;
+
+#endif
+  
+  range_tail_map_type range_tails;
   
   void extract_pairs(const hypergraph_type& source,
 		     const hypergraph_type& target,
@@ -1243,245 +1277,147 @@ struct ExtractTree
     // we will perform pairing of source/target derivations....
     
     // first, compute span-mapping from target-side...
+
+    rule_pair_set_local_type rule_pairs_local;
+    rule_pair_type rule_pair;
     
+    range_tail_type range_tail;
+    range_tails.clear();
     
-    
-    for (size_t id = 0; id != derivations.size(); ++ id) {
-      derivation_node_type& node = derivations[id];
+    for (size_t id = 0; id != graph_target.derivations.size(); ++ id) {
+      derivation_node_type& node = graph_target.derivations[id];
       
-      //std::cerr << "node id: " << id << std::endl;
+      range_tail.first = graph_target.ranges[node.node];
       
-      derivation_node_type::edge_set_type derivation_edges_new;
-      
-      candidates.clear();
-      cand_unique.clear();
-      
-      cand.clear();
-      cand.reserve(node.edges.size() * 100);
-      
-      derivation_node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-      for (derivation_node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const derivation_edge_type& edge = *eiter;
-	const index_set_type j(edge.tails.size(), -1);
+      for (size_t id_edge = 0; id_edge != node.edges.size(); ++ id_edge) {
+	const derivation_edge_type& edge = node.edges[id_edge];
 	
-	candidates.push_back(candidate_type(edge, j, false));
+	range_tail.second.clear();
 	
-	cand.push(&candidates.back());
-	cand_unique.insert(&candidates.back());
+	node_set_type::const_iterator titer_end = edge.tails.end();
+	for (node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+	  const derivation_node_type& node_tail = graph_target.derivations[*titer];
+	  
+	  range_tail.second.push_back(graph_target.ranges[node_tail.node]);
+	}
+	
+	range_tails[range_tail].push_back(std::make_pair(id, id_edge));
       }
+    }
+    
+    for (size_t id = 0; id != graph_source.derivations.size(); ++ id) {
+      derivation_node_type& node_source = graph_source.derivations[id];
       
-      while (! cand.empty()) {
-	const candidate_type* item = cand.top();
-	cand.pop();
-
-	const derivation_edge_type& edge_composed = item->edge_composed;
+      range_tail.first = node_source.range;
+      
+      derivation_node_type::edge_set_type::iterator siter_end = node_source.edges.end();
+      for (derivation_node_type::edge_set_type::iterator siter = node_source.edges.begin(); siter != siter_end; ++ siter) {
+	derivation_edge_type& edge_source = *siter;
 	
-	// construct rule pair and insert into rule pair list
-	construct_rule_pair(graph, sentence, node, edge_composed.edges, edge_composed.tails, rule_pair);
+	range_tail.second.clear();
 	
-	rule_pairs_local[edge_composed.edges].push_back(rule_pair);
-	
-	if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
-	  derivation_edges_new.push_back(edge_composed);
-	
-	// push-successor...
-
-	const derivation_edge_type& edge = *(item->edge);
-	  
-	candidate_type query(item->j);
-	index_set_type& j = query.j;
-	query.edge = item->edge;
-	  
-	for (size_t i = 0; i != j.size(); ++ i) {
-	  ++ j[i];
+	{
+	  node_set_type::const_iterator titer_end = edge_source.tails.end();
+	  for (node_set_type::const_iterator titer = edge_source.tails.begin(); titer != titer_end; ++ titer) {
+	    const derivation_node_type& node_tail = graph_source.derivations[*titer];
 	    
-	  if (j[i] < derivations[edge.tails[i]].edges.size() && cand_unique.find(&query) == cand_unique.end()) {
-	    edges_new.clear();
-	    tails_new.clear();
+	    range_tail.second.push_back(node_tail.range);
+	  }
+	}
+	
+	range_tail_map_type::const_iterator riter = range_tails.find(range_tail);
+	if (riter == range_tails.end()) continue;
+	
+	node_edge_set_type::const_iterator titer_end = riter->second.end();
+	for (node_edge_set_type::const_iterator titer = riter->second.begin(); titer != titer_end; ++ titer) {
+	  derivation_edge_type& edge_target = graph_target.derivations[titer->first].edges[titer->second];
+	  
+	  if (edge_source.rule.empty())
+	    construct_rule(source, node_source, graph_source, edge_source);
+	  
+	  if (edge_target.rule.empty())
+	    construct_rule(target, graph_target.derivations[titer->first], graph_target, edge_target);
+	  
+	  rule_pair.source = edge_source.rule;
+	  rule_pair.target = edge_target.rule;
+	  
+	  // construct alignment... HOW?
+	  rule_pair.alignment.clear();
+
+	  for (size_t src = 0; src != edge_source.positions.size(); ++ src)
+	    if (edge_source.positions[src] >= 0) {
+	      point_set_type::const_iterator aiter_begin = graph_source.alignment_map[src].begin();
+	      point_set_type::const_iterator aiter_end   = graph_source.alignment_map[src].end();
 	      
-	    const std::pair<int, bool> composed_stat = compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
-	      
-	    if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
-	      index_set_type::const_iterator jiter_begin = j.begin();
-	      index_set_type::const_iterator jiter_end   = j.end();
-	      node_set_type::const_iterator  titer_begin = edge.tails.begin();
-	      edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
-	      edge_set_type::const_iterator  eiter_end   = edge.edges.end();
-		
-	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
-		
-	      if (max_height <= 0 || rule_stat.first <= max_height) {
-		candidates.push_back(candidate_type(edge, j, true));
-		  
-		candidate_type& item = candidates.back();
-		  
-		item.edge_composed.edges.swap(edges_new);
-		item.edge_composed.tails.swap(tails_new);
-		item.edge_composed.height = rule_stat.first;
-		item.edge_composed.internal = rule_stat.second;
-		
-		cand.push(&item);
-		cand_unique.insert(&item);
+	      for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+		if (edge_target.positions[*aiter] < 0)
+		  throw std::runtime_error("inlvalid alignment...?");
+
+		rule_pair.alignment.push_back(std::make_pair(edge_source.positions[src], edge_target.positions[*aiter]));
 	      }
 	    }
-	  }
 	  
-	  -- j[i];
+	  rule_pair.count = edge_source.count * edge_target.count;
+	  
+	  std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair);
+	  if (! result.second)
+	    const_cast<rule_pair_type&>(*(result.first)).count += rule_pair.count;
 	}
       }
-
-      
-      // allocate new derivations!
-      node.edges.swap(derivation_edges_new);
-      
-      // sort for cube-pruning!
-      std::sort(node.edges.begin(), node.edges.end(), less_derivation_edge_type());
-    }
-
-    // if we share the same edge set, then, we can easily conclude that it is
-    // caused by unaligned word ambiguity...
-    rule_pair_set_local_type::iterator riter_end = rule_pairs_local.end();
-    for (rule_pair_set_local_type::iterator riter = rule_pairs_local.begin(); riter != riter_end; ++ riter) {
-      rule_pair_list_type& rule_list = riter->second;
-      
-      const double factor = 1.0 / rule_list.size();
-      
-      rule_pair_list_type::iterator liter_end = rule_list.end();
-      for (rule_pair_list_type::iterator liter = rule_list.begin(); liter != liter_end; ++ liter) {
-	liter->count *= factor;
-	
-	std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
-	if (! result.second)
-	  const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
-      }
     }
   }
-  
   
   // construct rule-pair related data
+  covered_type   covered;
+  point_set_type positions_relative;
   
-  point_set_type positions_source;
-  point_set_type positions_target;
-  tree_rule_set_type trees;
-  covered_type covered;
-  range_pos_set_type range_pos;
-  
-  template <typename Tp>
-  struct less_first
+  void construct_rule(const hypergraph_type& graph,
+		      const derivation_node_type& node,
+		      const derivation_graph_type& derivations,
+		      derivation_edge_type& edge)
   {
-    bool operator()(const Tp& x, const Tp& y) const
-    {
-      return x.first < y.first;
-    }
-  };
-  
-  void construct_rule_pair(const hypergraph_type& graph,
-			   const sentence_type& sentence,
-			   const derivation_node_type& node,
-			   const edge_set_type& edges,
-			   const node_set_type& tails,
-			   rule_pair_type& rule_pair)
-  {
-    positions_source.clear();
+    positions_relative.clear();
     covered.clear();
-    covered.resize(alignment_source_target.size(), false);
+    covered.resize(derivations.alignment_map.size(), false);
     
-    tree_rule_type rule_source;
-    weight_type weight = weights_outside[node.node];
+    tree_rule_type tree_rule;
+    weight_type weight = derivations.weights_outside[node.node];
     
+    int frontier_pos = 0;
+    int index = 0;
+    
+    edge_set_type::const_iterator iter = edge.edges.begin();
+    edge_set_type::const_iterator iter_end = edge.edges.end();
+    
+    construct_rule(derivations, graph, iter, iter_end, tree_rule, index, frontier_pos, positions_relative, covered, weight);
 
-    //std::cerr << "construct source" << std::endl;
-    {
-      int frontier_pos = 0;
-      int index = 1;
-      edge_set_type::const_iterator iter = edges.begin();
-      edge_set_type::const_iterator iter_end = edges.end();
-      construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, covered, weight);
-    }
+    // count assignment..
+    edge.count = weight;
     
-    rule_pair.count = weight;
+    // mapping into actual positions_map...
+    edge.positions.clear();
+    edge.positions.reserve(derivations.alignment_map.size());
+    edge.positions.resize(derivations.alignment_map.size(), -1);
     
-    //std::cerr << "construct target" << std::endl;
-    
-    range_pos.clear();
-    trees.clear();
-    positions_target.clear();
-    positions_target.resize(sentence.size());
-    
-    if (tails.empty()) {
-      trees.insert(trees.end(), sentence.begin() + node.range.first, sentence.begin() + node.range.second);
-      for (int i = node.range.first; i != node.range.second; ++ i)
-	positions_target[i] = i - node.range.first;
-    } else {
-      int index = 1;
-      range_pos.reserve(tails.size());
-      node_set_type::const_iterator titer_end = tails.end();
-      for (node_set_type::const_iterator titer = tails.begin(); titer != titer_end; ++ titer, ++ index)
-	range_pos.push_back(std::make_pair(derivations[*titer].range, index));
-      
-      std::sort(range_pos.begin(), range_pos.end(), less_first<range_pos_type>());
-      
-      int pos_first = node.range.first;
-      range_pos_set_type::const_iterator riter_end = range_pos.end();
-      for (range_pos_set_type::const_iterator riter = range_pos.begin(); riter != riter_end; ++ riter) {
-	const int pos_last = riter->first.first;
-	
-	int mapped_pos = trees.size();
-	for (int i = pos_first; i != pos_last; ++ i, ++ mapped_pos)
-	  positions_target[i] = mapped_pos;
-	
-	trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
-	trees.push_back(non_terminal.non_terminal(riter->second));
-	
-	pos_first = riter->first.second;
+    point_set_type::const_iterator piter = positions_relative.begin();
+    for (size_t i = 0; i != covered.size(); ++ i)
+      if (covered[i]) {
+	edge.positions[i] = *piter;
+	++ piter;
       }
-      
-      const int pos_last = node.range.second;
-      int mapped_pos = trees.size();
-      for (int i = pos_first; i != pos_last; ++ i, ++ mapped_pos)
-	positions_target[i] = mapped_pos;
-      
-      trees.insert(trees.end(), sentence.begin() + pos_first, sentence.begin() + pos_last);
-    }
     
-    tree_rule_type rule_target(non_terminal, trees.begin(), trees.end());
+    // dump into rule...
+    edge.rule.clear();
+    boost::iostreams::filtering_ostream os;
 
-    //
-    // construct word alignment...
-    // we can easily reconsruct from positions_{source, target} + covered
-    //
-
-    //std::cerr << "construct alignment" << std::endl;
+    os.push(boost::iostreams::back_inserter(edge.rule));
     
-    rule_pair.alignment.clear();
-    int pos_src = 0;
-    
-    for (size_t src = 0; src != covered.size(); ++ src)
-      if (covered[src]) {
-	point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
-	point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
-	
-	for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	  rule_pair.alignment.push_back(std::make_pair(positions_source[pos_src], positions_target[*aiter]));
-	
-	++ pos_src;
-      }
-
-    rule_pair.source.clear();
-    rule_pair.target.clear();
-    
-    boost::iostreams::filtering_ostream os_source;
-    boost::iostreams::filtering_ostream os_target;
-    
-    os_source.push(boost::iostreams::back_inserter(rule_pair.source));
-    os_target.push(boost::iostreams::back_inserter(rule_pair.target));
-    
-    os_source << rule_source;
-    os_target << rule_target;
+    os << tree_rule;
   }
   
-  template <typename Iterator, typename PosMap, typename Covered>
-  void construct_rule(const hypergraph_type& graph,
+  template <typename Derivations, typename Iterator, typename PosMap, typename Covered>
+  void construct_rule(const Derivations& derivations,
+		      const hypergraph_type& graph,
 		      Iterator& iter,
 		      Iterator last,
 		      tree_rule_type& tree_rule,
@@ -1509,7 +1445,6 @@ struct ExtractTree
     
     ++ iter;
     
-    
     size_t tail_pos = 0;
     tree_rule_type::iterator titer_end = tree_rule.end();
     for (tree_rule_type::iterator titer = tree_rule.begin(); titer != titer_end; ++ titer) {
@@ -1518,12 +1453,12 @@ struct ExtractTree
 	const id_type node_id = edge.tails[tail_pos];
 	
 	if (iter != last && node_id == graph.edges[*iter].head)
-	  construct_rule(graph, iter, last, *titer, index, frontier_pos, pos_map, covered, weight);
+	  construct_rule(derivations, graph, iter, last, *titer, index, frontier_pos, pos_map, covered, weight);
 	else {
-	  for (int pos = ranges[node_id].first; pos != ranges[node_id].second; ++ pos)
+	  for (int pos = derivations.ranges[node_id].first; pos != derivations.ranges[node_id].second; ++ pos)
 	    covered[pos] = false;
 	  
-	  weight *= weights_inside[node_id];
+	  weight *= derivations.weights_inside[node_id];
 	  
 	  titer->label = titer->label.non_terminal(index ++);
 	  ++ frontier_pos;
@@ -1536,7 +1471,6 @@ struct ExtractTree
       }
     }
   }
-  
 };
 
 
@@ -1554,13 +1488,13 @@ struct Task
   
   Task(queue_type& __queue,
        const path_type& __output,
-       const std::string& non_terminal,
        const int max_nodes,
        const int max_height,
+       const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_nodes, max_height),
+      extractor(max_nodes, max_height, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

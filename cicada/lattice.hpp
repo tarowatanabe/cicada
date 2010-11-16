@@ -83,9 +83,9 @@ namespace cicada
     typedef lattice_type::const_iterator const_iterator;
     
   public:
-    Lattice() : lattice(), dist() {}
+    Lattice() : lattice(), dist_short(), dist_long() {}
     Lattice(const std::string& x) { assign(x); }
-    Lattice(const Sentence& x) : lattice(x.size()), dist()
+    Lattice(const Sentence& x) : lattice(x.size()), dist_short(), dist_long()
     {
       iterator liter = lattice.begin();
       Sentence::const_iterator iter_end = x.end();
@@ -122,18 +122,30 @@ namespace cicada
       return shortest_distance(0, size());
     }
     
+    difference_type longest_distance() const
+    {
+      // shortest distance from begining to end of lattice..
+      return longest_distance(0, size());
+    }
+    
     difference_type shortest_distance(difference_type begin, difference_type end) const 
     {
-      return (dist.empty() ? end - begin : dist(begin, end));
+      return (dist_short.empty() ? end - begin : dist_short(begin, end));
+    }
+    
+    difference_type longest_distance(difference_type begin, difference_type end) const 
+    {
+      return (dist_long.empty() ? end - begin : dist_long(begin, end));
     }
     
     void swap(Lattice& x)
     {
       lattice.swap(x.lattice);
-      dist.swap(x.dist);
+      dist_short.swap(x.dist_short);
+      dist_long.swap(x.dist_long);
     }
 
-    void clear() { lattice.clear(); dist.clear(); }
+    void clear() { lattice.clear(); dist_short.clear(); dist_long.clear(); }
 
     friend
     std::ostream& operator<<(std::ostream& os, const Lattice& x);
@@ -145,7 +157,8 @@ namespace cicada
     
   private:
     lattice_type lattice;
-    distance_type dist;
+    distance_type dist_short;
+    distance_type dist_long;
   };
   
 };

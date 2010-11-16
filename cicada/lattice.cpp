@@ -37,25 +37,36 @@ namespace cicada
     const difference_type infinity = boost::numeric::bounds<difference_type>::highest();
     
     // edge-cost is inifinity if no-path
-    dist.clear();
-    dist.reserve(dist_size, dist_size);
-    dist.resize(dist_size, dist_size, infinity);
+    dist_short.clear();
+    dist_short.reserve(dist_size, dist_size);
+    dist_short.resize(dist_size, dist_size, infinity);
+
+    dist_long.clear();
+    dist_long.reserve(dist_size, dist_size);
+    dist_long.resize(dist_size, dist_size, 0);
     
     // edge-cost for dist(i, j)
     for (size_t i = 0; i != lattice.size(); ++ i)
-      for (size_t j = 0; j != lattice[i].size(); ++ j)
-	dist(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
+      for (size_t j = 0; j != lattice[i].size(); ++ j) {
+	dist_short(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
+	dist_long(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
+      }
     
     // edge-cost dist(i, i) = 0
-    for (size_t i = 0; i != dist_size; ++ i)
-      dist(i, i) = 0;
+    for (size_t i = 0; i != dist_size; ++ i) {
+      dist_short(i, i) = 0;
+      dist_long(i, i)  = 0;
+    }
     
     // Floyd-Warshall algorithm to compute shortest path
     for (size_t k = 0; k != dist_size; ++ k) 
       for (size_t i = 0; i != dist_size; ++ i)
-	for (size_t j = 0; j != dist_size; ++ j)
-	  if (dist(i, k) != infinity && dist(k, j) != infinity)
-	    dist(i, j) = utils::bithack::min(dist(i, j), dist(i, k) + dist(k, j));
+	for (size_t j = 0; j != dist_size; ++ j) {
+	  if (dist_short(i, k) != infinity && dist_short(k, j) != infinity)
+	    dist_short(i, j) = utils::bithack::min(dist_short(i, j), dist_short(i, k) + dist_short(k, j));
+	  
+	  dist_long(i, j) = utils::bithack::max(dist_long(i, j), dist_long(i, k) + dist_long(k, j));
+	}
   }
   
   template <typename Iterator>

@@ -25,6 +25,8 @@ bin_PROGRAMS = \
 	cicada_extract_scfg_mpi \
 	cicada_extract_score \
 	cicada_extract_score_mpi \
+	cicada_extract_tree \
+	cicada_extract_tree_mpi \
 	cicada_filter_cabocha \
 	cicada_filter_extract \
 	cicada_filter_extract_ghkm \
@@ -89,6 +91,13 @@ cicada_extract_score_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftoo
 cicada_extract_score_mpi_SOURCES  = cicada_extract_score_mpi.cpp
 cicada_extract_score_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_score_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_extract_tree_SOURCES = cicada_extract_tree.cpp
+cicada_extract_tree_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_extract_tree_mpi_SOURCES  = cicada_extract_tree_mpi.cpp
+cicada_extract_tree_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_extract_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_penntreebank_SOURCES = cicada_filter_penntreebank.cpp
 cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
