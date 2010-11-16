@@ -117,6 +117,8 @@ namespace cicada
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+      typedef std::vector<int, std::allocator<int> > epsilon_set_type;
+      typedef std::vector<epsilon_set_type, std::allocator<epsilon_set_type> > epsilon_map_type;
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -124,6 +126,22 @@ namespace cicada
       feature_set_type features;
       features["insertion-penalty"] = - 1.0;
 
+      // first, compute closure for epsilon...
+      epsilon_map_type epsilons(lattice.size() + 1);
+      for (int first = lattice.size() - 1; first >= 0; -- first) {
+	const lattice_type::arc_set_type& arcs = lattice[first];
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
+	  if (aiter->label == vocab_type::EPSILON) {
+	    const int last = first + aiter->distance;
+	    
+	    epsilons[first].push_back(last);
+	    epsilons[first].insert(epsilons[first].end(), epsilons[last].begin(), epsilons[last].end());
+	  }
+      }
+      
+      // then, compute again...
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 	
@@ -135,9 +153,13 @@ namespace cicada
 	  const size_t last = first + aiter->distance;
 	  
 	  positions[first][last] = true;
+	  
+	  epsilon_set_type::const_iterator eiter_end = epsilons[last].end();
+	  for (epsilon_set_type::const_iterator eiter = epsilons[last].begin(); eiter != eiter_end; ++ eiter)
+	    positions[first][*eiter] = true;
 
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
-	  
+	    
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
 	    
 	    insert(rule, rule, features);
@@ -203,6 +225,8 @@ namespace cicada
       : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+      typedef std::vector<int, std::allocator<int> > epsilon_set_type;
+      typedef std::vector<epsilon_set_type, std::allocator<epsilon_set_type> > epsilon_map_type;
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -211,7 +235,23 @@ namespace cicada
       features["deletion-penalty"] = - 1.0;
       
       rule_ptr_type rule_epsilon(new rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
-
+      
+      // first, compute closure for epsilon...
+      epsilon_map_type epsilons(lattice.size() + 1);
+      for (int first = lattice.size() - 1; first >= 0; -- first) {
+	const lattice_type::arc_set_type& arcs = lattice[first];
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
+	  if (aiter->label == vocab_type::EPSILON) {
+	    const int last = first + aiter->distance;
+	    
+	    epsilons[first].push_back(last);
+	    epsilons[first].insert(epsilons[first].end(), epsilons[last].begin(), epsilons[last].end());
+	  }
+      }
+      
+      // then, compute again...
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 
@@ -223,6 +263,10 @@ namespace cicada
 	  const size_t last = first + aiter->distance;
 	  
 	  positions[first][last] = true;
+
+	  epsilon_set_type::const_iterator eiter_end = epsilons[last].end();
+	  for (epsilon_set_type::const_iterator eiter = epsilons[last].begin(); eiter != eiter_end; ++ eiter)
+	    positions[first][*eiter] = true;
 
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	  
