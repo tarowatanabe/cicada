@@ -406,14 +406,16 @@ struct ExtractTree
     int height;
     int internal;
 
+    std::string rule;
+
     DerivationEdge()
-      : edges(), tails(), height(0), internal(0) {}
+      : edges(), tails(), height(0), internal(0), rule() {}
     DerivationEdge(const edge_set_type& __edges, const node_set_type& __tails)
-      : edges(__edges), tails(__tails), height(0), internal(0) {}
+      : edges(__edges), tails(__tails), height(0), internal(0), rule() {}
     DerivationEdge(const edge_set_type& __edges, const node_set_type& __tails,
 		   const int __height,
 		   const int __internal)
-      : edges(__edges), tails(__tails), height(__height), internal(__internal) {}
+      : edges(__edges), tails(__tails), height(__height), internal(__internal), rule() {}
     
     void swap(DerivationEdge& x)
     {
@@ -421,6 +423,7 @@ struct ExtractTree
       tails.swap(x.tails);
       std::swap(height, x.height);
       std::swap(internal, x.internal);
+      rule.swap(x.rule);
     }
   };
   
@@ -472,7 +475,7 @@ struct ExtractTree
   typedef sgi::hash_map<edge_set_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_type>,
 			std::allocator<std::pair<const edge_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
 #endif
-
+  
   struct DerivationGraph
   {
     derivation_set_type derivations;
@@ -488,7 +491,226 @@ struct ExtractTree
     weight_set_type weights_outside;
     
     alignment_map_type alignment_map;
+
+    struct Candidate
+    {
+      const derivation_edge_type* edge;
+      derivation_edge_type edge_composed;
+      
+      index_set_type j;
+      bool composed;
+      
+      Candidate(const index_set_type& __j)
+	: edge(0), edge_composed(), j(__j), composed(true) {}
+      Candidate(const derivation_edge_type& __edge, const index_set_type& __j, const bool __composed)
+	: edge(&__edge), edge_composed(__edge), j(__j), composed(__composed) {}
+    };
+    typedef Candidate candidate_type;
+    typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
+    struct candidate_hash_type : public utils::hashmurmur<size_t>
+    {
+      size_t operator()(const candidate_type* x) const
+      {
+	return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), intptr_t(x->edge)));
+      }
+    };
+    
+    struct candidate_equal_type
+    {
+      bool operator()(const candidate_type* x, const candidate_type* y) const
+      {
+	return (x == y) || (x && y && x->edge == y->edge && x->j == y->j);
+      }
+    };
+    
+    struct compare_heap_type
+    {
+      // we use greater, so that when popped from heap, we will grab "less" in back...
+      bool operator()(const candidate_type* x, const candidate_type* y) const
+      {
+	return int(x->composed) > int(y->composed) || (x->composed == y->composed && x->edge_composed.internal > y->edge_composed.internal);
+      }
+    };
+    
+    void construct_subtrees(const hypergraph_type& graph)
+    {
+      typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
+      typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
+      typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_unique_type;
+      
+      derivation_set_type derivations_new(derivations.size());
+      derivation_set_type derivations_next(derivations.size());
+      
+      candidate_set_type    candidates;
+      candidate_heap_type   cand;
+      candidate_unique_type cand_unique;
+      cand_unique.set_empty_key(0);
+      
+      edge_set_type edges_new;
+      node_set_type tails_new;
+      
+      for (size_t id = 0; id != derivations.size(); ++ id) {
+	const derivation_node_type& node = derivations[id];
+	
+	derivations_new[id].node  = node.node;
+	derivations_new[id].range = node.range;
+	
+	candidates.clear();
+	cand_unique.clear();
+	
+	cand.clear();
+	cand.reserve(node.edges.size() * 100);
+	
+	derivation_node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (derivation_node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const derivation_edge_type& edge = *eiter;
+	  const index_set_type j(edge.tails.size(), -1);
+	  
+	  candidates.push_back(candidate_type(edge, j, false));
+	  
+	  cand.push(&candidates.back());
+	  cand_unique.insert(&candidates.back());
+	}
+	
+	while (! cand.empty()) {
+	  const candidate_type* item = cand.top();
+	  cand.pop();
+	  
+	  const derivation_edge_type& edge_composed = item->edge_composed;
+	  
+	  if (! item->composed || (max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes)) {
+	    derivations_new[id].push_back(edge_composed);
+	    
+	    if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
+	      derivations_next[id].push_back(edge_composed);
+	  }
+	  
+	  // push-successor...
+	  
+	  const derivation_edge_type& edge = *(item->edge);
+	  
+	  candidate_type query(item->j);
+	  index_set_type& j = query.j;
+	  query.edge = item->edge;
+	  
+	  for (size_t i = 0; i != j.size(); ++ i) {
+	    ++ j[i];
+	    
+	    if (j[i] < derivations_next[edge.tails[i]].edges.size() && cand_unique.find(&query) == cand_unique.end()) {
+	      edges_new.clear();
+	      tails_new.clear();
+	      
+	      const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
+	      
+	      if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
+		index_set_type::const_iterator jiter_begin = j.begin();
+		index_set_type::const_iterator jiter_end   = j.end();
+		node_set_type::const_iterator  titer_begin = edge.tails.begin();
+		edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
+		edge_set_type::const_iterator  eiter_end   = edge.edges.end();
+		
+		const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
+		
+		if (max_height <= 0 || rule_stat.first <= max_height) {
+		  candidates.push_back(candidate_type(edge, j, true));
+		  
+		  candidate_type& item = candidates.back();
+		  
+		  item.edge_composed.edges.swap(edges_new);
+		  item.edge_composed.tails.swap(tails_new);
+		  item.edge_composed.height = rule_stat.first;
+		  item.edge_composed.internal = rule_stat.second;
+		
+		  cand.push(&item);
+		  cand_unique.insert(&item);
+		}
+	      }
+	    }
+	  
+	    -- j[i];
+	  }
+	}
+	
+	// sort for cube-pruning!
+	std::sort(derivations_next[id].edges.begin(), derivations_next[id].edges.end(), less_derivation_edge_type());
+      }
+      
+      derivations.swap(derivations_new);
+    }
+
+    template <typename Derivations, typename IndexIterator, typename TailIterator, typename EdgeIterator, typename Edges>
+    std::pair<int, int> compose_edges(const Derivations& derivations,
+				      const hypergraph_type& graph,
+				      IndexIterator& iter, IndexIterator last,
+				      TailIterator& tail_iter,
+				      EdgeIterator& edge_iter, EdgeIterator edge_last,
+				      Edges& edges_new)
+    {
+      // this should not happen...
+      if (edge_iter == edge_last) return std::make_pair(0, 0);
+    
+      edges_new.push_back(*edge_iter);
+    
+      const hypergraph_type::edge_type& edge = graph.edges[*edge_iter];
+      ++ edge_iter;
+
+      int height = 1;
+      int num_tails = edge.tails.size();
+    
+      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+	if (edge_iter != edge_last && graph.edges[*edge_iter].head == *titer) {
+	  const std::pair<int, int> result = compose_edges(derivations, graph, iter, last, tail_iter, edge_iter, edge_last, edges_new);
+
+	  height = utils::bithack::max(height, result.first + 1);
+	  num_tails += result.second;
+	} else if (iter != last) {
+	  if (*iter >= 0) {
+	    const derivation_edge_type& edge = derivations[*tail_iter].edges[*iter];
+	    edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
+	  
+	    height = utils::bithack::max(height, edge.height + 1);
+	    num_tails += edge.internal;
+	  }
+	
+	  ++ iter;
+	  ++ tail_iter;
+	} else
+	  std::cerr << "WARNING: tails size and edge set frontier do not match" << std::endl;
+      }
+    
+      return std::make_pair(height, num_tails);
+    }
+
+
+    template <typename Derivations, typename IndexIterator, typename TailIterator, typename Tails>
+    std::pair<int, bool> compose_tails(const Derivations& derivations,
+				       IndexIterator first, IndexIterator last,
+				       TailIterator tail_iter,
+				       int internal,
+				       Tails& tails_new)
+    {
+      bool composed_rule = false;
+      for (/**/; first != last; ++ first, ++ tail_iter) {
+	if (*first < 0)
+	  tails_new.push_back(*tail_iter);
+	else {
+	  const derivation_edge_type& edge = derivations[*tail_iter].edges[*first];
+	  tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
+	
+	  internal += edge.internal;
+	  composed_rule = true;
+	
+	  // early termination...
+	  if (max_nodes > 0 && internal > max_nodes)
+	    return std::make_pair(internal, composed_rule);
+	}
+      }
+	    
+    return std::make_pair(internal, composed_rule);
+  }
+
     
     enum color_type {
       white,
@@ -509,6 +731,10 @@ struct ExtractTree
     typedef std::vector<int, std::allocator<int> > reloc_set_type;
     typedef std::vector<color_type, std::allocator<color_type> > color_set_type;
     typedef std::vector<dfs_type, std::allocator<dfs_type> > stack_type;
+
+    reloc_set_type reloc_node;
+    color_set_type color;
+    stack_type     stack;
     
     void prune_derivations()
     {
@@ -516,10 +742,13 @@ struct ExtractTree
       // I'm not sure whether we need this... but this is simply to make sure 
       // the extracted Tree rules are reachable from root of the parse forest
       
-      reloc_set_type reloc_node(derivations.size(), -1);
-      color_set_type color(derivations.size(), white);
-      stack_type stack;
-    
+      reloc_node.clear();
+      reloc_node.resize(derivations.size(), -1);
+      
+      color.clear();
+      color.resize(derivations.size(), white);
+      
+      stack.clear();
       stack.reserve(derivations.size());
       stack.push_back(dfs_type(derivations.size() - 1, 0, 0));
     
@@ -538,7 +767,7 @@ struct ExtractTree
       
 	while (pos_edge != curr_node->edges.size()) {
 	  const derivation_edge_type& curr_edge = curr_node->edges[pos_edge];
-	
+	  
 	  if (pos_tail == curr_edge.tails.size()) {
 	    // reach end...
 	    ++ pos_edge;
@@ -605,7 +834,7 @@ struct ExtractTree
       derivations.swap(derivations_new);
       derivations_new.clear();
     }
-
+    
     void construct_derivations(const DerivationGraph& counterpart)
     {
       typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
@@ -650,18 +879,21 @@ struct ExtractTree
 	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	    const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	  
+	    
 	    queue.resize(queue.size() + 1);
 	    frontier_type& frontier = queue.back();
-	  
+	    
 	    frontier.first.push_back(*eiter);
-	  
+	    
+	    // we will construct minimum considering only one-sided derivations..
+	    // when combined, we will reconsider counter part...
+	    
 	    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 	      if (! admissibles[*titer])
 		frontier.second.push_back(*titer);
 	  }
-
+	  
 	  while (! queue.empty()) {
 	    const frontier_type& frontier = queue.front();
 	    
@@ -682,7 +914,7 @@ struct ExtractTree
 	      
 	      // iterate over tails and compute span...
 	      // code taken from apply_exact...
-	    
+	      
 	      index_set_type j_ends(tails.size(), 0);
 	      index_set_type j(tails.size(), 0);
 	      
@@ -726,7 +958,7 @@ struct ExtractTree
 		    if (goal_node == size_t(-1)) {
 		      goal_node = derivations.size();
 		      derivations.resize(goal_node + 1);
-		    
+		      
 		      // range is always [0, cspan_max)
 		      derivations.back().node = id;
 		      derivations.back().range = range_type(0, cspan_max);
@@ -780,10 +1012,10 @@ struct ExtractTree
 	      
 		queue.resize(queue.size() + 1);
 		frontier_type& frontier_next = queue.back();
-	      
+		
 		frontier_next.first = frontier.first;
 		frontier_next.first.push_back(*eiter);
-	      
+		
 		hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 		for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 		  if (! admissibles[*titer])
@@ -798,37 +1030,66 @@ struct ExtractTree
 	}
     }
 
-  template <typename Iterator, typename Tails>
-  std::pair<int, int> construct_tails(const hypergraph_type& graph,
-				      Iterator& iter,
-				      Iterator last,
-				      Tails& tails)
-  {
-    if (iter == last) return std::make_pair(0, 0);
+    template <typename Iterator, typename Tails>
+    std::pair<int, int> construct_tails(const hypergraph_type& graph,
+					Iterator& iter,
+					Iterator last,
+					Tails& tails)
+    {
+      if (iter == last) return std::make_pair(0, 0);
     
-    const hypergraph_type::edge_type& edge = graph.edges[*iter];
-    ++ iter;
+      const hypergraph_type::edge_type& edge = graph.edges[*iter];
+      ++ iter;
     
-    int max_height = 1;
-    int num_tails = edge.tails.size();
+      int max_height = 1;
+      int num_tails = edge.tails.size();
     
-    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
-      if (iter != last && *titer == graph.edges[*iter].head) {
-	const std::pair<int, int> result = construct_tails(graph, iter, last, tails);
+      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+	if (iter != last && *titer == graph.edges[*iter].head) {
+	  const std::pair<int, int> result = construct_tails(graph, iter, last, tails);
 	
-	max_height = utils::bithack::max(max_height, result.first + 1);
-	num_tails += result.second;
-      } else
-	tails.push_back(*titer);
+	  max_height = utils::bithack::max(max_height, result.first + 1);
+	  num_tails += result.second;
+	} else
+	  tails.push_back(*titer);
+      }
+    
+      return std::make_pair(max_height, num_tails);
     }
-    
-    return std::make_pair(max_height, num_tails);
-  }
-    
-    void admissible_nodes(const hypergraph_type& graph,
-			  const alignment_type& alignment,
-			  const bool inverse)
+
+    void admissible_nodes(const DerivationGraph& counterpart)
+    {
+      const int cspan_max = counterpart.alignment_map.size();
+      
+      admissibles.clear();
+      admissibles.resize(graph.nodes.size());
+      for (size_t id = 0; id != graph.nodes.size(); ++ id) {
+	
+	const bool is_goal(id == graph.goal);
+
+	admissibles[id] = ! spans[id].empty() && ! complements[id].intersect(spans[id].range());
+	
+	if (! is_goal && admissibles[id]) {
+	  const range_type range_min(spans[id].range());
+	  
+	  span_type::const_iterator riter_first = complements[id].lower_bound(range_min.first);
+	  span_type::const_iterator riter_last  = complements[id].lower_bound(range_min.second);
+	  
+	  const range_type range_max(riter_first == complements[id].begin() ? 0 : *(-- riter_first) + 1,
+				     riter_last != complements[id].end() ? *riter_last : cspan_max);
+	  
+	  admissibles[id] = false;
+	  for (int first = range_max.first; first <= range_min.first && ! admissibles[id]; ++ first)
+	    for (int last = range_min.second; last <= range_max.second && ! admissibles[id]; ++ last)
+	      admissibles[id] = counterpart.range_map.find(range_type(first, last)) != counterpart.range_map.end();
+	}
+      }
+    }
+   
+    void construct_spans(const hypergraph_type& graph,
+			 const alignment_type& alignment,
+			 const bool inverse)
     {
       weights_inside.clear();
       weights_outside.clear();
@@ -921,11 +1182,6 @@ struct ExtractTree
 	  }
 	}
       }
-      
-      admissibles.clear();
-      admissibles.resize(graph.nodes.size());
-      for (size_t id = 0; id != graph.nodes.size(); ++ id)
-	admissibles[id] = ! spans[id].empty() && ! complements[id].intersect(spans[id].range());
     }
     
   };
@@ -945,161 +1201,64 @@ struct ExtractTree
   int max_height;
   bool inverse;
   
-  range_set_type ranges;
-  span_set_type spans;
-  span_set_type complements;
-
-  admissible_set_type admissibles;
-  
-  node_map_type node_map;
-  derivation_set_type derivations;
-  
-  alignment_map_type alignment_source_target;
-  alignment_map_type alignment_target_source;
-
-  weight_set_type weights_inside;
-  weight_set_type weights_outside;
-  
   void operator()(const hypergraph_type& source,
 		  const hypergraph_type& target,
 		  const alignment_type&  alignment,
 		  rule_pair_set_type& rules)
   {
 #if 0
-    std::cerr << "hypergraph: " << graph << std::endl
-	      << "sentence: " << sentence << std::endl
+    std::cerr << "source: " << source << std::endl
+	      << "target: " << target << std::endl
 	      << "alignment: " << alignment << std::endl;
 #endif
     
-    // compute admissible nodes
+    // compute spans
+    graph_source.construct_spans(source, alignment, inverse);
+    graph_target.construct_spans(target, alignment, ! inverse);
     
-    derivations_source.admissible_nodes(source, alignment, inverse);
-    derivations_target.admissible_nodes(target, alignment, ! inverse);
+    // construct admissible nodes
+    graph_source.admissible_nodes(graph_target);
+    graph_target.admissible_nodes(graph_source);
     
-    derivations_source.construct_derivations(derivations_target);
-    derivations_target.construct_derivations(derivations_source);
-
+    // construct derivations... here, we will create minimal rules wrt single side
+    graph_source.construct_derivations(graph_target);
+    graph_target.construct_derivations(graph_source);
+    
+    // prune...
     derivations_source.prune_derivations();
     derivations_target.prune_derivations();
-
-    admissible_nodes(source, target);
-
-    ranges.clear();
-    spans.clear();
-    complements.clear();
-    admissibles.clear();
-    node_map.clear();
-
-    derivations.clear();
     
-    ranges.resize(graph.nodes.size());
-    spans.resize(graph.nodes.size());
-    complements.resize(graph.nodes.size());
-    admissibles.resize(graph.nodes.size());
-    node_map.resize(graph.nodes.size());
+    // construct subtrees...
+    graph_source.construct_subtrees(source);
+    graph_target.construct_subtrees(target);
     
-
-    //std::cerr << "admissible nodes" << std::endl;
-    admissible_nodes(graph, sentence, alignment);
-    
-    //std::cerr << "construct derivations" << std::endl;
-    construct_derivations(graph, sentence);
-    
-    // compute reachable nodes and edges from root...
-
-    //std::cerr << "prune derivations" << std::endl;
-    prune_derivations();
-        
-    // perform compounds extraction
-    extract_composed(graph, sentence, alignment, rules);
+    // perform subtree pair extractions...
+    extract_pairs(source, target, rules);
   }
   
-  struct Candidate
+  void extract_pairs(const hypergraph_type& source,
+		     const hypergraph_type& target,
+		     rule_pair_set_type& rule_pairs)
   {
-    const derivation_edge_type* edge;
-    derivation_edge_type edge_composed;
+    // we will perform pairing of source/target derivations....
     
-    index_set_type j;
-    bool composed;
+    // first, compute span-mapping from target-side...
     
-    Candidate(const index_set_type& __j)
-      : edge(0), edge_composed(), j(__j), composed(true) {}
-    Candidate(const derivation_edge_type& __edge, const index_set_type& __j, const bool __composed)
-      : edge(&__edge), edge_composed(__edge), j(__j), composed(__composed) {}
-  };
-  typedef Candidate candidate_type;
-  typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
-
-  struct candidate_hash_type : public utils::hashmurmur<size_t>
-  {
-    size_t operator()(const candidate_type* x) const
-    {
-      return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), intptr_t(x->edge)));
-    }
-  };
-  
-  struct candidate_equal_type
-  {
-    bool operator()(const candidate_type* x, const candidate_type* y) const
-    {
-      return (x == y) || (x && y && x->edge == y->edge && x->j == y->j);
-    }
-  };
-  
-  struct compare_heap_type
-  {
-    // we use greater, so that when popped from heap, we will grab "less" in back...
-    bool operator()(const candidate_type* x, const candidate_type* y) const
-    {
-      return int(x->composed) > int(y->composed) || (x->composed == y->composed && x->edge_composed.internal > y->edge_composed.internal);
-    }
-  };
-  
-  void extract_composed(const hypergraph_type& graph,
-			const sentence_type& sentence,
-			const alignment_type& alignment,
-			rule_pair_set_type& rule_pairs)
-  {
-    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
-    typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
-    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_unique_type;
     
-    candidate_set_type    candidates;
-    candidate_heap_type   cand;
-    candidate_unique_type cand_unique;
-    cand_unique.set_empty_key(0);
-    
-    // difficult...
-    // we need to keep track of how many nodes / maximum height in the composed rules...
-    
-    //
-    // bottom-up traversal to construct composed rules...
-    // actually, we will construct new "composed edges" into new edge set, then, 
-    // replace this new edge set with current one, so that we can easily enumerate
-    // combination...
-    //
-    // first, we will implement naive enumeration...
-    
-    rule_pair_set_local_type rule_pairs_local;
-    rule_pair_type rule_pair;
-
-    edge_set_type edges_new;
-    node_set_type tails_new;
-
     
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
-
+      
       //std::cerr << "node id: " << id << std::endl;
       
       derivation_node_type::edge_set_type derivation_edges_new;
-
+      
       candidates.clear();
       cand_unique.clear();
       
       cand.clear();
       cand.reserve(node.edges.size() * 100);
-
+      
       derivation_node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (derivation_node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const derivation_edge_type& edge = *eiter;
@@ -1197,75 +1356,7 @@ struct ExtractTree
       }
     }
   }
-
-  template <typename IndexIterator, typename TailIterator, typename EdgeIterator, typename Edges>
-  std::pair<int, int> compose_edges(const hypergraph_type& graph,
-				    IndexIterator& iter, IndexIterator last,
-				    TailIterator& tail_iter,
-				    EdgeIterator& edge_iter, EdgeIterator edge_last,
-				    Edges& edges_new)
-  {
-    // this should not happen...
-    if (edge_iter == edge_last) return std::make_pair(0, 0);
-    
-    edges_new.push_back(*edge_iter);
-    
-    const hypergraph_type::edge_type& edge = graph.edges[*edge_iter];
-    ++ edge_iter;
-
-    int height = 1;
-    int num_tails = edge.tails.size();
-    
-    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
-      if (edge_iter != edge_last && graph.edges[*edge_iter].head == *titer) {
-	const std::pair<int, int> result = compose_edges(graph, iter, last, tail_iter, edge_iter, edge_last, edges_new);
-
-	height = utils::bithack::max(height, result.first + 1);
-	num_tails += result.second;
-      } else if (iter != last) {
-	if (*iter >= 0) {
-	  const derivation_edge_type& edge = derivations[*tail_iter].edges[*iter];
-	  edges_new.insert(edges_new.end(), edge.edges.begin(), edge.edges.end());
-	  
-	  height = utils::bithack::max(height, edge.height + 1);
-	  num_tails += edge.internal;
-	}
-	
-	++ iter;
-	++ tail_iter;
-      } else
-	std::cerr << "WARNING: tails size and edge set frontier do not match" << std::endl;
-    }
-    
-    return std::make_pair(height, num_tails);
-  }
   
-  template <typename IndexIterator, typename TailIterator, typename Tails>
-  std::pair<int, bool> compose_tails(IndexIterator first, IndexIterator last,
-				     TailIterator tail_iter,
-				     int internal,
-				     Tails& tails_new)
-  {
-    bool composed_rule = false;
-    for (/**/; first != last; ++ first, ++ tail_iter) {
-      if (*first < 0) {
-	tails_new.push_back(*tail_iter);
-      } else {
-	const derivation_edge_type& edge = derivations[*tail_iter].edges[*first];
-	tails_new.insert(tails_new.end(), edge.tails.begin(), edge.tails.end());
-	
-	internal += edge.internal;
-	composed_rule = true;
-	
-	// early termination...
-	if (max_nodes > 0 && internal > max_nodes)
-	  return std::make_pair(internal, composed_rule);
-      }
-    }
-    
-    return std::make_pair(internal, composed_rule);
-  }
   
   // construct rule-pair related data
   
@@ -1444,258 +1535,6 @@ struct ExtractTree
 	++ frontier_pos;
       }
     }
-  }
-  
-  void construct_derivations(const hypergraph_type& graph,
-			     const sentence_type& sentence)
-  {
-    typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
-    typedef google::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_node_map_type;
-    typedef google::dense_hash_set<range_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_set_type;
-
-    // construc derivations wrt non-aligned words...
-
-    size_t goal_node = size_t(-1);
-    
-    for (size_t id = 0; id != graph.nodes.size(); ++ id) 
-      if (admissibles[id]) {
-	const hypergraph_type::node_type& node = graph.nodes[id];
-
-	//std::cerr << "admissible node: " << id << std::endl;
-	//
-	// compute minimal range and maximum outer-range
-	//
-	
-	const range_type range_min(spans[id].range());
-	
-	span_type::const_iterator riter_first = complements[id].lower_bound(range_min.first);
-	span_type::const_iterator riter_last  = complements[id].lower_bound(range_min.second);
-	
-	const range_type range_max(riter_first == complements[id].begin() ? 0 : *(-- riter_first) + 1,
-				   riter_last != complements[id].end() ? *riter_last : static_cast<int>(sentence.size()));
-
-#if 0
-	std::cerr << "range min: " << range_min.first << ".." << range_min.second
-		  << " range max: " << range_max.first << ".." << range_max.second
-		  << std::endl;
-#endif
-	
-	const bool is_goal(id == graph.goal);
-	
-	range_node_map_type buf;
-	buf.set_empty_key(range_type(0, 0));
-	
-	queue_type queue;
-	
-	// construct initial frontiers...
-	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	  
-	  queue.resize(queue.size() + 1);
-	  frontier_type& frontier = queue.back();
-	  
-	  frontier.first.push_back(*eiter);
-	  
-	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	    if (! admissibles[*titer])
-	      frontier.second.push_back(*titer);
-	}
-
-	while (! queue.empty()) {
-	  const frontier_type& frontier = queue.front();
-	  
-	  if (frontier.second.empty()) {
-#if 0
-	    std::cerr << "completed frontier: ";
-	    std::copy(frontier.first.begin(), frontier.first.end(), std::ostream_iterator<int>(std::cerr, " "));
-	    std::cerr << std::endl;
-	    {
-	      edge_set_type::const_iterator eiter_end = frontier.first.end();
-	      for (edge_set_type::const_iterator eiter = frontier.first.begin(); eiter != eiter_end; ++ eiter) {
-		const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-		
-		std::cerr << "rule: " << *(edge.rule)
-			  << " head: " << edge.head
-			  << " tails: ";
-		std::copy(edge.tails.begin(), edge.tails.end(), std::ostream_iterator<int>(std::cerr, " "));
-		std::cerr << std::endl;
-	      }
-	    }
-#endif
-	    
-	    // construct rule from "fragment", frontier.first
-	    // by enumerating edge and its tails in depth-first manner...
-	    // use recursive call for simplicity...
-	    
-	    // compute "tails" for the fragment
-	    
-	    node_set_type tails;
-	    edge_set_type::const_iterator eiter = frontier.first.begin();
-	    edge_set_type::const_iterator eiter_end = frontier.first.end();
-	    const std::pair<int, int> rule_stat = construct_tails(graph, eiter, eiter_end, tails);
-	    
-	    
-#if 0
-	    std::cerr << "tails: ";
-	    std::copy(tails.begin(), tails.end(), std::ostream_iterator<int>(std::cerr, " "));
-	    std::cerr << std::endl;
-#endif
-	    
-	    // iterate over tails and compute span...
-	    // code taken from apply_exact...
-	    
-	    index_set_type j_ends(tails.size(), 0);
-	    index_set_type j(tails.size(), 0);
-	    
-	    for (size_t i = 0; i != tails.size(); ++ i) {
-	      j_ends[i] = node_map[tails[i]].size();
-	      //std::cerr << "tail: " << tails[i] << " node size: " << j_ends[i] << std::endl;
-	    }
-	    
-	    node_set_type tails_next(tails.size());
-
-	    range_set_type ranges;
-	    ranges.set_empty_key(range_type(0, 0));
-	    
-	    for (;;) {
-	      bool is_valid = true;
-	      
-	      range_type range(range_min);
-	      ranges.clear();
-	      
-	      for (size_t i = 0; is_valid && i != tails.size(); ++ i) {
-		tails_next[i] = node_map[tails[i]][j[i]];
-		
-		const range_type& range_antecedent = derivations[tails_next[i]].range;
-		
-		if (! ranges.empty()) {
-		  range_set_type::const_iterator riter_end = ranges.end();
-		  for (range_set_type::const_iterator riter = ranges.begin(); is_valid && riter != riter_end; ++ riter)
-		    is_valid = range_antecedent.second <= riter->first || riter->second <= range_antecedent.first;
-		}
-		
-		if (is_valid) {
-		  ranges.insert(range_antecedent);
-		  
-		  range.first  = utils::bithack::min(range.first, range_antecedent.first);
-		  range.second = utils::bithack::max(range.second, range_antecedent.second);
-		}
-	      }
-	      
-	      if (is_valid) {
-		// our tail-ranges are valid... and we will consider alternatives from range to range_max...
-		
-#if 0
-		std::cerr << "re-computed range min: " << range.first << ".." << range.second
-			  << " range max: " << range_max.first << ".." << range_max.second
-			  << std::endl;
-#endif
-
-		
-		if (is_goal) {
-		  if (goal_node == size_t(-1)) {
-		    goal_node = derivations.size();
-		    derivations.resize(goal_node + 1);
-		    
-		    // range is always [0, sentence.size())
-		    derivations.back().node = id;
-		    derivations.back().range = range_type(0, sentence.size());
-		  }
-		  
-		  
-		  derivations[goal_node].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
-		} else {
-		  // we will compute all possible ranges...
-		  for (int first = range_max.first; first <= range.first; ++ first)
-		    for (int last = range.second; last <= range_max.second; ++ last) {
-		      const range_type range_next(first, last);
-
-		      //std::cerr << "constructing for range: " << first << ".." << last << std::endl;
-		      
-		      range_node_map_type::iterator biter = buf.find(range_next);
-		      if (biter == buf.end()) {
-			derivations.resize(derivations.size() + 1);
-			
-			derivations.back().node = id;
-			derivations.back().range = range_next;
-			
-			node_map[id].push_back(derivations.size() - 1);
-			
-			biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
-		      }
-		      
-		      derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
-		    }
-		}
-	      }
-	      
-	      size_t index = 0;
-	      for (/**/; index != tails.size(); ++ index) {
-		++ j[index];
-		if (j[index] < j_ends[index]) break;
-		j[index] = 0;
-	      }
-	      
-	      // finished!
-	      if (index == tails.size()) break;
-	    }
-	    
-	  } else {
-	    // incomplete... futher expand!
-	    const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
-	    
-	    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-	      
-	      queue.resize(queue.size() + 1);
-	      frontier_type& frontier_next = queue.back();
-	      
-	      frontier_next.first = frontier.first;
-	      frontier_next.first.push_back(*eiter);
-	      
-	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-		if (! admissibles[*titer])
-		  frontier_next.second.push_back(*titer);
-	      
-	      frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
-	    }
-	  }
-	  
-	  queue.pop_front();
-	}
-      }
-  }
-    
-  template <typename Iterator, typename Tails>
-  std::pair<int, int> construct_tails(const hypergraph_type& graph,
-				      Iterator& iter,
-				      Iterator last,
-				      Tails& tails)
-  {
-    if (iter == last) return std::make_pair(0, 0);
-    
-    const hypergraph_type::edge_type& edge = graph.edges[*iter];
-    ++ iter;
-    
-    int max_height = 1;
-    int num_tails = edge.tails.size();
-    
-    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
-      if (iter != last && *titer == graph.edges[*iter].head) {
-	const std::pair<int, int> result = construct_tails(graph, iter, last, tails);
-	
-	max_height = utils::bithack::max(max_height, result.first + 1);
-	num_tails += result.second;
-      } else
-	tails.push_back(*titer);
-    }
-    
-    return std::make_pair(max_height, num_tails);
   }
   
 };
