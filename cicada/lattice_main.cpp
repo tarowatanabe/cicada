@@ -15,6 +15,11 @@ int main(int argc, char** argv)
 
 
   lattice_type input;
-  while (std::cin >> input)
+  while (std::cin >> input) {
+    
+    std::cout << "shortest: " << input.shortest_distance()
+	      << " longest: " << input.longest_distance()
+	      << std::endl;
     std::cout << input << std::endl;
+  }
 }

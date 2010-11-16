@@ -34,16 +34,17 @@ namespace cicada
   {
     const size_type dist_size = size() + 1;
 
-    const difference_type infinity = boost::numeric::bounds<difference_type>::highest();
+    const difference_type pos_infinity = boost::numeric::bounds<difference_type>::highest();
+    const difference_type neg_infinity = boost::numeric::bounds<difference_type>::lowest();
     
     // edge-cost is inifinity if no-path
     dist_short.clear();
     dist_short.reserve(dist_size, dist_size);
-    dist_short.resize(dist_size, dist_size, infinity);
+    dist_short.resize(dist_size, dist_size, pos_infinity);
 
     dist_long.clear();
     dist_long.reserve(dist_size, dist_size);
-    dist_long.resize(dist_size, dist_size, 0);
+    dist_long.resize(dist_size, dist_size, neg_infinity);
     
     // edge-cost for dist(i, j)
     for (size_t i = 0; i != lattice.size(); ++ i)
@@ -62,10 +63,11 @@ namespace cicada
     for (size_t k = 0; k != dist_size; ++ k) 
       for (size_t i = 0; i != dist_size; ++ i)
 	for (size_t j = 0; j != dist_size; ++ j) {
-	  if (dist_short(i, k) != infinity && dist_short(k, j) != infinity)
+	  if (dist_short(i, k) != pos_infinity && dist_short(k, j) != pos_infinity)
 	    dist_short(i, j) = utils::bithack::min(dist_short(i, j), dist_short(i, k) + dist_short(k, j));
-	  
-	  dist_long(i, j) = utils::bithack::max(dist_long(i, j), dist_long(i, k) + dist_long(k, j));
+	    
+	  if (dist_long(i, k) != neg_infinity && dist_long(k, j) != neg_infinity)
+	    dist_long(i, j) = utils::bithack::max(dist_long(i, j), dist_long(i, k) + dist_long(k, j));
 	}
   }
   
