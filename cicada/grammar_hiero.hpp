@@ -80,9 +80,6 @@ namespace cicada
     typedef Lattice    lattice_type;
     typedef HyperGraph hypergraph_type;
 
-  private:
-    typedef std::vector<bool, std::allocator<bool> > pos_set_type;
-    typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
     
   public:
     GrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
@@ -114,76 +111,20 @@ namespace cicada
     }
 
     GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
-      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
-      typedef std::vector<int, std::allocator<int> > epsilon_set_type;
-      typedef std::vector<epsilon_set_type, std::allocator<epsilon_set_type> > epsilon_map_type;
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
 
       feature_set_type features;
       features["insertion-penalty"] = - 1.0;
-
-      // first, compute closure for epsilon...
-      // we need epsilon* word epsilon* !
-      epsilon_map_type epsilons_head(lattice.size() + 1);
-      epsilon_map_type epsilons_tail(lattice.size() + 1);
       
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
-	  if (aiter->label == vocab_type::EPSILON) {
-	    const int last = first + aiter->distance;
-	    
-	    epsilons_head[last].push_back(first);
-	    epsilons_head[last].insert(epsilons_head[last].end(), epsilons_head[first].begin(), epsilons_head[first].end());
-	  }
-      }
-      
-      for (int first = lattice.size() - 1; first >= 0; -- first) {
-	const lattice_type::arc_set_type& arcs = lattice[first];
-	
-	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
-	  if (aiter->label == vocab_type::EPSILON) {
-	    const int last = first + aiter->distance;
-	    
-	    epsilons_tail[first].push_back(last);
-	    epsilons_tail[first].insert(epsilons_tail[first].end(), epsilons_tail[last].begin(), epsilons_tail[last].end());
-	  }
-      }
-      
-      // then, compute again...
-      for (size_t first = 0; first != lattice.size(); ++ first) {
-	const lattice_type::arc_set_type& arcs = lattice[first];
-	
-	if (arcs.empty())
-	  positions[first].clear();
-	
-	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  const size_t last = first + aiter->distance;
-	  
-	  positions[first][last] = true;
-	  
-	  epsilon_set_type::const_iterator hiter_begin = epsilons_head[first].begin();
-	  epsilon_set_type::const_iterator hiter_end   = epsilons_head[first].end();
-	  
-	  epsilon_set_type::const_iterator titer_begin = epsilons_tail[last].begin();
-	  epsilon_set_type::const_iterator titer_end   = epsilons_tail[last].end();
-	  
-	  for (epsilon_set_type::const_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter) {
-	    positions[*hiter][last] = true;
-	    for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	      positions[*hiter][*titer] = true;
-	  }
-	  for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	    positions[first][*titer] = true;
-	  
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
@@ -192,17 +133,13 @@ namespace cicada
 	    
 	    symbols.insert(aiter->label);
 	  }
-	}
       }
     }
 
     bool valid_span(int first, int last, int distance) const
     {
-      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
+      return distance <= 1;
     }
-
-  private:    
-    pos_pair_set_type positions;
   };
   
   
@@ -211,11 +148,7 @@ namespace cicada
   public:
     typedef Lattice    lattice_type;
     typedef HyperGraph hypergraph_type;
-
-  private:
-    typedef std::vector<bool, std::allocator<bool> > pos_set_type;
-    typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
-
+    
   public:
     GrammarDeletion(const hypergraph_type& graph, const symbol_type& non_terminal)
     {
@@ -248,11 +181,8 @@ namespace cicada
     }
 
     GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
-      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
-      typedef std::vector<int, std::allocator<int> > epsilon_set_type;
-      typedef std::vector<epsilon_set_type, std::allocator<epsilon_set_type> > epsilon_map_type;
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -262,83 +192,25 @@ namespace cicada
       
       rule_ptr_type rule_epsilon(new rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       
-      // first, compute closure for epsilon...
-      // we need epsilon* word epsilon* !
-      epsilon_map_type epsilons_head(lattice.size() + 1);
-      epsilon_map_type epsilons_tail(lattice.size() + 1);
-      
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
-	  if (aiter->label == vocab_type::EPSILON) {
-	    const int last = first + aiter->distance;
-	    
-	    epsilons_head[last].push_back(first);
-	    epsilons_head[last].insert(epsilons_head[last].end(), epsilons_head[first].begin(), epsilons_head[first].end());
-	  }
-      }
-      
-      for (int first = lattice.size() - 1; first >= 0; -- first) {
-	const lattice_type::arc_set_type& arcs = lattice[first];
-	
-	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
-	  if (aiter->label == vocab_type::EPSILON) {
-	    const int last = first + aiter->distance;
-	    
-	    epsilons_tail[first].push_back(last);
-	    epsilons_tail[first].insert(epsilons_tail[first].end(), epsilons_tail[last].begin(), epsilons_tail[last].end());
-	  }
-      }
-      
-      // then, compute again...
-      for (size_t first = 0; first != lattice.size(); ++ first) {
-	const lattice_type::arc_set_type& arcs = lattice[first];
-
-	if (arcs.empty())
-	  positions[first].clear();
-		
-	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  const size_t last = first + aiter->distance;
-	  
-	  positions[first][last] = true;
-	  
-	  epsilon_set_type::const_iterator hiter_begin = epsilons_head[first].begin();
-	  epsilon_set_type::const_iterator hiter_end   = epsilons_head[first].end();
-	  
-	  epsilon_set_type::const_iterator titer_begin = epsilons_tail[last].begin();
-	  epsilon_set_type::const_iterator titer_end   = epsilons_tail[last].end();
-	  
-	  for (epsilon_set_type::const_iterator hiter = hiter_begin; hiter != hiter_end; ++ hiter) {
-	    positions[*hiter][last] = true;
-	    for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	      positions[*hiter][*titer] = true;
-	  }
-	  for (epsilon_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	    positions[first][*titer] = true;
-	  
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
-	  
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
 	    
 	    insert(rule, rule_epsilon, features);
 	    
 	    symbols.insert(aiter->label);
 	  }
-	}
       }
     }
     
     bool valid_span(int first, int last, int distance) const
     {
-      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
+      return distance <= 1;
     }
-
-  private:    
-    pos_pair_set_type positions;
   };
 };
 
