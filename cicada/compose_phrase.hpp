@@ -98,9 +98,11 @@ namespace cicada
 #else
     typedef sgi::hash_set<coverage_type, boost::hash<coverage_type>, std::equal_to<coverage_type>,
 			  std::allocator<coverage_type > > coverage_set_type;
-    
 #endif
-
+    
+    typedef std::pair<int, feature_set_type> pos_feature_type;
+    typedef std::deque<pos_feature_type, std::allocator<pos_feature_type> > pos_feature_set_type;
+    typedef std::vector<pos_feature_set_type, std::allocator<pos_feature_set_type> > epsilon_set_type;
     
     ComposePhrase(const symbol_type& non_terminal,
 		  const grammar_type& __grammar,
@@ -122,10 +124,37 @@ namespace cicada
 
     void operator()(const lattice_type& lattice, hypergraph_type& graph)
     {
-      graph.clear();
+       graph.clear();
+
+      if (lattice.empty()) return;
+
+      epsilons.clear();
       nodes.clear();
       coverages.clear();
 
+      epsilons.resize(lattice.size() + 1);
+      
+      // first, construct closure for epsilons...
+      for (int first = lattice.size() - 1; first >= 0; -- first) {
+	const lattice_type::arc_set_type& arcs = lattice[first];
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
+	  if (aiter->label == vocab_type::EPSILON) {
+	    const int last = first + aiter->distance;
+	    
+	    epsilons[first].push_back(pos_feature_type(last, aiter->features));
+	    
+	    pos_feature_set_type::const_iterator eiter_end = epsilons[last].end();
+	    for (pos_feature_set_type::const_iterator eiter = epsilons[last].begin(); eiter != eiter_end; ++ eiter)
+	      epsilons[first].push_back(pos_feature_type(eiter->first, eiter->second + aiter->features));
+	  }
+      }
+      
+      // insert default positions...
+      for (size_t i = 0; i != lattice.size(); ++ i)
+	epsilons[i].push_back(pos_feature_type(i, feature_set_type()));
+      
       queue_type queue;
       
       // breadth first search to construct phrase translational forest
@@ -138,18 +167,20 @@ namespace cicada
       
       nodes[coverage_start] = hypergraph_type::invalid;
       
+      // we need to jump the starting positions...!
+      
       const int last = utils::bithack::min(static_cast<int>(lattice.size()), max_distortion + 1);
+      
       for (int i = 0; i != last; ++ i)
 	for (size_t table = 0; table != grammar.size(); ++ table)
 	  queue.push_back(state_type(coverage_start, table, grammar[table].root(), i, i, feature_set_type()));
       
       while (! queue.empty()) {
 	const state_type& state = queue.front();
-
+	
 	const transducer_type::rule_pair_set_type& rules = grammar[state.grammar_id].rules(state.node);
 	
 	if (! rules.empty()) {
-	  
 	  // next coverage vector...
 	  coverage_type __coverage_new = *state.coverage;
 	  for (int i = state.first; i != state.last; ++ i)
@@ -216,25 +247,24 @@ namespace cicada
 	    const symbol_type& terminal = aiter->label;
 	    const int length = aiter->distance;
 	    
-	    if (terminal == vocab_type::EPSILON) {
+	    const transducer_type& transducer = grammar[state.grammar_id];
+	    const transducer_type::id_type node = transducer.next(state.node, terminal);
+	    if (node == transducer.root()) continue;
+	    
+	    // check if we can use this phrase...
+	    // we can check by rank_1(pos) to see whether the number of 1s are equal
+	    
+	    const pos_feature_set_type& eps = epsilons[state.last + length];
+	    
+	    pos_feature_set_type::const_iterator eiter_end = eps.end();
+	    for (pos_feature_set_type::const_iterator eiter = eps.begin(); eiter != eiter_end; ++ eiter) {
+	      const int last = eiter->first;
+	      
 	      const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
-	      const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
-
-	      if (rank_first == rank_last)
-		queue.push_back(state_type(state.coverage, state.grammar_id, state.node, state.first, state.last + length, state.features + aiter->features));
-	    } else {
-	      const transducer_type& transducer = grammar[state.grammar_id];
-	      const transducer_type::id_type node = transducer.next(state.node, terminal);
-	      if (node == transducer.root()) continue;
-	      
-	      // check if we can use this phrase...
-	      // we can check by rank_1(pos) to see whether the number of 1s are equal
-	      
-	      const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
-	      const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
+	      const size_type rank_last  = state.coverage->rank(last - 1, true);
 	      
 	      if (rank_first == rank_last)
-		queue.push_back(state_type(state.coverage, state.grammar_id, node, state.first, state.last + length, state.features + aiter->features));
+		queue.push_back(state_type(state.coverage, state.grammar_id, node, state.first, last, state.features + aiter->features + eiter->second));
 	    }
 	  }
 	}
@@ -274,6 +304,7 @@ namespace cicada
     const grammar_type& grammar;
     const int max_distortion;
 
+    epsilon_set_type  epsilons;
     node_map_type     nodes;
     coverage_set_type coverages;
     
