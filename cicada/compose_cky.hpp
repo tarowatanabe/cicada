@@ -360,7 +360,7 @@ namespace cicada
       
       for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 	
-	if (check_empty && aiter->node == transducer.root()) continue;
+	//if (check_empty && aiter->node == transducer.root()) continue;
 	
 	for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	  const symbol_type& non_terminal = non_terminals[*piter];
