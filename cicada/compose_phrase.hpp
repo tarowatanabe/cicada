@@ -135,6 +135,9 @@ namespace cicada
       epsilons.resize(lattice.size() + 1);
       
       // first, construct closure for epsilons...
+      for (size_t i = 0; i != epsilons.size(); ++ i)
+	epsilons[i].push_back(pos_feature_type(i, feature_set_type()));
+      
       for (int first = lattice.size() - 1; first >= 0; -- first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 	
@@ -146,14 +149,11 @@ namespace cicada
 	    epsilons[first].push_back(pos_feature_type(last, aiter->features));
 	    
 	    pos_feature_set_type::const_iterator eiter_end = epsilons[last].end();
-	    for (pos_feature_set_type::const_iterator eiter = epsilons[last].begin(); eiter != eiter_end; ++ eiter)
+	    for (pos_feature_set_type::const_iterator eiter = epsilons[last].begin() + 1; eiter != eiter_end; ++ eiter)
 	      epsilons[first].push_back(pos_feature_type(eiter->first, eiter->second + aiter->features));
 	  }
       }
       
-      // insert default positions...
-      for (size_t i = 0; i != lattice.size(); ++ i)
-	epsilons[i].push_back(pos_feature_type(i, feature_set_type()));
       
       queue_type queue;
       
@@ -167,7 +167,8 @@ namespace cicada
       
       nodes[coverage_start] = hypergraph_type::invalid;
       
-      // we need to jump the starting positions...!
+      // we need to jump the starting positions... and consider the distortion wrt lattice distance..
+      // very hard...
       
       const int last = utils::bithack::min(static_cast<int>(lattice.size()), max_distortion + 1);
       

@@ -35,7 +35,7 @@ namespace cicada
     {
       target.clear();
       
-      closure_type closure(source.size() + 1);
+      closure_set_type closure(source.size() + 1);
       
       // initial closure...
       for (size_t first = 0; first != closure.size(); ++ first)
@@ -56,15 +56,38 @@ namespace cicada
 	  }
       }
       
+      for (size_t i = 0; i != source.size(); ++ i)
+	target.push_back(lattice_type::arc_set_type());
+      
       for (size_t state = 0; state != source.size(); ++ state) {
 	
+	lattice_type::arc_set_type::const_iterator aiter_end = source[state].end();
+	for (lattice_type::arc_set_type::const_iterator aiter = source[state].begin(); aiter != aiter_end; ++ aiter) {
+	  if (aiter->label == vocab_type::EPSILON) {
+	    const size_t state_next = state + aiter->distance;
+	    
+	    closure_type::const_iterator citer_end = closure[state_next].end();
+	    for (closure_type::const_iterator citer = closure[state_next].begin(); citer != citer_end; ++ citer) {
+	      
+	      lattice_type::arc_set_type::const_iterator niter_end = source[citer->first].end();
+	      for (lattice_type::arc_set_type::const_iterator niter = source[citer->first].begin(); niter != niter_end; ++ niter) 
+		if (niter->label != vocab_type::EPSILON) {
+		  // label: niter->label, features: aiter->features + citer->second + niter->features, distance = citer->first + niter->distance
+		  
+		  target[state].push_back(lattice_type::arc_type(niter->label, aiter->features + citer->second + niter->features, (citer->first + niter->distance) - state));
+		}
+	    }
+	    
+	  } else 
+	    target[state].push_back(*aiter);
+	}
       }
       
     }
   };
   
   inline
-  void remove_epsilin(Lattice& lattice)
+  void remove_epsilon(Lattice& lattice)
   {
     RemoveEpsilon __remover;
     Lattice __lattice;
@@ -74,7 +97,7 @@ namespace cicada
   
 
   inline
-  void remove_epsilin(const Lattice& lattice, Lattice& removed)
+  void remove_epsilon(const Lattice& lattice, Lattice& removed)
   {
     RemoveEpsilon __remover;
     __remover(lattice, removed);

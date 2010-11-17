@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "lattice.hpp"
+#include "remove_epsilon.hpp"
 
 int main(int argc, char** argv)
 {
@@ -15,11 +16,19 @@ int main(int argc, char** argv)
 
 
   lattice_type input;
+  lattice_type removed;
   while (std::cin >> input) {
     
     std::cout << "shortest: " << input.shortest_distance()
 	      << " longest: " << input.longest_distance()
 	      << std::endl;
+    
+    
+
     std::cout << input << std::endl;
+
+    cicada::remove_epsilon(input, removed);
+    
+    std::cout << "removed: " << removed << std::endl;
   }
 }
