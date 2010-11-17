@@ -112,7 +112,6 @@ namespace cicada
       rule_goal.reset(new rule_type(vocab_type::GOAL,
 				    rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
       
-      
       std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
       sequence.front() = non_terminal.non_terminal(1);
       sequence.back()  = non_terminal.non_terminal(2);
@@ -146,7 +145,7 @@ namespace cicada
       
       while (! queue.empty()) {
 	const state_type& state = queue.front();
-	
+
 	const transducer_type::rule_pair_set_type& rules = grammar[state.grammar_id].rules(state.node);
 	
 	if (! rules.empty()) {
@@ -162,11 +161,12 @@ namespace cicada
 	  if (result.second) {
 	    const int first = coverage_new->select(1, false);
 	    const int last  = utils::bithack::min(static_cast<int>(lattice.size()), first + max_distortion + 1);
-	    
+
 	    for (int i = first; i != last; ++ i)
-	      if (! coverage_new->test(i))
+	      if (! coverage_new->test(i)) {
 		for (size_t table = 0; table != grammar.size(); ++ table)
 		  queue.push_back(state_type(coverage_new, table, grammar[table].root(), i, i, feature_set_type()));
+	      }
 	  }
 	  
 	  // construct graph...
@@ -180,7 +180,7 @@ namespace cicada
 	    edge.features = riter->features;
 	    if (! state.features.empty())
 	      edge.features += state.features;
-
+	    
 	    edge.first    = state.first;
 	    edge.last     = state.last;
 	    
@@ -198,8 +198,8 @@ namespace cicada
 	  } else {
 	    node_map_type::iterator niter = nodes.find(coverage_new);
 	    if (niter == nodes.end())
-	      niter->second = graph.add_node().id;
-	    
+	      niter = nodes.insert(std::make_pair(coverage_new, graph.add_node().id)).first;
+
 	    hypergraph_type::id_type tails[2] = {titer->second, node.id};
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails, tails + 2);
 	    edge.rule = rule_x1_x2;
@@ -207,7 +207,7 @@ namespace cicada
 	    graph.connect_edge(edge.id, niter->second);
 	  }
 	}
-	
+
 	if (state.last != static_cast<int>(lattice.size())) {
 	  const lattice_type::arc_set_type& arcs = lattice[state.last];
 	  
@@ -215,11 +215,11 @@ namespace cicada
 	  for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
 	    const symbol_type& terminal = aiter->label;
 	    const int length = aiter->distance;
-
+	    
 	    if (terminal == vocab_type::EPSILON) {
 	      const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
 	      const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
-	      
+
 	      if (rank_first == rank_last)
 		queue.push_back(state_type(state.coverage, state.grammar_id, state.node, state.first, state.last + length, state.features + aiter->features));
 	    } else {
@@ -242,7 +242,7 @@ namespace cicada
 	// finally, pop from the queue!
 	queue.pop_front();
       }
-
+      
       node_map_type::iterator niter = nodes.find(coverage_goal);
       if (niter != nodes.end() && niter->second != hypergraph_type::invalid) {
 	

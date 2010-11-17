@@ -218,7 +218,6 @@ namespace cicada
 	      }
 	    }
 	    
-	    
 	    // apply rules on actives at [first, last)
 	    node_map_type&    node_map     = nodes(first, last);
 	    passive_set_type& passive_arcs = passives(first, last);
