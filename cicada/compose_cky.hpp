@@ -122,17 +122,18 @@ namespace cicada
 	return;
       
       // initialize internal structure...
-      epsilons.clear();
+      //epsilons.clear();
       actives.clear();
       passives.clear();
       nodes.clear();
       non_terminals.clear();
       
-      epsilons.resize(lattice.size() + 1);
+      //epsilons.resize(lattice.size() + 1);
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
       nodes.resize(lattice.size() + 1);
       
+#if 0
       // first, construct closure for epsilons...
       for (int first = lattice.size() - 1; first >= 0; -- first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
@@ -153,19 +154,21 @@ namespace cicada
       // insert default positions...
       for (size_t i = 0; i != lattice.size(); ++ i)
 	epsilons[i].push_back(pos_feature_type(i, feature_set_type()));
-      
+#endif
       
       // initialize active chart
       for (size_t table = 0; table != grammar.size(); ++ table) {
 	const transducer_type::id_type root = grammar[table].root();
 	
+#if 0
 	// pos 0...
 	pos_feature_set_type::const_iterator eiter_end = epsilons.front().end();
 	for (pos_feature_set_type::const_iterator eiter = epsilons.front().begin(); eiter != eiter_end; ++ eiter)
 	  if (grammar[table].valid_span(0, eiter->first, 0))
 	    actives[table](0, eiter->first).push_back(active_type(root, eiter->second));
+#endif
 	
-	for (size_t pos = 1; pos != lattice.size(); ++ pos)
+	for (size_t pos = 0; pos != lattice.size(); ++ pos)
 	  if (grammar[table].valid_span(pos, pos, 0))
 	    actives[table](pos, pos).push_back(active_type(root));
       }
@@ -188,9 +191,8 @@ namespace cicada
 	      const active_set_type&  active_arcs  = actives[table](first, middle);
 	      const passive_set_type& passive_arcs = passives(middle, last);
 	      
-	      extend_actives(transducer, active_arcs, passive_arcs, cell, true);
+	      extend_actives(transducer, active_arcs, passive_arcs, cell);
 	    }
-
 	    
 	    // then, advance by terminal(s) at lattice[last - 1];
 	    {
@@ -205,15 +207,18 @@ namespace cicada
 		const symbol_type& terminal = piter->label;
 		const int length = piter->distance;
 		
-		const pos_feature_set_type& eps = epsilons[last - 1 + length];
+		active_set_type& cell = actives[table](first, last - 1 + length);
 		
-		for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		  if (node == transducer.root()) continue;
-		  
-		  pos_feature_set_type::const_iterator eiter_end = eps.end();
-		  for (pos_feature_set_type::const_iterator eiter = eps.begin(); eiter != eiter_end; ++ eiter)
-		    actives[table](first, eiter->first).push_back(active_type(node, aiter->tails, aiter->features + piter->features + eiter->second));
+		if (piter->label == vocab_type::EPSILON) {
+		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+		    cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features));
+		} else {
+		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+		    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+		    if (node == transducer.root()) continue;
+		    
+		    cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features));
+		  }
 		}
 	      }
 	    }
@@ -276,7 +281,7 @@ namespace cicada
 	    
 	    active_set_type& cell = actives[table](first, last);
 	    
-	    extend_actives(transducer, active_arcs, passive_arcs, cell, false);
+	    extend_actives(transducer, active_arcs, passive_arcs, cell);
 	  }
 	}
       
@@ -347,8 +352,7 @@ namespace cicada
     void extend_actives(const transducer_type& transducer,
 			const active_set_type& actives, 
 			const passive_set_type& passives,
-			active_set_type& cell,
-			const bool check_skipping)
+			active_set_type& cell)
     {
       active_set_type::const_iterator aiter_begin = actives.begin();
       active_set_type::const_iterator aiter_end = actives.end();
@@ -359,9 +363,6 @@ namespace cicada
       for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 	for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	  const symbol_type& non_terminal = non_terminals[*piter];
-	  
-	  // we will perform skipping check!
-	  if (check_skipping && aiter->node == transducer.root()) continue;
 	  
 	  const transducer_type::id_type node = transducer.next(aiter->node, non_terminal);
 	  if (node == transducer.root()) continue;

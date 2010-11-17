@@ -97,7 +97,28 @@ namespace cicada
       }
       
       // replacing epsilon arcs...
+      target.clear();
+      target.resize(source.size());
       
+      for (size_t state = 0; state != source.size(); ++ state) {
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = aiter_end = source[state].end();
+	for (lattice_type::arc_set_type::const_iterator aiter = source[state].begin(); aiter != aiter_end; ++ aiter)
+	  if (aiter->label != vocab_type::EPSILON)
+	    target[state].push_back(*aiter);
+	
+	epsilon_path_type::const_iterator citer_end = closure[state].end();
+	for (epsilon_path_type::const_iterator citer = closure[state].begin(); citer != citer_end; ++ citer) {
+	  
+	  lattice_type::arc_set_type::const_iterator niter_end = source[citer->first].end();
+	  for (lattice_type::arc_set_type::const_iterator niter = source[citer->first].begin(); niter != niter_end; ++ niter) 
+	    if (niter->label != vocab_type::EPSILON) {
+	      
+	      
+	    }
+	}
+	
+      }
       
       
     }
