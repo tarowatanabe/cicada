@@ -348,7 +348,6 @@ namespace cicada
     
     rule_ptr_type goal_rule;
 
-    epsilon_set_type       epsilons;
     active_chart_set_type  actives;
     passive_chart_type     passives;
     node_map_chart_type    nodes;
