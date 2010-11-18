@@ -32,3 +32,7 @@ cicada_unite_sentence
 	TER-conputation by lower-cased word (--lower flag)
 	Dump in graphviz format (--graphviz flag)
 
+
+You can remove-epsilon for lattice. See --operation-list in cicada or cicada_mpi:
+    TODO: add remove-epsilon for cicada-unite-lattice and/or cicada-unite-sentence?
+
