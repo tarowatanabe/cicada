@@ -48,7 +48,9 @@ permute: permute tree (monolingual tree only)\n\
 \tcollapse=[true|false] collapse sparse features\n\
 \texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 compose-earley: composition from tree with grammar\n\
+\tyield=[source|target] use source or target yield for rule\n\
 compose-cky: composition from lattice (or sentence) with grammar\n\
+\tyield=[source|target] use source or target yield for rule\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
 \tdistortion=[distortion limit] default: 0 (== monotone)\n\
 generate-earley: re-generation from tree\n\

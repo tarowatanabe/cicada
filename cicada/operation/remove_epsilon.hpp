@@ -27,7 +27,7 @@ namespace cicada
 	
 	param_type param(parameter);
 	if (param.name() != "remove-epsilon")
-	  throw std::runtime_error("this is not a remove_epsilonr");
+	  throw std::runtime_error("this is not an epsilon remover");
 	
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
 	  std::cerr << "WARNING: unsupported parameter for remove-epsilon: " << piter->first << "=" << piter->second << std::endl;

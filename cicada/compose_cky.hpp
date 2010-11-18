@@ -39,8 +39,8 @@ namespace cicada
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     
-    ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar)
-      : goal(__goal), grammar(__grammar)
+    ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source=false)
+      : goal(__goal), grammar(__grammar), yield_source(__yield_source)
     {
       goal_rule.reset(new rule_type(vocab_type::GOAL,
 				    rule_type::symbol_set_type(1, goal.non_terminal(1))));
@@ -200,7 +200,8 @@ namespace cicada
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(riter->target, riter->features + citer->features, citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
+		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features,
+			   citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
 			   first, last);
 	    }
 	  }
@@ -230,7 +231,8 @@ namespace cicada
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(riter->target, riter->features, &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+		apply_rule(yield_source ? riter->source : riter->target, riter->features,
+			   &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
 			   first, last);
 	    }
 	  }
@@ -345,6 +347,7 @@ namespace cicada
   private:
     const symbol_type goal;
     const grammar_type& grammar;
+    const bool yield_source;
     
     rule_ptr_type goal_rule;
 
@@ -356,9 +359,9 @@ namespace cicada
   };
   
   inline
-  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph)
+  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false)
   {
-    ComposeCKY(goal, grammar)(lattice, graph);
+    ComposeCKY(goal, grammar, yield_source)(lattice, graph);
   }
 };
 

@@ -30,6 +30,7 @@ namespace cicada
 	: grammar(__grammar),
 	  goal(__goal), non_terminal(__non_terminal), 
 	  insertion(__insertion), deletion(__deletion),
+	  yield_source(false),
 	  debug(__debug)
       {
 	typedef cicada::Parameter param_type;
@@ -37,6 +38,26 @@ namespace cicada
 	param_type param(parameter);
 	if (param.name() != "compose-earley")
 	  throw std::runtime_error("this is not a Earley composer");
+	
+	bool source = false;
+	bool target = false;
+	
+	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	    if (strcasecmp(piter->second.c_str(), "source") == 0)
+	      source = true;
+	    else if (strcasecmp(piter->second.c_str(), "target") == 0)
+	      target = true;
+	    else
+	      throw std::runtime_error("unknown yield: " + piter->second);
+	  } else
+	    std::cerr << "WARNING: unsupported parameter for Earley composer: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	if (source && target)
+	  throw std::runtime_error("Earley composer can work either source or target yield");
+	
+	yield_source = source;
       }
   
       void operator()(data_type& data) const
@@ -57,7 +78,7 @@ namespace cicada
 	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(hypergraph, non_terminal)));
 
     
-	cicada::compose_earley(grammar_translation, hypergraph, composed);
+	cicada::compose_earley(grammar_translation, hypergraph, composed, yield_source);
     
 	utils::resource end;
     
@@ -77,11 +98,13 @@ namespace cicada
   
       const grammar_type& grammar;
   
-      const std::string goal;
-      const std::string non_terminal;
+      std::string goal;
+      std::string non_terminal;
   
-      const bool insertion;
-      const bool deletion;
+      bool insertion;
+      bool deletion;
+
+      bool yield_source;
   
       int debug;
     };
@@ -99,6 +122,7 @@ namespace cicada
 	: grammar(__grammar),
 	  goal(__goal), non_terminal(__non_terminal), 
 	  insertion(__insertion), deletion(__deletion),
+	  yield_source(false),
 	  debug(__debug)
       { 
 	typedef cicada::Parameter param_type;
@@ -106,6 +130,26 @@ namespace cicada
 	param_type param(parameter);
 	if (param.name() != "compose-cky")
 	  throw std::runtime_error("this is not a CKY composer");
+
+	bool source = false;
+	bool target = false;
+	
+	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	    if (strcasecmp(piter->second.c_str(), "source") == 0)
+	      source = true;
+	    else if (strcasecmp(piter->second.c_str(), "target") == 0)
+	      target = true;
+	    else
+	      throw std::runtime_error("unknown yield: " + piter->second);
+	  } else
+	    std::cerr << "WARNING: unsupported parameter for CKY composer: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	if (source && target)
+	  throw std::runtime_error("CKY composer can work either source or target yield");
+	
+	yield_source = source;
       }
   
       void operator()(data_type& data) const
@@ -125,9 +169,8 @@ namespace cicada
 	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
 	if (deletion)
 	  grammar_translation.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
-
-    
-	cicada::compose_cky(goal, grammar_translation, lattice, composed);
+	
+	cicada::compose_cky(goal, grammar_translation, lattice, composed, yield_source);
     
 	utils::resource end;
     
@@ -147,11 +190,13 @@ namespace cicada
   
       const grammar_type& grammar;
   
-      const std::string goal;
-      const std::string non_terminal;
+      std::string goal;
+      std::string non_terminal;
   
-      const bool insertion;
-      const bool deletion;
+      bool insertion;
+      bool deletion;
+
+      bool yield_source;
   
       int debug;
     };
@@ -227,11 +272,11 @@ namespace cicada
   
       const grammar_type& grammar;
   
-      const std::string goal;
-      const std::string non_terminal;
+      std::string goal;
+      std::string non_terminal;
   
-      const bool insertion;
-      const bool deletion;
+      bool insertion;
+      bool deletion;
 
       int distortion;
   

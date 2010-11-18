@@ -100,10 +100,6 @@ namespace cicada
 			  std::allocator<coverage_type > > coverage_set_type;
 #endif
     
-    typedef std::pair<int, feature_set_type> pos_feature_type;
-    typedef std::deque<pos_feature_type, std::allocator<pos_feature_type> > pos_feature_set_type;
-    typedef std::vector<pos_feature_set_type, std::allocator<pos_feature_set_type> > epsilon_set_type;
-    
     ComposePhrase(const symbol_type& non_terminal,
 		  const grammar_type& __grammar,
 		  const int& __max_distortion)
@@ -128,32 +124,8 @@ namespace cicada
 
       if (lattice.empty()) return;
 
-      epsilons.clear();
       nodes.clear();
       coverages.clear();
-
-      epsilons.resize(lattice.size() + 1);
-      
-      // first, construct closure for epsilons...
-      for (size_t i = 0; i != epsilons.size(); ++ i)
-	epsilons[i].push_back(pos_feature_type(i, feature_set_type()));
-      
-      for (int first = lattice.size() - 1; first >= 0; -- first) {
-	const lattice_type::arc_set_type& arcs = lattice[first];
-	
-	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) 
-	  if (aiter->label == vocab_type::EPSILON) {
-	    const int last = first + aiter->distance;
-	    
-	    epsilons[first].push_back(pos_feature_type(last, aiter->features));
-	    
-	    pos_feature_set_type::const_iterator eiter_end = epsilons[last].end();
-	    for (pos_feature_set_type::const_iterator eiter = epsilons[last].begin() + 1; eiter != eiter_end; ++ eiter)
-	      epsilons[first].push_back(pos_feature_type(eiter->first, eiter->second + aiter->features));
-	  }
-      }
-      
       
       queue_type queue;
       
@@ -247,25 +219,27 @@ namespace cicada
 	  for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
 	    const symbol_type& terminal = aiter->label;
 	    const int length = aiter->distance;
-	    
-	    const transducer_type& transducer = grammar[state.grammar_id];
-	    const transducer_type::id_type node = transducer.next(state.node, terminal);
-	    if (node == transducer.root()) continue;
-	    
-	    // check if we can use this phrase...
-	    // we can check by rank_1(pos) to see whether the number of 1s are equal
-	    
-	    const pos_feature_set_type& eps = epsilons[state.last + length];
-	    
-	    pos_feature_set_type::const_iterator eiter_end = eps.end();
-	    for (pos_feature_set_type::const_iterator eiter = eps.begin(); eiter != eiter_end; ++ eiter) {
-	      const int last = eiter->first;
-	      
+
+	    if (terminal == vocab_type::EPSILON) {
 	      const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
-	      const size_type rank_last  = state.coverage->rank(last - 1, true);
+	      const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
 	      
 	      if (rank_first == rank_last)
-		queue.push_back(state_type(state.coverage, state.grammar_id, node, state.first, last, state.features + aiter->features + eiter->second));
+		queue.push_back(state_type(state.coverage, state.grammar_id, state.node, state.first, state.last + length, state.features + aiter->features));
+	      
+	    } else {
+	      const transducer_type& transducer = grammar[state.grammar_id];
+	      const transducer_type::id_type node = transducer.next(state.node, terminal);
+	      if (node == transducer.root()) continue;
+	      
+	      // check if we can use this phrase...
+	      // we can check by rank_1(pos) to see whether the number of 1s are equal
+	      
+	      const size_type rank_first = (state.first == 0 ? size_type(0) : state.coverage->rank(state.first - 1, true));
+	      const size_type rank_last  = state.coverage->rank(state.last + length - 1, true);
+	      
+	      if (rank_first == rank_last)
+		queue.push_back(state_type(state.coverage, state.grammar_id, node, state.first, state.last + length, state.features + aiter->features));
 	    }
 	  }
 	}
@@ -305,7 +279,6 @@ namespace cicada
     const grammar_type& grammar;
     const int max_distortion;
 
-    epsilon_set_type  epsilons;
     node_map_type     nodes;
     coverage_set_type coverages;
     

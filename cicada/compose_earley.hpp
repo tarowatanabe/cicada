@@ -45,8 +45,8 @@ namespace cicada
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
-    ComposeEarley(const grammar_type& __grammar)
-      : grammar(__grammar) 
+    ComposeEarley(const grammar_type& __grammar, const bool __yield_source=false)
+      : grammar(__grammar), yield_source(__yield_source)
 
     {
       edges_unique.set_empty_key(0);
@@ -560,7 +560,7 @@ namespace cicada
 	    for (grammar_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	      
 	      hypergraph_type::edge_type& edge = target.add_edge();
-	      edge.rule = riter->target;
+	      edge.rule = (yield_source ? riter->source : riter->target);
 	      edge.features = riter->features;
 	      
 	      target.connect_edge(edge.id, node.id);
@@ -858,6 +858,7 @@ namespace cicada
     
   private:  
     const grammar_type& grammar;
+    const bool yield_source;
     
     symbol_type           goal_symbol;
     grammar_node_set_type grammar_nodes;
@@ -884,9 +885,9 @@ namespace cicada
   };
   
   inline
-  void compose_earley(const Grammar& grammar, const HyperGraph& source, HyperGraph& target)
+  void compose_earley(const Grammar& grammar, const HyperGraph& source, HyperGraph& target, const bool yield_source=false)
   {
-    ComposeEarley composer(grammar);
+    ComposeEarley composer(grammar, yield_source);
       
     composer(source, target);
   }
