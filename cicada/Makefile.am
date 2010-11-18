@@ -133,6 +133,7 @@ apply_cube_prune.hpp \
 apply_exact.hpp \
 apply_incremental.hpp \
 apply_state_less.hpp \
+attribute.hpp \
 binarize.hpp \
 cluster.hpp \
 compose.hpp \
@@ -195,6 +196,7 @@ weight_vector.hpp
 
 libcicada_la_SOURCES = \
 alignment.cpp \
+attribute.cpp \
 cluster.cpp \
 feature.cpp \
 feature_function.cpp \

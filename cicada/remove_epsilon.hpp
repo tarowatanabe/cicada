@@ -16,8 +16,6 @@
 #include <utils/mathop.hpp>
 #include <utils/chunk_vector.hpp>
 
-#include <google/dense_hash_set>
-
 namespace cicada
 {
   
@@ -254,11 +252,13 @@ namespace cicada
       position_set_type positions_removed(removed.nodes.size(), -1);
       const size_type  num_nodes_removed = dfs(removed, 0, positions_removed);
       
+      // after dfs, positons_removed is numberd by post-traversal order... thus,
+      // we can automatically transpose the graph!
+
       graph_type transposed(num_nodes_removed);
       
       for (size_t i = 0; i != positions_removed.size(); ++ i)
 	if (positions_removed[i] >= 0) {
-	  
 	  graph_type::node_type::edge_set_type::const_iterator eiter_end = removed.nodes[i].edges.end();
 	  for (graph_type::node_type::edge_set_type::const_iterator eiter = removed.nodes[i].edges.begin(); eiter != eiter_end; ++ eiter) {
 	    const graph_type::edge_type& edge = removed.edges[*eiter];
@@ -274,10 +274,14 @@ namespace cicada
       position_set_type positions_transposed(transposed.nodes.size(), -1);
       const size_type num_nodes_transposed = dfs(transposed, 0, positions_transposed);
       
+      // after dfs, positons_transposed is numberd by post-traversal order... thus,
+      // we can automatically transpose the graph... combined with the previous transposition,
+      // we can uncover original pruned graph!
+      
       target.resize(num_nodes_transposed - 1);
+      
       for (size_t i = 0; i != positions_transposed.size(); ++ i)
 	if (positions_transposed[i] >= 0) {
-	  
 	  graph_type::node_type::edge_set_type::const_iterator eiter_end = transposed.nodes[i].edges.end();
 	  for (graph_type::node_type::edge_set_type::const_iterator eiter = transposed.nodes[i].edges.begin(); eiter != eiter_end; ++ eiter) {
 	    const graph_type::edge_type& edge = transposed.edges[*eiter];

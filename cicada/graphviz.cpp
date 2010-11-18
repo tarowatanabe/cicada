@@ -124,6 +124,36 @@ namespace cicada
   };
 
   template <typename Iterator>
+  struct graphviz_tail_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::edge_type::node_set_type()>
+  {
+    
+    typedef cicada::HyperGraph::edge_type::node_set_type node_set_type;
+
+    graphviz_tail_generator() : graphviz_tail_generator::base_type(tail)
+    {
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using karma::omit;
+      using karma::repeat;
+      using karma::lit;
+      using karma::inf;
+      using karma::buffer;
+      using standard::char_;
+      using karma::double_;
+      using karma::int_;
+      
+      using namespace karma::labels;
+      
+      tail %= -(int_ % "\\ ");
+    }
+    
+    boost::spirit::karma::rule<Iterator, node_set_type()> tail;
+  };
+  
+  
+  template <typename Iterator>
   struct graphviz_feature_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::feature_set_type()>
   {
     typedef cicada::Rule                 rule_type;
@@ -185,45 +215,15 @@ namespace cicada
     typedef std::back_insert_iterator<std::string> iterator_type;
     
     typedef graphviz_rule_generator<iterator_type>    rule_grammar_type;
+    typedef graphviz_tail_generator<iterator_type>    tail_grammar_type;
     typedef graphviz_feature_generator<iterator_type> feature_grammar_type;
-
-#ifdef HAVE_TLS
-    static __thread rule_grammar_type* __rule_grammar_tls = 0;
-    static boost::thread_specific_ptr<rule_grammar_type > __rule_grammar;
     
-    if (! __rule_grammar_tls) {
-      __rule_grammar.reset(new rule_grammar_type());
-      __rule_grammar_tls = __rule_grammar.get();
-    }
-    
-    rule_grammar_type& rule_grammar = *__rule_grammar_tls;
-#else
-    static boost::thread_specific_ptr<rule_grammar_type > __rule_grammar;
-    if (! __rule_grammar.get())
-      __rule_grammar.reset(new rule_grammar_type());
-    
-    rule_grammar_type& rule_grammar = *__rule_grammar;
-#endif
-
-#ifdef HAVE_TLS
-    static __thread feature_grammar_type* __feature_grammar_tls = 0;
-    static boost::thread_specific_ptr<feature_grammar_type > __feature_grammar;
-    
-    if (! __feature_grammar_tls) {
-      __feature_grammar.reset(new feature_grammar_type());
-      __feature_grammar_tls = __feature_grammar.get();
-    }
-    
-    feature_grammar_type& feature_grammar = *__feature_grammar_tls;
-#else
-    static boost::thread_specific_ptr<feature_grammar_type > __feature_grammar;
-    if (! __feature_grammar.get())
-      __feature_grammar.reset(new feature_grammar_type());
-    
-    feature_grammar_type& feature_grammar = *__feature_grammar;
-#endif
+    rule_grammar_type    rule_grammar;
+    tail_grammar_type    tail_grammar;
+    feature_grammar_type feature_grammar;
 
     std::string output_rule;
+    std::string output_tail;
     std::string output_feature;
     
     os << "digraph { rankdir=BT;" << '\n';
@@ -241,15 +241,17 @@ namespace cicada
 	if (edge.rule) {
 	  output_rule.clear();
 	  iterator_type iter_rule(output_rule);
-	  
 	  boost::spirit::karma::generate(iter_rule, rule_grammar, *edge.rule);
+
+	  output_tail.clear();
+	  iterator_type iter_tail(output_tail);
+	  boost::spirit::karma::generate(iter_tail, tail_grammar, edge.tails);
 
 	  output_feature.clear();
 	  iterator_type iter_feature(output_feature);
-	  
 	  boost::spirit::karma::generate(iter_feature, feature_grammar, edge.features);
 	  
-	  os << "  edge_" << edge.id << " [label=\"" << output_rule << " | " << output_feature << "\", shape=record];" << '\n';
+	  os << "  edge_" << edge.id << " [label=\"{" << output_rule << " | " << output_tail << "} | " << output_feature << "\", shape=record];" << '\n';
 	} else
 	  os << "  edge_" << edge.id << " [label=\"\", shape=rect];" << '\n';
 	
@@ -276,47 +278,12 @@ namespace cicada
     typedef graphviz_label_generator<iterator_type>   label_grammar_type;
     typedef graphviz_feature_generator<iterator_type> feature_grammar_type;
 
-#ifdef HAVE_TLS
-    static __thread label_grammar_type* __label_grammar_tls = 0;
-    static boost::thread_specific_ptr<label_grammar_type > __label_grammar;
-    
-    if (! __label_grammar_tls) {
-      __label_grammar.reset(new label_grammar_type());
-      __label_grammar_tls = __label_grammar.get();
-    }
-    
-    label_grammar_type& label_grammar = *__label_grammar_tls;
-#else
-    static boost::thread_specific_ptr<label_grammar_type > __label_grammar;
-    if (! __label_grammar.get())
-      __label_grammar.reset(new label_grammar_type());
-    
-    label_grammar_type& label_grammar = *__label_grammar;
-#endif
-
-#ifdef HAVE_TLS
-    static __thread feature_grammar_type* __feature_grammar_tls = 0;
-    static boost::thread_specific_ptr<feature_grammar_type > __feature_grammar;
-    
-    if (! __feature_grammar_tls) {
-      __feature_grammar.reset(new feature_grammar_type());
-      __feature_grammar_tls = __feature_grammar.get();
-    }
-    
-    feature_grammar_type& feature_grammar = *__feature_grammar_tls;
-#else
-    static boost::thread_specific_ptr<feature_grammar_type > __feature_grammar;
-    if (! __feature_grammar.get())
-      __feature_grammar.reset(new feature_grammar_type());
-    
-    feature_grammar_type& feature_grammar = *__feature_grammar;
-#endif
-
+    label_grammar_type   label_grammar;
+    feature_grammar_type feature_grammar;
 
     std::string output_label;
     std::string output_feature;
     
-
     os << "digraph { " << '\n';
 
     int id_edge = 0;
@@ -337,7 +304,7 @@ namespace cicada
 	
 	boost::spirit::karma::generate(iter_feature, feature_grammar, arc.features);
 	
-	os << "    edge_" << id_edge << " [label=\"" << output_label << " | " << output_feature << "\", shape=record];" << '\n';
+	os << "   edge_" << id_edge << " [label=\"" << output_label << " | " << output_feature << "\", shape=record];" << '\n';
 	
 	os << "   node_" << id << " -> edge_" << id_edge << ';' << '\n';
 	os << "   edge_" << id_edge << " -> node_" << (id + arc.distance) << ';' << '\n';
@@ -345,7 +312,7 @@ namespace cicada
       }
     }
     
-    os << " node_" << lattice.size() << " [label=\"\", shape=circle, height=0.1, width=0.1];" << '\n';
+    os << " node_" << lattice.size() << " [label=\"" << lattice.size() << "\", shape=circle, height=0.1, width=0.1];" << '\n';
     
     os << '}' << '\n';
     
