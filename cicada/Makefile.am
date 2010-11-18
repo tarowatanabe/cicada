@@ -121,6 +121,7 @@ operation/normalize.hpp \
 operation/output.hpp \
 operation/permute.hpp \
 operation/prune.hpp \
+operation/remove_epsilon.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp
 
@@ -170,6 +171,7 @@ prune.hpp \
 prune_beam.hpp \
 prune_density.hpp \
 quantizer.hpp \
+remove_epsilon.hpp \
 rule.hpp \
 semiring.hpp \
 sentence.hpp \

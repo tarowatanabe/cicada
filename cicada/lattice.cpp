@@ -126,7 +126,7 @@ namespace cicada
       jlf_lattice_arc %= '[' >> jlf_label_double_quote >> ',' >> '{' >> -(jlf_lattice_score % ',') >> '}' >> ',' >> int_ >> ']';
       plf_lattice_arc %= '(' >> (plf_label_double_quote | plf_label_single_quote) >> ',' >> repeat(1)[plf_lattice_score] >> ',' >> int_ >> ')';
       
-      jlf_lattice_set %= '[' >> (jlf_lattice_arc % ',') >> ']';
+      jlf_lattice_set %= '[' >> -(jlf_lattice_arc % ',') >> ']';
       plf_lattice_set %= '(' >> +(plf_lattice_arc >> ',') >> ')';
 
       lattice_grammar %= hold[lit('(') >> *(plf_lattice_set >> ',') >> lit(')')] | (lit('[') >> -(jlf_lattice_set % ',') >> lit(']'));
@@ -261,7 +261,7 @@ namespace cicada
       lattice_score %= label_double_quote << ": " << double_;
       
       lattice_arc %= '[' << label_double_quote << ", " << '{' << -(lattice_score % ',') << '}' << ", " << int_ << ']';
-      lattice_set %= '[' << (lattice_arc % ", ") << ']';
+      lattice_set %= '[' << -(lattice_arc % ", ") << ']';
       lattice_grammar %= '[' << -(lattice_set % ", ") << ']';
     }
     

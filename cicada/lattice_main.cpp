@@ -14,21 +14,23 @@ int main(int argc, char** argv)
 
   std::cout << lattice << std::endl;
 
-
   lattice_type input;
   lattice_type removed;
   while (std::cin >> input) {
-    
     std::cout << "shortest: " << input.shortest_distance()
 	      << " longest: " << input.longest_distance()
+	      << " nodes: " << input.size()
 	      << std::endl;
     
-    
-
     std::cout << input << std::endl;
-
-    cicada::remove_epsilon(input, removed);
     
-    std::cout << "removed: " << removed << std::endl;
+    cicada::remove_epsilon(input, removed);
+
+    std::cout << "shortest: " << removed.shortest_distance()
+	      << " longest: " << removed.longest_distance()
+	      << " nodes: " << removed.size()
+	      << std::endl;
+    
+    std::cout << removed << std::endl;
   }
 }

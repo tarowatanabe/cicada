@@ -84,6 +84,7 @@ namespace cicada
     
   public:
     Lattice() : lattice(), dist_short(), dist_long() {}
+    Lattice(size_type size) : lattice(size), dist_short(), dist_long() {}
     Lattice(const std::string& x) { assign(x); }
     Lattice(const Sentence& x) : lattice(x.size()), dist_short(), dist_long()
     {
@@ -95,6 +96,8 @@ namespace cicada
     
     void assign(const std::string& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+
+    void resize(size_type size) { lattice.resize(size); }
     
     size_type size() const { return lattice.size(); }
     bool empty() const { return lattice.empty(); }
@@ -147,14 +150,13 @@ namespace cicada
 
     void clear() { lattice.clear(); dist_short.clear(); dist_long.clear(); }
 
+    void initialize_distance();
+  public:
     friend
     std::ostream& operator<<(std::ostream& os, const Lattice& x);
     friend
     std::istream& operator>>(std::istream& is, Lattice& x);
-    
-  private:
-    void initialize_distance();
-    
+        
   private:
     lattice_type lattice;
     distance_type dist_short;

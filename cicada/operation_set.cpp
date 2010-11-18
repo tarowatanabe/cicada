@@ -21,6 +21,7 @@
 #include "operation/apply.hpp"
 #include "operation/expected_ngram.hpp"
 #include "operation/prune.hpp"
+#include "operation/remove_epsilon.hpp"
 #include "operation/span_forest.hpp"
 #include "operation/intersect.hpp"
 #include "operation/normalize.hpp"
@@ -78,6 +79,7 @@ prune: pruning\n\
 intersect: compute intersection\n\
 normalize: feature value normalizer\n\
 \tprefix=feature name prefix\n\
+remove-epsilon: remove epsilon for lattice\n\
 span-forest: annotate terminal span\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
@@ -159,6 +161,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::Intersect(debug)));
       else if (param.name() == "normalize")
 	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
+      else if (param.name() == "remove-epsilon")
+	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
       else if (param.name() == "expected-ngram")
 	operations.push_back(operation_ptr_type(new operation::ExpectedNGram(*piter, debug)));
       else if (param.name() == "output") {
