@@ -10,10 +10,11 @@ If you need support contact me.
 
 filter_penntreebank [options]
 options:
-  --input arg (=-)      input file
+  --input arg (=-)      input file (parse trees)
   --output arg (=-)     output
   --escape              escape English penntreebank
   --leaf                collect leaf nodes only
+  --map                 re-label tree by sentences (a set of "parsed" original sentences)
   --help                help message
 
 For English treebanks, you may want to transform [,] or [.] into [COMMA] [PERIOD] respectively, otherwise

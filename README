@@ -4,8 +4,9 @@ A statistical machine translation toolkit based on a semiring parsing framework[
 Based on the generic framework, we can
    - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree)
    - translate sentence, lattice and/or parse tree
+   - analyze forest/tree/lattice
 
-Remark: cicada is 蝉, (or セミ) in Japanese, pronounced "SEMI"
+Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
 
 Basically, we have three distinct structures:
    - lattice: a representation of graph implemented as a two-dimentional array.
@@ -39,7 +40,7 @@ Or, you can combine outputs from multiple systems by (New! and TODO):
    - Construct hypergraph by linear grammar (grammar-glue-straight + grammar-insertion)
    - Generate k-best translations after feature application etc.
 
-Phrase/synchronou-rule/tree-to-string/string-to-tree extractions are implemented:
+Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
    - A conventional phrase extract algorithm in Moses
    - A conventional hierarchical phrase extraction algorithm in Hiero
       + syntax augmented rule extraction is also supported [15]
@@ -47,7 +48,6 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extractions are implemented
    - Tree-to-tree rule extraction from forest [17] (TODO!)
    
    - After count extraction, you can perform map/reduce to compute model scores
-     TODO: create "filers" to perform max-like estimation (with smoothing).
 
 Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]

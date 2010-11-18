@@ -10,6 +10,25 @@ SK: string kernel (by default, decay factor = 0.8, spectrum p = 4)
 
 Implemented bootstrap resampling[1] and sign test[2] in "cicada_eval"
 
+cicada_eval [options]
+
+configuration options:
+  --tstset arg                 test set file(s)
+  --tstset2 arg                test set file(s)   (required for sign test)
+  --refset arg                 reference set file(s)
+  --output arg (=-)            output file
+  --scorer arg (=bleu:order=4) error metric
+  --scorer-list                list of error metric
+  --signtest                   sign test
+  --bootstrap                  bootstrap resampling
+  --samples arg                # of samples
+
+reference/test set format is as follows:
+
+segment-id |||  sentence (||| .... some information, such as features etc. ...)
+
+Thus, you can directly feed k-best output from cicada(or cicada_mpi).
+
 Also, you can compute oracle-BLEU from hypergraph(s) by cicada_oracle{,_mpi}
 
 [1]
@@ -24,7 +43,6 @@ Also, you can compute oracle-BLEU from hypergraph(s) by cicada_oracle{,_mpi}
   publisher = {Association for Computational Linguistics},
   pages     = {388--395}
 }
-
 
 [2]
 @inproceedings{1219906,

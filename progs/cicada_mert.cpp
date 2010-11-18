@@ -216,9 +216,6 @@ int main(int argc, char ** argv)
       throw std::runtime_error("you cannot use both of L1 and L2...");
     
     if (regularize_l1 || regularize_l2) {
-      weight_normalize_l1 = false;
-      weight_normalize_l2 = false;
-      
       if (C <= 0.0)
 	throw std::runtime_error("the scaling for L1/L2 must be positive");
     }

@@ -1,0 +1,10 @@
+Tree-Grammar:
+
+We can use tree-transduce grammar as in:
+
+[X]([X,1] [X](a b c)) ||| [Y](A B [Y,1]) ||| feature1=0.5 feature2=-40
+
+no '(' or ')' allowed in non-terminals or terminals, but you can still "escape" by '\(' '\)'
+(You should escape '\' by '\\')
+
+
