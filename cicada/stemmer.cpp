@@ -17,6 +17,23 @@
 namespace cicada
 {
 
+  std::string Stemmer::lists()
+  {
+    static const char* desc = "\
+snowball: snowball stemming\n\
+\tlanguage=[language] stemming algorithm (en, de etc.)\n\
+prefix: taking prefix of letters\n\
+\tsize=[int] prefix size\n\
+suffix: taking suffix of letters\n\
+\tsize=[int] suffix size\n\
+digit: digits normalized to @\n\
+latin: romanization\n\
+lower: lower casing\n\
+";
+    return desc;
+  }
+  
+  
   template <typename Tp>
   struct hash_string : public utils::hashmurmur<size_t>
   {

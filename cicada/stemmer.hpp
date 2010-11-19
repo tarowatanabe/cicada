@@ -28,7 +28,8 @@ namespace cicada
     virtual ~Stemmer() {}
     
   public:
-    static Stemmer& create(const std::string& parameter);
+    static Stemmer&    create(const std::string& parameter);
+    static std::string lists();
     
   public:
     symbol_type operator()(const symbol_type& x) const { return operator[](x); }
