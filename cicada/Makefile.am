@@ -91,6 +91,7 @@ feature/ngram_tree.cpp \
 feature/parent.cpp \
 feature/span.cpp \
 feature/variational.cpp
+
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_stemmer_HEADERS = \
@@ -98,15 +99,19 @@ stemmer/prefix.hpp \
 stemmer/suffix.hpp \
 stemmer/latin.hpp \
 stemmer/lower.hpp \
-stemmer/digit.hpp
+stemmer/digit.hpp \
+stemmer/snowball.hpp
 
 libcicada_stemmer_la_SOURCES = \
 stemmer/prefix.cpp \
 stemmer/suffix.cpp \
 stemmer/latin.cpp \
 stemmer/lower.cpp \
-stemmer/digit.cpp
+stemmer/digit.cpp \
+stemmer/snowball.cpp
+
 libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
+libcicada_stemmer_la_LIBADD = $(top_builddir)/libstemmer_c/libstemmer.la
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
