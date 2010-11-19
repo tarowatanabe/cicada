@@ -642,14 +642,6 @@ struct ExtractGHKM
 	// construct rule pair and insert into rule pair list
 	construct_rule_pair(graph, sentence, node, edge_composed.edges, edge_composed.tails, rule_pair);
 	
-	if (item->composed)
-	  if ((max_nodes > 0 && edge_composed.internal > max_nodes)
-	      || (max_height > 0 && edge_composed.height > max_height))
-	    std::cerr << (item->composed ? "composed" : "minimal")
-		      << " height: " << edge_composed.height
-		      << " node: " << edge_composed.internal
-		      << " " << rule_pair.source << " ||| " << rule_pair.target << std::endl;
-	
 	rule_pairs_local[edge_composed.edges].push_back(rule_pair);
 	
 	if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
@@ -680,10 +672,7 @@ struct ExtractGHKM
 	      edge_set_type::const_iterator  eiter_end   = edge.edges.end();
 		
 	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
-
-	      if (rule_stat.second != composed_stat.first)
-		std::cerr << "composed: " << composed_stat.first << " rule: " << rule_stat.second << std::endl;
-		
+	      
 	      if (max_height <= 0 || rule_stat.first <= max_height) {
 		candidates.push_back(candidate_type(edge, j, true));
 		  
