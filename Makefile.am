@@ -1,4 +1,4 @@
 
 ACLOCAL_AMFLAGS = -I config
 
-SUBDIRS = utils succinct_db cicada progs
+SUBDIRS = utils succinct_db libstemmer_c cicada progs
