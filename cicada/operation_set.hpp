@@ -39,7 +39,7 @@ namespace cicada
     typedef std::vector<std::string, std::allocator<std::string> > parameter_set_type;
     
   public:
-    static std::string lists();
+    static const char* lists();
     
   public:
     template <typename Iterator>

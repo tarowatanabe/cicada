@@ -17,7 +17,7 @@
 namespace cicada
 {
 
-  std::string Stemmer::lists()
+  const char* Stemmer::lists()
   {
     static const char* desc = "\
 snowball: snowball stemming\n\

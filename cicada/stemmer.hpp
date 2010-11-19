@@ -29,7 +29,7 @@ namespace cicada
     
   public:
     static Stemmer&    create(const std::string& parameter);
-    static std::string lists();
+    static const char* lists();
     
   public:
     symbol_type operator()(const symbol_type& x) const { return operator[](x); }

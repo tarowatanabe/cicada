@@ -105,7 +105,7 @@ namespace cicada
       virtual bool error_metric() const = 0;
       virtual scorer_ptr_type clone() const = 0;
       
-      static std::string lists();
+      static const char*     lists();
       static scorer_ptr_type create(const std::string& parameter);
       
       

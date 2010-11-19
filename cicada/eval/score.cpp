@@ -93,7 +93,7 @@ namespace cicada
 	sentence_lower.push_back(stemmer[*siter]);
     }
 
-    std::string Scorer::lists()
+    const char* Scorer::lists()
     {
       static const char* desc = "\
 bleu:\n\

@@ -35,7 +35,7 @@
 
 namespace cicada
 {
-  std::string OperationSet::lists()
+  const char* OperationSet::lists()
   {
     static const char* desc = "\
 binarize: perform binarization (monolingual tree)\n\
