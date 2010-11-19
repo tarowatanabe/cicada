@@ -84,6 +84,9 @@ namespace cicada
     typedef std::vector<bool, std::allocator<bool> > pos_set_type;
     typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
     
+  private:
+    pos_pair_set_type positions;
+    
   public:
     GrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
     {
@@ -132,7 +135,7 @@ namespace cicada
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
 	  if (aiter->label != vocab_type::EPSILON)
-	    positions[first][last] = true;
+	    positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
@@ -161,6 +164,9 @@ namespace cicada
   private:
     typedef std::vector<bool, std::allocator<bool> > pos_set_type;
     typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
+
+  private:
+    pos_pair_set_type positions;
     
   public:
     GrammarDeletion(const hypergraph_type& graph, const symbol_type& non_terminal)
@@ -214,7 +220,7 @@ namespace cicada
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
 	  if (aiter->label != vocab_type::EPSILON)
-	    positions[first][last] = true;
+	    positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
