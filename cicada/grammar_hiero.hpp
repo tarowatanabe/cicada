@@ -80,6 +80,9 @@ namespace cicada
     typedef Lattice    lattice_type;
     typedef HyperGraph hypergraph_type;
 
+  private:
+    typedef std::vector<bool, std::allocator<bool> > pos_set_type;
+    typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
     
   public:
     GrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
@@ -110,6 +113,7 @@ namespace cicada
     }
 
     GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
+      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -121,9 +125,15 @@ namespace cicada
       
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
+
+	if (arcs.empty())
+	  positions[first].clear();
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
+	  if (aiter->label != vocab_type::EPSILON)
+	    positions[first][last] = true;
+	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
 	    
@@ -131,12 +141,13 @@ namespace cicada
 	    
 	    symbols.insert(aiter->label);
 	  }
+	}
       }
     }
-
+    
     bool valid_span(int first, int last, int distance) const
     {
-      return distance <= 1;
+      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
   };
   
@@ -146,6 +157,10 @@ namespace cicada
   public:
     typedef Lattice    lattice_type;
     typedef HyperGraph hypergraph_type;
+
+  private:
+    typedef std::vector<bool, std::allocator<bool> > pos_set_type;
+    typedef std::vector<pos_set_type, std::allocator<pos_set_type> > pos_pair_set_type;
     
   public:
     GrammarDeletion(const hypergraph_type& graph, const symbol_type& non_terminal)
@@ -178,6 +193,7 @@ namespace cicada
     }
 
     GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
+      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -191,9 +207,15 @@ namespace cicada
       
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
+
+	if (arcs.empty())
+	  positions[first].clear();
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
-	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
+	  if (aiter->label != vocab_type::EPSILON)
+	    positions[first][last] = true;
+	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
 	    
@@ -201,12 +223,13 @@ namespace cicada
 	    
 	    symbols.insert(aiter->label);
 	  }
+	}
       }
     }
     
     bool valid_span(int first, int last, int distance) const
     {
-      return distance <= 1;
+      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
   };
 };
