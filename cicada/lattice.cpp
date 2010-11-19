@@ -50,7 +50,7 @@ namespace cicada
     for (size_t i = 0; i != lattice.size(); ++ i)
       for (size_t j = 0; j != lattice[i].size(); ++ j) {
 	dist_short(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
-	dist_long(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
+	dist_long(i, i + lattice[i][j].distance)  = (lattice[i][j].label != Vocab::EPSILON);
       }
     
     // edge-cost dist(i, i) = 0
