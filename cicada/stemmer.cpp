@@ -175,6 +175,7 @@ lower: lower casing\n\
 	iter->second->__algorithm = parameter;
       }
       
+      return *(iter->second);
     } else
       throw std::runtime_error("invalid parameter: " + parameter);
   }
