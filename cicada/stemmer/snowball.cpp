@@ -12,6 +12,7 @@ namespace cicada
     struct SnowballImpl
     {
       typedef sb_stemmer stemmer_type;
+      typedef std::vector<sb_symbol, std::allocator<sb_symbol> > buffer_type;
 
       SnowballImpl(const std::string& lang) : pimpl(sb_stemmer_new(lang.c_str(), 0)) {}
       ~SnowballImpl() 
@@ -23,15 +24,20 @@ namespace cicada
       std::string operator()(const std::string& word) const
       {
 	if (! pimpl) return word;
+
+	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	
-	std::vector<sb_symbol, std::allocator<sb_symbol> > buffer(word.begin(), word.end());
+	buffer.clear();
+	buffer.insert(buffer.end(), word.begin(), word.end());
 	
 	const sb_symbol* stemmed = sb_stemmer_stem(pimpl, static_cast<const sb_symbol*>(&(*buffer.begin())), buffer.size());
+	const size_t length = sb_stemmer_length(pimpl);
 	
-	return std::string((const char*) stemmed);
+	return std::string(stemmed, stemmed + length);
       }
       
       stemmer_type* pimpl;
+      buffer_type buffer_impl;
     };
 
     Snowball::Snowball(const std::string& language)

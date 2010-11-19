@@ -5,6 +5,7 @@
 #include "stemmer/latin.hpp"
 #include "stemmer/digit.hpp"
 #include "stemmer/lower.hpp"
+#include "stemmer/snowball.hpp"
 
 #include "parameter.hpp"
 
@@ -133,6 +134,30 @@ namespace cicada
       }
       
       return *(iter->second);
+    } else if (param.name() == "snowball") {
+
+      std::string language;
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "lang") == 0
+	    || strcasecmp(piter->first.c_str(), "language") == 0
+	    || strcasecmp(piter->first.c_str(), "algorithm") == 0)
+	  language = piter->second;
+	else
+	  std::cerr << "unsupported parameter for snowball stemmer: " << piter->first << "=" << piter->second << std::endl;
+      }
+
+      if (language.empty())
+	throw std::runtime_error("no stemming algorithm?");
+      
+      const std::string name = "snowball:" + language;
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Snowball(language)))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
     } else
       throw std::runtime_error("invalid parameter: " + parameter);
   }
