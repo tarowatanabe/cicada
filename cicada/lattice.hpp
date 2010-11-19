@@ -71,7 +71,7 @@ namespace cicada
     typedef std::vector<arc_set_type, std::allocator<arc_set_type> >  lattice_type;
 
   private:
-    typedef utils::vector2<difference_type, std::allocator<difference_type> >     distance_type;
+    typedef utils::vector2<int, std::allocator<int> >     distance_type;
 
   public:
     typedef lattice_type::value_type      value_type;

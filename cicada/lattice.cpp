@@ -34,8 +34,8 @@ namespace cicada
   {
     const size_type dist_size = size() + 1;
 
-    const difference_type pos_infinity = boost::numeric::bounds<difference_type>::highest();
-    const difference_type neg_infinity = boost::numeric::bounds<difference_type>::lowest();
+    const int pos_infinity = boost::numeric::bounds<int>::highest();
+    const int neg_infinity = boost::numeric::bounds<int>::lowest();
     
     // edge-cost is inifinity if no-path
     dist_short.clear();
