@@ -63,7 +63,7 @@ namespace cicada
   public:
     
     static feature_function_ptr_type create(const std::string& parameter);
-    static std::string               lists();
+    static const char*               lists();
     
   public:
     // feature application 

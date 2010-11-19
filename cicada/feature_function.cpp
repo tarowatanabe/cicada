@@ -22,7 +22,7 @@
 namespace cicada
 {
   
-  std::string FeatureFunction::lists()
+  const char* FeatureFunction::lists()
   {
     static const char* desc = "\
 antecedent: antecedent feature\n\
