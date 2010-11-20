@@ -160,18 +160,10 @@ namespace cicada
 	typedef ngram_set_type::id_type id_type;
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
 
-	sentence_type sentence_split;
-	sentence_type sentence_lower;
-	
-	if (split)
-	  split_non_ascii_characters(__sentence, sentence_split);
-	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
-	
-	if (lower)
-	  lower_case(__sentence_split, sentence_lower);
-	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
-
+	sentence_type sentence;
 	counts_type counts;
+
+	tokenize(__sentence, sentence);
 	
 	sentence_type::const_iterator siter_end = sentence.end();
 	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
@@ -199,16 +191,8 @@ namespace cicada
 	
 	typedef std::vector<counts_type, std::allocator<counts_type> > counts_set_type;
 	
-	sentence_type sentence_split;
-	sentence_type sentence_lower;
-	
-	if (split)
-	  split_non_ascii_characters(__sentence, sentence_split);
-	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
-	
-	if (lower)
-	  lower_case(__sentence_split, sentence_lower);
-	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
+	sentence_type sentence;
+	tokenize(__sentence, sentence);
 	
 	std::auto_ptr<Bleu> bleu(new Bleu(order));
 	counts_set_type counts(order);

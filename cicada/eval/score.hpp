@@ -108,9 +108,7 @@ namespace cicada
       static const char*     lists();
       static scorer_ptr_type create(const std::string& parameter);
       
-      
-      void split_non_ascii_characters(const sentence_type& sentence, sentence_type& sentence_split) const;
-      void lower_case(const sentence_type& sentence, sentence_type& sentence_lower) const;
+      void tokenize(const sentence_type& sentence, sentence_type& tokenized) const;
       
     protected:
       bool split;

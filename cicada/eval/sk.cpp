@@ -140,16 +140,8 @@ namespace cicada
     
     void SKScorer::insert(const sentence_type& __sentence)
     {
-      sentence_type sentence_split;
-      sentence_type sentence_lower;
-      
-      if (split)
-	split_non_ascii_characters(__sentence, sentence_split);
-      const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
-      
-      if (lower)
-	lower_case(__sentence_split, sentence_lower);
-      const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
+      sentence_type sentence;
+      tokenize(__sentence, sentence);
 
       impl.push_back(new impl_type(sentence));
     }
@@ -157,17 +149,8 @@ namespace cicada
 
     SKScorer::score_ptr_type SKScorer::score(const sentence_type& __sentence) const
     {
-      sentence_type sentence_split;
-      sentence_type sentence_lower;
-      
-      if (split)
-	split_non_ascii_characters(__sentence, sentence_split);
-      const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
-      
-      if (lower)
-	lower_case(__sentence_split, sentence_lower);
-      const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
-      
+      sentence_type sentence;
+      tokenize(__sentence, sentence);
       
       double precision_max = 0.0;
       double recall_max = 0.0;

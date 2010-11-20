@@ -17,13 +17,15 @@ namespace cicada
       typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
       
     public:
-      Lower() {}
+      Lower();
+      ~Lower();
       
     public:
       symbol_type operator[](const symbol_type& x) const;
       
     private:
       symbol_set_type cache;
+      void*           pimpl;
     };
   };
 };

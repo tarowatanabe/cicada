@@ -4,10 +4,11 @@ int main(int argc, char** argv)
 {
   if (argc < 2) {
     std::cout << argv[0] << " stemmer-spec" << std::endl;
+    std::cout << cicada::Stemmer::lists();
     return 1;
   }
 
-  std::cout << cicada::Stemmer::lists();
+  
   
   cicada::Stemmer& stemmer(cicada::Stemmer::create(argv[1]));
   

@@ -28,9 +28,12 @@ namespace cicada
 {
   namespace eval
   {
-
-    void Scorer::split_non_ascii_characters(const sentence_type& sentence, sentence_type& sentence_split) const
+    
+    static void split_non_ascii_characters(const Sentence& sentence, Sentence& sentence_split)
     {
+      typedef Sentence sentence_type;
+      typedef sentence_type::word_type word_type;
+
       sentence_split.clear();
 
       std::string buffer;
@@ -65,32 +68,55 @@ namespace cicada
 	buffer.clear();
       }
     }
-    
-    void Scorer::lower_case(const sentence_type& sentence, sentence_type& sentence_lower) const
-    {
-      typedef cicada::Stemmer stemmer_type;
 
+#ifndef HAVE_TLS
+    static void __no_clean_up_func(cicada::Stemmer* x)
+    {
+      
+    }
+#endif
+    
+    static void lower_case(const Sentence& sentence, Sentence& sentence_lower)
+    {
+      typedef cicada::Sentence sentence_type;
+      typedef cicada::Stemmer stemmer_type;
+      
+      // we will assign no clean up function!!!
+      
 #ifdef HAVE_TLS
       static __thread stemmer_type* __stemmer_tls = 0;
-      static boost::thread_specific_ptr<stemmer_type> __stemmer;
-      if (! __stemmer_tls) {
-	__stemmer.reset(&stemmer_type::create("lower"));
-	__stemmer_tls = __stemmer.get();
-      }
-      
+      if (! __stemmer_tls)
+	__stemmer_tls = &stemmer_type::create("lower");
       stemmer_type& stemmer = *__stemmer_tls;
 #else
-      static boost::thread_specific_ptr<stemmer_type> __stemmer;
+      static boost::thread_specific_ptr<stemmer_type> __stemmer(__no_clean_up_func);
       if (! __stemmer.get())
 	__stemmer.reset(&stemmer_type::create("lower"));
       
       stemmer_type& stemmer = *__stemmer;
 #endif
-
+      
       sentence_lower.clear();
       sentence_type::const_iterator siter_end = sentence.end();
       for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
 	sentence_lower.push_back(stemmer[*siter]);
+    }
+    
+    void Scorer::tokenize(const sentence_type& sentence, sentence_type& tokenized) const
+    {
+      if (lower || split) {
+	if (lower && split) {
+	  sentence_type sentence_split;
+	  
+	  split_non_ascii_characters(sentence, sentence_split);
+	  
+	  lower_case(sentence_split, tokenized);
+	} else if (split)
+	  split_non_ascii_characters(sentence, tokenized);
+	else
+	  lower_case(sentence, tokenized);
+      } else
+	tokenized = sentence;
     }
 
     const char* Scorer::lists()

@@ -27,6 +27,11 @@ namespace cicada
     Stemmer() {}
     virtual ~Stemmer() {}
     
+  private:
+    // we do not allow copy/construct
+    Stemmer& operator=(const Stemmer& x) { return *this; }
+    Stemmer(const Stemmer& x) {}
+    
   public:
     static Stemmer&    create(const std::string& parameter);
     static const char* lists();

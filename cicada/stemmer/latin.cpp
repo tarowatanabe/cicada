@@ -11,19 +11,15 @@ namespace cicada
 
   namespace stemmer
   {
-    class AnyLatin
+    struct LatinImpl
     {
     private:
       Transliterator* trans;
-    
+      
     public:
-      AnyLatin() : trans(0) { open(); }
-      ~AnyLatin() { close(); }
-    
-    private:
-      AnyLatin(const AnyLatin& x) { }
-      AnyLatin& operator=(const AnyLatin& x) { return *this; }
-    
+      LatinImpl() : trans(0) { open(); }
+      ~LatinImpl() { close(); }
+      
     public:
       void operator()(UnicodeString& data) { trans->transliterate(data); }
     
@@ -73,8 +69,14 @@ namespace cicada
       }
     };
 
+    Latin::Latin() : pimpl(new impl_type()) {}
+    Latin::~Latin() { std::auto_ptr<impl_type> tmp(pimpl); }
+
     Stemmer::symbol_type Latin::operator[](const symbol_type& word) const
     {
+      if (! pimpl)
+	throw std::runtime_error("no latin normalizer?");
+
       if (word == vocab_type::EMPTY || word.is_non_terminal()) return word;
     
       const size_type word_size = word.size();
@@ -87,30 +89,12 @@ namespace cicada
     
       if (word.id() >= __cache.size())
 	__cache.resize(word.id() + 1, vocab_type::EMPTY);
-    
+      
       if (__cache[word.id()] == vocab_type::EMPTY) {
-#ifdef HAVE_TLS
-	static __thread AnyLatin* __any_latin_tls = 0;
-	static boost::thread_specific_ptr<AnyLatin> __any_latin_specific;
-      
-	if (! __any_latin_tls) {
-	  __any_latin_specific.reset(new AnyLatin());
-	  __any_latin_tls = __any_latin_specific.get();
-	}
-      
-	AnyLatin& any_latin = *__any_latin_tls;
-#else
-	static boost::thread_specific_ptr<AnyLatin> __any_latin_specific;
-      
-	if (! __any_latin_specific.get())
-	  __any_latin_specific.reset(new AnyLatin());
-      
-	AnyLatin& any_latin = *__any_latin_specific;
-#endif
-      
+	
 	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
-      
-	any_latin(uword);
+	
+	pimpl->operator()(uword);
       
 	if (! uword.isEmpty()) {
 	  std::string word_latin;
