@@ -6,6 +6,8 @@
 #include <unicode/bytestream.h>
 #include <unicode/translit.h>
 
+#include <boost/thread/mutex.hpp>
+
 namespace cicada
 {
 
@@ -47,27 +49,46 @@ namespace cicada
       }
     
     private:
+      typedef boost::mutex              mutex_type;
+      typedef boost::mutex::scoped_lock lock_type;
+
+      static mutex_type __mutex;
+
       void __initialize()
       {
 	static bool __initialized = false;
-      
-	if (__initialized) return;
-      
-	// Any-Latin, NFKD, remove accents, NFKC
-	UErrorCode status = U_ZERO_ERROR;
-	UParseError status_parse;
-	Transliterator* __trans = Transliterator::createFromRules(UnicodeString::fromUTF8("AnyLatinNoAccents"),
-								  UnicodeString::fromUTF8(":: Any-Latin; :: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
-								  UTRANS_FORWARD, status_parse, status);
-	if (U_FAILURE(status))
-	  throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
-      
-	// register here...
-	Transliterator::registerInstance(__trans);
-      
-	__initialized = true;
+
+	volatile bool tmp = __initialized;
+	
+	__sync_synchronize();
+	
+	if (! __initialized) {
+	  
+	  lock_type lock(__mutex);
+	  
+	  if (! __initialized) {
+	    
+	    // Any-Latin, NFKD, remove accents, NFKC
+	    UErrorCode status = U_ZERO_ERROR;
+	    UParseError status_parse;
+	    Transliterator* __trans = Transliterator::createFromRules(UnicodeString::fromUTF8("AnyLatinNoAccents"),
+								      UnicodeString::fromUTF8(":: Any-Latin; :: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
+								      UTRANS_FORWARD, status_parse, status);
+	    if (U_FAILURE(status))
+	      throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
+	    
+	    // register here...
+	    Transliterator::registerInstance(__trans);
+	    
+	    tmp = true;
+	    __sync_synchronize();
+	    __initialized = tmp;
+	  }
+	}
       }
     };
+    
+    LatinImpl::mutex_type LatinImpl::__mutex;
 
     Latin::Latin() : pimpl(new impl_type()) {}
     Latin::~Latin() { std::auto_ptr<impl_type> tmp(pimpl); }
