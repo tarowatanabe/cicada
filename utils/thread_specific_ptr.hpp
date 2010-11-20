@@ -8,6 +8,8 @@
 
 #include <boost/thread.hpp>
 
+#include <utils/atomicop.hpp>
+
 namespace utils
 {
   
@@ -36,7 +38,7 @@ namespace utils
     void initialize()
     {
       volatile bool tmp = initialized;
-      __sync_synchronize();
+      utils::atomicop::memory_barrier();
       if (! initialized) {
 	boost::mutex::scoped_lock lock(mutex);
       
@@ -44,7 +46,7 @@ namespace utils
 	  pthread_key_create(&key, delete_value);
 	
 	  tmp = true;
-	  __sync_synchronize();
+	  utils::atomicop::memory_barrier();
 	  initialized = tmp;
 	}
       }

@@ -8,6 +8,8 @@
 
 #include <boost/thread/mutex.hpp>
 
+#include <utils/atomicop.hpp>
+
 namespace cicada
 {
 
@@ -60,7 +62,7 @@ namespace cicada
 
 	volatile bool tmp = __initialized;
 	
-	__sync_synchronize();
+	utils::atomicop::memory_barrier();
 	
 	if (! __initialized) {
 	  
@@ -81,7 +83,7 @@ namespace cicada
 	    Transliterator::registerInstance(__trans);
 	    
 	    tmp = true;
-	    __sync_synchronize();
+	    utils::atomicop::memory_barrier();
 	    __initialized = tmp;
 	  }
 	}
