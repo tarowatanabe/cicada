@@ -43,7 +43,7 @@ namespace cicada
     Snowball::Snowball(const std::string& language)
       : pimpl(new impl_type(language))
     {
-      if (! pimpl)
+      if (! pimpl->pimpl)
 	throw std::runtime_error("we do not support stemming algorithm: " + language);
     }
     

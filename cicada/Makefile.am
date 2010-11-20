@@ -95,6 +95,7 @@ feature/variational.cpp
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_stemmer_HEADERS = \
+stemmer/arabic.hpp \
 stemmer/prefix.hpp \
 stemmer/suffix.hpp \
 stemmer/latin.hpp \
@@ -103,6 +104,7 @@ stemmer/digit.hpp \
 stemmer/snowball.hpp
 
 libcicada_stemmer_la_SOURCES = \
+stemmer/arabic.cpp \
 stemmer/prefix.cpp \
 stemmer/suffix.cpp \
 stemmer/latin.cpp \
