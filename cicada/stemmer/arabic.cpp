@@ -119,17 +119,12 @@ namespace cicada
       private:
 	void initialize(const char* pattern, const char* subst)
 	{
-	  initialize(UnicodeString(pattern, "utf-8"), UnicodeString(subst, "utf-8"));
-	}
-	
-	
-	void initialize(const UnicodeString& pattern, const UnicodeString& subst)
-	{
 	  UErrorCode status = U_ZERO_ERROR;
-	  matcher = new RegexMatcher(pattern, 0, status);
+	  matcher = new RegexMatcher(UnicodeString::fromUTF8(pattern), 0, status);
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RegexMatcher: ") + u_errorName(status));
-	  substitute = subst;
+	  
+	  substitute = UnicodeString::fromUTF8(subst);
 	}
 	
       private:
@@ -162,22 +157,15 @@ namespace cicada
 	}
       
       private:
-      
 	void initialize(const char* pattern, const char* subst)
 	{
-	  initialize(UnicodeString(pattern, "utf-8"), UnicodeString(subst, "utf-8"));
-	}
-      
-      
-	void initialize(const UnicodeString& pattern, const UnicodeString& subst)
-	{
 	  UErrorCode status = U_ZERO_ERROR;
-	  matcher = new RegexMatcher(pattern, 0, status);
+	  matcher = new RegexMatcher(UnicodeString::fromUTF8(pattern), 0, status);
 	  if (U_FAILURE(status))
 	    throw std::runtime_error(std::string("RegexMatcher: ") + u_errorName(status));
-	  substitute = subst;
+	  
+	  substitute = UnicodeString::fromUTF8(subst);
 	}
-  
 
       private:
 	RegexMatcher* matcher;
@@ -195,16 +183,16 @@ namespace cicada
       
       std::string operator()(const std::string& word)
       {
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+	UnicodeString uword = UnicodeString::fromUTF8(word);
 	
 	normalize_ya_alef_maqsoura(uword);
-      
+	
 	normalize_aggressive(uword);
 	
 	remove_prefix(uword);
 	
 	remove_suffix(uword);
-
+	
 	std::string word_stemmed;
 	StringByteSink<std::string> __sink(&word_stemmed);
 	uword.toUTF8(__sink);

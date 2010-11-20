@@ -1,5 +1,6 @@
 
 #include "stemmer.hpp"
+#include "stemmer/arabic.hpp"
 #include "stemmer/prefix.hpp"
 #include "stemmer/suffix.hpp"
 #include "stemmer/latin.hpp"
@@ -22,6 +23,7 @@ namespace cicada
     static const char* desc = "\
 snowball: snowball stemming\n\
 \tlanguage=[language] stemming algorithm (en, de etc.)\n\
+arabic: Arabic stemming\n\
 prefix: taking prefix of letters\n\
 \tsize=[int] prefix size\n\
 suffix: taking suffix of letters\n\
@@ -147,6 +149,16 @@ lower: lower casing\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Lower()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (param.name() == "arabic") {
+      const std::string name("arabic");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Arabic()))).first;
 	iter->second->__algorithm = parameter;
       }
       

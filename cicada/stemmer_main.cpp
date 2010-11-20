@@ -6,6 +6,8 @@ int main(int argc, char** argv)
     std::cout << argv[0] << " stemmer-spec" << std::endl;
     return 1;
   }
+
+  std::cout << cicada::Stemmer::lists();
   
   cicada::Stemmer& stemmer(cicada::Stemmer::create(argv[1]));
   
