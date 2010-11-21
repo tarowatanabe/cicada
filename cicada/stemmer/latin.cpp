@@ -6,7 +6,7 @@
 #include <unicode/bytestream.h>
 #include <unicode/translit.h>
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread.hpp>
 
 #include <utils/atomicop.hpp>
 
@@ -15,83 +15,52 @@ namespace cicada
 
   namespace stemmer
   {
-    struct LatinImpl
+    static boost::once_flag latin_installer_once = BOOST_ONCE_INIT;
+
+    struct LatinDetail
+    {
+      LatinDetail()
+      {
+	boost::call_once(latin_installer_once, initialize);
+      }
+      
+      static void initialize()
+      {
+	// Any-Latin, NFKD, remove accents, NFKC
+	UErrorCode status = U_ZERO_ERROR;
+	UParseError status_parse;
+	Transliterator* __trans = Transliterator::createFromRules(UnicodeString::fromUTF8("AnyLatinNoAccents"),
+								  UnicodeString::fromUTF8(":: Any-Latin; :: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
+								  UTRANS_FORWARD, status_parse, status);
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
+	
+	// register here...
+	Transliterator::registerInstance(__trans);
+      }
+    };
+    
+    struct LatinImpl : public LatinDetail
     {
     private:
       Transliterator* trans;
       
     public:
-      LatinImpl() : trans(0) { open(); }
-      ~LatinImpl() { close(); }
-      
-    public:
-      void operator()(UnicodeString& data) { trans->transliterate(data); }
-    
-    private:
-      void open()
+      LatinImpl() : LatinDetail(), trans(0)
       {
-	close();
-      
-	__initialize();
-      
 	UErrorCode status = U_ZERO_ERROR;
 	trans = Transliterator::createInstance(UnicodeString::fromUTF8("AnyLatinNoAccents"),
 					       UTRANS_FORWARD,
 					       status);
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("transliterator::create_instance(): ") + u_errorName(status));
+      }
+      ~LatinImpl() { std::auto_ptr<Transliterator> tmp(trans); }
       
-      }
-    
-      void close()
-      {
-	if (trans) 
-	  delete trans;
-	trans = 0;
-      }
-    
-    private:
-      typedef boost::mutex              mutex_type;
-      typedef boost::mutex::scoped_lock lock_type;
-
-      static mutex_type __mutex;
-
-      void __initialize()
-      {
-	static bool __initialized = false;
-
-	volatile bool tmp = __initialized;
-	
-	utils::atomicop::memory_barrier();
-	
-	if (! __initialized) {
-	  
-	  lock_type lock(__mutex);
-	  
-	  if (! __initialized) {
-	    
-	    // Any-Latin, NFKD, remove accents, NFKC
-	    UErrorCode status = U_ZERO_ERROR;
-	    UParseError status_parse;
-	    Transliterator* __trans = Transliterator::createFromRules(UnicodeString::fromUTF8("AnyLatinNoAccents"),
-								      UnicodeString::fromUTF8(":: Any-Latin; :: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
-								      UTRANS_FORWARD, status_parse, status);
-	    if (U_FAILURE(status))
-	      throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
-	    
-	    // register here...
-	    Transliterator::registerInstance(__trans);
-	    
-	    tmp = true;
-	    utils::atomicop::memory_barrier();
-	    __initialized = tmp;
-	  }
-	}
-      }
+    public:
+      void operator()(UnicodeString& data) { trans->transliterate(data); }
     };
     
-    LatinImpl::mutex_type LatinImpl::__mutex;
-
     Latin::Latin() : pimpl(new impl_type()) {}
     Latin::~Latin() { std::auto_ptr<impl_type> tmp(pimpl); }
 

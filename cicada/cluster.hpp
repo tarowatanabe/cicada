@@ -51,6 +51,7 @@ namespace cicada
     void write(const path_type& path) const;
     const path_type& path() const { return file; }
     
+    symbol_type operator()(const symbol_type& word) const { return operator[](word); }
     symbol_type operator[](const symbol_type& word) const
     {
       // empty word, non-terminals are not clusters...
