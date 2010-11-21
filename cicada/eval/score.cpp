@@ -24,8 +24,8 @@
 
 #include <boost/filesystem.hpp>
 
-#include "cicada/tokenize/lower.hpp"
-#include "cicada/tokenize/nonascii.hpp"
+#include "cicada/tokenizer/lower.hpp"
+#include "cicada/tokenizer/nonascii.hpp"
 
 namespace cicada
 {
@@ -38,12 +38,12 @@ namespace cicada
 	if (lower && split) {
 	  sentence_type sentence_split;
 	  
-	  cicada::tokenize::nonascii(sentence, sentence_split);
-	  cicada::tokenize::lower(sentence_split, tokenized);
+	  cicada::tokenizer::nonascii(sentence, sentence_split);
+	  cicada::tokenizer::lower(sentence_split, tokenized);
 	} else if (split)
-	  cicada::tokenize::nonascii(sentence, tokenized);
+	  cicada::tokenizer::nonascii(sentence, tokenized);
 	else
-	  cicada::tokenize::lower(sentence, tokenized);
+	  cicada::tokenizer::lower(sentence, tokenized);
       } else
 	tokenized = sentence;
     }

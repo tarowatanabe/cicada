@@ -53,3 +53,7 @@ Tree-to-Tree rule extraction from forest:
 	Extract rule pairs by traversing both graphs at the same time
 	  - Cube pruning like procedure to enumerate in depth-first order to
 	    generate paired graph...?
+
+
+Add tokenize class:
+    We will create instance for tokenizer, and use it via operator()(const Sent& source, Sent& target)

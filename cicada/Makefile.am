@@ -19,7 +19,7 @@ optimizedir  = $(pkgincludedir)/cicada/optimize
 featuredir   = $(pkgincludedir)/cicada/feature
 stemmerdir   = $(pkgincludedir)/cicada/stemmer
 operationdir = $(pkgincludedir)/cicada/operation
-tokenizedir  = $(pkgincludedir)/cicada/tokenize
+tokenizerdir = $(pkgincludedir)/cicada/tokenizer
 
 dist_semiring_HEADERS = \
 semiring/envelope.hpp \
@@ -116,9 +116,9 @@ stemmer/snowball.cpp
 libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
 libcicada_stemmer_la_LIBADD = $(top_builddir)/libstemmer_c/libstemmer.la
 
-dist_tokenize_HEADERS = \
-tokenize/lower.hpp \
-tokenize/nonascii.hpp
+dist_tokenizer_HEADERS = \
+tokenizer/lower.hpp \
+tokenizer/nonascii.hpp
 
 dist_operation_HEADERS = \
 operation/apply.hpp \

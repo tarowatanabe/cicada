@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__TOKENIZE__NONASCII__HPP__
-#define __CICADA__TOKENIZE__NONASCII__HPP__ 1
+#ifndef __CICADA__TOKENIZER__NONASCII__HPP__
+#define __CICADA__TOKENIZER__NONASCII__HPP__ 1
 
 #include <vector>
 #include <string>
@@ -13,7 +13,7 @@
 
 namespace cicada
 {
-  namespace tokenize
+  namespace tokenizer
   {
     template <typename Sent, typename Tokenized>
     void nonascii(const Sent& sentence, Tokenized& __tokenized)

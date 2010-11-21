@@ -16,8 +16,8 @@
 #include "cicada/sentence_vector.hpp"
 #include "cicada/stemmer.hpp"
 
-#include "cicada/tokenize/nonascii.hpp"
-#include "cicada/tokenize/lower.hpp"
+#include "cicada/tokenizer/nonascii.hpp"
+#include "cicada/tokenizer/lower.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
 #include <boost/tokenizer.hpp>
@@ -124,10 +124,10 @@ namespace cicada
 	phrase_type target_split;
 	phrase_type target_lower;
 	if (split)
-	  cicada::tokenize::nonascii(__target, target_split);
+	  cicada::tokenizer::nonascii(__target, target_split);
 	const phrase_type& __target_split = (split ? target_split : __target);
 	if (lower)
-	  cicada::tokenize::lower(__target_split, target_lower);
+	  cicada::tokenizer::lower(__target_split, target_lower);
 	
 	const phrase_type& target = (lower ? target_lower : __target_split);
 	
@@ -329,10 +329,10 @@ namespace cicada
 	sentence_type sentence_lower;
 	
 	if (split)
-	  cicada::tokenize::nonascii(__sentence, sentence_split);
+	  cicada::tokenizer::nonascii(__sentence, sentence_split);
 	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
 	if (lower)
-	  cicada::tokenize::lower(__sentence_split, sentence_lower);
+	  cicada::tokenizer::lower(__sentence_split, sentence_lower);
 	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
 	
 	counts_type counts;

@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__TOKENIZE__LOWER__HPP__
-#define __CICADA__TOKENIZE__LOWER__HPP__ 1
+#ifndef __CICADA__TOKENIZER__LOWER__HPP__
+#define __CICADA__TOKENIZER__LOWER__HPP__ 1
 
 #include <vector>
 #include <string>
@@ -15,7 +15,7 @@
 
 namespace cicada
 {
-  namespace tokenize
+  namespace tokenizer
   {
     
 #ifndef HAVE_TLS
