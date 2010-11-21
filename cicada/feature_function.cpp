@@ -33,8 +33,7 @@ antecedent: antecedent feature\n\
 bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
-\tsplit=[true|false] split non-ascii chars\n\
-\tlower=[true|false] perform lower casing\n\
+\tokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu)\n\
 \trefset=reference set file\n\
 bleu-expected: expected-BLEU\n\
@@ -43,8 +42,7 @@ bleu-linear: linear corpus-BLEU\n\
 \torder=<order>,\n\
 \tprecision=<default 0.8>,\n\
 \tratio=<default 0.6>\n\
-\tsplit=[true|false] split non-ascii chars\n\
-\tlower=[true|false] perform lower casing\n\
+\tokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu-linear)\n\
 \trefset=reference set file\n\
 distortion: phrase-based distortion\n\

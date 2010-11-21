@@ -162,7 +162,7 @@ namespace cicada
 
 	sentence_type sentence;
 	counts_type counts;
-
+	
 	tokenize(__sentence, sentence);
 	
 	sentence_type::const_iterator siter_end = sentence.end();

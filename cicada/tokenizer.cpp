@@ -2,8 +2,14 @@
 
 #include "parameter.hpp"
 
+#include "tokenizer/lower.hpp"
+#include "tokenizer/nonascii.hpp"
+#include "tokenizer/tokenize.hpp"
+#include "tokenizer/nist.hpp"
+
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/lexical_cast.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -16,9 +22,11 @@ namespace cicada
     static const char* desc = "\
 lower: lower casing\n\
 nonascii: split non ascii characters\n\
+nist: NIST mteval style tokenization\n\
 tokenize: use the chain of tokenization\n\
 \tlower=[true|false] perform lower casing\n\
 \tnonascii=[true|false] perform non ascii character splitting\n\
+\tnist=[true|false] perform NIST tokenization\n\
 ";
     return desc;
   }
@@ -69,12 +77,86 @@ tokenize: use the chain of tokenization\n\
     const parameter_type param(parameter);
     
     if (param.name() == "lower") {
+      const std::string name("lower");
       
+      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+      if (iter == tokenizers_map.end()) {
+	iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Lower()))).first;
+	iter->second->__algorithm = parameter;
+      }
+
+      return *(iter->second);
+    } else if (param.name() == "nist") {
+      const std::string name("nist");
       
+      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+      if (iter == tokenizers_map.end()) {
+	iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Nist()))).first;
+	iter->second->__algorithm = parameter;
+      }
+
+      return *(iter->second);
     } else if (param.name() == "nonascii") {
+      const std::string name("nonascii");
       
+      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+      if (iter == tokenizers_map.end()) {
+	iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::NonAscii()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
     } else if (param.name() == "tokenize") {
+      tokenizer_map_type::iterator iter = tokenizers_map.find(parameter);
+      if (iter == tokenizers_map.end()) {
+	std::auto_ptr<tokenizer::Tokenize> tokenize(new tokenizer::Tokenize());
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "lower") == 0) {
+	    if (utils::lexical_cast<bool>(piter->second)) {
+	      const std::string name("lower");
       
+	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+	      if (iter == tokenizers_map.end()) {
+		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Lower()))).first;
+		iter->second->__algorithm = parameter;
+	      }
+	      
+	      tokenize->insert(*(iter->second));
+	    }
+	  } else if (strcasecmp(piter->first.c_str(), "nist") == 0) {
+	    if (utils::lexical_cast<bool>(piter->second)) {
+	      const std::string name("nist");
+      
+	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+	      if (iter == tokenizers_map.end()) {
+		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Nist()))).first;
+		iter->second->__algorithm = parameter;
+	      }
+	      
+	      tokenize->insert(*(iter->second));
+	    }
+	  } else if (strcasecmp(piter->first.c_str(), "nonascii") == 0) {
+	    if (utils::lexical_cast<bool>(piter->second)) {
+	      const std::string name("nonascii");
+	      
+	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+	      if (iter == tokenizers_map.end()) {
+		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::NonAscii()))).first;
+		iter->second->__algorithm = parameter;
+	      }
+	      
+	      tokenize->insert(*(iter->second));
+	    }
+	  } else
+	    std::cerr << "unsupported parameter for combined tokenizer: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	iter = tokenizers_map.insert(std::make_pair(parameter, tokenizer_ptr_type(tokenize.release()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
     } else
       throw std::runtime_error("invalid parameter: " + parameter);
   }

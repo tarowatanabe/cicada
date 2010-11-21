@@ -14,10 +14,8 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/sentence_vector.hpp"
-#include "cicada/stemmer.hpp"
 
-#include "cicada/tokenizer/nonascii.hpp"
-#include "cicada/tokenizer/lower.hpp"
+#include "cicada/tokenizer.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
 #include <boost/tokenizer.hpp>
@@ -47,7 +45,7 @@ namespace cicada
       
       typedef cicada::FeatureFunction feature_function_type;
 
-      typedef cicada::Stemmer stemmer_type;
+      typedef cicada::Tokenizer tokenizer_type;
       
       typedef feature_function_type::state_ptr_type     state_ptr_type;
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
@@ -99,10 +97,9 @@ namespace cicada
     public:
       BleuImpl(const int __order,
 	       const bool __exact,
-	       const bool __split,
-	       const bool __lower)
+	       const tokenizer_type* __tokenizer)
 	: ngrams(word_type()), nodes(), sizes(),
-	  order(__order), exact(__exact), split(__split), lower(__lower ? &stemmer_type::create("lower") : 0)
+	  order(__order), exact(__exact), tokenizer(__tokenizer)
       {
 	
       }
@@ -121,15 +118,11 @@ namespace cicada
 	const rule_type& rule = *edge.rule;
 	
 	const phrase_type& __target = rule.rhs;
-	phrase_type target_split;
-	phrase_type target_lower;
-	if (split)
-	  cicada::tokenizer::nonascii(__target, target_split);
-	const phrase_type& __target_split = (split ? target_split : __target);
-	if (lower)
-	  cicada::tokenizer::lower(__target_split, target_lower);
 	
-	const phrase_type& target = (lower ? target_lower : __target_split);
+	phrase_type __target_tokenized;
+	if (tokenizer)
+	  tokenizer->operator()(__target, __target_tokenized);
+	const phrase_type& target = (tokenizer ? __target_tokenized : __target);
 	
 	count_set_type counts;
 
@@ -325,15 +318,10 @@ namespace cicada
       {
 	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
 	
-	sentence_type sentence_split;
-	sentence_type sentence_lower;
-	
-	if (split)
-	  cicada::tokenizer::nonascii(__sentence, sentence_split);
-	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
-	if (lower)
-	  cicada::tokenizer::lower(__sentence_split, sentence_lower);
-	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
+	sentence_type __sentence_tokenized;
+	if (tokenizer)
+	  tokenizer->operator()(__sentence, __sentence_tokenized);
+	const sentence_type& sentence = (tokenizer ? __sentence_tokenized : __sentence);
 	
 	counts_type counts;
 	sentence_type::const_iterator siter_end = sentence.end();
@@ -590,9 +578,8 @@ namespace cicada
 
       int order;
       bool exact;
-      bool split;
 
-      stemmer_type* lower;
+      const tokenizer_type* tokenizer;
     };
     
     
@@ -609,8 +596,8 @@ namespace cicada
 
       int order = 4;
       bool exact = false;
-      bool split = false;
-      bool lower = false;
+
+      const cicada::Tokenizer* tokenizer = 0;
       
       std::string name;
       path_type   refset_file;
@@ -620,10 +607,8 @@ namespace cicada
 	  order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
 	  exact = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "split") == 0)
-	  split = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "lower") == 0)
-	  lower = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  tokenizer = &cicada::Tokenizer::create(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "name") == 0)
 	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "refset") == 0)
@@ -635,7 +620,7 @@ namespace cicada
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
 	throw std::runtime_error("no refset file?: " + refset_file.file_string());
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, split, lower));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, tokenizer));
       
       // two-side context + length (hypothesis/parsed-unused...) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;

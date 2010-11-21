@@ -6,55 +6,34 @@
 #include <vector>
 #include <string>
 
-#include <unicode/uchar.h>
-#include <unicode/unistr.h>
-#include <unicode/schriter.h>
-#include <unicode/bytestream.h>
-
 #include <cicada/stemmer.hpp>
+#include <cicada/tokenizer.hpp>
 
 namespace cicada
 {
   namespace tokenizer
   {
-    
-#ifndef HAVE_TLS
-    static void __lower_no_clean_up_func(cicada::Stemmer* x)
+    class Lower : public cicada::Tokenizer
     {
+    public:
+      Lower() : lower(&cicada::Stemmer::create("lower"))
+      {
+	if (! lower)
+	  throw std::runtime_error("no lower caser?");
+      }
       
-    }
-#endif
-    
-    template <typename Sent, typename Tokenized>
-    void lower(const Sent& sentence, Tokenized& __tokenized)
-    {
-      typedef Sent sentence_type;
-      typedef typename sentence_type::value_type word_type;
+    protected:
+      virtual void tokenize(const sentence_type& source, sentence_type& tokenized) const
+      {
+	tokenized.clear();
+	sentence_type::const_iterator siter_end = source.end();
+	for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
+	  tokenized.push_back(lower->operator()(*siter));
+      }
       
-      typedef cicada::Stemmer stemmer_type;
-
-#ifdef HAVE_TLS
-      static __thread stemmer_type* __stemmer_tls = 0;
-      if (! __stemmer_tls)
-	__stemmer_tls = &stemmer_type::create("lower");
-      stemmer_type& stemmer = *__stemmer_tls;
-#else
-      static boost::thread_specific_ptr<stemmer_type> __stemmer(__lower_no_clean_up_func);
-      if (! __stemmer.get())
-	__stemmer.reset(&stemmer_type::create("lower"));
-      
-      stemmer_type& stemmer = *__stemmer;
-#endif
-      
-      std::vector<word_type, std::allocator<word_type> > tokenized;
-      
-      typename sentence_type::const_iterator siter_end = sentence.end();
-      for (typename sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
-	tokenized.push_back(stemmer(*siter));
-      
-      __tokenized = Tokenized(tokenized.begin(), tokenized.end());
-    }
-    
+    private:
+      cicada::Stemmer* lower;
+    };
   };
 };
 

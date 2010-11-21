@@ -9,6 +9,7 @@
 
 #include <cicada/sentence.hpp>
 #include <cicada/sentence_vector.hpp>
+#include <cicada/tokenizer.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -91,9 +92,11 @@ namespace cicada
       
       typedef boost::shared_ptr<score_type>  score_ptr_type;
       typedef boost::shared_ptr<scorer_type> scorer_ptr_type;
+
+      typedef cicada::Tokenizer tokenizer_type;
       
     public:
-      Scorer() : split(false), lower(false) {}
+      Scorer() : tokenizer(0) {}
       virtual ~Scorer() {}
       
       // insert a sentence for scoring
@@ -107,12 +110,17 @@ namespace cicada
       
       static const char*     lists();
       static scorer_ptr_type create(const std::string& parameter);
-      
-      void tokenize(const sentence_type& sentence, sentence_type& tokenized) const;
+
+      void tokenize(const sentence_type& source, sentence_type& tokenized) const
+      {
+	if (tokenizer)
+	  tokenizer->operator()(source, tokenized);
+	else
+	  tokenized = source;
+      }
       
     protected:
-      bool split;
-      bool lower;
+      const tokenizer_type* tokenizer;
     };    
     
     class ScorerDocument

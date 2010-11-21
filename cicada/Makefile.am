@@ -9,7 +9,7 @@ libcicada-feature.la \
 libcicada-semiring.la \
 libcicada-eval.la \
 libcicada-optimize.la \
-libcicada-stemmer.la
+libcicada-stemmer.la 
 
 libcicadaincludedir= $(pkgincludedir)/cicada
 
@@ -118,7 +118,8 @@ libcicada_stemmer_la_LIBADD = $(top_builddir)/libstemmer_c/libstemmer.la
 
 dist_tokenizer_HEADERS = \
 tokenizer/lower.hpp \
-tokenizer/nonascii.hpp
+tokenizer/nonascii.hpp \
+tokenizer/tokenize.hpp
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
@@ -195,6 +196,7 @@ span_edge.hpp \
 span_forest.hpp \
 span_vector.hpp \
 stemmer.hpp \
+tokenizer.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 transducer.hpp \
@@ -230,6 +232,7 @@ sentence.cpp \
 sentence_vector.cpp \
 span_vector.cpp \
 stemmer.cpp \
+tokenizer.cpp \
 symbol.cpp \
 symbol_vector.cpp \
 tree_grammar_static.cpp \
@@ -255,6 +258,7 @@ libcicada_la_LIBADD = \
 	$(BOOST_FILESYSTEM_LIBS) \
 	$(BOOST_IOSTREAMS_LIBS) \
 	$(BOOST_SYSTEM_LIBS) \
+	$(BOOST_REGEX_LIBS) \
 	$(ICU_LDFLAGS)
 
 noinst_PROGRAMS = \
@@ -270,6 +274,7 @@ sentence_vector_main \
 span_vector_main \
 stemmer_main \
 symbol_main \
+tokenizer_main \
 tree_rule_main
 
 cluster_main_SOURCES = cluster_main.cpp
@@ -307,6 +312,9 @@ stemmer_main_LDADD = libcicada.la
 
 symbol_main_SOURCES = symbol_main.cpp
 symbol_main_LDADD = libcicada.la
+
+tokenizer_main_SOURCES = tokenizer_main.cpp
+tokenizer_main_LDADD = libcicada.la
 
 tree_rule_main_SOURCES = tree_rule_main.cpp
 tree_rule_main_LDADD = libcicada.la
