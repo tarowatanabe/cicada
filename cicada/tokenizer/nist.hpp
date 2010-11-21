@@ -29,7 +29,7 @@ namespace cicada
     {
     private:
       typedef boost::regex regex_type;
-      typedef std::string  replace_type;
+      typedef const char*  replace_type;
       typedef std::pair<regex_type, replace_type> pattern_type;
 
     public:
