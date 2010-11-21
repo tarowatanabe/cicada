@@ -24,83 +24,13 @@
 
 #include <boost/filesystem.hpp>
 
+#include "cicada/tokenize/lower.hpp"
+#include "cicada/tokenize/nonascii.hpp"
+
 namespace cicada
 {
   namespace eval
   {
-    
-    static void split_non_ascii_characters(const Sentence& sentence, Sentence& sentence_split)
-    {
-      typedef Sentence sentence_type;
-      typedef sentence_type::word_type word_type;
-
-      sentence_split.clear();
-
-      std::string buffer;
-	
-      sentence_type::const_iterator siter_end = sentence.end();
-      for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	  
-	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*siter));
-	  
-	StringCharacterIterator iter(uword);
-	for (iter.setToStart(); iter.hasNext(); /**/) {
-	  const UChar32 c = iter.next32PostInc();
-	    
-	  if (c < 128)
-	    buffer.push_back(c);
-	  else {
-	    // we will split...
-	    if (! buffer.empty())
-	      sentence_split.push_back(word_type(buffer.begin(), buffer.end()));
-	    buffer.clear();
-	      
-	    StringByteSink<std::string> __sink(&buffer);
-	    UnicodeString(c).toUTF8(__sink);
-	      
-	    sentence_split.push_back(word_type(buffer.begin(), buffer.end()));
-	    buffer.clear();
-	  }
-	}
-	
-	if (! buffer.empty())
-	  sentence_split.push_back(word_type(buffer.begin(), buffer.end()));
-	buffer.clear();
-      }
-    }
-
-#ifndef HAVE_TLS
-    static void __no_clean_up_func(cicada::Stemmer* x)
-    {
-      
-    }
-#endif
-    
-    static void lower_case(const Sentence& sentence, Sentence& sentence_lower)
-    {
-      typedef cicada::Sentence sentence_type;
-      typedef cicada::Stemmer stemmer_type;
-      
-      // we will assign no clean up function!!!
-      
-#ifdef HAVE_TLS
-      static __thread stemmer_type* __stemmer_tls = 0;
-      if (! __stemmer_tls)
-	__stemmer_tls = &stemmer_type::create("lower");
-      stemmer_type& stemmer = *__stemmer_tls;
-#else
-      static boost::thread_specific_ptr<stemmer_type> __stemmer(__no_clean_up_func);
-      if (! __stemmer.get())
-	__stemmer.reset(&stemmer_type::create("lower"));
-      
-      stemmer_type& stemmer = *__stemmer;
-#endif
-      
-      sentence_lower.clear();
-      sentence_type::const_iterator siter_end = sentence.end();
-      for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
-	sentence_lower.push_back(stemmer[*siter]);
-    }
     
     void Scorer::tokenize(const sentence_type& sentence, sentence_type& tokenized) const
     {
@@ -108,13 +38,12 @@ namespace cicada
 	if (lower && split) {
 	  sentence_type sentence_split;
 	  
-	  split_non_ascii_characters(sentence, sentence_split);
-	  
-	  lower_case(sentence_split, tokenized);
+	  cicada::tokenize::nonascii(sentence, sentence_split);
+	  cicada::tokenize::lower(sentence_split, tokenized);
 	} else if (split)
-	  split_non_ascii_characters(sentence, tokenized);
+	  cicada::tokenize::nonascii(sentence, tokenized);
 	else
-	  lower_case(sentence, tokenized);
+	  cicada::tokenize::lower(sentence, tokenized);
       } else
 	tokenized = sentence;
     }

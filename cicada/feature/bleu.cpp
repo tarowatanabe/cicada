@@ -16,6 +16,9 @@
 #include "cicada/sentence_vector.hpp"
 #include "cicada/stemmer.hpp"
 
+#include "cicada/tokenize/nonascii.hpp"
+#include "cicada/tokenize/lower.hpp"
+
 #include <boost/numeric/conversion/bounds.hpp>
 #include <boost/tokenizer.hpp>
 
@@ -103,68 +106,6 @@ namespace cicada
       {
 	
       }
-      
-      template <typename Sentence>
-      void lower_case(const Sentence& phrase, Sentence& result) const
-      {
-	if (lower) {
-	  std::vector<word_type, std::allocator<word_type> > tokens;
-	  
-	  typename Sentence::const_iterator piter_end = phrase.end();
-	  for (typename Sentence::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
-	    tokens.push_back(lower->operator[](*piter));
-	  
-	  result.assign(tokens.begin(), tokens.end());
-	} else
-	  result = phrase;
-      }
-      
-      
-      template <typename Sentence>
-      void split_non_ascii_characters(const Sentence& phrase, Sentence& result) const
-      {
-	std::vector<word_type, std::allocator<word_type> > tokens;
-	std::string buffer;
-	
-	typename Sentence::const_iterator piter_end = phrase.end();
-	for (typename Sentence::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
-
-	  const size_t word_size = piter->size();
-	  
-	  if (piter->is_non_terminal() || (word_size >= 3 && piter->operator[](0) == '<' && piter->operator[](word_size - 1) == '>'))
-	    tokens.push_back(*piter);
-	  else {
-	    UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(*piter));
-	  
-	    StringCharacterIterator iter(uword);
-	    for (iter.setToStart(); iter.hasNext(); /**/) {
-	      const UChar32 c = iter.next32PostInc();
-	    
-	      if (c < 128)
-		buffer.push_back(c);
-	      else {
-		// we will split...
-		if (! buffer.empty())
-		  tokens.push_back(word_type(buffer.begin(), buffer.end()));
-		buffer.clear();
-	      
-		StringByteSink<std::string> __sink(&buffer);
-		UnicodeString(c).toUTF8(__sink);
-	      
-		tokens.push_back(word_type(buffer.begin(), buffer.end()));
-		buffer.clear();
-	      }
-	    }
-	  
-	    if (! buffer.empty())
-	      tokens.push_back(word_type(buffer.begin(), buffer.end()));
-	    buffer.clear();
-	  }
-	}
-	
-	result.assign(tokens.begin(), tokens.end());
-      }
-
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
@@ -183,10 +124,10 @@ namespace cicada
 	phrase_type target_split;
 	phrase_type target_lower;
 	if (split)
-	  split_non_ascii_characters(__target, target_split);
+	  cicada::tokenize::nonascii(__target, target_split);
 	const phrase_type& __target_split = (split ? target_split : __target);
 	if (lower)
-	  lower_case(__target_split, target_lower);
+	  cicada::tokenize::lower(__target_split, target_lower);
 	
 	const phrase_type& target = (lower ? target_lower : __target_split);
 	
@@ -388,10 +329,10 @@ namespace cicada
 	sentence_type sentence_lower;
 	
 	if (split)
-	  split_non_ascii_characters(__sentence, sentence_split);
+	  cicada::tokenize::nonascii(__sentence, sentence_split);
 	const sentence_type& __sentence_split = (split ? sentence_split : __sentence);
 	if (lower)
-	  lower_case(__sentence_split, sentence_lower);
+	  cicada::tokenize::lower(__sentence_split, sentence_lower);
 	const sentence_type& sentence = (lower ? sentence_lower : __sentence_split);
 	
 	counts_type counts;
