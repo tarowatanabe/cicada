@@ -6,6 +6,7 @@
 #include "tokenizer/nonascii.hpp"
 #include "tokenizer/tokenize.hpp"
 #include "tokenizer/nist.hpp"
+#include "tokenizer/penntreebank.hpp"
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
@@ -23,14 +24,15 @@ namespace cicada
 lower: lower casing\n\
 nonascii: split non ascii characters\n\
 nist: NIST mteval style tokenization\n\
+penn: penn-treebank stye tokenization\n\
 tokenize: use the chain of tokenization\n\
 \tlower=[true|false] perform lower casing\n\
 \tnonascii=[true|false] perform non ascii character splitting\n\
 \tnist=[true|false] perform NIST tokenization\n\
+\tpenn=[true|false] perform Penn-treebank tokenization\n\
 ";
     return desc;
   }
-  
   
   template <typename Tp>
   struct hash_string : public utils::hashmurmur<size_t>
@@ -96,6 +98,16 @@ tokenize: use the chain of tokenization\n\
       }
 
       return *(iter->second);
+    } else if (param.name() == "penn") {
+      const std::string name("penn");
+      
+      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+      if (iter == tokenizers_map.end()) {
+	iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Penntreebank()))).first;
+	iter->second->__algorithm = parameter;
+      }
+
+      return *(iter->second);
     } else if (param.name() == "nonascii") {
       const std::string name("nonascii");
       
@@ -131,6 +143,18 @@ tokenize: use the chain of tokenization\n\
 	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
 	      if (iter == tokenizers_map.end()) {
 		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Nist()))).first;
+		iter->second->__algorithm = parameter;
+	      }
+	      
+	      tokenize->insert(*(iter->second));
+	    }
+	  } else if (strcasecmp(piter->first.c_str(), "penn") == 0) {
+	    if (utils::lexical_cast<bool>(piter->second)) {
+	      const std::string name("penn");
+      
+	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+	      if (iter == tokenizers_map.end()) {
+		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Penntreebank()))).first;
 		iter->second->__algorithm = parameter;
 	      }
 	      

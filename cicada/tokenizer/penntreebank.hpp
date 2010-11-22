@@ -106,20 +106,41 @@ namespace cicada
       typedef boost::regex regex_type;
       typedef const char*  replace_type;
       typedef std::pair<regex_type, replace_type> pattern_type;
+
+      typedef std::vector<pattern_type, std::allocator<pattern_type> > pattern_set_type;
+
       
     public:
       Penntreebank()
-	: pattern1(regex_type("^[[:space:]]*\""), " `` "),
-	  pattern2(regex_type("([\\x20\\x28\\x5B\\x7B\\x3C])\""), "$1 `` "),
-	  
-	  pattern3(regex_type("\\.\\.\\."), " ... "),
-	  pattern4(regex_type("([,;:@#$%&])"), " $1 "),
-	  
-	  pattern5(regex_type("([^.])([.])([\\x5B\\x5D\\x29\\x7D\\x3E\\x22\\x27]*)(?=[[:space:]]*$)"), "$1 $2$3"),
-	  pattern6(regex_type("([?!\\x5B\\x5D\\x28\\x29\\x7B\\x7D\\x3C\\x3E])"), " $1 "),
-	  pattern7(regex_type("--"), " -- "),
-	  pattern8(regex_type("\""), " '' ")
-      {}
+	: patterns() 
+      {
+	patterns.push_back(pattern_type(regex_type("^[[:space:]]*\""), " `` "));
+	
+	patterns.push_back(pattern_type(regex_type("([\\x20\\x28\\x5B\\x7B\\x3C])\""), "$1 `` "));
+	
+	patterns.push_back(pattern_type(regex_type("([,;:@#$%&]|\\.\\.\\.\\.)"), " $1 "));
+	
+	patterns.push_back(pattern_type(regex_type("([^.])([.])([\\x5B\\x5D\\x29\\x7D\\x3E\\x22\\x27]*)(?=[[:space:]]*$)"), "$1 $2$3"));
+	patterns.push_back(pattern_type(regex_type("([?!\\x5B\\x5D\\x28\\x29\\x7B\\x7D\\x3C\\x3E]|--)"), " $1 "));
+	
+	patterns.push_back(pattern_type(regex_type("\""), " \'\' "));
+	
+	patterns.push_back(pattern_type(regex_type("([^\'])\' "), "$1 \' ")); // possessive or close-single-quote
+	patterns.push_back(pattern_type(regex_type("\'([sSmMdD]|ll|LL|re|RE|ve|VE) "), " \'$1 ")); // as in it's I'm we'd, 'll 're
+	patterns.push_back(pattern_type(regex_type("(n\'t|N\'T) "), " $1 "));
+	
+	patterns.push_back(pattern_type(regex_type(" ([Cc])annot "), " $1an not"));
+	patterns.push_back(pattern_type(regex_type(" ([Dd])\'ye "), " $1\' ye "));
+	patterns.push_back(pattern_type(regex_type(" ([Gg])imme "), " $1im me "));
+	patterns.push_back(pattern_type(regex_type(" ([Gg])onna "), " $1on na "));
+	patterns.push_back(pattern_type(regex_type(" ([Gg])otta "), " $1ot ta "));
+	patterns.push_back(pattern_type(regex_type(" ([Ll])emme "), " $1em me "));
+	patterns.push_back(pattern_type(regex_type(" ([Mm])ore\'n "), " $1ore \'n "));
+	patterns.push_back(pattern_type(regex_type(" \'([Tt])is "), " \'$1 is "));
+	patterns.push_back(pattern_type(regex_type(" \'([Tt])was "), " \'$1 was "));
+	patterns.push_back(pattern_type(regex_type(" ([Ww])anna "), " $1an na "));
+      }
+      
     protected:
       virtual void tokenize(const sentence_type& source, sentence_type& tokenized) const
       {
@@ -127,36 +148,28 @@ namespace cicada
 	
 	if (source.empty()) return;
 	
-	std::string tokenized_string = ' ';
+	std::string result = " ";
 	sentence_type::const_iterator siter_end = source.end();
 	for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter) {
-	  tokenized_string += static_cast<const std::string&>(*siter);
-	  tokenized_string += ' ';
+	  result += static_cast<const std::string&>(*siter);
+	  result += ' ';
 	}
 	
-	std::string result;
-	boost::regex_replace(std::back_inserter(result), tokenized_string.begin(), tokenized_string.end(), pattern1.first, pattern1.second);
-	
-	tokenized_string.swap(result);
-	result.clear();
-	boost::regex_replace(std::back_inserter(result), tokenized_string.begin(), tokenized_string.end(), pattern2.first, pattern2.second);
-	
-	tokenized_string.swap(result);
-	result.clear();
-	boost::regex_replace(std::back_inserter(result), tokenized_string.begin(), tokenized_string.end(), pattern3.first, pattern3.second);
-	
-	tokenized_string.swap(result);
-	result.clear();
-	boost::regex_replace(std::back_inserter(result), tokenized_string.begin(), tokenized_string.end(), pattern4.first, pattern4.second);
+	std::string source_string;
+	for (size_t i = 0; i != patterns.size(); ++ i) {
+	  source_string.swap(result);
+	  result.clear();
+	  
+	  boost::regex_replace(std::back_inserter(result),
+			       source_string.begin(), source_string.end(),
+			       patterns[i].first, patterns[i].second);
+	}
 	
 	tokenized.assign(result);
       }
       
     private:
-      pattern_type pattern1;
-      pattern_type pattern2;
-      pattern_type pattern3;
-      pattern_type pattern4;
+      pattern_set_type patterns;
     };
   };
 };
