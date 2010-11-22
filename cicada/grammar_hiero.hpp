@@ -134,8 +134,8 @@ namespace cicada
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  if (aiter->label != vocab_type::EPSILON)
-	    positions[first][first + aiter->distance] = true;
+	  //if (aiter->label != vocab_type::EPSILON)
+	  positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
@@ -219,8 +219,8 @@ namespace cicada
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  if (aiter->label != vocab_type::EPSILON)
-	    positions[first][first + aiter->distance] = true;
+	  //if (aiter->label != vocab_type::EPSILON)
+	  positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
