@@ -1,3 +1,9 @@
+2010-11-22
+Support tree transduction (but experimental)
+Removed bi-rules in hypergraph: removed "yield" in features etc. but added in compositional operations.
+Added tokenizer
+Added new API for word normalizer (stemmer or cluster) and use it for sparce features
+
 2010-10-31
 Support phrase-based composition with length-based distortion
 and lexicalized-reordering (experimental, and only for monotonic lattice)
