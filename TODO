@@ -23,3 +23,4 @@ Use source side tree-fragment as a rule, and parse "lattice"
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
 
+Add Matcher interface?
