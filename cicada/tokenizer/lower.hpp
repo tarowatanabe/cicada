@@ -16,10 +16,12 @@ namespace cicada
     class Lower : public cicada::Tokenizer
     {
     public:
-      Lower() : lower(&cicada::Stemmer::create("lower"))
+      Lower() : lower(&cicada::Stemmer::create("lower")) {}
+      Lower(const Lower& x) : lower(&cicada::Stemmer::create("lower")) {}
+      Lower& operator=(const Lower& x)
       {
-	if (! lower)
-	  throw std::runtime_error("no lower caser?");
+	lower = &cicada::Stemmer::create("lower");
+	return *this;
       }
       
     protected:

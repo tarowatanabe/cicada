@@ -97,7 +97,22 @@ namespace cicada
       
     public:
       Scorer() : tokenizer(0) {}
+      Scorer(const Scorer& x)
+	: tokenizer(0)
+      {
+	if (x.tokenizer)
+	  tokenizer = &tokenizer_type::create(x.tokenizer->algorithm());
+      }
+      
       virtual ~Scorer() {}
+
+      Scorer& operator=(const Scorer& x)
+      {
+	tokenizer = 0;
+	if (x.tokenizer)
+	  tokenizer = &tokenizer_type::create(x.tokenizer->algorithm());
+	return *this;
+      }
       
       // insert a sentence for scoring
       virtual void clear() = 0;

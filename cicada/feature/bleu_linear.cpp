@@ -41,6 +41,41 @@ namespace cicada
 
       typedef cicada::Tokenizer tokenizer_type;
       
+      struct tokenizer_wrapper_type
+      {
+	tokenizer_wrapper_type(const tokenizer_type* __tokenizer)
+	  : tokenizer(__tokenizer) {}
+
+	tokenizer_wrapper_type()
+	  : tokenizer(0) {}
+	tokenizer_wrapper_type(const tokenizer_wrapper_type& x)
+	  : tokenizer(0)
+	{
+	  if (x.tokenizer)
+	    tokenizer = &tokenizer_type::create(x.tokenizer->algorithm());
+	}
+	tokenizer_wrapper_type& operator=(const tokenizer_wrapper_type& x)
+	{
+	  tokenizer = 0;
+	  if (x.tokenizer)
+	    tokenizer = &tokenizer_type::create(x.tokenizer->algorithm());
+	  return *this;
+	}
+	
+	template <typename Sent>
+	void operator()(const Sent& source, Sent& tokenized) const
+	{
+	  if (tokenizer)
+	    tokenizer->operator()(source, tokenized);
+	  else
+	    tokenized = source;
+	}
+	
+	operator bool() const { return tokenizer; }
+	
+	const tokenizer_type* tokenizer;
+      };
+      
       typedef feature_function_type::state_ptr_type     state_ptr_type;
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
       
@@ -109,7 +144,7 @@ namespace cicada
 	
 	phrase_type __target_tokenized;
 	if (tokenizer)
-	  tokenizer->operator()(__target, __target_tokenized);
+	  tokenizer(__target, __target_tokenized);
 	const phrase_type& target = (tokenizer ? __target_tokenized : __target);
 	
 	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
@@ -236,7 +271,7 @@ namespace cicada
 	
 	sentence_type __sentence_tokenized;
 	if (tokenizer)
-	  tokenizer->operator()(__sentence, __sentence_tokenized);
+	  tokenizer(__sentence, __sentence_tokenized);
 	const sentence_type& sentence = (tokenizer ? __sentence_tokenized : __sentence);
 	
 	counts_type counts;
@@ -336,7 +371,7 @@ namespace cicada
       double precision;
       double ratio;
       
-      const tokenizer_type* tokenizer;
+      tokenizer_wrapper_type tokenizer;
     };
     
     BleuLinear::BleuLinear(const std::string& parameter)
