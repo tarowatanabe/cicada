@@ -20,29 +20,10 @@ System combination as statitical generation
 
 rename cicada_unite_{forest,lattice,sentence} to cicada_tool_{forest,lattice,sentence}???
 
-Support sign-test/bootstrap for evaluation
-	Add NIST?
-
-Add cicada_oracle{,_mpi}, compute oracle translations (sentence and/or forest?) from hypergraphs
-
-Add libstemmer? (and hand-coded Arabic rule?)
-
-Added phrasal-composer, which performs phrase-based decoding..
-      add lexicalized reordering... but difficult since we do not presesrve source-side phrases!!!
-      
-
-Allow binarization/permutation with arbitrary rule type?
-      attach terminals to binarized rule...where?
-
-
 Use source side tree-fragment as a rule, and parse "lattice"
     Simply convert source side into a flat structure and parse via CKY
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
-
-Add filters for extracted scores...
-    Differentiate phrase/scfg/ghkm etc.
-    Default to cicada format: expect log-prob, not prob!
 
 Tree-to-Tree rule extraction from forest:
     Given GHKM rule extraction from forest, it is very trivial...
@@ -54,9 +35,3 @@ Tree-to-Tree rule extraction from forest:
 	  - Cube pruning like procedure to enumerate in depth-first order to
 	    generate paired graph...?
 
-
-Add tokenize class:
-    We will create instance for tokenizer, and use it via operator()(const Sent& source, Sent& target)
-
-Use new stemmer/cluster integrated interface for feature-functions:
-	How to handle parent feature...?
