@@ -23,14 +23,14 @@ Other dynamically assigned features are applied via "apply" operaion:
 antecedent: sparse features assigned two-level non-terminals, delimited terminals and span-size
 bleu: bleu score
 blue-linear: linear bleu score
-boundary: sparse features assigned for 4-tuple of source/target words at non-terminal boundaries
+bleu-expected: expected bleu score (You need to compute expected counts before this feature application)
 neighbours: sparse features assigned for non-terminal, its neighboring words and span-size
 ngram: ngram langauge model feature. You can assign multiple LM by defining name=<feature-name> option.
 ngram-tree: sparse featuers assigned for non-terminal path for boundaries.
 parent:  rule (itself) and rule with its parent category
+span: span feature
 variational: features for variational decoding
-target-word-penalty: simply count # of target words
-source-word-penalty: simply count # of source words
+word-penalty: simply count # of words
 rule-penalty: simply count # of rules
 
 HOW TO DEVELOP YOUR FEATURE FUNCTIONS?

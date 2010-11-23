@@ -35,23 +35,23 @@ namespace cicada
       static const char* desc = "\
 bleu:\n\
 \torder=<order, default=4> ngram order\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 per: position indenendent error rate\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 wer: word error rate\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 ter: translation error rate\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 sk: string kernel\n\
 \tp=order of string kernel (default 4)\n\
 \tdecay=decay factor for string kernel (default 0.8)\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 wlcs: weighted longest common subsequence\n\
 \talpha=length factor, k^alpha (default 1.0)\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 sb: skip bigram\n\
 \twindow=window size (default 4, < 0 for infinity, == 0 for non-skip bigram)\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 ";
 
       return desc;

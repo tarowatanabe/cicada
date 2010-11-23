@@ -29,16 +29,16 @@ antecedent: antecedent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 bleu: BLEU\n\
-\torder=<order>,\n\
+\torder=<order>\n\
 \texact=[true|false] clipped ngram computation\n\
 \tokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu)\n\
 \trefset=reference set file\n\
 bleu-expected: expected-BLEU\n\
-\torder=<order>,\n\
+\torder=<order>\n\
 bleu-linear: linear corpus-BLEU\n\
-\torder=<order>,\n\
-\tprecision=<default 0.8>,\n\
+\torder=<order>\n\
+\tprecision=<default 0.8>\n\
 \tratio=<default 0.6>\n\
 \tokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu-linear)\n\

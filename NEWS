@@ -5,6 +5,7 @@ Added phrase/synchronous-rule/GHKM-rule extractor + score accumulator
 Added tokenizer, and use it for MT evaluators and bleu-related features
 Added new API for word normalizer (stemmer or cluster) and use it for sparce features
 Added remove-epsilon for lattice
+Added linguistic stemmer (snowball and LDC's Arabic stemmer)
 
 2010-10-31
 Support phrase-based composition with length-based distortion

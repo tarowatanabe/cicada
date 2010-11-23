@@ -18,20 +18,8 @@ System combination as statitical generation
   Collect rules
   Generate from rules
 
-rename cicada_unite_{forest,lattice,sentence} to cicada_tool_{forest,lattice,sentence}???
-
 Use source side tree-fragment as a rule, and parse "lattice"
     Simply convert source side into a flat structure and parse via CKY
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
-
-Tree-to-Tree rule extraction from forest:
-    Given GHKM rule extraction from forest, it is very trivial...
-    Do we share some codes?
-    Outline:
-	Construct derivational hypergraph in both sides
-	  - consider the other side's span when checking for admissibility
-	Extract rule pairs by traversing both graphs at the same time
-	  - Cube pruning like procedure to enumerate in depth-first order to
-	    generate paired graph...?
 
