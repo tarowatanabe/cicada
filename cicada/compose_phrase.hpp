@@ -256,15 +256,15 @@ namespace cicada
 	    
 	    nodes[coverage_new] = node.id;
 	  } else {
-	    node_map_type::iterator niter = nodes.find(coverage_new);
-	    if (niter == nodes.end())
-	      niter = nodes.insert(std::make_pair(coverage_new, graph.add_node().id)).first;
-
+	    std::pair<node_map_type::iterator, bool> result = nodes.insert(std::make_pair(coverage_new, 0));
+	    if (result.second)
+	      result.first->second = graph.add_node().id;
+	    
 	    hypergraph_type::id_type tails[2] = {titer->second, node.id};
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails, tails + 2);
 	    edge.rule = rule_x1_x2;
 	    
-	    graph.connect_edge(edge.id, niter->second);
+	    graph.connect_edge(edge.id, result.first->second);
 	  }
 	}
 
