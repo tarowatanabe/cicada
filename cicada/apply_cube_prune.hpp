@@ -276,20 +276,22 @@ namespace cicada
 	graph.connect_edge(edge_new.id, node.id);
       } else {
 	// hypothesis re-combination...
-	typename state_node_map_type::iterator biter = buf.find(item.state);
-	if (biter == buf.end()) {
+	
+	typedef std::pair<typename state_node_map_type::iterator, bool> result_type;
+	
+	result_type result = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item)));
+	
+	if (result.second) {
 	  //std::cerr << "added node!" << std::endl;
 	  
-	  biter = buf.insert(std::make_pair(item.state, const_cast<candidate_type*>(&item))).first;
-	  
-	  biter->second->out_edge.head = graph.add_node().id;
+	  result.first->second->out_edge.head = graph.add_node().id;
 	  node_states.push_back(item.state);
 	} else
 	  model.deallocate(item.state);
 	
 	//std::cerr << "node: " << biter->second->node << std::endl;
 	
-	candidate_type& item_graph = *(biter->second);
+	candidate_type& item_graph = *(result.first->second);
 	
 	node_type& node = graph.nodes[item_graph.out_edge.head];
 	

@@ -315,16 +315,19 @@ namespace cicada
 	} else {
 	  // we will merge states, but do not merge score/estimates, since we
 	  // are enumerating jth best derivations... is this correct?
-	  state_node_map_type::iterator siter = state.nodes.find(candidate.state);
-	  if (siter == state.nodes.end()) {
+	  
+	  typedef std::pair<state_node_map_type::iterator, bool> result_type;
+	  
+	  result_type result = state.nodes.insert(std::make_pair(candidate.state, 0));
+	  if (result.second) {
 	    node_maps.push_back(candidate.out_edge.head);
 	    node_states.push_back(candidate.state);
 	    
-	    siter = state.nodes.insert(std::make_pair(candidate.state, graph_out.add_node().id)).first;
+	    result.first->second = graph_out.add_node().id;
 	  } else
 	    model.deallocate(candidate.state);
 	  
-	  candidate.out_edge.head = siter->second;
+	  candidate.out_edge.head = result.first->second;
 	}
 	
 	edge_type& edge = graph_out.add_edge(candidate.out_edge);
@@ -400,14 +403,17 @@ namespace cicada
       //node_states_coarse.push_back(node_state);
       
       // state merging... so that we may reuse state structure
-      state_node_map_type::iterator siter = state.nodes_coarse.find(node_state);
-      if (siter == state.nodes_coarse.end()) {
-	siter = state.nodes_coarse.insert(std::make_pair(node_state, node_states_coarse.size())).first;
+      typedef std::pair<state_node_map_type::iterator, bool> result_type;
+
+      result_type result = state.nodes_coarse.insert(std::make_pair(node_state, 0));
+      if (result.second) {
+	result.first->second = node_states_coarse.size();
+	
 	node_states_coarse.push_back(node_state);
       } else
 	model.deallocate(node_state);
-      
-      candidate.out_edge.head = siter->second;
+
+      candidate.out_edge.head = result.first->second;
       
       return &candidate;
     };

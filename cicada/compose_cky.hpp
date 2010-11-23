@@ -287,9 +287,9 @@ namespace cicada
       // assign metadata...
       edge.first    = lattice_first;
       edge.last     = lattice_last;
-      
-      node_map_type::iterator niter = node_map.find(rule->lhs);
-      if (niter == node_map.end()) {
+
+      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(rule->lhs, 0));
+      if (result.second) {
 	hypergraph_type::node_type& node = graph.add_node();
 	
 	if (rule->lhs == goal_rule->lhs)
@@ -301,10 +301,10 @@ namespace cicada
 	  non_terminals.resize(node.id + 1);
 	non_terminals[node.id] = rule->lhs;
 	
-	niter = node_map.insert(std::make_pair(rule->lhs, node.id)).first;
+	result.first->second = node.id;
       }
       
-      graph.connect_edge(edge.id, niter->second);
+      graph.connect_edge(edge.id, result.first->second);
 
 #if 0
       std::cerr << "new rule: " << *(edge.rule)

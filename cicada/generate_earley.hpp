@@ -534,11 +534,11 @@ namespace cicada
 	
 	head_id = target.goal;
       } else {
-	non_terminal_node_set_type::iterator niter = non_terminal_nodes.find(&edge);
-	if (niter == non_terminal_nodes.end())
-	  niter = non_terminal_nodes.insert(std::make_pair(&edge, target.add_node().id)).first;
+	std::pair<non_terminal_node_set_type::iterator, bool> result = non_terminal_nodes.insert(std::make_pair(&edge, 0));
+	if (result.second) 
+	  result.first->second = target.add_node().id;
 	
-	head_id = niter->second;
+	head_id = result.first->second;
       }
       
       hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());

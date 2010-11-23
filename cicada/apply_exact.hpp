@@ -126,18 +126,19 @@ namespace cicada
 	    
 	    graph_out.connect_edge(edge_new.id, node.id);
 	  } else {
-	    state_node_map_type::iterator biter = buf.find(state);
-	    if (biter == buf.end()) {
-	      const node_type& node_new = graph_out.add_node();
+	    typedef std::pair<state_node_map_type::iterator, bool > result_type;
+	    
+	    result_type result = buf.insert(std::make_pair(state, 0));
+	    if (result.second) {
+	      result.first->second = graph_out.add_node().id;
+	      
 	      node_states.push_back(state);
 	      
-	      node_map[edge.head].push_back(node_new.id);
-	      
-	      biter = buf.insert(std::make_pair(state, node_new.id)).first;
+	      node_map[edge.head].push_back(result.first->second);
 	    } else
 	      model.deallocate(state);
 	    
-	    graph_out.connect_edge(edge_new.id, biter->second);
+	    graph_out.connect_edge(edge_new.id, result.first->second);
 	  }
 	  
 	  // proceed to the next id...
