@@ -6,6 +6,7 @@
 #include "cicada/parameter.hpp"
 #include "cicada/cluster.hpp"
 #include "cicada/stemmer.hpp"
+#include "cicada/cluster_stemmer.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie_dense.hpp"
@@ -27,6 +28,9 @@ namespace cicada
       typedef cicada::Cluster  cluster_type;
       typedef cicada::Stemmer  stemmer_type;
       
+      typedef cicada::ClusterStemmer normalizer_type;
+      typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
+      
       typedef cicada::FeatureFunction feature_function_type;
       
       typedef feature_function_type::state_ptr_type     state_ptr_type;
@@ -45,35 +49,29 @@ namespace cicada
       
       struct node_pair_type
       {
-	std::string node;
-	std::string cluster;
-	std::string prefix;
-	std::string suffix;
-	std::string digits;
+	typedef utils::simple_vector<std::string, std::allocator<std::string> > node_set_type;
+
+	node_set_type nodes;
 	
-	node_pair_type() : node(), cluster(), prefix(), suffix(), digits() {}
+	node_pair_type() : nodes() {}
       };
       
       typedef utils::compact_trie_dense<symbol_type, node_pair_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 					std::allocator<std::pair<const symbol_type, node_pair_type> > > tree_map_type;
 
       typedef tree_map_type::id_type id_type;
-      
+
       
       NGramTreeImpl()
-	: cluster(0), stemmer_prefix(0), stemmer_suffix(0), stemmer_digits(0),
-	  tree_map(symbol_type()),
+	: tree_map(symbol_type()),
 	  forced_feature(false) {}
       
       void clear()
       {
 	tree_map.clear();
       }
-
-      cluster_type* cluster;
-      stemmer_type* stemmer_prefix;
-      stemmer_type* stemmer_suffix;
-      stemmer_type* stemmer_digits;
+      
+      normalizer_set_type normalizers;
       
       tree_map_type  tree_map;
       
@@ -189,32 +187,27 @@ namespace cicada
       id_type tree_id(const symbol_type& node, const id_type parent) const
       {
 	tree_map_type& __tree_map = const_cast<tree_map_type&>(tree_map);
-
+	
 	const id_type id = __tree_map.insert(parent, node);
 	
-	if (__tree_map[id].node.empty()) {
+	if (__tree_map[id].nodes.empty())
+	  __tree_map[id].nodes = node_pair_type::node_set_type(normalizers.size() + 1);
+	
+	if (__tree_map[id].nodes.front().empty()) {
 	  if (__tree_map.is_root(parent)) {
-	    __tree_map[id].node = node;
-	    if (cluster)
-	      __tree_map[id].cluster = cluster->operator[](node);
-	    if (stemmer_prefix)
-	      __tree_map[id].prefix = stemmer_prefix->operator[](node);
-	    if (stemmer_suffix)
-	      __tree_map[id].suffix = stemmer_suffix->operator[](node);
-	    if (stemmer_digits)
-	      __tree_map[id].digits = stemmer_digits->operator[](node);
+	    __tree_map[id].nodes.front() = node;
+	    
+	    for (size_t i = 0; i != normalizers.size(); ++ i) 
+	      __tree_map[id].nodes[i + 1] = normalizers[i](node);
+	    
 	  } else {
-	    __tree_map[id].node = compose_path(node, __tree_map[parent].node);
-	    if (cluster)
-	      __tree_map[id].cluster = compose_path(node, __tree_map[parent].cluster);
-	    if (stemmer_prefix)
-	      __tree_map[id].prefix = compose_path(node, __tree_map[parent].prefix);
-	    if (stemmer_suffix)
-	      __tree_map[id].suffix = compose_path(node, __tree_map[parent].suffix);
-	    if (stemmer_digits)
-	      __tree_map[id].digits = compose_path(node, __tree_map[parent].digits);
+	    __tree_map[id].nodes.front() = compose_path(node, __tree_map[parent].nodes.front());
+	    
+	    for (size_t i = 0; i != normalizers.size(); ++ i) 
+	      __tree_map[id].nodes[i + 1] = compose_path(node, __tree_map[parent].nodes[i + 1]);
 	  }
 	}
+	
 	return id;
       }
 
@@ -223,34 +216,16 @@ namespace cicada
 	const node_pair_type& prev_node = tree_map[prev];
 	const node_pair_type& next_node = tree_map[next];
 	
-	if (cluster && (prev_node.node != prev_node.cluster || next_node.node != next_node.cluster)) {
-	  const std::string name = feature_name(node, prev_node.cluster, next_node.cluster);
-	  if (forced_feature || feature_set_type::feature_type::exists(name))
-	    features[name] += 1.0;
-	}
-	
-	if (stemmer_prefix && (prev_node.node != prev_node.prefix || next_node.node != next_node.prefix)) {
-	  const std::string name = feature_name(node, prev_node.prefix, next_node.prefix);
-	  if (forced_feature || feature_set_type::feature_type::exists(name))
-	    features[name] += 1.0;
-	}
-
-	if (stemmer_suffix && (prev_node.node != prev_node.suffix || next_node.node != next_node.suffix)) {
-	  const std::string name = feature_name(node, prev_node.suffix, next_node.suffix);
-	  if (forced_feature || feature_set_type::feature_type::exists(name))
-	    features[name] += 1.0;
-	}
-	
-	if (stemmer_digits && (prev_node.node != prev_node.digits || next_node.node != next_node.digits)) {
-	  const std::string name = feature_name(node, prev_node.digits, next_node.digits);
-	  if (forced_feature || feature_set_type::feature_type::exists(name))
-	    features[name] += 1.0;
-	}
-	
-	
-	const std::string name = feature_name(node, prev_node.node, next_node.node);
+	const std::string name = feature_name(node, prev_node.nodes.front(), next_node.nodes.front());
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
+
+	for (size_t i = 0; i != normalizers.size(); ++ i) 
+	  if (prev_node.nodes.front() != prev_node.nodes[i + 1] || next_node.nodes.front() != next_node.nodes[i + 1]) {
+	    const std::string name = feature_name(node, prev_node.nodes[i + 1], next_node.nodes[i + 1]);
+	    if (forced_feature || feature_set_type::feature_type::exists(name))
+	      features[name] += 1.0;
+	  }
       }
 
       template <typename Iterator>
@@ -297,48 +272,23 @@ namespace cicada
       if (param.name() != "ngram-tree")
 	throw std::runtime_error("is this really ngram tree feature function? " + parameter);
       
-      int stemmer_prefix_size = 0;
-      int stemmer_suffix_size = 0;
-      bool stemmer_digits = false;
-      
-      boost::filesystem::path cluster_path;
+      impl_type::normalizer_set_type normalizers;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "cluster") == 0)
-	  cluster_path = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "prefix") == 0)
-	  stemmer_prefix_size = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "suffix") == 0)
-	  stemmer_suffix_size = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "digits") == 0)
-	  stemmer_digits = utils::lexical_cast<bool>(piter->second);
+	if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
+	  if (! boost::filesystem::exists(piter->second))
+	    throw std::runtime_error("no cluster file: " + piter->second);
+	  
+	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
+	} else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
+	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
 	else
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      if (stemmer_prefix_size < 0)
-	throw std::runtime_error("negative prefix size?");
-      if (stemmer_suffix_size < 0)
-	throw std::runtime_error("negative suffix size?");
-      
       std::auto_ptr<impl_type> ngram_tree_impl(new impl_type());
 
-      if (! cluster_path.empty()) {
-	if (! boost::filesystem::exists(cluster_path))
-	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
-	
-	ngram_tree_impl->cluster = &cicada::Cluster::create(cluster_path);
-      }
-      
-      if (stemmer_prefix_size > 0)
-	ngram_tree_impl->stemmer_prefix = &cicada::Stemmer::create("prefix:size=" + boost::lexical_cast<std::string>(stemmer_prefix_size));
-      
-      if (stemmer_suffix_size > 0)
-	ngram_tree_impl->stemmer_suffix = &cicada::Stemmer::create("suffix:size=" + boost::lexical_cast<std::string>(stemmer_suffix_size));
-
-      if (stemmer_digits)
-	ngram_tree_impl->stemmer_digits = &cicada::Stemmer::create("digits");
-
+      ngram_tree_impl->normalizers.swap(normalizers);
       
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type) * 2;

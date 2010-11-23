@@ -149,6 +149,7 @@ apply_state_less.hpp \
 attribute.hpp \
 binarize.hpp \
 cluster.hpp \
+cluster_stemmer.hpp \
 compose.hpp \
 compose_cky.hpp \
 compose_earley.hpp \

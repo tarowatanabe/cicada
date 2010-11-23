@@ -24,7 +24,7 @@ namespace cicada
     
     private:
       symbol_set_type cache;
-      size_type       size;
+      size_type size;
     };
   };
 };

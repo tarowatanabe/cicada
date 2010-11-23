@@ -65,9 +65,7 @@ ngram: ngram language model\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
 ngram-tree: ngram tree feature\n\
 \tcluster=[word class file]\n\
-\tprefix=[prefix stemming size]\n\
-\tsuffix=[suffix stemming size]\n\
-\tdigits=[perform digits stemming]\n\
+\tstemmer=[stemmer spec]\n\
 parent: parent feature\n\
 \tcluster=[word class file]\n\
 \tprefix=[prefix stemming size]\n\
