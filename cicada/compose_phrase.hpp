@@ -144,9 +144,39 @@ namespace cicada
       
       const int last = utils::bithack::min(static_cast<int>(lattice.size()), max_distortion + 1);
       
-      for (int i = 0; i != last; ++ i)
-	for (size_t table = 0; table != grammar.size(); ++ table)
-	  queue.push_back(state_type(coverage_start, table, grammar[table].root(), i, i, feature_set_type()));
+      // breadth first search to compute jump positions...
+      {
+	typedef std::vector<int, std::allocator<int> > node_set_type;
+	
+	node_set_type nodes;
+	node_set_type nodes_next;
+	coverage_type visited;
+	
+	nodes.push_back(0);
+	visited.set(0);
+	
+	for (int i = 0; i != last && ! nodes.empty(); ++ i) {
+	  nodes_next.clear();
+	  
+	  node_set_type::const_iterator niter_end = nodes.end();
+	  for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	    for (size_t table = 0; table != grammar.size(); ++ table)
+	      queue.push_back(state_type(coverage_start, table, grammar[table].root(), *niter, *niter, feature_set_type()));
+	    
+	    lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
+	    for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
+	      const int next = *niter + aiter->distance;
+	      
+	      if (! visited[next]) {
+		nodes_next.push_back(next);
+		visited.set(next);
+	      }
+	    }
+	  }
+	  
+	  nodes.swap(nodes_next);
+	}
+      }
       
       while (! queue.empty()) {
 	const state_type& state = queue.front();
@@ -163,14 +193,40 @@ namespace cicada
 	  const coverage_type* coverage_new = result.first;
 	  
 	  if (result.second) {
+	    typedef std::vector<int, std::allocator<int> > node_set_type;
+	
+	    node_set_type nodes;
+	    node_set_type nodes_next;
+	    coverage_type visited;
+	    
 	    const int first = coverage_new->select(1, false);
 	    const int last  = utils::bithack::min(static_cast<int>(lattice.size()), first + max_distortion + 1);
 
-	    for (int i = first; i != last; ++ i)
-	      if (! coverage_new->test(i)) {
-		for (size_t table = 0; table != grammar.size(); ++ table)
-		  queue.push_back(state_type(coverage_new, table, grammar[table].root(), i, i, feature_set_type()));
+	    nodes.push_back(first);
+	    visited.set(first);
+	    
+	    for (int i = first; i != last && ! nodes.empty(); ++ i) {
+	      nodes_next.clear();
+	      
+	      node_set_type::const_iterator niter_end = nodes.end();
+	      for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+		if (! coverage_new->test(*niter))
+		  for (size_t table = 0; table != grammar.size(); ++ table)
+		    queue.push_back(state_type(coverage_new, table, grammar[table].root(), *niter, *niter, feature_set_type()));
+		
+		lattice_type::arc_set_type::const_iterator aiter_end = lattice[*niter].end();
+		for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
+		  const int next = *niter + aiter->distance;
+		  
+		  if (next < last && ! visited[next]) {
+		    nodes_next.push_back(next);
+		    visited.set(next);
+		  }
+		}
 	      }
+
+	      nodes.swap(nodes_next);
+	    }
 	  }
 	  
 	  // construct graph...
