@@ -131,7 +131,7 @@ tokenize: use the chain of tokenization\n\
 	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
 	      if (iter == tokenizers_map.end()) {
 		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Lower()))).first;
-		iter->second->__algorithm = parameter;
+		iter->second->__algorithm = "lower";
 	      }
 	      
 	      tokenize->insert(*(iter->second));
@@ -143,7 +143,7 @@ tokenize: use the chain of tokenization\n\
 	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
 	      if (iter == tokenizers_map.end()) {
 		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Nist()))).first;
-		iter->second->__algorithm = parameter;
+		iter->second->__algorithm = "nist";
 	      }
 	      
 	      tokenize->insert(*(iter->second));
@@ -155,7 +155,7 @@ tokenize: use the chain of tokenization\n\
 	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
 	      if (iter == tokenizers_map.end()) {
 		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Penntreebank()))).first;
-		iter->second->__algorithm = parameter;
+		iter->second->__algorithm = "penn";
 	      }
 	      
 	      tokenize->insert(*(iter->second));
@@ -167,7 +167,7 @@ tokenize: use the chain of tokenization\n\
 	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
 	      if (iter == tokenizers_map.end()) {
 		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::NonAscii()))).first;
-		iter->second->__algorithm = parameter;
+		iter->second->__algorithm = "nonascii";
 	      }
 	      
 	      tokenize->insert(*(iter->second));
