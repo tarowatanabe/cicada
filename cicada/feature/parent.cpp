@@ -90,6 +90,7 @@ namespace cicada
       void clear()
       {
 	string_map.clear();
+	normalized.clear();
       }
 
       template <typename Iterator, typename Extractor>
