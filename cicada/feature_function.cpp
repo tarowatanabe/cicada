@@ -27,9 +27,7 @@ namespace cicada
     static const char* desc = "\
 antecedent: antecedent feature\n\
 \tcluster=[word class file]\n\
-\tprefix=[prefix stemming size]\n\
-\tsuffix=[suffix stemming size]\n\
-\tdigits=[perform digits stemming]\n\
+\tstemmer=[stemmer spec]\n\
 bleu: BLEU\n\
 \torder=<order>,\n\
 \texact=[true|false] clipped ngram computation\n\
@@ -52,9 +50,7 @@ lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tfile=model file\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
-\tprefix=[prefix stemming size]\n\
-\tsuffix=[suffix stemming size]\n\
-\tdigits=[perform digits stemming]\n\
+\tstemmer=[stemmer spec]\n\
 ngram: ngram language model\n\
 \tfile=<file>\n\
 \torder=<order>\n\
@@ -68,9 +64,7 @@ ngram-tree: ngram tree feature\n\
 \tstemmer=[stemmer spec]\n\
 parent: parent feature\n\
 \tcluster=[word class file]\n\
-\tprefix=[prefix stemming size]\n\
-\tsuffix=[suffix stemming size]\n\
-\tdigits=[perform digits stemming]\n\
+\tstemmer=[stemmer spec]\n\
 \texclude-terminal=[true|false] exclude terminal symbol\n\
 span: lexical span feature\n\
 variational: variational feature for variational decoding\n\

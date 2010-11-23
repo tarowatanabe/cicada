@@ -57,3 +57,6 @@ Tree-to-Tree rule extraction from forest:
 
 Add tokenize class:
     We will create instance for tokenizer, and use it via operator()(const Sent& source, Sent& target)
+
+Use new stemmer/cluster integrated interface for feature-functions:
+	How to handle parent feature...?
