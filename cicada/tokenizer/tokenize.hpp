@@ -22,6 +22,8 @@ namespace cicada
       {
 	tokenizers.push_back(&tokenizer);
       }
+
+      bool empty() const { return tokenizers.empty(); }
       
     protected:
       virtual void tokenize(const sentence_type& source, sentence_type& tokenized) const

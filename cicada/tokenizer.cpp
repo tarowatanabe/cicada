@@ -7,6 +7,7 @@
 #include "tokenizer/tokenize.hpp"
 #include "tokenizer/nist.hpp"
 #include "tokenizer/penntreebank.hpp"
+#include "tokenizer/stemmer.hpp"
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
@@ -25,11 +26,14 @@ lower: lower casing\n\
 nonascii: split non ascii characters\n\
 nist: NIST mteval style tokenization\n\
 penn: penn-treebank stye tokenization\n\
+stemmer: tokenize by stemming algorithm\n\
+\talgorithm=[stemmer spec]\n\
 tokenize: use the chain of tokenization\n\
 \tlower=[true|false] perform lower casing\n\
 \tnonascii=[true|false] perform non ascii character splitting\n\
 \tnist=[true|false] perform NIST tokenization\n\
 \tpenn=[true|false] perform Penn-treebank tokenization\n\
+\tstemmer=[stemmer spec] perform by stemmring tokenization\n\
 ";
     return desc;
   }
@@ -118,6 +122,28 @@ tokenize: use the chain of tokenization\n\
       }
       
       return *(iter->second);
+    } else if (param.name() == "stemmer") {
+      std::string algorithm;
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "algorithm") == 0)
+	  algorithm = piter->second;
+	else
+	  std::cerr << "unsupported parameter for stemming tokenizer: " << piter->first << "=" << piter->second << std::endl;
+      }
+      
+      if (algorithm.empty())
+	throw std::runtime_error("no stemming algorithm?");
+
+      const std::string name = "stemmer:" + algorithm;
+      
+      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+      if (iter == tokenizers_map.end()) {
+	iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Stemmer(&cicada::Stemmer::create(algorithm))))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
     } else if (param.name() == "tokenize") {
       tokenizer_map_type::iterator iter = tokenizers_map.find(parameter);
       if (iter == tokenizers_map.end()) {
@@ -125,56 +151,25 @@ tokenize: use the chain of tokenization\n\
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "lower") == 0) {
-	    if (utils::lexical_cast<bool>(piter->second)) {
-	      const std::string name("lower");
-      
-	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
-	      if (iter == tokenizers_map.end()) {
-		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Lower()))).first;
-		iter->second->__algorithm = "lower";
-	      }
-	      
-	      tokenize->insert(*(iter->second));
-	    }
+	    if (utils::lexical_cast<bool>(piter->second))
+	      tokenize->insert(create("lower"));
 	  } else if (strcasecmp(piter->first.c_str(), "nist") == 0) {
-	    if (utils::lexical_cast<bool>(piter->second)) {
-	      const std::string name("nist");
-      
-	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
-	      if (iter == tokenizers_map.end()) {
-		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Nist()))).first;
-		iter->second->__algorithm = "nist";
-	      }
-	      
-	      tokenize->insert(*(iter->second));
-	    }
+	    if (utils::lexical_cast<bool>(piter->second))
+	      tokenize->insert(create("nist"));
 	  } else if (strcasecmp(piter->first.c_str(), "penn") == 0) {
-	    if (utils::lexical_cast<bool>(piter->second)) {
-	      const std::string name("penn");
-      
-	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
-	      if (iter == tokenizers_map.end()) {
-		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Penntreebank()))).first;
-		iter->second->__algorithm = "penn";
-	      }
-	      
-	      tokenize->insert(*(iter->second));
-	    }
+	    if (utils::lexical_cast<bool>(piter->second))
+	      tokenize->insert(create("penn"));
 	  } else if (strcasecmp(piter->first.c_str(), "nonascii") == 0) {
-	    if (utils::lexical_cast<bool>(piter->second)) {
-	      const std::string name("nonascii");
-	      
-	      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
-	      if (iter == tokenizers_map.end()) {
-		iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::NonAscii()))).first;
-		iter->second->__algorithm = "nonascii";
-	      }
-	      
-	      tokenize->insert(*(iter->second));
-	    }
-	  } else
+	    if (utils::lexical_cast<bool>(piter->second))
+	      tokenize->insert(create("nonascii"));
+	  } else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
+	    tokenize->insert(create("stemmer:algorithm=" + piter->second));
+	  else
 	    std::cerr << "unsupported parameter for combined tokenizer: " << piter->first << "=" << piter->second << std::endl;
 	}
+
+	if (tokenize->empty())
+	  throw std::runtime_error("no tokenization for combined tokenizer?");
 	
 	iter = tokenizers_map.insert(std::make_pair(parameter, tokenizer_ptr_type(tokenize.release()))).first;
 	iter->second->__algorithm = parameter;

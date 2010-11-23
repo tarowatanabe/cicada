@@ -1,7 +1,7 @@
 // -*- mode: c++ -*-
 
-#ifndef __CICADA__TOKENIZER__LOWER__HPP__
-#define __CICADA__TOKENIZER__LOWER__HPP__ 1
+#ifndef __CICADA__TOKENIZER__STEMMER__HPP__
+#define __CICADA__TOKENIZER__STEMMER__HPP__ 1
 
 #include <vector>
 #include <string>
@@ -13,10 +13,10 @@ namespace cicada
 {
   namespace tokenizer
   {
-    class Lower : public cicada::Tokenizer
+    class Stemmer : public cicada::Tokenizer
     {
     public:
-      Lower() : lower(&cicada::Stemmer::create("lower")) {}
+      Stemmer(const cicada::Stemmer* __stemmer) : stemmer(__stemmer) {}
       
     protected:
       virtual void tokenize(const sentence_type& source, sentence_type& tokenized) const
@@ -24,11 +24,11 @@ namespace cicada
 	tokenized.clear();
 	sentence_type::const_iterator siter_end = source.end();
 	for (sentence_type::const_iterator siter = source.begin(); siter != siter_end; ++ siter)
-	  tokenized.push_back(lower->operator()(*siter));
+	  tokenized.push_back(stemmer->operator()(*siter));
       }
       
     private:
-      cicada::Stemmer* lower;
+      const cicada::Stemmer* stemmer;
     };
   };
 };

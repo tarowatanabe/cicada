@@ -39,8 +39,6 @@ namespace cicada
   private:
     Tokenizer(const Tokenizer& x) {}
     Tokenizer& operator=(const Tokenizer& x) { return *this; }
-    
-  private:
 
   public:
     template <typename Sent>
@@ -52,7 +50,7 @@ namespace cicada
     const std::string& algorithm() const { return __algorithm; }
     
   public:
-    static Tokenizer&    create(const std::string& parameter);
+    static Tokenizer&  create(const std::string& parameter);
     static const char* lists();
     
   protected:
