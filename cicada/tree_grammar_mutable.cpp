@@ -119,16 +119,14 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
       
-      using qi::phrase_parse;
       using qi::lexeme;
       using qi::attr;
       using qi::hold;
       using standard::char_;
       using qi::double_;
-      using qi::_1;
       using standard::space;
       
-      score %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> double_;
+      score  %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> double_;
       scores %= +score;
     }
     
@@ -215,17 +213,19 @@ namespace cicada
       if (! source.assign(iter, iter_end)) continue;
       if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
       if (! target.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space)) continue;
+      
+      if (iter != iter_end && qi::phrase_parse(iter, iter_end, "|||", standard::space))
+	if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores)) continue;
+      
       if (iter != iter_end) continue;
       
       features.clear();
       int feature = 0;
       scores_parsed_type::const_iterator fiter_end = scores.end();
-      for (scores_parsed_type::const_iterator fiter = scores.begin(); fiter != fiter_end; ++ fiter) 
+      for (scores_parsed_type::const_iterator fiter = scores.begin(); fiter != fiter_end; ++ fiter) {
 	if (fiter->first.empty()) {
 	  
-	  if (feature < int(feature_names.size()) && ! feature_names[feature].empty())
+	  if (feature < static_cast<int>(feature_names.size()) && ! feature_names[feature].empty())
 	    features[feature_names[feature]] = fiter->second;
 	  else {
 	    // default name!
@@ -237,6 +237,7 @@ namespace cicada
 	  ++ feature;
 	} else
 	  features[fiter->first] = fiter->second;
+      }
       
       insert(rule_pair_type(rule_ptr_type(new rule_type(source)), rule_ptr_type(new rule_type(target)), features));
     }
@@ -282,8 +283,10 @@ namespace cicada
     if (! source->assign(iter, iter_end)) return;
     if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) return;
     if (! target->assign(iter, iter_end)) return;
-    if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) return;
-    if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space)) return;
+    
+    if (iter != iter_end && qi::phrase_parse(iter, iter_end, "|||", standard::space))
+      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores)) return;
+    
     if (iter != iter_end) return;
     
     int feature = 0;
@@ -349,7 +352,7 @@ namespace cicada
   {
     // compute max-depth by pre-order
     const int max_depth = tree_depth(tree, 0);
-    
+
     // add epsilon annotation by pre-order
     TreeRule tree_epsilon(tree);
     tree_add_epsilon(tree_epsilon, max_depth, 0);
@@ -378,7 +381,7 @@ namespace cicada
     typename Path::const_iterator piter_end = path.end();
     for (typename Path::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
       typedef typename Path::value_type node_type;
-      
+
       buffer.clear();
       typename node_type::const_iterator niter_end = piter->end();
       for (typename node_type::const_iterator niter = piter->begin(); niter != niter_end; ++ niter) {

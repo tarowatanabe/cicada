@@ -814,7 +814,7 @@ namespace cicada
       if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
       if (! target.assign(iter, iter_end)) continue;
       if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space)) continue;
+      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores)) continue;
       if (iter != iter_end) continue;
       
       if (source != source_prev) {
