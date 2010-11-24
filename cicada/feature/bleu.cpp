@@ -203,7 +203,7 @@ namespace cicada
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 
-	  const double bleu = bleu_score(counts, *context_hypothesis, minimum_size, ! final);
+	  const double bleu = bleu_score(counts, *context_hypothesis, ! final);
 	  
 	  //std::cerr << "bleu: " << bleu << ' ';
 	  //std::copy(buffer.begin(), buffer.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
@@ -245,7 +245,7 @@ namespace cicada
 
 	      const count_set_type& counts_antecedent = states_counts[*antecedent_count];
 	      
-	      bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, minimum_size, true);
+	      bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, true);
 
 	      // merge statistics...
 	      counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
@@ -317,7 +317,7 @@ namespace cicada
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 	  
-	  return bleu_score(counts, *context_hypothesis, minimum_size, ! final) - bleu_antecedent;
+	  return bleu_score(counts, *context_hypothesis, ! final) - bleu_antecedent;
 	}
       }
 
@@ -508,7 +508,7 @@ namespace cicada
 	  return std::min(1.0 - reference_size / hypothesis_size, 0.0);
       }
       
-      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const int minimum_size, const bool scaling=true) const
+      double bleu_score(const count_set_type& __counts, const int hypothesis_size, const bool scaling=true) const
       {
 	count_set_type counts_bleu(order, count_type(0));
 	if (exact)
@@ -521,7 +521,7 @@ namespace cicada
 	
 	if (__bleu && __bleu->length_reference > 0) {
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, minimum_size, scaling);
+	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
 	  
 	  double smooth = 0.5;
@@ -546,7 +546,7 @@ namespace cicada
 	} else {
 	  if (hypothesis_size == 0 || counts.empty()) return 0.0;
 	  
-	  const double hypothesis_length = tst_size(hypothesis_size, minimum_size, scaling);
+	  const double hypothesis_length = tst_size(hypothesis_size, scaling);
 	  const double reference_length  = ref_size(hypothesis_length);
 	  
 	  double smooth = 0.5;
@@ -566,15 +566,13 @@ namespace cicada
 	}
       }
 
-      double tst_size(int length, int minimum_size, const bool scaling=true) const
+      double tst_size(int length, const bool scaling=true) const
       {
 	if (length == 0) return 0.0;
 	
 	// we will scale hypothesis length by the minimum size
 	
-	return (length < minimum_size && scaling
-		? double(minimum_size)
-		: double(length));
+	return (length < minimum_size && scaling ? double(minimum_size) : double(length));
       }
       
       double ref_size(const double hypothesis_size) const
