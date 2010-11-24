@@ -19,6 +19,7 @@ namespace cicada
     typedef Symbol  symbol_type;
 
   public:
+    ClusterStemmer() : cluster(0), stemmer(0) {}
     ClusterStemmer(const cluster_type* __cluster)
       : cluster(__cluster), stemmer(0) {}
     ClusterStemmer(const stemmer_type* __stemmer)
