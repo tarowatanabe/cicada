@@ -105,8 +105,8 @@ namespace cicada
     typedef NodeMap node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     
-    ComposeTree(const symbol_type& __goal, const grammar_type& __grammar)
-      : goal(__goal), grammar(__grammar) 
+    ComposeTree(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source)
+      : goal(__goal), grammar(__grammar), yield_source(__yield_source) 
     { }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
@@ -261,14 +261,24 @@ namespace cicada
       //
       // construct graph_out in pre-order...
       //
-      
-      std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule_pair.target->label.non_terminal(), 0));
-      if (result.second)
-	result.first->second = graph_out.add_node().id;
-      
-      const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.target, result.first->second, frontiers, graph_in, graph_out);
-      
-      graph_out.edges[edge_id].features += rule_pair.features;
+
+      if (yield_source) {
+	std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule_pair.source->label.non_terminal(), 0));
+	if (result.second)
+	  result.first->second = graph_out.add_node().id;
+	
+	const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.source, result.first->second, frontiers, graph_in, graph_out);
+	
+	graph_out.edges[edge_id].features += rule_pair.features;
+      } else {
+	std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule_pair.target->label.non_terminal(), 0));
+	if (result.second)
+	  result.first->second = graph_out.add_node().id;
+	
+	const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.target, result.first->second, frontiers, graph_in, graph_out);
+	
+	graph_out.edges[edge_id].features += rule_pair.features;
+      }
     }
     
     hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
@@ -330,13 +340,14 @@ namespace cicada
     
     symbol_type goal;
     const grammar_type& grammar;
+    const bool yield_source;
   };
   
   
   inline
-  void compose_tree(const Symbol& goal, const TreeGrammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out)
+  void compose_tree(const Symbol& goal, const TreeGrammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
   {
-    ComposeTree __composer(goal, grammar);
+    ComposeTree __composer(goal, grammar, yield_source);
     __composer(graph_in, graph_out);
   }
 };

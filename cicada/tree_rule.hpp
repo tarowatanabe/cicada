@@ -48,14 +48,14 @@ namespace cicada
       label = label_type();
       antecedents.clear();
     }
-
-    // compute max-depth
+    
+    // compute max-depth excluding root-label
     size_type depth() const
     {
       return __depth(*this, 0);
     }
-
-    // convert into hyperpth
+    
+    // convert into hyperpath
     template <typename Path>
     void hyperpath(Path& path) const
     {
