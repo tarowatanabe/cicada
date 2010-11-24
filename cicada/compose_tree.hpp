@@ -76,17 +76,38 @@ namespace cicada
     
     typedef std::pair<frontier_type, transducer_type::id_type> frontier_pair_type;
     typedef std::deque<frontier_pair_type, std::allocator<frontier_pair_type> > queue_type;
-    
-    typedef std::pair<hypergraph_type::id_type, symbol_type> node_label_type;
-    
-    typedef google::dense_hash_map<node_label_type, hypergraph_type::id_type,
-				   utils::hashmurmur<size_t>, std::equal_to<node_label_type> > node_map_type;
+
+    struct NodeMap
+    {
+      typedef google::dense_hash_map<symbol_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_type> > node_map_type;
+
+      typedef node_map_type::value_type value_type;
+      
+      typedef node_map_type::iterator       iterator;
+      typedef node_map_type::const_iterator const_iterator;
+
+      NodeMap() : node_map() { node_map.set_empty_key(symbol_type()); }
+      
+      std::pair<iterator, bool> insert(const value_type& x) { return node_map.insert(x); }
+      
+      const_iterator find(const symbol_type& x) const { return node_map.find(x); }
+      iterator find(const symbol_type& x) { return node_map.find(x); }
+      
+      const_iterator begin() const { return node_map.begin(); }
+      iterator begin() { return node_map.begin(); }
+
+      const_iterator end() const { return node_map.end(); }
+      iterator end() { return node_map.end(); }
+
+      node_map_type node_map;
+    };
+
+    typedef NodeMap node_map_type;
+    typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     
     ComposeTree(const symbol_type& __goal, const grammar_type& __grammar)
       : goal(__goal), grammar(__grammar) 
-    {
-      node_map.set_empty_key(std::make_pair(hypergraph_type::invalid, symbol_type()));
-    }
+    { }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
@@ -94,13 +115,16 @@ namespace cicada
       node_map.clear();
       
       if (! graph_in.is_valid()) return;
+
+      node_map.reserve(graph_in.nodes.size());
+      node_map.resize(graph_in.nodes.size());
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id)
 	match_tree(id, graph_in, graph_out);
       
-      node_map_type::const_iterator niter = node_map.find(std::make_pair(graph_in.goal, goal.non_terminal()));
-      if (niter != node_map.end())
+      node_map_type::const_iterator niter = node_map[graph_in.goal].find(goal.non_terminal());
+      if (niter != node_map[graph_in.goal].end())
 	graph_out.goal = niter->second;
 
       node_map.clear();
@@ -238,11 +262,11 @@ namespace cicada
       // construct graph_out in pre-order...
       //
       
-      node_map_type::iterator niter = node_map.find(std::make_pair(root_in, rule_pair.target->label.non_terminal()));
-      if (niter == node_map.end())
-	niter = node_map.insert(std::make_pair(std::make_pair(root_in, rule_pair.target->label.non_terminal()), graph_out.add_node().id)).first;
+      std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule_pair.target->label.non_terminal(), 0));
+      if (result.second)
+	result.first->second = graph_out.add_node().id;
       
-      const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.target, niter->second, frontiers, graph_in, graph_out);
+      const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.target, result.first->second, frontiers, graph_in, graph_out);
       
       graph_out.edges[edge_id].features += rule_pair.features;
     }
@@ -272,12 +296,12 @@ namespace cicada
 	      throw std::runtime_error("non-terminal index exceeds frontier size");
 	    
 	    const hypergraph_type::id_type node = frontiers[non_terminal_index - 1];
+
+	    std::pair<node_map_type::iterator, bool> result = node_map[node].insert(std::make_pair(aiter->label.non_terminal(), 0));
+	    if (result.second)
+	      result.first->second = graph_out.add_node().id;
 	    
-	    node_map_type::iterator niter = node_map.find(std::make_pair(node, aiter->label.non_terminal()));
-	    if (niter == node_map.end())
-	      niter = node_map.insert(std::make_pair(std::make_pair(node, aiter->label.non_terminal()), graph_out.add_node().id)).first;
-	    
-	    tails.push_back(niter->second);
+	    tails.push_back(result.first->second);
 	  } else
 	    tails.push_back(graph_out.add_node().id);
 	  
@@ -302,7 +326,7 @@ namespace cicada
       return edge_id;
     }
 
-    node_map_type node_map;
+    node_map_set_type node_map;
     
     symbol_type goal;
     const grammar_type& grammar;

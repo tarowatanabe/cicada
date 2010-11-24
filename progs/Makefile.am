@@ -37,6 +37,7 @@ bin_PROGRAMS = \
 	cicada_index_grammar \
 	cicada_index_global_lexicon \
 	cicada_index_lexicalized_reordering \
+	cicada_index_tree_grammar \
 	cicada_learn \
 	cicada_learn_mpi \
 	cicada_learn_online \
@@ -128,6 +129,9 @@ cicada_index_global_lexicon_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(
 
 cicada_index_lexicalized_reordering_SOURCES = cicada_index_lexicalized_reordering.cpp
 cicada_index_lexicalized_reordering_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_index_tree_grammar_SOURCES = cicada_index_tree_grammar.cpp
+cicada_index_tree_grammar_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_learn_SOURCES = cicada_learn.cpp lbfgs.c
 cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

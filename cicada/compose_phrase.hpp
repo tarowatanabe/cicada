@@ -102,9 +102,11 @@ namespace cicada
     
     ComposePhrase(const symbol_type& non_terminal,
 		  const grammar_type& __grammar,
-		  const int& __max_distortion)
+		  const int& __max_distortion,
+		  const bool __yield_source)
       : grammar(__grammar),
-	max_distortion(__max_distortion)
+	max_distortion(__max_distortion),
+	yield_source(__yield_source)
     {
       // initializer...
       rule_goal.reset(new rule_type(vocab_type::GOAL,
@@ -236,7 +238,7 @@ namespace cicada
 	  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	    hypergraph_type::edge_type& edge = graph.add_edge();
-	    edge.rule = riter->target;
+	    edge.rule = (yield_source ? riter->source : riter->target);
 	    edge.features = riter->features;
 	    if (! state.features.empty())
 	      edge.features += state.features;
@@ -334,6 +336,7 @@ namespace cicada
     
     const grammar_type& grammar;
     const int max_distortion;
+    const bool yield_source;
 
     node_map_type     nodes;
     coverage_set_type coverages;
@@ -344,9 +347,9 @@ namespace cicada
   };
   
   inline
-  void compose_phrase(const Symbol& non_terminal, const Grammar& grammar, const Lattice& lattice, const int max_distortion, HyperGraph& graph)
+  void compose_phrase(const Symbol& non_terminal, const Grammar& grammar, const Lattice& lattice, const int max_distortion, HyperGraph& graph, const bool yield_source=false)
   {
-    ComposePhrase __composer(non_terminal, grammar, max_distortion);
+    ComposePhrase __composer(non_terminal, grammar, max_distortion, yield_source);
     __composer(lattice, graph);
   }
 

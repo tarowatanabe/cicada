@@ -216,6 +216,7 @@ namespace cicada
 	  goal(__goal), non_terminal(__non_terminal), 
 	  insertion(__insertion), deletion(__deletion),
 	  distortion(0),
+	  yield_source(false),
 	  debug(__debug)
       { 
 	typedef cicada::Parameter param_type;
@@ -223,14 +224,28 @@ namespace cicada
 	param_type param(parameter);
 	if (param.name() != "compose-phrase")
 	  throw std::runtime_error("this is not a phrase composer");
+
+	bool source = false;
+	bool target = false;
 	
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "distortion") == 0)
 	    distortion = boost::lexical_cast<int>(piter->second);
-	  else
+	  else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
+	    if (strcasecmp(piter->second.c_str(), "source") == 0)
+	      source = true;
+	    else if (strcasecmp(piter->second.c_str(), "target") == 0)
+	      target = true;
+	    else
+	      throw std::runtime_error("unknown yield: " + piter->second);
+	  } else
 	    std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
+	if (source && target)
+	  throw std::runtime_error("Phrase composer can work either source or target yield");
+	
+	yield_source = source;
       }
   
       void operator()(data_type& data) const
@@ -279,6 +294,8 @@ namespace cicada
       bool deletion;
 
       int distortion;
+      
+      bool yield_source;
   
       int debug;
     };
