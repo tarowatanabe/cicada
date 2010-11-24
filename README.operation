@@ -14,9 +14,14 @@ permute: permute tree (monolingual tree only)
 	collapse=[true|false] collapse sparse features
 	exclude=[a non-terminal] to prohibit permutation. You can supply multiple
 compose-earley: composition from tree with grammar
+	yield=[source|target] use source or target yield for rule
 compose-cky: composition from lattice (or sentence) with grammar
-compose-phrase: phrasal composition from lattice (or sentence)
+	yield=[source|target] use source or target yield for rule
+compose-phrase: composition from lattice (or sentence) with phrase-based grammar
+	distortion=[distortion limit] default: 0 (== monotone)
 generate-earley: re-generation from tree
+	depth: depth of rule pattern 
+	width: width of rule pattern 
 apply: feature application
 	size=<cube size>
 	exact=[true|false]  no pruning feature application
@@ -31,7 +36,7 @@ expected-ngram: expected ngram computation
 	bos-eos=[true|false] include <s> and </s> in ngrams
 	weights=weight file for feature
 	weights-one=[true|false] one initialized weight
-	yield=[source|target]
+	scale=scaling for score
 prune: pruning
 	beam=beam pruning threshold in threshold > 0.0
 	density=density pruning threshold in threshold > 1.0
@@ -40,13 +45,18 @@ prune: pruning
 	weights=weight file for feature
 	weights-one=[true|false] one initialzied weight
 intersect: compute intersection
+normalize: feature value normalizer
+	prefix=feature name prefix
+remove-epsilon: remove epsilon for lattice
+span-forest: annotate terminal span
 output: kbest or hypergraph output
 	kbest=<kbest size> zero for hypergraph output (default)
 	unique=[true|false] unique translation
 	weights=weight file for feature
 	weights-one=[true|false] one initialize weight
-	yield=[source|target|derivation|tree] yield for kbest
+	yield=[sentence|string|derivation|tree] yield for kbest
 	graphviz=[true|false] dump in graphviz format
+	statistics=[true|fals] dump various statistics (size etc.)
 	directory=directory for output
 	file=file for output
 

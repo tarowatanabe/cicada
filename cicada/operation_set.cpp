@@ -53,6 +53,7 @@ compose-cky: composition from lattice (or sentence) with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
 \tdistortion=[distortion limit] default: 0 (== monotone)\n\
+\tyield=[source|target] use source or target yield for rule\n\
 generate-earley: re-generation from tree\n\
 \tdepth: depth of rule pattern \n\
 \twidth: width of rule pattern \n\
