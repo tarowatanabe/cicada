@@ -107,27 +107,199 @@ namespace cicada
   // we will parse only scores part and rely on tree-rule to parse partial string...
   //
   
+  typedef std::pair<std::string, double> score_parsed_type;
+  typedef std::vector<score_parsed_type, std::allocator<score_parsed_type> > scores_parsed_type;
+  
+  template <typename Iterator>
+  struct tree_rule_scores_parser : boost::spirit::qi::grammar<Iterator, scores_parsed_type(), boost::spirit::standard::space_type>
+  {
+    tree_rule_scores_parser() : tree_rule_scores_parser::base_type(scores)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      using qi::phrase_parse;
+      using qi::lexeme;
+      using qi::attr;
+      using qi::hold;
+      using standard::char_;
+      using qi::double_;
+      using qi::_1;
+      using standard::space;
+      
+      score %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> double_;
+      scores %= +score;
+    }
+    
+    boost::spirit::qi::rule<Iterator, score_parsed_type(), boost::spirit::standard::space_type>  score;
+    boost::spirit::qi::rule<Iterator, scores_parsed_type(), boost::spirit::standard::space_type> scores;
+  };
+
   
   void TreeGrammarMutableImpl::read(const std::string& parameter)
   {
+    typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
+    
+
     typedef cicada::Parameter parameter_type;
 	  
     const parameter_type param(parameter);
-    
     const path_type path = param.name();
     
     if (path != "-" && ! boost::filesystem::exists(path))
       throw std::runtime_error(std::string("no grammar file") + param.name());
     
+    feature_name_set_type feature_names;
+    parameter_type::iterator piter_end = param.end();
+    for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
+      
+      std::string::const_iterator iter = piter->first.begin();
+      std::string::const_iterator iter_end = piter->first.end();
+      
+      int feature_id = -1;
+      
+      const bool result = boost::spirit::qi::parse(iter, iter_end,
+						   "feature" >> boost::spirit::qi::int_[boost::phoenix::ref(feature_id) = boost::spirit::qi::_1]);
+      if (result && iter == iter_end && feature_id >= 0) {
+	if (feature_id >= int(feature_names.size()))
+	  feature_names.resize(feature_id + 1);
+	feature_names[feature_id] = piter->second;
+      } else
+	throw std::runtime_error("unsupported key: " + piter->first);
+    }
+
+    typedef tree_rule_scores_parser<std::string::const_iterator> scores_parser_type;
+    
+#ifdef HAVE_TLS
+    static __thread scores_parser_type* __scores_parser_tls = 0;
+    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
+    
+    if (! __scores_parser_tls) {
+      __scores_parser.reset(new scores_parser_type());
+      __scores_parser_tls = __scores_parser.get();
+    }
+    
+    scores_parser_type& scores_parser = *__scores_parser_tls;
+#else
+    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
+    if (! __scores_parser.get())
+      __scores_parser.reset(new scores_parser_type());
+    
+    scores_parser_type& scores_parser = *__scores_parser;
+#endif
     
     
+    utils::compress_istream is(path, 1024 * 1024);
+    std::string line;
+
+    rule_type          source;
+    rule_type          target;
+    scores_parsed_type scores;
+    feature_set_type   features;
+    
+    while (std::getline(is, line)) {
+      if (line.empty()) continue;
+      
+      source.clear();
+      target.clear();
+      scores.clear();
+      
+      std::string::const_iterator iter_end = line.end();
+      std::string::const_iterator iter = line.begin();
+
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
+      if (! source.assign(iter, iter_end)) continue;
+      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
+      if (! target.assign(iter, iter_end)) continue;
+      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
+      if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space)) continue;
+      if (iter != iter_end) continue;
+      
+      features.clear();
+      int feature = 0;
+      scores_parsed_type::const_iterator fiter_end = scores.end();
+      for (scores_parsed_type::const_iterator fiter = scores.begin(); fiter != fiter_end; ++ fiter) 
+	if (fiter->first.empty()) {
+	  
+	  if (feature < int(feature_names.size()) && ! feature_names[feature].empty())
+	    features[feature_names[feature]] = fiter->second;
+	  else {
+	    // default name!
+	    const std::string name = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
+	    
+	    features[name] = fiter->second;
+	  }
+	  
+	  ++ feature;
+	} else
+	  features[fiter->first] = fiter->second;
+      
+      insert(rule_pair_type(rule_ptr_type(new rule_type(source)), rule_ptr_type(new rule_type(target)), features));
+    }
   }
   
 
-  void TreeGrammarMutableImpl::insert(const std::string& pattern)
+  void TreeGrammarMutableImpl::insert(const std::string& line)
   {
+    typedef tree_rule_scores_parser<std::string::const_iterator> scores_parser_type;
     
+#ifdef HAVE_TLS
+    static __thread scores_parser_type* __scores_parser_tls = 0;
+    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
     
+    if (! __scores_parser_tls) {
+      __scores_parser.reset(new scores_parser_type());
+      __scores_parser_tls = __scores_parser.get();
+    }
+    
+    scores_parser_type& scores_parser = *__scores_parser_tls;
+#else
+    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
+    if (! __scores_parser.get())
+      __scores_parser.reset(new scores_parser_type());
+    
+    scores_parser_type& scores_parser = *__scores_parser;
+#endif
+
+    if (line.empty()) return;
+    
+    rule_ptr_type      source(new rule_type());
+    rule_ptr_type      target(new rule_type());
+    scores_parsed_type scores;
+    feature_set_type   features;
+    
+    std::string::const_iterator iter_end = line.end();
+    std::string::const_iterator iter = line.begin();
+    
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    namespace phoenix = boost::phoenix;
+
+    if (! source->assign(iter, iter_end)) return;
+    if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) return;
+    if (! target->assign(iter, iter_end)) return;
+    if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) return;
+    if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space)) return;
+    if (iter != iter_end) return;
+    
+    int feature = 0;
+    scores_parsed_type::const_iterator fiter_end = scores.end();
+    for (scores_parsed_type::const_iterator fiter = scores.begin(); fiter != fiter_end; ++ fiter)
+      if (fiter->first.empty()) {
+	// default name!
+	const std::string name = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
+	
+	features[name] = fiter->second;
+	
+	++ feature;
+      } else
+	features[fiter->first] = fiter->second;
+    
+    insert(rule_pair_type(source, target, features));
   }
   
   inline
@@ -190,10 +362,51 @@ namespace cicada
     path[0].push_back(Vocab::NONE);
   }
   
+
+  template <typename Path, typename Edges, typename Trie>
+  inline
+  TreeGrammarMutableImpl::id_type encode_path(const Path& path, Edges& edges, Trie& trie)
+  {
+    typedef cicada::Symbol symbol_type;
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+    
+    symbol_set_type buffer;
+    typename Trie::id_type id = trie.root();
+
+    const typename Edges::id_type edge_none = edges.insert(edges.root(), Vocab::NONE);
+    
+    typename Path::const_iterator piter_end = path.end();
+    for (typename Path::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
+      typedef typename Path::value_type node_type;
+      
+      buffer.clear();
+      typename node_type::const_iterator niter_end = piter->end();
+      for (typename node_type::const_iterator niter = piter->begin(); niter != niter_end; ++ niter) {
+	if (*niter == Vocab::NONE) {
+	  id = trie.insert(id, edges.insert(buffer.begin(), buffer.end()));
+	  buffer.clear();
+	} else
+	  buffer.push_back(*niter);
+      }
+      
+      id = trie.insert(id, edge_none);
+    }
+    
+    return id;
+  }
+
   void TreeGrammarMutableImpl::insert(const rule_pair_type& rule_pair)
   {
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > node_type;
+    typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
     
+    hyperpath_type hyperpath;
     
+    tree_to_hyperpath(*rule_pair.source, hyperpath);
+    
+    const id_type id = encode_path(hyperpath, edges, trie);
+    
+    trie[id].push_back(rule_pair);
     
   }
 

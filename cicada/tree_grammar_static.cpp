@@ -922,7 +922,7 @@ namespace cicada
       }
       
       edge_db.close();
-      edge_db.open(path_edge);;
+      edge_db.open(path_edge);
     }
     
     // vocabulary...
