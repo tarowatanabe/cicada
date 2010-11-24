@@ -19,6 +19,7 @@ compose-cky: composition from lattice (or sentence) with grammar
 	yield=[source|target] use source or target yield for rule
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar
 	distortion=[distortion limit] default: 0 (== monotone)
+	yield=[source|target] use source or target yield for rule
 generate-earley: re-generation from tree
 	depth: depth of rule pattern 
 	width: width of rule pattern 
