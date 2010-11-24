@@ -10,6 +10,8 @@
 #include <cicada/symbol_vector.hpp>
 #include <cicada/feature_vector.hpp>
 
+#include <utils/bithack.hpp>
+
 namespace cicada
 {
   class TreeRule
@@ -47,6 +49,27 @@ namespace cicada
       antecedents.clear();
     }
 
+    // compute max-depth
+    size_type depth() const
+    {
+      return __depth(*this, 0);
+    }
+
+    // convert into hyperpth
+    template <typename Path>
+    void hyperpath(Path& path) const
+    {
+      const size_type max_depth = depth();
+      
+      path.clear();
+      path.resize(max_depth + 1);
+      
+      __hyperpath(*this, path, max_depth, 0);
+      
+      path.front().push_back(vocab_type::NONE);
+    }
+    
+    // collect frontiers...
     template <typename Iterator>
     void frontier(Iterator iter) const
     {
@@ -58,6 +81,36 @@ namespace cicada
       const_iterator aiter_end = antecedents.end();
       for (const_iterator aiter = antecedents.begin(); aiter != aiter_end; ++ aiter)
 	aiter->frontier(iter);
+    }
+
+  private:
+    size_type __depth(const TreeRule& tree, const size_type depth) const
+    {
+      size_type max_depth = depth;
+      
+      const_iterator aiter_end = tree.end();
+      for (const_iterator aiter = tree.begin(); aiter != aiter_end; ++ aiter)
+	max_depth = utils::bithack::max(max_depth, __depth(*aiter, depth + 1));
+      
+      return max_depth;
+    }
+
+    template <typename Path>
+    void __hyperpath(const TreeRule& tree, Path& path, const size_type max_depth, const size_type depth) const
+    {
+      path[depth].push_back(tree.label);
+      
+      if (tree.empty()) {
+	for (size_type i = depth; i != max_depth; ++ i) {
+	  path[i + 1].push_back(vocab_type::EPSILON);
+	  path[i + 1].push_back(vocab_type::NONE);
+	}
+      } else {
+	const_iterator aiter_end = tree.end();
+	for (const_iterator aiter = tree.begin(); aiter != aiter_end; ++ aiter)
+	  __hyperpath(*aiter, path, max_depth, depth + 1);
+	path[depth + 1].push_back(vocab_type::NONE);
+      }
     }
     
   public:

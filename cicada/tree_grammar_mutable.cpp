@@ -305,66 +305,6 @@ namespace cicada
     insert(rule_pair_type(source, target, features));
   }
   
-  inline
-  int tree_depth(const TreeRule& tree, const int depth)
-  {
-    // pre-order traversal
-    int max_depth = depth;
-    for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-      max_depth = utils::bithack::max(max_depth, tree_depth(*aiter, depth + 1));
-    
-    return max_depth;
-  }
-
-  inline
-  void tree_add_epsilon(TreeRule& tree, const int max_depth, const int depth)
-  {
-    // pre-order traversal
-    if (tree.empty()) {
-      TreeRule* curr = &tree;
-      
-      for (int i = depth; i != max_depth; ++ i) {
-	curr->antecedents = TreeRule::antecedent_set_type(1, TreeRule(Vocab::EPSILON));
-	curr = &curr->front();
-      }
-    } else {
-      for (TreeRule::iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-	tree_add_epsilon(*aiter, max_depth, depth + 1);
-    }
-  }
-
-  template <typename Path>
-  inline
-  void tree_to_hyperpath(const TreeRule& tree, Path& path, const int depth)
-  {
-    path[depth].push_back(tree.label);
-
-    if (! tree.empty()) {
-      for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-	tree_to_hyperpath(*aiter, path, depth + 1);
-      path[depth + 1].push_back(Vocab::NONE);
-    }
-  }
-  
-  template <typename Path>
-  inline
-  void tree_to_hyperpath(const TreeRule& tree, Path& path)
-  {
-    // compute max-depth by pre-order
-    const int max_depth = tree_depth(tree, 0);
-
-    // add epsilon annotation by pre-order
-    TreeRule tree_epsilon(tree);
-    tree_add_epsilon(tree_epsilon, max_depth, 0);
-    
-    // convert into hyperpath by pre-order
-    path.clear();
-    path.resize(max_depth + 1);
-    
-    tree_to_hyperpath(tree_epsilon, path, 0);
-    path[0].push_back(Vocab::NONE);
-  }
-  
 
   template <typename Path, typename Edges, typename Trie>
   inline
@@ -381,6 +321,12 @@ namespace cicada
     typename Path::const_iterator piter_end = path.end();
     for (typename Path::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
       typedef typename Path::value_type node_type;
+
+#if 0
+      std::cerr << "hyperpath: ";
+      std::copy(piter->begin(), piter->end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+      std::cerr << std::endl;
+#endif
 
       buffer.clear();
       typename node_type::const_iterator niter_end = piter->end();
@@ -404,8 +350,11 @@ namespace cicada
     typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
     
     hyperpath_type hyperpath;
-    
-    tree_to_hyperpath(*rule_pair.source, hyperpath);
+
+
+    rule_pair.source->hyperpath(hyperpath);
+
+    //std::cerr << "source: " << *(rule_pair.source) << std::endl;
     
     const id_type id = encode_path(hyperpath, edges, trie);
     

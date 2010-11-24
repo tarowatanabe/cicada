@@ -559,67 +559,6 @@ namespace cicada
       feature_names[feature] = iter->second;
     }
   }
-  
-  inline
-  int tree_depth(const TreeRule& tree, const int depth)
-  {
-    // pre-order traversal
-    int max_depth = depth;
-    for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-      max_depth = utils::bithack::max(max_depth, tree_depth(*aiter, depth + 1));
-    
-    return max_depth;
-  }
-
-  inline
-  void tree_add_epsilon(TreeRule& tree, const int max_depth, const int depth)
-  {
-    // pre-order traversal
-    if (tree.empty()) {
-      TreeRule* curr = &tree;
-      
-      for (int i = depth; i != max_depth; ++ i) {
-	curr->antecedents = TreeRule::antecedent_set_type(1, TreeRule(Vocab::EPSILON));
-	curr = &curr->front();
-      }
-    } else {
-      for (TreeRule::iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-	tree_add_epsilon(*aiter, max_depth, depth + 1);
-    }
-  }
-
-  template <typename Path>
-  inline
-  void tree_to_hyperpath(const TreeRule& tree, Path& path, const int depth)
-  {
-    path[depth].push_back(tree.label);
-
-    if (! tree.empty()) {
-      for (TreeRule::const_iterator aiter = tree.begin(); aiter != tree.end(); ++ aiter)
-	tree_to_hyperpath(*aiter, path, depth + 1);
-      path[depth + 1].push_back(Vocab::NONE);
-    }
-  }
-  
-  template <typename Path>
-  inline
-  void tree_to_hyperpath(const TreeRule& tree, Path& path)
-  {
-    // compute max-depth by pre-order
-    const int max_depth = tree_depth(tree, 0);
-    
-    // add epsilon annotation by pre-order
-    TreeRule tree_epsilon(tree);
-    tree_add_epsilon(tree_epsilon, max_depth, 0);
-    
-    // convert into hyperpath by pre-order
-    path.clear();
-    path.resize(max_depth + 1);
-    
-    tree_to_hyperpath(tree_epsilon, path, 0);
-    path[0].push_back(Vocab::NONE);
-  }
-  
 
   struct TreeScoreSetStream
   {
@@ -827,7 +766,7 @@ namespace cicada
 	  
 	  encode_tree_options(rule_options, buffer_options, id_source);
 	  
-	  tree_to_hyperpath(source_prev, hyperpath);
+	  source_prev.hyperpath(hyperpath);
 	  
 	  encode_path(hyperpath, buffer_index, edge_map);
 	  
@@ -872,8 +811,8 @@ namespace cicada
 						  hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
       
       encode_tree_options(rule_options, buffer_options, id_source);
-      
-      tree_to_hyperpath(source_prev, hyperpath);
+            
+      source_prev.hyperpath(hyperpath);
       
       encode_path(hyperpath, buffer_index, edge_map);
       
