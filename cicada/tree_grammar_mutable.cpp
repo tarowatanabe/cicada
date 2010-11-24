@@ -335,7 +335,7 @@ namespace cicada
 	  id = trie.insert(id, edges.insert(buffer.begin(), buffer.end()));
 	  buffer.clear();
 	} else
-	  buffer.push_back(*niter);
+	  buffer.push_back(niter->non_terminal());
       }
       
       id = trie.insert(id, edge_none);
@@ -383,7 +383,9 @@ namespace cicada
   
   TreeGrammarMutable::edge_id_type TreeGrammarMutable::edge(const symbol_type& symbol) const
   {
-    return edge(&symbol, (&symbol) + 1);
+    impl_type::edge_id_type node = pimpl->edges.find(pimpl->edges.root(), symbol.non_terminal());
+
+    return (node != pimpl->edges.npos() ? node : edge_id_type(-1));
   }
   
   TreeGrammarMutable::edge_id_type TreeGrammarMutable::edge(const symbol_set_type& symbols) const
@@ -393,9 +395,14 @@ namespace cicada
   
   TreeGrammarMutable::edge_id_type TreeGrammarMutable::edge(const symbol_type* first, const symbol_type* last) const
   {
-    impl_type::edge_id_type id = pimpl->edge(first, last);
+    impl_type::edge_id_type node = pimpl->edges.root();
+    for (/**/; first != last; ++ first) {
+      node = pimpl->edges.find(node, first->non_terminal());
+      
+      if (node == pimpl->edges.npos()) break;
+    }
     
-    return (id != pimpl->edges.npos() ? id : edge_id_type(-1));
+    return (node != pimpl->edges.npos() ? node : edge_id_type(-1));
   }
 
 

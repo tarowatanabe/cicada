@@ -653,7 +653,7 @@ namespace cicada
 	  buffer.push_back(edge_db.insert(&(*codes.begin()), codes.size(), hasher_type()(codes.begin(), codes.end(), 0)));
 	  codes.clear();
 	} else {
-	  const size_type buf_size = utils::byte_aligned_encode(niter->id(), buf);
+	  const size_type buf_size = utils::byte_aligned_encode(niter->non_terminal().id(), buf);
 	  codes.insert(codes.end(), buf, buf + buf_size);
 	}
       }
