@@ -262,23 +262,15 @@ namespace cicada
       // construct graph_out in pre-order...
       //
 
-      if (yield_source) {
-	std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule_pair.source->label.non_terminal(), 0));
-	if (result.second)
-	  result.first->second = graph_out.add_node().id;
-	
-	const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.source, result.first->second, frontiers, graph_in, graph_out);
-	
-	graph_out.edges[edge_id].features += rule_pair.features;
-      } else {
-	std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule_pair.target->label.non_terminal(), 0));
-	if (result.second)
-	  result.first->second = graph_out.add_node().id;
-	
-	const hypergraph_type::id_type edge_id = construct_graph(*rule_pair.target, result.first->second, frontiers, graph_in, graph_out);
-	
-	graph_out.edges[edge_id].features += rule_pair.features;
-      }
+      const tree_rule_type rule = (yield_source ? *rule_pair.source : *rule_pair.target);
+      
+      std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
+      if (result.second)
+	result.first->second = graph_out.add_node().id;
+      
+      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_in, graph_out);
+      
+      graph_out.edges[edge_id].features += rule_pair.features;
     }
     
     hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
