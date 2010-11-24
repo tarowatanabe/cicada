@@ -933,7 +933,8 @@ namespace cicada
     for (/**/; first != last; ++ first) {
       node = pimpl->find_edge(first->non_terminal(), node);
       
-      if (! pimpl->is_valid_edge(node)) break;
+      if (! pimpl->is_valid_edge(node))
+	return edge_id_type(-1);
     }
     
     return (pimpl->is_valid_edge(node) && pimpl->exists_edge(node) ? pimpl->edge_db[node] : edge_id_type(-1));

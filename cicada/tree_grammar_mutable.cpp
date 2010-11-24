@@ -399,7 +399,8 @@ namespace cicada
     for (/**/; first != last; ++ first) {
       node = pimpl->edges.find(node, first->non_terminal());
       
-      if (node == pimpl->edges.npos()) break;
+      if (node == pimpl->edges.npos())
+	return edge_id_type(-1);
     }
     
     return (node != pimpl->edges.npos() ? node : edge_id_type(-1));
