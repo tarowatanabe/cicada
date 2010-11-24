@@ -280,9 +280,7 @@ namespace cicada
     {
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
-      
-      if (! features.empty())
-	edge.features += features;
+      edge.features = features;
       
       // assign metadata...
       edge.first    = lattice_first;
