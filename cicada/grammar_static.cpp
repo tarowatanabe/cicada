@@ -1025,7 +1025,7 @@ namespace cicada
     pimpl->quantize();
   }
   
-  void GrammarStatic::write(const path_type& path)
+  void GrammarStatic::write(const path_type& path) const
   {
     pimpl->write(path);
   }

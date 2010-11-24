@@ -65,7 +65,7 @@ namespace cicada
 
     // grammar_static specific members
     void quantize();
-    void write(const path_type& path);
+    void write(const path_type& path) const;
     
   private:
     impl_type* pimpl;

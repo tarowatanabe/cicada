@@ -43,6 +43,8 @@ byte_aligned_code.hpp \
 chunk_vector.hpp \
 compact_trie.hpp \
 compact_trie_dense.hpp \
+compact_trie_set.hpp \
+compact_trie_dense_set.hpp \
 compress_stream.hpp \
 config.hpp \
 config.h \

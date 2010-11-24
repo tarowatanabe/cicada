@@ -1032,7 +1032,7 @@ namespace cicada
     pimpl->quantize();
   }
   
-  void TreeGrammarStatic::write(const path_type& path)
+  void TreeGrammarStatic::write(const path_type& path) const
   {
     pimpl->write(path);
   }
