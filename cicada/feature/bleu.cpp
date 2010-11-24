@@ -245,7 +245,7 @@ namespace cicada
 
 	      const count_set_type& counts_antecedent = states_counts[*antecedent_count];
 	      
-	      bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, *antecedent_parsed, minimum_size);
+	      bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, minimum_size, true);
 
 	      // merge statistics...
 	      counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
