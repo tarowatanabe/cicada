@@ -262,7 +262,7 @@ namespace cicada
       // construct graph_out in pre-order...
       //
 
-      const tree_rule_type rule = (yield_source ? *rule_pair.source : *rule_pair.target);
+      const tree_rule_type& rule = (yield_source ? *rule_pair.source : *rule_pair.target);
       
       std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
       if (result.second)
