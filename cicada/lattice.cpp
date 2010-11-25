@@ -46,7 +46,13 @@ namespace cicada
     dist_long.reserve(dist_size, dist_size);
     dist_long.resize(dist_size, dist_size, neg_infinity);
 
-#if 0
+#if 1
+    // edge-cost dist(i, i) = 0
+    for (size_t i = 0; i != dist_size; ++ i) {
+      dist_short(i, i) = 0;
+      dist_long(i, i)  = 0;
+    }
+
     // we will assume lattice structure to compute shortest and longest distance...
     typedef std::set<int, std::less<int>, std::allocator<int> > closure_type;
     typedef std::vector<closure_type, std::allocator<closure_type> > closure_set_type;
@@ -57,28 +63,37 @@ namespace cicada
       arc_set_type::const_iterator aiter_end = lattice[node].end();
       for (arc_set_type::const_iterator aiter = lattice[node].begin(); aiter != aiter_end; ++ aiter) {
 	const int last = node + aiter->distance;
+	const int dist = aiter->label != Vocab::EPSILON;
 	
-	if (aiter->label != vocab_type::EPSILON) {
-	  closure[node].insert(last);
+	dist_short(node, last) = utils::bithack::min(dist_short(node, last), dist);
+	dist_long(node, last)  = utils::bithack::max(dist_long(node, last),  dist);
+      }
+      
+      for (arc_set_type::const_iterator aiter = lattice[node].begin(); aiter != aiter_end; ++ aiter) {
+	const int last = node + aiter->distance;
+	
+	closure[node].insert(last);
+	closure_type::const_iterator citer_end = closure[last].end();
+	for (closure_type::const_iterator citer = closure[last].begin(); citer != citer_end; ++ citer) {
 	  
-	  closure_type::const_iterator citer_end = closure[last].end();
-	  for (closure_type::const_iterator citer = closure[last].begin(); citer != citer_end; ++ citer)
-	    closure[node].insert(*citer);
-	} else {
+	  dist_short(node, *citer) = utils::bithack::min(dist_short(node, *citer), dist_short(node, last) + dist_short(last, *citer));
+	  dist_long(node, *citer)  = utils::bithack::max(dist_long(node, *citer),  dist_long(node, last)  + dist_long(last, *citer));
 	  
-	  
-	  
+	  closure[node].insert(*citer);
 	}
       }
     }
 #endif
     
-#if 1
+#if 0
     // edge-cost for dist(i, j)
     for (size_t i = 0; i != lattice.size(); ++ i)
       for (size_t j = 0; j != lattice[i].size(); ++ j) {
-	dist_short(i, i + lattice[i][j].distance) = (lattice[i][j].label != Vocab::EPSILON);
-	dist_long(i, i + lattice[i][j].distance)  = (lattice[i][j].label != Vocab::EPSILON);
+	const int last = i + lattice[i][j].distance;
+	const int dist = lattice[i][j].label != Vocab::EPSILON;
+	
+	dist_short(i, last) = utils::bithack::min(dist_short(i, last), dist);
+	dist_long(i, last)  = utils::bithack::max(dist_long(i, last),  dist);
       }
     
     // edge-cost dist(i, i) = 0
