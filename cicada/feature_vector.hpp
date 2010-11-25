@@ -12,7 +12,6 @@
 #include <cicada/feature.hpp>
 #include <utils/space_separator.hpp>
 
-#include <boost/fusion/tuple.hpp>
 #include <boost/tokenizer.hpp>
 
 namespace cicada

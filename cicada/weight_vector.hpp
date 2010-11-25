@@ -16,7 +16,6 @@
 #include <utils/bithack.hpp>
 
 #include <boost/tokenizer.hpp>
-#include <boost/fusion/tuple.hpp>
 
 namespace cicada
 {

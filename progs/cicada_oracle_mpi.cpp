@@ -6,6 +6,15 @@
 // 1 |||  reference translation for source sentence 1
 //
 
+
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+
 #include <iostream>
 #include <vector>
 #include <deque>
@@ -30,7 +39,7 @@
 #include "cicada/feature/bleu.hpp"
 #include "cicada/feature/bleu_linear.hpp"
 #include "cicada/parameter.hpp"
-
+#include "cicada/prune.hpp"
 #include "cicada/eval.hpp"
 
 #include "utils/program_options.hpp"
@@ -95,6 +104,9 @@ path_set_type tstset_files;
 path_set_type refset_files;
 path_type     output_file = "-";
 
+bool forest_mode = false;
+bool directory_mode = false;
+
 std::string scorer_name = "bleu:order=4,exact=true";
 
 int iteration = 10;
@@ -111,9 +123,10 @@ void read_refset(const path_set_type& file,
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences);
+		     sentence_set_type& sentences,
+		     hypergraph_set_type& forests);
 
-void bcast_sentences(sentence_set_type& sentences);
+void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests);
 void bcast_weights(const int rank, weight_set_type& weights);
 void options(int argc, char** argv);
 
@@ -180,13 +193,49 @@ int main(int argc, char ** argv)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
     
     sentence_set_type oracles(sentences.size());
-    compute_oracles(graphs, features, scorers, oracles);
+    hypergraph_set_type oracles_forest(sentences.size());
+    compute_oracles(graphs, features, scorers, oracles, oracles_forest);
     
     if (mpi_rank == 0) {
-      utils::compress_ostream os(output_file, 1024 * 1024);
-      for (size_t id = 0; id != oracles.size(); ++ id)
-	if (! oracles[id].empty())
-	  os << id << " ||| " << oracles[id] << '\n';
+      if (directory_mode) {
+	if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
+	  boost::filesystem::remove_all(output_file);
+	
+	boost::filesystem::create_directories(output_file);
+	
+	boost::filesystem::directory_iterator iter_end;
+	for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
+	  boost::filesystem::remove_all(*iter);
+	
+	if (forest_mode) {
+	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
+	    if (oracles_forest[id].is_valid()) {
+	      utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      
+	      os << id << " ||| " << oracles_forest[id] << '\n';
+	    }
+	} else {
+	  for (size_t id = 0; id != oracles.size(); ++ id)
+	    if (! oracles[id].empty()) {
+	      utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      
+	      os << id << " ||| " << oracles[id] << '\n';
+	    }
+	}
+	
+      } else {
+	utils::compress_ostream os(output_file, 1024 * 1024);
+
+	if (forest_mode) {
+	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
+	    if (oracles_forest[id].is_valid())
+	      os << id << " ||| " << oracles_forest[id] << '\n';
+	} else {
+	  for (size_t id = 0; id != oracles.size(); ++ id)
+	    if (! oracles[id].empty())
+	      os << id << " ||| " << oracles[id] << '\n';
+	}
+      }
     }
   }
   catch (const std::exception& err) {
@@ -203,12 +252,14 @@ struct TaskOracle
 	     const feature_function_ptr_set_type& __features,
 	     const scorer_document_type&          __scorers,
 	     score_ptr_set_type&                  __scores,
-	     sentence_set_type&                   __sentences)
+	     sentence_set_type&                   __sentences,
+	     hypergraph_set_type&                 __forests)
     : graphs(__graphs),
       features(__features),
       scorers(__scorers),
       scores(__scores),
-      sentences(__sentences)
+      sentences(__sentences),
+      forests(__forests)
   {
     score_optimum.reset();
     
@@ -223,11 +274,12 @@ struct TaskOracle
   }
   
   
+  template <typename Weight>
   struct bleu_function
   {
     typedef hypergraph_type::feature_set_type feature_set_type;
     
-    typedef cicada::semiring::Logprob<double> value_type;
+    typedef Weight value_type;
 
     bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
       : name(__name), factor(__factor) {}
@@ -327,10 +379,16 @@ struct TaskOracle
       
       cicada::apply_cube_prune(model, graphs[id], graph_oracle, weight_bleu_function(feature_bleu, score_factor), cube_size);
       
+      // compute viterbi...
       cicada::semiring::Logprob<double> weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), bleu_function(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), bleu_function<cicada::semiring::Logprob<double> >(feature_bleu, score_factor));
       
+      // compute pruned forest
+      hypergraph_type forest;
+      cicada::prune_beam(graph_oracle, forest, bleu_function<cicada::semiring::Tropical<double> >(feature_bleu, score_factor), 1e-5);
+      
+      // compute scores...
       score_ptr_type score_sample = scorers[id]->score(sentence);
       if (score_curr)
 	*score_curr += *score_sample;
@@ -343,6 +401,7 @@ struct TaskOracle
 	score_optimum = score_curr;
 	objective_optimum = objective;
 	sentences[id] = sentence;
+	forests[id] = forest;
 	scores[id] = score_sample;
       }
     }
@@ -355,13 +414,15 @@ struct TaskOracle
   const scorer_document_type&          scorers;
   score_ptr_set_type&                  scores;
   sentence_set_type&                   sentences;
+  hypergraph_set_type&                 forests;
 };
 
 
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences)
+		     sentence_set_type& sentences,
+		     hypergraph_set_type& forests)
 {
   typedef TaskOracle task_type;
 
@@ -373,7 +434,8 @@ void compute_oracles(const hypergraph_set_type& graphs,
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
 
-  sentence_set_type sentences_optimum;
+  sentence_set_type   sentences_optimum;
+  hypergraph_set_type forests_optimum;
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -383,10 +445,11 @@ void compute_oracles(const hypergraph_set_type& graphs,
       std::cerr << "iteration: " << (iter + 1) << std::endl;
     
     sentences_optimum = sentences;
+    forests_optimum   = forests;
     
-    task_type(graphs, features, scorers, scores, sentences)();
+    task_type(graphs, features, scorers, scores, sentences, forests)();
 
-    bcast_sentences(sentences);
+    bcast_sentences(sentences, forests);
     
     score_optimum.reset();
     for (size_t id = 0; id != sentences.size(); ++ id)
@@ -408,6 +471,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
     
     if (terminate) {
       sentences.swap(sentences_optimum);
+      forests.swap(forests_optimum);
       break;
     }
     
@@ -430,7 +494,6 @@ void compute_oracles(const hypergraph_set_type& graphs,
       else
 	__bleu_linear->assign(score_curr);
     }
-
 }
 
 
@@ -584,7 +647,7 @@ void read_refset(const path_set_type& files,
   }  
 }
 
-void bcast_sentences(sentence_set_type& sentences)
+void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -597,22 +660,40 @@ void bcast_sentences(sentence_set_type& sentences)
       
       for (size_t id = 0; id != sentences.size(); ++ id)
 	if (static_cast<int>(id % mpi_size) == mpi_rank)
-	  os << id << " ||| " << sentences[id] << '\n';
+	  os << id << " ||| " << sentences[id] << " ||| " << forests[id] << '\n';
       
     } else {
       boost::iostreams::filtering_istream is;
       is.push(boost::iostreams::gzip_decompressor());
       is.push(utils::mpi_device_bcast_source(rank, 4096));
       
-      int id;
-      std::string sep;
-      sentence_type sentence;
+      std::string line;
       
-      while (is >> id >> sep >> sentence) {
-	if (sep != "|||")
-	  throw std::runtime_error("invalid sentence format");
+      int id;
+      sentence_type sentence;
+      hypergraph_type forest;
+
+      while (std::getline(is, line)) {
+	sentence.clear();
+	forest.clear();
+
+	std::string::const_iterator iter_end = line.end();
+	std::string::const_iterator iter = line.begin();
+
+	namespace qi = boost::spirit::qi;
+	namespace standard = boost::spirit::standard;
+	namespace phoenix = boost::phoenix;
+
+	if (! qi::phrase_parse(iter, iter_end, qi::int_, standard::space, id)) continue;
+	if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
+	if (! sentence.assign(iter, iter_end)) continue;
+	if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
+	if (! forest.assign(iter, iter_end)) continue;
 	
-	sentences[id] = sentence;
+	if (iter != iter_end) continue;
+	
+	sentences[id].swap(sentence);
+	forests[id].swap(forest);
       }
     }
   }
@@ -668,6 +749,9 @@ void options(int argc, char** argv)
     ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
+
+    ("forest",    po::bool_switch(&forest_mode),    "output by forest")
+    ("directory", po::bool_switch(&directory_mode), "output in directory")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     

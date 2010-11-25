@@ -24,3 +24,8 @@ Use source side tree-fragment as a rule, and parse "lattice"
     Allow special encoding in tree-grammar...
 
 Add Matcher interface?
+
+Compute kbest oracle translations or packed forest:
+  - We can treat the packed forest as the "correct translations"
+  - Or, use the kbest, intersect with incorrect translations in order to 
+    compute features???
