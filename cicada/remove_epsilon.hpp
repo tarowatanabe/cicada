@@ -131,15 +131,25 @@ namespace cicada
 	return pos == nodes.size() - 1 || ! nodes[pos].edges.empty();
       }
 
-      struct less_tail
+      struct less_edge
       {
-	less_tail(const Graph& __graph) : graph(__graph) {}
+	less_edge(const Graph& __graph) : graph(__graph) {}
 	
 	const Graph& graph;
 	
 	bool operator()(const int& x, const int& y) const
 	{
-	  return graph.edges[x].tail < graph.edges[y].tail;
+	  const edge_type& edge1 = graph.edges[x];
+	  const edge_type& edge2 = graph.edges[y];
+	  
+	  return edge1.tail < edge2.tail;
+#if 0
+	  return (edge1.tail < edge2.tail
+		  || (edge1.tail == edge2.tail
+		      && (edge1.label < edge2.label
+			  || (edge1.label == edge2.label
+			      && edge1.features < edge2.features))));
+#endif
 	}
       };
       
@@ -147,7 +157,19 @@ namespace cicada
       {
 	node_set_type::iterator niter_end = nodes.end();
 	for (node_set_type::iterator niter = nodes.begin(); niter != niter_end; ++ niter)
-	  std::sort(niter->edges.begin(), niter->edges.end(), less_tail(*this));
+	  std::sort(niter->edges.begin(), niter->edges.end(), less_edge(*this));
+
+#if 0
+	std::set<int, less_edge, std::allocator<int> > sorted(less_edge(*this));
+
+	node_set_type::iterator niter_end = nodes.end();
+	for (node_set_type::iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	  sorted.clear();
+	  sorted.insert(niter->edges.begin(), niter->edges.end());
+	  
+	  niter->edges.assign(sorted.begin(), sorted.end());
+	}
+#endif
       }
       
       edge_set_type edges;
