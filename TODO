@@ -13,11 +13,6 @@ Support tree-to-tree transduction:
 
 Better MIRA training
 
-System combination as statitical generation
-  Parse nbests
-  Collect rules
-  Generate from rules
-
 Use source side tree-fragment as a rule, and parse "lattice"
     Simply convert source side into a flat structure and parse via CKY
     	   + additional checking for target-side!

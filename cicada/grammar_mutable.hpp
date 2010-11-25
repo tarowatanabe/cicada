@@ -68,11 +68,21 @@ namespace cicada
     
     void insert(const rule_type& source, const rule_type& target)
     {
-      insert(rule_pair_type(rule_ptr_type(new rule_type(source)), rule_ptr_type(new rule_type(target))));
+      rule_ptr_type __source(new rule_type(source));
+      rule_ptr_type __target(new rule_type(target));
+
+      cicada::sort(*__source, *__target);
+      
+      insert(rule_pair_type(__source, __target));
     }
     void insert(const rule_type& source, const rule_type& target, const feature_set_type& features)
     {
-      insert(rule_pair_type(rule_ptr_type(new rule_type(source)), rule_ptr_type(new rule_type(target)), features));
+      rule_ptr_type __source(new rule_type(source));
+      rule_ptr_type __target(new rule_type(target));
+      
+      cicada::sort(*__source, *__target);
+      
+      insert(rule_pair_type(__source, __target, features));
     }
     void insert(const rule_ptr_type& source, const rule_ptr_type& target)
     {

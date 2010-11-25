@@ -21,7 +21,7 @@ Translation can be carried out by:
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
-      * cicada implementes cube-pruning [4], cube-growing [4], incremental (Huang and Mi, 2010)
+      * cicada implementes cube-pruning [4], cube-growing [4], incremental [18]
         and exact (and stateless-inside-algorithm) methods
       * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
    - Perform variational decoding for hypergraph [10].
@@ -278,3 +278,17 @@ References:
   pages     = {558--566},
   url       = {http://www.aclweb.org/anthology/P/P09/P09-1063}
 }
+
+[18]
+@InProceedings{huang-mi:2010:EMNLP,
+  author    = {Huang, Liang  and  Mi, Haitao},
+  title     = {Efficient Incremental Decoding for Tree-to-String Translation},
+  booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
+  month     = {October},
+  year      = {2010},
+  address   = {Cambridge, MA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {273--283},
+  url       = {http://www.aclweb.org/anthology/D10-1027}
+}
+
