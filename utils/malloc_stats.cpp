@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include <utils/config.hpp>
 #include <utils/malloc_stats.hpp>

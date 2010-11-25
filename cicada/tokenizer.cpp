@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 #include "tokenizer.hpp"
 
 #include "parameter.hpp"

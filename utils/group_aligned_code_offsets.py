@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+#
+#  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+#
 
 import sys
 

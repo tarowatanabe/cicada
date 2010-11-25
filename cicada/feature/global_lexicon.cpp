@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include "cicada/global_lexicon.hpp"
 #include "cicada/feature/global_lexicon.hpp"

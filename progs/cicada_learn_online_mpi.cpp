@@ -1,4 +1,8 @@
 //
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
+//
 // online learning using the margin between forest
 //
 

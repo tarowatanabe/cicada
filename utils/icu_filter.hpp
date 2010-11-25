@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #ifndef __UTILS__ICU_FILTER__HPP__
 #define __UTILS__ICU_FILTER__HPP__ 1

@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
@@ -813,6 +816,8 @@ namespace cicada
     size_type arity_source = 0;
 
     while (std::getline(is, line)) {
+      if (line.empty()) continue;
+
       boost::fusion::get<0>(rule).clear();
       boost::fusion::get<1>(rule).clear();
       boost::fusion::get<2>(rule).clear();
@@ -928,23 +933,37 @@ namespace cicada
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
     }
 
+    std::cerr << "dumping source" << std::endl;
+
     // source phrases...
     sources_db.write(path_source);
     sources_db.clear();
     source_db.open(path_source);
     
+    std::cerr << "dumping target" << std::endl;
+
     // target phrases...
     targets_db.write(path_target);
     targets_db.clear();
     target_db.open(path_target);
 
+    std::cerr << "dumping rules" << std::endl;
+
     // rules....
     rule_db.close();
+    
+    std::cerr << "opening rules" << std::endl;
+
     rule_db.open(path_rule);
      
+    std::cerr << "dumping vocabulary" << std::endl;
+
     // vocabulary...
     word_type::write(path_vocab);
     vocab.open(path_vocab);
+
+    if (feature_size < 0)
+      feature_size = 0;
         
     // scores...
     score_db.reserve(feature_size);
@@ -953,6 +972,8 @@ namespace cicada
     feature_names.clear();
     feature_names.reserve(feature_size);
     feature_names.resize(feature_size, feature_type());
+
+    std::cerr << "dumping featuers: " << feature_size << std::endl;
      
     for (int feature = 0; feature < feature_size; ++ feature) {
       score_streams[feature].ostream->reset();

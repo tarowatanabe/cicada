@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 #define BOOST_SPIRIT_THREADSAFE 1
 #define PHOENIX_THREADSAFE 1
 

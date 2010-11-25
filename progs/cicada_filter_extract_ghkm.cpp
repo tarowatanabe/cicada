@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include "cicada_filter_extract_impl.hpp"
 

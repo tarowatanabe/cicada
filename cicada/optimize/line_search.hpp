@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #ifndef __CICADA__OPTIMIZE__LINE_SEARCH__HPP__
 #define __CICADA__OPTIMIZE__LINE_SEARCH__HPP__ 1

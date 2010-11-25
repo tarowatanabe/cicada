@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 // a model composed of many feature functions
 

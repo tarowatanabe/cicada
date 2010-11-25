@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 
 // TLS support is disabled for MacOSX... (impossible???)

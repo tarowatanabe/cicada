@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
@@ -742,6 +745,8 @@ namespace cicada
     scores_parser %= +qi::float_;
     
     while (std::getline(is, line)) {
+      if (line.empty()) continue;
+      
       source.clear();
       target.clear();
       scores.clear();
@@ -867,6 +872,9 @@ namespace cicada
     // vocabulary...
     word_type::write(path_vocab);
     vocab.open(path_vocab);
+
+    if (feature_size < 0)
+      feature_size = 0;
     
     // scores...
     score_db.reserve(feature_size);

@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 #include "sentence_vector.hpp"
 
 int main(int argc, char** argv)

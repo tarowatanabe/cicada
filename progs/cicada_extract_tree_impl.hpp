@@ -1,6 +1,9 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 #ifndef __CICADA__EXTRACT_TREE_IMPL__HPP__
 #define __CICADA__EXTRACT_TREE_IMPL__HPP__ 1
-
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE

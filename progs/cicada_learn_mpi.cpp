@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 // learning from hypergraphs...
 //
 // we assume two inputs, one for partition and the other for marginals

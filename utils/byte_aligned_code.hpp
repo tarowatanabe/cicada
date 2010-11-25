@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #ifndef __UTILS__BYTE_ALIGNED_CODE__HPP__
 #define __UTILS__BYTE_ALIGNED_CODE__HPP__ 1

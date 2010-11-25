@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 //
 // taken from Bringing Practical Lock-Free Synchronization to 64-Bit Applications

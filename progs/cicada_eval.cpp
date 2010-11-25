@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 // evaluation tool....
 // this will be nothing related to hypergraph!
 // (or, do we compute oracle bleu after bleu-composition?)

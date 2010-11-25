@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #ifndef __CICADA__OPERATION__REMOVE_EPSILON__HPP__
 #define __CICADA__OPERATION__REMOVE_EPSILON__HPP__ 1
