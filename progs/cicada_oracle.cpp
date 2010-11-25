@@ -360,11 +360,18 @@ struct TaskOracle
       if (objective > objective_optimum || ! scores[id]) {
 	score_optimum = score_curr;
 	objective_optimum = objective;
-	sentences[id] = sentence;
-	forests[id] = forest;
 	scores[id] = score_sample;
+	
+	sentences[id].swap(sentence);
+	forests[id].swap(forest);
+
+	// remove features...
+	hypergraph_type::edge_set_type::iterator eiter_end = forests[id].edges.end();
+	for (hypergraph_type::edge_set_type::iterator eiter = forests[id].edges.begin(); eiter != eiter_end; ++ eiter)
+	  eiter->features.erase(feature_bleu);
       }
     }
+    
   }
   
   score_ptr_type score_optimum;
