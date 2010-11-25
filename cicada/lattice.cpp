@@ -45,7 +45,35 @@ namespace cicada
     dist_long.clear();
     dist_long.reserve(dist_size, dist_size);
     dist_long.resize(dist_size, dist_size, neg_infinity);
+
+#if 0
+    // we will assume lattice structure to compute shortest and longest distance...
+    typedef std::set<int, std::less<int>, std::allocator<int> > closure_type;
+    typedef std::vector<closure_type, std::allocator<closure_type> > closure_set_type;
     
+    closure_set_type closure(lattice.size() + 1);
+    
+    for (int node = lattice.size() - 1; node >= 0; -- node) {
+      arc_set_type::const_iterator aiter_end = lattice[node].end();
+      for (arc_set_type::const_iterator aiter = lattice[node].begin(); aiter != aiter_end; ++ aiter) {
+	const int last = node + aiter->distance;
+	
+	if (aiter->label != vocab_type::EPSILON) {
+	  closure[node].insert(last);
+	  
+	  closure_type::const_iterator citer_end = closure[last].end();
+	  for (closure_type::const_iterator citer = closure[last].begin(); citer != citer_end; ++ citer)
+	    closure[node].insert(*citer);
+	} else {
+	  
+	  
+	  
+	}
+      }
+    }
+#endif
+    
+#if 1
     // edge-cost for dist(i, j)
     for (size_t i = 0; i != lattice.size(); ++ i)
       for (size_t j = 0; j != lattice[i].size(); ++ j) {
@@ -69,6 +97,7 @@ namespace cicada
 	  if (dist_long(i, k) != neg_infinity && dist_long(k, j) != neg_infinity)
 	    dist_long(i, j) = utils::bithack::max(dist_long(i, j), dist_long(i, k) + dist_long(k, j));
 	}
+#endif
   }
   
   template <typename Iterator>
