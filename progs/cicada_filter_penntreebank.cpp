@@ -34,7 +34,7 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/space_separator.hpp"
-
+#include "utils/chart.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -141,6 +141,12 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
 typedef cicada::HyperGraph hypergraph_type;
 typedef std::vector<std::string, std::allocator<std::string> > sentence_type;
 
+typedef std::pair<int, int> span_type;
+typedef std::pair<span_type, std::string> span_cat_type;
+typedef std::vector<span_cat_type, std::allocator<span_cat_type> > span_set_type;
+
+typedef std::set<span_cat_type, std::less<span_cat_type>, std::allocator<span_cat_type> > span_sorted_type;
+
 
 void transform(const hypergraph_type::id_type node_id,
 	       const treebank_type& treebank,
@@ -193,6 +199,23 @@ void transform(const treebank_type& treebank, sentence_type& sent)
       transform(*aiter, sent);
 }
 
+void transform_normalize(treebank_type& treebank)
+{
+  if (treebank.antecedents.empty()) return;
+  
+  // normalize treebank-category...
+  if (treebank.cat.size() == 1)
+    switch (treebank.cat[0]) {
+    case '.' : treebank.cat = "PERIOD"; break;
+    case ',' : treebank.cat = "COMMA"; break;
+    case ':' : treebank.cat = "COLON"; break;
+    case ';' : treebank.cat = "SEMICOLON"; break;
+    }
+  
+  for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+    transform_normalize(*aiter);
+}
+
 void transform_map(treebank_type& treebank, sentence_type& sent)
 {
   if (treebank.antecedents.empty()) {
@@ -206,13 +229,95 @@ void transform_map(treebank_type& treebank, sentence_type& sent)
       transform_map(*aiter, sent);
 }
 
+bool is_non_terminal(const std::string& cat)
+{
+  const size_t size = cat.size();
+  return size >= 3 && cat[0] == '[' && cat[size - 1] == ']';
+}
+
+struct config_span_type
+{
+  bool exclude_terminal;
+  bool binarize;
+  bool unary_top;
+  bool unary_bottom;
+};
+
+// top down traversal of this treebank structure to collect spans(w/ category)
+void transform_span(const treebank_type& treebank, span_set_type& spans, int& terminal, const config_span_type& config)
+{
+  if (treebank.antecedents.empty()) {
+    if (config.exclude_terminal)
+      spans.push_back(std::make_pair(std::make_pair(terminal, terminal + 1), std::string()));
+    else
+      spans.push_back(std::make_pair(std::make_pair(terminal, terminal + 1), treebank.cat));
+    ++ terminal;
+  } else {
+    span_set_type spans_rule;
+    
+    for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
+      transform_span(*aiter, spans, terminal, config);
+      spans_rule.push_back(spans.back());
+    }
+    
+    if (spans_rule.size() >= 3 && config.binarize)  {
+      typedef utils::chart<std::string, std::allocator<std::string> > chart_type;
+      
+      // its a chart parsing!
+      chart_type chart(spans_rule.size() + 1);
+      for (size_t pos = 0; pos < spans_rule.size(); ++ pos) 
+	chart(pos, pos + 1) = (is_non_terminal(spans_rule[pos].second)
+			       ? spans_rule[pos].second.substr(1, spans_rule[pos].second.size() - 2)
+			       : spans_rule[pos].second);
+      
+      for (size_t length = 2; length != spans_rule.size(); ++ length)
+	for (size_t first = 0; first + length <= spans_rule.size(); ++ first) {
+	  const size_t last = first + length;
+	  
+	  chart(first, last) = chart(first, last - 1) + '+' + chart(last - 1, last);
+	  
+	  spans.push_back(std::make_pair(span_type(spans_rule[first].first.first, spans_rule[last - 1].first.second), '[' + chart(first, last) + ']'));
+	}
+    }
+    
+    // when unary rule, and not immediate parent of terminal
+    if (spans_rule.size() == 1 && ! treebank.antecedents.front().antecedents.empty()) {
+      if (config.unary_top)
+	spans.back().second = '[' + treebank.cat + ']';
+      else if (config.unary_bottom)
+	;
+      else
+	spans.back().second = spans.back().second.substr(0, spans.back().second.size() - 1) + ':' + treebank.cat + ']';
+    } else
+      spans.push_back(std::make_pair(span_type(spans_rule.front().first.first, spans_rule.back().first.second), '[' + treebank.cat + ']'));
+  }
+}
+
+
+void transform_span(const treebank_type& treebank, span_set_type& spans, const config_span_type& config)
+{
+  int terminal = 0;
+  
+  transform_span(treebank, spans, terminal, config);
+}
+
+
 path_type input_file = "-";
 path_type output_file = "-";
 path_type map_file;
 
 bool escaped = false;
+bool normalize = false;
+
 bool leaf = false;
 bool rule = false;
+
+bool span = false;
+bool category = false;
+bool binarize = false;
+bool unary_top = false;
+bool unary_bottom = false;
+bool exclude_terminal = false;
 
 int debug = 0;
 
@@ -246,6 +351,14 @@ int main(int argc, char** argv)
     hypergraph_type graph;
     sentence_type   sent;
     
+    span_set_type    spans;
+    span_sorted_type spans_sorted;
+    config_span_type config_span;
+    config_span.exclude_terminal = exclude_terminal;
+    config_span.binarize         = binarize;
+    config_span.unary_top        = unary_top;
+    config_span.unary_bottom     = unary_bottom;
+
     std::string line;
     iter_type iter(is);
     iter_type iter_end;
@@ -265,7 +378,6 @@ int main(int argc, char** argv)
 	  throw std::runtime_error("parsing failed");
       }
 
-
       ++ num;
 
       if (ms) {
@@ -284,7 +396,10 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("# of words do not match?");
 	}
       }
-
+      
+      if (normalize)
+	transform_normalize(parsed);
+      
       if (leaf) {
 	sent.clear();
 	
@@ -296,6 +411,47 @@ int main(int argc, char** argv)
 	  os << '\n';
 	} else
 	  os << '\n';
+      } else if (span) {
+	spans.clear();
+	
+	transform_span(parsed, spans, config_span);
+	
+	if (spans.empty())
+	  os << '\n';
+	else {
+	  
+	  spans_sorted.clear();
+	  spans_sorted.insert(spans.begin(), spans.end());
+	  
+	  if (category) {
+	    bool initial = true;
+	    span_sorted_type::const_iterator siter_end = spans_sorted.end();
+	    for (span_sorted_type::const_iterator siter = spans_sorted.begin(); siter != siter_end; ++ siter) {
+	      if (! initial)
+		os << ' ';
+
+	      if (! siter->second.empty())
+		os << siter->first.first << '-' << siter->first.second << ':' << siter->second;
+	      
+	      initial = false;
+	    }
+	    
+	  } else {
+	    span_sorted_type::const_iterator siter_end = spans_sorted.end();
+	    span_sorted_type::const_iterator siter_prev = spans_sorted.end();
+	    for (span_sorted_type::const_iterator siter = spans_sorted.begin(); siter != siter_end; ++ siter) {
+	      
+	      if (siter_prev == siter_end)
+		os << siter->first.first << '-' << siter->first.second;
+	      else if (siter_prev->first != siter->first)
+		os << ' ' << siter->first.first << '-' << siter->first.second;
+	      
+	      siter_prev = siter;
+	    }
+	  }
+	  
+	  os << '\n';
+	}
       } else {
 	graph.clear();
 	
@@ -306,9 +462,7 @@ int main(int argc, char** argv)
 	  cicada::span_forest(graph);
 	} else
 	  graph.clear();
-
 	
-
 	if (rule) {
 	  hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
 	  for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
@@ -337,9 +491,20 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
-    ("escape",    po::bool_switch(&escaped), "escape English penntreebank")
+    ("escape",    po::bool_switch(&escaped),   "escape English penntreebank")
+    ("normalize", po::bool_switch(&normalize), "normalize category, such as [,] [.] etc.")
+    
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
+
+    ("span",      po::bool_switch(&span),     "collect span only")
+    ("binarize",  po::bool_switch(&binarize), "perform binarization")
+    ("category",  po::bool_switch(&category), "added category to span")
+    
+    ("unary-top",    po::bool_switch(&unary_top),    "use top-most category for unary rules")
+    ("unary-bottom", po::bool_switch(&unary_bottom), "use bottom-most category for unary rules")
+    
+    ("exclude-terminal", po::bool_switch(&exclude_terminal), "no terminal in span")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
