@@ -12,6 +12,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/feature_vector.hpp>
+#include <cicada/attribute_vector.hpp>
 #include <cicada/rule.hpp>
 
 #include <utils/simple_vector.hpp>
@@ -33,6 +34,7 @@ namespace cicada
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
 
     typedef cicada::FeatureVector<double, std::allocator<double> > feature_set_type;
+    typedef cicada::AttributeVector                                attribute_set_type;
     
   public:
     static const id_type invalid;
@@ -67,11 +69,12 @@ namespace cicada
       id_type       head;
       node_set_type tails;
       
-      feature_set_type features;
+      feature_set_type   features;   // features
+      attribute_set_type attributes; // attributes
       
       rule_ptr_type rule;
       
-      // meta data...
+      // meta data... this will be deprecated and moved to "attributes"
       int first;
       int last;
       

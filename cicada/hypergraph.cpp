@@ -188,9 +188,15 @@ namespace cicada
   typedef std::vector<rule_parsed_type> rule_parsed_set_type;
   
   typedef std::vector<int> tail_node_set_type;
+  
   typedef std::pair<std::string, double> feature_parsed_type;
   typedef std::vector<feature_parsed_type> feature_parsed_set_type;
-  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, int, int, int> edge_parsed_type;
+  
+  typedef AttributeVector::data_type attribute_data_type;
+  typedef std::pair<std::string, attribute_data_type> attribute_parsed_type;
+  typedef std::vector<attribute_parsed_type> attribute_parsed_set_type;
+
+  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, attribute_parsed_set_type, int, int, int> edge_parsed_type;
   
   typedef std::vector<edge_parsed_type> node_parsed_type;
   typedef std::vector<node_parsed_type> node_parsed_set_type;
@@ -243,12 +249,19 @@ namespace cicada
       feature       %= '\"' >> lexeme[*(escape_char | ~char_('\"'))] >> "\":" >> double_;
       feature_set   %= '{' >> -(feature % ',' )  >> '}';
       
+      // attributes...
+      key %= ('\"' >> lexeme[*(escape_char | (char_ - '\"' - space))] >> '\"');
+      data %= key | double_dot | int64_;
+      attribute %= key >> ':' >> data;
+      attribute_set %= '{' >> -(attribute % ',') >> '}';
+      
       edge %= ('{'
-	       >> lit("\"tail\"")    >> ':' >> tail_node_set >> ','
-	       >> lit("\"feature\"") >> ':' >> feature_set >> ','
-	       >> lit("\"rule\"")    >> ':' >> int_ >> ','
-	       >> lit("\"first\"")    >> ':' >> int_ >> ','
-	       >> lit("\"last\"")    >> ':' >> int_
+	       >> lit("\"tail\"")    >> ':' >> tail_node_set
+	       >> ',' >> lit("\"feature\"") >> ':' >> feature_set
+	       >> -(',' >> lit("\"attribute\"") >> ':' >> attribute_set)
+	       >> ',' >> lit("\"rule\"")    >> ':' >> int_
+	       >> -(',' >> lit("\"first\"")    >> ':' >> int_)
+	       >> -(',' >> lit("\"last\"")    >> ':' >> int_)
 	       >> '}');
       
       edge_action = edge [add_edge(graph, rules)];
@@ -316,11 +329,12 @@ namespace cicada
 	
 	edge.tails = hypergraph_type::edge_type::node_set_type(boost::fusion::get<0>(edge_parsed).begin(), boost::fusion::get<0>(edge_parsed).end());
 	edge.features.insert(boost::fusion::get<1>(edge_parsed).begin(), boost::fusion::get<1>(edge_parsed).end());
-	edge.rule = rules[boost::fusion::get<2>(edge_parsed)];
+	edge.attributes.insert(boost::fusion::get<2>(edge_parsed).begin(), boost::fusion::get<2>(edge_parsed).end());
+	edge.rule = rules[boost::fusion::get<3>(edge_parsed)];
 	
 	// meta data...
-	edge.first = boost::fusion::get<3>(edge_parsed);
-	edge.last = boost::fusion::get<4>(edge_parsed);
+	edge.first = boost::fusion::get<4>(edge_parsed);
+	edge.last = boost::fusion::get<5>(edge_parsed);
 	
 	graph.connect_edge(edge.id, graph.nodes.back().id);
       }
@@ -350,17 +364,25 @@ namespace cicada
 
     typedef boost::spirit::standard::space_type space_type;
     
-    
     boost::spirit::qi::symbols<char, char> escape_char;
     
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string;
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string_action;
-    
     boost::spirit::qi::rule<Iterator, rule_parsed_set_type(), space_type> rule_string_set;
     
     boost::spirit::qi::rule<Iterator, tail_node_set_type(), space_type>      tail_node_set;
+    
     boost::spirit::qi::rule<Iterator, feature_parsed_type(), space_type>     feature;
     boost::spirit::qi::rule<Iterator, feature_parsed_set_type(), space_type> feature_set;
+    
+    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
+    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
+    
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>                key;
+    boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
+    boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
+    boost::spirit::qi::rule<Iterator, attribute_parsed_set_type(), space_type>  attribute_set;
+    
     
     boost::spirit::qi::rule<Iterator, edge_parsed_type(), space_type> edge;
     boost::spirit::qi::rule<Iterator, edge_parsed_type(), space_type> edge_action;
@@ -666,6 +688,9 @@ namespace cicada
 	  os << output_features;
 	  
 	  os << "},";
+	  // dump attributes here...!
+	  
+	  
 	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second) << ',';
 	  os << "\"first\":" << edge.first << ',';
 	  os << "\"last\":" << edge.last;
