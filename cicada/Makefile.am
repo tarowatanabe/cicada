@@ -147,6 +147,7 @@ apply_exact.hpp \
 apply_incremental.hpp \
 apply_state_less.hpp \
 attribute.hpp \
+attribute_vector.hpp \
 binarize.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
@@ -213,6 +214,7 @@ weight_vector.hpp
 libcicada_la_SOURCES = \
 alignment.cpp \
 attribute.cpp \
+attribute_vector.cpp \
 cluster.cpp \
 feature.cpp \
 feature_function.cpp \
@@ -266,6 +268,7 @@ libcicada_la_LIBADD = \
 	$(ICU_LDFLAGS)
 
 noinst_PROGRAMS = \
+attribute_vector_main \
 cluster_main \
 grammar_mutable_main \
 grammar_static_main \
@@ -282,6 +285,9 @@ tokenizer_main \
 tree_grammar_mutable_main \
 tree_grammar_static_main \
 tree_rule_main
+
+attribute_vector_main_SOURCES = attribute_vector_main.cpp
+attribute_vector_main_LDADD = libcicada.la
 
 cluster_main_SOURCES = cluster_main.cpp
 cluster_main_LDADD = libcicada.la

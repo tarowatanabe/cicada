@@ -13,9 +13,8 @@
 #include <iostream>
 
 #include <cicada/attribute.hpp>
-#include <utils/space_separator.hpp>
 
-#include <boost/tokenizer.hpp>
+#include <boost/variant.hpp>
 
 namespace cicada
 {
@@ -25,36 +24,44 @@ namespace cicada
   public:
     typedef cicada::Attribute attribute_type;
     typedef cicada::Attribute key_type;
-    typedef int32_t mapped_type;
-    typedef int32_t data_type;
+
+    typedef int64_t     int_type;
+    typedef double      float_type;
+    typedef std::string string_type;
+    
+    typedef boost::variant<int_type, float_type, string_type> mapped_type;
+    typedef mapped_type                                       data_type;
     
     typedef std::pair<const attribute_type, data_type> value_type;
     
-  private:
-    typedef typename Alloc::template rebind<value_type>::other alloc_type;
-    typedef std::map<key_type, data_type, std::less<key_type>, alloc_type> attribute_vector_type;
-    typedef AttributeVector<data_type, Alloc> self_type;
-
   public:
-    typedef typename attribute_vector_type::size_type       size_type;
-    typedef typename attribute_vector_type::difference_type difference_type;
+    typedef std::map<key_type, data_type, std::less<key_type>, std::allocator<value_type> > attribute_vector_type;
+    typedef AttributeVector self_type;
     
-    typedef typename attribute_vector_type::const_iterator  const_iterator;
-    typedef typename attribute_vector_type::iterator        iterator;
+  public:
+    typedef attribute_vector_type::size_type       size_type;
+    typedef attribute_vector_type::difference_type difference_type;
     
-    typedef typename attribute_vector_type::const_reverse_iterator  const_reverse_iterator;
-    typedef typename attribute_vector_type::reverse_iterator        reverse_iterator;
+    typedef attribute_vector_type::const_iterator  const_iterator;
+    typedef attribute_vector_type::iterator        iterator;
     
-    typedef typename attribute_vector_type::const_reference const_reference;
-    typedef typename attribute_vector_type::reference       reference;
+    typedef attribute_vector_type::const_reverse_iterator  const_reverse_iterator;
+    typedef attribute_vector_type::reverse_iterator        reverse_iterator;
+    
+    typedef attribute_vector_type::const_reference const_reference;
+    typedef attribute_vector_type::reference       reference;
     
   public:
     AttributeVector() {}
     AttributeVector(const AttributeVector& x) : __values(x.__values) {}
     template <typename Iterator>
     AttributeVector(Iterator first, Iterator last) : __values(first, last) { }
+    AttributeVector(const std::string& x) : __values() { assign(x); }
 
   public:
+    bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
+    void assign(const std::string& x);
+
     template <typename Iterator>
     void assign(Iterator first, Iterator last)
     {
@@ -75,11 +82,10 @@ namespace cicada
 
     size_type size() const { return __values.size(); }
     bool empty() const { return __values.empty(); }
-
+    
     void reserve(size_type x) { }
     
     void clear() { __values.clear(); }
-    
     
     data_type& operator[](const key_type& x)
     {
@@ -123,6 +129,86 @@ namespace cicada
     reference back() { return *(-- __values.end());}
     
     void swap(AttributeVector& x) { __values.swap(x.__values); }
+
+  private:
+    template <typename Tp, typename Iterator>
+    struct __find_visitor : public boost::static_visitor<Iterator>
+    {
+      __find_visitor(Iterator __iter, Iterator __iter_end) : iter(__iter), iter_end(__iter_end) {}
+      
+      Iterator iter;
+      Iterator iter_end;
+      
+      Iterator operator()(Tp& i) const
+      {
+	return iter;
+      }
+      
+      template <typename T>
+      Iterator operator()(T& x) const
+      {
+	return iter_end;
+      }
+    };
+
+    const_iterator find_int(const key_type& x) const
+    {
+      const_iterator iter = __values.find(x);
+      if (iter == __values.end())
+	return iter;
+      else
+	return boost::apply_visitor(__find_visitor<int_type, const_iterator>(iter, __values.end()), iter->second);
+    }
+    
+    iterator find_int(const key_type& x)
+    {
+      iterator iter = __values.find(x);
+      if (iter == __values.end())
+	return iter;
+      else
+	return boost::apply_visitor(__find_visitor<int_type, iterator>(iter, __values.end()), iter->second);
+    }
+    
+
+    const_iterator find_float(const key_type& x) const
+    {
+      const_iterator iter = __values.find(x);
+      
+      if (iter == __values.end())
+	return iter;
+      else
+	return boost::apply_visitor(__find_visitor<float_type, const_iterator>(iter, __values.end()), iter->second);
+    }
+
+    iterator find_float(const key_type& x)
+    {
+      iterator iter = __values.find(x);
+      
+      if (iter == __values.end())
+	return iter;
+      else
+	return boost::apply_visitor(__find_visitor<float_type, iterator>(iter, __values.end()), iter->second);
+    }
+
+    const_iterator find_string(const key_type& x) const
+    {
+      const_iterator iter = __values.find(x);
+      
+      if (iter == __values.end())
+	return iter;
+      else
+	return boost::apply_visitor(__find_visitor<string_type, const_iterator>(iter, __values.end()), iter->second);
+    }
+
+    iterator find_string(const key_type& x)
+    {
+      iterator iter = __values.find(x);
+      
+      if (iter == __values.end())
+	return iter;
+      else
+	return boost::apply_visitor(__find_visitor<string_type, iterator>(iter, __values.end()), iter->second);
+    }
     
   public:
     // comparison
@@ -155,7 +241,7 @@ namespace cicada
     {
       return x.__values > y.__values;
     }
-
+    
     friend
     bool operator>=(const AttributeVector& x, const AttributeVector& y)
     {
@@ -178,9 +264,8 @@ namespace cicada
 
 namespace std
 {
-  template <typename T, typename A>
   inline
-  void swap(cicada::AttributeVector<T,A>& x, cicada::AttributeVector<T, A>& y)
+  void swap(cicada::AttributeVector& x, cicada::AttributeVector& y)
   {
     x.swap(y);
   }
