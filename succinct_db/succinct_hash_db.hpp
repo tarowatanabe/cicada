@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __SUCCINCT_DB__SUCCINCT_HASH_DB__HPP__

@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __SUCCINCT_DB__SUCCINCT_TRIE_DB__HPP__
@@ -144,7 +144,7 @@ namespace succinctdb
     struct __less_value
     {
       bool operator()(const __value_type& x, const __value_type& y) const {
-	return std::lexicographical_compare(x.first, x.last, y.first, x.last);
+	return std::lexicographical_compare(x.first, x.last, y.first, y.last);
       }
     };
 

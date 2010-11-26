@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2009-2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 // TODO...!
 

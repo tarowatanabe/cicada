@@ -829,6 +829,9 @@ namespace cicada
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule);
       
       if (! result || iter != iter_end) continue;
+
+      // skip empty source...
+      if (boost::fusion::get<1>(rule).empty()) continue;
       
       source.clear();
       source.insert(source.end(), boost::fusion::get<1>(rule).begin(), boost::fusion::get<1>(rule).end());
@@ -961,9 +964,7 @@ namespace cicada
     feature_names.clear();
     feature_names.reserve(feature_size);
     feature_names.resize(feature_size, feature_type());
-
-    std::cerr << "dumping featuers: " << feature_size << std::endl;
-     
+    
     for (int feature = 0; feature < feature_size; ++ feature) {
       score_streams[feature].ostream->reset();
       utils::tempfile::permission(score_streams[feature].path);
