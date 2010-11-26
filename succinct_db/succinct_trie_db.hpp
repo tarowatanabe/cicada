@@ -51,9 +51,8 @@ namespace succinctdb
     typedef typename Alloc::template rebind<char>::other      byte_alloc_type;
 
     // we assume that pointer size is multiple of two!
-    static const size_type pointer_size = sizeof(data_type*);
+    static const size_type pointer_size = sizeof(void*);
     static const size_type pointer_mask = ~(pointer_size - 1);
-
     
     __succinct_trie_db_writer(const path_type& path)
       : path_output(), path_key_data(), path_size(), __os_key_data(), __os_size(), __size(0) { open(path); }

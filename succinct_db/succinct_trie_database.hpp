@@ -37,7 +37,7 @@ namespace succinctdb
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     typedef uint64_t  off_type;
-    typedef uint32_t  pos_type;
+    typedef uint64_t  pos_type;
     
     typedef Key       key_type;
     typedef Data      data_type;
@@ -50,6 +50,10 @@ namespace succinctdb
     typedef typename Alloc::template rebind<off_type>::other  off_alloc_type;
     typedef typename Alloc::template rebind<char>::other      byte_alloc_type;
     typedef typename Alloc::template rebind<std::pair<key_type, pos_type> >::other trie_alloc_type;
+
+    // we assume that pointer size is multiple of two!
+    static const size_type pointer_size = sizeof(void*);
+    static const size_type pointer_mask = ~(pointer_size - 1);
     
     __succinct_trie_database_writer(const path_type& path) 
       : path_output(), path_key_data(), path_size(), __offset(0), __size(0) { open(path); }
@@ -59,9 +63,26 @@ namespace succinctdb
     
     size_type insert(const key_type* buf, size_type buf_size, const data_type* data, size_type data_size)
     {
+      const size_type buf_size_bytes   = buf_size * sizeof(key_type);
+      const size_type buf_size_aligned = (buf_size_bytes + pointer_size - 1) & pointer_mask;
+      
+      const size_type pos_size_bytes   = sizeof(pos_type);
+      const size_type pos_size_aligned = (pos_size_bytes + pointer_size - 1) & pointer_mask;
+      
+
       // key value
       __os_key_data->write((char*) buf, buf_size * sizeof(key_type));
+      if (buf_size_aligned > buf_size_bytes) {
+	char __buf[pointer_size];
+	__os_key_data->write((char*) __buf, buf_size_aligned - buf_size_bytes);
+      }
+      
       __os_key_data->write((char*) &__size, sizeof(pos_type));
+      if (pos_size_aligned > pos_size_bytes) {
+	char __buf[pointer_size];
+	__os_key_data->write((char*) __buf, pos_size_aligned - pos_size_bytes);
+      }
+      
       __os_key_size->write((char*) &buf_size, sizeof(size_type));
       
       // mapped value
@@ -136,7 +157,10 @@ namespace succinctdb
     {
       const pos_type& operator()(const __value_type& x) const
       {
-	return *reinterpret_cast<const pos_type*>(x.last);
+	const size_type key_size_bytes = sizeof(key_type) * (x.last - x.first);
+	const size_type key_size_aligned = (key_size_bytes + pointer_size - 1) & pointer_mask;
+	
+	return *reinterpret_cast<const pos_type*>(((char*) x.first) + key_size_aligned);
       }
     };
 
@@ -154,6 +178,16 @@ namespace succinctdb
       typedef utils::map_file<char, byte_alloc_type> map_file_type;
       typedef succinct_trie<key_type, pos_type, trie_alloc_type> succinct_trie_type;
       
+      if (__os_key_data)
+	__os_key_data->flush();
+      if (__os_key_size)
+	__os_key_size->flush();
+      
+      if (__os_data)
+	__os_data->flush();
+      if (__os_data_off)
+	__os_data_off->flush();
+
       __os_key_data.reset();
       __os_key_size.reset();
       
@@ -161,6 +195,9 @@ namespace succinctdb
       __os_data_off.reset();
       
       if (boost::filesystem::exists(path_key_data) && boost::filesystem::exists(path_size) && ! path_output.empty()) {
+	
+	::sync();
+
 	typedef utils::repository repository_type;
 	
 	repository_type rep(path_output, repository_type::read);
@@ -180,7 +217,13 @@ namespace succinctdb
 	    values[i].first = reinterpret_cast<const key_type*>(iter);
 	    values[i].last  = reinterpret_cast<const key_type*>(iter) + key_size;
 	    
-	    iter += key_size * sizeof(key_type) + sizeof(pos_type);
+	    const size_type key_size_bytes = key_size * sizeof(key_type);
+	    const size_type key_size_aligned = (key_size_bytes + pointer_size - 1) & pointer_mask;
+	    
+	    const size_type pos_size_bytes   = sizeof(pos_type);
+	    const size_type pos_size_aligned = (pos_size_bytes + pointer_size - 1) & pointer_mask;
+	    
+	    iter += key_size_aligned + pos_size_aligned;
 	  }
 	}
 	boost::filesystem::remove(path_size);
@@ -264,7 +307,7 @@ namespace succinctdb
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     typedef uint64_t  off_type;
-    typedef uint32_t  pos_type;
+    typedef uint64_t  pos_type;
       
     typedef Key  key_type;
     typedef Data data_type;

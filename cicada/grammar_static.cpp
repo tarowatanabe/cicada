@@ -933,30 +933,19 @@ namespace cicada
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
     }
 
-    std::cerr << "dumping source" << std::endl;
-
     // source phrases...
     sources_db.write(path_source);
     sources_db.clear();
     source_db.open(path_source);
-    
-    std::cerr << "dumping target" << std::endl;
 
     // target phrases...
     targets_db.write(path_target);
     targets_db.clear();
     target_db.open(path_target);
 
-    std::cerr << "dumping rules" << std::endl;
-
     // rules....
     rule_db.close();
-    
-    std::cerr << "opening rules" << std::endl;
-
     rule_db.open(path_rule);
-     
-    std::cerr << "dumping vocabulary" << std::endl;
 
     // vocabulary...
     word_type::write(path_vocab);
