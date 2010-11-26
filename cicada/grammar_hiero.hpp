@@ -153,7 +153,8 @@ namespace cicada
     
     bool valid_span(int first, int last, int distance) const
     {
-      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
+      return distance <= 1;
+      //return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
   };
   
@@ -238,7 +239,8 @@ namespace cicada
     
     bool valid_span(int first, int last, int distance) const
     {
-      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
+      return distance <= 1;
+      //return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
   };
 };
