@@ -50,7 +50,8 @@ namespace utils {
       {
 	if (__base) {
 	  const size_type __size = *(reinterpret_cast<size_type*>(__base));
-	  allocator().deallocate(__base, __size * sizeof(value_type) + sizeof(size_type));
+	  if (__size)
+	    allocator().deallocate(__base, __size * sizeof(value_type) + sizeof(size_type));
 	}
       }
     
@@ -69,8 +70,14 @@ namespace utils {
     
     void initialize_vector(size_type __n)
     {
-      __base = allocator().allocate(__n * sizeof(value_type) + sizeof(size_type));
-      *(reinterpret_cast<size_type*>(__base)) = __n;
+      static size_type __zero = 0;
+
+      if (__n == 0)
+	__base = reinterpret_cast<pointer>(&__zero);
+      else {
+	__base = allocator().allocate(__n * sizeof(value_type) + sizeof(size_type));
+	*(reinterpret_cast<size_type*>(__base)) = __n;
+      }
     }
     
     const allocator_type& allocator() const { return static_cast<allocator_type&>(*this); }

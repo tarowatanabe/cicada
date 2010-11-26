@@ -24,6 +24,8 @@ int main(int argc, char** argv)
   std::cout << "allocated: " << utils::allocinfo().allocated() << std::endl;
   std::cout << "sizeof simple_vector<int>: " << sizeof(utils::simple_vector<int>) << std::endl;
   std::cout << "sizeof simple_vector<string>: " << sizeof(utils::simple_vector<std::string>) << std::endl;
+
+  std::cout << "begin: " << int_vec.begin() << " begin-1: " << (int_vec.begin() - 1) << " end: " << int_vec.end() << std::endl;
   
   str_vec[0] = "January";
   str_vec[1] = "February";
