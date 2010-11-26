@@ -6,6 +6,33 @@
 
 #include "attribute_vector.hpp"
 
+void find_attrs(const cicada::AttributeVector& attrs, const std::string& attr)
+{
+  typedef cicada::AttributeVector attribute_set_type;
+  
+  attribute_set_type::const_iterator iter = attrs.find(attr);
+  if (iter != attrs.end())
+    std::cout << "found: " << iter->first << " : " << iter->second << std::endl;
+  
+  {
+    attribute_set_type::const_iterator iter = attrs.find_int(attr);
+    if (iter != attrs.end())
+      std::cout << "int: " << iter->first << " : " << iter->second << std::endl;
+  }
+
+  {
+    attribute_set_type::const_iterator iter = attrs.find_float(attr);
+    if (iter != attrs.end())
+      std::cout << "float: " << iter->first << " : " << iter->second << std::endl;
+  }
+  
+  {
+    attribute_set_type::const_iterator iter = attrs.find_string(attr);
+    if (iter != attrs.end())
+      std::cout << "string: " << iter->first << " : " << iter->second << std::endl;
+  }
+}
+
 int main(int argc, char** argv)
 {
   typedef cicada::AttributeVector attribute_set_type;
@@ -14,17 +41,10 @@ int main(int argc, char** argv)
 
   std::cout << "attr1 size: " << attr1.size() << std::endl;
   
-  attribute_set_type::const_iterator giter = attr1.find("good");
-  if (giter != attr1.end())
-    std::cout << giter->first << " : " << giter->second << std::endl;
-  
-  attribute_set_type::const_iterator biter = attr1.find("bad");
-  if (biter != attr1.end())
-    std::cout << biter->first << " : " << biter->second << std::endl;
-
-  attribute_set_type::const_iterator niter = attr1.find("neutral");
-  if (niter != attr1.end())
-    std::cout << niter->first << " : " << niter->second << std::endl;
+  find_attrs(attr1, "good");
+  find_attrs(attr1, "bad");
+  find_attrs(attr1, "bad2");
+  find_attrs(attr1, "neutral");
   
   std::cout << "attr1: " << attr1 << std::endl;
   

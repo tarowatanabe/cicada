@@ -151,6 +151,7 @@ namespace cicada
       }
     };
 
+  public:
     const_iterator find_int(const key_type& x) const
     {
       const_iterator iter = __values.find(x);

@@ -65,7 +65,7 @@ namespace cicada
     
     typedef boost::spirit::standard::space_type space_type;
     
-    boost::spirit::qi::int_parser<int64_t, 10, 1, -1> int64_;
+    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
     boost::spirit::qi::symbols<char, char> escape_char;
@@ -115,7 +115,7 @@ namespace cicada
     
     boost::spirit::karma::real_generator<double, real_precision> double10;
     
-    boost::spirit::karma::int_generator<int64_t, 10, false> int64_;
+    boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
     
     boost::spirit::karma::symbols<char, const char*> escape_char;
     boost::spirit::karma::rule<Iterator, std::string()> key;
