@@ -131,26 +131,28 @@ namespace cicada
     void swap(AttributeVector& x) { __values.swap(x.__values); }
 
   private:
-    template <typename Tp, typename Iterator>
-    struct __find_visitor : public boost::static_visitor<Iterator>
+    struct __find_visitor_int : public boost::static_visitor<bool>
     {
-      __find_visitor(Iterator __iter, Iterator __iter_end) : iter(__iter), iter_end(__iter_end) {}
-      
-      Iterator iter;
-      Iterator iter_end;
-      
-      Iterator operator()(Tp& i) const
-      {
-	return iter;
-      }
-      
-      template <typename T>
-      Iterator operator()(T& x) const
-      {
-	return iter_end;
-      }
+      bool operator()(const int_type& x) const { return true; }
+      bool operator()(const float_type& x) const { return false; }
+      bool operator()(const string_type& x) const { return false; }
+    };
+    
+    struct __find_visitor_float : public boost::static_visitor<bool>
+    {
+      bool operator()(const int_type& x) const { return false; }
+      bool operator()(const float_type& x) const { return true; }
+      bool operator()(const string_type& x) const { return false; }
     };
 
+    struct __find_visitor_string : public boost::static_visitor<bool>
+    {
+      bool operator()(const int_type& x) const { return false; }
+      bool operator()(const float_type& x) const { return false; }
+      bool operator()(const string_type& x) const { return true; }
+    };
+    
+    
   public:
     const_iterator find_int(const key_type& x) const
     {
@@ -158,7 +160,7 @@ namespace cicada
       if (iter == __values.end())
 	return iter;
       else
-	return boost::apply_visitor(__find_visitor<int_type, const_iterator>(iter, __values.end()), iter->second);
+	return boost::apply_visitor(__find_visitor_int(), iter->second) ? iter : __values.end();
     }
     
     iterator find_int(const key_type& x)
@@ -167,49 +169,45 @@ namespace cicada
       if (iter == __values.end())
 	return iter;
       else
-	return boost::apply_visitor(__find_visitor<int_type, iterator>(iter, __values.end()), iter->second);
+	return boost::apply_visitor(__find_visitor_int(), iter->second) ? iter : __values.end();
     }
-    
 
     const_iterator find_float(const key_type& x) const
     {
       const_iterator iter = __values.find(x);
-      
       if (iter == __values.end())
 	return iter;
       else
-	return boost::apply_visitor(__find_visitor<float_type, const_iterator>(iter, __values.end()), iter->second);
+	return boost::apply_visitor(__find_visitor_float(), iter->second) ? iter : __values.end();
     }
-
+    
     iterator find_float(const key_type& x)
     {
       iterator iter = __values.find(x);
-      
       if (iter == __values.end())
 	return iter;
       else
-	return boost::apply_visitor(__find_visitor<float_type, iterator>(iter, __values.end()), iter->second);
+	return boost::apply_visitor(__find_visitor_float(), iter->second) ? iter : __values.end();
     }
 
     const_iterator find_string(const key_type& x) const
     {
       const_iterator iter = __values.find(x);
-      
       if (iter == __values.end())
 	return iter;
       else
-	return boost::apply_visitor(__find_visitor<string_type, const_iterator>(iter, __values.end()), iter->second);
+	return boost::apply_visitor(__find_visitor_string(), iter->second) ? iter : __values.end();
     }
-
+    
     iterator find_string(const key_type& x)
     {
       iterator iter = __values.find(x);
-      
       if (iter == __values.end())
 	return iter;
       else
-	return boost::apply_visitor(__find_visitor<string_type, iterator>(iter, __values.end()), iter->second);
+	return boost::apply_visitor(__find_visitor_string(), iter->second) ? iter : __values.end();
     }
+
     
   public:
     // comparison
