@@ -20,6 +20,7 @@
 #include <utils/hashmurmur.hpp>
 
 #include <google/dense_hash_map>
+#include <google/dense_hash_set>
 
 //
 // hypergraph-to-hypergraph transduction by
@@ -109,15 +110,34 @@ namespace cicada
 
     typedef NodeMap node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
+
+    struct rule_ptr_hash
+    {
+      size_t operator()(const rule_ptr_type& x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+
+    struct rule_ptr_equal
+    {
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
+      {
+	return (x == y || (x && y && *x == *y));
+      }
+    };
+    
+    typedef google::dense_hash_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal> rule_set_type;
     
     ComposeTree(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source)
       : goal(__goal), grammar(__grammar), yield_source(__yield_source) 
-    { }
+    { rules_unique.set_empty_key(rule_ptr_type()); }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       graph_out.clear();
       node_map.clear();
+      rules_unique.clear();
       
       if (! graph_in.is_valid()) return;
 
@@ -322,6 +342,8 @@ namespace cicada
       
       const hypergraph_type::id_type edge_id = graph_out.add_edge(tails.begin(), tails.end()).id;
       graph_out.edges[edge_id].rule.reset(new rule_type(rule.label, rule_type::symbol_set_type(rhs.begin(), rhs.end())));
+      graph_out.edges[edge_id].rule = *(rules_unique.insert(graph_out.edges[edge_id].rule).first);
+
       graph_out.connect_edge(edge_id, root);
       
       tails_type::const_iterator titer = tails.begin();
@@ -340,6 +362,8 @@ namespace cicada
     symbol_type goal;
     const grammar_type& grammar;
     const bool yield_source;
+
+    rule_set_type rules_unique;
   };
   
   

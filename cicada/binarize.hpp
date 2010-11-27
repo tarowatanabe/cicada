@@ -14,8 +14,11 @@
 #include <cicada/sort.hpp>
 
 #include <utils/bithack.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include <boost/lexical_cast.hpp>
+
+#include <google/dense_hash_set>
 
 namespace cicada
 {
@@ -28,10 +31,29 @@ namespace cicada
     typedef hypergraph_type::rule_type        rule_type;
     typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
     typedef hypergraph_type::feature_set_type feature_set_type;
-
+    
     typedef std::vector<symbol_type, std::allocator<symbol_type> > phrase_type;
-
+    
     typedef std::vector<bool, std::allocator<bool> > removed_type;
+    
+    struct rule_ptr_hash
+    {
+      size_t operator()(const rule_ptr_type& x) const
+      {
+	return (x ? hash_value(*x) : size_t(0));
+      }
+    };
+
+    struct rule_ptr_equal
+    {
+      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
+      {
+	return (x == y || (x && y && *x == *y));
+      }
+    };
+    
+    typedef google::dense_hash_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal> rule_set_type;
+    
 
     struct filter
     {
@@ -46,6 +68,9 @@ namespace cicada
       }
     };
 
+    __BinarizeBase() : rules() { rules.set_empty_key(rule_ptr_type()); }
+    
+    rule_set_type rules;
   };
 
   struct BinarizeRight : public __BinarizeBase
@@ -55,6 +80,8 @@ namespace cicada
 
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
+      rules.clear();
+
       // first, copy...
       target = source;
       
@@ -103,6 +130,8 @@ namespace cicada
 	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	    edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
 					      rule_type::symbol_set_type(binarized.begin(), binarized.end())));
+
+	    edge_new.rule = *(rules.insert(edge_new.rule).first);
 	    
 	    target.connect_edge(edge_new.id, head);
 	    
@@ -117,9 +146,12 @@ namespace cicada
 	  
 	  edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
 					    rule_type::symbol_set_type(binarized.begin(), binarized.end())));
+
+	  edge_new.rule = *(rules.insert(edge_new.rule).first);
 	  
 	  // assign features here...
-	  edge_new.features = edge_source.features;
+	  edge_new.features   = edge_source.features;
+	  edge_new.attributes = edge_source.attributes;
 	  
 	  target.connect_edge(edge_new.id, head);
 	}
@@ -143,9 +175,11 @@ namespace cicada
   {
     BinarizeLeft(const int __binarize_size)
       : binarize_size(__binarize_size) {}
-
+    
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
+      rules.clear();
+
       // first, copy...
       target = source;
       
@@ -194,6 +228,8 @@ namespace cicada
 	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	    edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
 					      rule_type::symbol_set_type(binarized.begin(), binarized.end())));
+
+	    edge_new.rule = *(rules.insert(edge_new.rule).first);
 	    
 	    target.connect_edge(edge_new.id, head);
 	    
@@ -209,8 +245,11 @@ namespace cicada
 	  edge_new.rule.reset(new rule_type('[' + non_terminal_head + ']',
 					    rule_type::symbol_set_type(binarized.begin(), binarized.end())));
 	  
+	  edge_new.rule = *(rules.insert(edge_new.rule).first);
+	  
 	  // assign features here...
-	  edge_new.features = edge_source.features;
+	  edge_new.features   = edge_source.features;
+	  edge_new.attributes = edge_source.attributes;
 	  
 	  target.connect_edge(edge_new.id, head);
 	}

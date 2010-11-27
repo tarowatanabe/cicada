@@ -14,6 +14,7 @@
 
 #include <utils/bithack.hpp>
 #include <utils/bit_vector.hpp>
+#include <utils/hashmurmur.hpp>
 
 #include <boost/lexical_cast.hpp>
 
