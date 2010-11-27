@@ -56,10 +56,11 @@ namespace cicada
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
-    typedef cicada::Symbol  symbol_type;
-    typedef cicada::Symbol  word_type;
-    typedef cicada::Feature feature_type;
-    typedef cicada::Vocab   vocab_type;
+    typedef cicada::Symbol    symbol_type;
+    typedef cicada::Symbol    word_type;
+    typedef cicada::Feature   feature_type;
+    typedef cicada::Attribute attribute_type;
+    typedef cicada::Vocab     vocab_type;
     
     
     typedef TreeTransducer::rule_type          rule_type;
@@ -67,8 +68,8 @@ namespace cicada
     typedef TreeTransducer::rule_pair_type     rule_pair_type;
     typedef TreeTransducer::rule_pair_set_type rule_pair_set_type;
     
-    typedef TreeTransducer::feature_set_type feature_set_type;
-    
+    typedef TreeTransducer::feature_set_type   feature_set_type;
+    typedef TreeTransducer::attribute_set_type attribute_set_type;
     
     typedef float          score_type;
     typedef uint8_t        quantized_type;
@@ -91,7 +92,8 @@ namespace cicada
     typedef succinctdb::succinct_trie_db<word_type::id_type, id_type, std::allocator<std::pair<word_type::id_type, id_type> > > edge_db_type;
     typedef succinctdb::succinct_trie_database<id_type, mapped_type, rule_alloc_type > rule_pair_db_type;
     
-    typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
+    typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
+    typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
     
     class ScoreSet
     {
@@ -166,8 +168,10 @@ namespace cicada
 	source_db(x.source_db),
 	target_db(x.target_db),
 	score_db(x.score_db),
+	attr_db(x.attr_db),
 	vocab(x.vocab),
-	feature_names(x.feature_names) {}
+	feature_names(x.feature_names),
+	attribute_names(x.attribute_names) {}
 
     TreeGrammarStaticImpl& operator=(const TreeGrammarStaticImpl& x)
     {
@@ -178,8 +182,10 @@ namespace cicada
       source_db     = x.source_db;
       target_db     = x.target_db;
       score_db      = x.score_db;
+      attr_db      = x.attr_db;
       vocab         = x.vocab;
       feature_names = x.feature_names;
+      attribute_names = x.attribute_names;
       
       return *this;
     }
@@ -191,8 +197,10 @@ namespace cicada
       source_db.clear();
       target_db.clear();
       score_db.clear();
+      attr_db.clear();
       vocab.clear();
       feature_names.clear();
+      attribute_names.clear();
 
       cache_rule.clear();
       cache_source.clear();
@@ -230,7 +238,7 @@ namespace cicada
     bool has_children(size_type node) const { return rule_db.has_children(node); }
     bool exists(size_type node) const { return rule_db.exists(node); }
     
-        struct rule_unique_hash 
+    struct rule_unique_hash 
     {
       size_t operator()(const rule_ptr_type& x) const
       {
@@ -329,6 +337,16 @@ namespace cicada
 								     : feature_set_type::mapped_type(score)));
 	     }
 	     
+	     for (size_t attr = 0; attr < attr_db.size(); ++ attr) {
+	       const score_type score = attr_db[attr][pos_feature];
+	       
+	       options.back().attributes[attribute_names[attr]] = (score <= boost::numeric::bounds<score_type>::lowest()
+								   ? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								   : (score >= boost::numeric::bounds<score_type>::highest()
+								      ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								      : feature_set_type::mapped_type(score)));
+	     }
+	     
 	     ++ pos_feature;
 	  }
 	}
@@ -373,8 +391,11 @@ namespace cicada
     rule_db_type          source_db;
     rule_db_type          target_db;
     score_db_type         score_db;
+    score_db_type         attr_db;
     vocab_type            vocab;
-    feature_name_set_type feature_names;
+    
+    feature_name_set_type   feature_names;
+    attribute_name_set_tyep attribute_names;
     
     // caching..
     cache_rule_pair_map_type cache_rule;
@@ -472,6 +493,43 @@ namespace cicada
 	score_db[feature].quantized.open(path);
 	score_db[feature].score.clear();
       }
+
+    for (size_t attr = 0; attr < attr_db.size(); ++ attr)
+      if (attr_db[attr].score.is_open()) {
+	
+	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.attr.quantized.XXXXXX");
+	utils::tempfile::insert(path);
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(utils::packed_sink<quantized_type, std::allocator<quantized_type> >(path));
+	
+	counts.clear();
+	codemap.clear();
+	std::fill(codebook.begin(), codebook.end(), 0.0);
+	
+	score_set_type::score_set_type::const_iterator liter_end = attr_db[attr].score.end();
+	for (score_set_type::score_set_type::const_iterator liter = attr_db[attr].score.begin(); liter != liter_end; ++ liter)
+	  ++ counts[*liter];
+	
+	Quantizer::quantize(counts, codebook, codemap);
+	
+	for (score_set_type::score_set_type::const_iterator liter = attr_db[attr].score.begin(); liter != liter_end; ++ liter) {
+	  codemap_type::const_iterator citer = codemap.find(*liter);
+	  if (citer == codemap.end())
+	    throw std::runtime_error("no codemap?");
+	  
+	  os.write((char*) &(citer->second), sizeof(quantized_type));
+	}
+	
+	for (int i = 0; i < 256; ++ i)
+	  attr_db[attr].maps[i] = codebook[i];
+	
+	os.pop();
+	utils::tempfile::permission(path);
+	
+	attr_db[attr].quantized.open(path);
+	attr_db[attr].score.clear();
+      }
   }
   
   
@@ -509,6 +567,8 @@ namespace cicada
     vocab.write(rep.path("vocab"));
     
     const size_type feature_size = score_db.size();
+    const size_type attribute_size = attr_db.size();
+    
     for (size_t feature = 0; feature < feature_size; ++ feature) {
       std::ostringstream stream_score;
       stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
@@ -519,8 +579,20 @@ namespace cicada
       
       rep[name] = feature_names[feature];
     }
+
+    for (size_t attribute = 0; attribute < attribute_size; ++ attribute) {
+      std::ostringstream stream_score;
+      stream_score << "attribute-" << std::setfill('0') << std::setw(6) << attribute;
+      
+      attr_db[attribute].write(rep.path(stream_score.str()));
+
+      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+      
+      rep[name] = attribute_names[attribute];
+    }
     
     rep["feature-size"] = boost::lexical_cast<std::string>(feature_size);
+    rep["attribute-size"] = boost::lexical_cast<std::string>(attribute_size);
   }
   
   
@@ -541,7 +613,7 @@ namespace cicada
     if (iter == rep.end())
       throw std::runtime_error("no feature size?");
 
-    const size_type feature_size = atoi(iter->second.c_str());
+    const size_type feature_size = boost::lexical_cast<size_type>(iter->second.c_str());
     
     feature_names.reserve(feature_size);
     feature_names.resize(feature_size);
@@ -560,6 +632,30 @@ namespace cicada
 	throw std::runtime_error(std::string("no feature name?: ") + name);
       
       feature_names[feature] = iter->second;
+    }
+
+    repository_type::const_iterator aiter = rep.find("attribute-size");
+    if (aiter == rep.end()) return;
+    
+    const size_type attribute_size = boost::lexical_cast<size_type>(aiter->second);
+    
+    attribute_names.reserve(attribute_size);
+    attribute_names.resize(attribute_size);
+    attr_db.reserve(attribute_size);
+    attr_db.resize(attribute_size);
+    
+    for (size_t attribute = 0; attribute < attribute_size; ++ attribute) {
+      std::ostringstream stream_score;
+      stream_score << "attribute-" << std::setfill('0') << std::setw(6) << attribute;
+      
+      attr_db[attribute].read(rep.path(stream_score.str()));
+      
+      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+      repository_type::const_iterator iter = rep.find(name);
+      if (iter == rep.end())
+	throw std::runtime_error(std::string("no attribute name?: ") + name);
+      
+      attribute_names[attribute] = iter->second;
     }
   }
 
@@ -715,15 +811,18 @@ namespace cicada
     rule_map_type target_map(1024 * 1024 * 4);
     
     score_stream_set_type score_streams;
+    score_stream_set_type attr_streams;
     
     id_type id_rule = 0;
     
     int feature_size = -1;
+    int attribute_size = -1;
 
     rule_type   source_prev;
     rule_type   source;
     rule_type   target;
     scores_type scores;
+    scores_type attrs;
     
     std::string buffer_source;
     std::string buffer_target;
@@ -741,8 +840,10 @@ namespace cicada
     namespace phoenix = boost::phoenix;
     
     qi::rule<std::string::const_iterator, scores_type(), standard::space_type> scores_parser;
+    qi::rule<std::string::const_iterator, scores_type(), standard::space_type> attrs_parser;
     
-    scores_parser %= +qi::float_;
+    scores_parser %= "|||" >> +qi::float_;
+    attrs_parser  %= -("|||" >> *qi::float_);
     
     while (std::getline(is, line)) {
       if (line.empty()) continue;
@@ -750,6 +851,7 @@ namespace cicada
       source.clear();
       target.clear();
       scores.clear();
+      attrs.clear();
 
       std::string::const_iterator iter_end = line.end();
       std::string::const_iterator iter = line.begin();
@@ -757,8 +859,8 @@ namespace cicada
       if (! source.assign(iter, iter_end)) continue;
       if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
       if (! target.assign(iter, iter_end)) continue;
-      if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
       if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores)) continue;
+      if (! qi::phrase_parse(iter, iter_end, attrs_parser, standard::space, attrs)) continue;
       if (iter != iter_end) continue;
       
       if (source != source_prev) {

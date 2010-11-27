@@ -577,7 +577,6 @@ namespace cicada
 	attr_db[attr].quantized.open(path);
 	attr_db[attr].score.clear();
       }
-
   }
   
   void GrammarStaticImpl::read(const std::string& parameter)
