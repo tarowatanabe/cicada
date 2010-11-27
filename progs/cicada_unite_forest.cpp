@@ -14,6 +14,28 @@
 
 #include <boost/program_options.hpp>
 
+#include <google/dense_hash_set>
+
+typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
+
+struct rule_ptr_hash
+{
+  size_t operator()(const rule_ptr_type& x) const
+  {
+    return (x ? hash_value(*x) : size_t(0));
+  }
+};
+
+struct rule_ptr_equal
+{
+  bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
+  {
+    return (x == y || (x && y && *x == *y));
+  }
+};
+
+typedef google::dense_hash_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal> rule_set_type;
+
 typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
 
 path_type input_file = "-";
@@ -111,8 +133,19 @@ int main(int argc, char ** argv)
     
     if (output_graphviz)
       cicada::graphviz(os, merged);
-    else
+    else {
+      // uniquify rules...
+      rule_set_type rules;
+      
+      hypergraph_type::edge_set_type::iterator eiter_end = merged.edges.end();
+      for (hypergraph_type::edge_set_type::iterator eiter = merged.edges.begin(); eiter != eiter_end; ++ eiter) {
+	hypergraph_type::edge_type& edge = *eiter;
+	
+	edge.rule = *(rules.insert(edge.rule).first);
+      }
+      
       os << merged << '\n';
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
