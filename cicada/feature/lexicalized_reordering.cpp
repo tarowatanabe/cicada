@@ -43,9 +43,16 @@ namespace cicada
       
       typedef feature_set_type::feature_type feature_type;
       typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
+
+      typedef feature_function_type::attribute_set_type attribute_set_type;
+      
+      typedef attribute_set_type::attribute_type attribute_type;
+
       
       LexicalizedReorderingImpl(const std::string& parameter)
-	: model(parameter), feature_names(), lattice(0)
+	: model(parameter), feature_names(), lattice(0),
+	  attr_phrase_span_first("phrase-span-first"),
+	  attr_phrase_span_last("phrase-span-last")
       {
 	if (model.bidirectional) {
 	  if (model.monotonicity) {
@@ -74,7 +81,9 @@ namespace cicada
       }
       
       LexicalizedReorderingImpl(const LexicalizedReorderingImpl& x)
-	: model(x.model), feature_names(x.feature_names), lattice(0) {}
+	: model(x.model), feature_names(x.feature_names), lattice(0),
+	  attr_phrase_span_first("phrase-span-first"),
+	  attr_phrase_span_last("phrase-span-last") {}
       LexicalizedReorderingImpl& operator=(const LexicalizedReorderingImpl& x)
       {
 	model = x.model;
@@ -150,6 +159,22 @@ namespace cicada
 	}
       }
       
+      struct __phrase_span : public boost::static_visitor<int>
+      {
+	int operator()(const attribute_set_type::int_type& x) const { return x; }
+	template <typename Tp>
+	int operator()(const Tp& x) const { throw std::runtime_error("no phrasal span with integer?"); }
+      };
+      
+      int phrase_span(const attribute_set_type& attrs, const attribute_type& attr) const
+      {
+	attribute_set_type::const_iterator iter = attrs.find(attr);
+	if (iter == attrs.end())
+	  throw std::runtime_error("no phrasal span attribute?");
+	
+	return boost::apply_visitor(__phrase_span(), iter->second);
+      }
+
       
       void lexicalized_reordering_score(state_ptr_type& state,
 					const state_ptr_set_type& states,
@@ -164,19 +189,23 @@ namespace cicada
 	
 	if (states.empty()) {
 	  // How do we capture initial phrase....???
-	  span[0] = edge.first;
-	  span[1] = edge.last;
+	  
+	  const int span_first = phrase_span(edge.attributes, attr_phrase_span_first);
+	  const int span_last  = phrase_span(edge.attributes, attr_phrase_span_last);
+
+	  span[0] = span_first;
+	  span[1] = span_last;
 
 	  sentence_type& phrase = const_cast<sentence_type&>(phrase_impl);
 	  phrase.clear();
-	  for (int pos = edge.first; pos != edge.last; ++ pos)
+	  for (int pos = span_first; pos != span_last; ++ pos)
 	    phrase.push_back(lattice->operator[](pos).front().label);
 	  
 	  *node = (model.fe
 		   ? model.find(phrase.begin(), phrase.end(), edge.rule->rhs.begin(), edge.rule->rhs.end())
 		   : model.find(phrase.begin(), phrase.end()));
 	  
-	  reordering_score(0, 0, edge.first, edge.last, *node, features);
+	  reordering_score(0, 0, span_first, span_last, *node, features);
 	} else if (states.size() == 1) {
 	  // it is only for the goal state...
 	  const int*       span_antecedent = reinterpret_cast<const int*>(states[0]);
@@ -229,6 +258,9 @@ namespace cicada
       feature_list_type feature_names;
       
       const lattice_type* lattice;
+
+      const attribute_type attr_phrase_span_first;
+      const attribute_type attr_phrase_span_last;
     };
 
     

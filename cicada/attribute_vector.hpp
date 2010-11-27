@@ -208,6 +208,13 @@ namespace cicada
 	return boost::apply_visitor(__find_visitor_string(), iter->second) ? iter : __values.end();
     }
 
+  public:
+    // operators...
+    self_type& operator+=(const AttributeVector& x)
+    {
+      __values.insert(x.begin(), x.end());
+      return *this;
+    }
     
   public:
     // comparison
@@ -258,6 +265,20 @@ namespace cicada
   private:
     attribute_vector_type __values;
   };
+  
+  inline
+  AttributeVector operator+(const AttributeVector& x, const AttributeVector& y)
+  {
+    if (x.empty())
+      return y;
+    else if (y.empty())
+      return x;
+    else {
+      AttributeVector attrs(x);
+      attrs += y;
+      return attrs;
+    }
+  }
   
 };
 

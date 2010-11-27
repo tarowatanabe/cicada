@@ -34,11 +34,37 @@ namespace cicada
       
       typedef feature_function_type::edge_type edge_type;
 
-      DistortionImpl() : lattice(0) {}
-      DistortionImpl(const DistortionImpl& x) : lattice(0) {}
+      typedef feature_function_type::attribute_set_type attribute_set_type;
+      
+      typedef attribute_set_type::attribute_type attribute_type;
+
+      DistortionImpl()
+	: lattice(0),
+	  attr_phrase_span_first("phrase-span-first"),
+	  attr_phrase_span_last("phrase-span-last") {}
+      DistortionImpl(const DistortionImpl& x)
+	: lattice(0),
+	  attr_phrase_span_first("phrase-span-first"),
+	  attr_phrase_span_last("phrase-span-last") {}
       DistortionImpl& operator=(const DistortionImpl& x)
       {
 	return *this;
+      }
+      
+      struct __phrase_span : public boost::static_visitor<int>
+      {
+	int operator()(const attribute_set_type::int_type& x) const { return x; }
+	template <typename Tp>
+	int operator()(const Tp& x) const { throw std::runtime_error("no phrasal span with integer?"); }
+      };
+      
+      int phrase_span(const attribute_set_type& attrs, const attribute_type& attr) const
+      {
+	attribute_set_type::const_iterator iter = attrs.find(attr);
+	if (iter == attrs.end())
+	  throw std::runtime_error("no phrasal span attribute?");
+	
+	return boost::apply_visitor(__phrase_span(), iter->second);
       }
       
       double distortion_score(state_ptr_type& state,
@@ -49,8 +75,8 @@ namespace cicada
 	
 	if (states.empty()) {
 	  // How do we capture initial phrase....???
-	  span[0] = edge.first;
-	  span[1] = edge.last;
+	  span[0] = phrase_span(edge.attributes, attr_phrase_span_first);
+	  span[1] = phrase_span(edge.attributes, attr_phrase_span_last);
 	  
 	  return (lattice ? - lattice->shortest_distance(0, span[0]) : - span[0]);
 	} else if (states.size() == 1) {
@@ -96,6 +122,9 @@ namespace cicada
       }
       
       const lattice_type* lattice;
+      
+      const attribute_type attr_phrase_span_first;
+      const attribute_type attr_phrase_span_last;
     };
 
     

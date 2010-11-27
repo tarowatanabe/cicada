@@ -315,6 +315,10 @@ struct ExtractTree
   
   typedef std::pair<int, int> range_type;
   typedef std::vector<range_type, std::allocator<range_type> > range_set_type;
+
+  typedef hypergraph_type::attribute_set_type attribute_set_type;
+  
+  typedef attribute_set_type::attribute_type attribute_type;
   
 
   struct Span
@@ -485,6 +489,12 @@ struct ExtractTree
   
   struct DerivationGraph
   {
+    DerivationGraph()
+      : attr_span_first("span-first"), attr_span_last("span-last") {}
+    
+    attribute_type attr_span_first;
+    attribute_type attr_span_last;
+
     derivation_set_type derivations;
     
     range_map_type range_map;
@@ -498,6 +508,23 @@ struct ExtractTree
     weight_set_type weights_outside;
     
     alignment_map_type alignment_map;
+
+    struct __rule_span : public boost::static_visitor<int>
+    {
+      int operator()(const attribute_set_type::int_type& x) const { return x; }
+      template <typename Tp>
+      int operator()(const Tp& x) const { throw std::runtime_error("no rule span with integer?"); }
+    };
+  
+    int rule_span(const attribute_set_type& attrs, const attribute_type& attr) const
+    {
+      attribute_set_type::const_iterator iter = attrs.find(attr);
+      if (iter == attrs.end())
+	throw std::runtime_error("no phrasal span attribute?");
+    
+      return boost::apply_visitor(__rule_span(), iter->second);
+    }
+    
 
     struct Candidate
     {
@@ -1151,14 +1178,17 @@ struct ExtractTree
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+
+	  const range_type edge_range(rule_span(edge.attributes, attr_span_first),
+				      rule_span(edge.attributes, attr_span_last));
 	  
 	  // copy range...
-	  ranges[id] = range_type(edge.first, edge.last);
+	  ranges[id] = edge_range;
 	  
-	  if (edge.last - 1 >= static_cast<int>(alignment_map.size()))
-	    alignment_map.resize(edge.last);
+	  if (edge_range.second - 1 >= static_cast<int>(alignment_map.size()))
+	    alignment_map.resize(edge_range.second);
 	  
-	  for (int i = edge.first; i != edge.last; ++ i) {
+	  for (int i = edge_range.first; i != edge_range.second; ++ i) {
 	    point_set_type::const_iterator aiter_begin = alignment_map[i].begin();
 	    point_set_type::const_iterator aiter_end   = alignment_map[i].end();
 	    
@@ -1205,11 +1235,16 @@ struct ExtractTree
 	      const bool __inverse)
     : max_nodes(__max_nodes),
       max_height(__max_height),
-      inverse(__inverse) {}
+      inverse(__inverse),
+      attr_span_first("span-first"),
+      attr_span_last("span-last") {}
 
   int max_nodes;
   int max_height;
   bool inverse;
+
+  attribute_type attr_span_first;
+  attribute_type attr_span_last;
   
   derivation_graph_type graph_source;
   derivation_graph_type graph_target;
@@ -1373,6 +1408,22 @@ struct ExtractTree
   // construct rule-pair related data
   covered_type   covered;
   point_set_type positions_relative;
+
+  struct __rule_span : public boost::static_visitor<int>
+  {
+    int operator()(const attribute_set_type::int_type& x) const { return x; }
+    template <typename Tp>
+    int operator()(const Tp& x) const { throw std::runtime_error("no rule span with integer?"); }
+  };
+  
+  int rule_span(const attribute_set_type& attrs, const attribute_type& attr) const
+  {
+    attribute_set_type::const_iterator iter = attrs.find(attr);
+    if (iter == attrs.end())
+      throw std::runtime_error("no phrasal span attribute?");
+    
+    return boost::apply_visitor(__rule_span(), iter->second);
+  }
   
   void construct_rule(const hypergraph_type& graph,
 		      const derivation_node_type& node,
@@ -1439,7 +1490,9 @@ struct ExtractTree
     
     const hypergraph_type::edge_type& edge = graph.edges[*iter];
     
-    for (int pos = edge.first; pos != edge.last; ++ pos)
+    const int edge_first = rule_span(edge.attributes, attr_span_first);
+    const int edge_last  = rule_span(edge.attributes, attr_span_last);
+    for (int pos = edge_first; pos != edge_last; ++ pos)
       covered[pos] = true;
     
     weight *= cicada::operation::weight_function_one<weight_type>()(edge);

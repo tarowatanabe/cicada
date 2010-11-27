@@ -15,15 +15,19 @@ typedef cicada::HyperGraph hypergraph_type;
 int main(int argc, char** argv)
 {
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
+#if 0
   if (argc < 2) {
     std::cout << argv[0] << " grammar-file" << std::endl;
     return 1;
   }
+#endif
 
-  cicada::GrammarMutable grammar(argv[1]);
+  cicada::GrammarMutable grammar;
   
-  grammar.insert("[x] ||| good boy |||  bad boy ||| feature1=0.4");
+  grammar.insert("[x] ||| good boy |||  bad boy ||| feature1=0.4 ||| attribute1=6.7 attribute2=6 attribute3=\"bad morning\" 5.6 \"good\"");
+  grammar.insert("[x] ||| good boy |||  bad boy ||| ||| attribute1=6.7 attribute2=6 attribute3=\"bad morning\"");
+  grammar.insert("[x] ||| good boy |||  bad boy ||| ||| ");
+  grammar.insert("[x] ||| good boy |||  bad boy ||| feature2=0.6 ||| ");
 
   std::string line;
   while (std::getline(std::cin, line)) {
@@ -42,6 +46,9 @@ int main(int argc, char** argv)
 	
 	for (hypergraph_type::feature_set_type::const_iterator fiter = riter->features.begin(); fiter != riter->features.end(); ++ fiter)
 	  std::cout << ' ' << fiter->first << '=' << fiter->second;
+	
+	std::cout << " attribute: " << riter->attributes;
+	
 	std::cout << std::endl;
       }
     }

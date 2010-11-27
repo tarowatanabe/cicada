@@ -45,7 +45,9 @@ namespace cicada
     
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
-    typedef hypergraph_type::feature_set_type feature_set_type;
+    
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
 
   public:
     typedef void* state_ptr_type;

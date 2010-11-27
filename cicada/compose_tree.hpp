@@ -62,7 +62,9 @@ namespace cicada
     typedef TreeTransducer transducer_type;
     typedef HyperGraph     hypergraph_type;
     
-    typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
     typedef hypergraph_type::rule_type        rule_type;
     typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
     
@@ -133,6 +135,7 @@ namespace cicada
       node_map.clear();
     }
     
+    // TODO: collect features on graph_in.... HOW?
     void match_tree(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       if (graph_in.nodes[id].edges.empty()) return;
@@ -273,7 +276,8 @@ namespace cicada
       
       const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_in, graph_out);
       
-      graph_out.edges[edge_id].features += rule_pair.features;
+      graph_out.edges[edge_id].features   += rule_pair.features;
+      graph_out.edges[edge_id].attributes += rule_pair.attributes;
     }
     
     hypergraph_type::id_type construct_graph(const tree_rule_type& rule,

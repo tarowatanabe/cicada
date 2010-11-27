@@ -316,6 +316,10 @@ struct ExtractGHKM
   typedef std::pair<int, int> range_type;
   typedef std::vector<range_type, std::allocator<range_type> > range_set_type;
 
+  typedef hypergraph_type::attribute_set_type attribute_set_type;
+  
+  typedef attribute_set_type::attribute_type attribute_type;
+
   struct Span
   {
     typedef std::set<int, std::less<int>, std::allocator<int> > span_type;
@@ -475,13 +479,18 @@ struct ExtractGHKM
       max_nodes(__max_nodes),
       max_height(__max_height),
       inverse(__inverse),
-      swap_source_target(__swap_source_target) {}
+      swap_source_target(__swap_source_target),
+      attr_span_first("span-first"),
+      attr_span_last("span-last") {}
 
   symbol_type non_terminal;
   int max_nodes;
   int max_height;
   bool inverse;
   bool swap_source_target;
+  
+  attribute_type attr_span_first;
+  attribute_type attr_span_last;
   
   range_set_type ranges;
   span_set_type spans;
@@ -538,6 +547,24 @@ struct ExtractGHKM
     // perform compounds extraction
     extract_composed(graph, sentence, alignment, rules);
   }
+
+  struct __rule_span : public boost::static_visitor<int>
+  {
+    int operator()(const attribute_set_type::int_type& x) const { return x; }
+    template <typename Tp>
+    int operator()(const Tp& x) const { throw std::runtime_error("no rule span with integer?"); }
+  };
+  
+  int rule_span(const attribute_set_type& attrs, const attribute_type& attr) const
+  {
+    attribute_set_type::const_iterator iter = attrs.find(attr);
+    if (iter == attrs.end())
+      throw std::runtime_error("no phrasal span attribute?");
+    
+    return boost::apply_visitor(__rule_span(), iter->second);
+  }
+
+  
   
   struct Candidate
   {
@@ -936,8 +963,11 @@ struct ExtractGHKM
     }
     
     const hypergraph_type::edge_type& edge = graph.edges[*iter];
+
+    const int edge_first = rule_span(edge.attributes, attr_span_first);
+    const int edge_last  = rule_span(edge.attributes, attr_span_last);
     
-    for (int pos = edge.first; pos != edge.last; ++ pos)
+    for (int pos = edge_first; pos != edge_last; ++ pos)
       covered[pos] = true;
     
     weight *= cicada::operation::weight_function_one<weight_type>()(edge);
@@ -1406,14 +1436,17 @@ struct ExtractGHKM
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+
+	const range_type edge_range(rule_span(edge.attributes, attr_span_first),
+				    rule_span(edge.attributes, attr_span_last));
 	
 	// copy range...
-	ranges[id] = range_type(edge.first, edge.last);
+	ranges[id] = edge_range;
 
-	if (edge.last - 1 >= static_cast<int>(alignment_source_target.size()))
-	  alignment_source_target.resize(edge.last);
+	if (edge_range.second - 1 >= static_cast<int>(alignment_source_target.size()))
+	  alignment_source_target.resize(edge_range.second);
 
-	for (int i = edge.first; i != edge.last; ++ i) {
+	for (int i = edge_range.first; i != edge_range.second; ++ i) {
 	  point_set_type::const_iterator aiter_begin = alignment_source_target[i].begin();
 	  point_set_type::const_iterator aiter_end   = alignment_source_target[i].end();
 	  

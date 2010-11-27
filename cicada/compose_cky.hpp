@@ -36,14 +36,19 @@ namespace cicada
     typedef Transducer transducer_type;
     typedef HyperGraph hypergraph_type;
     
-    typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+    typedef attribute_set_type::attribute_type attribute_type;
     
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     
     ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source=false)
-      : goal(__goal), grammar(__grammar), yield_source(__yield_source)
+      : goal(__goal), grammar(__grammar), yield_source(__yield_source),
+	attr_span_first("span-first"),
+	attr_span_last("span-last")
     {
       goal_rule.reset(new rule_type(vocab_type::GOAL,
 				    rule_type::symbol_set_type(1, goal.non_terminal(1))));
@@ -53,23 +58,42 @@ namespace cicada
     {
       ActiveItem(const transducer_type::id_type& __node,
 		 const hypergraph_type::edge_type::node_set_type __tails,
+		 const feature_set_type& __features,
+		 const attribute_set_type& __attributes)
+	: node(__node),
+	  tails(__tails),
+	  features(__features),
+	  attributes(__attributes) {}
+      ActiveItem(const transducer_type::id_type& __node,
+		 const feature_set_type& __features,
+		 const attribute_set_type& __attributes)
+	: node(__node),
+	  tails(),
+	  features(__features),
+	  attributes(__attributes) {}
+      ActiveItem(const transducer_type::id_type& __node,
+		 const hypergraph_type::edge_type::node_set_type __tails,
 		 const feature_set_type& __features)
 	: node(__node),
 	  tails(__tails),
-	  features(__features) {}
+	  features(__features),
+	  attributes() {}
       ActiveItem(const transducer_type::id_type& __node,
 		 const feature_set_type& __features)
 	: node(__node),
 	  tails(),
-	  features(__features) {}
+	  features(__features),
+	  attributes() {}
       ActiveItem(const transducer_type::id_type& __node)
 	: node(__node),
 	  tails(),
-	  features() {}
+	  features(),
+	  attributes() {}
       
       transducer_type::id_type                  node;
       hypergraph_type::edge_type::node_set_type tails;
       feature_set_type                          features;
+      attribute_set_type                        attributes;
     };
     
     typedef ActiveItem active_type;
@@ -179,13 +203,13 @@ namespace cicada
 		// handling of EPSILON rule...
 		if (terminal == vocab_type::EPSILON) {
 		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-		    cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features));
+		    cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
 		} else {
 		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 		    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 		    if (node == transducer.root()) continue;
 		    
-		    cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features));
+		    cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
 		  }
 		}
 	      }
@@ -203,7 +227,7 @@ namespace cicada
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features,
+		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features, riter->attributes + citer->attributes,
 			   citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
 			   first, last);
 	    }
@@ -234,7 +258,7 @@ namespace cicada
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(yield_source ? riter->source : riter->target, riter->features,
+		apply_rule(yield_source ? riter->source : riter->target, riter->features, riter->attributes,
 			   &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
 			   first, last);
 	    }
@@ -261,7 +285,7 @@ namespace cicada
       passive_set_type& passive_arcs = passives(0, lattice.size());
       for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	if (non_terminals[passive_arcs[p]] == goal)
-	  apply_rule(goal_rule, feature_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+	  apply_rule(goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
 		     0, lattice.size());
       
       // we will sort to remove unreachable nodes......
@@ -273,6 +297,7 @@ namespace cicada
     template <typename Iterator>
     void apply_rule(const rule_ptr_type& rule,
 		    const feature_set_type& features,
+		    const attribute_set_type& attributes,
 		    Iterator first,
 		    Iterator last,
 		    node_map_type& node_map,
@@ -284,11 +309,12 @@ namespace cicada
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
       edge.features = features;
+      edge.attributes = attributes;
       
       // assign metadata...
-      edge.first    = lattice_first;
-      edge.last     = lattice_last;
-
+      edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
+      edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
+      
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(rule->lhs, 0));
       if (result.second) {
 	hypergraph_type::node_type& node = graph.add_node();
@@ -339,7 +365,7 @@ namespace cicada
 	  std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
 	  tails.back() = *piter;
 	  
-	  cell.push_back(active_type(node, tails, aiter->features));
+	  cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
 	}
     }
 
@@ -349,6 +375,8 @@ namespace cicada
     const symbol_type goal;
     const grammar_type& grammar;
     const bool yield_source;
+    const attribute_type attr_span_first;
+    const attribute_type attr_span_last;
     
     rule_ptr_type goal_rule;
 

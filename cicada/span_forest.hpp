@@ -31,12 +31,18 @@ namespace cicada
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
+    typedef attribute_set_type::attribute_type attribute_type;
+
     typedef Vocab vocab_type;
 
     typedef std::pair<int, int> span_type;
     typedef std::vector<span_type, std::allocator<span_type> > span_set_type;
 
     typedef std::vector<bool, std::allocator<bool> > visited_type;
+
+    SpanForest() : attr_span_first("span-first"), attr_span_last("span-last") {}
     
     void operator()(const hypergraph_type& __graph, hypergraph_type& graph)
     {
@@ -68,7 +74,7 @@ namespace cicada
 	
 	int span_pos = spans_node[node_id].first;
 	
-	edge.first = span_pos;
+	edge.attributes[attr_span_first] = attribute_set_type::int_type(span_pos);
 	
 	int non_terminal_pos = 0;
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
@@ -89,7 +95,7 @@ namespace cicada
 	    ++ span_pos;
 	}
 	
-	edge.last = span_pos;
+	edge.attributes[attr_span_last] = attribute_set_type::int_type(span_pos);
 	
 	spans_node[node_id].second = utils::bithack::max(spans_node[node_id].second, span_pos);
       }
@@ -99,6 +105,9 @@ namespace cicada
 
     span_set_type spans_node;
     visited_type  visited;
+    
+    const attribute_type attr_span_first;
+    const attribute_type attr_span_last;
   };
 
   inline

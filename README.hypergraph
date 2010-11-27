@@ -61,11 +61,12 @@ EDGE
 
 {
  "tail" : [node-id, node-id, ...],
- "featuers" : {"feature-name" : double, "feature-name2" : double, ... },
- "rule" : rule-id, (zero indicating no-rule == invalid hypergraph)
- "first" : first-span-position, (assigned by cky-composer, phrase-composer etc.)
- "last" : last-span-position,
- "distance" : distance
+ "feature" : {"feature-name" : double, "feature-name2" : double, ... },
+ "attribute" : {"attribute-name" : ATTRIBUTE, "attribute-name2" : ATTRIBUTE, ...},
+ "rule" : rule-id (zero indicating no-rule == invalid hypergraph)
 }
 
+ATTRIBUTE
+
+float(double precision) | integer(64-bit) | " escaped string "
 

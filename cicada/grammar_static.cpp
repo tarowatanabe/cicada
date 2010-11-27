@@ -52,10 +52,11 @@ namespace cicada
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
-    typedef cicada::Symbol  symbol_type;
-    typedef cicada::Symbol  word_type;
-    typedef cicada::Feature feature_type;
-    typedef cicada::Vocab   vocab_type;
+    typedef cicada::Symbol    symbol_type;
+    typedef cicada::Symbol    word_type;
+    typedef cicada::Feature   feature_type;
+    typedef cicada::Attribute attribute_type;
+    typedef cicada::Vocab     vocab_type;
     
     typedef Transducer::rule_type          rule_type;
     typedef Transducer::rule_ptr_type      rule_ptr_type;
@@ -66,8 +67,6 @@ namespace cicada
     
     typedef rule_type::symbol_set_type symbol_set_type;
     typedef rule_type::symbol_set_type phrase_type;
-
-    
     
     typedef float          score_type;
     typedef uint8_t        quantized_type;
@@ -87,7 +86,8 @@ namespace cicada
     typedef succinctdb::succinct_trie_database<word_type::id_type, mapped_type, rule_alloc_type > rule_db_type;
     typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > phrase_db_type;
 
-    typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
+    typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
+    typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
 
     class ScoreSet
     {
@@ -162,21 +162,25 @@ namespace cicada
 	source_db(x.source_db),
 	target_db(x.target_db),
 	score_db(x.score_db),
+	attr_db(x.attr_db),
 	vocab(x.vocab),
 	feature_names(x.feature_names),
+	attribute_names(x.attribute_names),
 	max_span(x.max_span) {}
 
     GrammarStaticImpl& operator=(const GrammarStaticImpl& x)
     {
       clear();
       
-      rule_db       = x.rule_db;
-      source_db     = x.source_db;
-      target_db     = x.target_db;
-      score_db      = x.score_db;
-      vocab         = x.vocab;
-      feature_names = x.feature_names;
-      max_span      = x.max_span;
+      rule_db         = x.rule_db;
+      source_db       = x.source_db;
+      target_db       = x.target_db;
+      score_db        = x.score_db;
+      attr_db         = x.attr_db;
+      vocab           = x.vocab;
+      feature_names   = x.feature_names;
+      attribute_names = x.attribute_names;
+      max_span        = x.max_span;
       
       return *this;
     }
@@ -189,8 +193,10 @@ namespace cicada
       source_db.clear();
       target_db.clear();
       score_db.clear();
+      attr_db.clear();
       vocab.clear();
       feature_names.clear();
+      attribute_names.clear();
 
       cache_rule_sets.clear();
       cache_sources.clear();
@@ -340,6 +346,16 @@ namespace cicada
 								    ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
 								    : feature_set_type::mapped_type(score)));
 	    }
+
+	    for (size_t attr = 0; attr < attr_db.size(); ++ attr) {
+	      const score_type score = attr_db[attr][pos_feature];
+	      
+	      options.back().attributes[attribute_names[attr]] = (score <= boost::numeric::bounds<score_type>::lowest()
+								  ? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								  : (score >= boost::numeric::bounds<score_type>::highest()
+								     ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								     : feature_set_type::mapped_type(score)));
+	    }
 	    
 	    ++ pos_feature;
 	  }
@@ -416,10 +432,12 @@ namespace cicada
     phrase_db_type  target_db;
     
     score_db_type   score_db;
+    score_db_type   attr_db;
     
     vocab_type      vocab;
 
-    feature_name_set_type feature_names;
+    feature_name_set_type   feature_names;
+    attribute_name_set_type attribute_names;
     
     // caching..
     cache_rule_map_type   cache_rule_sets;
@@ -522,6 +540,44 @@ namespace cicada
 	score_db[feature].quantized.open(path);
 	score_db[feature].score.clear();
       }
+
+    for (size_t attr = 0; attr < attr_db.size(); ++ attr)
+      if (attr_db[attr].score.is_open()) {
+	
+	const path_type path = utils::tempfile::directory_name(tmp_dir / "cicada.attr.quantized.XXXXXX");
+	utils::tempfile::insert(path);
+	
+	boost::iostreams::filtering_ostream os;
+	os.push(utils::packed_sink<quantized_type, std::allocator<quantized_type> >(path));
+	
+	counts.clear();
+	codemap.clear();
+	std::fill(codebook.begin(), codebook.end(), 0.0);
+	
+	score_set_type::score_set_type::const_iterator liter_end = attr_db[attr].score.end();
+	for (score_set_type::score_set_type::const_iterator liter = attr_db[attr].score.begin(); liter != liter_end; ++ liter)
+	  ++ counts[*liter];
+	
+	Quantizer::quantize(counts, codebook, codemap);
+	
+	for (score_set_type::score_set_type::const_iterator liter = attr_db[attr].score.begin(); liter != liter_end; ++ liter) {
+	  codemap_type::const_iterator citer = codemap.find(*liter);
+	  if (citer == codemap.end())
+	    throw std::runtime_error("no codemap?");
+	  
+	  os.write((char*) &(citer->second), sizeof(quantized_type));
+	}
+	
+	for (int i = 0; i < 256; ++ i)
+	  attr_db[attr].maps[i] = codebook[i];
+	
+	os.pop();
+	utils::tempfile::permission(path);
+	
+	attr_db[attr].quantized.open(path);
+	attr_db[attr].score.clear();
+      }
+
   }
   
   void GrammarStaticImpl::read(const std::string& parameter)
@@ -547,7 +603,7 @@ namespace cicada
   
   void GrammarStaticImpl::write(const path_type& file) const
   {
-        typedef utils::repository repository_type;
+    typedef utils::repository repository_type;
     
     if (file == path()) return;
     
@@ -560,6 +616,8 @@ namespace cicada
     vocab.write(rep.path("vocab"));
     
     const size_type feature_size = score_db.size();
+    const size_type attribute_size = attr_db.size();
+    
     for (size_t feature = 0; feature < feature_size; ++ feature) {
       std::ostringstream stream_score;
       stream_score << "score-" << std::setfill('0') << std::setw(6) << feature;
@@ -571,7 +629,19 @@ namespace cicada
       rep[name] = feature_names[feature];
     }
     
-    rep["feature-size"] = boost::lexical_cast<std::string>(feature_size);
+    for (size_t attribute = 0; attribute < attribute_size; ++ attribute) {
+      std::ostringstream stream_score;
+      stream_score << "attribute-" << std::setfill('0') << std::setw(6) << attribute;
+      
+      attr_db[attribute].write(rep.path(stream_score.str()));
+
+      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+      
+      rep[name] = attribute_names[attribute];
+    }
+    
+    rep["feature-size"]   = boost::lexical_cast<std::string>(feature_size);
+    rep["attribute-size"] = boost::lexical_cast<std::string>(attribute_size);
   }
   
   void GrammarStaticImpl::read_binary(const path_type& path)
@@ -590,7 +660,7 @@ namespace cicada
     if (iter == rep.end())
       throw std::runtime_error("no feature size?");
 
-    const size_type feature_size = atoi(iter->second.c_str());
+    const size_type feature_size = boost::lexical_cast<size_type>(iter->second);
     
     feature_names.reserve(feature_size);
     feature_names.resize(feature_size);
@@ -611,17 +681,34 @@ namespace cicada
       feature_names[feature] = iter->second;
     }
     
-#if 0
-    std::cerr << "phrase-table: " << path
-		<< " feature size: " << feature_size
-		<< std::endl;
-#endif
+    repository_type::const_iterator aiter = rep.find("attribute-size");
+    if (aiter == rep.end()) return;
+    
+    const size_type attribute_size = boost::lexical_cast<size_type>(aiter->second);
+    
+    attribute_names.reserve(attribute_size);
+    attribute_names.resize(attribute_size);
+    attr_db.reserve(attribute_size);
+    attr_db.resize(attribute_size);
+    
+    for (size_t attribute = 0; attribute < attribute_size; ++ attribute) {
+      std::ostringstream stream_score;
+      stream_score << "attribute-" << std::setfill('0') << std::setw(6) << attribute;
+      
+      attr_db[attribute].read(rep.path(stream_score.str()));
+      
+      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+      repository_type::const_iterator iter = rep.find(name);
+      if (iter == rep.end())
+	throw std::runtime_error(std::string("no attribute name?: ") + name);
+      
+      attribute_names[attribute] = iter->second;
+    }
   }
-  
   
   typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
   typedef std::vector<float, std::allocator<float> > scores_parsed_type;
-  typedef boost::fusion::tuple<std::string, phrase_parsed_type, phrase_parsed_type, scores_parsed_type > rule_parsed_type;
+  typedef boost::fusion::tuple<std::string, phrase_parsed_type, phrase_parsed_type, scores_parsed_type, scores_parsed_type> rule_parsed_type;
 
   template <typename Iterator>
   struct rule_grammar_parser_static : boost::spirit::qi::grammar<Iterator, rule_parsed_type(), boost::spirit::standard::space_type>
@@ -644,7 +731,7 @@ namespace cicada
       
       lhs %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);
       phrase %= *(lexeme[+(char_ - space) - "|||"]);
-      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> "|||" >> (+float_);
+      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> "|||" >> +float_ >> -("|||" >> *float_);
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> lhs;
@@ -782,14 +869,16 @@ namespace cicada
     utils::tempfile::insert(path_vocab);
     
     rule_db.open(path_rule, rule_db_type::WRITE);
-    phrase_db_type        sources_db(1024 * 1024 * 4);
-    phrase_db_type        targets_db(1024 * 1024 * 4);
+    phrase_db_type        source_map(1024 * 1024 * 4);
+    phrase_db_type        target_map(1024 * 1024 * 4);
     
     score_stream_set_type score_streams;
+    score_stream_set_type attr_streams;
     
     id_type id_rule = 0;
     
     int feature_size = -1;
+    int attribute_size = -1;
     
     sequence_type source_prev;
     sequence_type source;
@@ -846,7 +935,7 @@ namespace cicada
 	   
 	  encode_phrase(source_prev, codes_source);
 	     
-	  const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
+	  const id_type id_source = source_map.insert(&(*codes_source.begin()), codes_source.size(),
 						      hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
 
 	  // encode options
@@ -886,6 +975,8 @@ namespace cicada
       std::copy(target.begin(), target.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
       std::cerr << "features: ";
       std::copy(boost::fusion::get<3>(rule).begin(), boost::fusion::get<3>(rule).end(), std::ostream_iterator<score_type>(std::cerr, " "));
+      std::cerr << "attribute: ";
+      std::copy(boost::fusion::get<4>(rule).begin(), boost::fusion::get<4>(rule).end(), std::ostream_iterator<score_type>(std::cerr, " "));
       std::cerr << std::endl;
 #endif
       
@@ -904,14 +995,32 @@ namespace cicada
 	}
       } else if (feature_size != static_cast<int>(boost::fusion::get<3>(rule).size()))
 	throw std::runtime_error("invalid # of features...");
+
+      if (attribute_size < 0) {
+	attribute_size = boost::fusion::get<4>(rule).size();
+	
+	attr_streams.reserve(attribute_size);
+	attr_streams.resize(attribute_size);
+	
+	for (int attribute = 0; attribute < attribute_size; ++ attribute) {
+	  attr_streams[attribute].path = utils::tempfile::file_name(tmp_dir / "cicada.attribute.XXXXXX");
+	  utils::tempfile::insert(attr_streams[attribute].path);
+	  
+	  attr_streams[attribute].ostream.reset(new utils::compress_ostream(attr_streams[attribute].path, 1024 * 1024));
+	}
+      } else if (attribute_size != static_cast<int>(boost::fusion::get<4>(rule).size()))
+	throw std::runtime_error("invalid # of attributes...");
       
       for (int feature = 0; feature < feature_size; ++ feature)
 	score_streams[feature].ostream->write((char*) &boost::fusion::get<3>(rule)[feature], sizeof(score_type));
-       
+      
+      for (int attribute = 0; attribute < attribute_size; ++ attribute)
+	attr_streams[attribute].ostream->write((char*) &boost::fusion::get<4>(rule)[attribute], sizeof(score_type));
+      
       // encode target...
       encode_phrase(target, codes_target);
        
-      const id_type id_target = targets_db.insert(&(*codes_target.begin()), codes_target.size(),
+      const id_type id_target = target_map.insert(&(*codes_target.begin()), codes_target.size(),
 						  hasher_type::operator()(codes_target.begin(), codes_target.end(), 0));
        
       // put into rule_options...
@@ -923,7 +1032,7 @@ namespace cicada
 	
       encode_phrase(source_prev, codes_source);
 	     
-      const id_type id_source = sources_db.insert(&(*codes_source.begin()), codes_source.size(),
+      const id_type id_source = source_map.insert(&(*codes_source.begin()), codes_source.size(),
 						  hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
       
       // encode options
@@ -937,13 +1046,13 @@ namespace cicada
     }
 
     // source phrases...
-    sources_db.write(path_source);
-    sources_db.clear();
+    source_map.write(path_source);
+    source_map.clear();
     source_db.open(path_source);
 
     // target phrases...
-    targets_db.write(path_target);
-    targets_db.clear();
+    target_map.write(path_target);
+    target_map.clear();
     target_db.open(path_target);
 
     // rules....
@@ -980,6 +1089,34 @@ namespace cicada
       if (feature_names[feature] == feature_type())
 	feature_names[feature] = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
     }
+
+    if (attribute_size < 0)
+      attribute_size = 0;
+    
+    // attributes
+    attr_db.reserve(attribute_size);
+    attr_db.resize(attribute_size);
+    
+    attribute_names.clear();
+    attribute_names.reserve(attribute_size);
+    attribute_names.resize(attribute_size, attribute_type());
+    
+    for (int attribute = 0; attribute < attribute_size; ++ attribute) {
+      attr_streams[attribute].ostream->reset();
+      utils::tempfile::permission(attr_streams[attribute].path);
+      attr_db[attribute].score.open(attr_streams[attribute].path);
+
+      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+
+      parameter_type::const_iterator piter = param.find(name);
+      if (piter != param.end())
+	attribute_names[attribute] = attribute_type(piter->second);
+      
+      // default name...!
+      if (attribute_names[attribute] == attribute_type())
+	attribute_names[attribute] = std::string("rule-table-") + boost::lexical_cast<std::string>(attribute);
+    }
+
   }
   
   

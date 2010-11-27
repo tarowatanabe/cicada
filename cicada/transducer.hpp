@@ -33,22 +33,32 @@ namespace cicada
     typedef cicada::Vocab  vocab_type;
     typedef cicada::Rule   rule_type;
 
-    typedef cicada::HyperGraph::feature_set_type feature_set_type;
+    typedef cicada::HyperGraph::feature_set_type   feature_set_type;
+    typedef cicada::HyperGraph::attribute_set_type attribute_set_type;
     
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
     
     struct RulePair
     {
-      rule_ptr_type    source;
-      rule_ptr_type    target;
-      feature_set_type features;
+      rule_ptr_type      source;
+      rule_ptr_type      target;
+      feature_set_type   features;
+      attribute_set_type attributes;
       
       RulePair()
-	: source(), target(), features() {}
-      RulePair(const rule_ptr_type& __source, const rule_ptr_type& __target)
-	: source(__source), target(__target), features() {}
-      RulePair(const rule_ptr_type& __source, const rule_ptr_type& __target, const feature_set_type& __features)
-	: source(__source), target(__target), features(__features) {}
+	: source(), target(), features(), attributes() {}
+      RulePair(const rule_ptr_type& __source,
+	       const rule_ptr_type& __target)
+	: source(__source), target(__target), features(), attributes() {}
+      RulePair(const rule_ptr_type& __source,
+	       const rule_ptr_type& __target,
+	       const feature_set_type& __features)
+	: source(__source), target(__target), features(__features), attributes() {}
+      RulePair(const rule_ptr_type& __source,
+	       const rule_ptr_type& __target,
+	       const feature_set_type& __features,
+	       const attribute_set_type& __attributes)
+	: source(__source), target(__target), features(__features), attributes(__attributes) {}
     };
 
     typedef RulePair rule_pair_type;

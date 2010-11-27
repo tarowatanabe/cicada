@@ -42,6 +42,10 @@ namespace cicada
       typedef feature_function_type::edge_type edge_type;
 
       typedef feature_function_type::feature_set_type feature_set_type;
+
+      typedef feature_function_type::attribute_set_type attribute_set_type;
+      
+      typedef attribute_set_type::attribute_type attribute_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -61,8 +65,25 @@ namespace cicada
 #endif
 
       SpanImpl()
-	: forced_feature(false) {}
+	: forced_feature(false), attr_span_first("span-first"), attr_span_last("span-last") {}
       
+      
+      struct __rule_span : public boost::static_visitor<int>
+      {
+	int operator()(const attribute_set_type::int_type& x) const { return x; }
+	template <typename Tp>
+	int operator()(const Tp& x) const { throw std::runtime_error("no phrasal span with integer?"); }
+      };
+      
+      int rule_span(const attribute_set_type& attrs, const attribute_type& attr) const
+      {
+	attribute_set_type::const_iterator iter = attrs.find(attr);
+	if (iter == attrs.end())
+	  throw std::runtime_error("no rule span attribute?");
+	
+	return boost::apply_visitor(__rule_span(), iter->second);
+      }
+
       
       void span_score(state_ptr_type& state,
 		      const state_ptr_set_type& states,
@@ -71,11 +92,12 @@ namespace cicada
       {
 	if (label_map.empty()) return;
 
-	span_type span(edge.first, edge.last);
+	span_type span(rule_span(edge.attributes, attr_span_first),
+		       rule_span(edge.attributes, attr_span_last));
 	
 	int* context = reinterpret_cast<int*>(state);
-	context[0] = edge.first;
-	context[1] = edge.last;
+	context[0] = span.first;
+	context[1] = span.second;
 	
 	std::string rule_string = "span:" + span_label(span) + '(';
 	
@@ -208,8 +230,8 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = hypergraph.nodes[hypergraph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge = hypergraph.edges[*eiter];
 	  
-	  span_goal.first  = utils::bithack::min(span_goal.first, edge.first);
-	  span_goal.second = utils::bithack::max(span_goal.second, edge.last);
+	  span_goal.first  = utils::bithack::min(span_goal.first,  rule_span(edge.attributes, attr_span_first));
+	  span_goal.second = utils::bithack::max(span_goal.second, rule_span(edge.attributes, attr_span_last));
 	}
 	
 	label_chart.clear();
@@ -227,6 +249,9 @@ namespace cicada
       label_map_type   label_map;
 
       bool forced_feature;
+
+      attribute_type attr_span_first;
+      attribute_type attr_span_last;
     };
     
 

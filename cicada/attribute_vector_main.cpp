@@ -37,7 +37,7 @@ int main(int argc, char** argv)
 {
   typedef cicada::AttributeVector attribute_set_type;
   
-  attribute_set_type attr1("{\"good\":1,\"bad\":4.5,\"bad2\":1e-5, \"neutral\":\"big\"}");
+  attribute_set_type attr1("{\"good\":1,\"bad\":4.5,\"bad2\":1e-5, \"neutral\":\"bi\\u0020g\"}");
 
   std::cout << "attr1 size: " << attr1.size() << std::endl;
   

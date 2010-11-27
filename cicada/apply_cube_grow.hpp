@@ -356,7 +356,6 @@ namespace cicada
 	candidate.score *= antecedent.score;
       }
       
-      
       const id_type node_id_coarse = candidate.out_edge.head;
       
       // assign node-id of in-graph for scoring...

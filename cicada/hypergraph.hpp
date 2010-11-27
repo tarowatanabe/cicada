@@ -60,11 +60,11 @@ namespace cicada
       typedef cicada::Rule rule_type;
       
       Edge()
-	: head(invalid), tails(), rule(), first(0), last(0) {}
+	: head(invalid), tails(), rule() {}
       
       template <typename Iterator>
       Edge(Iterator first, Iterator last)
-	: head(invalid), tails(first, last), rule(), first(0), last(0) {}
+	: head(invalid), tails(first, last), rule() {}
       
       id_type       head;
       node_set_type tails;
@@ -73,10 +73,6 @@ namespace cicada
       attribute_set_type attributes; // attributes
       
       rule_ptr_type rule;
-      
-      // meta data... this will be deprecated and moved to "attributes"
-      int first;
-      int last;
       
       id_type id;
     };

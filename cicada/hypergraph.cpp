@@ -238,7 +238,8 @@ namespace cicada
 	("\\f", '\f')
 	("\\n", '\n')
 	("\\r", '\r')
-	("\\t", '\t');
+	("\\t", '\t')
+	("\\u0020", ' ');
       
       rule_string %= ('\"' >> lexeme[*(escape_char | ~char_('\"'))] >> '\"') ;
       rule_string_action = rule_string [add_rule(rules)];
@@ -251,7 +252,8 @@ namespace cicada
       
       // attributes...
       key %= ('\"' >> lexeme[*(escape_char | (char_ - '\"' - space))] >> '\"');
-      data %= key | double_dot | int64_;
+      data_value %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      data %= data_value | double_dot | int64_;
       attribute %= key >> ':' >> data;
       attribute_set %= '{' >> -(attribute % ',') >> '}';
       
@@ -332,16 +334,11 @@ namespace cicada
 	edge.attributes.insert(boost::fusion::get<2>(edge_parsed).begin(), boost::fusion::get<2>(edge_parsed).end());
 	edge.rule = rules[boost::fusion::get<3>(edge_parsed)];
 	
-	// meta data...
-	edge.first = boost::fusion::get<4>(edge_parsed);
-	edge.last = boost::fusion::get<5>(edge_parsed);
-	
 	graph.connect_edge(edge.id, graph.nodes.back().id);
       }
       
       hypergraph_type* _graph;
       rule_ptr_set_type* _rules;
-      
     };
 
     struct add_rule
@@ -379,6 +376,7 @@ namespace cicada
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
     boost::spirit::qi::rule<Iterator, std::string(), space_type>                key;
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
     boost::spirit::qi::rule<Iterator, attribute_parsed_set_type(), space_type>  attribute_set;
@@ -677,8 +675,8 @@ namespace cicada
 	    std::copy(edge.tails.begin(), edge.tails.end() - 1, std::ostream_iterator<hypergraph_type::id_type>(os, ","));
 	    os << edge.tails.back();
 	  }
-	  os << "],";
-	  os << "\"feature\":{";
+	  os << "]";
+	  os << ',' << "\"feature\":{";
 	  // dump features!
 	  
 	  output_features.clear();
@@ -686,14 +684,9 @@ namespace cicada
 	  boost::spirit::karma::generate(iter, features_grammar, edge.features);
 	  
 	  os << output_features;
-	  
-	  os << "},";
-	  // dump attributes here...!
-	  
-	  
-	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second) << ',';
-	  os << "\"first\":" << edge.first << ',';
-	  os << "\"last\":" << edge.last;
+	  os << "}";
+	  os << ',' << "\"attribute\":" << edge.attributes;
+	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
 	  os << '}';
 	}
 	

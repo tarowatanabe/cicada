@@ -564,7 +564,8 @@ namespace cicada
 	      
 	      hypergraph_type::edge_type& edge = target.add_edge();
 	      edge.rule = (yield_source ? riter->source : riter->target);
-	      edge.features = riter->features;
+	      edge.features   = riter->features;
+	      edge.attributes = riter->attributes;
 	      
 	      target.connect_edge(edge.id, node.id);
 	    }
@@ -629,8 +630,10 @@ namespace cicada
       case 2: graph_edge.rule = rule_x1_x2;   break;
       }
 
-      if (edge.edge != hypergraph_type::invalid)
-	graph_edge.features = source.edges[edge.edge].features;
+      if (edge.edge != hypergraph_type::invalid) {
+	graph_edge.features   = source.edges[edge.edge].features;
+	graph_edge.attributes = source.edges[edge.edge].attributes;
+      }
       
       target.connect_edge(graph_edge.id, node_head.id);
     }

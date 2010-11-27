@@ -54,10 +54,12 @@ namespace cicada
 	("\\f", '\f')
 	("\\n", '\n')
 	("\\r", '\r')
-	("\\t", '\t');
+	("\\t", '\t')
+	("\\u0020", ' ');
       
       key %= ('\"' >> lexeme[*(escape_char | (char_ - '\"' - space))] >> '\"');
-      data %= key | double_dot | int64_;
+      data_value %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      data %= data_value | double_dot | int64_;
       
       attribute %= key >> ':' >> data;
       attributes %= '{' >> -(attribute % ',') >> '}';
@@ -70,6 +72,7 @@ namespace cicada
     
     boost::spirit::qi::symbols<char, char> escape_char;
     boost::spirit::qi::rule<Iterator, std::string(), space_type>                key;
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
     boost::spirit::qi::rule<Iterator, attribute_set_parsed_type(), space_type>  attributes;
@@ -96,7 +99,8 @@ namespace cicada
 	('\f', "\\f")
 	('\n', "\\n")
 	('\r', "\\r")
-	('\t', "\\t");
+	('\t', "\\t")
+	(' ', "\\u0020");
       
       key %= ('\"' << +(escape_char | ~char_('\"')) << '\"');
       data %= int64_ | double10 | key;

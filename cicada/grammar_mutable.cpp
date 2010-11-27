@@ -9,6 +9,7 @@
 
 #include "grammar_mutable.hpp"
 #include "parameter.hpp"
+#include "attribute_vector.hpp"
 
 #include "utils/compact_trie_dense.hpp"
 #include "utils/compress_stream.hpp"
@@ -47,10 +48,11 @@ namespace cicada
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
-    typedef cicada::Symbol  symbol_type;
-    typedef cicada::Symbol  word_type;
-    typedef cicada::Feature feature_type;
-    typedef cicada::Vocab   vocab_type;
+    typedef cicada::Symbol    symbol_type;
+    typedef cicada::Symbol    word_type;
+    typedef cicada::Feature   feature_type;
+    typedef cicada::Attribute attribute_type;
+    typedef cicada::Vocab     vocab_type;
 
     typedef Transducer::rule_type          rule_type;
     typedef Transducer::rule_ptr_type      rule_ptr_type;
@@ -60,6 +62,9 @@ namespace cicada
     typedef utils::compact_trie_dense<symbol_type, rule_pair_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				      std::allocator<std::pair<const symbol_type, rule_pair_set_type> > > trie_type;
     typedef trie_type::id_type id_type;
+
+    typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
+    typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
 
     GrammarMutableImpl() : trie(symbol_type()) {}
     
@@ -96,13 +101,19 @@ namespace cicada
 
   private:
     trie_type trie;
+
+    feature_name_set_type   feature_names_default;
+    attribute_name_set_type attribute_names_default;
   };
-  
   
   typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
   typedef std::pair<std::string, double> score_parsed_type;
   typedef std::vector<score_parsed_type, std::allocator<score_parsed_type> > scores_parsed_type;
-  typedef boost::fusion::tuple<std::string, phrase_parsed_type, phrase_parsed_type, scores_parsed_type > rule_parsed_type;
+  
+  typedef std::pair<std::string, AttributeVector::data_type> attr_parsed_type;
+  typedef std::vector<attr_parsed_type, std::allocator<attr_parsed_type> > attrs_parsed_type;
+  
+  typedef boost::fusion::tuple<std::string, phrase_parsed_type, phrase_parsed_type, scores_parsed_type, attrs_parsed_type> rule_parsed_type;
   
   template <typename Iterator>
   struct rule_grammar_parser_mutable : boost::spirit::qi::grammar<Iterator, rule_parsed_type(), boost::spirit::standard::space_type>
@@ -123,20 +134,51 @@ namespace cicada
       using qi::_1;
       using standard::space;
       
+      escape_char.add
+	("\\\"", '\"')
+	("\\\\", '\\')
+	("\\/", '/')
+	("\\b", '\b')
+	("\\f", '\f')
+	("\\n", '\n')
+	("\\r", '\r')
+	("\\t", '\t')
+	("\\u0020", ' ');
+      
       lhs %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);
       phrase %= *(lexeme[+(char_ - space) - "|||"]);
 
       score %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> double_;
-      scores %= +score;
+      scores %= *score;
       
-      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> -("|||" >> scores);
+      data_value %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      data %= data_value | double_dot | int64_;
+      
+      attribute %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> data;
+      attributes %= *attribute;
+      
+      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> -("|||" >> scores) >> -("|||" >> attributes);
     }
   
-    boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> lhs;
-    boost::spirit::qi::rule<Iterator, phrase_parsed_type(), boost::spirit::standard::space_type> phrase;
-    boost::spirit::qi::rule<Iterator, score_parsed_type(), boost::spirit::standard::space_type>  score;
-    boost::spirit::qi::rule<Iterator, scores_parsed_type(), boost::spirit::standard::space_type> scores;
-    boost::spirit::qi::rule<Iterator, rule_parsed_type(), boost::spirit::standard::space_type> rule_grammar;
+    typedef boost::spirit::standard::space_type space_type;
+
+    boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
+    boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
+    
+    boost::spirit::qi::symbols<char, char> escape_char;
+
+    boost::spirit::qi::rule<Iterator, std::string(), space_type> lhs;
+    boost::spirit::qi::rule<Iterator, phrase_parsed_type(), space_type> phrase;
+    
+    boost::spirit::qi::rule<Iterator, score_parsed_type(), space_type>  score;
+    boost::spirit::qi::rule<Iterator, scores_parsed_type(), space_type> scores;
+    
+    boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
+    boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
+    boost::spirit::qi::rule<Iterator, attr_parsed_type(), space_type>           attribute;
+    boost::spirit::qi::rule<Iterator, attrs_parsed_type(), space_type>          attributes;
+    
+    boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type> rule_grammar;
   };
 
   
@@ -203,18 +245,38 @@ namespace cicada
     for (scores_parsed_type::const_iterator fiter = scores.begin(); fiter != fiter_end; ++ fiter)
       if (fiter->first.empty()) {
 	// default name!
-	const std::string name = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
 	
-	rules.back().features[name] = fiter->second;
+	if (feature >= feature_names_default.size())
+	  feature_names_default.resize(feature + 1);
+	if (feature_names_default[feature].empty())
+	  feature_names_default[feature] = "rule-table-" + boost::lexical_cast<std::string>(feature);
+	
+	rules.back().features[feature_names_default[feature]] = fiter->second;
 	
 	++ feature;
       } else
 	rules.back().features[fiter->first] = fiter->second;
+    
+    int attribute = 0;
+    attrs_parsed_type::const_iterator aiter_end = boost::fusion::get<4>(rule_parsed).end();
+    for (attrs_parsed_type::const_iterator aiter = boost::fusion::get<4>(rule_parsed).begin(); aiter != aiter_end; ++ aiter) 
+      if (aiter->first.empty()) {
+	
+	if (attribute >= attribute_names_default.size())
+	  attribute_names_default.resize(attribute + 1);
+	if (attribute_names_default[attribute].empty())
+	  attribute_names_default[attribute] = "rule-table-" + boost::lexical_cast<std::string>(attribute);
+	
+	rules.back().attributes[attribute_names_default[attribute]] = aiter->second;
+	
+	++ attribute;
+      } else
+	rules.back().attributes[aiter->first] = aiter->second;
   }
   
   void GrammarMutableImpl::read(const std::string& parameter)
   {
-    typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
+    
     typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
 
     typedef cicada::Parameter parameter_type;
@@ -225,23 +287,41 @@ namespace cicada
     if (param.name() != "-" && ! boost::filesystem::exists(param.name()))
       throw std::runtime_error("no grammar file: " + param.name());
     
-    feature_name_set_type feature_names;
+    feature_name_set_type   feature_names;
+    attribute_name_set_type attribute_names;
     parameter_type::iterator piter_end = param.end();
     for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
-
-      std::string::const_iterator iter = piter->first.begin();
-      std::string::const_iterator iter_end = piter->first.end();
-
-      int feature_id = -1;
+      {
+	std::string::const_iterator iter = piter->first.begin();
+	std::string::const_iterator iter_end = piter->first.end();
+	
+	int feature_id = -1;
+	const bool result = boost::spirit::qi::parse(iter, iter_end,
+						     "feature" >> boost::spirit::qi::int_[boost::phoenix::ref(feature_id) = boost::spirit::qi::_1]);
+	if (result && iter == iter_end && feature_id >= 0) {
+	  if (feature_id >= int(feature_names.size()))
+	    feature_names.resize(feature_id + 1);
+	  feature_names[feature_id] = piter->second;
+	  continue;
+	}
+      }
       
-      const bool result = boost::spirit::qi::parse(iter, iter_end,
-						   "feature" >> boost::spirit::qi::int_[boost::phoenix::ref(feature_id) = boost::spirit::qi::_1]);
-      if (result && iter == iter_end && feature_id >= 0) {
-	if (feature_id >= int(feature_names.size()))
-	  feature_names.resize(feature_id + 1);
-	feature_names[feature_id] = piter->second;
-      } else
-	throw std::runtime_error("unsupported key: " + piter->first);
+      {
+	std::string::const_iterator iter = piter->first.begin();
+	std::string::const_iterator iter_end = piter->first.end();
+	
+	int attribute_id = -1;
+	const bool result = boost::spirit::qi::parse(iter, iter_end,
+						     "attribute" >> boost::spirit::qi::int_[boost::phoenix::ref(attribute_id) = boost::spirit::qi::_1]);
+	if (result && iter == iter_end && attribute_id >= 0) {
+	  if (attribute_id >= int(attribute_names.size()))
+	    attribute_names.resize(attribute_id + 1);
+	  attribute_names[attribute_id] = piter->second;
+	  continue;
+	}
+      }
+      
+      throw std::runtime_error("unsupported key: " + piter->first);
     }
 
     typedef rule_grammar_parser_mutable<std::string::const_iterator> rule_parser_type;
@@ -302,8 +382,7 @@ namespace cicada
       rule_type::symbol_set_type::const_iterator siter_end = rule.source->rhs.end();
       for (rule_type::symbol_set_type::const_iterator siter = rule.source->rhs.begin(); siter != siter_end; ++ siter, ++ iiter)
 	*iiter = siter->non_terminal();
-
-
+      
       // we do not check duplicates!
       rule_pair_set_type& rules = trie[trie.insert(source_index.begin(), source_index.end())];
       rules.push_back(rule);
@@ -320,14 +399,38 @@ namespace cicada
 	    rules.back().features[feature_names[feature]] = fiter->second;
 	  else {
 	    // default name!
-	    const std::string name = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
+	    if (feature >= feature_names_default.size())
+	      feature_names_default.resize(feature + 1);
+	    if (feature_names_default[feature].empty())
+	      feature_names_default[feature] = "rule-table-" + boost::lexical_cast<std::string>(feature);
 	    
-	    rules.back().features[name] = fiter->second;
+	    rules.back().features[feature_names_default[feature]] = fiter->second;
 	  }
 	  
 	  ++ feature;
 	} else
 	  rules.back().features[fiter->first] = fiter->second;
+      
+      int attribute = 0;
+      attrs_parsed_type::const_iterator aiter_end = boost::fusion::get<4>(rule_parsed).end();
+      for (attrs_parsed_type::const_iterator aiter = boost::fusion::get<4>(rule_parsed).begin(); aiter != aiter_end; ++ aiter) 
+	if (aiter->first.empty()) {
+	  
+	  if (attribute < int(attribute_names.size()) && ! attribute_names[attribute].empty())
+	    rules.back().attributes[attribute_names[attribute]] = aiter->second;
+	  else {
+	    // default name!
+	    if (attribute >= attribute_names_default.size())
+	      attribute_names_default.resize(attribute + 1);
+	    if (attribute_names_default[attribute].empty())
+	      attribute_names_default[attribute] = "rule-table-" + boost::lexical_cast<std::string>(attribute);
+	    
+	    rules.back().attributes[attribute_names_default[attribute]] = aiter->second;
+	  }
+	  
+	  ++ attribute;
+	} else
+	  rules.back().attributes[aiter->first] = aiter->second;
     }
   }
   

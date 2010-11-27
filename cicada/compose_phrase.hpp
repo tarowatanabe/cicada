@@ -54,7 +54,10 @@ namespace cicada
     typedef Transducer transducer_type;
     typedef HyperGraph hypergraph_type;
     
-    typedef hypergraph_type::feature_set_type feature_set_type;
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+    typedef attribute_set_type::attribute_type attribute_type;
     
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
@@ -109,7 +112,9 @@ namespace cicada
 		  const bool __yield_source)
       : grammar(__grammar),
 	max_distortion(__max_distortion),
-	yield_source(__yield_source)
+	yield_source(__yield_source),
+	attr_phrase_span_first("phrase-span-first"),
+	attr_phrase_span_last("phrase-span-last")
     {
       // initializer...
       rule_goal.reset(new rule_type(vocab_type::GOAL,
@@ -245,9 +250,11 @@ namespace cicada
 	    edge.features = riter->features;
 	    if (! state.features.empty())
 	      edge.features += state.features;
+	    edge.attributes = riter->attributes;
 	    
-	    edge.first    = state.first;
-	    edge.last     = state.last;
+	    // assign metadata...
+	    edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(state.first);
+	    edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(state.last);
 	    
 	    graph.connect_edge(edge.id, node.id);
 	  }
@@ -315,8 +322,8 @@ namespace cicada
 	hypergraph_type::edge_type& edge = graph.add_edge(&(niter->second), &(niter->second) + 1);
 	edge.rule = rule_goal;
 	
-	edge.first    = 0;
-	edge.last     = lattice.size();
+	edge.attributes[attr_phrase_span_first] = attribute_set_type::int_type(0);
+	edge.attributes[attr_phrase_span_last]  = attribute_set_type::int_type(lattice.size());
 	
 	hypergraph_type::node_type& node = graph.add_node();
 	
@@ -340,13 +347,15 @@ namespace cicada
     const grammar_type& grammar;
     const int max_distortion;
     const bool yield_source;
+    
+    const attribute_type attr_phrase_span_first;
+    const attribute_type attr_phrase_span_last;
 
     node_map_type     nodes;
     coverage_set_type coverages;
     
     rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
-    
   };
   
   inline
