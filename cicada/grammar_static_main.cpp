@@ -40,6 +40,9 @@ int main(int argc, char** argv)
 	
 	for (hypergraph_type::feature_set_type::const_iterator fiter = riter->features.begin(); fiter != riter->features.end(); ++ fiter)
 	  std::cout << ' ' << fiter->first << '=' << fiter->second;
+	
+	std::cout << " attributes: " << riter->attributes;
+	
 	std::cout << std::endl;
       }
     }
