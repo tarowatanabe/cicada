@@ -216,7 +216,7 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
 
-    typedef std::back_insert_iterator<std::string> iterator_type;
+    typedef std::ostream_iterator<char> iterator_type;
     
     typedef graphviz_rule_generator<iterator_type>    rule_grammar_type;
     typedef graphviz_tail_generator<iterator_type>    tail_grammar_type;
@@ -225,10 +225,6 @@ namespace cicada
     rule_grammar_type    rule_grammar;
     tail_grammar_type    tail_grammar;
     feature_grammar_type feature_grammar;
-
-    std::string output_rule;
-    std::string output_tail;
-    std::string output_feature;
     
     os << "digraph { rankdir=BT;" << '\n';
     
@@ -243,19 +239,25 @@ namespace cicada
 	const edge_type& edge = hypergraph.edges[*eiter];
 
 	if (edge.rule) {
-	  output_rule.clear();
-	  iterator_type iter_rule(output_rule);
-	  boost::spirit::karma::generate(iter_rule, rule_grammar, *edge.rule);
-
-	  output_tail.clear();
-	  iterator_type iter_tail(output_tail);
-	  boost::spirit::karma::generate(iter_tail, tail_grammar, edge.tails);
-
-	  output_feature.clear();
-	  iterator_type iter_feature(output_feature);
-	  boost::spirit::karma::generate(iter_feature, feature_grammar, edge.features);
+	  os << "  edge_" << edge.id << " [label=\"{";
 	  
-	  os << "  edge_" << edge.id << " [label=\"{" << output_rule << " | " << output_tail << "} | " << output_feature << "\", shape=record];" << '\n';
+	  iterator_type iter_rule(os);
+	  boost::spirit::karma::generate(iter_rule, rule_grammar, *edge.rule);
+	  
+	  os << " | ";
+	  
+	  iterator_type iter_tail(os);
+	  boost::spirit::karma::generate(iter_tail, tail_grammar, edge.tails);
+	  
+	  os << "}";
+	  
+	  if (! edge.features.empty()) {
+	    os << " | ";
+	    iterator_type iter_feature(os);
+	    boost::spirit::karma::generate(iter_feature, feature_grammar, edge.features);
+	  }
+	  
+	  os << "\", shape=record];" << '\n';
 	} else
 	  os << "  edge_" << edge.id << " [label=\"\", shape=rect];" << '\n';
 	
@@ -277,7 +279,7 @@ namespace cicada
   {
     typedef Lattice lattice_type;
     
-    typedef std::back_insert_iterator<std::string> iterator_type;
+    typedef std::ostream_iterator<char> iterator_type;
 
     typedef graphviz_label_generator<iterator_type>   label_grammar_type;
     typedef graphviz_feature_generator<iterator_type> feature_grammar_type;
@@ -285,9 +287,6 @@ namespace cicada
     label_grammar_type   label_grammar;
     feature_grammar_type feature_grammar;
 
-    std::string output_label;
-    std::string output_feature;
-    
     os << "digraph { " << '\n';
 
     int id_edge = 0;
@@ -298,17 +297,19 @@ namespace cicada
       for (lattice_type::arc_set_type::const_iterator aiter = lattice[id].begin(); aiter != aiter_end; ++ aiter) {
 	const lattice_type::arc_type& arc = *aiter;
 	
-	output_label.clear();
-	iterator_type iter_label(output_label);
-	
+	os << "   edge_" << id_edge << " [label=\"";
+
+	iterator_type iter_label(os);
 	boost::spirit::karma::generate(iter_label, label_grammar, arc.label);
 	
-	output_feature.clear();
-	iterator_type iter_feature(output_feature);
+	if (! arc.features.empty()) {
+	  os << " | ";
+	  
+	  iterator_type iter_feature(os);
+	  boost::spirit::karma::generate(iter_feature, feature_grammar, arc.features);
+	}
 	
-	boost::spirit::karma::generate(iter_feature, feature_grammar, arc.features);
-	
-	os << "   edge_" << id_edge << " [label=\"" << output_label << " | " << output_feature << "\", shape=record];" << '\n';
+	os << "\", shape=record];" << '\n';
 	
 	os << "   node_" << id << " -> edge_" << id_edge << ';' << '\n';
 	os << "   edge_" << id_edge << " -> node_" << (id + arc.distance) << ';' << '\n';
