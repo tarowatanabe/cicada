@@ -258,10 +258,10 @@ namespace cicada
       attribute_set %= '{' >> -(attribute % ',') >> '}';
       
       edge %= ('{'
-	       >> lit("\"tail\"")    >> ':' >> tail_node_set
-	       >> ',' >> lit("\"feature\"") >> ':' >> feature_set
-	       >> -(',' >> lit("\"attribute\"") >> ':' >> attribute_set)
-	       >> ',' >> lit("\"rule\"")    >> ':' >> int_
+	       >> -(lit("\"tail\"")    >> ':' >> tail_node_set >> ',')
+	       >> -(lit("\"feature\"") >> ':' >> feature_set >> ',')
+	       >> -(lit("\"attribute\"") >> ':' >> attribute_set >> ',')
+	       >> lit("\"rule\"")    >> ':' >> int_
 	       >> -(',' >> lit("\"first\"")    >> ':' >> int_)
 	       >> -(',' >> lit("\"last\"")    >> ':' >> int_)
 	       >> '}');
@@ -667,24 +667,31 @@ namespace cicada
 	  if (! initial_edge)
 	    os << ", ";
 	  initial_edge = false;
-
+	  
 	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
 	  
-	  os << "{\"tail\":[";
+	  os << '{';
+
 	  if (! edge.tails.empty()) {
+	    os << "\"tail\":[";
 	    std::copy(edge.tails.begin(), edge.tails.end() - 1, std::ostream_iterator<hypergraph_type::id_type>(os, ","));
 	    os << edge.tails.back();
+	    os << "],";
 	  }
-	  os << "]";
 	  
-	  os << ',' << "\"feature\":{";
-	  iterator_type iter(os);
-	  boost::spirit::karma::generate(iter, features_grammar, edge.features);
-	  os << "}";
+	  if (! edge.features.empty()) {
+	    os << "\"feature\":{";
+	    iterator_type iter(os);
+	    boost::spirit::karma::generate(iter, features_grammar, edge.features);
+	    os << "},";
+	  }
 	  
-	  os << ',' << "\"attribute\":" << edge.attributes;
+	  if (! edge.attributes.empty()) {
+	    os << "\"attribute\":" << edge.attributes;
+	    os << ',';
+	  }
 	  
-	  os << ',' << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
+	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
 	  
 	  os << '}';
 	}

@@ -60,9 +60,9 @@ NODE (contains list of edge)
 EDGE
 
 {
- "tail" : [node-id, node-id, ...],
- "feature" : {"feature-name" : double, "feature-name2" : double, ... },
- "attribute" : {"attribute-name" : ATTRIBUTE, "attribute-name2" : ATTRIBUTE, ...},
+ "tail" : [node-id, node-id, ...],  (if no tails, this entry is empty)
+ "feature" : {"feature-name" : double, "feature-name2" : double, ... }, (if no features, this entry is empty)
+ "attribute" : {"attribute-name" : ATTRIBUTE, "attribute-name2" : ATTRIBUTE, ...}, (if no attributes, this entry is empty)
  "rule" : rule-id (zero indicating no-rule == invalid hypergraph)
 }
 
