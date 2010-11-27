@@ -686,7 +686,7 @@ namespace cicada
 	  os << output_features;
 	  os << "}";
 	  os << ',' << "\"attribute\":" << edge.attributes;
-	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
+	  os << ',' << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
 	  os << '}';
 	}
 	
