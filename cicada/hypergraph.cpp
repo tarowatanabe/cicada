@@ -562,6 +562,7 @@ namespace cicada
 
       // dump rule part...
       
+      typedef std::ostream_iterator<char> iterator_type;
       typedef rule_generator<iterator_type> grammar_type;
 
 #ifdef HAVE_TLS
@@ -583,7 +584,6 @@ namespace cicada
 #endif
       
       bool initial_rule = true;
-      std::string output_rule;
       
       hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
@@ -606,14 +606,14 @@ namespace cicada
 	      
 	      rules_unique.insert(std::make_pair(&rule, rule_id));
 	      
-	      output_rule.clear();
-	      iterator_type iter(output_rule);
-	      
-	      boost::spirit::karma::generate(iter, rule_grammar, rule);
-	      
 	      if (! initial_rule)
 		os << ", ";
-	      os << '\"' << output_rule << '\"';
+	      os << '\"';
+	      
+	      iterator_type iter(os);
+	      boost::spirit::karma::generate(iter, rule_grammar, rule);
+	      
+	      os << '\"';
 	      
 	      initial_rule = false;
 	    }
@@ -628,6 +628,8 @@ namespace cicada
     
     {
       os << "\"nodes\"" << ": " << '[';
+
+      typedef std::ostream_iterator<char> iterator_type;
 
       typedef features_generator<iterator_type> grammar_type;
 
@@ -648,8 +650,6 @@ namespace cicada
       
       grammar_type& features_grammar = *__grammar;
 #endif
-
-      std::string output_features;
       
       // dump nodes...
       bool initial_node = true;
@@ -676,17 +676,16 @@ namespace cicada
 	    os << edge.tails.back();
 	  }
 	  os << "]";
+	  
 	  os << ',' << "\"feature\":{";
-	  // dump features!
-	  
-	  output_features.clear();
-	  iterator_type iter(output_features);
+	  iterator_type iter(os);
 	  boost::spirit::karma::generate(iter, features_grammar, edge.features);
-	  
-	  os << output_features;
 	  os << "}";
+	  
 	  os << ',' << "\"attribute\":" << edge.attributes;
+	  
 	  os << ',' << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
+	  
 	  os << '}';
 	}
 	
