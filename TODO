@@ -10,8 +10,10 @@ Support tree-to-tree transduction:
 	Support non-tree transducer matching:
 	match with phrases or hierarchical phrases whose spans match with
 	syntactic spans.
+	experimental code exits, but which do not support features/attributes in original hypergraph....
 
 Better MIRA training
+    Optimized online training by combining MERT procedure to select better update ratio.... (does it work?)
 
 Use source side tree-fragment as a rule, and parse "lattice"
     Simply convert source side into a flat structure and parse via CKY
@@ -19,8 +21,14 @@ Use source side tree-fragment as a rule, and parse "lattice"
     Allow special encoding in tree-grammar...
 
 Add Matcher interface?
+  - for lattice generation, it is reported stemming or word net synset does help to generalize matching.
+    Do we implement this as our string baseline?
 
 Compute kbest oracle translations or packed forest:
   - We can treat the packed forest as the "correct translations"
   - Or, use the kbest, intersect with incorrect translations in order to 
     compute features???
+
+Systematic symbols:
+  - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
+    I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
