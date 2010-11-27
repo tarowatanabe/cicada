@@ -1078,7 +1078,7 @@ namespace cicada
       utils::tempfile::permission(score_streams[feature].path);
       score_db[feature].score.open(score_streams[feature].path);
 
-      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+      const std::string name("feature" + boost::lexical_cast<std::string>(feature));
 
       parameter_type::const_iterator piter = param.find(name);
       if (piter != param.end())
@@ -1086,7 +1086,7 @@ namespace cicada
       
       // default name...!
       if (feature_names[feature] == feature_type())
-	feature_names[feature] = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
+	feature_names[feature] = "rule-table-" + boost::lexical_cast<std::string>(feature);
     }
 
     if (attribute_size < 0)

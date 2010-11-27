@@ -7,11 +7,11 @@
 
 #include "cicada/feature/lexicalized_reordering.hpp"
 #include "cicada/parameter.hpp"
-#include "cicada/lexicalized_reordering.hpp"
 
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/simple_vector.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -27,11 +27,9 @@ namespace cicada
       typedef cicada::Vocab    vocab_type;
       typedef cicada::Sentence sentence_type;
       typedef cicada::Lattice  lattice_type;
-      
-      typedef cicada::LexicalizedReordering model_type;
 
-      typedef model_type::size_type       size_type;
-      typedef model_type::difference_type difference_type;
+      typedef size_t    size_type;
+      typedef ptrdiff_t difference_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -39,28 +37,77 @@ namespace cicada
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
       
       typedef feature_function_type::edge_type edge_type;
-      typedef feature_function_type::feature_set_type feature_set_type;
       
-      typedef feature_set_type::feature_type feature_type;
-      typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
-
+      typedef feature_function_type::feature_set_type   feature_set_type;
       typedef feature_function_type::attribute_set_type attribute_set_type;
       
+      typedef feature_set_type::feature_type     feature_type;
       typedef attribute_set_type::attribute_type attribute_type;
-
+      
+      typedef std::vector<feature_type, std::allocator<feature_type> >     feature_list_type;
+      typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_list_type;
+      
+      typedef utils::simple_vector<float, std::allocator<float> > feature_cache_type;
+      
+      struct feature_cache_hash_type : public utils::hashmurmur<size_t>
+      {
+	size_t operator()(const feature_cache_type& x) const
+	{
+	  return utils::hashmurmur<size_t>::operator()(x.begin(), x.end(), 0);
+	}
+      };
+      typedef utils::indexed_set<feature_cache_type, feature_cache_hash_type, std::equal_to<feature_cache_type>,
+				 std::allocator<feature_cache_type> > feature_cache_states_type;
+      typedef feature_cache_states_type::index_type state_type;
       
       LexicalizedReorderingImpl(const std::string& parameter)
-	: model(parameter), feature_names(), lattice(0),
+	: feature_names(),
+	  attribute_names(),
+	  bidirectional(false),
+	  monotonicity(false),
+	  source_only(false),
+	  target_only(false),
+	  lattice(0),
 	  attr_phrase_span_first("phrase-span-first"),
 	  attr_phrase_span_last("phrase-span-last")
       {
-	if (model.bidirectional) {
-	  if (model.monotonicity) {
+	typedef cicada::Parameter parameter_type;
+      
+	const parameter_type param(parameter);
+
+	if (param.name() != "lexicalized-reordering"
+	    && param.name() != "lexicalized-reorder"
+	    && param.name() != "lexical-reordering"
+	    && param.name() != "lexical-reorder")
+	  throw std::runtime_error("is this really lexicalized reordering feature function? " + parameter);
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "bidirectional") == 0 || strcasecmp(piter->first.c_str(), "bi") == 0)
+	    bidirectional = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "monotonicity") == 0 || strcasecmp(piter->first.c_str(), "mono") == 0)
+	    monotonicity = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "source-only") == 0 || strcasecmp(piter->first.c_str(), "f") == 0)
+	    source_only = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "target-only") == 0 || strcasecmp(piter->first.c_str(), "e") == 0)
+	    target_only = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "feature") == 0)
+	    attribute_names.push_back(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for lexicalized reordering: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	if (source_only && target_only)
+	  throw std::runtime_error("you cannot use both source/target-only");
+	
+	if (bidirectional) {
+	  if (monotonicity) {
+	    feature_names.reserve(4);
 	    feature_names.push_back("lexicalized-reordering:forward-monotone");
 	    feature_names.push_back("lexicalized-reordering:forward-others");
 	    feature_names.push_back("lexicalized-reordering:backward-monotone");
 	    feature_names.push_back("lexicalized-reordering:backward-others");
 	  } else {
+	    feature_names.reserve(6);
 	    feature_names.push_back("lexicalized-reordering:forward-monotone");
 	    feature_names.push_back("lexicalized-reordering:forward-swap");
 	    feature_names.push_back("lexicalized-reordering:forward-discontinuous");
@@ -69,93 +116,105 @@ namespace cicada
 	    feature_names.push_back("lexicalized-reordering:backward-discontinuous");
 	  }
 	} else {
-	  if (model.monotonicity) {
+	  if (monotonicity) {
+	    feature_names.reserve(2);
 	    feature_names.push_back("lexicalized-reordering:forward-monotone");
 	    feature_names.push_back("lexicalized-reordering:forward-others");
 	  } else {
+	    feature_names.reserve(3);
 	    feature_names.push_back("lexicalized-reordering:forward-monotone");
 	    feature_names.push_back("lexicalized-reordering:forward-swap");
 	    feature_names.push_back("lexicalized-reordering:forward-discontinuous");
 	  }
 	}
-      }
-      
-      LexicalizedReorderingImpl(const LexicalizedReorderingImpl& x)
-	: model(x.model), feature_names(x.feature_names), lattice(0),
-	  attr_phrase_span_first("phrase-span-first"),
-	  attr_phrase_span_last("phrase-span-last") {}
-      LexicalizedReorderingImpl& operator=(const LexicalizedReorderingImpl& x)
-      {
-	model = x.model;
-	feature_names = x.feature_names;
-	return *this;
+	
+	attribute_names.resize(utils::bithack::max(feature_names.size(), attribute_names.size()));
+	
+	if (feature_names.size() != attribute_names.size())
+	  throw std::runtime_error("attribute to feature mapping size do not match...");
+	
+	// assign default...
+	for (size_t i = 0; i != attribute_names.size(); ++ i)
+	  if (attribute_names[i].empty())
+	    attribute_names[i] = "rule-table-" + boost::lexical_cast<std::string>(i);
       }
 
-      void assign_feature(const feature_type& feature, const double& score, feature_set_type& features) const
+      void clear() { cache_states.clear(); }
+      
+      struct __feature_map : public boost::static_visitor<double>
+      {
+	double operator()(const double& x) const { return x; }
+	template <typename Tp>
+	double operator()(const Tp& x) const { return 0.0; }
+      };
+      
+      void assign_feature(const feature_type& feature,
+			  const double& score,
+			  feature_set_type& features) const
       {
 	if (score != 0.0)
 	  features[feature] += score;
       }
-
+      
       void reordering_score_next(const int prev_first, const int prev_last,
 				 const int next_first, const int next_last,
-				 const size_type node,
+				 const feature_cache_type& cache,
 				 feature_set_type& features) const
       {
-	if (model.bidirectional) {
-	  if (model.monotonicity) {
+	if (bidirectional) {
+	  if (monotonicity) {
 	    if (prev_last == next_first)
-	      assign_feature(feature_names[2], model[node][2], features);
+	      assign_feature(feature_names[2], cache[2], features);
 	    else
-	      assign_feature(feature_names[3], model[node][3], features);
+	      assign_feature(feature_names[3], cache[3], features);
 	  } else {
 	    if (prev_last == next_first)
-	      assign_feature(feature_names[3], model[node][3], features);
+	      assign_feature(feature_names[3], cache[3], features);
 	    else if (next_last == prev_first)
-	      assign_feature(feature_names[4], model[node][4], features);
+	      assign_feature(feature_names[4], cache[4], features);
 	    else
-	      assign_feature(feature_names[5], model[node][5], features);
+	      assign_feature(feature_names[5], cache[5], features);
 	  }
 	}
       }
       
       void reordering_score(const int prev_first, const int prev_last,
 			    const int next_first, const int next_last,
-			    const size_type node,
+			    const feature_cache_type& cache,
 			    feature_set_type& features) const
       {
-	if (model.monotonicity) {
+	if (monotonicity) {
 	  if (prev_last == next_first)
-	    assign_feature(feature_names[0], model[node][0], features);
+	    assign_feature(feature_names[0], cache[0], features);
 	  else
-	    assign_feature(feature_names[1], model[node][1], features);
+	    assign_feature(feature_names[1], cache[1], features);
 	} else {
 	  if (prev_last == next_first)
-	    assign_feature(feature_names[0], model[node][0], features);
+	    assign_feature(feature_names[0], cache[0], features);
 	  else if (next_last == prev_first)
-	    assign_feature(feature_names[1], model[node][1], features);
+	    assign_feature(feature_names[1], cache[1], features);
 	  else
-	    assign_feature(feature_names[2], model[node][2], features);
+	    assign_feature(feature_names[2], cache[2], features);
 	}
       }
     
       void reordering_score_adjust(const int prev_first, const int prev_last,
 				   const int next_first, const int next_last,
-				   const size_type node,
+				   const feature_cache_type& cache,
 				   feature_set_type& features) const
       {
-	if (model.monotonicity) {
+	if (monotonicity) {
 	  if (prev_last == next_first)
-	    assign_feature(feature_names[0], - model[node][0], features);
+	    assign_feature(feature_names[0], - cache[0], features);
 	  else
-	    assign_feature(feature_names[1], - model[node][1], features);
+	    assign_feature(feature_names[1], - cache[1], features);
 	} else {
 	  if (prev_last == next_first)
-	    assign_feature(feature_names[0], - model[node][0], features);
+	    assign_feature(feature_names[0], - cache[0], features);
 	  else if (next_last == prev_first)
-	    assign_feature(feature_names[1], - model[node][1], features);
+	    assign_feature(feature_names[1], - cache[1], features);
 	  else
-	    assign_feature(feature_names[2], - model[node][2], features);
+	    assign_feature(feature_names[2], - cache[2], features);
 	}
       }
       
@@ -181,54 +240,51 @@ namespace cicada
 					const edge_type& edge,
 					feature_set_type& features) const
       {
-	if (! lattice)
-	  throw std::runtime_error("no input lattice?");
-
-	int* span       = reinterpret_cast<int*>(state);
-	size_type* node = reinterpret_cast<size_type*>(span + 2);
+	int* span = reinterpret_cast<int*>(state);
+	state_type* node = reinterpret_cast<state_type*>(span + 2);
 	
 	if (states.empty()) {
 	  // How do we capture initial phrase....???
-	  
 	  const int span_first = phrase_span(edge.attributes, attr_phrase_span_first);
 	  const int span_last  = phrase_span(edge.attributes, attr_phrase_span_last);
 
 	  span[0] = span_first;
 	  span[1] = span_last;
-
-	  sentence_type& phrase = const_cast<sentence_type&>(phrase_impl);
-	  phrase.clear();
-	  for (int pos = span_first; pos != span_last; ++ pos)
-	    phrase.push_back(lattice->operator[](pos).front().label);
 	  
-	  *node = (model.fe
-		   ? model.find(phrase.begin(), phrase.end(), edge.rule->rhs.begin(), edge.rule->rhs.end())
-		   : model.find(phrase.begin(), phrase.end()));
+	  feature_cache_type cache(feature_names.size(), 0.0);
+	  for (size_t i = 0; i != feature_names.size(); ++ i) {
+	    attribute_set_type::const_iterator aiter = edge.attributes.find(attribute_names[i]);
+	    if (aiter != edge.attributes.end())
+	      cache[i] = boost::apply_visitor(__feature_map(), aiter->second);
+	  }
 	  
-	  reordering_score(0, 0, span_first, span_last, *node, features);
+	  feature_cache_states_type::iterator siter = const_cast<feature_cache_states_type&>(cache_states).insert(cache).first;
+	  *node = siter - cache_states.begin();
+	  
+	  reordering_score(0, 0, span_first, span_last, cache, features);
 	} else if (states.size() == 1) {
 	  // it is only for the goal state...
-	  const int*       span_antecedent = reinterpret_cast<const int*>(states[0]);
-	  const size_type* node_antecedent = reinterpret_cast<const size_type*>(span_antecedent + 2);
+	  const int*        span_antecedent = reinterpret_cast<const int*>(states[0]);
+	  const state_type* node_antecedent = reinterpret_cast<const state_type*>(span_antecedent + 2);
 
 	  span[0] = span_antecedent[0];
 	  span[1] = span_antecedent[1];
 	  *node   = *node_antecedent;
 	} else if (states.size() == 2) {
-	  const int*       span_antecedent = reinterpret_cast<const int*>(states[0]);
-	  const size_type* node_antecedent = reinterpret_cast<const size_type*>(span_antecedent + 2);
+	  const int*        span_antecedent = reinterpret_cast<const int*>(states[0]);
+	  const state_type* node_antecedent = reinterpret_cast<const state_type*>(span_antecedent + 2);
 	  
-	  const int*       span_phrase     = reinterpret_cast<const int*>(states[1]);
-	  const size_type* node_phrase     = reinterpret_cast<const size_type*>(span_phrase + 2);
+	  const int*        span_phrase     = reinterpret_cast<const int*>(states[1]);
+	  const state_type* node_phrase     = reinterpret_cast<const state_type*>(span_phrase + 2);
 	  
 	  span[0] = span_phrase[0];
 	  span[1] = span_phrase[1];
 	  *node   = *node_phrase;
 	  
 	  // make adjustment, since this span-phrase is not a initial phrase..
-	  reordering_score_adjust(0, 0, span_phrase[0], span_phrase[1], *node_phrase, features);
-	  reordering_score(span_antecedent[0], span_antecedent[1], span_phrase[0], span_phrase[1], *node_phrase, features);
-	  reordering_score_next(span_antecedent[0], span_antecedent[1], span_phrase[0], span_phrase[1], *node_antecedent, features);
+	  reordering_score_adjust(0, 0, span_phrase[0], span_phrase[1], cache_states[*node_phrase], features);
+	  reordering_score(span_antecedent[0], span_antecedent[1], span_phrase[0], span_phrase[1], cache_states[*node_phrase], features);
+	  reordering_score_next(span_antecedent[0], span_antecedent[1], span_phrase[0], span_phrase[1], cache_states[*node_antecedent], features);
 	} else
 	  throw std::runtime_error("we do not support non-phrasal composed hypergraph");
       }
@@ -236,64 +292,42 @@ namespace cicada
       void lexicalized_reordering_final_score(const state_ptr_type& state,
 						feature_set_type& features) const
       {
-	const int* span       = reinterpret_cast<const int*>(state);
-	const size_type* node = reinterpret_cast<const size_type*>(span + 2);
+	const int*        span = reinterpret_cast<const int*>(state);
+	const state_type* node = reinterpret_cast<const state_type*>(span + 2);
 	
-	reordering_score_next(span[0], span[1], lattice->size(), lattice->size(), *node, features);
+	reordering_score_next(span[0], span[1], lattice->size(), lattice->size(), cache_states[*node], features);
       }
       
       void assign(const lattice_type& __lattice)
       {
 	lattice = &__lattice;
-	
-	lattice_type::const_iterator liter_end = lattice->end();
-	for (lattice_type::const_iterator liter = lattice->begin(); liter != liter_end; ++ liter)
-	  if (liter->size() != 1)
-	    throw std::runtime_error("we do not support non-linear lattice!");
       }
       
-      model_type model;
-      sentence_type phrase_impl;
-
-      feature_list_type feature_names;
+      feature_cache_states_type cache_states;
       
+      feature_list_type   feature_names;
+      attribute_list_type attribute_names;
+      
+      bool bidirectional;
+      bool monotonicity;
+      bool source_only;
+      bool target_only;
+
       const lattice_type* lattice;
 
-      const attribute_type attr_phrase_span_first;
-      const attribute_type attr_phrase_span_last;
+      attribute_type attr_phrase_span_first;
+      attribute_type attr_phrase_span_last;
     };
 
     
     LexicalizedReordering::LexicalizedReordering(const std::string& parameter)
       : pimpl(0)
     {
-      typedef cicada::Parameter parameter_type;
-      
-      const parameter_type param(parameter);
-
-      if (param.name() != "lexicalized-reordering"
-	  && param.name() != "lexicalized-reorder"
-	  && param.name() != "lexical-reordering"
-	  && param.name() != "lexical-reorder")
-	throw std::runtime_error("is this really lexicalized reordering feature function? " + parameter);
-      
-      std::string file;
-
-      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "file") == 0)
-	  file = piter->second;
-	else
-	  std::cerr << "WARNING: unsupported parameter for lexicalizedreordering: " << piter->first << "=" << piter->second << std::endl;
-      }
-
-      if (file.empty())
-	throw std::runtime_error("no lexicalized reordering model?");
+      pimpl = new impl_type(parameter);
       
       // distotion context: span = [first, last)
-      base_type::__state_size = sizeof(int) * 2  + sizeof(impl_type::size_type);
+      base_type::__state_size = sizeof(int) * 2 + sizeof(impl_type::state_type);
       base_type::__feature_name = std::string("lexicalized-reordering");
-      
-      pimpl = new impl_type(file);
     }
     
     LexicalizedReordering::~LexicalizedReordering() { std::auto_ptr<impl_type> tmp(pimpl); }
@@ -377,7 +411,7 @@ namespace cicada
 
     void LexicalizedReordering::initialize()
     {
-      
+      pimpl->clear();
     }
   };
 };
