@@ -100,9 +100,9 @@ int main(int argc, char** argv)
     
     if (mode_cicada) {
       if (mode_reordering)
-	process<ScorerCICADA>(is, os, root_source, root_target);
-      else
 	process<ScorerCICADAReordering>(is, os, root_source, root_target);
+      else
+	process<ScorerCICADA>(is, os, root_source, root_target);
     } else if (mode_moses) {
       if (mode_reordering)
 	process<ScorerMOSESReordering>(is, os, root_source, root_target);
