@@ -395,7 +395,7 @@ namespace cicada
     vocab_type            vocab;
     
     feature_name_set_type   feature_names;
-    attribute_name_set_tyep attribute_names;
+    attribute_name_set_type attribute_names;
     
     // caching..
     cache_rule_pair_map_type cache_rule;
@@ -900,8 +900,27 @@ namespace cicada
       } else if (feature_size != static_cast<int>(scores.size()))
 	throw std::runtime_error("invalid # of features...");
       
+      // encode attributes...
+      if (attribute_size < 0) {
+	attribute_size = attrs.size();
+	
+	attr_streams.reserve(attribute_size);
+	attr_streams.resize(attribute_size);
+	
+	for (int attribute = 0; attribute < attribute_size; ++ attribute) {
+	  attr_streams[attribute].path = utils::tempfile::file_name(tmp_dir / "cicada.attribute.XXXXXX");
+	  utils::tempfile::insert(attr_streams[attribute].path);
+	  
+	  attr_streams[attribute].ostream.reset(new utils::compress_ostream(attr_streams[attribute].path, 1024 * 1024));
+	}
+      } else if (attribute_size != static_cast<int>(attrs.size()))
+	throw std::runtime_error("invalid # of attributes...");
+      
       for (int feature = 0; feature < feature_size; ++ feature)
 	score_streams[feature].ostream->write((char*) &scores[feature], sizeof(score_type));
+      
+      for (int attribute = 0; attribute < attribute_size; ++ attribute)
+	attr_streams[attribute].ostream->write((char*) &attrs[attribute], sizeof(score_type));
       
       encode_rule(target, buffer_target);
       
@@ -1000,6 +1019,33 @@ namespace cicada
       // default name...!
       if (feature_names[feature] == feature_type())
 	feature_names[feature] = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
+    }
+    
+    if (attribute_size < 0)
+      attribute_size = 0;
+    
+    // attrs...
+    attr_db.reserve(attribute_size);
+    attr_db.resize(attribute_size);
+    
+    attribute_names.clear();
+    attribute_names.reserve(attribute_size);
+    attribute_names.resize(attribute_size, attribute_type());
+     
+    for (int attribute = 0; attribute < attribute_size; ++ attribute) {
+      attr_streams[attribute].ostream->reset();
+      utils::tempfile::permission(attr_streams[attribute].path);
+      attr_db[attribute].score.open(attr_streams[attribute].path);
+
+      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+
+      parameter_type::const_iterator piter = param.find(name);
+      if (piter != param.end())
+	attribute_names[attribute] = attribute_type(piter->second);
+      
+      // default name...!
+      if (attribute_names[attribute] == attribute_type())
+	attribute_names[attribute] = std::string("rule-table-") + boost::lexical_cast<std::string>(attribute);
     }
   }
   
