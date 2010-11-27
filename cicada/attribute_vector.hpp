@@ -257,6 +257,13 @@ namespace cicada
 
   public:
     friend
+    std::ostream& operator<<(std::ostream& os, const data_type& x);
+    
+    friend
+    std::istream& operator>>(std::istream& is, data_type& x);
+    
+
+    friend
     std::ostream& operator<<(std::ostream& os, const AttributeVector& x);
     
     friend
