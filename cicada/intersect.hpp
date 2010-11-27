@@ -70,7 +70,6 @@ namespace cicada
       yield.clear();
       yield.insert(yield.end(), edge.rule->rhs.begin(), edge.rule->rhs.end());
       
-      
       // sort...
       if (! edge.tails.empty()) {
 	int pos = 0;

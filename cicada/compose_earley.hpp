@@ -659,23 +659,20 @@ namespace cicada
       goal_nodes.clear();
       
       if (! rule_epsilon)
-	rule_epsilon.reset(new rule_type(vocab_type::X,
-					 rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+	rule_epsilon = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
       
       if (! rule_goal)
-	rule_goal.reset(new rule_type(vocab_type::GOAL,
-				      rule_type::symbol_set_type(1, vocab_type::X1)));
+	rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, vocab_type::X1)));
       
       if (! rule_x1)
-	rule_x1.reset(new rule_type(vocab_type::X,
-				    rule_type::symbol_set_type(1, vocab_type::X1)));
+	rule_x1 = rule_type::create(rule_type(vocab_type::X, rule_type::symbol_set_type(1, vocab_type::X1)));
+      
       if (! rule_x1_x2) {
 	std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
 	sequence.front() = vocab_type::X1;
 	sequence.back() = vocab_type::X2;
 	
-	rule_x1_x2.reset(new rule_type(vocab_type::X,
-				       rule_type::symbol_set_type(sequence.begin(), sequence.end())));
+	rule_x1_x2 =  rule_type::create(rule_type(vocab_type::X, sequence.begin(), sequence.end()));
       }
 
       

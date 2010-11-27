@@ -22,11 +22,37 @@
 #include <boost/thread.hpp>
 
 #include "utils/config.hpp"
+#include "utils/array_power2.hpp"
 
 namespace cicada
 {
- 
- 
+  
+  Rule::rule_ptr_type Rule::create(const Rule& x)
+  {
+    typedef utils::array_power2<rule_ptr_type, 1024 * 128, std::allocator<rule_ptr_type> > cache_type;
+
+#ifdef HAVE_TLS
+    static __thread cache_type* __cache_tls = 0;
+    static boost::thread_specific_ptr<cache_type> __cache;
+    
+    if (! __cache_tls) {
+      __cache.reset(new cache_type());
+      __cache_tls = __cache.get();
+    }
+    cache_type& cache = *__cache_tls;
+#else
+    static boost::thread_specific_ptr<cache_type> __cache;
+    if (! __cache.get())
+      __cache.reset(new cache_type());
+    cache_type& cache = *__cache;
+#endif
+    
+    const size_t cache_pos = hash_value(x) & (cache.size() - 1);
+    if (*cache[cache_pos] != x)
+      cache[cache_pos].reset(new Rule(x));
+    return cache[cache_pos];
+  }
+  
   typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
   
   typedef boost::fusion::tuple<std::string, phrase_parsed_type > rule_parsed_type;

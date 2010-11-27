@@ -26,7 +26,7 @@ namespace cicada
     GrammarGlue(const symbol_type& goal, const symbol_type& non_terminal, const bool __straight, const bool __inverted)
       : straight(__straight), inverted(__inverted)
     {
-      rule_ptr_type rule_unary(new rule_type(goal, rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
+      rule_ptr_type rule_unary(rule_type::create(rule_type(goal, rule_type::symbol_set_type(1, non_terminal.non_terminal(1)))));
       
       insert(rule_unary, rule_unary);
 
@@ -35,7 +35,7 @@ namespace cicada
 	phrase.front() = goal.non_terminal(1);
 	phrase.back()  = non_terminal.non_terminal(2);
 	
-	rule_ptr_type rule(new rule_type(goal, rule_type::symbol_set_type(phrase.begin(), phrase.end())));
+	rule_ptr_type rule(rule_type::create(rule_type(goal, phrase.begin(), phrase.end())));
 
 	feature_set_type features;
 	features["glue-straight-penalty"] = -1;
@@ -53,8 +53,8 @@ namespace cicada
 	phrase2.front() = non_terminal.non_terminal(2);
 	phrase2.back()  = goal.non_terminal(1);
 	
-	rule_ptr_type rule1(new rule_type(goal, rule_type::symbol_set_type(phrase1.begin(), phrase1.end())));
-	rule_ptr_type rule2(new rule_type(goal, rule_type::symbol_set_type(phrase2.begin(), phrase2.end())));
+	rule_ptr_type rule1(rule_type::create(rule_type(goal, phrase1.begin(), phrase1.end())));
+	rule_ptr_type rule2(rule_type::create(rule_type(goal, phrase2.begin(), phrase2.end())));
 	
 	feature_set_type features;
 	features["glue-inverted-penalty"] = -1;
@@ -109,7 +109,7 @@ namespace cicada
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
 	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
-	      rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, *siter)));
+	      rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
 	      insert(rule, rule, features);
 	      
@@ -141,7 +141,7 @@ namespace cicada
 	    positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
-	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
+	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
 	    
 	    insert(rule, rule, features);
 	    
@@ -183,7 +183,7 @@ namespace cicada
       feature_set_type features;
       features["deletion-penalty"] = - 1.0;
       
-      rule_ptr_type rule_epsilon(new rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+      rule_ptr_type rule_epsilon(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
       
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
@@ -193,7 +193,7 @@ namespace cicada
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
 	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
-	      rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, *siter)));
+	      rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
 	      insert(rule, rule_epsilon, features);
 	      
@@ -213,7 +213,7 @@ namespace cicada
       feature_set_type features;
       features["deletion-penalty"] = - 1.0;
       
-      rule_ptr_type rule_epsilon(new rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON)));
+      rule_ptr_type rule_epsilon(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
       
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
@@ -227,7 +227,7 @@ namespace cicada
 	    positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
-	    rule_ptr_type rule(new rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label)));
+	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
 	    
 	    insert(rule, rule_epsilon, features);
 	    

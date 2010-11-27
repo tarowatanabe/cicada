@@ -238,23 +238,6 @@ namespace cicada
     
     // exists implies data associated with the node exists...
     bool exists(size_type node) const { return rule_db.exists(node); }
-
-    struct rule_unique_hash 
-    {
-      size_t operator()(const rule_ptr_type& x) const
-      {
-	return (x.get() ? hash_value(*x) : size_t(0));
-      }
-    };
-
-    struct rule_unique_equal
-    {
-      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
-      {
-	return x == y || (x.get() && y.get() && *x == *y);
-      }
-    };
-    typedef google::dense_hash_set<rule_ptr_type, rule_unique_hash, rule_unique_equal > rule_unique_map_type;
     
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
@@ -265,9 +248,6 @@ namespace cicada
       std::pair<cache_rule_set_type::iterator, bool> result = cache.find(node);
       if (! result.second) {
 	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
-
-	rule_unique_map_type rules_unique;
-	rules_unique.set_empty_key(rule_ptr_type());
 	
 	rule_pair_set_type& options = result.first->second;
 	options.clear();
@@ -316,22 +296,12 @@ namespace cicada
 	    const rule_ptr_type rule_source = read_phrase(lhs, pos_source, cache_sources, source_db);
 	    const rule_ptr_type rule_target = read_phrase(lhs, pos_target, cache_targets, target_db);
 	    
-	    rule_ptr_type rule_sorted_source(new rule_type(*rule_source));
-	    rule_ptr_type rule_sorted_target(new rule_type(*rule_target));
+	    rule_type rule_sorted_source(*rule_source);
+	    rule_type rule_sorted_target(*rule_target);
 	    
-	    cicada::sort(*rule_sorted_source, *rule_sorted_target);
+	    cicada::sort(rule_sorted_source, rule_sorted_target);
 	    
-	    if (*rule_source == *rule_sorted_source)
-	      rule_sorted_source = rule_source;
-	    else
-	      rule_sorted_source = *(rules_unique.insert(rule_sorted_source).first);
-	    
-	    if (*rule_target == *rule_sorted_target)
-	      rule_sorted_target = rule_target;
-	    else
-	      rule_sorted_target = *(rules_unique.insert(rule_sorted_target).first);
-	    
-	    options.push_back(rule_pair_type(rule_sorted_source, rule_sorted_target));
+	    options.push_back(rule_pair_type(rule_type::create(rule_sorted_source), rule_type::create(rule_sorted_target)));
 	    
 	    for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];
@@ -405,7 +375,7 @@ namespace cicada
 	  *piter = vocab[*iiter];
 	
 	cache.pos = pos;
-	cache.rule.reset(new rule_type(lhs, phrase.begin(), phrase.end()));
+	cache.rule = rule_type::create(rule_type(lhs, phrase.begin(), phrase.end()));
       }
       return cache.rule;
     }

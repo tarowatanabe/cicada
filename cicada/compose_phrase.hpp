@@ -117,15 +117,13 @@ namespace cicada
 	attr_phrase_span_last("phrase-span-last")
     {
       // initializer...
-      rule_goal.reset(new rule_type(vocab_type::GOAL,
-				    rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
+      rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
       
       std::vector<symbol_type, std::allocator<symbol_type> > sequence(2);
       sequence.front() = non_terminal.non_terminal(1);
       sequence.back()  = non_terminal.non_terminal(2);
       
-      rule_x1_x2.reset(new rule_type(non_terminal.non_terminal(),
-				     rule_type::symbol_set_type(sequence.begin(), sequence.end())));
+      rule_x1_x2 = rule_type::create(rule_type(non_terminal.non_terminal(), sequence.begin(), sequence.end()));
     }
 
     void operator()(const lattice_type& lattice, hypergraph_type& graph)

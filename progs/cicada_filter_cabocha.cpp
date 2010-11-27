@@ -135,14 +135,14 @@ int main(int argc, char** argv)
 	      symbols.push_back('[' + titer->second + ']');
 	      
 	      hypergraph_type::edge_type& edge = graph.add_edge();
-	      edge.rule.reset(new rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
+	      edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
 	      graph.connect_edge(edge.id, node.id);
 	    }
 
 	    niter->cat = symbols[niter->head];
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	    edge.rule.reset(new rule_type(niter->cat, rule_type::symbol_set_type(symbols.begin(), symbols.end())));
+	    edge.rule = rule_type::create(rule_type(niter->cat, symbols.begin(), symbols.end()));
 	    graph.connect_edge(edge.id, head.id);
 	  }
 	  
@@ -182,8 +182,10 @@ int main(int argc, char** argv)
 	    }
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
-	    edge.rule.reset(new rule_type(static_cast<hypergraph_type::id_type>(parent_id) == graph.goal ? symbol_type("[root]") : nodes[node_id].cat,
-					  rule_type::symbol_set_type(symbols.begin(), symbols.end())));
+	    edge.rule = rule_type::create(rule_type(static_cast<hypergraph_type::id_type>(parent_id) == graph.goal
+						    ? symbol_type("[root]")
+						    : nodes[node_id].cat,
+						    symbols.begin(), symbols.end()));
 	    graph.connect_edge(edge.id, parent_id);
 	  }
 	  

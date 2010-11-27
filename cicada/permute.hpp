@@ -140,41 +140,16 @@ namespace cicada
     typedef utils::bit_vector<1024> coverage_type;
     typedef utils::bit_vector<1024> mask_type;
     
-
-    struct rule_ptr_hash
-    {
-      size_t operator()(const rule_ptr_type& x) const
-      {
-	return (x ? hash_value(*x) : size_t(0));
-      }
-    };
-
-    struct rule_ptr_equal
-    {
-      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
-      {
-	return (x == y || (x && y && *x == *y));
-      }
-    };
-
-    typedef google::dense_hash_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal> rule_set_type;
-    
-    
-    
     Permute(FeatureFunction __function,
 	    Filter __filter,
 	    const int __permute_size)
       : function(__function),
 	filter(__filter),
-	permute_size(__permute_size),
-	rules() { rules.set_empty_key(rule_ptr_type()); }
-    
+	permute_size(__permute_size) {}
     
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
-      rules.clear();
-
       target = source;
       
       permutation_type permutation;
@@ -334,11 +309,8 @@ namespace cicada
       if (permuted_phrase.size() == edge_source.rule->rhs.size()
 	  && std::equal(permuted_phrase.begin(), permuted_phrase.end(), edge_source.rule->rhs.begin()))
 	edge.rule = edge_source.rule;
-      else {
-	edge.rule.reset(new rule_type(*edge_source.rule));
-	edge.rule->rhs = rule_type::symbol_set_type(permuted_phrase.begin(), permuted_phrase.end());
-	edge.rule = *(rules.insert(edge.rule).first);
-      }
+      else
+	edge.rule = rule_type::create(rule_type(edge_source.rule->lhs, permuted_phrase.begin(), permuted_phrase.end()));
       
       edge.features = edge_source.features;
       edge.attributes = edge_source.attributes;
@@ -372,8 +344,6 @@ namespace cicada
     phrase_type permuted_non_terminals;
     
     tails_type tails;
-
-    rule_set_type rules;
   };
 
   template <typename Function, typename Filter>

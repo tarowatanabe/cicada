@@ -160,10 +160,10 @@ namespace cicada
 	goal_edge_x.id = x.edges.size() - 2;
 	goal_edge_y.id = x.edges.size() - 1;
 
-	goal_edge_x.rule.reset(new rule_type(vocab_type::GOAL,
-					     rule_type::symbol_set_type(1, goal_x.non_terminal(1))));
-	goal_edge_y.rule.reset(new rule_type(vocab_type::GOAL,
-					     rule_type::symbol_set_type(1, goal_y.non_terminal(1))));
+	goal_edge_x.rule = rule_type::create(rule_type(vocab_type::GOAL,
+						       rule_type::symbol_set_type(1, goal_x.non_terminal(1))));
+	goal_edge_y.rule = rule_type::create(rule_type(vocab_type::GOAL,
+						       rule_type::symbol_set_type(1, goal_y.non_terminal(1))));
 	
 	goal_edge_x.head = goal_node.id;
 	goal_edge_y.head = goal_node.id;
@@ -348,7 +348,7 @@ namespace cicada
       
       void operator()(const std::string& pattern, boost::spirit::qi::unused_type, boost::spirit::qi::unused_type) const
       {
-	const_cast<rule_ptr_set_type&>(*rules).push_back(rule_ptr_type(new rule_type(pattern)));
+	const_cast<rule_ptr_set_type&>(*rules).push_back(rule_type::create(rule_type(pattern)));
 
 	//std::cerr << "add rule: " << *(*rules).back() << std::endl;
       }

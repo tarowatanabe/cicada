@@ -171,7 +171,7 @@ void transform(const hypergraph_type::id_type node_id,
   }
   
   hypergraph_type::edge_type& edge = graph.add_edge(nodes.begin(), nodes.end());
-  edge.rule.reset(new rule_type(rule));
+  edge.rule = rule_type::create(rule_type(rule));
   graph.connect_edge(edge.id, node_id);
   
   node_set_type::const_iterator niter = nodes.begin();

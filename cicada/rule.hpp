@@ -15,6 +15,8 @@
 
 #include <utils/bithack.hpp>
 
+#include <boost/shared_ptr.hpp>
+
 namespace cicada
 {
   class Rule
@@ -24,12 +26,17 @@ namespace cicada
     typedef cicada::Symbol       word_type;
     typedef cicada::Vocab        vocab_type;
     typedef cicada::SymbolVector symbol_set_type;
+
+    typedef boost::shared_ptr<Rule> rule_ptr_type;
     
   public:
     Rule(const std::string& x) { assign(x); }
     Rule(const symbol_type& x_lhs, const symbol_set_type& x_rhs) : lhs(x_lhs), rhs(x_rhs) {}
     template <typename Iterator>
     Rule(const symbol_type& __lhs, Iterator first, Iterator last) : lhs(__lhs), rhs(first, last) {}
+
+  public:
+    static rule_ptr_type create(const Rule& x);
     
   public:
     void assign(const std::string& x);

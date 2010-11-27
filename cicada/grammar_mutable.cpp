@@ -217,25 +217,25 @@ namespace cicada
       throw std::runtime_error(std::string("rule parsing failed: ") + pattern);    
     
     const symbol_type lhs(boost::fusion::get<0>(rule_parsed).empty() ? vocab_type::X : symbol_type(boost::fusion::get<0>(rule_parsed)));
-    
-    rule_pair_type rule(rule_ptr_type(new rule_type(lhs, boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end())),
-			rule_ptr_type(new rule_type(lhs, boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end())));
-    
-    if (! rule.target->rhs.empty() && rule.source->rhs.arity() != rule.target->rhs.arity())
-      throw std::runtime_error("arity do not match");
 
-    cicada::sort(*rule.source, *rule.target);
+    rule_type rule_source(lhs, boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end());
+    rule_type rule_target(lhs, boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end());
+    
+    if (! rule_target.rhs.empty() && rule_source.rhs.arity() != rule_target.rhs.arity())
+      throw std::runtime_error("arity do not match");
+    
+    cicada::sort(rule_source, rule_target);
     
     // we will transform into "plain" non-terminal, so that we can query!
-    sequence_type source_index(rule.source->rhs.size());
+    sequence_type source_index(rule_source.rhs.size());
     sequence_type::iterator iiter = source_index.begin();
-    rule_type::symbol_set_type::const_iterator siter_end = rule.source->rhs.end();
-    for (rule_type::symbol_set_type::const_iterator siter = rule.source->rhs.begin(); siter != siter_end; ++ siter, ++ iiter)
+    rule_type::symbol_set_type::const_iterator siter_end = rule_source.rhs.end();
+    for (rule_type::symbol_set_type::const_iterator siter = rule_source.rhs.begin(); siter != siter_end; ++ siter, ++ iiter)
       *iiter = siter->non_terminal();
     
     // we do not check duplicates!
     rule_pair_set_type& rules = trie[trie.insert(source_index.begin(), source_index.end())];
-    rules.push_back(rule);
+    rules.push_back(rule_pair_type(rule_type::create(rule_source), rule_type::create(rule_target)));
     
     // add features...
     const scores_parsed_type& scores = boost::fusion::get<3>(rule_parsed);
@@ -358,6 +358,7 @@ namespace cicada
       boost::fusion::get<1>(rule_parsed).clear();
       boost::fusion::get<2>(rule_parsed).clear();
       boost::fusion::get<3>(rule_parsed).clear();
+      boost::fusion::get<4>(rule_parsed).clear();
       
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator iter_end = line.end();
@@ -368,24 +369,24 @@ namespace cicada
 	throw std::runtime_error("rule parsing failed: " + line);
       
       const symbol_type lhs(boost::fusion::get<0>(rule_parsed).empty() ? vocab_type::X : symbol_type(boost::fusion::get<0>(rule_parsed)));
+
+      rule_type rule_source(lhs, boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end());
+      rule_type rule_target(lhs, boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end());
       
-      rule_pair_type rule(rule_ptr_type(new rule_type(lhs, boost::fusion::get<1>(rule_parsed).begin(), boost::fusion::get<1>(rule_parsed).end())),
-			  rule_ptr_type(new rule_type(lhs, boost::fusion::get<2>(rule_parsed).begin(), boost::fusion::get<2>(rule_parsed).end())));
+      if (! rule_target.rhs.empty() && rule_source.rhs.arity() != rule_target.rhs.arity())
+      throw std::runtime_error("arity do not match");
       
-      if (! rule.target->rhs.empty() && rule.source->rhs.arity() != rule.target->rhs.arity())
-	throw std::runtime_error("arity do not match");
+      cicada::sort(rule_source, rule_target);
       
-      cicada::sort(*rule.source, *rule.target);
-      
-      source_index.resize(rule.source->rhs.size());
+      source_index.resize(rule_source.rhs.size());
       sequence_type::iterator iiter = source_index.begin();
-      rule_type::symbol_set_type::const_iterator siter_end = rule.source->rhs.end();
-      for (rule_type::symbol_set_type::const_iterator siter = rule.source->rhs.begin(); siter != siter_end; ++ siter, ++ iiter)
+      rule_type::symbol_set_type::const_iterator siter_end = rule_source.rhs.end();
+      for (rule_type::symbol_set_type::const_iterator siter = rule_source.rhs.begin(); siter != siter_end; ++ siter, ++ iiter)
 	*iiter = siter->non_terminal();
       
       // we do not check duplicates!
       rule_pair_set_type& rules = trie[trie.insert(source_index.begin(), source_index.end())];
-      rules.push_back(rule);
+      rules.push_back(rule_pair_type(rule_type::create(rule_source), rule_type::create(rule_target)));
       
       // add features...
       const scores_parsed_type& scores = boost::fusion::get<3>(rule_parsed);
