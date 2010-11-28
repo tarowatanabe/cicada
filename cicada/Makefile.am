@@ -204,6 +204,7 @@ transducer.hpp \
 tree_grammar.hpp \
 tree_grammar_mutable.hpp \
 tree_grammar_static.hpp \
+tree_grammar_simple.hpp \
 tree_rule.hpp \
 tree_transducer.hpp \
 unite.hpp \
