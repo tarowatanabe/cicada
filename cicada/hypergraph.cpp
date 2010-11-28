@@ -550,8 +550,6 @@ namespace cicada
 
     typedef google::dense_hash_map<const rule_type*, int, utils::hashmurmur<size_t>, std::equal_to<const rule_type*> > rule_unique_map_type;
     
-    typedef std::back_insert_iterator<std::string> iterator_type;
-    
     os << '{';
     
     rule_unique_map_type rules_unique;
