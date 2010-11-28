@@ -399,7 +399,7 @@ int main(int argc, char** argv)
       
       if (normalize)
 	transform_normalize(parsed);
-      
+
       if (leaf) {
 	sent.clear();
 	
@@ -456,6 +456,9 @@ int main(int argc, char** argv)
 	graph.clear();
 	
 	transform(parsed, graph);
+
+	if (debug)
+	  std::cerr << "transformed into hypergraph" << std::endl;
 
 	if (! graph.edges.empty()) {
 	  graph.topologically_sort();
