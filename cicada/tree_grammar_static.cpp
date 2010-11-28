@@ -238,23 +238,6 @@ namespace cicada
     bool has_children(size_type node) const { return rule_db.has_children(node); }
     bool exists(size_type node) const { return rule_db.exists(node); }
     
-    struct rule_unique_hash 
-    {
-      size_t operator()(const rule_ptr_type& x) const
-      {
-	return (x.get() ? hash_value(*x) : size_t(0));
-      }
-    };
-
-    struct rule_unique_equal
-    {
-      bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
-      {
-	return x == y || (x.get() && y.get() && *x == *y);
-      }
-    };
-    typedef google::dense_hash_set<rule_ptr_type, rule_unique_hash, rule_unique_equal > rule_unique_map_type;
-
     const rule_pair_set_type& read_rule_set(size_type node) const
     {
       const size_type cache_pos = hasher_type::operator()(node) & (cache_rule.size() - 1);
@@ -265,9 +248,6 @@ namespace cicada
       if (! result.second) {
 	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
 
-	rule_unique_map_type rules_unique;
-	rules_unique.set_empty_key(rule_ptr_type());
-	
 	rule_pair_set_type& options = result.first->second;
 	options.clear();
 	
@@ -299,55 +279,40 @@ namespace cicada
 	  const rule_ptr_type rule_source = read_rule(pos_source, cache_source, source_db);
 	  
 	  while (citer != citer_end) {
-	     const size_type offset_target = utils::group_aligned_decode(pos_target, &(*hiter), code_pos);
-	     citer = hiter + offset_target;
-	     hiter += offset_target & (- size_type((code_pos & 0x03) == 0x03));
-	     ++ code_pos;
+	    const size_type offset_target = utils::group_aligned_decode(pos_target, &(*hiter), code_pos);
+	    citer = hiter + offset_target;
+	    hiter += offset_target & (- size_type((code_pos & 0x03) == 0x03));
+	    ++ code_pos;
 	     
-	     const rule_ptr_type rule_target = read_rule(pos_target, cache_target, target_db);
+	    const rule_ptr_type rule_target = read_rule(pos_target, cache_target, target_db);
 	     
-	     rule_ptr_type rule_sorted_source(new rule_type(*rule_source));
-	     rule_ptr_type rule_sorted_target(new rule_type(*rule_target));
+	    options.push_back(rule_pair_type(rule_source, rule_target));
 	     
-	     cicada::sort(*rule_sorted_source, *rule_sorted_target);
-	     
-	     if (*rule_source == *rule_sorted_source)
-	       rule_sorted_source = rule_source;
-	     else
-	       rule_sorted_source = *(rules_unique.insert(rule_sorted_source).first);
-	     
-	     if (*rule_target == *rule_sorted_target)
-	      rule_sorted_target = rule_target;
-	    else
-	      rule_sorted_target = *(rules_unique.insert(rule_sorted_target).first);
-	     
-	     options.push_back(rule_pair_type(rule_sorted_source, rule_sorted_target));
-	     
-	     for (size_t feature = 0; feature < score_db.size(); ++ feature) {
-	       const score_type score = score_db[feature][pos_feature];
+	    for (size_t feature = 0; feature < score_db.size(); ++ feature) {
+	      const score_type score = score_db[feature][pos_feature];
 	       
-	       // ignore zero score...
-	       if (score == 0.0) continue;
+	      // ignore zero score...
+	      if (score == 0.0) continue;
 	       
-	       // when zero, we will use inifinity...
-	       options.back().features[feature_names[feature]] = (score <= boost::numeric::bounds<score_type>::lowest()
+	      // when zero, we will use inifinity...
+	      options.back().features[feature_names[feature]] = (score <= boost::numeric::bounds<score_type>::lowest()
+								 ? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								 : (score >= boost::numeric::bounds<score_type>::highest()
+								    ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
+								    : feature_set_type::mapped_type(score)));
+	    }
+	     
+	    for (size_t attr = 0; attr < attr_db.size(); ++ attr) {
+	      const score_type score = attr_db[attr][pos_feature];
+	       
+	      options.back().attributes[attribute_names[attr]] = (score <= boost::numeric::bounds<score_type>::lowest()
 								  ? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
 								  : (score >= boost::numeric::bounds<score_type>::highest()
 								     ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
 								     : feature_set_type::mapped_type(score)));
-	     }
+	    }
 	     
-	     for (size_t attr = 0; attr < attr_db.size(); ++ attr) {
-	       const score_type score = attr_db[attr][pos_feature];
-	       
-	       options.back().attributes[attribute_names[attr]] = (score <= boost::numeric::bounds<score_type>::lowest()
-								   ? - std::numeric_limits<feature_set_type::mapped_type>::infinity()
-								   : (score >= boost::numeric::bounds<score_type>::highest()
-								      ? std::numeric_limits<feature_set_type::mapped_type>::infinity()
-								      : feature_set_type::mapped_type(score)));
-	     }
-	     
-	     ++ pos_feature;
+	    ++ pos_feature;
 	  }
 	}
       }
