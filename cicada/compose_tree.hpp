@@ -14,6 +14,8 @@
 #include <cicada/vocab.hpp>
 #include <cicada/tree_grammar.hpp>
 #include <cicada/tree_transducer.hpp>
+#include <cicada/grammar.hpp>
+#include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 
 #include <utils/chunk_vector.hpp>
@@ -60,8 +62,8 @@ namespace cicada
     typedef Symbol symbol_type;
     typedef Vocab  vocab_type;
 
-    typedef TreeGrammar    grammar_type;
-    typedef TreeTransducer transducer_type;
+    typedef TreeGrammar    tree_grammar_type;
+    typedef TreeTransducer tree_transducer_type;
     typedef HyperGraph     hypergraph_type;
     
     typedef hypergraph_type::feature_set_type   feature_set_type;
@@ -70,14 +72,14 @@ namespace cicada
     typedef hypergraph_type::rule_type        rule_type;
     typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
     
-    typedef transducer_type::rule_pair_set_type tree_rule_pair_set_type;
-    typedef transducer_type::rule_pair_type     tree_rule_pair_type;
-    typedef transducer_type::rule_type          tree_rule_type;
-    typedef transducer_type::rule_ptr_type      tree_rule_ptr_type;
+    typedef tree_transducer_type::rule_pair_set_type tree_rule_pair_set_type;
+    typedef tree_transducer_type::rule_pair_type     tree_rule_pair_type;
+    typedef tree_transducer_type::rule_type          tree_rule_type;
+    typedef tree_transducer_type::rule_ptr_type      tree_rule_ptr_type;
     
-    typedef std::vector<transducer_type::edge_id_type, std::allocator<transducer_type::edge_id_type> > edge_set_type;
+    typedef std::vector<tree_transducer_type::edge_id_type, std::allocator<tree_transducer_type::edge_id_type> > edge_set_type;
     
-    typedef std::vector<transducer_type::id_type, std::allocator<transducer_type::id_type> > node_queue_type;
+    typedef std::vector<tree_transducer_type::id_type, std::allocator<tree_transducer_type::id_type> > node_queue_type;
     
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > frontier_type;
     typedef std::deque<frontier_type, std::allocator<frontier_type> > frontier_queue_type;
@@ -90,16 +92,16 @@ namespace cicada
       frontier_type            frontier;
       feature_set_type         features;
       attribute_set_type       attributes;
-      transducer_type::id_type node;
+      tree_transducer_type::id_type node;
       
-      State() : frontier(), features(), attributes(), node(transducer_type::id_type(-1)) {}
+      State() : frontier(), features(), attributes(), node(tree_transducer_type::id_type(-1)) {}
       State(const frontier_type& __frontier,
-	    const transducer_type::id_type& __node)
+	    const tree_transducer_type::id_type& __node)
 	: frontier(__frontier), features(), attributes(), node(__node) {}
       State(const frontier_type& __frontier,
 	    const feature_set_type& __features,
 	    const attribute_set_type& __attributes,
-	    const transducer_type::id_type& __node)
+	    const tree_transducer_type::id_type& __node)
       : frontier(__frontier), features(__features), attributes(__attributes), node(__node) {}
     };
     typedef State state_type;
@@ -134,8 +136,8 @@ namespace cicada
     typedef NodeMap node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     
-    ComposeTree(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source)
-      : goal(__goal), grammar(__grammar), yield_source(__yield_source) 
+    ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const bool __yield_source)
+      : goal(__goal), tree_grammar(__tree_grammar), yield_source(__yield_source) 
     {  }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
@@ -166,17 +168,17 @@ namespace cicada
 
       queue_type queue;
       
-      for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
-	const transducer_type& transducer = grammar[grammar_id];
+      for (size_t grammar_id = 0; grammar_id != tree_grammar.size(); ++ grammar_id) {
+	const tree_transducer_type& transducer = tree_grammar[grammar_id];
 	
-	const transducer_type::edge_id_type edge_id = transducer.edge(graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs);
+	const tree_transducer_type::edge_id_type edge_id = transducer.edge(graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs);
 	
-	if (edge_id == transducer_type::edge_id_type(-1)) continue;
+	if (edge_id == tree_transducer_type::edge_id_type(-1)) continue;
 	
-	const transducer_type::edge_id_type edge_epsilon = transducer.edge(vocab_type::EPSILON);
-	const transducer_type::edge_id_type edge_none    = transducer.edge(vocab_type::NONE);
+	const tree_transducer_type::edge_id_type edge_epsilon = transducer.edge(vocab_type::EPSILON);
+	const tree_transducer_type::edge_id_type edge_none    = transducer.edge(vocab_type::NONE);
 	
-	transducer_type::id_type node = transducer.next(transducer.root(), edge_id);
+	tree_transducer_type::id_type node = transducer.next(transducer.root(), edge_id);
 	if (node == transducer.root()) continue;
 	
 	node = transducer.next(node, edge_none);
@@ -224,7 +226,7 @@ namespace cicada
 
 	    node_queue_type::const_iterator titer_end = nodes.end();
 	    for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	      const transducer_type::size_type node_epsilon = transducer.next(edge_epsilon, *titer);
+	      const tree_transducer_type::size_type node_epsilon = transducer.next(edge_epsilon, *titer);
 	      if (node_epsilon != transducer.root()) {
 		frontier_type frontier(*fiter);
 		frontier.push_back(*niter);
@@ -238,10 +240,10 @@ namespace cicada
 	      edge_set_type::const_iterator eiter_begin = edges.begin();
 	      edge_set_type::const_iterator eiter_end = edges.end();
 	      for (edge_set_type::const_iterator eiter = eiter_begin; eiter != eiter_end; ++ eiter)
-		if (*eiter != transducer_type::edge_id_type(-1)) {
-		  const transducer_type::edge_id_type& edge_id = *eiter;
+		if (*eiter != tree_transducer_type::edge_id_type(-1)) {
+		  const tree_transducer_type::edge_id_type& edge_id = *eiter;
 		  
-		  const transducer_type::size_type node_edge = transducer.next(edge_id, *titer);
+		  const tree_transducer_type::size_type node_edge = transducer.next(edge_id, *titer);
 		  if (node_edge != transducer.root()) {
 		    const hypergraph_type::edge_type& edge = graph_in.edges[graph_in.nodes[*niter].edges[eiter - eiter_begin]];
 		    
@@ -276,16 +278,16 @@ namespace cicada
 	  
 	  node_queue_type::const_iterator titer_end = nodes.end();
 	  for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	    const transducer_type::size_type node_none = transducer.next(edge_none, *titer);
+	    const tree_transducer_type::size_type node_none = transducer.next(edge_none, *titer);
 	    if (node_none == transducer.root()) continue;
 	    
-	    const transducer_type::rule_pair_set_type& rules = transducer.rules(node_none);
+	    const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node_none);
 	    
 	    if (! rules.empty()) {
 	      // try match with rules with *fiter == frontier-nodes and generate graph_out!
 	      
-	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	      tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	      for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
 		apply_rule(*riter, id, *fiter, *siter, *aiter, graph_in, graph_out);
 	    }
 	    
@@ -389,15 +391,15 @@ namespace cicada
     node_map_set_type node_map;
     
     symbol_type goal;
-    const grammar_type& grammar;
+    const tree_grammar_type& tree_grammar;
     const bool yield_source;
   };
   
   
   inline
-  void compose_tree(const Symbol& goal, const TreeGrammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
+  void compose_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
   {
-    ComposeTree __composer(goal, grammar, yield_source);
+    ComposeTree __composer(goal, tree_grammar, yield_source);
     __composer(graph_in, graph_out);
   }
 };
