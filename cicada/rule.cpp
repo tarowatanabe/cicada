@@ -50,6 +50,7 @@ namespace cicada
     const size_t cache_pos = hash_value(x) & (cache.size() - 1);
     if (! cache[cache_pos] || *cache[cache_pos] != x)
       cache[cache_pos].reset(new Rule(x));
+    
     return cache[cache_pos];
   }
   

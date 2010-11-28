@@ -206,6 +206,7 @@ tree_grammar_mutable.hpp \
 tree_grammar_static.hpp \
 tree_rule.hpp \
 tree_transducer.hpp \
+unite.hpp \
 viterbi.hpp \
 vocab.hpp \
 weight_vector.hpp

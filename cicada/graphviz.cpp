@@ -204,7 +204,6 @@ namespace cicada
     
     boost::spirit::karma::symbols<char, const char*> escape_char;
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
-    
   };
 
 
