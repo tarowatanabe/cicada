@@ -50,7 +50,9 @@ distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
 lexicalized-reordering: lexicalized reordering for phrase-based\n\
-\tfile=model file\n\
+\tbidirectional=[true|false]\n\
+\tmonotonicity=[true|false]\n\
+\tfeature=attribute name mapping\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
