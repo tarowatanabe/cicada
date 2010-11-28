@@ -182,12 +182,7 @@ struct ScorerCICADAReordering
     if (phrase_pair.counts_target.size() != 5)
       throw std::runtime_error("target counts size do not match");
     
-    if (mode_source_only)
-      os << phrase_pair.source << " |||";
-    else if (mode_target_only)
-      os << phrase_pair.target << " |||";
-    else
-      os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
+    os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
     
     const double& count = phrase_pair.counts.front();
     const double& count_source = phrase_pair.counts_source.front();
