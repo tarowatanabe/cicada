@@ -329,9 +329,10 @@ namespace cicada
       
       typename another_type::const_iterator iter2_end = x.end();
       for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	iterator iter1 = __values.find(iter2->first);
-	if (iter1 == __values.end())
-	  __values.insert(*iter2);
+	iterator iter1 = __values.lower_bound(iter2->first);
+	
+	if (iter1 == __values.end() || iter1->first != iter2->first)
+	  __values.insert(iter1, *iter2);
 	else {
 	  iter1->second += iter2->second;
 	  if (iter1->second == Tp())
@@ -349,9 +350,10 @@ namespace cicada
       
       typename another_type::const_iterator iter2_end = x.end();
       for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	iterator iter1 = __values.find(iter2->first);
-	if (iter1 == __values.end())
-	  __values.insert(std::make_pair(iter2->first, - Tp(iter2->second)));
+	iterator iter1 = __values.lower_bound(iter2->first);
+	
+	if (iter1 == __values.end() || iter1->first != iter2->first)
+	  __values.insert(iter1, std::make_pair(iter2->first, - Tp(iter2->second)));
 	else {
 	  iter1->second -= iter2->second;
 	  if (iter1->second == Tp())
@@ -383,7 +385,7 @@ namespace cicada
 	else {
 	  const Tp value = iter1->second * iter2->second;
 	  if (value != Tp())
-	    features.__values.insert(std::make_pair(iter1->first, value));
+	    features.__values.insert(features.__values.end(), std::make_pair(iter1->first, value));
 	  
 	  ++ iter1;
 	  ++ iter2;
@@ -520,7 +522,7 @@ namespace cicada
       else {
 	const T1 value = iter1->second * iter2->second;
 	if (value != T1())
-	  features.__values.insert(std::make_pair(iter1->first, value));
+	  features.__values.insert(features.__values.end(), std::make_pair(iter1->first, value));
 	
 	++ iter1;
 	++ iter2;

@@ -212,7 +212,10 @@ namespace cicada
     // operators...
     self_type& operator+=(const AttributeVector& x)
     {
-      __values.insert(x.begin(), x.end());
+      const_iterator iter_end = x.end();
+      for (const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+	__values[iter->first] = iter->second;
+      
       return *this;
     }
     
@@ -280,9 +283,13 @@ namespace cicada
       return y;
     else if (y.empty())
       return x;
-    else {
+    else if (x.size() >= y.size()) {
       AttributeVector attrs(x);
       attrs += y;
+      return attrs;
+    } else {
+      AttributeVector attrs(y);
+      attrs += x;
       return attrs;
     }
   }
