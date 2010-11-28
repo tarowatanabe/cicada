@@ -32,3 +32,6 @@ Compute kbest oracle translations or packed forest:
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
     I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
+
+
+Add head-finder?

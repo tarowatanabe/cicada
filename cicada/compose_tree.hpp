@@ -7,6 +7,7 @@
 #define __CICADA__COMPOSE_TREE__HPP__ 1
 
 #include <vector>
+#include <deque>
 #include <algorithm>
 
 #include <cicada/symbol.hpp>
@@ -75,13 +76,35 @@ namespace cicada
     typedef transducer_type::rule_ptr_type      tree_rule_ptr_type;
     
     typedef std::vector<transducer_type::edge_id_type, std::allocator<transducer_type::edge_id_type> > edge_set_type;
-    typedef std::vector<transducer_type::id_type, std::allocator<transducer_type::id_type> >           node_set_type;
+    
+    typedef std::vector<transducer_type::id_type, std::allocator<transducer_type::id_type> > node_queue_type;
     
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > frontier_type;
-    typedef std::vector<frontier_type, std::allocator<frontier_type> > frontier_set_type;
+    typedef std::deque<frontier_type, std::allocator<frontier_type> > frontier_queue_type;
+
+    typedef std::deque<feature_set_type, std::allocator<feature_set_type> >    feature_queue_type;
+    typedef std::deque<attribute_set_type, std::allocator<attribute_set_type> > attribute_queue_type;
     
-    typedef std::pair<frontier_type, transducer_type::id_type> frontier_pair_type;
-    typedef std::deque<frontier_pair_type, std::allocator<frontier_pair_type> > queue_type;
+    struct State
+    {
+      frontier_type            frontier;
+      feature_set_type         features;
+      attribute_set_type       attributes;
+      transducer_type::id_type node;
+      
+      State() : frontier(), features(), attributes(), node(transducer_type::id_type(-1)) {}
+      State(const frontier_type& __frontier,
+	    const transducer_type::id_type& __node)
+	: frontier(__frontier), features(), attributes(), node(__node) {}
+      State(const frontier_type& __frontier,
+	    const feature_set_type& __features,
+	    const attribute_set_type& __attributes,
+	    const transducer_type::id_type& __node)
+      : frontier(__frontier), features(__features), attributes(__attributes), node(__node) {}
+    };
+    typedef State state_type;
+
+    typedef std::deque<state_type, std::allocator<state_type> > queue_type;
 
     struct NodeMap
     {
@@ -160,25 +183,33 @@ namespace cicada
 	if (node == transducer.root()) continue;
 	
 	queue.clear();
-	queue.push_back(std::make_pair(frontier_type(1, id), node));
+	queue.push_back(state_type(frontier_type(1, id), node));
 	
 	while (! queue.empty()) {
-	  const frontier_pair_type& frontier = queue.front();
+	  const state_type& state = queue.front();
 	  
-	  frontier_set_type frontiers(1, frontier_type());
-	  frontier_set_type frontiers_next;
+	  frontier_queue_type frontiers(1, frontier_type());
+	  frontier_queue_type frontiers_next;
 	  
-	  node_set_type nodes(1, frontier.second);
-	  node_set_type nodes_next;
+	  node_queue_type nodes(1, state.node);
+	  node_queue_type nodes_next;
+
+	  feature_queue_type features(1, state.features);
+	  feature_queue_type features_next;
+	  
+	  attribute_queue_type attributes(1, state.attributes);
+	  attribute_queue_type attributes_next;
 
 	  edge_set_type edges;
 	  
-	  frontier_type::const_iterator niter_end = frontier.first.end();
-	  for (frontier_type::const_iterator niter = frontier.first.begin(); niter != niter_end; ++ niter) {
+	  frontier_type::const_iterator niter_end = state.frontier.end();
+	  for (frontier_type::const_iterator niter = state.frontier.begin(); niter != niter_end; ++ niter) {
 	    
 	    frontiers_next.clear();
 	    nodes_next.clear();
-
+	    features_next.clear();
+	    attributes_next.clear();
+	    
 	    edges.clear();
 	    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = graph_in.nodes[*niter].edges.end();
 	    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = graph_in.nodes[*niter].edges.begin(); eiter != eiter_end; ++ eiter) {
@@ -187,10 +218,12 @@ namespace cicada
 	      edges.push_back(transducer.edge(edge.rule->rhs));
 	    }
 	    
-	    
-	    frontier_set_type::const_iterator fiter = frontiers.begin();
-	    node_set_type::const_iterator titer_end = nodes.end();
-	    for (node_set_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter) {
+	    frontier_queue_type::const_iterator  fiter = frontiers.begin();
+	    feature_queue_type::const_iterator   siter = features.begin();
+	    attribute_queue_type::const_iterator aiter = attributes.begin();
+
+	    node_queue_type::const_iterator titer_end = nodes.end();
+	    for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
 	      const transducer_type::size_type node_epsilon = transducer.next(edge_epsilon, *titer);
 	      if (node_epsilon != transducer.root()) {
 		frontier_type frontier(*fiter);
@@ -198,6 +231,8 @@ namespace cicada
 		
 		frontiers_next.push_back(frontier);
 		nodes_next.push_back(node_epsilon);
+		features_next.push_back(*siter);
+		attributes_next.push_back(*aiter);
 	      }
 
 	      edge_set_type::const_iterator eiter_begin = edges.begin();
@@ -215,23 +250,32 @@ namespace cicada
 		    
 		    frontiers_next.push_back(frontier);
 		    nodes_next.push_back(node_edge);
+		    features_next.push_back(*siter + edge.features);
+		    attributes_next.push_back(*aiter + edge.attributes);
 		  }
 		}
 	    }
 	    
 	    frontiers.swap(frontiers_next);
 	    nodes.swap(nodes_next);
+	    features.swap(features_next);
+	    attributes.swap(attributes_next);
 	    
 	    frontiers_next.clear();
 	    nodes_next.clear();
+	    features_next.clear();
+	    attributes_next.clear();
 	  }
 	  
 	  // frontiers and nodes contain new frontier!
 	  // in addition, we need to traverse transducer.next() with edge_none!
 	  
-	  frontier_set_type::const_iterator fiter = frontiers.begin();
-	  node_set_type::const_iterator titer_end = nodes.end();
-	  for (node_set_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter) {
+	  frontier_queue_type::const_iterator  fiter = frontiers.begin();
+	  feature_queue_type::const_iterator   siter = features.begin();
+	  attribute_queue_type::const_iterator aiter = attributes.begin();
+	  
+	  node_queue_type::const_iterator titer_end = nodes.end();
+	  for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
 	    const transducer_type::size_type node_none = transducer.next(edge_none, *titer);
 	    if (node_none == transducer.root()) continue;
 	    
@@ -242,10 +286,10 @@ namespace cicada
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(*riter, id, *fiter, graph_in, graph_out);
+		apply_rule(*riter, id, *fiter, *siter, *aiter, graph_in, graph_out);
 	    }
 	    
-	    queue.push_back(std::make_pair(*fiter, node_none));
+	    queue.push_back(state_type(*fiter, node_none));
 	  }
 	  
 	  queue.pop_front();
@@ -257,6 +301,8 @@ namespace cicada
     void apply_rule(const tree_rule_pair_type& rule_pair,
 		    const hypergraph_type::id_type root_in,
 		    const frontier_type& frontiers,
+		    const feature_set_type& features,
+		    const attribute_set_type& attributes,
 		    const hypergraph_type& graph_in,
 		    hypergraph_type& graph_out)
     {
@@ -277,6 +323,9 @@ namespace cicada
       
       const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_in, graph_out);
       
+      graph_out.edges[edge_id].features   += features;
+      graph_out.edges[edge_id].attributes += attributes;
+
       graph_out.edges[edge_id].features   += rule_pair.features;
       graph_out.edges[edge_id].attributes += rule_pair.attributes;
     }
