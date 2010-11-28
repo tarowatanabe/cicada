@@ -43,6 +43,8 @@ namespace cicada
     typedef google::dense_hash_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal> graph_rule_ptr_set_type;
 
   public:
+
+    // copy, but use default non-terminal category
     TreeGrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
@@ -73,6 +75,33 @@ namespace cicada
 	insert(rule_pair_type(rule_source, rule_target, features));
       }
     }
+    
+    // simply copy and preserve the same non-terminal category...
+    TreeGrammarInsertion(const hypergraph_type& graph)
+    {
+      typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
+
+      graph_rule_ptr_set_type rules;
+      rules.set_empty_key(graph_rule_ptr_type());
+
+      feature_set_type features;
+      features["tree-insertion-penalty"] = -1.0;
+
+      non_terminal_set_type non_terminals;
+      
+      hypegraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+      for (hypegraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = *eiter;
+	
+	if (rules.find(edge.rule) != rules.end()) continue;
+	rules.insert(edge.rule);
+	
+	rule_ptr_type rule(new rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end()));
+	
+	insert(rule_pair_type(rule, rule, features));
+      }
+    }
+
   };
   
 };
