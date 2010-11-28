@@ -1,3 +1,7 @@
+2010-11-28
+Added "attribute" in each hyperedge which can store key-value pair with arbitray value type: 64-bit-int, double float or string.
+Cache rule allocation in hypergraph for better memory consumption
+
 2010-11-22
 Support tree transduction (but experimental)
 Removed bi-rules in hypergraph: removed "yield" in features etc. but added in compositional operations.

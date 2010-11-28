@@ -65,8 +65,6 @@ namespace cicada
 	  attribute_names(),
 	  bidirectional(false),
 	  monotonicity(false),
-	  source_only(false),
-	  target_only(false),
 	  lattice(0),
 	  attr_phrase_span_first("phrase-span-first"),
 	  attr_phrase_span_last("phrase-span-last")
@@ -86,18 +84,11 @@ namespace cicada
 	    bidirectional = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "monotonicity") == 0 || strcasecmp(piter->first.c_str(), "mono") == 0)
 	    monotonicity = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "source-only") == 0 || strcasecmp(piter->first.c_str(), "f") == 0)
-	    source_only = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "target-only") == 0 || strcasecmp(piter->first.c_str(), "e") == 0)
-	    target_only = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "feature") == 0)
 	    attribute_names.push_back(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for lexicalized reordering: " << piter->first << "=" << piter->second << std::endl;
 	}
-	
-	if (source_only && target_only)
-	  throw std::runtime_error("you cannot use both source/target-only");
 	
 	if (bidirectional) {
 	  if (monotonicity) {
@@ -310,8 +301,6 @@ namespace cicada
       
       bool bidirectional;
       bool monotonicity;
-      bool source_only;
-      bool target_only;
 
       const lattice_type* lattice;
 
