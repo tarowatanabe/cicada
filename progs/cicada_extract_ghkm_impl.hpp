@@ -688,7 +688,7 @@ struct ExtractGHKM
 	for (size_t i = 0; i != j.size(); ++ i) {
 	  ++ j[i];
 	    
-	  if (j[i] < derivations[edge.tails[i]].edges.size() && cand_unique.find(&query) == cand_unique.end()) {
+	  if (j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size()) && cand_unique.find(&query) == cand_unique.end()) {
 	    edges_new.clear();
 	    tails_new.clear();
 	      

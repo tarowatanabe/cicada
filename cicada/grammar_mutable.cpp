@@ -246,7 +246,7 @@ namespace cicada
       if (fiter->first.empty()) {
 	// default name!
 	
-	if (feature >= feature_names_default.size())
+	if (feature >= static_cast<int>(feature_names_default.size()))
 	  feature_names_default.resize(feature + 1);
 	if (feature_names_default[feature].empty())
 	  feature_names_default[feature] = "rule-table-" + boost::lexical_cast<std::string>(feature);
@@ -262,7 +262,7 @@ namespace cicada
     for (attrs_parsed_type::const_iterator aiter = boost::fusion::get<4>(rule_parsed).begin(); aiter != aiter_end; ++ aiter) 
       if (aiter->first.empty()) {
 	
-	if (attribute >= attribute_names_default.size())
+	if (attribute >= static_cast<int>(attribute_names_default.size()))
 	  attribute_names_default.resize(attribute + 1);
 	if (attribute_names_default[attribute].empty())
 	  attribute_names_default[attribute] = "rule-table-" + boost::lexical_cast<std::string>(attribute);
@@ -400,7 +400,7 @@ namespace cicada
 	    rules.back().features[feature_names[feature]] = fiter->second;
 	  else {
 	    // default name!
-	    if (feature >= feature_names_default.size())
+	    if (feature >= static_cast<int>(feature_names_default.size()))
 	      feature_names_default.resize(feature + 1);
 	    if (feature_names_default[feature].empty())
 	      feature_names_default[feature] = "rule-table-" + boost::lexical_cast<std::string>(feature);
@@ -421,7 +421,7 @@ namespace cicada
 	    rules.back().attributes[attribute_names[attribute]] = aiter->second;
 	  else {
 	    // default name!
-	    if (attribute >= attribute_names_default.size())
+	    if (attribute >= static_cast<int>(attribute_names_default.size()))
 	      attribute_names_default.resize(attribute + 1);
 	    if (attribute_names_default[attribute].empty())
 	      attribute_names_default[attribute] = "rule-table-" + boost::lexical_cast<std::string>(attribute);
