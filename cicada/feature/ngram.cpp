@@ -93,7 +93,7 @@ namespace cicada
       }
 
       NGramImpl(const NGramImpl& x)
-	: ngram(x.ngram), order(x.order), cluster(x.cluster), coarse(x.coarse)
+	: ngram(x.ngram), order(x.order), cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0), coarse(x.coarse)
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -105,7 +105,7 @@ namespace cicada
       {
 	ngram = x.ngram;
 	order = x.order;
-	cluster = x.cluster;
+	cluster = (x.cluster ? &cluster_type::create(x.cluster->path()) : 0);
 	coarse = x.coarse;
 	
 	cache_logprob.clear();
