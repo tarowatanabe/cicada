@@ -334,7 +334,7 @@ namespace cicada
 	  attributes[aiter->first] = aiter->second;
       }
       
-      insert(rule_pair_type(rule_ptr_type(new rule_type(source)), rule_ptr_type(new rule_type(target)), features, attributes));
+      insert(rule_pair_type(rule_type::create(rule_type(source)), rule_type::create(rule_type(target)), features, attributes));
     }
   }
   
@@ -363,8 +363,8 @@ namespace cicada
 
     if (line.empty()) return;
     
-    rule_ptr_type            source(new rule_type());
-    rule_ptr_type            target(new rule_type());
+    rule_type            source;
+    rule_type            target;
     scores_attrs_parsed_type scores_attrs;
     feature_set_type         features;
     attribute_set_type       attributes;
@@ -376,9 +376,9 @@ namespace cicada
     namespace standard = boost::spirit::standard;
     namespace phoenix = boost::phoenix;
 
-    if (! source->assign(iter, iter_end)) return;
+    if (! source.assign(iter, iter_end)) return;
     if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) return;
-    if (! target->assign(iter, iter_end)) return;
+    if (! target.assign(iter, iter_end)) return;
     
     if (! qi::phrase_parse(iter, iter_end, scores_parser, standard::space, scores_attrs)) return;
     
@@ -416,7 +416,7 @@ namespace cicada
       } else
 	attributes[aiter->first] = aiter->second;
     
-    insert(rule_pair_type(source, target, features, attributes));
+    insert(rule_pair_type(rule_type::create(source), rule_type::create(target), features, attributes));
   }
   
 

@@ -26,6 +26,8 @@ namespace cicada
     
     typedef utils::simple_vector<TreeRule, std::allocator<TreeRule> > antecedent_set_type;
 
+    typedef boost::shared_ptr<TreeRule> rule_ptr_type;
+    
     typedef antecedent_set_type::size_type       size_type;
     typedef antecedent_set_type::difference_type difference_type;
     
@@ -41,6 +43,9 @@ namespace cicada
     TreeRule(const label_type& __label, Iterator first, Iterator last) : label(__label), antecedents(first, last) {}
     explicit TreeRule(const std::string& x) : label(), antecedents() { assign(x); }
     explicit TreeRule(const char* x) : label(), antecedents() { assign(x); }
+
+  public:
+    static rule_ptr_type create(const TreeRule& x);
     
   public:
     void assign(const std::string& x);

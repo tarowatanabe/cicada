@@ -331,7 +331,7 @@ namespace cicada
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
       if (cache.pos != pos) {
 	cache.pos = pos;
-	cache.rule.reset(new rule_type(std::string(db[pos].begin(), db[pos].end())));
+	cache.rule = rule_type::create(rule_type(std::string(db[pos].begin(), db[pos].end())));
       }
       
       return cache.rule;
