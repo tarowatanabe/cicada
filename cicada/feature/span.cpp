@@ -8,7 +8,6 @@
 #include "cicada/feature/span.hpp"
 #include "cicada/parameter.hpp"
 
-#include "utils/indexed_set.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/hashmurmur.hpp"

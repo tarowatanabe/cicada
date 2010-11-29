@@ -11,7 +11,6 @@
 #include "cicada/stemmer.hpp"
 #include "cicada/cluster_stemmer.hpp"
 
-#include "utils/indexed_set.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 
