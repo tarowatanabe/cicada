@@ -143,10 +143,11 @@ namespace cicada
       
     public:
       CombinedScorer() : scorers() { }
-      CombinedScorer(const CombinedScorer& x) : scorers() {}
+      CombinedScorer(const CombinedScorer& x) : scorers(x.scorers), weights(x.weights) {}
       CombinedScorer& operator=(const CombinedScorer& x)
       {
-	
+	scorers = x.scorers;
+	weights = x.weights;
 	return *this;
       }
       
@@ -154,8 +155,16 @@ namespace cicada
       
       scorer_ptr_type clone() const
       {
+	scorer_ptr_type scorer(new CombinedScorer());
 	
-	
+	scorer->scorers.reserve(scorers.size());
+	scorer_ptr_set_type::const_iterator siter_end = scorers.end();
+	for (scorer_ptr_set_type::const_iterator siter = scorers.begin(); siter != siter_end; ++ siter)
+	  scorer->scorers.push_back((*siter)->clone());
+
+	scorer->weights = weights;
+
+	return scorer;
       }
       
       void clear()
@@ -166,12 +175,23 @@ namespace cicada
       
       void insert(const sentence_type& sentence)
       {
-	
+	scorer_ptr_set_type::iterator siter_end = scorers.end();
+	for (scorer_ptr_set_type::iterator siter = scorers.begin(); siter != siter_end; ++ siter)
+	  (*siter)->insert(sentence);
       }
       
       score_ptr_type score(const sentence_type& __sentence) const
       {
+	std::auto_ptr<Combined> combined(new Combined());
 	
+	combined->scores.reserve(scorers.size());
+	scorer_ptr_set_type::const_iterator siter_end = scorers.end();
+	for (scorer_ptr_set_type::const_iterator siter = scorers.begin(); siter != siter_end; ++ siter)
+	  combined->scores.push_back((*siter)->score(__sentence));
+	
+	combined->weights = weights;
+	
+	return scorer_ptr_type(combined.release());
       }
       
     private:
