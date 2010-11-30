@@ -390,10 +390,12 @@ namespace cicada
 	const bool has_rule = dot_next.edge != hypergraph_type::invalid;
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
+
+	// actually, we need to increment edge.span.second! but temporary disabled
 	if (has_rule)
-	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, span_type(edge.span.first, edge.span.second + 1), edge, dot_next.edge));
+	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, span_type(edge.span.first, edge.span.second), edge, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, span_type(edge.span.first, edge.span.second + 1), edge));
+	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, span_type(edge.span.first, edge.span.second), edge));
       }
     }
     

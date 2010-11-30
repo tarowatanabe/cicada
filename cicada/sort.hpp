@@ -159,6 +159,13 @@ namespace cicada
 	color[node_id] = black;
 	reloc_node[node_id] = node_count ++;
       }
+
+#if 0
+      if (! edges_cycle.empty()) {
+	std::cerr << "cycle detected!" << std::endl;
+	std::cerr << x << std::endl;
+      }
+#endif
       
       // sorted graph!
       sorted.clear();
