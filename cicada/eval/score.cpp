@@ -10,6 +10,7 @@
 #include "eval/ter.hpp"
 #include "eval/bleu.hpp"
 #include "eval/wlcs.hpp"
+#include "eval/combined.hpp"
 
 #include "stemmer.hpp"
 #include "parameter.hpp"

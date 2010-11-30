@@ -56,7 +56,7 @@ namespace cicada
 	score_ptr_set_type::iterator iter = scores.begin();
 	score_ptr_set_type::const_iterator siter_end = rhs->scores.end();
 	for (score_ptr_set_type::const_iterator siter = rhs->scores.begin(); siter != siter_end; ++ siter, ++ iter)
-	  (*iter)->assign(*(*ster));
+	  (*iter)->assign(*(*siter));
 	
 	weights = rhs->weights;
       }
@@ -100,14 +100,14 @@ namespace cicada
       void multiplies_equal(const double& scale)
       {
 	score_ptr_set_type::iterator siter_end = scores.end();
-	for (score_ptr_set_type::iterator siter = scores.begin(); siter != siter_end; ++ siter, ++ iter)
+	for (score_ptr_set_type::iterator siter = scores.begin(); siter != siter_end; ++ siter)
 	  (*siter)->multiplies_equal(scale);
       }
       
       void divides_equal(const double& scale)
       {
 	score_ptr_set_type::iterator siter_end = scores.end();
-	for (score_ptr_set_type::iterator siter = scores.begin(); siter != siter_end; ++ siter, ++ iter)
+	for (score_ptr_set_type::iterator siter = scores.begin(); siter != siter_end; ++ siter)
 	  (*siter)->divides_equal(scale);
       }
 
@@ -118,21 +118,21 @@ namespace cicada
 
       score_ptr_type clone() const
       {
-	score_ptr_type combined(new Combined());
+	std::auto_ptr<Combined> combined(new Combined());
 	
-	combined->scores.reserve(scores.sizes());
+	combined->scores.reserve(scores.size());
 	score_ptr_set_type::const_iterator siter_end = scores.end();
 	for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter)
 	  combined->scores.push_back((*siter)->clone());
 	
 	combined->weights = weights;
 	
-	return combined;
+	return score_ptr_type(combined.release());
       }
       
     private:
-      score_set_type  scores;
-      weight_set_type weights;
+      score_ptr_set_type scores;
+      weight_set_type    weights;
     };
     
     class CombinedScorer : public Scorer
@@ -155,7 +155,7 @@ namespace cicada
       
       scorer_ptr_type clone() const
       {
-	scorer_ptr_type scorer(new CombinedScorer());
+	std::auto_ptr<CombinedScorer> scorer(new CombinedScorer());
 	
 	scorer->scorers.reserve(scorers.size());
 	scorer_ptr_set_type::const_iterator siter_end = scorers.end();
@@ -164,7 +164,7 @@ namespace cicada
 
 	scorer->weights = weights;
 
-	return scorer;
+	return scorer_ptr_type(scorer.release());
       }
       
       void clear()
@@ -191,11 +191,11 @@ namespace cicada
 	
 	combined->weights = weights;
 	
-	return scorer_ptr_type(combined.release());
+	return score_ptr_type(combined.release());
       }
       
     private:
-      scorer_set_type scorers;
+      scorer_ptr_set_type scorers;
       weight_set_type weights;
       bool error;
     };
