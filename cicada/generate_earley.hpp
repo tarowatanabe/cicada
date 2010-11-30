@@ -675,7 +675,7 @@ namespace cicada
 	    if (titer_curr == titer_end)
 	      throw std::runtime_error("no antecedent?");
 	    
-	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_curr; ++ titer) {
+	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = std::max(titer_begin, titer_curr - width); titer != titer_curr; ++ titer) {
 	      const symbol_type non_terminal = source.edges[source.nodes[*titer].edges.front()].rule->lhs.non_terminal();
 	      
 	      if (label.empty())
@@ -686,7 +686,7 @@ namespace cicada
 	    
 	    label += '@' + source.edges[source.nodes[*titer_curr].edges.front()].rule->lhs.non_terminal().non_terminal_strip();
 	    
-	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_curr + 1; titer != titer_end; ++ titer) {
+	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_curr + 1; titer != std::min(titer_curr + 1 + width, titer_end); ++ titer) {
 	      const symbol_type non_terminal = source.edges[source.nodes[*titer].edges.front()].rule->lhs.non_terminal();
 	      
 	      label += '|' + non_terminal.non_terminal_strip();
@@ -702,11 +702,11 @@ namespace cicada
 		label = label.substr(pos + 1);
 	    }
 	  }
-	  
-	  non_terminals[id] = '[' + labels[id] + ']';
-	  
-	  std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
 	}
+	
+	non_terminals[id] = '[' + labels[id] + ']';
+	
+	//std::cerr << "non-terminal: " << non_terminals[id] << std::endl;
       }
       
       // max-tree-depth is the 1.5 of the original tree
