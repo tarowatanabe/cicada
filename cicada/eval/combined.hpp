@@ -50,6 +50,7 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid combined score");
 	
+	scores.reserve(utils::bithack::max(scores.size(), rhs->scores.size()));
 	scores.resize(rhs->scores.size());
 	
 	score_ptr_set_type::iterator iter = scores.begin();
@@ -66,6 +67,7 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid combined score");
 	
+	scores.reserve(utils::bithack::max(scores.size(), rhs->scores.size()));
 	scores.resize(utils::bithack::max(scores.size(), rhs->scores.size()));
 	
 	score_ptr_set_type::iterator iter = scores.begin();
@@ -83,6 +85,7 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid combined score");	
 
+	scores.reserve(utils::bithack::max(scores.size(), rhs->scores.size()));
 	scores.resize(utils::bithack::max(scores.size(), rhs->scores.size()));
 	
 	score_ptr_set_type::iterator iter = scores.begin();
@@ -115,7 +118,16 @@ namespace cicada
 
       score_ptr_type clone() const
       {
-	return score_ptr_type(new Combined(*this));
+	score_ptr_type combined(new Combined());
+	
+	combined->scores.reserve(scores.sizes());
+	score_ptr_set_type::const_iterator siter_end = scores.end();
+	for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter)
+	  combined->scores.push_back((*siter)->clone());
+	
+	combined->weights = weights;
+	
+	return combined;
       }
       
     private:
@@ -123,34 +135,49 @@ namespace cicada
       weight_set_type weights;
     };
     
-    class CombinedScorerImpl;
-    
     class CombinedScorer : public Scorer
     {
-    public:
-      typedef double count_type;
-      
     private:
-      typedef CombinedScorerImpl impl_type;
-      typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
+      typedef std::vector<scorer_ptr_type, std::allocator<scorer_ptr_type> > scorer_ptr_set_type;
+      typedef std::vector<double, std::allocator<double> > weight_set_type;
       
     public:
-      CombinedScorer() : impl() { }
-      CombinedScorer(const CombinedScorer& x);
-      ~CombinedScorer();
-      CombinedScorer& operator=(const CombinedScorer& x);
+      CombinedScorer() : scorers() { }
+      CombinedScorer(const CombinedScorer& x) : scorers() {}
+      CombinedScorer& operator=(const CombinedScorer& x)
+      {
+	
+	return *this;
+      }
       
-      bool error_metric() const { return true; }
+      bool error_metric() const { return error; }
       
-      scorer_ptr_type clone() const { return scorer_ptr_type(new CombinedScorer(*this)); }
+      scorer_ptr_type clone() const
+      {
+	
+	
+      }
       
-      void clear();
+      void clear()
+      {
+	scorers.clear();
+	weights.clear();
+      }
       
-      void insert(const sentence_type& sentence);
-      score_ptr_type score(const sentence_type& __sentence) const;
+      void insert(const sentence_type& sentence)
+      {
+	
+      }
+      
+      score_ptr_type score(const sentence_type& __sentence) const
+      {
+	
+      }
       
     private:
-      impl_set_type impl;
+      scorer_set_type scorers;
+      weight_set_type weights;
+      bool error;
     };
   };
 };
