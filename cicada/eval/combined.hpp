@@ -137,6 +137,9 @@ namespace cicada
     
     class CombinedScorer : public Scorer
     {
+    public:
+      friend class Scorer;
+      
     private:
       typedef std::vector<scorer_ptr_type, std::allocator<scorer_ptr_type> > scorer_ptr_set_type;
       typedef std::vector<double, std::allocator<double> > weight_set_type;

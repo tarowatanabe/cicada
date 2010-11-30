@@ -37,6 +37,11 @@ namespace cicada
     const char* Scorer::lists()
     {
       static const char* desc = "\
+combined: combined scorer\n\
+\terror=[true|fase] error metric\n\
+\treward=[true|fase] reward metric\n\
+\tmetric=[scorer spec] i.e. metric=\"bleu:order=4\"\n\
+\tweight=[weight for the scorer]\n\
 bleu:\n\
 \torder=<order, default=4> ngram order\n\
 \ttokenizer=[tokenizer spec]\n\
@@ -69,8 +74,48 @@ sb: skip bigram\n\
       const parameter_type param(parameter);
 
       scorer_ptr_type scorer;
-      
-      if (param.name() == "bleu" || param.name() == "bleu-linear") {
+
+      if (param.name() == "combined") {
+	bool error = false;
+	bool reward = false;
+
+	std::vector<std::string, std::allocator<std::string> > metrics;
+	std::vector<double, std::allocator<double> > weights;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "error") == 0)
+	    error = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "reward") == 0)
+	    reward = utils::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "metric") == 0)
+	    metrics.push_back(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "weight") == 0)
+	    weights.push_back(boost::lexical_cast<double>(piter->second));
+	  else
+	    std::cerr << "WARNING: unsupported parameter for combined: " << piter->first << "=" << piter->second << std::endl;
+	}
+
+	if (int(error) + reward != 1)
+	  throw std::runtime_error("specify whether this is error or reward metric");
+
+	if (metrics.empty())
+	  throw std::runtime_error("no metrics?");
+	if (weights.empty())
+	  throw std::runtime_error("no weights?");
+	if (metrics.size() != weights.size())
+	  throw std::runtime_error("metrics and weights size do not match");
+	
+	std::auto_ptr<CombinedScorer> combined(new CombinedScorer());
+	combined->error = error;
+	
+	for (size_t i = 0; i != metrics.size(); ++ i) {
+	  combined->scorers.push_back(create(metrics[i]));
+	  combined->weights.push_back(weights[i]);
+	}
+	
+	scorer.reset(combined.release());
+	
+      } else if (param.name() == "bleu" || param.name() == "bleu-linear") {
 	int  order = 4;
 	const tokenizer_type* tokenizer = 0;
 	bool exact = false;
