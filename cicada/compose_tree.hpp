@@ -64,6 +64,10 @@ namespace cicada
 
     typedef TreeGrammar    tree_grammar_type;
     typedef TreeTransducer tree_transducer_type;
+    
+    typedef Grammar    grammar_type;
+    typedef Transducer transducer_type;
+    
     typedef HyperGraph     hypergraph_type;
     
     typedef hypergraph_type::feature_set_type   feature_set_type;
