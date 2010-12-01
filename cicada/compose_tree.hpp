@@ -91,9 +91,9 @@ namespace cicada
     typedef std::deque<feature_set_type, std::allocator<feature_set_type> >    feature_queue_type;
     typedef std::deque<attribute_set_type, std::allocator<attribute_set_type> > attribute_queue_type;
     
-    typedef std::vector<transducer_type::id_type, std::alloactor<transducer_type::id_type> > phrase_node_set_type;
+    typedef std::vector<transducer_type::id_type, std::allocator<transducer_type::id_type> > phrase_node_set_type;
     typedef std::vector<phrase_node_set_type, std::allocator<phrase_node_set_type> > phrase_node_map_type;
-    typedef std::vector<phrase_node_map_set_type, std::allocator<phrase_node_map_set_type> > phrase_node_map_set_type;
+    typedef std::vector<phrase_node_map_type, std::allocator<phrase_node_map_type> > phrase_node_map_set_type;
     
     struct State
     {
