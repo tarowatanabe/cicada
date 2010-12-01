@@ -83,9 +83,13 @@ namespace cicada
     
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > frontier_type;
     typedef std::deque<frontier_type, std::allocator<frontier_type> > frontier_queue_type;
-
+    
     typedef std::deque<feature_set_type, std::allocator<feature_set_type> >    feature_queue_type;
     typedef std::deque<attribute_set_type, std::allocator<attribute_set_type> > attribute_queue_type;
+    
+    typedef std::vector<transducer_type::id_type, std::alloactor<transducer_type::id_type> > phrase_node_set_type;
+    typedef std::vector<phrase_node_set_type, std::allocator<phrase_node_set_type> > phrase_node_map_type;
+    typedef std::vector<phrase_node_map_set_type, std::allocator<phrase_node_map_set_type> > phrase_node_map_set_type;
     
     struct State
     {
@@ -136,8 +140,8 @@ namespace cicada
     typedef NodeMap node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     
-    ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const bool __yield_source)
-      : goal(__goal), tree_grammar(__tree_grammar), yield_source(__yield_source) 
+    ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
+      : goal(__goal), tree_grammar(__tree_grammar), grammar(__grammar), yield_source(__yield_source) 
     {  }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
@@ -149,6 +153,10 @@ namespace cicada
 
       node_map.reserve(graph_in.nodes.size());
       node_map.resize(graph_in.nodes.size());
+      
+      phrase_node_map.clear();
+      phrase_node_map.reserve(grammar.size());
+      phrase_node_map.resize(grammar.size(), phrase_node_map_type(graph_in.nodes.size()));
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id)
@@ -165,7 +173,7 @@ namespace cicada
     void match_tree(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       if (graph_in.nodes[id].edges.empty()) return;
-
+      
       queue_type queue;
       
       for (size_t grammar_id = 0; grammar_id != tree_grammar.size(); ++ grammar_id) {
@@ -297,6 +305,9 @@ namespace cicada
 	  queue.pop_front();
 	}
       }
+      
+      // then, try phrasal grammar...
+      
     }
     
     
@@ -390,16 +401,20 @@ namespace cicada
 
     node_map_set_type node_map;
     
+    phrase_node_map_set_type phrase_node_map;
+    
+    
     symbol_type goal;
     const tree_grammar_type& tree_grammar;
+    const grammar_type& grammar;
     const bool yield_source;
   };
   
   
   inline
-  void compose_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
+  void compose_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
   {
-    ComposeTree __composer(goal, tree_grammar, yield_source);
+    ComposeTree __composer(goal, tree_grammar, grammar, yield_source);
     __composer(graph_in, graph_out);
   }
 };
