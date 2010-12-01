@@ -728,7 +728,12 @@ namespace cicada
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
-	    const symbol_type& non_terminal = non_terminals[edge.tails[tail_pos]];
+	    int pos = siter->non_terminal_index() - 1;
+	    if (pos < 0)
+	      pos = tail_pos;
+	    ++ tail_pos;
+	    
+	    const symbol_type& non_terminal = non_terminals[edge.tails[pos]];
 	    
 	    const id_type grammar_node = niter->second;
 	    
@@ -738,8 +743,6 @@ namespace cicada
 	      grammar_nodes.push_back(grammar_node_type());
 	      niter = grammar_nodes[grammar_node].non_terminals.insert(std::make_pair(non_terminal, id)).first;
 	    }
-	    
-	    ++ tail_pos;
 	  } else {
 	    const symbol_type& terminal = *siter;
 	    
