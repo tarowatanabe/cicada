@@ -668,7 +668,8 @@ namespace cicada
 	    if (titer_curr == titer_end)
 	      throw std::runtime_error("no antecedent?");
 	    
-	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = std::max(titer_begin, titer_curr - width); titer != titer_curr; ++ titer) {
+	    hypergraph_type::edge_type::node_set_type::const_iterator titer_first = std::max(titer_begin, titer_curr - width);
+	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_first; titer != titer_curr; ++ titer) {
 	      const symbol_type non_terminal = source.edges[source.nodes[*titer].edges.front()].rule->lhs.non_terminal();
 	      
 	      if (label.empty())
@@ -679,7 +680,8 @@ namespace cicada
 	    
 	    label += '@' + source.edges[source.nodes[*titer_curr].edges.front()].rule->lhs.non_terminal().non_terminal_strip();
 	    
-	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_curr + 1; titer != std::min(titer_curr + 1 + width, titer_end); ++ titer) {
+	    hypergraph_type::edge_type::node_set_type::const_iterator titer_last = std::min(titer_curr + 1 + width, titer_end);
+	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_curr + 1; titer != titer_last; ++ titer) {
 	      const symbol_type non_terminal = source.edges[source.nodes[*titer].edges.front()].rule->lhs.non_terminal();
 	      
 	      label += '|' + non_terminal.non_terminal_strip();

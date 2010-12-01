@@ -81,7 +81,6 @@ namespace cicada
       
       int depth;
       int width;
-      bool context;
       
       int debug;
     };
