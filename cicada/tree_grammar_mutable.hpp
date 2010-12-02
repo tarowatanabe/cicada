@@ -83,6 +83,10 @@ namespace cicada
     {
       insert(rule_pair_type(rule_type::create(rule_type(source)), rule_type::create(rule_type(target)), features));
     }
+    void insert(const rule_type& source, const rule_type& target, const feature_set_type& features, const attribute_set_type& attributes)
+    {
+      insert(rule_pair_type(rule_type::create(rule_type(source)), rule_type::create(rule_type(target)), features, attributes));
+    }
     void insert(const rule_ptr_type& source, const rule_ptr_type& target)
     {
       insert(rule_pair_type(source, target));
@@ -91,7 +95,10 @@ namespace cicada
     {
       insert(rule_pair_type(source, target, features));
     }
-
+    void insert(const rule_ptr_type& source, const rule_ptr_type& target, const feature_set_type& features, const attribute_set_type& attributes)
+    {
+      insert(rule_pair_type(source, target, features, attributes));
+    }
     
   private:
     impl_type* pimpl;

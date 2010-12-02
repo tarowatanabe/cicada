@@ -159,6 +159,7 @@ namespace cicada
       Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
 	: output_data(__output_data), file(), directory(), weights(0), weights_one(false),
 	  kbest_size(0), kbest_unique(false),
+	  insertion_prefix(),
 	  yield_string(false),
 	  yield_tree(false),
 	  graphviz(false),
@@ -189,6 +190,8 @@ namespace cicada
 	    file = piter->second;
 	  else if (strcasecmp(piter->first.c_str(), "directory") == 0)
 	    directory = piter->second;
+	  else if (strcasecmp(piter->first.c_str(), "insertion-prefix") == 0)
+	    insertion_prefix = piter->second;
 	  else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
 	    const std::string& value = piter->second;
 	    
@@ -353,24 +356,24 @@ namespace cicada
 	  if (weights_one) {
 	    if (kbest_unique) {
 	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function_one<weight_type>(), kbest_filter_unique(hypergraph));
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function_one<weight_type>(), kbest_filter_unique(hypergraph));
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function_one<weight_type>(), kbest_filter());
 	    } else {
 	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function_one<weight_type>(), kbest_filter());
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function_one<weight_type>(), kbest_filter());
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function_one<weight_type>(), kbest_filter());
 	    }
 	  } else {
 	    if (kbest_unique) {
 	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function<weight_type>(*weights_kbest), kbest_filter_unique(hypergraph));
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function<weight_type>(*weights_kbest), kbest_filter_unique(hypergraph));
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function<weight_type>(*weights_kbest), kbest_filter());
 	    } else {
 	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(), weight_function<weight_type>(*weights_kbest), kbest_filter());
+		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function<weight_type>(*weights_kbest), kbest_filter());
 	      else
 		kbest_derivations(os, id, hypergraph, kbest_size, weight_function<weight_type>(*weights_kbest), kbest_filter());
 	    }
@@ -394,6 +397,8 @@ namespace cicada
       bool weights_one;
       int  kbest_size;
       bool kbest_unique;
+      
+      std::string insertion_prefix;
 
       bool yield_string;
       bool yield_tree;

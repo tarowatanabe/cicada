@@ -101,6 +101,9 @@ namespace cicada
       feature_set_type features;
       features["insertion-penalty"] = - 1.0;
       
+      attribute_set_type attributes;
+      attributes["insertion"] = attribute_set_type::int_type(1);
+      
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
 	if (eiter->rule) {
@@ -111,7 +114,7 @@ namespace cicada
 	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
 	      rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
-	      insert(rule, rule, features);
+	      insert(rule, rule, features, attributes);
 	      
 	      symbols.insert(*siter);
 	    }
@@ -128,6 +131,9 @@ namespace cicada
 
       feature_set_type features;
       features["insertion-penalty"] = - 1.0;
+
+      attribute_set_type attributes;
+      attributes["insertion"] = attribute_set_type::int_type(1);
       
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
@@ -143,7 +149,7 @@ namespace cicada
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
 	    
-	    insert(rule, rule, features);
+	    insert(rule, rule, features, attributes);
 	    
 	    symbols.insert(aiter->label);
 	  }
@@ -182,6 +188,9 @@ namespace cicada
       
       feature_set_type features;
       features["deletion-penalty"] = - 1.0;
+
+      attribute_set_type attributes;
+      attributes["deletion"] = attribute_set_type::int_type(1);
       
       rule_ptr_type rule_epsilon(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
       
@@ -195,7 +204,7 @@ namespace cicada
 	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
 	      rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
-	      insert(rule, rule_epsilon, features);
+	      insert(rule, rule_epsilon, features, attributes);
 	      
 	      symbols.insert(*siter);
 	    }
@@ -213,6 +222,9 @@ namespace cicada
       feature_set_type features;
       features["deletion-penalty"] = - 1.0;
       
+      attribute_set_type attributes;
+      attributes["insertion"] = attribute_set_type::int_type(1);
+
       rule_ptr_type rule_epsilon(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
       
       for (size_t first = 0; first != lattice.size(); ++ first) {
@@ -229,7 +241,7 @@ namespace cicada
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
 	    
-	    insert(rule, rule_epsilon, features);
+	    insert(rule, rule_epsilon, features, attributes);
 	    
 	    symbols.insert(aiter->label);
 	  }
