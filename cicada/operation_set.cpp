@@ -90,6 +90,7 @@ remove-epsilon: remove epsilon for lattice\n\
 span-forest: annotate terminal span\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
+\tinsertion-prefix=<prefix attatched to inserted word>\n\
 \tunique=[true|false] unique translation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialize weight\n\
