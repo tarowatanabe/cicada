@@ -241,10 +241,11 @@ struct config_span_type
   bool binarize;
   bool unary_top;
   bool unary_bottom;
+  bool unary_root;
 };
 
 // top down traversal of this treebank structure to collect spans(w/ category)
-void transform_span(const treebank_type& treebank, span_set_type& spans, int& terminal, const config_span_type& config)
+void transform_span(const treebank_type& treebank, span_set_type& spans, int& terminal, const config_span_type& config, const int level)
 {
   if (treebank.antecedents.empty()) {
     if (config.exclude_terminal)
@@ -256,7 +257,7 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, int& te
     span_set_type spans_rule;
     
     for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
-      transform_span(*aiter, spans, terminal, config);
+      transform_span(*aiter, spans, terminal, config, level + 1);
       spans_rule.push_back(spans.back());
     }
     
@@ -282,12 +283,13 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, int& te
     
     // when unary rule, and not immediate parent of terminal
     if (spans_rule.size() == 1 && ! treebank.antecedents.front().antecedents.empty()) {
-      if (config.unary_top)
+      if (config.unary_top || (config.unary_root && level == 0))
 	spans.back().second = '[' + treebank.cat + ']';
       else if (config.unary_bottom)
 	;
-      else
+      else 
 	spans.back().second = spans.back().second.substr(0, spans.back().second.size() - 1) + ':' + treebank.cat + ']';
+
     } else
       spans.push_back(std::make_pair(span_type(spans_rule.front().first.first, spans_rule.back().first.second), '[' + treebank.cat + ']'));
   }
@@ -298,7 +300,7 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, const c
 {
   int terminal = 0;
   
-  transform_span(treebank, spans, terminal, config);
+  transform_span(treebank, spans, terminal, config, 0);
 }
 
 
@@ -317,6 +319,7 @@ bool category = false;
 bool binarize = false;
 bool unary_top = false;
 bool unary_bottom = false;
+bool unary_root = false;
 bool exclude_terminal = false;
 
 int debug = 0;
@@ -358,6 +361,7 @@ int main(int argc, char** argv)
     config_span.binarize         = binarize;
     config_span.unary_top        = unary_top;
     config_span.unary_bottom     = unary_bottom;
+    config_span.unary_root       = unary_root;
 
     std::string line;
     iter_type iter(is);
@@ -429,7 +433,7 @@ int main(int argc, char** argv)
 	    for (span_sorted_type::const_iterator siter = spans_sorted.begin(); siter != siter_end; ++ siter) {
 	      if (! initial)
 		os << ' ';
-
+	      
 	      if (! siter->second.empty())
 		os << siter->first.first << '-' << siter->first.second << ':' << siter->second;
 	      
@@ -506,6 +510,7 @@ void options(int argc, char** argv)
     
     ("unary-top",    po::bool_switch(&unary_top),    "use top-most category for unary rules")
     ("unary-bottom", po::bool_switch(&unary_bottom), "use bottom-most category for unary rules")
+    ("unary-root",   po::bool_switch(&unary_root),   "use single category for root")
     
     ("exclude-terminal", po::bool_switch(&exclude_terminal), "no terminal in span")
     
