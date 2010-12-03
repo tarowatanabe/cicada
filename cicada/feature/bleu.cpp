@@ -23,10 +23,6 @@
 #include <boost/numeric/conversion/bounds.hpp>
 #include <boost/tokenizer.hpp>
 
-#include <unicode/uchar.h>
-#include <unicode/unistr.h>
-#include <unicode/schriter.h>
-#include <unicode/bytestream.h>
 
 namespace cicada
 {

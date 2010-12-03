@@ -20,12 +20,6 @@
 #include "utils/config.hpp"
 #include "utils/lexical_cast.hpp"
 
-#include <unicode/uchar.h>
-#include <unicode/unistr.h>
-#include <unicode/schriter.h>
-#include <unicode/bytestream.h>
-#include <unicode/translit.h>
-
 #include <boost/filesystem.hpp>
 
 
