@@ -1,6 +1,6 @@
 Phrase/Rule/Tree-fragment extraction
 
-We (will) support various phrase/rule/tree extraction. Basically, we will run in two steps:
+We support various phrase/rule/tree extraction. Basically, we will run in two steps:
    Collect counts by mapping input sentences/parse trees/alignmeent etc.
    Map/Reduce to collect target-side counts
    Map/Reduce to collect source/target counts and produce various counts

@@ -24,11 +24,6 @@ Add Matcher interface?
   - for lattice generation, it is reported stemming or word net synset does help to generalize matching.
     Do we implement this as our string baseline?
 
-Compute kbest oracle translations or packed forest:
-  - We can treat the packed forest as the "correct translations"
-  - Or, use the kbest, intersect with incorrect translations in order to 
-    compute features???
-
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
     I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
