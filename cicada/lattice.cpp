@@ -36,10 +36,10 @@ namespace cicada
   
   void Lattice::initialize_distance()
   {
-    const size_type dist_size = size() + 1;
-
     const int pos_infinity = boost::numeric::bounds<int>::highest();
     const int neg_infinity = boost::numeric::bounds<int>::lowest();
+    
+    const size_type dist_size = size() + 1;
     
     // edge-cost is inifinity if no-path
     dist_short.clear();
@@ -49,8 +49,7 @@ namespace cicada
     dist_long.clear();
     dist_long.reserve(dist_size, dist_size);
     dist_long.resize(dist_size, dist_size, neg_infinity);
-
-#if 1
+    
     // edge-cost dist(i, i) = 0
     for (size_t i = 0; i != dist_size; ++ i) {
       dist_short(i, i) = 0;
@@ -87,36 +86,6 @@ namespace cicada
 	}
       }
     }
-#endif
-    
-#if 0
-    // edge-cost for dist(i, j)
-    for (size_t i = 0; i != lattice.size(); ++ i)
-      for (size_t j = 0; j != lattice[i].size(); ++ j) {
-	const int last = i + lattice[i][j].distance;
-	const int dist = lattice[i][j].label != Vocab::EPSILON;
-	
-	dist_short(i, last) = utils::bithack::min(dist_short(i, last), dist);
-	dist_long(i, last)  = utils::bithack::max(dist_long(i, last),  dist);
-      }
-    
-    // edge-cost dist(i, i) = 0
-    for (size_t i = 0; i != dist_size; ++ i) {
-      dist_short(i, i) = 0;
-      dist_long(i, i)  = 0;
-    }
-    
-    // Floyd-Warshall algorithm to compute shortest path
-    for (size_t k = 0; k != dist_size; ++ k) 
-      for (size_t i = 0; i != dist_size; ++ i)
-	for (size_t j = 0; j != dist_size; ++ j) {
-	  if (dist_short(i, k) != pos_infinity && dist_short(k, j) != pos_infinity)
-	    dist_short(i, j) = utils::bithack::min(dist_short(i, j), dist_short(i, k) + dist_short(k, j));
-	    
-	  if (dist_long(i, k) != neg_infinity && dist_long(k, j) != neg_infinity)
-	    dist_long(i, j) = utils::bithack::max(dist_long(i, j), dist_long(i, k) + dist_long(k, j));
-	}
-#endif
   }
   
   template <typename Iterator>
