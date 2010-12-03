@@ -201,6 +201,7 @@ void transform(const treebank_type& treebank, sentence_type& sent)
 
 void transform_normalize(treebank_type& treebank)
 {
+  // no terminal...
   if (treebank.antecedents.empty()) return;
   
   // normalize treebank-category...
