@@ -126,14 +126,15 @@ namespace cicada
   template <typename KFunction, typename XFunction>
   struct InsideOutside
   {
-    typedef HyperGraph            hypergraph_type;
+    typedef HyperGraph hypergraph_type;
 
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
 
     InsideOutside(KFunction __function_k,
 		  XFunction __function_x)
-      : function_k(__function_k),
+      : inside(__function_k),
+	outside(__function_k),
 	function_x(__function_x) {}
 
     template <typename KWeightSet, typename KWeightOutsideSet, typename XWeightSet>
@@ -144,9 +145,6 @@ namespace cicada
     {
       typedef typename KWeightSet::value_type KWeight;
       typedef typename XWeightSet::value_type XWeight;
-      
-      Inside<KFunction>  inside(function_k);
-      Outside<KFunction> outside(function_k);
       
       inside(graph, inside_k);
       outside(graph, inside_k, outside_k);
@@ -186,7 +184,8 @@ namespace cicada
       operator()(graph, inside_k, outside_k, x);
     }
     
-    KFunction function_k;
+    Inside<KFunction>  inside;
+    Outside<KFunction> outside;
     XFunction function_x;
   };
 
