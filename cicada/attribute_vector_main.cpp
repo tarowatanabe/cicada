@@ -45,6 +45,8 @@ int main(int argc, char** argv)
   find_attrs(attr1, "bad");
   find_attrs(attr1, "bad2");
   find_attrs(attr1, "neutral");
+
+  std::cout << "sizeof attr-value: " << sizeof(attribute_set_type::data_type) << std::endl;
   
   std::cout << "attr1: " << attr1 << std::endl;
   
