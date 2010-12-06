@@ -12,7 +12,6 @@
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
 #include <unicode/schriter.h>
-#include <unicode/bytestream.h>
 
 namespace cicada
 {
@@ -41,10 +40,9 @@ namespace cicada
 	      // we will split...
 	      if (! buffer.empty())
 		tokenized.push_back(word_type(buffer.begin(), buffer.end()));
-	      buffer.clear();
 	      
-	      StringByteSink<std::string> __sink(&buffer);
-	      UnicodeString(c).toUTF8(__sink);
+	      buffer.clear();
+	      UnicodeString(c).toUTF8String(buffer);
 	      
 	      tokenized.push_back(word_type(buffer.begin(), buffer.end()));
 	      buffer.clear();

@@ -10,7 +10,6 @@
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
 #include <unicode/translit.h>
-#include <unicode/bytestream.h>
 #include <unicode/regex.h>
 
 #include "utils/config.hpp"
@@ -197,8 +196,7 @@ namespace cicada
 	remove_suffix(uword);
 	
 	std::string word_stemmed;
-	StringByteSink<std::string> __sink(&word_stemmed);
-	uword.toUTF8(__sink);
+	uword.toUTF8String(word_stemmed);
 	
 	return word_stemmed;
       }

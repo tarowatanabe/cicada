@@ -7,7 +7,6 @@
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
 #include <unicode/schriter.h>
-#include <unicode/bytestream.h>
 
 namespace cicada
 {
@@ -59,8 +58,7 @@ namespace cicada
 	    uword_digits.append('>');
 	  
 	    std::string word_digits;
-	    StringByteSink<std::string> __sink(&word_digits);
-	    uword_digits.toUTF8(__sink);
+	    uword_digits.toUTF8String(word_digits);
 	  
 	    __cache[word.id()] = word_digits;
 	  } else

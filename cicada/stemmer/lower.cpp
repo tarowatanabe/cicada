@@ -9,7 +9,6 @@
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
 #include <unicode/translit.h>
-#include <unicode/bytestream.h>
 
 #include "utils/config.hpp"
 
@@ -51,13 +50,13 @@ namespace cicada
 	__cache.resize(word.id() + 1, vocab_type::EMPTY);
     
       if (__cache[word.id()] == vocab_type::EMPTY) {
-	std::string word_lower;
+	
 	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	
 	static_cast<Transliterator*>(pimpl)->transliterate(uword);
 	
-	StringByteSink<std::string> __sink(&word_lower);
-	uword.toUTF8(__sink);
+	std::string word_lower;
+	uword.toUTF8String(word_lower);
 	
 	__cache[word.id()] = word_lower;
       }

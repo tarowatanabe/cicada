@@ -6,7 +6,6 @@
 
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
-#include <unicode/bytestream.h>
 #include <unicode/translit.h>
 
 #include <boost/thread.hpp>
@@ -93,8 +92,7 @@ namespace cicada
       
 	if (! uword.isEmpty()) {
 	  std::string word_latin;
-	  StringByteSink<std::string> __sink(&word_latin);
-	  uword.toUTF8(__sink);
+	  uword.toUTF8String(word_latin);
 	
 	  __cache[word.id()] = word_latin;
 	} else

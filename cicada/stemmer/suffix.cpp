@@ -6,7 +6,6 @@
 
 #include <unicode/uchar.h>
 #include <unicode/unistr.h>
-#include <unicode/bytestream.h>
 
 namespace cicada
 {
@@ -39,8 +38,7 @@ namespace cicada
 	  uword_suffix.insert(0, '+');
 	
 	  std::string word_suffix;
-	  StringByteSink<std::string> __sink(&word_suffix);
-	  uword_suffix.toUTF8(__sink);
+	  uword_suffix.toUTF8String(word_suffix);
 	
 	  __cache[word.id()] = word_suffix;
 	} else
