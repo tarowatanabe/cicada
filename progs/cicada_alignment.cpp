@@ -123,8 +123,7 @@ struct bitext_giza_parser : boost::spirit::qi::grammar<Iterator, bitext_giza_typ
     namespace phoenix = boost::phoenix;
     
     comment %= qi::lexeme[*(standard::char_ - qi::eol)] >> qi::eol;
-    word    %= qi::lexeme[+(standard::char_ - standard::space - qi::eol)];
-    target  %= *word >> qi::eol;
+    target  %= *qi::lexeme[+(standard::char_ - standard::space - qi::eol)] >> qi::eol;
     
     points     %= "({" >> *qi::int_ >> "})";
     word_align %= qi::lexeme[+(standard::char_ - standard::space - qi::eol)] >> points;
@@ -136,7 +135,6 @@ struct bitext_giza_parser : boost::spirit::qi::grammar<Iterator, bitext_giza_typ
   typedef boost::spirit::standard::blank_type blank_type;
   
   boost::spirit::qi::rule<Iterator, std::string(), blank_type>                           comment;
-  boost::spirit::qi::rule<Iterator, std::string(), blank_type>                           word;
   boost::spirit::qi::rule<Iterator, bitext_giza_type::sent_type(), blank_type>           target;
   boost::spirit::qi::rule<Iterator, bitext_giza_type::point_set_type(), blank_type>      points;
   boost::spirit::qi::rule<Iterator, bitext_giza_type::word_align_type(), blank_type>     word_align;
