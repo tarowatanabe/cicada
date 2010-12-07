@@ -16,6 +16,7 @@ LIBUTILS   = $(top_builddir)/utils/libutils.la
 bin_PROGRAMS = \
 	cicada \
 	cicada_mpi \
+	cicada_alignment \
 	cicada_eval \
 	cicada_extract_ghkm \
 	cicada_extract_ghkm_mpi \
@@ -60,6 +61,9 @@ cicada_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 cicada_mpi_SOURCES  = cicada_mpi.cpp
 cicada_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_alignment_SOURCES = cicada_alignment.cpp
+cicada_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_eval_SOURCES = cicada_eval.cpp
 cicada_eval_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

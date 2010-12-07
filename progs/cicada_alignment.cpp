@@ -4,6 +4,22 @@
 //        invert alignment
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/spirit/include/phoenix_operator.hpp>
+#include <boost/spirit/include/phoenix_stl.hpp>
+#include <boost/spirit/include/phoenix_object.hpp>
+
+#include <boost/spirit/include/support_istream_iterator.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted/std_pair.hpp>
+#include <boost/fusion/include/std_pair.hpp>
+
 #include <stdexcept>
 #include <iostream>
 #include <string>
@@ -14,6 +30,7 @@
 #include <cicada/alignment.hpp>
 
 #include "utils/program_options.hpp"
+#include "utils/compress_stream.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -21,6 +38,37 @@
 typedef boost::filesystem::path path_type;
 
 typedef cicada::Alignment alignment_type;
+
+struct BitextGiza
+{
+  typedef std::vector<int, std::allocator<int> > point_set_type;
+  typedef std::pair<std::string, point_set_type> word_align_type;
+  typedef std::vector<word_align_type, std::allocator<word_align_type> > word_align_set_type;
+  typedef std::vector<std::string, std::allocator<std::string> > sent_type;
+  
+  std::string         comment;
+  sent_type           target;
+  word_align_set_type source;
+  
+  BitextGiza() {}
+
+  void clear()
+  {
+    comment.clear();
+    target.clear();
+    source.clear();
+  }
+};
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  BitextGiza,
+			  (std::string,                     comment)
+			  (BitextGiza::sent_type,           target)
+			  (BitextGiza::word_align_set_type, source)
+			  )
+
+typedef BitextGiza bitext_giza_type;
+
 
 path_type source_target_file;
 path_type target_source_file;
@@ -46,7 +94,8 @@ bool invert_mode = false;
 int threads = 1;
 int debug = 0;
 
-// input mode... use of one-line lattice input or sentence input?
+void process(std::istream& is, std::ostream& os);
+
 void options(int argc, char** argv);
 
 int main(int argc, char ** argv)
@@ -54,7 +103,7 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    
+    process(std::cin, std::cout);
     
   }
   catch (const std::exception& err) {
@@ -62,6 +111,66 @@ int main(int argc, char ** argv)
     return 1;
   }
   return 0;
+}
+
+template <typename Iterator>
+struct bitext_giza_parser : boost::spirit::qi::grammar<Iterator, bitext_giza_type(), boost::spirit::standard::blank_type>
+{
+  bitext_giza_parser() : bitext_giza_parser::base_type(bitext)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    namespace phoenix = boost::phoenix;
+    
+    comment %= qi::lexeme[*(standard::char_ - qi::eol)] >> qi::eol;
+    word    %= qi::lexeme[+(standard::char_ - standard::space - qi::eol)];
+    target  %= *word >> qi::eol;
+    
+    points     %= "({" >> *qi::int_ >> "})";
+    word_align %= qi::lexeme[+(standard::char_ - standard::space - qi::eol)] >> points;
+    source     %= *word_align >> qi::eol;
+    
+    bitext %= comment >> target >> source;
+  }
+  
+  typedef boost::spirit::standard::blank_type blank_type;
+  
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type>                           comment;
+  boost::spirit::qi::rule<Iterator, std::string(), blank_type>                           word;
+  boost::spirit::qi::rule<Iterator, bitext_giza_type::sent_type(), blank_type>           target;
+  boost::spirit::qi::rule<Iterator, bitext_giza_type::point_set_type(), blank_type>      points;
+  boost::spirit::qi::rule<Iterator, bitext_giza_type::word_align_type(), blank_type>     word_align;
+  boost::spirit::qi::rule<Iterator, bitext_giza_type::word_align_set_type(), blank_type> source;
+  
+  boost::spirit::qi::rule<Iterator, bitext_giza_type(), blank_type> bitext;
+};
+
+void process(std::istream& is, 
+	     std::ostream& os)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  
+  bitext_giza_parser<iter_type> parser;
+  
+  bitext_giza_type bitext_giza;
+  
+  is.unsetf(std::ios::skipws);
+  
+  iter_type iter(is);
+  iter_type iter_end;
+  
+  while (iter != iter_end) {
+    bitext_giza.clear();
+    
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, bitext_giza))
+      if (iter != iter_end)
+	throw std::runtime_error("parsing failed");
+    
+    os << "comment: " << bitext_giza.comment << '\n';
+    os << "target: ";
+    std::copy(bitext_giza.target.begin(), bitext_giza.target.end(), std::ostream_iterator<std::string>(os, " "));
+    os << '\n';
+  }
 }
 
 void options(int argc, char** argv)
