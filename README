@@ -8,9 +8,10 @@ Based on the generic framework, we can
 
 Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
 
-Basically, we have three distinct structures:
+Basically, we have four distinct structures:
    - lattice: a representation of graph implemented as a two-dimentional array.
    - grammar: a collection of WFST implemented as a trie structure.
+   - tree-grammar: a collectin of WFSTT (tree-transducer) implemented as a (nested) trie structure.
    - hypergraph: a compact representation of set of trees (or forest).
 
 Translation can be carried out by:
@@ -27,8 +28,8 @@ After the hypergraph generation, you can:
    - Perform variational decoding for hypergraph [10].
    - Perform MBR decoding for hypergraph [12].
       * Above two computations rely on expected ngram-counts over forest [13].
-   - K-bests sentences are generated from hypergraph [5].
-   - Generate oracle translations.
+   - K-best sentences are generated from hypergraph [5].
+   - Generate oracle translations (BLEU only).
 
 Or, you can combine outputs from multiple systems by (New! and TODO):
    - Perform parsing over nbests (use your favorite parser, such as Berkeley parser/Stanford parser etc.)
@@ -48,7 +49,7 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
    - Tree-to-string/strint-to-tree extractin from forest [16]
    - Tree-to-tree rule extraction from forest [17] (TODO!)
    
-   - After count extraction, you can perform map/reduce to compute model scores
+   - After count extraction, you can perform map/reduce to compute model scores [19]
 
 Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
@@ -293,3 +294,15 @@ References:
   url       = {http://www.aclweb.org/anthology/D10-1027}
 }
 
+[19]
+@InProceedings{dyer-EtAl:2008:WMT,
+  author    = {Dyer, Chris  and  Cordova, Aaron  and  Mont, Alex  and  Lin, Jimmy},
+  title     = {Fast, Easy, and Cheap: Construction of Statistical Machine Translation Models with {MapReduce}},
+  booktitle = {Proceedings of the Third Workshop on Statistical Machine Translation},
+  month     = {June},
+  year      = {2008},
+  address   = {Columbus, Ohio},
+  publisher = {Association for Computational Linguistics},
+  pages     = {199--207},
+  url       = {http://www.aclweb.org/anthology/W/W08/W08-0333}
+}

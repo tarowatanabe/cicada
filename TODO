@@ -15,7 +15,7 @@ Support tree-to-tree transduction:
 Better MIRA training
     Optimized online training by combining MERT procedure to select better update ratio.... (does it work?)
 
-Use source side tree-fragment as a rule, and parse "lattice"
+Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree, as in ISI system!)
     Simply convert source side into a flat structure and parse via CKY
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
@@ -28,5 +28,6 @@ Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
     I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
 
-
 Add head-finder?
+
+Add alignment tool, which can read GIZA++ output and dump heuristic alignment?
