@@ -128,7 +128,7 @@ struct bitext_giza_parser : boost::spirit::qi::grammar<Iterator, bitext_giza_typ
     
     points     %= "({" >> *qi::int_ >> "})";
     word_align %= qi::lexeme[+(standard::char_ - standard::space - qi::eol)] >> points;
-    source     %= *word_align >> qi::eol;
+    source     %= *word_align >> (qi::eol | qi::eoi);
     
     bitext %= comment >> target >> source;
   }
