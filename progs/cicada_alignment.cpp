@@ -20,6 +20,8 @@
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
+//#include <boost/numeric/ublas/matrix.hpp>
+
 #include <stdexcept>
 #include <iostream>
 #include <string>
@@ -32,6 +34,10 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/bithack.hpp"
+#include "utils/mathop.hpp"
+#include "utils/vector2.hpp"
+
+#include "kuhn_munkres.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -109,6 +115,14 @@ bool diag_mode = false;
 bool final_and_mode = false;
 bool invert_mode = false;
 
+double prob_null         = 0.01;
+double prob_union        = 0.5;
+double prob_intersection = 1.0;
+
+double score_null = 0.0;
+double score_union = 0.0;
+double score_intersection = 0.0;
+
 int threads = 1;
 int debug = 0;
 
@@ -123,6 +137,10 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
 
+    score_null         = utils::mathop::log(prob_null);
+    score_union        = utils::mathop::log(prob_union);
+    score_intersection = utils::mathop::log(prob_intersection);
+    
     const bool flush_output = (output_file == "-"
 			       || (boost::filesystem::exists(output_file)
 				   && ! boost::filesystem::is_regular_file(output_file)));
@@ -515,6 +533,92 @@ struct FinalAnd
 };
 
 
+struct MaxMatch
+{
+  //typedef boost::numeric::ublas::matrix<double> matrix_type;
+  
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<char, std::allocator<char> > assigned_type;
+
+  template <typename Alignment>
+  class insert_align
+  {
+    typedef Alignment align_type;
+
+    int source_size;
+    int target_size;
+      
+    align_type*   align;
+      
+  public:
+    insert_align(const int& _source_size,
+		 const int& _target_size,
+		 align_type& __align)
+      : source_size(_source_size), target_size(_target_size),
+	align(&__align) {}
+    
+    template <typename Edge>
+    insert_align& operator=(const Edge& edge)
+    {	
+      if (edge.first < source_size && edge.second < target_size)
+	align->insert(edge);
+	
+      return *this;
+    }
+      
+    insert_align& operator*() { return *this; }
+    insert_align& operator++() { return *this; }
+    insert_align operator++(int) { return *this; }
+  };
+
+
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    const int source_size = utils::bithack::max(bitext_source_target.source.size() - 1, bitext_target_source.target.size());
+    const int target_size = utils::bithack::max(bitext_source_target.target.size(),     bitext_target_source.source.size() - 1);
+    
+    costs.clear();
+    costs.resize(source_size + target_size, source_size + target_size, 0.0);
+    
+    assigned.clear();
+    assigned.resize(source_size, target_size, false);
+    
+    for (int src = 1; src < static_cast<int>(bitext_source_target.source.size()); ++ src) {
+      const bitext_giza_type::point_set_type& aligns = bitext_source_target.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) {
+	costs(src - 1, *titer - 1) = score_union;
+	assigned(src - 1, *titer - 1) = true;
+      }
+    }
+    
+    for (int trg = 1; trg < static_cast<int>(bitext_target_source.source.size()); ++ trg) {
+      const bitext_giza_type::point_set_type& aligns = bitext_target_source.source[trg].second;
+      
+      bitext_giza_type::point_set_type::const_iterator siter_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator siter = aligns.begin(); siter != siter_end; ++ siter)
+	costs(*siter - 1, trg - 1) = (assigned(*siter - 1, trg - 1) ? score_intersection : score_union);
+    }
+    
+    for (int trg = 0; trg < target_size; ++ trg)
+      for (int src = 0; src < source_size; ++ src) {
+	// NULL network...
+	costs(src, trg + source_size) = score_null;
+	costs(src + target_size, trg) = score_null;
+      }
+    
+    kuhn_munkres_assignment(costs, insert_align<Alignment>(source_size, target_size, align));
+  }
+  
+  matrix_type   costs;
+  assigned_type assigned;
+};
+
+
 void process_alignment(std::istream& is, std::ostream& os)
 {
   alignment_type align;
@@ -624,14 +728,15 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
   alignment_type inverted;
   AlignmentInserter inserter(alignment);
   AlignmentInserter inverted_inserter(inverted);
-
+  
+  MaxMatch  __max_match;
   Intersect __intersect;
   Union     __union;
   Grow      __grow;
   GrowDiag  __grow_diag;
   Final     __final;
   FinalAnd  __final_and;
-
+  
   Invert    __invert;
 
   while (siter != siter_end && titer != titer_end) {
@@ -649,7 +754,11 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
     alignment.clear();
     aligns.clear();
     
-    if (intersection_mode) 
+    if (max_match_mode) {
+      __max_match(bitext_source_target, bitext_target_source, aligns);
+      
+      alignment.insert(alignment.end(), aligns.begin(), aligns.end());
+    } else if (intersection_mode) 
       __intersect(bitext_source_target, bitext_target_source, inserter);
     else if (union_mode) {
       __union(bitext_source_target, bitext_target_source, aligns);
@@ -719,6 +828,10 @@ void options(int argc, char** argv)
     ("final",        po::bool_switch(&final_mode),        "final")
     ("final-and",    po::bool_switch(&final_and_mode),    "final-and")
     ("invert",       po::bool_switch(&invert_mode),       "invert alignment")
+
+    ("prob-null",         po::value<double>(&prob_null),         "NULL probability")
+    ("prob-union",        po::value<double>(&prob_union),        "union probability")
+    ("prob-intersection", po::value<double>(&prob_intersection), "intersection probability")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
