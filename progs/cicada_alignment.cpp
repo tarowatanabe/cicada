@@ -657,7 +657,8 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
     } else {
       // first, compute intersection
       __intersect(bitext_source_target, bitext_target_source, aligns);
-
+      
+      // grow...
       if (grow_mode) {
 	if (diag_mode)
 	  __grow_diag(bitext_source_target, bitext_target_source, aligns);
@@ -665,14 +666,16 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
 	  __grow(bitext_source_target, bitext_target_source, aligns);
       }
       
+      // final...
       if (final_mode)
 	__final(bitext_source_target, bitext_target_source, aligns);
       else if (final_and_mode)
 	__final_and(bitext_source_target, bitext_target_source, aligns);
-
+      
       alignment.insert(alignment.end(), aligns.begin(), aligns.end());
     }
 
+    // invert this alignment...
     if (invert_mode) {
       inverted.clear();
       __invert(alignment, inverted_inserter);
