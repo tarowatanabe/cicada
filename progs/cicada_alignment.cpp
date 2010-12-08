@@ -655,10 +655,14 @@ void process_giza(std::istream& is, std::ostream& os)
   iter_type iter_end;
   
   alignment_type    alignment;
+  alignment_type    inverted;
+  
   AlignmentInserter inserter(alignment);
+  AlignmentInserter inverted_inserter(inverted);
 
   if (source_target_mode) {
     SourceTarget process;
+    Invert       invert;
   
     while (iter != iter_end) {
       bitext_giza.clear();
@@ -670,11 +674,19 @@ void process_giza(std::istream& is, std::ostream& os)
       alignment.clear();
       
       process(bitext_giza, inserter);
+
+      if (invert_mode) {
+	inverted.clear();
+	invert(alignment, inverted_inserter);
+	std::sort(inverted.begin(), inverted.end());
+	alignment.swap(inverted);
+      }
     
       os << alignment << '\n';
     }
   } else {
     TargetSource process;
+    Invert       invert;
   
     while (iter != iter_end) {
       bitext_giza.clear();
@@ -686,6 +698,13 @@ void process_giza(std::istream& is, std::ostream& os)
       alignment.clear();
 
       process(bitext_giza, inserter);
+
+      if (invert_mode) {
+	inverted.clear();
+	invert(alignment, inverted_inserter);
+	std::sort(inverted.begin(), inverted.end());
+	alignment.swap(inverted);
+      }
       
       os << alignment << '\n';
     }
