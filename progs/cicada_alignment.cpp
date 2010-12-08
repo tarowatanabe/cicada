@@ -31,6 +31,7 @@
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/bithack.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -38,10 +39,11 @@
 typedef boost::filesystem::path path_type;
 
 typedef cicada::Alignment alignment_type;
+typedef alignment_type::point_type point_type;
 
 struct BitextGiza
 {
-  typedef std::vector<int, std::allocator<int> > point_set_type;
+  typedef std::set<int, std::less<int>, std::allocator<int> > point_set_type;
   typedef std::pair<std::string, point_set_type> word_align_type;
   typedef std::vector<word_align_type, std::allocator<word_align_type> > word_align_set_type;
   typedef std::vector<std::string, std::allocator<std::string> > sent_type;
@@ -57,6 +59,22 @@ struct BitextGiza
     comment.clear();
     target.clear();
     source.clear();
+  }
+
+  void swap(BitextGiza& x)
+  {
+    comment.swap(x.comment);
+    target.swap(x.target);
+    source.swap(x.source);
+  }
+};
+
+namespace std
+{
+  inline
+  void swap(BitextGiza& x, BitextGiza& y)
+  {
+    x.swap(y);
   }
 };
 
@@ -94,7 +112,9 @@ bool invert_mode = false;
 int threads = 1;
 int debug = 0;
 
-void process(std::istream& is, std::ostream& os);
+void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostream& os);
+void process_giza(std::istream& is, std::ostream& os);
+void process_alignment(std::istream& is, std::ostream& os);
 
 void options(int argc, char** argv);
 
@@ -102,9 +122,49 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
+
+    const bool flush_output = (output_file == "-"
+			       || (boost::filesystem::exists(output_file)
+				   && ! boost::filesystem::is_regular_file(output_file)));
     
-    process(std::cin, std::cout);
-    
+    if (source_target_mode || target_source_mode) {
+      if (source_target_mode && target_source_mode)
+	throw std::runtime_error("which mode f2e or e2f?");
+      
+      if (source_target_mode) {
+	if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
+	  throw std::runtime_error("no f2e file?" + source_target_file.file_string());
+	
+	utils::compress_istream is(source_target_file, 1024 * 1024);
+	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+	
+	process_giza(is, os);
+      } else {
+	if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
+	  throw std::runtime_error("no e2f file?" + target_source_file.file_string());
+
+	utils::compress_istream is(target_source_file, 1024 * 1024);
+	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+	
+	process_giza(is, os);
+      }
+    } if (input_file == "-" || boost::filesystem::exists(input_file)) {
+      utils::compress_istream is(input_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+      
+      process_alignment(is, os);
+    } else {
+      if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
+	throw std::runtime_error("no f2e file?" + source_target_file.file_string());
+      if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
+	throw std::runtime_error("no e2f file?" + target_source_file.file_string());
+      
+      utils::compress_istream is_src_trg(source_target_file, 1024 * 1024);
+      utils::compress_istream is_trg_src(target_source_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+      
+      process_giza(is_src_trg, is_trg_src, os);
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -143,8 +203,339 @@ struct bitext_giza_parser : boost::spirit::qi::grammar<Iterator, bitext_giza_typ
   boost::spirit::qi::rule<Iterator, bitext_giza_type(), blank_type> bitext;
 };
 
-void process(std::istream& is, 
-	     std::ostream& os)
+struct AlignmentInserter
+{
+  AlignmentInserter(alignment_type& __align) : align(__align) {}
+
+  void insert(const point_type& point)
+  {
+    align.push_back(point);
+  }
+  
+  alignment_type& align;
+};
+
+struct Invert
+{
+  template <typename Alignment>
+  void operator()(const alignment_type& align, Alignment& inverted)
+  {
+    alignment_type::const_iterator aiter_end = align.end();
+    for (alignment_type::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter)
+      inverted.insert(std::make_pair(aiter->target, aiter->source));
+  }
+};
+
+struct SourceTarget
+{
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext,
+		  Alignment& align)
+  {
+    for (int src = 1; src < static_cast<int>(bitext.source.size()); ++ src) {
+      const bitext_giza_type::point_set_type& aligns = bitext.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) 
+	align.insert(std::make_pair(src - 1, *titer - 1));
+    }
+  }
+};
+
+struct TargetSource
+{
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext,
+		  Alignment& align)
+  {
+    for (int src = 1; src < static_cast<int>(bitext.source.size()); ++ src) {
+      const bitext_giza_type::point_set_type& aligns = bitext.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) 
+	align.insert(std::make_pair(*titer - 1, src - 1));
+    }
+  }
+};
+
+struct Intersect
+{
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    // - 1 for NULL
+    const int source_size = utils::bithack::min(bitext_source_target.source.size() - 1, bitext_target_source.target.size());
+    const int target_size = utils::bithack::min(bitext_source_target.target.size(),     bitext_target_source.source.size() - 1);
+    
+    for (int src = 1; src <= source_size; ++ src) {
+      const bitext_giza_type::point_set_type& aligns = bitext_source_target.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) 
+	if (*titer < bitext_target_source.source.size()) {
+	  const bitext_giza_type::point_set_type& invert = bitext_target_source.source[*titer].second;
+	  
+	  if (invert.find(src) != invert.end())
+	    align.insert(std::make_pair(src - 1, *titer - 1));
+	}
+    }
+  }
+};
+
+struct Union
+{
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    for (int src = 1; src < static_cast<int>(bitext_source_target.source.size()); ++ src) {
+      const bitext_giza_type::point_set_type& aligns = bitext_source_target.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) 
+	align.insert(std::make_pair(src - 1, *titer - 1));
+    }
+    
+    for (int trg = 1; trg < static_cast<int>(bitext_target_source.source.size()); ++ trg) {
+      const bitext_giza_type::point_set_type& aligns = bitext_target_source.source[trg].second;
+      
+      bitext_giza_type::point_set_type::const_iterator siter_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator siter = aligns.begin(); siter != siter_end; ++ siter) 
+	align.insert(std::make_pair(*siter - 1, trg - 1));
+    }
+  }
+};
+
+struct __Grow
+{
+  template <typename Alignment, size_t N>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align,
+		  const point_type (&neighbours)[N])
+  {
+    const int source_size = utils::bithack::max(bitext_source_target.source.size() - 1, bitext_target_source.target.size());
+    const int target_size = utils::bithack::max(bitext_source_target.target.size(),     bitext_target_source.source.size() - 1);
+    
+    std::vector<bool, std::allocator<bool> > aligned_source(source_size, false);
+    std::vector<bool, std::allocator<bool> > aligned_target(target_size, false);
+    
+    typename Alignment::const_iterator aiter_end = align.end();
+    for (typename Alignment::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
+      aligned_source[aiter->source] = true;
+      aligned_target[aiter->target] = true;
+    }
+    
+    Alignment align_new;
+    bool added = true;
+    do {
+      added = false;
+      align_new.clear();
+      
+      typename Alignment::const_iterator aiter_end = align.end();
+      for (typename Alignment::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
+	for (size_t n = 0; n != N; ++ n) {
+	  point_type point = *aiter;
+	  point.source += neighbours[n].source;
+	  point.target += neighbours[n].target;
+	  
+	  if (0 <= point.source && point.source < source_size && 0 <= point.target && point.target < target_size) 
+	    if ((! aligned_source[point.source]) || (! aligned_target[point.target]))
+	      if (has_alignment(bitext_source_target, point.source, point.target) || has_alignment(bitext_target_source, point.target, point.source)) {
+		
+		align_new.insert(point);
+		
+		aligned_source[point.source] = true;
+		aligned_target[point.target] = true;
+		
+		added = true;
+	      }
+	}
+      }
+      
+      align.insert(align_new.begin(), align_new.end());
+      
+    } while (added);
+  }
+
+  
+  bool has_alignment(const bitext_giza_type& bitext, const int source, const int target)
+  {
+    if (source + 1 >= static_cast<int>(bitext.source.size())) return false;
+    
+    const bitext_giza_type::point_set_type& aligns = bitext.source[source + 1].second;
+    
+    return aligns.find(target + 1) != aligns.end();
+  }
+};
+
+struct Grow
+{
+  static const point_type points[4];
+  
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    grow(bitext_source_target, bitext_target_source, align, points);
+  }
+  
+  __Grow grow;
+};
+
+struct GrowDiag
+{
+  static const point_type points[8];
+  
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    grow(bitext_source_target, bitext_target_source, align, points);
+  }
+  
+  __Grow grow;
+};
+
+const point_type Grow::points[4] = {point_type(-1, 0), point_type(0, -1), point_type(1, 0), point_type(0, 1)};
+const point_type GrowDiag::points[8] = {point_type(-1, 0), point_type(0, -1), point_type(1, 0), point_type(0, 1),
+					point_type(-1, -1), point_type(-1, 1), point_type(1, -1), point_type(1, 1)};
+
+struct __Final
+{
+  template <typename Alignment, typename Function>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align,
+		  Function func)
+  {
+    const int source_size = utils::bithack::max(bitext_source_target.source.size() - 1, bitext_target_source.target.size());
+    const int target_size = utils::bithack::max(bitext_source_target.target.size(),     bitext_target_source.source.size() - 1);
+    
+    std::vector<bool, std::allocator<bool> > aligned_source(source_size, false);
+    std::vector<bool, std::allocator<bool> > aligned_target(target_size, false);
+    
+    typename Alignment::const_iterator aiter_end = align.end();
+    for (typename Alignment::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
+      aligned_source[aiter->source] = true;
+      aligned_target[aiter->target] = true;
+    }
+    
+    // grow finally, but not extending from previously infered alignments...
+    for (int src = 1; src < static_cast<int>(bitext_source_target.source.size()); ++ src) {
+      const bitext_giza_type::point_set_type& aligns =  bitext_source_target.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) {
+	const int trg = *titer;
+	
+	if (func(aligned_source[src - 1], aligned_target[trg - 1])) continue;
+	
+	align.insert(point_type(src - 1, trg - 1));
+	aligned_source[src - 1] = true;
+	aligned_target[trg - 1] = true;
+      }
+    }
+    
+    for (int trg = 1; trg < static_cast<int>(bitext_target_source.source.size()); ++ trg) {
+      const bitext_giza_type::point_set_type& aligns =  bitext_target_source.source[trg].second;
+      
+      bitext_giza_type::point_set_type::const_iterator siter_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator siter = aligns.begin(); siter != siter_end; ++ siter) {
+	const int src = *siter;
+	
+	if (func(aligned_source[src - 1], aligned_target[trg - 1])) continue;
+	
+	align.insert(point_type(src - 1, trg - 1));
+	aligned_source[src - 1] = true;
+	aligned_target[trg - 1] = true;
+      }
+    }
+  }
+};
+
+struct Final
+{
+  struct Func
+  {
+    bool operator()(const bool source, const bool target) const
+    {
+      return source && target;
+    }
+  };
+
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    final(bitext_source_target, bitext_target_source, align, Func());
+  }
+
+  __Final final;
+};
+
+struct FinalAnd
+{
+
+  struct Func
+  {
+    bool operator()(const bool source, const bool target) const
+    {
+      return source || target;
+    }
+  };
+
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    final(bitext_source_target, bitext_target_source, align, Func());
+  }
+  
+  __Final final;
+};
+
+struct Task
+{
+  
+  void operator()()
+  {
+    
+    
+  }
+  
+};
+
+void process_alignment(std::istream& is, std::ostream& os)
+{
+  alignment_type align;
+  alignment_type inverted;
+  AlignmentInserter inserter(inverted);
+  Invert invert;
+  
+  if (invert_mode) {
+    while (is >> align) {
+      inverted.clear();
+      invert(align, inserter);
+      std::sort(inverted.begin(), inverted.end());
+      os << inverted << '\n';
+    }
+  } else {
+    while (is >> align) {
+      std::sort(align.begin(), align.end());
+      os << align << '\n';
+    }
+  }
+}
+
+void process_giza(std::istream& is, std::ostream& os)
 {
   typedef boost::spirit::istream_iterator iter_type;
   
@@ -157,19 +548,81 @@ void process(std::istream& is,
   iter_type iter(is);
   iter_type iter_end;
   
-  while (iter != iter_end) {
-    bitext_giza.clear();
+  alignment_type    alignment;
+  AlignmentInserter inserter(alignment);
+
+  if (source_target_mode) {
+    SourceTarget process;
+  
+    while (iter != iter_end) {
+      bitext_giza.clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, bitext_giza))
+	if (iter != iter_end)
+	  throw std::runtime_error("parsing failed");
+      
+      alignment.clear();
+      
+      process(bitext_giza, inserter);
     
-    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, bitext_giza))
-      if (iter != iter_end)
-	throw std::runtime_error("parsing failed");
-    
-    os << "comment: " << bitext_giza.comment << '\n';
-    os << "target: ";
-    std::copy(bitext_giza.target.begin(), bitext_giza.target.end(), std::ostream_iterator<std::string>(os, " "));
-    os << '\n';
+      os << alignment << '\n';
+    }
+  } else {
+    TargetSource process;
+  
+    while (iter != iter_end) {
+      bitext_giza.clear();
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, bitext_giza))
+	if (iter != iter_end)
+	  throw std::runtime_error("parsing failed");
+      
+      alignment.clear();
+
+      process(bitext_giza, inserter);
+      
+      os << alignment << '\n';
+    }
   }
 }
+
+
+void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostream& os)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  
+  bitext_giza_parser<iter_type> parser;
+  
+  bitext_giza_type bitext_source_target;
+  bitext_giza_type bitext_target_source;
+  
+  is_src_trg.unsetf(std::ios::skipws);
+  is_trg_src.unsetf(std::ios::skipws);
+  
+  iter_type siter(is_src_trg);
+  iter_type siter_end;
+
+  iter_type titer(is_trg_src);
+  iter_type titer_end;
+  
+  while (siter != siter_end && titer != titer_end) {
+    bitext_source_target.clear();
+    bitext_target_source.clear();
+    
+    if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser, boost::spirit::standard::blank, bitext_source_target))
+      if (siter != siter_end)
+	throw std::runtime_error("source-target parsing failed");
+
+    if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, bitext_target_source))
+      if (titer != titer_end)
+	throw std::runtime_error("target-source parsing failed");
+    
+  }
+  
+  if (siter != siter_end || titer != titer_end)
+    throw std::runtime_error("# of samples do not match");
+}
+
 
 void options(int argc, char** argv)
 {
