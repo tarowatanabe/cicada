@@ -136,6 +136,7 @@ int main(int argc, char ** argv)
     else {
       // uniquify rules...
       rule_set_type rules;
+      rules.set_empty_key(rule_ptr_type());
       
       hypergraph_type::edge_set_type::iterator eiter_end = merged.edges.end();
       for (hypergraph_type::edge_set_type::iterator eiter = merged.edges.begin(); eiter != eiter_end; ++ eiter) {
