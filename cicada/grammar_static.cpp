@@ -1085,7 +1085,6 @@ namespace cicada
       if (attribute_names[attribute] == attribute_type())
 	attribute_names[attribute] = std::string("rule-table-") + boost::lexical_cast<std::string>(attribute);
     }
-
   }
   
   
@@ -1110,7 +1109,7 @@ namespace cicada
 
   bool GrammarStatic::valid_span(int first, int last, int distance) const
   {
-    return distance <= pimpl->max_span;
+    return pimpl->max_span <= 0 || distance <= pimpl->max_span;
   }
   
   GrammarStatic::id_type GrammarStatic::root() const
