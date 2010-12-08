@@ -417,11 +417,11 @@ struct __Final
   std::vector<bool, std::allocator<bool> > aligned_source;
   std::vector<bool, std::allocator<bool> > aligned_target;
   
-  template <typename Alignment, typename Function>
+  template <typename Alignment, typename Filter>
   void operator()(const bitext_giza_type& bitext_source_target,
 		  const bitext_giza_type& bitext_target_source,
 		  Alignment& align,
-		  Function func)
+		  Filter filter)
   {
     const int source_size = utils::bithack::max(bitext_source_target.source.size() - 1, bitext_target_source.target.size());
     const int target_size = utils::bithack::max(bitext_source_target.target.size(),     bitext_target_source.source.size() - 1);
@@ -446,7 +446,7 @@ struct __Final
       for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) {
 	const int trg = *titer;
 	
-	if (func(aligned_source[src - 1], aligned_target[trg - 1])) continue;
+	if (filter(aligned_source[src - 1], aligned_target[trg - 1])) continue;
 	
 	align.insert(point_type(src - 1, trg - 1));
 	aligned_source[src - 1] = true;
@@ -461,7 +461,7 @@ struct __Final
       for (bitext_giza_type::point_set_type::const_iterator siter = aligns.begin(); siter != siter_end; ++ siter) {
 	const int src = *siter;
 	
-	if (func(aligned_source[src - 1], aligned_target[trg - 1])) continue;
+	if (filter(aligned_source[src - 1], aligned_target[trg - 1])) continue;
 	
 	align.insert(point_type(src - 1, trg - 1));
 	aligned_source[src - 1] = true;
@@ -473,7 +473,7 @@ struct __Final
 
 struct Final
 {
-  struct Func
+  struct Filter
   {
     bool operator()(const bool source, const bool target) const
     {
@@ -486,7 +486,7 @@ struct Final
 		  const bitext_giza_type& bitext_target_source,
 		  Alignment& align)
   {
-    final(bitext_source_target, bitext_target_source, align, Func());
+    final(bitext_source_target, bitext_target_source, align, Filter());
   }
 
   __Final final;
@@ -495,7 +495,7 @@ struct Final
 struct FinalAnd
 {
 
-  struct Func
+  struct Filter
   {
     bool operator()(const bool source, const bool target) const
     {
@@ -508,7 +508,7 @@ struct FinalAnd
 		  const bitext_giza_type& bitext_target_source,
 		  Alignment& align)
   {
-    final(bitext_source_target, bitext_target_source, align, Func());
+    final(bitext_source_target, bitext_target_source, align, Filter());
   }
   
   __Final final;
@@ -653,6 +653,7 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
       __intersect(bitext_source_target, bitext_target_source, inserter);
     else if (union_mode) {
       __union(bitext_source_target, bitext_target_source, aligns);
+      
       alignment.insert(alignment.end(), aligns.begin(), aligns.end());
     } else {
       // first, compute intersection
@@ -674,7 +675,7 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
       
       alignment.insert(alignment.end(), aligns.begin(), aligns.end());
     }
-
+    
     // invert this alignment...
     if (invert_mode) {
       inverted.clear();
