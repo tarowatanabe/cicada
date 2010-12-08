@@ -567,11 +567,17 @@ namespace cicada
 
       double tst_size(int length, const bool scaling=true) const
       {
+	if (length == 0 || sizes.empty()) return length;
+	
+	return (length < sizes.front() && scaling ? double(sizes.front()) : double(length));
+	
+#if 0
 	if (length == 0) return 0.0;
 	
 	// we will scale hypothesis length by the minimum size
 	
 	return (length < minimum_size && scaling ? double(minimum_size) : double(length));
+#endif
       }
       
       double ref_size(const double hypothesis_size) const
@@ -793,9 +799,11 @@ namespace cicada
     {
       pimpl->clear();
 
+#if 0
       std::vector<length_function::value_type, std::allocator<length_function::value_type> > lengths(hypergraph.nodes.size());
       cicada::inside(hypergraph, lengths, length_function());
       pimpl->minimum_size = - log(lengths.back());
+#endif
       
       if (! targets.empty()) {
 	sentence_set_type::const_iterator titer_end = targets.end();
