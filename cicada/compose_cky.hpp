@@ -172,49 +172,54 @@ namespace cicada
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
 	    
-	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
-	    // advance dots....
+	    // we will advance active spans, but constrained by transducer's valid span
+	    if (transducer.valid_span(first, last, lattice.shortest_distance(first, last))) {
+	      // advance dots....
 	      
-	    // first, extend active items...
-	    active_set_type& cell = actives[table](first, last);
+	      // first, extend active items...
+	      active_set_type& cell = actives[table](first, last);
 	      
-	    for (size_t middle = first + 1; middle < last; ++ middle) {
-	      const active_set_type&  active_arcs  = actives[table](first, middle);
-	      const passive_set_type& passive_arcs = passives(middle, last);
+	      for (size_t middle = first + 1; middle < last; ++ middle) {
+		const active_set_type&  active_arcs  = actives[table](first, middle);
+		const passive_set_type& passive_arcs = passives(middle, last);
 		
-	      extend_actives(transducer, active_arcs, passive_arcs, cell);
-	    }
+		extend_actives(transducer, active_arcs, passive_arcs, cell);
+	      }
 	      
-	    // then, advance by terminal(s) at lattice[last - 1];
-	    {
-	      const active_set_type&  active_arcs  = actives[table](first, last - 1);
-	      const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
+	      // then, advance by terminal(s) at lattice[last - 1];
+	      {
+		const active_set_type&  active_arcs  = actives[table](first, last - 1);
+		const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
 		
-	      active_set_type::const_iterator aiter_begin = active_arcs.begin();
-	      active_set_type::const_iterator aiter_end = active_arcs.end();
+		active_set_type::const_iterator aiter_begin = active_arcs.begin();
+		active_set_type::const_iterator aiter_end = active_arcs.end();
 		
-	      lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
-	      for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-		const symbol_type& terminal = piter->label;
-		const int length = piter->distance;
+		lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+		for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+		  const symbol_type& terminal = piter->label;
+		  const int length = piter->distance;
 		
-		active_set_type& cell = actives[table](first, last - 1 + length);
+		  active_set_type& cell = actives[table](first, last - 1 + length);
 		
-		// handling of EPSILON rule...
-		if (terminal == vocab_type::EPSILON) {
-		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-		    cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		} else {
-		  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		    if (node == transducer.root()) continue;
+		  // handling of EPSILON rule...
+		  if (terminal == vocab_type::EPSILON) {
+		    for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+		      cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		  } else {
+		    for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+		      const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+		      if (node == transducer.root()) continue;
 		      
-		    cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		      cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		    }
 		  }
 		}
 	      }
 	    }
-	      
+	     
+	    
+	    // complete active items if possible... The active items may be created from child span due to the
+	    // lattice structure...
 	    // apply rules on actives at [first, last)
 	    node_map_type&    node_map     = nodes(first, last);
 	    passive_set_type& passive_arcs = passives(first, last);
