@@ -113,6 +113,7 @@ bool directory_mode = false;
 std::string scorer_name = "bleu:order=4,exact=true";
 
 int iteration = 10;
+bool apply_exact = false;
 int cube_size = 200;
 int debug = 0;
 
@@ -380,7 +381,10 @@ struct TaskOracle
       model_type model;
       model.push_back(features[id]);
       
-      cicada::apply_cube_prune(model, graphs[id], graph_oracle, weight_bleu_function(feature_bleu, score_factor), cube_size);
+      if (apply_exact)
+	cicada::apply_exact(model, graphs[id], graph_oracle);
+      else
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, weight_bleu_function(feature_bleu, score_factor), cube_size);
       
       // compute viterbi...
       cicada::semiring::Logprob<double> weight;
@@ -765,6 +769,8 @@ void options(int argc, char** argv)
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     
     ("iteration", po::value<int>(&iteration), "# of hill-climbing iteration")
+    
+    ("apply-exact", po::bool_switch(&apply_exact), "exact application")
     ("cube-size", po::value<int>(&cube_size), "cube-pruning size")
     ;
   

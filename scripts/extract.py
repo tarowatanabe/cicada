@@ -253,7 +253,6 @@ class MPI:
 
 
 class Toolkit:
-
     def __init__(self, dir=""):
 
 	self.dir = dir	
@@ -324,12 +323,10 @@ class Alignemnt:
         
 
 class Lexicon:
-    def __init__(self, lexical_dir="", alignment=None):
+    def __init__(self, lexical_dir=""):
         
         if not os.path.exists(lexical_dir):
             os.makedirs(lexical_dir)
-        
-        self.alignment = alignment.alignment
         
         self.source_target = compressed_file(os.path.join(lexical_dir, 'lex.f2n'))
         self.target_source = compressed_file(os.path.join(lexical_dir, 'lex.n2f'))
@@ -365,6 +362,7 @@ class Extract:
 class ExtractPhrase(Extract):
     
     def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 model_dir="",
                  max_length=7, max_fertility=4,
                  max_malloc=8, threads=4, mpi=None, pbs=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
@@ -408,6 +406,7 @@ class ExtractPhrase(Extract):
 class ExtractSCFG(Extract):
     
     def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 model_dir="",
                  max_length=7, max_fertility=4, max_span=15, min_hole=1,
                  max_malloc=8, threads=4, mpi=None, pbs=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
@@ -460,6 +459,7 @@ class ExtractSCFG(Extract):
 class ExtractGHKM(Extract):
     
     def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 model_dir="",
                  non_terminal="", max_nodes=15, max_height=4,
                  max_malloc=8, threads=4, mpi=None, pbs=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
@@ -510,6 +510,7 @@ class ExtractGHKM(Extract):
 class ExtractTree(Extract):
     
     def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 model_dir="",
                  max_nodes=15, max_height=4,
                  max_malloc=8, threads=4, mpi=None, pbs=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
@@ -553,28 +554,35 @@ class ExtractTree(Extract):
 
 class ExtractScore(Extract):
     
-    def __init__(self, toolkit=None, lexicon=None, extract=None,
+    def __init__(self, toolkit=None, lexicon=None,
+                 model_dir="",
                  phrase=None, scfg=None, ghkm=None, tree=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
         
         option = ""
         if phrase:
+            self.counts = os.path.join(model_dir, "phrase-counts")
             self.scores = os.path.join(model_dir, "phrase-score")
             option = " --phrase"
         elif scfg:
+            self.counts = os.path.join(model_dir, "scfg-counts")
             self.scores = os.path.join(model_dir, "scfg-score")
             option = " --scfg"
         elif ghkm:
+            self.counts = os.path.join(model_dir, "ghkm-counts")
             self.scores = os.path.join(model_dir, "ghkm-score")
             option = " --ghkm"
         elif tree:
+            self.counts = os.path.join(model_dir, "tree-counts")
             self.scores = os.path.join(model_dir, "tree-score")
             option = " --tree"
         else:
             raise ValueError, "no count type?"
-            
-        
+
+        if not os.path.exists(self.counts):
+            raise ValueError, "no counts? %s" %(self.counts)
+                
         prog_name = ""
         if mpi:
             prog_name = toolkit.cicada_extract_score_mpi
@@ -583,7 +591,7 @@ class ExtractScore(Extract):
         
         command = prog_name
         
-        command += " --list \"%s\"" %(extract.counts)
+        command += " --list \"%s\"" %(self.counts)
         command += " --output \"%s\"" %(self.counts)
         command += " --lexicon-source-target \"%s\"" %(lexicon.source_target)
         command += " --lexicon-target-source \"%s\"" %(lexicon.target_source)
@@ -603,3 +611,90 @@ class ExtractScore(Extract):
         self.command = command
 
 
+(options, args) = opt_parser.parse_args()
+
+if not options.model_dir:
+    options.model_dir = os.path.join(options.root_dir, "model")
+if not options.lexical_dir:
+    options.lexical_dir = options.model_dir
+
+toolkit = Toolkit(options.toolkit_dir)
+
+mpi = None
+if options.mpi_host or options.mpi_host_file or options.mpi:
+    mpi = MPI(dir=options.mpi_dir,
+              hosts=options.mpi_host,
+              hosts_file=options.mpi_host_file,
+              number=options.mpi)
+
+pbs = None
+if options.pbs:
+    pbs = PBS(queue=options.pbs_queue)
+
+corpus = Corpus(corpus=options.corpus,
+                f=options.f,
+                e=options.e,
+                a=options.a,
+                sf=options.sf,
+                se=options.se,
+                ff=options.ff,
+                fe=options.fe)
+
+
+if options.first_step <= 5 and options.last_step >= 5:
+    
+    if not os.path.exists(options.model_dir):
+        os.makedirs(options.model_dir)
+
+    alignment = Alignment(options.model_dir, options.alignment)
+    
+    extract = None
+    if options.phrase:
+        extract = ExtractPhrase(toolkit=toolkit, corpus=corpus, alignment=alignment,
+                                model_dir=model_dir,
+                                max_length=options.max_length,
+                                max_fertility=options.max_fertility,
+                                max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+    elif options.scfg:
+        extract = ExtractSCFG(toolkit=toolkit, corpus=corpus, alignment=alignment,
+                              model_dir=model_dir,
+                              max_length=options.max_length,
+                              max_fertility=options.max_fertility,
+                              max_span=options.max_span,
+                              min_hole=options.min_hole,
+                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+    elif options.ghkm:
+        extract = ExtractGHKM(toolkit=toolkit, corpus=corpus, alignment=alignment,
+                              model_dir=model_dir,
+                              non_terminal=options.non_terminal,
+                              max_nodes=options.max_nodes,
+                              min_height=options.min_height,
+                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+    elif options.tree:
+        extract = ExtractTree(toolkit=toolkit, corpus=corpus, alignment=alignment,
+                              model_dir=model_dir,
+                              max_nodes=options.max_nodes,
+                              min_height=options.min_height,
+                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+    else:
+        raise ValueError, "no count type?"
+
+    print "(5) extract phrase table started @", time.ctime()
+    extract.run()
+    print "(5) extract phrase table finished @", time.ctime()
+
+if options.first_step <= 6 and options.last_step >= 6:
+
+    if not os.path.exists(options.lexical_dir):
+        os.makedirs(options.lexical_dir)
+
+    lexicon = Lexicon(lexical_dir=options.lexical_dir)
+    
+    score = ExtractScore(toolkit=toolkit, lexicon=lexicon,
+                         model_dir=model_dir,
+                         phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
+                         max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+    
+    print "(6) score phrase table started @", time.ctime()
+    score.run()
+    print "(6) score phrase table finished @", time.ctime()
