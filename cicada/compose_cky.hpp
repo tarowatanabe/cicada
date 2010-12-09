@@ -172,8 +172,6 @@ namespace cicada
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
 	    
-	    
-	    
 	    // we will advance active spans, but constrained by transducer's valid span
 	    if (transducer.valid_span(first, last, lattice.shortest_distance(first, last))) {
 	      // advance dots....
