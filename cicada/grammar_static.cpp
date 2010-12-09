@@ -1109,6 +1109,8 @@ namespace cicada
 
   bool GrammarStatic::valid_span(int first, int last, int distance) const
   {
+    // max-span checking + distance checking
+    // we need this last - first == 1 when intersecting with lattice...
     return pimpl->max_span <= 0 || distance <= pimpl->max_span || last - first == 1;
   }
   
