@@ -569,7 +569,7 @@ namespace cicada
       {
 	if (length == 0 || sizes.empty()) return length;
 	
-	return (length < sizes.front() && scaling ? double(sizes.front()) : double(length));
+	return (scaling ? utils::bithack::max(length, sizes.front()) : length);
 	
 #if 0
 	if (length == 0) return 0.0;
