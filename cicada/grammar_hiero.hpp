@@ -119,7 +119,7 @@ namespace cicada
     }
 
     GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
-      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
+    //      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -135,12 +135,12 @@ namespace cicada
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 
-	if (arcs.empty())
-	  positions[first].clear();
+	//if (arcs.empty())
+	//  positions[first].clear();
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  positions[first][first + aiter->distance] = true;
+	  //positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
@@ -156,12 +156,12 @@ namespace cicada
     
     bool valid_span(int first, int last, int distance) const
     {
-      //return distance <= 1;
-      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
+      return distance <= 1 || last - first == 1;
+      //return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
     
   private:    
-    pos_pair_set_type positions;
+    //pos_pair_set_type positions;
   };
   
   
@@ -209,7 +209,7 @@ namespace cicada
     }
 
     GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
-      : positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
+    //: positions(lattice.size(), pos_set_type(lattice.size() + 1, false))
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -227,12 +227,12 @@ namespace cicada
       for (size_t first = 0; first != lattice.size(); ++ first) {
 	const lattice_type::arc_set_type& arcs = lattice[first];
 
-	if (arcs.empty())
-	  positions[first].clear();
-
+	//if (arcs.empty())
+	// positions[first].clear();
+	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter) {
-	  positions[first][first + aiter->distance] = true;
+	  //positions[first][first + aiter->distance] = true;
 	  
 	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
 	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
@@ -247,12 +247,12 @@ namespace cicada
     
     bool valid_span(int first, int last, int distance) const
     {
-      //return distance <= 1;
-      return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
+      return distance <= 1 || last - first == 1;
+      //return positions.empty() || (! positions[first].empty() && (first == last || positions[first][last]));
     }
     
   private:    
-    pos_pair_set_type positions;
+    //pos_pair_set_type positions;
   };
 };
 

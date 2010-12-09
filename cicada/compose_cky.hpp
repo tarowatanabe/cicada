@@ -166,6 +166,8 @@ namespace cicada
       for (size_t length = 1; length <= lattice.size(); ++ length)
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
+
+	  //std::cerr << "span: " << first << ".." << last << " distance: " << lattice.shortest_distance(first, last) << std::endl;
 	  
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
@@ -186,6 +188,7 @@ namespace cicada
 	    
 	    // then, advance by terminal(s) at lattice[last - 1];
 	    {
+
 	      const active_set_type&  active_arcs  = actives[table](first, last - 1);
 	      const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
 
@@ -196,8 +199,9 @@ namespace cicada
 	      for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
 		const symbol_type& terminal = piter->label;
 		const int length = piter->distance;
+		const int last_pos = last - 1 + length;
 		
-		active_set_type& cell = actives[table](first, last - 1 + length);
+		active_set_type& cell = actives[table](first, last_pos);
 		
 		// handling of EPSILON rule...
 		if (terminal == vocab_type::EPSILON) {
@@ -223,7 +227,7 @@ namespace cicada
 	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
 	      
 	      if (rules.empty()) continue;
-	      
+
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
 		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features, riter->attributes + citer->attributes,
@@ -268,6 +272,8 @@ namespace cicada
 	    const transducer_type& transducer = grammar[table];
 	    
 	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+
+	    
 	    
 	    const active_set_type&  active_arcs  = actives[table](first, first);
 	    const passive_set_type& passive_arcs = passives(first, last);
@@ -342,7 +348,7 @@ namespace cicada
       
     }
     
-    void extend_actives(const transducer_type& transducer,
+    bool extend_actives(const transducer_type& transducer,
 			const active_set_type& actives, 
 			const passive_set_type& passives,
 			active_set_type& cell)
@@ -352,6 +358,8 @@ namespace cicada
       
       passive_set_type::const_iterator piter_begin = passives.begin();
       passive_set_type::const_iterator piter_end = passives.end();
+
+      bool found = false;
       
       for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 	for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
@@ -365,7 +373,11 @@ namespace cicada
 	  tails.back() = *piter;
 	  
 	  cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
+
+	  found = true;
 	}
+
+      return found;
     }
 
 

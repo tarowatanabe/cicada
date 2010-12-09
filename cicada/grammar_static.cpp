@@ -1109,7 +1109,7 @@ namespace cicada
 
   bool GrammarStatic::valid_span(int first, int last, int distance) const
   {
-    return pimpl->max_span <= 0 || distance <= pimpl->max_span;
+    return pimpl->max_span <= 0 || distance <= pimpl->max_span || last - first == 1;
   }
   
   GrammarStatic::id_type GrammarStatic::root() const
