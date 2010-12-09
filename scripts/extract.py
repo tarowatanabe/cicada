@@ -1,0 +1,605 @@
+#!/usr/bin/env python
+
+### a wrapper script (similar to phrase-extract in moses)
+### we support only "extraction" meaning only step 5 and 6
+
+import threading
+import multiprocessing
+
+import time
+import sys
+import os, os.path
+import string
+import re
+import subprocess
+
+opt_parser = OptionParser(
+    option_list=[
+	
+    # output directory/filename prefix
+    make_option("--root-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="root directory for outputs"),
+    make_option("--corpus-dir", default="", action="store", type="string",
+                metavar="PREFIX", help="corpus directory (default: $root_dir/corpus)"),
+    make_option("--giza-f2e", default="", action="store", type="string",
+                metavar="DIRECTORY", help="giza directory for P(f|e) (default: $root_dir/giza.$f-$e)"),
+    make_option("--giza-e2f", default="", action="store", type="string",
+                metavar="DIRECTORY", help="giza directory for P(e|f) (default: $root_dir/giza.$e-$f)"),
+    make_option("--model-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="model directory (default: $root_dir/model)"),
+    make_option("--lexical-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="lexical transltion table directory (default: $root_dir/model)"),
+    
+    ### source/target flags
+    make_option("--f", default="F", action="store", type="string",
+                metavar="SUFFIX", help="source (or 'French') language suffix for training corpus"),
+    make_option("--e", default="E", action="store", type="string",
+                metavar="SUFFIX", help="target (or 'English') language suffix for training corpus"),
+    ### span...
+    make_option("--sf", default="SF", action="store", type="string",
+                metavar="SUFFIX", help="source (or 'French') span suffix for training corpus"),
+    make_option("--se", default="SE", action="store", type="string",
+                metavar="SUFFIX", help="target (or 'English') span suffix for training corpus"),
+    ### forest!
+    make_option("--ff", default="SF", action="store", type="string",
+                metavar="SUFFIX", help="source (or 'French') forest suffix for training corpus"),
+    make_option("--fe", default="SE", action="store", type="string",
+                metavar="SUFFIX", help="target (or 'English') forest suffix for training corpus"),
+    
+    # data prefix
+    make_option("--corpus", default="corpus", action="store", type="string",
+                help="bilingual trainging corpus"),
+
+    # alignment method
+    make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
+                help="alignment methods"),
+    
+    # steps
+    make_option("--first-step", default=5, action="store", type="int"),
+    make_option("--last-step", default=6, action="store", type="int"),
+    
+    # option for extraction
+    make_option("--phrase", default=None, action="store_true", help="extract phrase"),
+    make_option("--scfg",   default=None, action="store_true", help="extract SCFG"),
+    make_option("--ghkm",   default=None, action="store_true", help="extract GHKM"),
+    make_option("--tree",   default=None, action="store_true", help="extract tree-to-tree"),
+
+    make_option("--non-terminal", default="[x]", action="store", type="string", help="default non-terminal for GHKM rule"),
+    
+    make_option("--max-span", default=15, action="store", type="int",
+                metavar="MAX_LENGTH", help="maximum span size"),
+    make_option("--min-hole", default=1, action="store", type="int",
+                metavar="MIN_LENGTH", help="maximum hole size"),
+    make_option("--max-length", default=7, action="store", type="int",
+                metavar="MAX_LENGTH", help="maximum phrase/rule length"),
+    make_option("--max-fertility", default=4, action="store", type="int",
+                metavar="MAX_FERTILITY",help="maximum phrase/rule fertility"),
+    make_option("--max-nodes", default=4, action="store", type="int",
+                metavar="MAX_NODES",help="maximum rule nodes"),
+    make_option("--max-height", default=4, action="store", type="int",
+                metavar="MAX_HEIGHT",help="maximum rule height"),
+    
+    ## max-malloc
+    make_option("--max-malloc", default=8, action="store", type="float",
+                metavar="MAX_MALLOC", help="maximum memory for process (not thread!)"),
+
+    # CICADA Toolkit directory
+    make_option("--toolkit-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="toolkit directory"),
+    # MPI Implementation.. if different from standard location...
+    make_option("--mpi-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="MPI directory"),
+
+    # perform threading or MPI training
+    make_option("--threads", default=2, action="store", type="int",
+                help="# of thrads for thread-based parallel processing"),
+    
+    make_option("--pbs", default=None, action="store_true",
+                help="PBS for launching processes"),
+    make_option("--pbs-queue", default="ltg", action="store", type="string",
+                help="PBS queue for launching processes"),
+    
+    make_option("--mpi", default=0, action="store", type="int",
+                help="# of processes for MPI-based parallel processing. Identical to --np for mpirun"),
+    make_option("--mpi-host", default="", action="store", type="string",
+                help="list of hosts to run job. Identical to --host for mpirun"),
+    make_option("--mpi-host-file", default="", action="store", type="string",
+                help="host list file to run job. Identical to --hostfile for mpirun"),
+    
+    ## debug messages
+    make_option("--debug", default=0, action="store", type="int"),
+    ])
+
+
+### dump to stderr
+stdout = sys.stdout
+sys.stdout = sys.stderr
+
+def run_command(command):
+    
+    fp = os.popen(command)
+    while 1:
+        data = fp.read(1)
+        if not data: break
+        stdout.write(data)
+
+def compressed_file(file):
+    if not file:
+        return file
+    if os.path.exists(file):
+        return file
+    if os.path.exists(file+'.gz'):
+	return file+'.gz'
+    if os.path.exists(file+'.bz2'):
+	return file+'.bz2'
+    (base, ext) = os.path.splitext(file)
+    if ext == '.gz' or ext == '.bz2':
+	if os.path.exists(base):
+	    return base
+    return file
+
+class PBS:
+    def __init__(self, queue="", workingdir=os.getcwd()):
+        self.queue = queue
+        self.workingdir = workingdir
+        self.tmpdir = None
+        self.tmpdir_spec = None
+
+        if os.environ.has_key('TMPDIR'):
+            self.tmpdir_spec = os.environ['TMPDIR']
+
+        if os.environ.has_key('TMPDIR_SPEC'):
+            self.tmpdir_spec = os.environ['TMPDIR_SPEC']
+            
+    def run(self, command="", threads=1, memory=0.0, name="name", mpi=None, logfile=None):
+        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE)
+
+        pipe = popen.stdin
+        
+        pipe.write("#!/bin/sh\n")
+        pipe.write("#PBS -N %s\n" %(name))
+        pipe.write("#PBS -W block=true\n")
+        
+        if logfile:
+            pipe.write("#PBS -e %s\n" %(logfile))
+        else:
+            pipe.write("#PBS -e /dev/null\n")
+        pipe.write("#PBS -o /dev/null\n")
+        
+        if self.queue:
+            pipe.write("#PBS -q %s\n" %(self.queue))
+
+        if mpi:
+            if memory > 0.0:
+                if memory < 1.0:
+                    pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1:mem=%dmb\n" %(mpi.number, int(memory * 1000)))
+                else:
+                    pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1:mem=%dgb\n" %(mpi.number, int(memory)))
+            else:
+                pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1\n" %(mpi.number))
+                
+        else:
+            if memory > 0.0:
+                if memory < 1.0:
+                    pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dmb\n" %(threads, int(memory * 1000)))
+                else:
+                    pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dgb\n" %(threads, int(memory)))
+            else:
+                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1\n" %(threads))
+        
+        # setup TMPDIR and TMPDIR_SPEC
+        if self.tmpdir:
+            pipe.write("export TMPDIR=%s\n" %(self.tmpdir))
+        if self.tmpdir_spec:
+            pipe.write("export TMPDIR_SPEC=%s\n" %(self.tmpdir_spec))
+            
+        pipe.write("cd \"%s\"\n" %(self.workingdir))
+
+        if mpi:
+            pipe.write("%s %s\n" %(mpi.mpirun, command))
+        else:
+            pipe.write("%s\n" %(command))
+        
+        pipe.close()
+        popen.wait()
+            
+class MPI:
+    
+    def __init__(self, dir="", hosts="", hosts_file="", number=0):
+        
+	self.dir = dir
+	self.hosts = hosts
+        self.hosts_file = hosts_file
+        self.number = number
+	
+        if self.dir:
+            if not os.path.exists(self.dir):
+                raise ValueError, self.dir + " does not exist"
+            self.dir = os.path.realpath(self.dir)
+
+        if self.hosts_file:
+            if not os.path.exists(self.hosts_file):
+                raise ValueError, self.hosts_file + " does no exist"
+            self.hosts_file = os.path.realpath(hosts_file)
+
+        self.bindir = self.dir
+        if self.bindir:
+            self.bindir = os.path.join(self.bindir, 'bin')
+            if not os.path.exists(self.bindir) or not os.path.isdir(self.bindir):
+                raise ValueError, self.bindir + " does not exist"
+	
+        for binprog in ['mpirun']:
+            if self.bindir:
+                prog = os.path.join(self.bindir, binprog)
+                if not os.path.exists(prog):
+                    raise ValueError, prog + " does not exist at " + self.bindir
+                setattr(self, binprog, prog)
+            else:
+                setattr(self, binprog, binprog)
+                
+    def run(self, command):	
+        mpirun = self.mpirun
+        if self.dir:
+            mpirun += ' --prefix %s' %(self.dir)
+        if self.number > 0:
+            mpirun += ' --np %d' %(self.number)
+        if self.hosts:
+            mpirun += ' --host %s' %(self.hosts)
+        elif self.hosts_file:
+            mpirun += ' --hostfile %s' %(self.hosts_file)
+	mpirun += ' ' + command
+	
+	run_command(mpirun)
+
+
+class Toolkit:
+
+    def __init__(self, dir=""):
+
+	self.dir = dir	
+	if not dir: return
+	
+	if not os.path.exists(self.dir):
+	    raise ValueError, self.dir + " does not exist"
+	
+	self.dir = os.path.realpath(self.dir)
+        
+	self.bindirs = []
+	for dir in ('bin', 'progs', 'scripts'): 
+	    bindir = os.path.join(self.dir, dir)
+	    if os.path.exists(bindir) and os.path.isdir(bindir):
+		self.bindirs.append(bindir)
+
+	if not self.bindirs:
+	    raise ValueError, str(self.bindirs) + "  does not exist"
+	
+	for binprog in ('extract.py',
+                        ## step 5
+                        'cicada_extract_phrase', 'cicada_extract_phrase_mpi',
+                        'cicada_extract_scfg', 'cicada_extract_scfg_mpi',
+                        'cicada_extract_ghkm', 'cicada_extract_ghkm_mpi',
+                        'cicada_extract_tree', 'cicada_extract_tree_mpi',
+                        ## step6
+                        'cicada_extract_score', 'cicada_extract_score_mpi',):
+	    
+	    for bindir in self.bindirs:
+		prog = os.path.join(bindir, binprog)
+		if os.path.exists(prog):
+		    setattr(self, binprog, prog)
+		    break
+	    if not hasattr(self, binprog):
+		raise ValueError, binprog + ' does not exist'
+        
+class Corpus:
+
+    def __init__(self, corpus="", f="", e="", sf="", se="", ff="", fe=""):
+
+        self.source_tag = f
+        self.target_tag = e
+
+        self.source_span_tag = sf
+        self.target_span_tag = se
+
+        self.source_forest_tag = ff
+        self.target_forest_tag = fe
+        
+        self.source = compressed_file(corpus+'.'+f)
+        self.target = compressed_file(corpus+'.'+e)
+        
+        self.source_span = compressed_file(corpus+'.'+sf)
+        self.target_span = compressed_file(corpus+'.'+se)
+        
+        self.source_forest = compressed_file(corpus+'.'+ff)
+        self.target_forest = compressed_file(corpus+'.'+fe)
+
+class Alignemnt:
+    def __init__(self, model_dir="", alignment=""):
+        if not os.path.exists(model_dir):
+            os.makedirs(model_dir)
+        
+        self.alignment = compressed_file(os.path.join(model_dir, 'aligned.'+alignment))
+
+        if not os.path.exists(self.alignment):
+            raise ValueError, "no alignment data %s" %(self.alignment)
+        
+
+class Lexicon:
+    def __init__(self, lexical_dir="", alignment=None):
+        
+        if not os.path.exists(lexical_dir):
+            os.makedirs(lexical_dir)
+        
+        self.alignment = alignment.alignment
+        
+        self.source_target = compressed_file(os.path.join(lexical_dir, 'lex.f2n'))
+        self.target_source = compressed_file(os.path.join(lexical_dir, 'lex.n2f'))
+        
+        if not os.path.exists(self.source_target):
+            raise ValueError, "no f2n lexicon data %s" %(self.source_target)
+
+        if not os.path.exists(self.target_source):
+            raise ValueError, "no n2f lexicon data %s" %(self.target_source)
+
+class Extract:
+    def __init__(self, max_malloc=8, threads=4, mpi=None, pbs=None):
+        self.threads = threads
+        self.max_malloc = max_malloc
+        self.mpi = mpi
+        self.pbs = pbs
+
+        if not hasattr(self, 'command'):
+            self.command = ""
+        
+    def run(self):
+        if self.mpi:
+            if self.pbs:
+                self.pbs.run(command=self.command, name="extract", mpi=self.mpi, memory=self.max_malloc, logfile="extract.log")
+            else:
+                self.mpi.run(self.command)
+        else:
+            if self.pbs:
+                self.pbs.run(command=self.command, threads=self.threads, name="extract", memory=self.max_malloc, logfile="extract.log")
+            else:
+                run_command(self.command)
+
+class ExtractPhrase(Extract):
+    
+    def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 max_length=7, max_fertility=4,
+                 max_malloc=8, threads=4, mpi=None, pbs=None):
+        Extract.__init__(self, max_malloc, threads, mpi, pbs)
+        
+        self.counts = os.path.join(model_dir, "phrase-counts")
+
+        if not os.path.exists(corpus.source):
+            raise ValueError, "no file: " + corpus.source
+        if not os.path.exists(corpus.target):
+            raise ValueError, "no file: " + corpus.target
+        
+        prog_name = ""
+        if mpi:
+            prog_name = toolkit.cicada_extract_phrase_mpi
+        else:
+            prog_name = toolkit.cicada_extract_phrase
+        
+        command = prog_name
+        
+        command += " --source \"%s\"" %(corpus.source)
+        command += " --target \"%s\"" %(corpus.target)
+        command += " --alignment \"%s\"" %(alignment.alignment)
+        
+        command += " --output \"%s\"" %(self.counts)
+        
+        command += " --max-length %d"    %(max_length)
+        command += " --max-fertility %d" %(max_fertility)
+        
+        command += " --max-malloc %g" %(max_malloc)
+        
+        if not mpi:
+            command += " --threads %d" %(threads)
+
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+class ExtractSCFG(Extract):
+    
+    def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 max_length=7, max_fertility=4, max_span=15, min_hole=1,
+                 max_malloc=8, threads=4, mpi=None, pbs=None):
+        Extract.__init__(self, max_malloc, threads, mpi, pbs)
+        
+        self.counts = os.path.join(model_dir, "scfg-counts")
+
+        if not os.path.exists(corpus.source):
+            raise ValueError, "no file: " + corpus.source
+        if not os.path.exists(corpus.target):
+            raise ValueError, "no file: " + corpus.target
+        
+        if os.path.exists(corpus.source_span) and os.path.exists(corpus.target_span):
+            raise ValueError, "both of source/target span specified... which one?"
+        
+        prog_name = ""
+        if mpi:
+            prog_name = toolkit.cicada_extract_scfg_mpi
+        else:
+            prog_name = toolkit.cicada_extract_scfg
+        
+        command = prog_name
+        
+        command += " --source \"%s\"" %(corpus.source)
+        command += " --target \"%s\"" %(corpus.target)
+        command += " --alignment \"%s\"" %(alignment.alignment)
+
+        if os.path.exists(corpus.source_span):
+            command += " --spans-source \"%s\"" %(corpus.source_span)
+        if os.path.exists(corpus.target_span):
+            command += " --spans-target \"%s\"" %(corpus.target_span)
+        
+        command += " --output \"%s\"" %(self.counts)
+        
+        command += " --max-length %d"    %(max_length)
+        command += " --max-fertility %d" %(max_fertility)
+        command += " --max-span %d"      %(max_span)
+        command += " --min-hole %d"      %(min_hole)
+        
+        command += " --max-malloc %g" %(max_malloc)
+
+        if not mpi:
+            command += " --threads %d" %(self.threads)        
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+class ExtractGHKM(Extract):
+    
+    def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 non_terminal="", max_nodes=15, max_height=4,
+                 max_malloc=8, threads=4, mpi=None, pbs=None):
+        Extract.__init__(self, max_malloc, threads, mpi, pbs)
+        
+        self.counts = os.path.join(model_dir, "ghkm-counts")
+
+        if not os.path.exists(corpus.target):
+            raise ValueError, "no file: " + corpus.target
+
+        if not os.path.exists(corpus.source_forest):
+            raise ValueError, "we have no forest at source side"
+        
+        prog_name = ""
+        if mpi:
+            prog_name = toolkit.cicada_extract_ghkm_mpi
+        else:
+            prog_name = toolkit.cicada_extract_ghkm
+        
+        command = prog_name
+        
+        command += " --source \"%s\"" %(corpus.source_forest)
+        command += " --target \"%s\"" %(corpus.target)
+        command += " --alignment \"%s\"" %(alignment.alignment)
+        
+        command += " --output \"%s\"" %(self.counts)
+        
+        if non_terminal:
+            if non_terminal[0] != '[' or non_terminal[-1] != ']':
+                raise ValueError, "invalid non-terminal: %s" %(non_terminal)
+
+            command += " --non-terminal \"%s\"" %(non_terminal)
+        
+        command += " --max-nodes %d"  %(max_nodes)
+        command += " --max-height %d" %(max_height)
+        
+        command += " --max-malloc %g" %(max_malloc)
+
+        if not mpi:
+            command += " --threads %d" %(self.threads)
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+
+class ExtractTree(Extract):
+    
+    def __init__(self, toolkit=None, corpus=None, alignment=None,
+                 max_nodes=15, max_height=4,
+                 max_malloc=8, threads=4, mpi=None, pbs=None):
+        Extract.__init__(self, max_malloc, threads, mpi, pbs)
+        
+        self.counts = os.path.join(model_dir, "tree-counts")
+
+        if not os.path.exists(corpus.source_forest):
+            raise ValueError, "we have no forest at source side"
+
+        if not os.path.exists(corpus.target_forest):
+            raise ValueError, "we have no forest at target side"
+        
+        prog_name = ""
+        if mpi:
+            prog_name = toolkit.cicada_extract_tree_mpi
+        else:
+            prog_name = toolkit.cicada_extract_tree
+        
+        command = prog_name
+        
+        command += " --source \"%s\"" %(corpus.source_forest)
+        command += " --target \"%s\"" %(corpus.target_forest)
+        command += " --alignment \"%s\"" %(alignment.alignment)
+        
+        command += " --output \"%s\"" %(self.counts)
+        
+        command += " --max-nodes %d"  %(max_nodes)
+        command += " --max-height %d" %(max_height)
+        
+        command += " --max-malloc %g" %(max_malloc)
+        
+        if not mpi:
+            command += " --threads %d" %(self.threads)
+            
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+class ExtractScore(Extract):
+    
+    def __init__(self, toolkit=None, lexicon=None, extract=None,
+                 phrase=None, scfg=None, ghkm=None, tree=None,
+                 max_malloc=8, threads=4, mpi=None, pbs=None):
+        Extract.__init__(self, max_malloc, threads, mpi, pbs)
+        
+        option = ""
+        if phrase:
+            self.scores = os.path.join(model_dir, "phrase-score")
+            option = " --phrase"
+        elif scfg:
+            self.scores = os.path.join(model_dir, "scfg-score")
+            option = " --scfg"
+        elif ghkm:
+            self.scores = os.path.join(model_dir, "ghkm-score")
+            option = " --ghkm"
+        elif tree:
+            self.scores = os.path.join(model_dir, "tree-score")
+            option = " --tree"
+        else:
+            raise ValueError, "no count type?"
+            
+        
+        prog_name = ""
+        if mpi:
+            prog_name = toolkit.cicada_extract_score_mpi
+        else:
+            prog_name = toolkit.cicada_extract_score
+        
+        command = prog_name
+        
+        command += " --list \"%s\"" %(extract.counts)
+        command += " --output \"%s\"" %(self.counts)
+        command += " --lexicon-source-target \"%s\"" %(lexicon.source_target)
+        command += " --lexicon-target-source \"%s\"" %(lexicon.target_source)
+        command += option
+        command += " --max-malloc %g" %(max_malloc)
+        
+        if mpi:
+            command += " --prog \"%s\"" %(prog_name)
+        else:
+            command += " --threads %d" %(self.threads)
+            
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+
