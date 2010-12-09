@@ -10,6 +10,7 @@
 
 #include "cicada_impl.hpp"
 #include "cicada/graphviz.hpp"
+#include "cicada/remove_epsilon.hpp"
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/program_options.hpp"
@@ -29,6 +30,7 @@ std::string confidence;
 std::string count;
 double count_weight = 1.0;
 
+bool remove_epsilon = false;
 bool output_graphviz = false;
 
 int debug = 0;
@@ -141,6 +143,9 @@ int main(int argc, char ** argv)
       }
     }
     
+    if (remove_epsilon)
+      cicada::remove_epsilon(merged);
+    
     utils::compress_ostream os(output_file, 1024 * 1024);
     
     if (output_graphviz)
@@ -174,6 +179,7 @@ void options(int argc, char** argv)
     ("count",        po::value<std::string>(&count),         "add count weight feature name")
     ("count-weight", po::value<double>(&count_weight),       "count weight")
     
+    ("remove-epsilon", po::bool_switch(&remove_epsilon), "remvoe epsilon")
     ("graphviz", po::bool_switch(&output_graphviz), "output in graphviz format")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
