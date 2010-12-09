@@ -65,11 +65,7 @@ namespace cicada
     
     bool valid_span(int first, int last, int distance) const
     {
-      // how to check inverted only...?
-      if (straight && ! inverted)
-	return first == 0;
-      else
-	return true;
+      return (straight && inverted ? true : first == 0);
     }
     
   private:
