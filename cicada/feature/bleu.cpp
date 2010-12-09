@@ -568,8 +568,11 @@ namespace cicada
       double tst_size(int length, const bool scaling=true) const
       {
 	if (length == 0 || sizes.empty()) return length;
+
+	const int mask = int(scaling) - 1;
 	
-	return (scaling ? utils::bithack::max(length, sizes.front()) : length);
+	return ((~mask) & utils::bithack::max(length, sizes.front())) | (mask & length);
+	//return (scaling ? utils::bithack::max(length, sizes.front()) : length);
 	
 #if 0
 	if (length == 0) return 0.0;
