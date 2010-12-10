@@ -6,6 +6,7 @@ lib_LTLIBRARIES = libcicada.la
 
 noinst_LTLIBRARIES = \
 libcicada-feature.la \
+libcicada-matcher.la \
 libcicada-semiring.la \
 libcicada-eval.la \
 libcicada-optimize.la \
@@ -127,7 +128,13 @@ tokenizer/stemmer.hpp \
 tokenizer/tokenize.hpp
 
 dist_matcher_HEADERS = \
-matcher/stemmer.hpp 
+matcher/stemmer.hpp \
+matcher/wordnet.hpp 
+
+libcicada_matcher_la_SOURCES = \
+matcher/wordnet.cpp
+
+libcicada_matcher_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
@@ -265,6 +272,7 @@ libcicada_la_LDFLAGS = \
 libcicada_la_LIBADD = \
 	libcicada-eval.la \
 	libcicada-feature.la \
+	libcicada-matcher.la \
 	libcicada-optimize.la \
 	libcicada-semiring.la \
 	libcicada-stemmer.la \

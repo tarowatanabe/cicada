@@ -8,17 +8,16 @@
 
 #include <string>
 
-#include <cicada/wordnet.hpp>
 #include <cicada/matcher.hpp>
 
 namespace cicada
 {
   namespace matcher
   {
-    class Wordnet : public cicada::Matcher
+    class WordNet : public cicada::Matcher
     {
     public:
-      Wordnet(const std::string& path) : { initialize(path); }
+      WordNet(const std::string& path) { initialize(path); }
       
     public:
       bool operator()(const symbol_type& x, const symbol_type& y) const
