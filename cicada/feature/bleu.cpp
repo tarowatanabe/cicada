@@ -591,7 +591,7 @@ namespace cicada
 	double min_diff = boost::numeric::bounds<double>::highest();
 	for (size_set_type::const_iterator siter = sizes.begin(); siter != sizes.end(); ++ siter) {
 	  const double diff = std::fabs(hypothesis_size - *siter);
-
+	  
 	  if (diff < min_diff) {
 	    min_diff = diff;
 	    reference_size = *siter;
