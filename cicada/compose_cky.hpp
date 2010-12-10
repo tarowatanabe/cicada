@@ -362,22 +362,23 @@ namespace cicada
 
       bool found = false;
       
-      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
-	  const symbol_type& non_terminal = non_terminals[*piter];
-	  
-	  const transducer_type::id_type node = transducer.next(aiter->node, non_terminal);
-	  if (node == transducer.root()) continue;
-	  
-	  hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
-	  std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
-	  tails.back() = *piter;
-	  
-	  cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
-
-	  found = true;
-	}
-
+      if (piter_begin != piter_end)
+	for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	  for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
+	    const symbol_type& non_terminal = non_terminals[*piter];
+	    
+	    const transducer_type::id_type node = transducer.next(aiter->node, non_terminal);
+	    if (node == transducer.root()) continue;
+	    
+	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
+	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
+	    tails.back() = *piter;
+	    
+	    cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
+	    
+	    found = true;
+	  }
+      
       return found;
     }
 
