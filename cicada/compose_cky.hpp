@@ -370,9 +370,8 @@ namespace cicada
 	    const transducer_type::id_type node = transducer.next(aiter->node, non_terminal);
 	    if (node == transducer.root()) continue;
 	    
-	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
+	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1, *piter);
 	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
-	    tails.back() = *piter;
 	    
 	    cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
 	    
