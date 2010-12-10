@@ -17,6 +17,7 @@ namespace cicada
     // this is the global guard!
     static utils::spinlock __wordnet_mutex;
     
+    // TODO: do we move this to wn directory, with thread-safe c++ wrapper?
     
     
     
