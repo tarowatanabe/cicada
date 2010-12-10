@@ -660,7 +660,7 @@ namespace cicada
 	    hypergraph_type::edge_type::node_set_type::const_iterator titer_curr = titer_end;
 	    
 	    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	      if (*titer == id) {
+	      if (static_cast<int>(*titer) == id) {
 		titer_curr = titer;
 		break;
 	      }
