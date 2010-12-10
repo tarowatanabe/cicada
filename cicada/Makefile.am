@@ -20,6 +20,7 @@ featuredir   = $(pkgincludedir)/cicada/feature
 stemmerdir   = $(pkgincludedir)/cicada/stemmer
 operationdir = $(pkgincludedir)/cicada/operation
 tokenizerdir = $(pkgincludedir)/cicada/tokenizer
+matcherdir = $(pkgincludedir)/cicada/matcher
 
 dist_semiring_HEADERS = \
 semiring/envelope.hpp \
@@ -119,8 +120,14 @@ libcicada_stemmer_la_LIBADD = $(top_builddir)/libstemmer_c/libstemmer.la
 
 dist_tokenizer_HEADERS = \
 tokenizer/lower.hpp \
+tokenizer/nist.hpp \
 tokenizer/nonascii.hpp \
+tokenizer/penntreebank.hpp \
+tokenizer/stemmer.hpp \
 tokenizer/tokenize.hpp
+
+dist_matcher_HEADERS = \
+matcher/stemmer.hpp 
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
@@ -174,6 +181,7 @@ hypergraph.hpp \
 inside_outside.hpp \
 kbest.hpp \
 lattice.hpp \
+matcher.hpp \
 model.hpp \
 ngram.hpp \
 ngram_index.hpp \
@@ -226,9 +234,10 @@ grammar_static.cpp \
 graphviz.cpp \
 hypergraph.cpp \
 lattice.cpp \
+matcher.cpp \
+model.cpp \
 ngram.cpp \
 ngram_index.cpp \
-model.cpp \
 operation.cpp \
 operation_set.cpp \
 parameter.cpp \
