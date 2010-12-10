@@ -20,7 +20,7 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
 
-Add Matcher interface?
+Add matcher interface?
   - for lattice generation, it is reported stemming or word net synset does help to generalize matching.
     Do we implement this as our string baseline?
 
@@ -31,3 +31,5 @@ Systematic symbols:
 Add head-finder?
 
 Add alignment tool, which can read GIZA++ output and dump heuristic alignment?
+
+Add pharse-extract like script supporting phrase-extract only (step 5 and 6)
