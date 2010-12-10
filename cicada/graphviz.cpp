@@ -225,7 +225,7 @@ namespace cicada
     tail_grammar_type    tail_grammar;
     feature_grammar_type feature_grammar;
     
-    os << "digraph { rankdir=BT; ordering=out;" << '\n';
+    os << "digraph { rankdir=BT; ordering=in;" << '\n';
     
     hypergraph_type::node_set_type::const_iterator niter_end = hypergraph.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = hypergraph.nodes.begin(); niter != niter_end; ++ niter) {
