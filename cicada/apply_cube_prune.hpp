@@ -312,11 +312,11 @@ namespace cicada
     }
     
     // push succ...
-    void push_succ(const candidate_type& candidate,
-		   const bool is_goal,
-		   candidate_heap_type& cand,
-		   candidate_set_unique_type& candidates_unique,
-		   hypergraph_type& graph_out)
+    size_type push_succ(const candidate_type& candidate,
+			const bool is_goal,
+			candidate_heap_type& cand,
+			candidate_set_unique_type& candidates_unique,
+			hypergraph_type& graph_out)
     {
       // proceed to the next until we find better candidate...
       // @InProceedings{iglesias-EtAl:2009:EACL,
@@ -332,17 +332,17 @@ namespace cicada
       // }
 
       candidate_type query(candidate.j);
-      index_set_type& j = query.j;
-
-      size_t inserted = 0;
       
+      query.in_edge = candidate.in_edge;
+      index_set_type& j = query.j;
+      
+      size_type inserted = 0;
       for (size_t i = 0; i != candidate.j.size(); ++ i) {
 	
 	const int j_i_prev = j[i];
 	++ j[i];
 	
 	for (/**/; j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size()); ++ j[i]) {
-	  query.in_edge = candidate.in_edge;
 	  
 	  if (candidates_unique.find(&query) == candidates_unique.end()) {
 	    // new candidate...
@@ -359,8 +359,10 @@ namespace cicada
 	
 	j[i] = j_i_prev;
       }
-
+      
       //std::cerr << "inserted: " << inserted << std::endl;
+      
+      return inserted;
     }
     
     const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const hypergraph_type& graph, const bool is_goal)
