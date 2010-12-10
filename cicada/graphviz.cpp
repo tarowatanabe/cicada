@@ -243,10 +243,12 @@ namespace cicada
 	  iterator_type iter_rule(os);
 	  boost::spirit::karma::generate(iter_rule, rule_grammar, *edge.rule);
 	  
-	  os << " | ";
-	  
-	  iterator_type iter_tail(os);
-	  boost::spirit::karma::generate(iter_tail, tail_grammar, edge.tails);
+	  if (! edge.tails.empty()) {
+	    os << " | ";
+	    
+	    iterator_type iter_tail(os);
+	    boost::spirit::karma::generate(iter_tail, tail_grammar, edge.tails);
+	  }
 	  
 	  os << "}";
 	  
