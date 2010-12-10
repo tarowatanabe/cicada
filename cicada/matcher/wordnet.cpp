@@ -4,51 +4,61 @@
 #include "cicada/matcher/wordnet.hpp"
 
 #include "utils/spinlock.hpp"
+#include "utils/simple_vector.hpp"
+#include "utils/array_power2.hpp"
+
+#include "wn/wordnet.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
-
-#include "wn/wn.h"
 
 namespace cicada
 {
   namespace matcher
   {
-    // this is the global guard!
-    static utils::spinlock __wordnet_mutex;
+    WordNet::WordNet() { wn::WordNet __wn; }
+    WordNet::WordNet(const std::string& path) { wn::WordNet __wn(path); }
     
-    // TODO: do we move this to wn directory, with thread-safe c++ wrapper?
+    // do we cache...?
     
-    
-    
-    
-    static boost::once_flag __wordnet_init_once = BOOST_ONCE_INIT;
-    static std::string      __wordnet_path;
-    
-    static void __wordnet_init()
+    typedef cicada::Symbol symbol_type;
+    typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+    struct __wordnet_cache
     {
-      if (wninit()) {
-	if (__wordnet_path.empty() || ! boost::filesystem::exists(__wordnet_path))
-	  throw std::runtime_error("no wordnet database? check WNHOME, WNSEARCHDIR or supply path with file=\"path to db\"");
-	
-	setenv("WNHOME", __wordnet_path.c_str(), 1);
-	if (wninit()) {
-	  setenv("WNSEARCHDIR", __wordnet_path.c_str(), 1);
-	  
-	  if (wninit())
-	    throw std::runtime_error("no wordnet database? " + __wordnet_path);
-	}
+      symbol_type     word;
+      symbol_set_type synsets;
+
+      __wordnet_cache() : word(), synsets() {}
+    };
+
+    typedef __wordnet_cache cache_type;
+    
+    typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+    
+    
+    bool WordNet::operator()(const symbol_type& x, const symbol_type& y) const
+    {
+#ifdef HAVE_TLS
+      static __thread cache_set_type* __caches_tls = 0;
+      static boost::thread_specific_ptr<cache_set_type> __caches;
+      
+      if (! __caches_tls) {
+	__caches.reset(new cache_set_type());
+	__caches_tls = __caches.get();
       }
-    }
-    
-    void WordNet::initialize(const std::string& path)
-    {
-      // we will assure locking + once to make sure this will be called only once...
-      utils::spinlock::scoped_lock lock(__wordnet_mutex);
+      cache_set_type& caches = *__caches_tls;    
+#else
+      static boost::thread_specific_ptr<cache_set_type> __caches;
       
-      __wordnet_path = path;
+      if (! __caches.get())
+	__caches.reset(new cache_set_type());
       
-      boost::call_once(__wordnet_init_once, __wordnet_init);
+      cache_set_type& caches = *__caches;
+#endif
+      
+      
+      
+      
     }
   };
 };

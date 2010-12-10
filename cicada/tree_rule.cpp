@@ -70,7 +70,7 @@ namespace cicada
   
   TreeRule::rule_ptr_type TreeRule::create(const TreeRule& x)
   {
-    typedef utils::array_power2<rule_ptr_type, 1024 * 256, std::allocator<rule_ptr_type> > cache_type;
+    typedef utils::array_power2<rule_ptr_type, 1024 * 64, std::allocator<rule_ptr_type> > cache_type;
 
 #ifdef HAVE_TLS
     static __thread cache_type* __cache_tls = 0;

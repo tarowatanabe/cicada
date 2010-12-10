@@ -77,7 +77,7 @@ namespace wn
     return x.iter - y.iter;
   }
   
-  void WordNet::operator()(const std::string& word, synset_set_type& synsets)
+  void WordNet::operator()(const std::string& word, synset_set_type& synsets) const
   {
     typedef std::vector<char, std::allocator<char> > buffer_type;
     

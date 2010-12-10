@@ -17,18 +17,11 @@ namespace cicada
     class WordNet : public cicada::Matcher
     {
     public:
-      WordNet(const std::string& path) { initialize(path); }
+      WordNet();
+      WordNet(const std::string& path);
       
     public:
-      bool operator()(const symbol_type& x, const symbol_type& y) const
-      {
-	
-	return true;
-      }
-      
-    private:
-      
-      static void initialize(const std::string& path);
+      bool operator()(const symbol_type& x, const symbol_type& y) const;
     };
   };
 };

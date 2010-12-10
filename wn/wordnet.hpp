@@ -27,7 +27,7 @@ namespace wn
     WordNet(const std::string& path) { initialize(path); }
     
   public:
-    void operator()(const std::string& word, synset_set_type& synsets);
+    void operator()(const std::string& word, synset_set_type& synsets) const;
     
   private:
     static void initialize(const std::string& path);
