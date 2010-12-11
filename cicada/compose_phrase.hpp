@@ -226,13 +226,13 @@ namespace cicada
 		for (lattice_type::arc_set_type::const_iterator aiter = lattice[*niter].begin(); aiter != aiter_end; ++ aiter) {
 		  const int next = *niter + aiter->distance;
 		  
-		  if (next < last && ! visited[next]) {
+		  if (! visited[next]) {
 		    nodes_next.push_back(next);
 		    visited.set(next);
 		  }
 		}
 	      }
-
+	      
 	      nodes.swap(nodes_next);
 	    }
 	  }

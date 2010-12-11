@@ -369,7 +369,8 @@ struct __Grow
 	  
 	  if (0 <= point.source && point.source < source_size && 0 <= point.target && point.target < target_size) 
 	    if ((! aligned_source[point.source]) || (! aligned_target[point.target]))
-	      if (has_alignment(bitext_source_target, point.source, point.target) || has_alignment(bitext_target_source, point.target, point.source)) {
+	      if (has_alignment(bitext_source_target, point.source, point.target)
+		  || has_alignment(bitext_target_source, point.target, point.source)) {
 		align_new.insert(point);
 		
 		aligned_source[point.source] = true;

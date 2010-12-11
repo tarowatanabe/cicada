@@ -1,11 +1,15 @@
 Phrase/Rule/Tree-fragment extraction
 
 We support various phrase/rule/tree extraction. Basically, we will run in two steps:
-   Collect counts by mapping input sentences/parse trees/alignmeent etc.
+   Collect counts by mapping input sentences/parse trees/alignment etc.
    Map/Reduce to collect target-side counts
    Map/Reduce to collect source/target counts and produce various counts
 
    They can operate similarly with underlying extraction specific map/reduce framework.
+
+
+You can try "extract.py" which runs like phrase-extract in moses, but starting from step 5 (and 6).
+Internally, extract.py call following binaries:
 
 cicada_extract_phrase{,_mpi}
 	Extract phrase
