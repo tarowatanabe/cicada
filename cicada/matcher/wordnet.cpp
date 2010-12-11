@@ -61,19 +61,23 @@ namespace cicada
 	if (cache.word == x) {
 	  synset_set_type synsets;
 	  wordnet(y, synsets);
+	  std::sort(synsets.begin(), synsets.end());
 
 	  return __match(cache.synsets.begin(), cache.synsets.end(), synsets.begin(), synsets.end());
 	} else if (cache.word == y) {
 	  synset_set_type synsets;
 	  wordnet(x, synsets);
+	  std::sort(synsets.begin(), synsets.end());
 	  
 	  return __match(cache.synsets.begin(), cache.synsets.end(), synsets.begin(), synsets.end());
 	} else {
 	  cache.word = x;
 	  wordnet(x, cache.synsets);
+	  std::sort(cache.synsets.begin(), cache.synsets.end());
 	  
 	  synset_set_type synsets;
 	  wordnet(y, synsets);
+	  std::sort(synsets.begin(), synsets.end());
 	  
 	  return __match(cache.synsets.begin(), cache.synsets.end(), synsets.begin(), synsets.end());
 	}
