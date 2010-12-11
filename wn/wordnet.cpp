@@ -76,6 +76,7 @@ namespace wn
     return x.iter == y.iter;
   }
   
+  inline
   ptrdiff_t operator-(const UnescapeIterator& x, const UnescapeIterator& y)
   {
     return x.iter - y.iter;
@@ -95,6 +96,7 @@ namespace wn
 
 
   template <typename Ptr, typename Synsets>
+  inline
   void __wordnet_synset(Ptr ptr, Synsets& synsets)
   {
     for (Ptr current = ptr; current; current = current->nextss) {
