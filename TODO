@@ -23,7 +23,6 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
 Add matcher interface?
   - for lattice generation, it is reported stemming or word net synset does help to generalize matching.
     Do we implement this as our string baseline?
-    Very difficult, especially with synsets closure computation... wordnet code is very hard to read
 
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
