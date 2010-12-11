@@ -56,9 +56,42 @@ namespace cicada
       cache_set_type& caches = *__caches;
 #endif
       
-      
-      
-      
+      const size_type pos_x = hash_value(x) & (caches.size() - 1);
+      const size_type pos_y = hash_value(y) & (caches.size() - 1);
+
+      if (pos_x != pos_y) {
+	cache_type& cache_x = caches[pos_x];
+	cache_type& cache_y = caches[pos_y];
+	
+	if (cache_x.word != x) {
+	  wordnet_type::synset_set_type synsets;
+	  wordnet(x, synsets);
+
+	  cache_x.word = x;
+	  cache_x.synsets.resize(synsets.size());
+	  for (size_t i = 0; i != synsets.size(); ++ i)
+	    cache_x.synsets[i] = synsets[i].word;
+	  
+	}
+
+	if (cache_y.word != y) {
+	  wordnet_type::synset_set_type synsets;
+	  wordnet(y, synsets);
+	  
+	  cache_y.synsets.resize(synsets.size());
+	  for (size_t i = 0; i != synsets.size(); ++ i)
+	    cache_y.synsets[i] = synsets[i].word;
+	}
+	
+	// check if we have matching between cache_x and cache_y
+	
+	
+	
+      } else {
+	// check if we have an entry in cache... otherwise...
+	
+	
+      }
     }
   };
 };

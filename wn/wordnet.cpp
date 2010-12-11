@@ -76,6 +76,42 @@ namespace wn
   {
     return x.iter - y.iter;
   }
+
+  template <typename Ptr, typename Synsets>
+  void __wordnet_synset(Ptr ptr, Synsets& synsets)
+  {
+    for (SynsetPtr current = ptr; current; current = current->nextss) {
+      const std::string pos = current->pos;
+      
+      for (int i = 0; i != current->wcount; ++ i) {
+	synsets.resize(synsets.size() + 1);
+	
+	synsets.back().pos  = std::string(UnescapeIterator(pos.c_str()),
+					  UnescapeIterator(pos.c_str() + pos.size()));
+	synsets.back().word = std::string(UnescapeIterator(current->words[i]),
+					  UnescapeIterator(current->words[i] + std::strlen(current->words[i])));
+	synsets.back().sense = current->wnsns[i];
+      }
+      
+      // we do not deep copy...
+      for (int i = 0; i != current->ptrcount; ++ i) 
+	if (current->ptrtyp[i] == HYPERPTR) {
+	  Ptr curr = read_synset(current->ppos[i], current->ptroff[i], "");
+	  
+	  const std::string pos = current->pos;
+	  
+	  synsets.resize(synsets.size() + 1);
+	
+	  synsets.back().pos  = std::string(UnescapeIterator(pos.c_str()),
+					    UnescapeIterator(pos.c_str() + pos.size()));
+	  synsets.back().word = std::string(UnescapeIterator(curr->words[i]),
+					    UnescapeIterator(curr->words[i] + std::strlen(curr->words[i])));
+	  synsets.back().sense = curr->wnsns[i];
+	  
+	  free_syns(curr);
+	}
+    }
+  }
   
   void WordNet::operator()(const std::string& word, synset_set_type& synsets) const
   {
@@ -86,27 +122,23 @@ namespace wn
     std::copy(EscapeIterator(word.begin()), EscapeIterator(word.end()), buffer.begin());
     
     for (int pos = 1; pos <= NUMPARTS; ++ pos) {
-      SynsetPtr synset_ptr;
-      {
-	lock_type lock(__wordnet_mutex);
-	
-	// retrieven all senses, but do not traverse edges...
-	synset_ptr = findtheinfo_ds(&(*buffer.begin()), pos, 0, ALLSENSES);
-      }
+      lock_type lock(__wordnet_mutex);
       
-      for (SynsetPtr current = synset_ptr; current; current = current->nextss) {
-	const std::string pos = current->pos;
-
-	for (int i = 0; i != current->wcount; ++ i) {
-	  synsets.resize(synsets.size() + 1);
-	  
-	  synsets.back().pos = std::string(UnescapeIterator(pos.c_str()), UnescapeIterator(pos.c_str() + pos.size()));
-	  synsets.back().word = std::string(UnescapeIterator(current->words[i]), UnescapeIterator(current->words[i] + std::strlen(current->words[i])));
-	  synsets.back().sense = current->wnsns[i];
-	}
-      }
+      SynsetPtr synset_ptr = findtheinfo_ds(&(*buffer.begin()), pos, 0, ALLSENSES);
+      
+      __wordnet_synset(synset_ptr, synsets);
       
       free_syns(synset_ptr);
+      
+      char* morphword = 0;
+      if (morphword = morphstr(&(*buffer.begin()), pos))
+	do {
+	  SynsetPtr synset_ptr = findtheinfo_ds(morphword, pos, 0, ALLSENSES);
+	  
+	  __wordnet_synset(synset_ptr, synsets);
+	  
+	  free_syns(synset_ptr);
+	} while (morphword = morphstr(0, pos));
     }
   }
   
