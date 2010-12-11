@@ -33,23 +33,11 @@ namespace cicada
     namespace standard = boost::spirit::standard;
     namespace phoenix = boost::phoenix;
     
-    using qi::phrase_parse;
-    using qi::lexeme;
-    using qi::_1;
-    using qi::attr_cast;
-    using standard::char_;
-    using standard::space;
-    
-    using phoenix::push_back;
-    using phoenix::ref;
-
-    qi::rule<iter_type, std::string(), standard::space_type> word = lexeme[+(char_ - space) - "|||"];
+    qi::rule<iter_type, std::string(), standard::space_type> word = qi::lexeme[+(standard::char_ - standard::space) - "|||"];
     
     clear();
     
-    return phrase_parse(iter, end,
-			*(word[push_back(ref(__sent), _1)]),
-			space);
+    return qi::phrase_parse(iter, end, *(word[phoenix::push_back(phoenix::ref(__sent), qi::_1)]), standard::space);
   }
   
   void Sentence::assign(const std::string& x)

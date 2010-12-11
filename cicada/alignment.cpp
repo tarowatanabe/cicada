@@ -11,10 +11,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-#include <boost/spirit/include/phoenix_object.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted/std_pair.hpp>
@@ -36,17 +32,10 @@ namespace cicada
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
-    
-    using qi::int_;
-    using standard::space;
     
     clear();
     
-    return qi::phrase_parse(iter, end,
-			    *(int_ >> '-' >> int_),
-			    space,
-			    __align);
+    return qi::phrase_parse(iter, end, *(qi::int_ >> '-' >> qi::int_), standard::space, __align);
   }
 
   void Alignment::assign(const std::string& line)
