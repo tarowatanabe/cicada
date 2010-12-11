@@ -17,6 +17,11 @@ namespace cicada
     inline
     bool __match(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2)
     {
+      if (first2 != last2)
+	first1 = std::lower_bound(first1, last1, *first2);
+      if (first1 != last1)
+	first2 = std::lower_bound(first2, last2, *first1);
+      
       while (first1 != last1 && first2 != last2) {
 	if (*first1 < *first2)
 	  ++ first1;
