@@ -7,9 +7,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -35,14 +32,8 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using qi::lexeme;
-      using qi::attr_cast;
-      using standard::char_;
-      using standard::space;
-      
-      word = lexeme[+(char_ - space) - "|||"];
+      word = qi::lexeme[+(standard::char_ - standard::space) - "|||"];
       sentence = *word;
       sentence_vector = -(sentence % "|||");
     }
