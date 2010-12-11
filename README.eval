@@ -31,6 +31,11 @@ Thus, you can directly feed k-best output from cicada(or cicada_mpi).
 
 Also, you can compute oracle-BLEU from hypergraph(s) by cicada_oracle{,_mpi}
 
+Tips: cicada_oracle{,_mpi} assumes "forests" as a input. If you want to compute
+an oracle score for k-bests, you can convert the k-bests as a forest, by first
+conver the sentence set as a lattice using cicada_unite_lattice, then, use cicada
+to intersect with a straight glue-rule.
+
 [1]
 @inproceedings{koehn:2004:EMNLP,
   author    = {Koehn, Philipp},
