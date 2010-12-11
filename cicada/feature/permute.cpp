@@ -99,7 +99,7 @@ namespace cicada
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "collapse") == 0)
 	  collapse = utils::lexical_cast<bool>(piter->second);
-	if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	else if (strcasecmp(piter->first.c_str(), "weights") == 0)
 	  path = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for permute: " << piter->first << "=" << piter->second << std::endl;
