@@ -35,3 +35,6 @@ Add head-finder?
 Add alignment tool, which can read GIZA++ output and dump heuristic alignment?
 
 Add pharse-extract like script supporting phrase-extract only (step 5 and 6)
+
+
+Do we allow intersect with lattice, not the first sentence of targets...?
