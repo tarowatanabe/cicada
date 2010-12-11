@@ -4,21 +4,24 @@ expgram: ngram language model training/indexing
 nicttm:  translation model training
 
 Others:
-Boost library
-MPI (Open MPI)
-ICU
-google-sparsehash
+Boost library     (http://www.boost.org/)
+MPI (Open MPI)    (http://www.open-mpi.org/)
+ICU               (http://site.icu-project.org/)
+google-sparsehash (http://code.google.com/p/google-sparsehash/)
 
 Optional:
-	google-perftools
-	jemalloc
-		You should install one of them for better memory performance
-		and to know how many bytes malloced in Linux
+	google-perftools (http://code.google.com/p/google-perftools/)
+	jemalloc (http://mxr.mozilla.org/mozilla-central/source/memory/jemalloc/)
+		 There is a different jemalloc (by the original author) from http://www.canonware.com/jemalloc/,
+		 but it is not tested. (I'm sure it will not work)
+	
+	You should install one of them for better memory performance
+	and to know how many bytes malloced in Linux
 
 Included libraries:
 
 ==========================================================
-libstemmer_c: Snowball stemmer from http://snowball.tartarus.org/
+libstemmer_c: Snowball stemmer (http://snowball.tartarus.org/)
 
 All the software given out on this Snowball site is covered by the BSD License (see http://www.opensource.org/licenses/bsd-license.html ), with Copyright (c) 2001, Dr Martin Porter, and (for the Java developments) Copyright (c) 2002, Richard Boulton.
 
@@ -27,7 +30,7 @@ Essentially, all this means is that you can do what you like with the code, exce
 We have not bothered to insert the licensing arrangement into the text of the Snowball software. 
 
 ==========================================================
-WordNet-3.0: WordNet from http://wordnet.princeton.edu/
+WordNet-3.0: WordNet (http://wordnet.princeton.edu/)
 
 ### Actually, we do not include data, but uses c-library...
 
