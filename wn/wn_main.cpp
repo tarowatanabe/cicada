@@ -10,8 +10,17 @@ int main(int argc, char** argv)
     
     std::string word;
     wn::WordNet::synset_set_type synsets;
+    wn::WordNet::morph_set_type morphs;
     
     while (std::getline(std::cin, word)) {
+      wordnet(word, morphs);
+
+      if (! morphs.empty()) {
+	wn::WordNet::morph_set_type::const_iterator miter_end = morphs.end();
+	for (wn::WordNet::morph_set_type::const_iterator miter = morphs.begin(); miter != miter_end; ++ miter)
+	  std::cout << "morph: " << *miter << std::endl;
+      }
+      
       wordnet(word, synsets);
       if (! synsets.empty()) {
 	std::cout << "word: " << word << std::endl;

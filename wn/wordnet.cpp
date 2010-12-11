@@ -130,6 +130,25 @@ namespace wn
 	}
     }
   }
+
+  void WordNet::operator()(const std::string& word, morph_set_type& morphs) const
+  {
+    typedef std::vector<char, std::allocator<char> > buffer_type;
+    
+    morphs.clear();
+    buffer_type buffer(word.size() + 1, 0);
+    std::copy(EscapeIterator(word.begin()), EscapeIterator(word.end()), buffer.begin());
+    
+    for (int pos = 1; pos <= NUMPARTS; ++ pos) {
+      lock_type lock(__wordnet_mutex);
+      
+      char* morphword = 0;
+      if (morphword = morphstr(&(*buffer.begin()), pos))
+	do {
+	  morphs.push_back(std::string(UnescapeIterator(morphword), UnescapeIterator(morphword + std::strlen(morphword))));
+	} while (morphword = morphstr(0, pos));
+    }
+  }
   
   void WordNet::operator()(const std::string& word, synset_set_type& synsets) const
   {

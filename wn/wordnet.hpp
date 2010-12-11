@@ -26,6 +26,8 @@ namespace wn
     };
     typedef SynSet synset_type;
     typedef std::vector<synset_type, std::allocator<synset_type> > synset_set_type;
+
+    typedef std::vector<std::string, std::allocator<std::string> > morph_set_type;
     
   public:
     WordNet()  { initialize(""); }
@@ -33,6 +35,7 @@ namespace wn
     
   public:
     void operator()(const std::string& word, synset_set_type& synsets) const;
+    void operator()(const std::string& word, morph_set_type& morphs) const;
     
   private:
     static void initialize(const std::string& path);
