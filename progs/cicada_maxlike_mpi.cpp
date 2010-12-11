@@ -1177,6 +1177,7 @@ void read_refset(const path_set_type& files,
     iter_type iter_end;
     
     while (iter != iter_end) {
+      id_sentence.second.clear();
       if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
 	if (iter != iter_end)
 	  throw std::runtime_error("refset parsing failed");

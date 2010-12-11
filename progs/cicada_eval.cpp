@@ -311,6 +311,7 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
     iter_type iter_end;
     
     while (iter != iter_end) {
+      id_sentence.second.clear();
       if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
 	if (iter != iter_end)
 	  throw std::runtime_error("tstset parsing failed");
@@ -353,6 +354,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
     iter_type iter_end;
     
     while (iter != iter_end) {
+      id_sentence.second.clear();
       if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
 	if (iter != iter_end)
 	  throw std::runtime_error("refset parsing failed");

@@ -13,6 +13,13 @@ boost_LDADD = \
 LIBCICADA = $(top_builddir)/cicada/libcicada.la
 LIBUTILS   = $(top_builddir)/utils/libutils.la
 
+noinst_PROGRAMS = \
+cicada_text_main
+
+cicada_text_main_SOURCES = cicada_text_main.cpp
+cicada_text_main_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+
 bin_PROGRAMS = \
 	cicada \
 	cicada_mpi \
