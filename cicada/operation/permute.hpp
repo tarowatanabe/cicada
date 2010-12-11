@@ -30,7 +30,7 @@ namespace cicada
 
     public:
       Permute(const std::string& parameter, const int __debug)
-	: excludes(), weights(0), size(0), feature(false), collapse(false), debug(__debug)
+	: excludes(), size(0), debug(__debug)
       {
 	typedef cicada::Parameter param_type;
 
@@ -43,20 +43,11 @@ namespace cicada
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "size") == 0)
 	    size = boost::lexical_cast<int>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "weights") == 0)
-	    weights = &base_type::weights(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "feature") == 0)
-	    feature = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "collapse") == 0)
-	    collapse = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "exclude") == 0)
 	    excludes.insert(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for permute: " << piter->first << "=" << piter->second << std::endl;
 	}
-    
-	if (collapse && ! weights)
-	  throw std::runtime_error("collapsing but no weights...");
       }
   
       struct Filter
@@ -84,13 +75,8 @@ namespace cicada
     
 	utils::resource start;
     
-	if (collapse)
-	  cicada::permute(hypergraph, permuted, cicada::PermuteFeatureCollapsed<weight_set_type>(*weights), Filter(excludes), size);
-	else if (feature)
-	  cicada::permute(hypergraph, permuted, cicada::PermuteFeature(), Filter(excludes), size);
-	else
-	  cicada::permute(hypergraph, permuted, cicada::PermuteNoFeature(), Filter(excludes), size);
-    
+	cicada::permute(hypergraph, permuted, Filter(excludes), size);
+	
 	utils::resource end;
     
 	if (debug)
@@ -108,13 +94,8 @@ namespace cicada
       }
 
       exclude_set_type excludes;
-  
-      const weight_set_type* weights;
-  
       int size;
-      bool feature;
-      bool collapse;
-  
+      
       int debug;
     };
 

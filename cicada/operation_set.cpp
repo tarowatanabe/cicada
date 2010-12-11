@@ -46,10 +46,7 @@ binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right] binarization direction\n\
 \tsize=binarization size\n\
 permute: permute tree (monolingual tree only)\n\
-\tfeature=[true|false] apply feature\n\
-\tweights=file weight file for composed feature\n\
 \tsize=permute size\n\
-\tcollapse=[true|false] collapse sparse features\n\
 \texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 compose-earley: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\

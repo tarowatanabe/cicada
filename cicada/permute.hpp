@@ -121,7 +121,7 @@ namespace cicada
     };
   };
 
-  template <typename FeatureFunction, typename Filter>
+  template <typename Filter>
   struct Permute
   {
     typedef HyperGraph hypergraph_type;
@@ -129,22 +129,24 @@ namespace cicada
     typedef hypergraph_type::symbol_type      symbol_type;
     typedef hypergraph_type::rule_type        rule_type;
     typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
-    typedef hypergraph_type::feature_set_type feature_set_type;
     
-    typedef feature_set_type::feature_type    feature_type;
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
+    
+    typedef feature_set_type::feature_type     feature_type;
+    typedef attribute_set_type::attribute_type attribute_type;
     
     typedef std::vector<int, std::allocator<int> > permutation_type;
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
+    typedef std::vector<std::string, std::allocator<std::string> > non_terminal_set_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > phrase_type;
     
     typedef utils::bit_vector<1024> coverage_type;
     typedef utils::bit_vector<1024> mask_type;
     
-    Permute(FeatureFunction __function,
-	    Filter __filter,
+    Permute(Filter __filter,
 	    const int __permute_size)
-      : function(__function),
-	filter(__filter),
+      : filter(__filter),
 	permute_size(__permute_size) {}
     
     
@@ -170,7 +172,7 @@ namespace cicada
 	  for (size_t i = 0; i != edge_source.tails.size(); ++ i)
 	    permutation.push_back(i);
 	  
-	  function(edge.features, *edge.rule, permutation);
+	  rule_attributes(edge.attributes, *edge.rule, permutation);
 	  
 	  if (edge_source.tails.size() > 1) {
 	    mask_type mask;
@@ -315,7 +317,7 @@ namespace cicada
       edge.features = edge_source.features;
       edge.attributes = edge_source.attributes;
       
-      function(edge.features, *edge_source.rule, permutation);
+      rule_attributes(edge.attributes, *edge_source.rule, permutation);
       
       graph.connect_edge(edge.id, node.id);
     }
@@ -333,9 +335,34 @@ namespace cicada
       }
       return differences > 0;
     }
+
     
+    void rule_attributes(attribute_set_type& attributes, const rule_type& rule, const permutation_type& permutation)
+    {
+      non_terminals.clear();
+      
+      int non_terminal_pos = 0;
+      rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+      for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  non_terminals.push_back('[' + siter->non_terminal_strip() + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
+	  ++ non_terminal_pos;
+	}
+      
+      std::string rule_string("permute:");
+      rule_string += static_cast<const std::string&>(rule.lhs) + "->";
+      
+      int permutation_pos = 0;
+      for (typename rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal()) {
+	  rule_string += non_terminals[permutation[permutation_pos]];
+	  ++ permutation_pos;
+	} else
+	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
+      
+      attributes[rule_string] = attribute_set_type::int_type(1);
+    }
     
-    FeatureFunction function;
     Filter          filter;
 
     int permute_size;
@@ -344,22 +371,15 @@ namespace cicada
     phrase_type permuted_non_terminals;
     
     tails_type tails;
+
+    non_terminal_set_type non_terminals;
   };
 
-  template <typename Function, typename Filter>
+  template <typename Filter>
   inline
-  void permute(const HyperGraph& source, HyperGraph& target, Function function, Filter filter, const int permute_size)
+  void permute(const HyperGraph& source, HyperGraph& target, Filter filter, const int permute_size)
   {
-    Permute<Function, Filter> permutation(function, filter, permute_size);
-    
-    permutation(source, target);
-  }
-
-  template <typename Function>
-  inline
-  void permute(const HyperGraph& source, HyperGraph& target, Function function, const int permute_size)
-  {
-    Permute<Function, PermuteFilter> permutation(function, PermuteFilter(), permute_size);
+    Permute<Filter> permutation(filter, permute_size);
     
     permutation(source, target);
   }
@@ -367,7 +387,7 @@ namespace cicada
   inline
   void permute(const HyperGraph& source, HyperGraph& target, const int permute_size)
   {
-    Permute<PermuteFeature, PermuteFilter> permutation(PermuteFeature(), PermuteFilter(), permute_size);
+    Permute<PermuteFilter> permutation(PermuteFilter(), permute_size);
     
     permutation(source, target);
   }
