@@ -19,6 +19,7 @@ Remark, the costs are interpreted as logarithmic value so that we can compute sc
 
 
 We allow <epsilon> node which allows us to directly handle confusion nework.
+## inside cicada, it is recommended to perform remove-epsilon, before intersecting with grammar etc.
 
 sentence/lattie related tools:
 

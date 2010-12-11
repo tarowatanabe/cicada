@@ -159,7 +159,7 @@ namespace cicada
     };
     
     typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 16, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
-    typedef utils::array_power2<cache_rule_type,          1024 * 16, std::allocator<cache_rule_type> >          cache_rule_set_type;
+    typedef utils::array_power2<cache_rule_type,          1024 *  8, std::allocator<cache_rule_type> >          cache_rule_set_type;
 
     TreeGrammarStaticImpl(const std::string& parameter) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)

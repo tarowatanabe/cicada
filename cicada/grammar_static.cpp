@@ -151,7 +151,7 @@ namespace cicada
     };
     
     typedef utils::array_power2<cache_rule_set_type, 1024 * 16, std::allocator<cache_rule_set_type> > cache_rule_map_type;
-    typedef utils::array_power2<cache_phrase_type,   1024 * 16, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
+    typedef utils::array_power2<cache_phrase_type,   1024 *  8, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
             
 
   public:
