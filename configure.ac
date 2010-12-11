@@ -346,6 +346,7 @@ AC_CONFIG_FILES([Makefile
 		 libstemmer_c/Makefile
 		 wn/Makefile
 		 progs/Makefile
+		 scripts/Makefile
                  succinct_db/Makefile
                  utils/Makefile])
 AC_OUTPUT
