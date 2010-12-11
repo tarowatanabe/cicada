@@ -93,18 +93,29 @@ namespace wn
     _Ptr ptr;
   };
 
+  template <typename _Ptr>
+  struct __wordnet_synset_autoptr
+  {
+    __wordnet_synset_autoptr(_Ptr __ptr) : ptr(__ptr) {}
+    ~__wordnet_synset_autoptr() { free_synset(ptr); }
+    
+    _Ptr operator->() { return ptr; }
+    _Ptr get() { return ptr; }
+    
+    _Ptr ptr;
+  };
+
 
   template <typename Ptr, typename Synsets>
   void __wordnet_synset(Ptr ptr, Synsets& synsets)
   {
     for (Ptr current = ptr; current; current = current->nextss) {
-      const std::string pos = current->pos;
+      const std::string pos(UnescapeIterator(current->pos), UnescapeIterator(current->pos + std::strlen(current->pos)));
       
       for (int i = 0; i != current->wcount; ++ i) {
 	synsets.resize(synsets.size() + 1);
 	
-	synsets.back().pos  = std::string(UnescapeIterator(pos.c_str()),
-					  UnescapeIterator(pos.c_str() + pos.size()));
+	synsets.back().pos  = pos;
 	synsets.back().word = std::string(UnescapeIterator(current->words[i]),
 					  UnescapeIterator(current->words[i] + std::strlen(current->words[i])));
 	synsets.back().sense = current->wnsns[i];
@@ -113,17 +124,18 @@ namespace wn
       // we do not deep copy...
       for (int i = 0; i != current->ptrcount; ++ i) 
 	if (current->ptrtyp[i] == HYPERPTR) {
-	  __wordnet_autoptr<Ptr> curr(read_synset(current->ppos[i], current->ptroff[i], ""));
+	  __wordnet_synset_autoptr<Ptr> curr(read_synset(current->ppos[i], current->ptroff[i], ""));
 	  
-	  const std::string pos = current->pos;
+	  const std::string pos(UnescapeIterator(curr->pos), UnescapeIterator(curr->pos + std::strlen(curr->pos)));
 	  
-	  synsets.resize(synsets.size() + 1);
-	  
-	  synsets.back().pos  = std::string(UnescapeIterator(pos.c_str()),
-					    UnescapeIterator(pos.c_str() + pos.size()));
-	  synsets.back().word = std::string(UnescapeIterator(curr->words[i]),
-					    UnescapeIterator(curr->words[i] + std::strlen(curr->words[i])));
-	  synsets.back().sense = curr->wnsns[i];
+	  for (int j = 0; j < curr->wcount; ++ j) {
+	    synsets.resize(synsets.size() + 1);
+	    
+	    synsets.back().pos  = pos;
+	    synsets.back().word = std::string(UnescapeIterator(curr->words[j]),
+					      UnescapeIterator(curr->words[j] + std::strlen(curr->words[j])));
+	    synsets.back().sense = curr->wnsns[j];
+	  }
 	}
     }
   }
