@@ -272,7 +272,7 @@ namespace cicada
 	  rule_string += non_terminals[permutation[permutation_pos]];
 	  ++ permutation_pos;
 	} else
-	  rule_string += '<' + static_cast<const std::string&>(*siter) + '>';
+	  rule_string += '{' + static_cast<const std::string&>(*siter) + '}';
       
       attributes[rule_string] = attribute_set_type::int_type(1);
     }
