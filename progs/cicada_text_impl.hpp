@@ -11,6 +11,8 @@
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/support_istream_iterator.hpp>
 
+#include <boost/fusion/adapted.hpp>
+
 #include <cicada/sentence.hpp>
 
 typedef std::pair<int, cicada::Sentence> id_sentence_type;
@@ -24,13 +26,16 @@ struct cicada_sentence_parser : boost::spirit::qi::grammar<Iterator, id_sentence
     namespace standard = boost::spirit::standard;
     
     word        %= qi::lexeme[+(standard::char_ - standard::space) - "|||"];
-    id_sentence %= qi::int_ >> "|||" >> *word >> (qi::eol | qi::eoi);
+    sentence    %= *word;
+    id_sentence %= qi::int_ >> "|||" >> sentence >> -qi::omit["|||" >> *(standard::char_ - qi::eol)] >> (qi::eol | qi::eoi);
   };
   
   typedef boost::spirit::standard::blank_type blank_type;
   
   boost::spirit::qi::rule<Iterator, std::string(), blank_type>      word;
+  boost::spirit::qi::rule<Iterator, cicada::Sentence(), blank_type> sentence;
   boost::spirit::qi::rule<Iterator, id_sentence_type(), blank_type> id_sentence;
 };
 
 #endif
+

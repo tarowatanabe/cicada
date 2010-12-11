@@ -12,15 +12,6 @@
 #include <string>
 #include <stdexcept>
 
-#include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-
-#include <boost/fusion/tuple.hpp>
-#include <boost/fusion/adapted.hpp>
-
 #include "cicada/sentence.hpp"
 #include "cicada/sentence_vector.hpp"
 #include "cicada/eval.hpp"
@@ -31,6 +22,8 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/random.hpp>
+
+#include "cicada_text_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -296,39 +289,13 @@ int main(int argc, char** argv)
   return 0;
 }
 
-typedef std::pair<int, sentence_type> id_sentence_type;
-
-template <typename Iterator>
-struct sentence_parser : boost::spirit::qi::grammar<Iterator, id_sentence_type(), boost::spirit::standard::space_type>
-{
-    
-  sentence_parser() : sentence_parser::base_type(id_sentence)
-  {
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
-    
-    using qi::lexeme;
-    using qi::int_;
-    
-    using standard::char_;
-    using standard::space;
-    
-    word        %= lexeme[+(char_ - space) - "|||"];
-    sentence    %= *word;
-    id_sentence %= int_ >> "|||" >> sentence;
-  }
-  
-  boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>      word;
-  boost::spirit::qi::rule<Iterator, sentence_type(), boost::spirit::standard::space_type>    sentence;
-  boost::spirit::qi::rule<Iterator, id_sentence_type(), boost::spirit::standard::space_type> id_sentence;
-};
-
 void read_tstset(const path_set_type& files, sentence_set_type& sentences)
 {
-  sentence_parser<std::string::const_iterator> parser;
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+  
+  parser_type parser;
   id_sentence_type id_sentence;
-  std::string line;
 
   std::vector<bool, std::allocator<bool> > finished(sentences.size());
   
@@ -338,25 +305,24 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
       throw std::runtime_error("no test file: " + fiter->file_string());
     
     utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+
+    iter_type iter(is);
+    iter_type iter_end;
     
-    while (std::getline(is, line)) {
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-      
-      id_sentence.second.clear();
-      
-      if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_sentence))
-	continue;
+    while (iter != iter_end) {
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("tstset parsing failed");
       
       const int& id = id_sentence.first;
-      const sentence_type& sentence = id_sentence.second;
       
       if (id >= static_cast<int>(sentences.size()))
 	throw std::runtime_error("id exceeds the reference data");
       
       if (finished[id]) continue;
       
-      sentences[id] = sentence;
+      sentences[id] = id_sentence.second;
       finished[id] = true;
     }
   }
@@ -364,33 +330,34 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
 {
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+  
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
   if (files.empty())
     throw std::runtime_error("no reference files?");
-    
+  
   scorers.clear();
-
-  sentence_parser<std::string::const_iterator> parser;
-  id_sentence_type id_sentence;
-  std::string line;
-
+  
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no reference file: " + fiter->file_string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
-    
-    while (std::getline(is, line)) {
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-      
-      id_sentence.second.clear();
-      
-      if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, id_sentence))
-	continue;
+    is.unsetf(std::ios::skipws);
 
+    iter_type iter(is);
+    iter_type iter_end;
+    
+    while (iter != iter_end) {
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
       const int& id = id_sentence.first;
-      const sentence_type& sentence = id_sentence.second;
       
       if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
@@ -398,7 +365,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
       if (! scorers[id])
 	scorers[id] = scorers.create();
       
-      scorers[id]->insert(sentence);
+      scorers[id]->insert(id_sentence.second);
     }
   }  
 }

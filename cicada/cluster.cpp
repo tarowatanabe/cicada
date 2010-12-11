@@ -31,7 +31,7 @@ namespace cicada
       clusters.open(rep.path("clusters"));
     } else {
       typedef std::vector<id_type, std::allocator<id_type> > cluster_map_type;
-
+      
       cluster_map_type cluster_map;
       
       utils::compress_istream is(path, 1024 * 1024);
