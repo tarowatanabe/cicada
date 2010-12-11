@@ -13,9 +13,6 @@
 #include <iostream>
 
 #include <cicada/feature.hpp>
-#include <utils/space_separator.hpp>
-
-#include <boost/tokenizer.hpp>
 
 namespace cicada
 {
@@ -587,8 +584,6 @@ namespace cicada
   inline
   std::istream& operator>>(std::istream& is, FeatureVector<T,A>& x)
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-    
     x.clear();
     
     std::string feature;

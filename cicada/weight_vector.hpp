@@ -15,10 +15,7 @@
 
 #include <cicada/feature.hpp>
 
-#include <utils/space_separator.hpp>
 #include <utils/bithack.hpp>
-
-#include <boost/tokenizer.hpp>
 
 namespace cicada
 {
@@ -331,8 +328,6 @@ namespace cicada
   inline
   std::istream& operator>>(std::istream& is, WeightVector<T,A>& x)
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-      
     x.clear();
 
     std::string feature;
