@@ -169,7 +169,10 @@ namespace cicada
 				feature_set_type& features,
 				feature_set_type& estimates,
 				const bool final) const
-    {}
+    {
+      apply(state, states, edge, features, estimates, final);
+    }
+    
     void Permute::apply_scan(state_ptr_type& state,
 			     const state_ptr_set_type& states,
 			     const edge_type& edge,
@@ -184,10 +187,7 @@ namespace cicada
 				 feature_set_type& features,
 				 feature_set_type& estimates,
 				 const bool final) const
-    {
-      apply(state, states, edge, features, estimates, final);
-    }
-    
+    {}
     
     void Permute::initialize()
     {
