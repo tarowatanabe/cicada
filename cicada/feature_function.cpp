@@ -18,6 +18,7 @@
 #include "feature/ngram_tree.hpp"
 #include "feature/parent.hpp"
 #include "feature/penalty.hpp"
+#include "feature/permute.hpp"
 #include "feature/span.hpp"
 #include "feature/variational.hpp"
 
@@ -71,6 +72,9 @@ parent: parent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \texclude-terminal=[true|false] exclude terminal symbol\n\
+permute: permutation feature\n\
+\tweights=weight file for collapsed feature\n\
+\tcollapse=[true|false] collapsed feature\n\
 span: lexical span feature\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
@@ -96,6 +100,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::Antecedent(parameter));
     else if (param.name() == "parent")
       return feature_function_ptr_type(new feature::Parent(parameter));
+    else if (param.name() == "permute")
+      return feature_function_ptr_type(new feature::Permute(parameter));
     else if (param.name() == "bleu")
       return feature_function_ptr_type(new feature::Bleu(parameter));
     else if (param.name() == "bleu-expected")

@@ -78,6 +78,7 @@ feature/ngram.hpp \
 feature/ngram_tree.hpp \
 feature/parent.hpp \
 feature/penalty.hpp \
+feature/permute.hpp \
 feature/span.hpp \
 feature/variational.hpp
 
@@ -93,6 +94,7 @@ feature/neighbours.cpp \
 feature/ngram.cpp \
 feature/ngram_tree.cpp \
 feature/parent.cpp \
+feature/permute.cpp \
 feature/span.cpp \
 feature/variational.cpp
 
