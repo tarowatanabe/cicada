@@ -61,16 +61,15 @@ namespace cicada
       } else {
 	// check if we have an entry in cache... otherwise...
 
+	synset_set_type synsets;
 	cache_type& cache = const_cast<cache_type&>(caches[pos_x]);
 	
 	if (cache.word == x) {
-	  synset_set_type synsets;
 	  wordnet(y, synsets);
 	  std::sort(synsets.begin(), synsets.end());
 
 	  return __match(cache.synsets.begin(), cache.synsets.end(), synsets.begin(), synsets.end());
 	} else if (cache.word == y) {
-	  synset_set_type synsets;
 	  wordnet(x, synsets);
 	  std::sort(synsets.begin(), synsets.end());
 	  
@@ -80,7 +79,6 @@ namespace cicada
 	  wordnet(x, cache.synsets);
 	  std::sort(cache.synsets.begin(), cache.synsets.end());
 	  
-	  synset_set_type synsets;
 	  wordnet(y, synsets);
 	  std::sort(synsets.begin(), synsets.end());
 	  
