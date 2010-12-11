@@ -93,18 +93,6 @@ namespace wn
     _Ptr ptr;
   };
 
-  template <typename _Ptr>
-  struct __wordnet_synset_autoptr
-  {
-    __wordnet_synset_autoptr(_Ptr __ptr) : ptr(__ptr) {}
-    ~__wordnet_synset_autoptr() { free_synset(ptr); }
-    
-    _Ptr operator->() { return ptr; }
-    _Ptr get() { return ptr; }
-    
-    _Ptr ptr;
-  };
-
 
   template <typename Ptr, typename Synsets>
   void __wordnet_synset(Ptr ptr, Synsets& synsets)
@@ -124,7 +112,7 @@ namespace wn
       // we do not deep copy...
       for (int i = 0; i != current->ptrcount; ++ i) 
 	if (current->ptrtyp[i] == HYPERPTR) {
-	  __wordnet_synset_autoptr<Ptr> curr(read_synset(current->ppos[i], current->ptroff[i], ""));
+	  __wordnet_autoptr<Ptr> curr(read_synset(current->ppos[i], current->ptroff[i], ""));
 	  
 	  const std::string pos(UnescapeIterator(curr->pos), UnescapeIterator(curr->pos + std::strlen(curr->pos)));
 	  
