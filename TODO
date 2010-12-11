@@ -1,3 +1,5 @@
+VERSIONING!
+
 Do we allow state-less features applied during composition???
 	We need composition-based features for phrase-based MT
 	to compute distortion/lexicalized reordering etc. not represented in
