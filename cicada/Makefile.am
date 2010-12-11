@@ -21,7 +21,7 @@ featuredir   = $(pkgincludedir)/cicada/feature
 stemmerdir   = $(pkgincludedir)/cicada/stemmer
 operationdir = $(pkgincludedir)/cicada/operation
 tokenizerdir = $(pkgincludedir)/cicada/tokenizer
-matcherdir = $(pkgincludedir)/cicada/matcher
+matcherdir   = $(pkgincludedir)/cicada/matcher
 
 dist_semiring_HEADERS = \
 semiring/envelope.hpp \
@@ -128,6 +128,7 @@ tokenizer/stemmer.hpp \
 tokenizer/tokenize.hpp
 
 dist_matcher_HEADERS = \
+matcher/lower.hpp \
 matcher/stemmer.hpp \
 matcher/wordnet.hpp 
 

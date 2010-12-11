@@ -6,6 +6,7 @@
 
 #include "parameter.hpp"
 
+#include "matcher/lower.hpp"
 #include "matcher/stemmer.hpp"
 #include "matcher/wordnet.hpp"
 
@@ -21,6 +22,7 @@ namespace cicada
   const char* Matcher::lists()
   {
     static const char* desc = "\
+lower: matching by lower-case\n\
 stemmer: matching by stemming algorithm\n\
 \talgorithm=[stemmer spec]\n\
 wordnet: matching by wordnet synsets\n\
@@ -72,7 +74,17 @@ wordnet: matching by wordnet synsets\n\
     
     const parameter_type param(parameter);
 
-    if (param.name() == "stemmer") {
+    if (param.name() == "lower") {
+      const std::string name("lower");
+      
+      matcher_map_type::iterator iter = matchers_map.find(name);
+      if (iter == matchers_map.end()) {
+	iter = matchers_map.insert(std::make_pair(name, matcher_ptr_type(new matcher::Lower()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (param.name() == "stemmer") {
       std::string algorithm;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -94,7 +106,6 @@ wordnet: matching by wordnet synsets\n\
       }
       
       return *(iter->second);
-      
     } else if (param.name() == "wordnet" || param.name() == "wn") {
       std::string path;
       
@@ -105,14 +116,15 @@ wordnet: matching by wordnet synsets\n\
 	  std::cerr << "unsupported parameter for wordnet matcher: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      matcher_map_type::iterator iter = matchers_map.find("wordnet");
+      const std::string name("lower");
+      
+      matcher_map_type::iterator iter = matchers_map.find(name);
       if (iter == matchers_map.end()) {
-	iter = matchers_map.insert(std::make_pair("wordnet", matcher_ptr_type(new matcher::WordNet(path)))).first;
-	iter->second->__algorithm = "wordnet";
+	iter = matchers_map.insert(std::make_pair(name, matcher_ptr_type(new matcher::WordNet(path)))).first;
+	iter->second->__algorithm = param;
       }
       
       return *(iter->second);
-
     } else
       throw std::runtime_error("invalid parameter: " + parameter);
   }
