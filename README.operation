@@ -8,10 +8,7 @@ binarize: perform binarization (monolingual tree)
 	direction=[left|right] binarization direction
 	size=binarization size
 permute: permute tree (monolingual tree only)
-	feature=[true|false] apply feature
-	weights=file weight file for composed feature
 	size=permute size
-	collapse=[true|false] collapse sparse features
 	exclude=[a non-terminal] to prohibit permutation. You can supply multiple
 compose-earley: composition from tree with grammar
 	yield=[source|target] use source or target yield for rule
