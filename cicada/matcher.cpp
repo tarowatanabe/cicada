@@ -7,6 +7,7 @@
 #include "parameter.hpp"
 
 #include "matcher/stemmer.hpp"
+#include "matcher/wordnet.hpp"
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
@@ -22,6 +23,8 @@ namespace cicada
     static const char* desc = "\
 stemmer: matching by stemming algorithm\n\
 \talgorithm=[stemmer spec]\n\
+wordnet: matching by wordnet synsets\n\
+\tpath=[path to wordnet database]\n\
 ";
     return desc;
   }
@@ -91,6 +94,25 @@ stemmer: matching by stemming algorithm\n\
       }
       
       return *(iter->second);
+      
+    } else if (param.name() == "wordnet" || param.name() == "wn") {
+      std::string path;
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (strcasecmp(piter->first.c_str(), "path") == 0)
+	  path = piter->second;
+	else
+	  std::cerr << "unsupported parameter for wordnet matcher: " << piter->first << "=" << piter->second << std::endl;
+      }
+      
+      matcher_map_type::iterator iter = matchers_map.find("wordnet");
+      if (iter == matchers_map.end()) {
+	iter = matchers_map.insert(std::make_pair("wordnet", matcher_ptr_type(new matcher::WordNet(path)))).first;
+	iter->second->__algorithm = "wordnet";
+      }
+      
+      return *(iter->second);
+
     } else
       throw std::runtime_error("invalid parameter: " + parameter);
   }

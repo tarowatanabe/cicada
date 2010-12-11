@@ -135,6 +135,7 @@ libcicada_matcher_la_SOURCES = \
 matcher/wordnet.cpp
 
 libcicada_matcher_la_CPPFLAGS = $(AM_CPPFLAGS)
+libcicada_matcher_la_LIBADD = $(top_builddir)/wn/libwn.la
 
 dist_operation_HEADERS = \
 operation/apply.hpp \
@@ -292,6 +293,7 @@ grammar_mutable_main \
 grammar_static_main \
 hypergraph_main \
 lattice_main \
+matcher_main \
 parameter_main \
 rule_main \
 sentence_main \
@@ -321,6 +323,9 @@ hypergraph_main_LDADD = libcicada.la
 
 lattice_main_SOURCES = lattice_main.cpp
 lattice_main_LDADD = libcicada.la
+
+matcher_main_SOURCES = matcher_main.cpp
+matcher_main_LDADD = libcicada.la
 
 parameter_main_SOURCES = parameter_main.cpp
 parameter_main_LDADD = libcicada.la
