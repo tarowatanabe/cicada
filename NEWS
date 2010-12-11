@@ -1,7 +1,9 @@
 2010-12-13
-Added matching API, word matcher using lower-case, stemming and wordnet synsets(!)
+Added phrase-extract-like script, extract.py, for easily extract/score phrase/scfg/ghkm.
+Added alignment tool, cicada_alignment (do we need this?) (TODO: add ITG alignment + threading)
+Added matching API, word matcher using lower-case, stemming and wordnet synsets(!) (TODO: use this for TER etc.)
 Added wordnet API (we use the standard c-interface wrapped by thread-safe API)
-Modified "permute" so that permutation rules are stored in attributes, so that permute-feature can access and perform scoring.
+Modified "permute" so that permutation rules are stored in attributes and permute-feature can access and perform scoring.
 
 2010-11-28
 Added "attribute" in each hyperedge which can store key-value pair with arbitray value type: 64-bit-int, double float or string.
