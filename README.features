@@ -28,6 +28,7 @@ neighbours: sparse features assigned for non-terminal, its neighboring words and
 ngram: ngram langauge model feature. You can assign multiple LM by defining name=<feature-name> option.
 ngram-tree: sparse featuers assigned for non-terminal path for boundaries.
 parent:  rule (itself) and rule with its parent category
+permute: permutation feature (we assume tree is permuted via "permute" operation)
 span: span feature
 variational: features for variational decoding
 word-penalty: simply count # of words
