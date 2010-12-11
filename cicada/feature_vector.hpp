@@ -159,7 +159,34 @@ namespace cicada
     template <typename T, typename A>
     Tp dot(const FeatureVector<T,A>& x) const
     {
-      return dot(x.begin(), x.end());
+      typedef FeatureVector<T,A> another_type;
+      
+      if (empty() || x.empty()) return Tp();
+      
+      const_iterator iter1     = __values.lower_bound(x.begin()->first);
+      const_iterator iter1_end = __values.end();
+      
+      typename another_type::const_iterator iter2     = (iter1 != iter1_end
+							 ? x.__values.lower_bound(iter1->first)
+							 : x.__values.begin());
+      typename another_type::const_iterator iter2_end = x.__values.end();
+      
+      Tp sum = Tp();
+      
+      while (iter1 != iter1_end && iter2 != iter2_end) {
+	if (iter1->first < iter2->first)
+	  ++ iter1;
+	else if (iter2->first < iter1->first)
+	  ++ iter2;
+	else {
+	  sum += iter1->second * iter2->second;
+	  
+	  ++ iter1;
+	  ++ iter2;
+	}
+      }
+      
+      return sum;
     }
 
     template <typename T, typename A, typename BinaryOp>
@@ -369,13 +396,20 @@ namespace cicada
     {
       typedef FeatureVector<T,A> another_type;
       
+      if (empty() || x.empty()) {
+	clear();
+	return *this;
+      }
+
       self_type features;
       
-      const_iterator iter1 = begin();
-      const_iterator iter1_end = end();
+      const_iterator iter1     = __values.lower_bound(x.begin()->first);
+      const_iterator iter1_end = __values.end();
       
-      typename another_type::const_iterator iter2 = x.begin();
-      typename another_type::const_iterator iter2_end = x.end();
+      typename another_type::const_iterator iter2     = (iter1 != iter1_end
+							 ? x.__values.lower_bound(iter1->first)
+							 : x.__values.begin());
+      typename another_type::const_iterator iter2_end = x.__values.end();
       
       while (iter1 != iter1_end && iter2 != iter2_end) {
 	if (iter1->first < iter2->first)
@@ -505,14 +539,19 @@ namespace cicada
   {
     typedef FeatureVector<T1,A1> left_type;
     typedef FeatureVector<T2,A2> right_type;
-
+    
+    if (x.empty() || y.empty())
+      return left_type();
+    
     left_type features;
     
-    typename left_type::const_iterator iter1 = x.begin();
-    typename left_type::const_iterator iter1_end = x.end();
+    typename left_type::const_iterator iter1     = x.__values.lower_bound(y.begin()->first);
+    typename left_type::const_iterator iter1_end = x.__values.end();
 
-    typename right_type::const_iterator iter2 = y.begin();
-    typename right_type::const_iterator iter2_end = y.end();
+    typename right_type::const_iterator iter2     = (iter1 != iter1_end
+						     ? y.__values.lower_bound(iter1->first)
+						     : y.__values.begin());
+    typename right_type::const_iterator iter2_end = y.__values.end();
     
     while (iter1 != iter1_end && iter2 != iter2_end) {
       if (iter1->first < iter2->first)
