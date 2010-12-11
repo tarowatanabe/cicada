@@ -1,6 +1,6 @@
 (sort of) linguistic component in cicada
 
-We have three linsuistic component, extensively used in mteval/feature computation etc.
+We have three linsuistic components, extensively used in mteval/feature computation etc.
 
 stemmer: stemming algorithm (used in evaluation and feature computation)
 
