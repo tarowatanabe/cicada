@@ -74,8 +74,11 @@ namespace cicada
 	  std::cerr << "permute" << std::endl;
     
 	utils::resource start;
-    
-	cicada::permute(hypergraph, permuted, Filter(excludes), size);
+	
+	if (excludes.empty())
+	  cicada::permute(hypergraph, permuted, size);
+	else
+	  cicada::permute(hypergraph, permuted, Filter(excludes), size);
 	
 	utils::resource end;
     
