@@ -12,10 +12,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-#include <boost/spirit/include/phoenix_object.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted/std_pair.hpp>
@@ -44,16 +40,9 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using qi::phrase_parse;
-      using qi::int_;
-      using qi::lexeme;
-      using standard::space;
-      using standard::char_;
-      
-      label %= lexeme[+(char_ - space)];
-      spans %= *(int_ >> '-' >> int_ >> -(':' >> label));
+      label %= qi::lexeme[+(standard::char_ - standard::space)];
+      spans %= *(qi::int_ >> '-' >> qi::int_ >> -(':' >> label));
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
@@ -104,19 +93,31 @@ namespace cicada
 
   std::ostream& operator<<(std::ostream& os, const SpanVector::span_type& x)
   {
-    if (x.label.empty())
-      os << x.first << '-' << x.last;
-    else
-      os << x.first << '-' << x.last << ':' << x.label;
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    iterator_type iter(os);
+    
+    if (! boost::spirit::karma::generate(iter, karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_], x))
+      throw std::runtime_error("span generation failed...?");
+    
     return os;
   }
 
   std::ostream& operator<<(std::ostream& os, const SpanVector& x)
   {
-    if (! x.empty()) {
-      std::copy(x.begin(), x.end() - 1, std::ostream_iterator<SpanVector::span_type>(os, " "));
-      os << x.back();
-    }
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    iterator_type iter(os);
+    
+    if (! boost::spirit::karma::generate(iter, (karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_]) % ' ', x))
+      throw std::runtime_error("span vector generation failed...?");
+    
     return os;
   }
 
@@ -124,14 +125,7 @@ namespace cicada
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
     
-    using qi::phrase_parse;
-    using qi::int_;
-    using qi::lexeme;
-    using standard::space;
-    using standard::char_;
-
     std::string token;
     
     x.clear();
@@ -140,13 +134,13 @@ namespace cicada
       std::string::const_iterator end = token.end();
       
       qi::rule<std::string::const_iterator, std::string(), standard::space_type> label;
-
-      label %= lexeme[+(char_ - space)];
       
-      const bool result = phrase_parse(iter, end,
-				       int_ >> '-' >> int_ >> -(':' >> label),
-				       space,
-				       x);
+      label %= qi::lexeme[+(standard::char_ - standard::space)];
+      
+      const bool result = qi::phrase_parse(iter, end,
+					   qi::int_ >> '-' >> qi::int_ >> -(':' >> label),
+					   standard::space,
+					   x);
       
       if (! result || iter != end)
 	throw std::runtime_error("span format error");

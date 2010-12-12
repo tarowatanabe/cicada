@@ -12,10 +12,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-#include <boost/spirit/include/phoenix_object.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -95,22 +91,7 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
     
-      using qi::phrase_parse;
-      using qi::lexeme;
-      using qi::repeat;
-      using qi::hold;
-      using qi::lit;
-      using qi::attr;
-      using standard::char_;
-      using qi::double_;
-      using qi::int_;
-      
-      using namespace qi::labels;
-      
-      using standard::space;
-
       jlf_escape_char.add
 	("\\\"", '\"')
 	("\\\\", '\\')
@@ -133,41 +114,42 @@ namespace cicada
 	("\\t", '\t')
 	("\\v", '\v');
       
-      jlf_label_double_quote %= '"' >> lexeme[*(jlf_escape_char | ~char_('"'))] >> '"';
-      plf_label_double_quote %= '"' >> lexeme[*(plf_escape_char | ~char_('"'))] >> '"';
-      plf_label_single_quote %= '\'' >> lexeme[*(plf_escape_char | ~char_('\''))] >> '\'';
+      jlf_label_double_quote %= '"' >> qi::lexeme[*(jlf_escape_char | ~standard::char_('"'))] >> '"';
+      plf_label_double_quote %= '"' >> qi::lexeme[*(plf_escape_char | ~standard::char_('"'))] >> '"';
+      plf_label_single_quote %= '\'' >> qi::lexeme[*(plf_escape_char | ~standard::char_('\''))] >> '\'';
       
-      jlf_lattice_score %= jlf_label_double_quote >> ':' >> double_;
-      plf_lattice_score %= attr("lattice-cost") >> double_;
+      jlf_lattice_score %= jlf_label_double_quote >> ':' >> qi::double_;
+      plf_lattice_score %= qi::attr("lattice-cost") >> qi::double_;
       
-      jlf_lattice_arc %= '[' >> jlf_label_double_quote >> ',' >> '{' >> -(jlf_lattice_score % ',') >> '}' >> ',' >> int_ >> ']';
-      plf_lattice_arc %= '(' >> (plf_label_double_quote | plf_label_single_quote) >> ',' >> repeat(1)[plf_lattice_score] >> ',' >> int_ >> ')';
+      jlf_lattice_arc %= '[' >> jlf_label_double_quote >> ',' >> '{' >> -(jlf_lattice_score % ',') >> '}' >> ',' >> qi::int_ >> ']';
+      plf_lattice_arc %= '(' >> (plf_label_double_quote | plf_label_single_quote) >> ',' >> qi::repeat(1)[plf_lattice_score] >> ',' >> qi::int_ >> ')';
       
       jlf_lattice_set %= '[' >> -(jlf_lattice_arc % ',') >> ']';
       plf_lattice_set %= '(' >> +(plf_lattice_arc >> ',') >> ')';
 
-      lattice_grammar %= hold[lit('(') >> *(plf_lattice_set >> ',') >> lit(')')] | (lit('[') >> -(jlf_lattice_set % ',') >> lit(']'));
+      lattice_grammar %= qi::hold['(' >> *(plf_lattice_set >> ',') >> ')'] | ('[' >> -(jlf_lattice_set % ',') >> ']');
     }
     
+    typedef boost::spirit::standard::space_type space_type;
 
     boost::spirit::qi::symbols<char, char> jlf_escape_char;
     
-    boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> jlf_label_double_quote;
+    boost::spirit::qi::rule<Iterator, std::string(), space_type> jlf_label_double_quote;
     
-    boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), boost::spirit::standard::space_type> jlf_lattice_score;
-    boost::spirit::qi::rule<Iterator, Lattice::arc_type(), boost::spirit::standard::space_type>               jlf_lattice_arc;
-    boost::spirit::qi::rule<Iterator, Lattice::arc_set_type(), boost::spirit::standard::space_type>           jlf_lattice_set;
+    boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> jlf_lattice_score;
+    boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               jlf_lattice_arc;
+    boost::spirit::qi::rule<Iterator, Lattice::arc_set_type(), space_type>           jlf_lattice_set;
     
     boost::spirit::qi::symbols<char, char> plf_escape_char;
     
-    boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> plf_label_double_quote;
-    boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> plf_label_single_quote;
+    boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_double_quote;
+    boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_single_quote;
     
-    boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), boost::spirit::standard::space_type> plf_lattice_score;
-    boost::spirit::qi::rule<Iterator, Lattice::arc_type(), boost::spirit::standard::space_type>               plf_lattice_arc;
-    boost::spirit::qi::rule<Iterator, Lattice::arc_set_type(), boost::spirit::standard::space_type>           plf_lattice_set;
+    boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> plf_lattice_score;
+    boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               plf_lattice_arc;
+    boost::spirit::qi::rule<Iterator, Lattice::arc_set_type(), space_type>           plf_lattice_set;
     
-    boost::spirit::qi::rule<Iterator, Lattice::lattice_type(), boost::spirit::standard::space_type>           lattice_grammar;
+    boost::spirit::qi::rule<Iterator, Lattice::lattice_type(), space_type>           lattice_grammar;
   };
 
   void Lattice::assign(const std::string& x)
@@ -251,16 +233,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-    
-      using karma::lit;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      
-      using namespace karma::labels;
-      
-      using standard::space;
 
       // json grammar...
       escape_char.add
@@ -273,11 +245,11 @@ namespace cicada
 	('\r', "\\r")
 	('\t', "\\t");
       
-      label_double_quote %= '\"' << *(escape_char | ~char_('\"')) << '\"';
+      label_double_quote %= '\"' << *(escape_char | ~standard::char_('\"')) << '\"';
 
-      lattice_score %= label_double_quote << ": " << double_;
+      lattice_score %= label_double_quote << ": " << karma::double_;
       
-      lattice_arc %= '[' << label_double_quote << ", " << '{' << -(lattice_score % ',') << '}' << ", " << int_ << ']';
+      lattice_arc %= '[' << label_double_quote << ", " << '{' << -(lattice_score % ',') << '}' << ", " << karma::int_ << ']';
       lattice_set %= '[' << -(lattice_arc % ", ") << ']';
       lattice_grammar %= '[' << -(lattice_set % ", ") << ']';
     }

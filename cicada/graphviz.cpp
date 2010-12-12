@@ -7,9 +7,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -41,18 +38,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::omit;
-      using karma::repeat;
-      using karma::lit;
-      using karma::inf;
-      using karma::buffer;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      
-      using namespace karma::labels;
       
       escape_char.add
 	('\\', "\\\\")
@@ -68,7 +53,7 @@ namespace cicada
 	('\r', "\\r")
 	('\t', "\\t");
       
-      label %= *(escape_char | ~char_('\"'));
+      label %= *(escape_char | ~standard::char_('\"'));
     }
     
     boost::spirit::karma::symbols<char, const char*> escape_char;
@@ -87,18 +72,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::omit;
-      using karma::repeat;
-      using karma::lit;
-      using karma::inf;
-      using karma::buffer;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      
-      using namespace karma::labels;
       
       escape_char.add
 	('\\', "\\\\")
@@ -114,7 +87,7 @@ namespace cicada
 	('\r', "\\r")
 	('\t', "\\t");
       
-      lhs %= *(escape_char | ~char_('\"'));
+      lhs %= *(escape_char | ~standard::char_('\"'));
       phrase %= -(lhs % "\\ ");
       
       rule %= lhs << " | " << phrase;
@@ -137,20 +110,8 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using karma::omit;
-      using karma::repeat;
-      using karma::lit;
-      using karma::inf;
-      using karma::buffer;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      
-      using namespace karma::labels;
-      
-      tail %= -(int_ % "\\ ");
+      tail %= -(karma::int_ % "\\ ");
     }
     
     boost::spirit::karma::rule<Iterator, node_set_type()> tail;
@@ -171,18 +132,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::omit;
-      using karma::repeat;
-      using karma::lit;
-      using karma::inf;
-      using karma::buffer;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      
-      using namespace karma::labels;
       
       escape_char.add
 	('\\', "\\\\")
@@ -199,7 +148,7 @@ namespace cicada
 	('\t', "\\t");
       
       // left adjusted newlines
-      features %= -(((+(escape_char | ~char_('\"')) << ":\\ " << double_) % "\\l") << "\\l");
+      features %= -(((+(escape_char | ~standard::char_('\"')) << ":\\ " << karma::double_) % "\\l") << "\\l");
     }
     
     boost::spirit::karma::symbols<char, const char*> escape_char;
