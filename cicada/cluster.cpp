@@ -2,14 +2,21 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
 #include <cicada/cluster.hpp>
 
 #include <utils/tempfile.hpp>
 #include <utils/compress_stream.hpp>
-#include <utils/space_separator.hpp>
 #include <utils/sgi_hash_map.hpp>
 
-#include <boost/tokenizer.hpp>
 #include <boost/thread.hpp>
 
 namespace cicada
@@ -31,27 +38,38 @@ namespace cicada
       clusters.open(rep.path("clusters"));
     } else {
       typedef std::vector<id_type, std::allocator<id_type> > cluster_map_type;
+      typedef boost::spirit::istream_iterator iterator_type;
+      typedef std::pair<std::string, std::string> word_pair_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      qi::rule<iterator_type, std::string(), standard::blank_type>    word;
+      qi::rule<iterator_type, word_pair_type(), standard::blank_type> parser; 
+      
+      word   %= qi::lexeme[+(standard::char_ - standard::space)];
+      parser %= word >> word >> (qi::eol | qi::eoi);
       
       cluster_map_type cluster_map;
       
       utils::compress_istream is(path, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+
+      iterator_type iter(is);
+      iterator_type iter_end;
       
-      std::string line;
+      word_pair_type word_pair;
       
-      while (std::getline(is, line)) {
-	tokenizer_type tokenizer(line);
+      while (iter != iter_end) {
+	word_pair.first.clear();
+	word_pair.second.clear();
 	
-	tokenizer_type::iterator iter = tokenizer.begin();
-	if (iter == tokenizer.end()) continue;
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, word_pair))
+	  if (iter != iter_end)
+	    throw std::runtime_error("cluster parsing failed");
 	
-	const std::string __cluster = *iter;
-	++ iter;
-	if (iter == tokenizer.end()) continue;
-	
-	const std::string __word = *iter;
-	
-	const word_type cluster(__cluster);
-	const word_type word(__word);
+	const word_type cluster(word_pair.first);
+	const word_type word(word_pair.second);
 	
 	if (word.id() >= cluster_map.size())
 	  cluster_map.resize(word.id() + 1, 0);
@@ -66,14 +84,14 @@ namespace cicada
       
       repository_type rep(path_repository, repository_type::write);
       
-      boost::iostreams::filtering_ostream os;
-      os.push(utils::packed_sink<id_type, std::allocator<id_type> >(rep.path("clusters")), 1024 * 1024);
-      
-      cluster_map_type::const_iterator iter_end = cluster_map.end();
-      for (cluster_map_type::const_iterator iter = cluster_map.begin(); iter != iter_end; ++ iter)
-	os.write((char*) &(*iter), sizeof(id_type));
-      
-      os.pop();
+      {
+	boost::iostreams::filtering_ostream os;
+	os.push(utils::packed_sink<id_type, std::allocator<id_type> >(rep.path("clusters")), 1024 * 1024);
+	
+	cluster_map_type::const_iterator iter_end = cluster_map.end();
+	for (cluster_map_type::const_iterator iter = cluster_map.begin(); iter != iter_end; ++ iter)
+	  os.write((char*) &(*iter), sizeof(id_type));
+      }
       
       word_type::write(rep.path("vocab"));
       

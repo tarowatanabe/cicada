@@ -2,20 +2,17 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#include <iostream>
-#include <sstream>
-//
-//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
-//
-
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 
-#include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/karma.hpp>
+#include <iostream>
+#include <sstream>
 
 #include "global_lexicon.hpp"
 
@@ -71,8 +68,8 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      qi::rule<iterator_type, std::string(), standard::blank_type>       word;
-      qi::rule<iterator_type, lexicon_parsed_type, standard::blank_type> parser; 
+      qi::rule<iterator_type, std::string(), standard::blank_type>         word;
+      qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
       
       word   %= qi::lexeme[+(standard::char_ - standard::space)];
       parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
