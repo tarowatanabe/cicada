@@ -290,6 +290,7 @@ libcicada_la_LIBADD = \
 	$(ICU_LDFLAGS)
 
 noinst_PROGRAMS = \
+alignment_main \
 attribute_vector_main \
 cluster_main \
 grammar_mutable_main \
@@ -308,6 +309,9 @@ tokenizer_main \
 tree_grammar_mutable_main \
 tree_grammar_static_main \
 tree_rule_main
+
+alignment_main_SOURCES = alignment_main.cpp
+alignment_main_LDADD = libcicada.la
 
 attribute_vector_main_SOURCES = attribute_vector_main.cpp
 attribute_vector_main_LDADD = libcicada.la

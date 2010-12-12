@@ -51,21 +51,33 @@ namespace cicada
 
   std::ostream& operator<<(std::ostream& os, const Alignment::point_type& x)
   {
-    os << x.source << '-' << x.target;
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    iterator_type iter(os);
+    
+    if (! boost::spirit::karma::generate(iter, karma::int_ << '-' << karma::int_, x))
+      throw std::runtime_error("point generation failed...?");
+    
     return os;
   }
   
   std::istream& operator>>(std::istream& is, Alignment::point_type& x)
   {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+
     std::string point;
 
     if (is >> point) {
-      std::string::size_type pos = point.find('-');
-      if (pos == std::string::npos)
-	throw std::runtime_error(std::string("invalid format? ") + point);
+      std::string::const_iterator iter = point.begin();
+      std::string::const_iterator end = point.end();
       
-      x.source = atoi(point.substr(0, pos).c_str());
-      x.target = atoi(point.substr(pos + 1).c_str());
+      const bool result = qi::phrase_parse(iter, end, qi::int_ >> '-' >> qi::int_, standard::space, x);
+      if (! result || iter != end)
+	throw std::runtime_error("invalid point format? " + point);
     } else {
       x.source = 0;
       x.target = 0;
@@ -76,10 +88,16 @@ namespace cicada
   
   std::ostream& operator<<(std::ostream& os, const Alignment& x)
   {
-    if (! x.empty()) {
-      std::copy(x.begin(), x.end() - 1, std::ostream_iterator<Alignment::point_type>(os, " "));
-      os << x.back();
-    }
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    iterator_type iter(os);
+    
+    if (! boost::spirit::karma::generate(iter, -((karma::int_ << '-' << karma::int_) % ' '), x.__align))
+      throw std::runtime_error("alignment generation failed...?");
+    
     return os;
   }
   

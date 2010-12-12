@@ -16,6 +16,8 @@ int main(int argc, char** argv)
   for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
     std::cout << "word: " <<  *siter << '\n';
   std::cout << "END" << '\n';
+
+  std::cout << "generation: " << sentence << std::endl;
   
   std::string parsing("good morning boy , yes ||| bood");
   std::string::const_iterator iter = parsing.begin();
@@ -32,5 +34,7 @@ int main(int argc, char** argv)
   } else
     std::cout << "failed:" << std::endl;
   
+  
+  std::cout << "generation: " << sentence << std::endl;
   
 }

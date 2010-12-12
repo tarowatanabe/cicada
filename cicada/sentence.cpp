@@ -7,9 +7,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -18,42 +15,45 @@
 
 #include "sentence.hpp"
 
-#include "utils/space_separator.hpp"
-
-#include <boost/tokenizer.hpp>
-
 namespace cicada
 {
-
   bool Sentence::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
     typedef std::string::const_iterator iter_type;
     
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
-    
-    qi::rule<iter_type, std::string(), standard::space_type> word = qi::lexeme[+(standard::char_ - standard::space) - "|||"];
     
     clear();
     
-    return qi::phrase_parse(iter, end, *(word[phoenix::push_back(phoenix::ref(__sent), qi::_1)]), standard::space);
+    qi::rule<iter_type, std::string(), standard::space_type> word = qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+    
+    return qi::phrase_parse(iter, end, *(word), standard::space, __sent);
   }
   
   void Sentence::assign(const std::string& x)
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+    std::string::const_iterator iter = x.begin();
+    std::string::const_iterator end = x.end();
     
-    tokenizer_type tokenizer(x);
-    __sent.assign(tokenizer.begin(), tokenizer.end());
+    const bool result = assign(iter, end);
+    
+    if (! result || iter != end)
+      throw std::runtime_error("sentence parsing failed");
   }
 
   std::ostream& operator<<(std::ostream& os, const Sentence& x)
   {
-    if (! x.empty()) {
-      std::copy(x.__sent.begin(), x.__sent.end() - 1, std::ostream_iterator<Sentence::word_type>(os, " "));
-      os << x.__sent.back();
-    }
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+
+    iterator_type iter(os);
+    
+    if (! boost::spirit::karma::generate(iter, -((+standard::char_) % ' '), x.__sent))
+      throw std::runtime_error("sentence generation failed...?");
+    
     return os;
   }
 
