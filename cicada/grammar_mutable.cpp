@@ -123,17 +123,7 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
     
-      using qi::phrase_parse;
-      using qi::lexeme;
-      using qi::attr;
-      using qi::hold;
-      using standard::char_;
-      using qi::double_;
-      using qi::_1;
-      using standard::space;
-      
       escape_char.add
 	("\\\"", '\"')
 	("\\\\", '\\')
@@ -145,19 +135,19 @@ namespace cicada
 	("\\t", '\t')
 	("\\u0020", ' ');
       
-      lhs %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);
-      phrase %= *(lexeme[+(char_ - space) - "|||"]);
+      lhs %= (qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')]);
+      phrase %= *(qi::lexeme[+(standard::char_ - standard::space) - "|||"]);
 
-      score %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> double_;
+      score %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> qi::double_;
       scores %= *score;
       
-      data_value %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
       data %= data_value | double_dot | int64_;
       
-      attribute %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> data;
+      attribute %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> data;
       attributes %= *attribute;
       
-      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase >> "|||" >> phrase >> -("|||" >> scores) >> -("|||" >> attributes);
+      rule_grammar %= (qi::hold[lhs >> "|||"] | qi::attr("")) >> phrase >> "|||" >> phrase >> -("|||" >> scores) >> -("|||" >> attributes);
     }
   
     typedef boost::spirit::standard::space_type space_type;
@@ -291,16 +281,21 @@ namespace cicada
     attribute_name_set_type attribute_names;
     parameter_type::iterator piter_end = param.end();
     for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+
       {
 	std::string::const_iterator iter = piter->first.begin();
 	std::string::const_iterator iter_end = piter->first.end();
 	
 	int feature_id = -1;
-	const bool result = boost::spirit::qi::parse(iter, iter_end,
-						     "feature" >> boost::spirit::qi::int_[boost::phoenix::ref(feature_id) = boost::spirit::qi::_1]);
+	const bool result = qi::parse(iter, iter_end, "feature" >> qi::int_[phoenix::ref(feature_id) = qi::_1]);
 	if (result && iter == iter_end && feature_id >= 0) {
 	  if (feature_id >= int(feature_names.size()))
 	    feature_names.resize(feature_id + 1);
+	  
 	  feature_names[feature_id] = piter->second;
 	  continue;
 	}
@@ -311,11 +306,11 @@ namespace cicada
 	std::string::const_iterator iter_end = piter->first.end();
 	
 	int attribute_id = -1;
-	const bool result = boost::spirit::qi::parse(iter, iter_end,
-						     "attribute" >> boost::spirit::qi::int_[boost::phoenix::ref(attribute_id) = boost::spirit::qi::_1]);
+	const bool result = qi::parse(iter, iter_end, "attribute" >> qi::int_[phoenix::ref(attribute_id) = qi::_1]);
 	if (result && iter == iter_end && attribute_id >= 0) {
 	  if (attribute_id >= int(attribute_names.size()))
 	    attribute_names.resize(attribute_id + 1);
+	  
 	  attribute_names[attribute_id] = piter->second;
 	  continue;
 	}
@@ -362,7 +357,7 @@ namespace cicada
       
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator iter_end = line.end();
-
+      
       const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule_parsed);
       
       if (! result || iter != iter_end)

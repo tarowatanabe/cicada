@@ -131,14 +131,6 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using qi::lexeme;
-      using qi::attr;
-      using qi::hold;
-      using standard::char_;
-      using qi::double_;
-      using standard::space;
       
       escape_char.add
 	("\\\"", '\"')
@@ -152,13 +144,13 @@ namespace cicada
 	("\\u0020", ' ');
 
       
-      score  %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> double_;
+      score  %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> qi::double_;
       scores %= *score;
       
-      data_value %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
       data %= data_value | double_dot | int64_;
       
-      attribute %= (hold[lexeme[+(char_ - space - '=')] >> '='] | attr("")) >> data;
+      attribute %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> data;
       attributes %= *attribute;
       
       scores_attrs %= -("|||" >> scores) >> -("|||" >> attribute);
@@ -171,8 +163,8 @@ namespace cicada
     
     boost::spirit::qi::symbols<char, char> escape_char;
     
-    boost::spirit::qi::rule<Iterator, score_parsed_type(), boost::spirit::standard::space_type>  score;
-    boost::spirit::qi::rule<Iterator, scores_parsed_type(), boost::spirit::standard::space_type> scores;
+    boost::spirit::qi::rule<Iterator, score_parsed_type(), space_type>  score;
+    boost::spirit::qi::rule<Iterator, scores_parsed_type(), space_type> scores;
 
     boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
@@ -201,19 +193,22 @@ namespace cicada
     parameter_type::iterator piter_end = param.end();
     for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
       
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      namespace phoenix = boost::phoenix;
+      
       {
 	std::string::const_iterator iter = piter->first.begin();
 	std::string::const_iterator iter_end = piter->first.end();
 	
 	int feature_id = -1;
 	
-	const bool result = boost::spirit::qi::parse(iter, iter_end,
-						     "feature" >> boost::spirit::qi::int_[boost::phoenix::ref(feature_id) = boost::spirit::qi::_1]);
+	const bool result = qi::parse(iter, iter_end, "feature" >> qi::int_[phoenix::ref(feature_id) = qi::_1]);
 	if (result && iter == iter_end && feature_id >= 0) {
 	  if (feature_id >= int(feature_names.size()))
 	    feature_names.resize(feature_id + 1);
-	  feature_names[feature_id] = piter->second;
 	  
+	  feature_names[feature_id] = piter->second;
 	  continue;
 	}
       }
@@ -223,11 +218,11 @@ namespace cicada
 	std::string::const_iterator iter_end = piter->first.end();
 	
 	int attribute_id = -1;
-	const bool result = boost::spirit::qi::parse(iter, iter_end,
-						     "attribute" >> boost::spirit::qi::int_[boost::phoenix::ref(attribute_id) = boost::spirit::qi::_1]);
+	const bool result = qi::parse(iter, iter_end, "attribute" >> qi::int_[phoenix::ref(attribute_id) = qi::_1]);
 	if (result && iter == iter_end && attribute_id >= 0) {
 	  if (attribute_id >= int(attribute_names.size()))
 	    attribute_names.resize(attribute_id + 1);
+	  
 	  attribute_names[attribute_id] = piter->second;
 	  continue;
 	}
@@ -279,7 +274,6 @@ namespace cicada
 
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
       if (! source.assign(iter, iter_end)) continue;
       if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
@@ -374,7 +368,6 @@ namespace cicada
     
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
 
     if (! source.assign(iter, iter_end)) return;
     if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) return;

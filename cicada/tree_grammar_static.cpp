@@ -35,9 +35,6 @@
 #include <boost/iostreams/filtering_stream.hpp>
 
 #include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/tuple/tuple.hpp>
 
@@ -802,7 +799,6 @@ namespace cicada
 
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
     
     qi::rule<std::string::const_iterator, scores_type(), standard::space_type> scores_parser;
     qi::rule<std::string::const_iterator, scores_type(), standard::space_type> attrs_parser;
