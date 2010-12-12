@@ -91,7 +91,13 @@ namespace utils
     void clear() { __root.clear(); __nodes.clear(); }
     
     bool empty() const { return __nodes.empty(); }
-    bool empty(id_type __id) const { return __nodes[__id].__map.empty(); }
+    bool empty(id_type __id) const
+    {
+      if (__id == npos())
+	return __root.empty();
+      else
+	return __nodes[__id].__map.empty();
+    }
     
     bool is_root(id_type __id) const { return __id == npos(); }
 
