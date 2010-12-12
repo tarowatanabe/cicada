@@ -19,9 +19,7 @@
 #include <map>
 
 #include <boost/tuple/tuple.hpp>
-#include <boost/tokenizer.hpp>
 
-#include <utils/space_separator.hpp>
 #include <utils/base64.hpp>
 
 #include <utils/lockfree_list_queue.hpp>

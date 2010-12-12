@@ -43,10 +43,8 @@
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
-#include "utils/space_separator.hpp"
 #include "utils/sgi_hash_map.hpp"
 
-#include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>

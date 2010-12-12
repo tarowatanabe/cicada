@@ -52,6 +52,8 @@
 
 #include <boost/thread.hpp>
 
+#include "cicada_text_impl.hpp"
+
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
@@ -991,44 +993,44 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
 {
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
 
   if (files.empty())
     throw std::runtime_error("no reference files?");
     
   scorers.clear();
 
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no reference file: " + fiter->file_string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
     
-    std::string line;
+    iter_type iter(is);
+    iter_type iter_end;
     
-    while (std::getline(is, line)) {
-      tokenizer_type tokenizer(line);
-    
-      tokenizer_type::iterator iter = tokenizer.begin();
-      if (iter == tokenizer.end()) continue;
-    
-      const int id = boost::lexical_cast<int>(*iter);
-      ++ iter;
-    
-      if (iter == tokenizer.end()) continue;
-      if (*iter != "|||") continue;
-      ++ iter;
-    
+    while (iter != iter_end) {
+      id_sentence.second.clear();
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
+      const int& id = id_sentence.first;
+      
       if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
-    
       if (! scorers[id])
 	scorers[id] = scorers.create();
-    
-      scorers[id]->insert(sentence_type(iter, tokenizer.end()));
+      
+      scorers[id]->insert(id_sentence.second);
     }
-  }  
+  }
 }
 
 void bcast_weights(const int rank, weight_set_type& weights)

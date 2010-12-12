@@ -50,9 +50,7 @@
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
-#include "utils/space_separator.hpp"
 
-#include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -68,6 +66,8 @@
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
+
+#include "cicada_text_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -616,48 +616,45 @@ void read_refset(const path_set_type& files,
 		 scorer_document_type& scorers,
 		 sentence_document_type& sentences)
 {
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+  
   if (files.empty())
     throw std::runtime_error("no reference files?");
-  
-  sentences.clear();
 
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no reference file: " + fiter->file_string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
     
-    std::string line;
+    iter_type iter(is);
+    iter_type iter_end;
     
-    while (std::getline(is, line)) {
-      tokenizer_type tokenizer(line);
-    
-      tokenizer_type::iterator iter = tokenizer.begin();
-      if (iter == tokenizer.end()) continue;
-    
-      const int id = boost::lexical_cast<int>(*iter);
-      ++ iter;
-    
-      if (iter == tokenizer.end()) continue;
-      if (*iter != "|||") continue;
-      ++ iter;
+    while (iter != iter_end) {
+      id_sentence.second.clear();
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
+      const int& id = id_sentence.first;
       
       if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
-      
       if (id >= static_cast<int>(sentences.size()))
 	sentences.resize(id + 1);
-      
       if (! scorers[id])
 	scorers[id] = scorers.create();
       
-      sentences[id].push_back(sentence_type(iter, tokenizer.end()));
+      sentences[id].push_back(id_sentence.second);
       scorers[id]->insert(sentences[id].back());
     }
-  }  
+  }
 }
 
 void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests)

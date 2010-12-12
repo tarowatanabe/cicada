@@ -69,8 +69,8 @@ namespace cicada
 	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
 	  non_terminals.push_back(riter->is_non_terminal() ? non_terminal.non_terminal(ritr->non_terminal_index()) : *riter);
 	
-	rule_ptr_type rule_source(new rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end()));
-	rule_ptr_type rule_target(new rule_type(non_terminal, non_terminals.begin(), non_terminals.end()));
+	rule_ptr_type rule_source(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
+	rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, non_terminals.begin(), non_terminals.end())));
 	
 	insert(rule_pair_type(rule_source, rule_target, features));
       }
@@ -96,7 +96,7 @@ namespace cicada
 	if (rules.find(edge.rule) != rules.end()) continue;
 	rules.insert(edge.rule);
 	
-	rule_ptr_type rule(new rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end()));
+	rule_ptr_type rule(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
 	
 	insert(rule_pair_type(rule, rule, features));
       }
