@@ -24,7 +24,6 @@ namespace cicada
   
   void Cluster::open(const path_type& path)
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
     typedef utils::repository repository_type;
 
     clear();
