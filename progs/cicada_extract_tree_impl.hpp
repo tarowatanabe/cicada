@@ -10,9 +10,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -210,7 +207,6 @@ struct RulePairGenerator
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
       using karma::repeat;
       using standard::char_;

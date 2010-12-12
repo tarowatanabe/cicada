@@ -12,7 +12,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -628,7 +627,6 @@ struct RootCountParser
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
       using qi::phrase_parse;
       using qi::lexeme;
@@ -726,7 +724,6 @@ struct PhrasePairParser
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
       using qi::lexeme;
       using qi::lit;
@@ -835,7 +832,6 @@ struct PhrasePairModifiedParser
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
       using qi::lexeme;
       using qi::hold;
