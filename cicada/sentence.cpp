@@ -28,7 +28,7 @@ namespace cicada
   bool Sentence::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
     typedef std::string::const_iterator iter_type;
-
+    
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     namespace phoenix = boost::phoenix;
@@ -59,15 +59,11 @@ namespace cicada
 
   std::istream& operator>>(std::istream& is, Sentence& x)
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-    
     std::string line;
     
     x.clear();
-    if (std::getline(is, line)) {
-      tokenizer_type tokenizer(line);
-      x.__sent.assign(tokenizer.begin(), tokenizer.end());
-    }
+    if (std::getline(is, line))
+      x.assign(line);
     
     return is;
   }
