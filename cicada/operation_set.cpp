@@ -6,7 +6,6 @@
 #define PHOENIX_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
 #include <boost/spirit/include/phoenix_stl.hpp>

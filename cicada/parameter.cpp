@@ -8,9 +8,6 @@
 #include "parameter.hpp"
 
 #include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
@@ -33,14 +30,7 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using qi::phrase_parse;
-      using qi::lexeme;
-      using qi::hold;
-      using standard::char_;
-      using standard::space;
-
       escape_char.add
 	("\\\"", '\"')
 	("\\\\", '\\')
@@ -52,13 +42,13 @@ namespace cicada
 	("\\t", '\t')
 	("\\v", '\v');
       
-      escaped %= '"' >> lexeme[*(escape_char | ~char_('"'))] >> '"';
+      escaped %= '"' >> qi::lexeme[*(escape_char | ~standard::char_('"'))] >> '"';
       
-      param %= lexeme[+(char_ - space - ':')];
-      key   %= lexeme[+(char_ - space - '=')];
-      value %= lexeme[+(char_ - space - ',')];
-      key_values %= ((hold[escaped] | key) >> '=' >> (hold[escaped] | value)) % ',';
-      parameter %= (hold[escaped] | param) >> -(':' >> key_values);
+      param %= qi::lexeme[+(standard::char_ - standard::space - ':')];
+      key   %= qi::lexeme[+(standard::char_ - standard::space - '=')];
+      value %= qi::lexeme[+(standard::char_ - standard::space - ',')];
+      key_values %= ((qi::hold[escaped] | key) >> '=' >> (qi::hold[escaped] | value)) % ',';
+      parameter %= (qi::hold[escaped] | param) >> -(':' >> key_values);
     }
     
     typedef boost::spirit::standard::space_type space_type;
