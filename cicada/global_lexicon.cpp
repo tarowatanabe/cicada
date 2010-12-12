@@ -4,17 +4,25 @@
 
 #include <iostream>
 #include <sstream>
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
 
 #include "global_lexicon.hpp"
 
 #include "utils/compress_stream.hpp"
 #include "utils/repository.hpp"
 #include "utils/tempfile.hpp"
-#include "utils/space_separator.hpp"
-
-#include <boost/tokenizer.hpp>
-#include <boost/lexical_cast.hpp>
-
+#include "utils/lexical_cast.hpp"
 
 namespace cicada
 {
@@ -57,7 +65,17 @@ namespace cicada
       lexicon.open(rep.path("lexicon"));
       vocab.open(rep.path("vocab"));
     } else {
-      typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+      typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
+      typedef boost::spirit::istream_iterator iterator_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      qi::rule<iterator_type, std::string(), standard::blank_type>       word;
+      qi::rule<iterator_type, lexicon_parsed_type, standard::blank_type> parser; 
+      
+      word   %= qi::lexeme[+(standard::char_ - standard::space)];
+      parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
       
       repository_type::const_iterator iter = rep.find("size");
       if (iter == rep.end())
@@ -85,31 +103,27 @@ namespace cicada
 	  throw std::runtime_error(std::string("no lexicon file: ") + path.file_string());
 	
 	utils::compress_istream is(path, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+
+	iterator_type iter(is);
+	iterator_type iter_end;
+  
+	lexicon_parsed_type lexicon_parsed;
 	
-	std::string line;
 	word_weight_set_type weights;
 	word_type target_prev;
-	
-	while (std::getline(is, line)) {
-	  tokenizer_type tokenizer(line);
+
+	while (iter != iter_end) {
+	  boost::fusion::get<0>(lexicon_parsed).clear();
+	  boost::fusion::get<1>(lexicon_parsed).clear();
 	  
-	  tokenizer_type::iterator iter = tokenizer.begin();
-	  if (iter == tokenizer.end()) continue;
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
+	    if (iter != iter_end)
+	      throw std::runtime_error("global lexicon parsing failed");
 	  
-	  const std::string word1 = *iter;
-	  ++ iter;
-	  if (iter == tokenizer.end()) continue;
-	  
-	  const std::string word2 = *iter;
-	  ++ iter;
-	  if (iter == tokenizer.end()) continue;
-	  
-	  const std::string word3 = *iter;
-	  
-	  const word_type target(word1);
-	  const word_type source(word2);
-	  
-	  const weight_type weight(boost::lexical_cast<weight_type>(word3));
+	  const word_type target(boost::fusion::get<0>(lexicon_parsed));
+	  const word_type source(boost::fusion::get<1>(lexicon_parsed));
+	  const weight_type weight(boost::fusion::get<2>(lexicon_parsed));
 	  
 	  if (target != target_prev) {
 	    if (! weights.empty())
