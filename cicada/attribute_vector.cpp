@@ -7,9 +7,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -38,14 +35,7 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using qi::hold;
-      using qi::lexeme;
-      using standard::char_;
-      using standard::space;
-      using qi::double_;
-
       escape_char.add
 	("\\\"", '\"')
 	("\\\\", '\\')
@@ -57,8 +47,8 @@ namespace cicada
 	("\\t", '\t')
 	("\\u0020", ' ');
       
-      key %= ('\"' >> lexeme[*(escape_char | (char_ - '\"' - space))] >> '\"');
-      data_value %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      key %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"' - standard::space))] >> '\"');
+      data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
       data %= data_value | double_dot | int64_;
       
       attribute %= key >> ':' >> data;
@@ -85,7 +75,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
       using karma::buffer;
       using standard::char_;
@@ -226,13 +215,6 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using qi::hold;
-      using qi::lexeme;
-      using standard::char_;
-      using standard::space;
-      using qi::double_;
       
       escape_char.add
 	("\\\"", '\"')
@@ -245,7 +227,7 @@ namespace cicada
 	("\\t", '\t')
 	("\\u0020", ' ');
       
-      str %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      str %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
       data %= str | double_dot | int64_;
     }
     
@@ -267,11 +249,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::buffer;
-      using standard::char_;
-      using karma::double_;
       
       escape_char.add
 	('\\', "\\\\")
@@ -284,7 +261,7 @@ namespace cicada
 	('\t', "\\t")
 	(' ', "\\u0020");
       
-      str %= ('\"' << +(escape_char | ~char_('\"')) << '\"');
+      str %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"');
       data %= int64_ | double10 | str;
     }
     

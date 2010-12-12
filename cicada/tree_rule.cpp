@@ -9,10 +9,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-#include <boost/spirit/include/phoenix_object.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -103,22 +99,14 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
     
-      using qi::lit;
-      using qi::lexeme;
-      using qi::hold;
-      using qi::eps;
-      using standard::char_;
-      using standard::space;
-      
       escaped_char.add
 	("\\\\", '\\')
 	("\\(", '(')
 	("\\)", ')');
       
-      label %= lexeme[+(escaped_char | (char_ - space - '(' - ')' - '\\')) - "|||"];
-      tree_rule %= label >> (hold['(' >> +tree_rule >> ')'] | eps);
+      label %= qi::lexeme[+(escaped_char | (standard::char_ - standard::space - '(' - ')' - '\\')) - "|||"];
+      tree_rule %= label >> (qi::hold['(' >> +tree_rule >> ')'] | qi::eps);
       root %= -tree_rule;
     }
     
@@ -135,23 +123,15 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
     
-      using karma::lit;
-      using karma::buffer;
-      using karma::repeat;
-      using karma::eps;
-      using standard::char_;
-      using standard::space;
-      
       escaped_char.add
 	('\\', "\\\\")
 	('(',  "\\(")
 	(')',  "\\)");
       
-      label %= *(escaped_char | char_);
+      label %= *(escaped_char | standard::char_);
       antecedents %= tree_rule % ' ';
-      tree_rule %= label << (buffer['(' << antecedents << ')'] | eps);
+      tree_rule %= label << (karma::buffer['(' << antecedents << ')'] | karma::eps);
     }
     
     boost::spirit::karma::symbols<char, const char*>                       escaped_char;

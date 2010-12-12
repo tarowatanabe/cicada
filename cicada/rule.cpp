@@ -11,10 +11,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-#include <boost/spirit/include/phoenix_object.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -66,20 +62,11 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
     
-      using qi::phrase_parse;
-      using qi::lexeme;
-      using qi::hold;
-      using qi::attr;
-      using standard::char_;
-      using qi::double_;
-      using standard::space;
+      lhs    %= (qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')]);
+      phrase %= *(qi::lexeme[+(standard::char_ - standard::space) - "|||"]);
       
-      lhs    %= (lexeme[char_('[') >> +(char_ - space - ']') >> char_(']')]);
-      phrase %= *(lexeme[+(char_ - space) - "|||"]);
-      
-      rule_grammar %= (hold[lhs >> "|||"] | attr("")) >> phrase;
+      rule_grammar %= (qi::hold[lhs >> "|||"] | qi::attr("")) >> phrase;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> lhs;

@@ -11,9 +11,6 @@
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -80,20 +77,8 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using qi::phrase_parse;
-      using qi::lexeme;
       using qi::lit;
-      using qi::attr;
-      using standard::char_;
-      using qi::double_;
-      using qi::int_;
-      using qi::uint_;
-      
-      using namespace qi::labels;
-      
-      using standard::space;
       
       escape_char.add
 	("\\\"", '\"')
@@ -106,18 +91,18 @@ namespace cicada
 	("\\t", '\t')
 	("\\u0020", ' ');
       
-      rule_string %= ('\"' >> lexeme[*(escape_char | ~char_('\"'))] >> '\"') ;
+      rule_string %= ('\"' >> qi::lexeme[*(escape_char | ~standard::char_('\"'))] >> '\"') ;
       rule_string_action = rule_string [add_rule(rules)];
       rule_string_set = '[' >> -(rule_string_action % ',')  >> ']';
       
-      tail_node_set %= '[' >> -(int_ % ',') >> ']';
+      tail_node_set %= '[' >> -(qi::int_ % ',') >> ']';
       
-      feature       %= '\"' >> lexeme[*(escape_char | ~char_('\"'))] >> "\":" >> double_;
+      feature       %= '\"' >> qi::lexeme[*(escape_char | ~standard::char_('\"'))] >> "\":" >> qi::double_;
       feature_set   %= '{' >> -(feature % ',' )  >> '}';
       
       // attributes...
-      key %= ('\"' >> lexeme[*(escape_char | (char_ - '\"' - space))] >> '\"');
-      data_value %= ('\"' >> lexeme[*(escape_char | (char_ - '\"'))] >> '\"');
+      key %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"' - standard::space))] >> '\"');
+      data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
       data %= data_value | double_dot | int64_;
       attribute %= key >> ':' >> data;
       attribute_set %= '{' >> -(attribute % ',') >> '}';
@@ -126,9 +111,9 @@ namespace cicada
 	       >> -(lit("\"tail\"")    >> ':' >> tail_node_set >> ',')
 	       >> -(lit("\"feature\"") >> ':' >> feature_set >> ',')
 	       >> -(lit("\"attribute\"") >> ':' >> attribute_set >> ',')
-	       >> lit("\"rule\"")    >> ':' >> int_
-	       >> -(',' >> lit("\"first\"")    >> ':' >> int_)
-	       >> -(',' >> lit("\"last\"")    >> ':' >> int_)
+	       >> lit("\"rule\"")    >> ':' >> qi::int_
+	       >> -(',' >> lit("\"first\"")    >> ':' >> qi::int_)
+	       >> -(',' >> lit("\"last\"")    >> ':' >> qi::int_)
 	       >> '}');
       
       edge_action = edge [add_edge(graph, rules)];
@@ -141,7 +126,7 @@ namespace cicada
       hypergraph = ('{'
 		    >> lit("\"rules\"") >> ':' >> rule_string_set >> ','
 		    >> lit("\"nodes\"") >> ':' >> node_set >> ','
-		    >> lit("\"goal\"") >> ':' >> uint_ [finish_graph(graph)]
+		    >> lit("\"goal\"") >> ':' >> qi::uint_ [finish_graph(graph)]
 		    >> '}');
     }
     
@@ -331,15 +316,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using karma::repeat;
-      using karma::buffer;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      
-      using namespace karma::labels;
       
       escape_char.add
 	('\\', "\\\\")
@@ -351,7 +327,7 @@ namespace cicada
 	('\r', "\\r")
 	('\t', "\\t");
       
-      lhs %= *(escape_char | ~char_('\"'));
+      lhs %= *(escape_char | ~standard::char_('\"'));
       phrase %= -(lhs % ' ');
       
       rule %= lhs << " ||| " << phrase;
@@ -373,13 +349,6 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-      
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      
-      using namespace karma::labels;
       
       escape_char.add
 	('\\', "\\\\")
@@ -391,7 +360,7 @@ namespace cicada
 	('\r', "\\r")
 	('\t', "\\t");
       
-      features %= ('\"' << +(escape_char | ~char_('\"')) << '\"' << ':' << double10) % ",";
+      features %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"' << ':' << double10) % ",";
     }
 
     struct real_precision : boost::spirit::karma::real_policies<double>
