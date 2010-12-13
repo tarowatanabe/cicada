@@ -53,13 +53,13 @@ namespace cicada
       
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features.dot() * scale);
+	return cicada::semiring::traits<value_type>::log(x.features.sum() * scale);
       }
       
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.dot() * scale);
+	return cicada::semiring::traits<value_type>::log(x.sum() * scale);
       }
     };
 
@@ -96,13 +96,13 @@ namespace cicada
       
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features.dot());
+	return cicada::semiring::traits<value_type>::log(x.features.sum());
       }
   
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.dot());
+	return cicada::semiring::traits<value_type>::log(x.sum());
       }
     };
     

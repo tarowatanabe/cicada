@@ -81,13 +81,13 @@ struct weight_set_function_one
 
   value_type operator()(const hypergraph_type::edge_type& x) const
   {
-    return cicada::semiring::traits<value_type>::log(x.features.dot());
+    return cicada::semiring::traits<value_type>::log(x.features.sum());
   }
   
   template <typename FeatureSet>
   value_type operator()(const FeatureSet& x) const
   {
-    return cicada::semiring::traits<value_type>::log(x.dot());
+    return cicada::semiring::traits<value_type>::log(x.sum());
   }
 };
 

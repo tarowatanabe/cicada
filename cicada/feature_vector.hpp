@@ -133,13 +133,22 @@ namespace cicada
     reference back() { return *(-- __values.end());}
     
     void swap(FeatureVector& x) { __values.swap(x.__values); }
+
+    Tp sum() const
+    {
+      Tp __sum = Tp();
+      const_iterator iter_end = end();
+      for (const_iterator iter = begin(); iter != iter_end; ++ iter)
+	__sum += iter->second;
+      return __sum;
+    }
     
     Tp dot() const
     {
       Tp sum = Tp();
       const_iterator iter_end = end();
       for (const_iterator iter = begin(); iter != iter_end; ++ iter)
-	sum += iter->second;
+	sum += iter->second * iter->second;
       return sum;
     }
 

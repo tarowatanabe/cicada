@@ -25,7 +25,7 @@ namespace cicada
     Tp sum = Tp();
     typename feature_vector_type::const_iterator iter_end = x.end();
     for (typename feature_vector_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-      sum += iter->second;
+      sum += iter->second * iter->second;
     
     return sum;
   }
@@ -34,9 +34,9 @@ namespace cicada
   inline
   Tp dot_product(const WeightVector<Tp, Alloc>& x)
   {
-    return std::accumulate(x.begin(), x.end(), Tp());
+    return std::inner_product(x.begin(), x.end(), x.begin(), Tp());
   }
-
+  
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
   inline
   Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
