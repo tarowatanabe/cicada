@@ -1,5 +1,5 @@
 2010-12-13
-Added phrase-extract-like script, extract.py, for easily extract/score phrase/scfg/ghkm.
+Added phrase-extract-like script, extract.py, for easily extracting/scoreing phrase/scfg/ghkm.
 Added alignment tool, cicada_alignment (do we need this?) (TODO: add ITG alignment + threading)
 Added matching API, word matcher using lower-case, stemming and wordnet synsets(!) (TODO: use this for TER etc.)
 Added wordnet API (we use the standard c-interface wrapped by thread-safe API)
