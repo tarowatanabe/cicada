@@ -21,6 +21,8 @@
 #include <utils/resource.hpp>
 #include <utils/sgi_hash_map.hpp>
 
+#include <google/dense_hash_map>
+
 namespace cicada
 {
   namespace operation
@@ -47,18 +49,14 @@ namespace cicada
 
       typedef typename Function::value_type weight_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-      typedef std::tr1::unordered_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
-				      std::allocator<std::pair<id_type, id_type> > > node_map_type;
-#else
-      typedef sgi::hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type>,
-			    std::allocator<std::pair<id_type, id_type> > > node_map_type;
-#endif
-
+      typedef google::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > node_map_type;
+      
       derivation_type derivation;
       weight_type     weight;
       node_map_type   node_maps;
       hypergraph_type graph_kbest;
+      
+      node_maps.set_empty_key(id_type(-1));
 
       edge_set_type tails;
   
@@ -97,6 +95,7 @@ namespace cicada
 	  typename hypergraph_type::edge_type& edge_kbest = graph_kbest.add_edge(tails.begin(), tails.end());
 	  edge_kbest.rule = edge.rule;
 	  edge_kbest.features = edge.features;
+	  edge_kbest.attributes = edge.attributes;
       
 	  graph_kbest.connect_edge(edge_kbest.id, node_maps[edge.head]);
 	}
