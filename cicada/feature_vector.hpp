@@ -126,11 +126,6 @@ namespace cicada
     const_iterator end() const { return __values.end(); }
     iterator end() { return __values.end(); }
     
-    const_iterator lower_bound(const feature_type& x) const { return __values.lower_bound(x); }
-    iterator lower_bound(const feature_type& x) { return __values.lower_bound(x); }
-    const_iterator upper_bound(const feature_type& x) const { return __values.upper_bound(x); }
-    iterator upper_bound(const feature_type& x) { return __values.upper_bound(x); }
-    
     const_reference front() const { return *__values.begin(); }
     reference front() { return *__values.begin(); }
     
@@ -233,13 +228,13 @@ namespace cicada
       
       while (iter1 != iter1_end && first != last) {
 	if (iter1->first < first->first) {
-	  sum += op(Tp(), iter1->second);
+	  sum += op(iter1->second, typename value2_type::second_type());
 	  ++ iter1;
 	} else if (first->first < iter1->first) {
-	  sum += op(first->second, typename value2_type::second_type());
+	  sum += op(Tp(), first->second);
 	  ++ first;
 	} else {
-	  sum += op(first->second, iter1->second);
+	  sum += op(iter1->second, first->second);
 	  
 	  ++ iter1;
 	  ++ first;
@@ -247,9 +242,9 @@ namespace cicada
       }
       
       for (/**/; iter1 != iter1_end; ++ iter1)
-	sum += op(Tp(), iter1->second);
+	sum += op(iter1->second, typename value2_type::second_type());
       for (/**/; first != last; ++ first)
-	sum += op(first->second, typename value2_type::second_type());
+	sum += op(Tp(), first->second);
       
       return sum;
     }
