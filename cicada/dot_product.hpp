@@ -6,8 +6,12 @@
 #ifndef __CICADA__DOT_PRODUCT__HPP__
 #define __CICADA__DOT_PRODUCT__HPP__ 1
 
+#include <numeric>
+
 #include <cicada/feature_vector.hpp>
 #include <cicada/weight_vector.hpp>
+
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -25,6 +29,23 @@ namespace cicada
     
     return sum;
   }
+  
+  template <typename Tp, typename Alloc>
+  inline
+  Tp dot_product(const WeightVector<Tp, Alloc>& x)
+  {
+    return std::accumulate(x.begin(), x.end(), Tp());
+  }
+
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
+  inline
+  Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
+  {
+    const size_t size = utils::bithack::min(x.size(), y.size());
+    
+    return std::inner_product(x.begin(), x.begin() + size, y.begin(), Tp1());
+  }
+
   
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
   inline
