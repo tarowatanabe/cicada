@@ -71,10 +71,7 @@ namespace cicada
 	id_type node_id = 0;
 	edge_set_type::const_iterator eiter_end = edges.end();
 	for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter)
-	  if (node_maps.find(graph.edges[*eiter].head) == node_maps.end()) {
-	    node_maps[graph.edges[*eiter].head] = node_id;
-	    ++ node_id;
-	  }
+	  node_id += node_maps.insert(std::make_pair(graph.edges[*eiter].head, node_id)).second;
     
 	for (id_type node = 0; node != node_id; ++ node)
 	  graph_kbest.add_node();
