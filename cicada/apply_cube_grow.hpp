@@ -267,7 +267,7 @@ namespace cicada
       for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter, ++ iiter) {
 	lazy_jth_best(*niter, *iiter, graph, graph_out);
 	
-	if (int(states[*niter].D.size()) <= *iiter) return;
+	if (static_cast<int>(states[*niter].D.size()) <= *iiter) return;
       }
       
       // push cand
