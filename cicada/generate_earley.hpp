@@ -59,7 +59,7 @@ namespace cicada
     GenerateEarley(const int __depth, const int __width)
       : depth(__depth), width(__width)
     {
-      edges_unique.set_empty_key(0);
+      items_unique.set_empty_key(0);
 
       traversals.set_empty_key(traversal_type());
 
@@ -100,9 +100,9 @@ namespace cicada
 
     typedef std::vector<int, std::allocator<int> > depth_set_type;
     
-    struct Edge
+    struct Item
     {
-      typedef Edge edge_type;
+      typedef Item item_type;
       
       symbol_type lhs; // lhs of rule
       const grammar_node_type* dot;  // earley grammar position
@@ -111,14 +111,14 @@ namespace cicada
       int          depth;
       
       // backpointers
-      const edge_type* active;
-      const edge_type* passive;
+      const item_type* active;
+      const item_type* passive;
       
       // backptr to source hypergraph's edge
       hypergraph_type::id_type edge;
       
       // created by predict...
-      Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
+      Item(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const int& __depth)
 	: lhs(__lhs), dot(&__dot),
 	  depth(__depth), 
@@ -126,50 +126,50 @@ namespace cicada
 	  edge(hypergraph_type::invalid) {}
 #if 0      
       // created by predict...
-      Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
+      Item(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const int& __depth,
-	   const edge_type& __active)
+	   const item_type& __active)
 	: lhs(__lhs), dot(&__dot),
 	  depth(__depth), 
 	  active(&__active), passive(0),
 	  edge(hypergraph_type::invalid) {}
 #endif
       // created by scan... we will always have terminal
-      Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
+      Item(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const int& __depth, 
-	   const edge_type& __active,
+	   const item_type& __active,
 	   const hypergraph_type::id_type& __edge)
 	: lhs(__lhs), dot(&__dot),
 	  depth(__depth), 
 	  active(&__active), passive(0),
 	  edge(__edge) {}
-      Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
+      Item(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const int& __depth, 
-	   const edge_type& __active)
+	   const item_type& __active)
 	: lhs(__lhs), dot(&__dot),
 	  depth(__depth), 
 	  active(&__active), passive(0),
 	  edge(hypergraph_type::invalid) {}
       
       // construct by complete
-      Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
+      Item(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const int& __depth, 
-	   const edge_type& __active, const edge_type& __passive,
+	   const item_type& __active, const item_type& __passive,
 	   const hypergraph_type::id_type& __edge)
 	: lhs(__lhs), dot(&__dot),
 	  depth(__depth), 
 	  active(&__active), passive(&__passive),
 	  edge(__edge) {}
-      Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
+      Item(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const int& __depth, 
-	   const edge_type& __active, const edge_type& __passive)
+	   const item_type& __active, const item_type& __passive)
 	: lhs(__lhs), dot(&__dot),
 	  depth(__depth), 
 	  active(&__active), passive(&__passive),
 	  edge(hypergraph_type::invalid) {}
       
       // for query...
-      Edge(const int& __depth) : depth(__depth) {}
+      Item(const int& __depth) : depth(__depth) {}
       
     public:
       bool is_passive() const { return edge != hypergraph_type::invalid; }
@@ -179,19 +179,19 @@ namespace cicada
       bool is_completed() const { return active && passive; }
     };
     
-    typedef Edge edge_type;
+    typedef Item item_type;
     
-    typedef utils::chunk_vector<edge_type, 1024 * 16 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
-    typedef std::deque<const edge_type*, std::allocator<const edge_type*> > agenda_type;
+    typedef utils::chunk_vector<item_type, 1024 * 16 / sizeof(item_type), std::allocator<item_type> > item_set_type;
+    typedef std::deque<const item_type*, std::allocator<const item_type*> > agenda_type;
     
-    // traversal structure to keep only unique edges...
+    // traversal structure to keep only unique items...
     struct Traversal
     {
-      const edge_type* active;
-      const edge_type* passive;
+      const item_type* active;
+      const item_type* passive;
       int is_active;
       
-      Traversal(const edge_type* __active, const edge_type* __passive, const bool __is_active)
+      Traversal(const item_type* __active, const item_type* __passive, const bool __is_active)
 	: active(__active), passive(__passive), is_active(__is_active) {}
 
       Traversal()
@@ -210,15 +210,15 @@ namespace cicada
     
     typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
     
-    // edge hash/comparison
+    // item hash/comparison
     
-    struct edge_unique_hash_type : public utils::hashmurmur<size_t>
+    struct item_unique_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
-      size_t operator()(const edge_type* x) const
+      size_t operator()(const item_type* x) const
       {
-	// passive edge do not care about what dot we have consumed...
+	// passive item do not care about what dot we have consumed...
 	if (! x)
 	  return 0;
 	else if (x->is_active())
@@ -228,11 +228,11 @@ namespace cicada
       }
     };
     
-    struct edge_unique_equal_type
+    struct item_unique_equal_type
     {
-      bool operator()(const edge_type* x, const edge_type* y) const
+      bool operator()(const item_type* x, const item_type* y) const
       {
-	// passive edge do not care dot...
+	// passive item do not care dot...
 	return ((x == y) 
 		|| (x && y
 		    && x->is_active() == y->is_active()
@@ -242,51 +242,51 @@ namespace cicada
       }
     };
     
-    struct edge_active_hash_type : public utils::hashmurmur<size_t>
+    struct item_active_hash_type : public utils::hashmurmur<size_t>
     {
-      size_t operator()(const edge_type* x) const
+      size_t operator()(const item_type* x) const
       {
 	return utils::hashmurmur<size_t>::operator()(x->depth);
       }
     };
     
-    struct edge_active_equal_type
+    struct item_active_equal_type
     {
-      bool operator()(const edge_type* x, const edge_type* y) const
+      bool operator()(const item_type* x, const item_type* y) const
       {
 	return x->depth == y->depth;
       }
     };
 
-    struct edge_passive_hash_type : public utils::hashmurmur<size_t>
+    struct item_passive_hash_type : public utils::hashmurmur<size_t>
     {
-      size_t operator()(const edge_type* x) const
+      size_t operator()(const item_type* x) const
       {
 	return utils::hashmurmur<size_t>::operator()(x->depth);
       }
     };
     
-    struct edge_passive_equal_type
+    struct item_passive_equal_type
     {
-      bool operator()(const edge_type* x, const edge_type* y) const
+      bool operator()(const item_type* x, const item_type* y) const
       {
 	return x->depth == y->depth;
       }
     };
 
-    struct edge_node_hash_type : public utils::hashmurmur<size_t>
+    struct item_node_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
-      size_t operator()(const edge_type* x) const
+      size_t operator()(const item_type* x) const
       {
 	return (x ? hasher_type::operator()(x->depth, x->lhs.id()) : size_t(0));
       }
     };
 
-    struct edge_node_equal_type
+    struct item_node_equal_type
     {
-      bool operator()(const edge_type* x, const edge_type* y) const
+      bool operator()(const item_type* x, const item_type* y) const
       {
 	return ((x == y) || (x && y
 			     && x->lhs == y->lhs
@@ -294,23 +294,23 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<const edge_type*, edge_unique_hash_type, edge_unique_equal_type > edge_set_unique_type;
+    typedef google::dense_hash_set<const item_type*, item_unique_hash_type, item_unique_equal_type > item_set_unique_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
-					 std::allocator<const edge_type*> > edge_set_active_type;
-    typedef std::tr1::unordered_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
-					 std::allocator<const edge_type*> > edge_set_passive_type;
+    typedef std::tr1::unordered_multiset<const item_type*, item_active_hash_type, item_active_equal_type,
+					 std::allocator<const item_type*> > item_set_active_type;
+    typedef std::tr1::unordered_multiset<const item_type*, item_passive_hash_type, item_passive_equal_type,
+					 std::allocator<const item_type*> > item_set_passive_type;
 #else
-    typedef sgi::hash_multiset<const edge_type*, edge_active_hash_type, edge_active_equal_type,
-			       std::allocator<const edge_type*> > edge_set_active_type;
-    typedef sgi::hash_multiset<const edge_type*, edge_passive_hash_type, edge_passive_equal_type,
-			       std::allocator<const edge_type*> > edge_set_passive_type;
+    typedef sgi::hash_multiset<const item_type*, item_active_hash_type, item_active_equal_type,
+			       std::allocator<const item_type*> > item_set_active_type;
+    typedef sgi::hash_multiset<const item_type*, item_passive_hash_type, item_passive_equal_type,
+			       std::allocator<const item_type*> > item_set_passive_type;
 #endif
 
     
-    // edge to traversal graph mappings...
-    typedef google::dense_hash_map<const edge_type*, hypergraph_type::id_type, edge_node_hash_type, edge_node_equal_type > non_terminal_node_set_type;
+    // item to traversal graph mappings...
+    typedef google::dense_hash_map<const item_type*, hypergraph_type::id_type, item_node_hash_type, item_node_equal_type > non_terminal_node_set_type;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -329,33 +329,33 @@ namespace cicada
 
       const grammar_node_type& dot_goal = grammar_nodes[giter->second];
       
-      // initial edges for each transducer defined in grammar...
-      insert_edge(edge_type(goal_symbol, dot_goal, 0));
+      // initial items for each transducer defined in grammar...
+      insert_item(item_type(goal_symbol, dot_goal, 0));
       
       // forever...
       while (! agenda_exploration.empty() || ! agenda_finishing.empty()) {
 	
-	// connect all the newly created edges at previous step.
+	// connect all the newly created items at previous step.
 	agenda_type::const_iterator aiter_end = agenda_exploration.end();
 	for (agenda_type::const_iterator aiter = agenda_exploration.begin(); aiter != aiter_end; ++ aiter)
-	  connect_edge(*(*aiter), source, target);
+	  connect_item(*(*aiter), source, target);
 	
 	agenda_exploration.clear();
 	
 	if (! agenda_finishing.empty()) {
-	  const edge_type* edge = agenda_finishing.front();
+	  const item_type* item = agenda_finishing.front();
 	  agenda_finishing.pop_front();
 	  
-	  if (edge->is_active()) {
-	    if (! edge->dot->terminals.empty())
-	      scan(*edge);
+	  if (item->is_active()) {
+	    if (! item->dot->terminals.empty())
+	      scan(*item);
 	    
-	    if (! edge->dot->non_terminals.empty()) {
-	      complete_active(*edge);
-	      predict(*edge);
+	    if (! item->dot->non_terminals.empty()) {
+	      complete_active(*item);
+	      predict(*item);
 	    }
 	  } else
-	    complete_passive(*edge);
+	    complete_passive(*item);
 	}
       }
       
@@ -366,9 +366,9 @@ namespace cicada
 
   private:
     
-    void scan(const edge_type& edge)
+    void scan(const item_type& item)
     {
-      const grammar_node_type& dot = *edge.dot;
+      const grammar_node_type& dot = *item.dot;
 
       //
       // scanning implies moving dot on terminals w/o intersecting with transducer...
@@ -383,19 +383,19 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 
-	// actually, we need to increment edge.span.second! but temporary disabled
+	// actually, we need to increment item.span.second! but temporary disabled
 	if (has_rule)
-	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, edge, dot_next.edge));
+	  insert_item(item_type(item.lhs, dot_next, item.depth, item, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(edge.lhs, dot_next, edge.depth, edge));
+	  insert_item(item_type(item.lhs, dot_next, item.depth, item));
       }
     }
     
-    void predict(const edge_type& edge)
+    void predict(const item_type& item)
     {
-      if (edge.depth >= max_tree_depth) return;
+      if (item.depth >= max_tree_depth) return;
       
-      const grammar_node_type& dot = *edge.dot;
+      const grammar_node_type& dot = *item.dot;
       
       id_map_type::const_iterator niter_end = dot.non_terminals.end();
       for (id_map_type::const_iterator niter = dot.non_terminals.begin(); niter != niter_end; ++ niter) {
@@ -410,21 +410,21 @@ namespace cicada
 	
 	const grammar_node_type& dot_next = grammar_nodes[piter->second];
 	
-	insert_edge(edge_type(lhs, dot_next, edge.depth + 1, edge));
+	insert_item(item_type(lhs, dot_next, item.depth + 1, item));
       }
     }
 
     // comlete passive with actives
-    void complete_passive(const edge_type& passive)
+    void complete_passive(const item_type& passive)
     {
       // we will try find actives whose last match with passive's first
       // do we group by passive's lhs?
 
-      const edge_type query(passive.depth - 1);
+      const item_type query(passive.depth - 1);
       
-      std::pair<edge_set_active_type::const_iterator, edge_set_active_type::const_iterator> result = edges_active.equal_range(&query);
-      for (edge_set_active_type::const_iterator aiter = result.first; aiter != result.second; ++ aiter) {
-	const edge_type& active = *(*aiter);
+      std::pair<item_set_active_type::const_iterator, item_set_active_type::const_iterator> result = items_active.equal_range(&query);
+      for (item_set_active_type::const_iterator aiter = result.first; aiter != result.second; ++ aiter) {
+	const item_type& active = *(*aiter);
 	
 	const grammar_node_type& dot = *(active.dot);
 	id_map_type::const_iterator niter = dot.non_terminals.find(passive.lhs);
@@ -436,23 +436,23 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, active.depth, active, passive, dot_next.edge));
+	  insert_item(item_type(active.lhs, dot_next, active.depth, active, passive, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, active.depth, active, passive));
+	  insert_item(item_type(active.lhs, dot_next, active.depth, active, passive));
       }
     }
     
     // find passives that can extend the active
-    void complete_active(const edge_type& active)
+    void complete_active(const item_type& active)
     {
       const grammar_node_type& dot = *(active.dot);
       
       // find passives whose first match with active's last
-      const edge_type query(active.depth + 1);
+      const item_type query(active.depth + 1);
       
-      std::pair<edge_set_passive_type::const_iterator, edge_set_passive_type::const_iterator> result = edges_passive.equal_range(&query);
-      for (edge_set_passive_type::const_iterator piter = result.first; piter != result.second; ++ piter) {
-	const edge_type& passive = *(*piter);
+      std::pair<item_set_passive_type::const_iterator, item_set_passive_type::const_iterator> result = items_passive.equal_range(&query);
+      for (item_set_passive_type::const_iterator piter = result.first; piter != result.second; ++ piter) {
+	const item_type& passive = *(*piter);
 	
 	id_map_type::const_iterator niter = dot.non_terminals.find(passive.lhs);
 	if (niter == dot.non_terminals.end()) continue;
@@ -463,42 +463,42 @@ namespace cicada
 	const bool has_next = ! dot_next.terminals.empty() || ! dot_next.non_terminals.empty();
 	
 	if (has_rule)
-	  insert_edge(edge_type(active.lhs, dot_next, active.depth, active, passive, dot_next.edge));
+	  insert_item(item_type(active.lhs, dot_next, active.depth, active, passive, dot_next.edge));
 	if (has_next)
-	  insert_edge(edge_type(active.lhs, dot_next, active.depth, active, passive));
+	  insert_item(item_type(active.lhs, dot_next, active.depth, active, passive));
       }
     }
     
-    void insert_edge(const edge_type& edge)
+    void insert_item(const item_type& item)
     {
-      if (edge.passive && edge.active) {
-	if (traversals.find(traversal_type(edge.active, edge.passive, edge.is_active())) != traversals.end())
+      if (item.passive && item.active) {
+	if (traversals.find(traversal_type(item.active, item.passive, item.is_active())) != traversals.end())
 	  return;
 	else
-	  traversals.insert(traversal_type(edge.active, edge.passive, edge.is_active()));
+	  traversals.insert(traversal_type(item.active, item.passive, item.is_active()));
       }
       
-      edges.push_back(edge);
+      items.push_back(item);
       
-      agenda_exploration.push_back(&edges.back());
+      agenda_exploration.push_back(&items.back());
     }
     
-    void connect_edge(const edge_type& edge, const hypergraph_type& source, hypergraph_type& target)
+    void connect_item(const item_type& item, const hypergraph_type& source, hypergraph_type& target)
     {
-      if (edges_unique.find(&edge) == edges_unique.end()) {
-	edges_unique.insert(&edge);
+      if (items_unique.find(&item) == items_unique.end()) {
+	items_unique.insert(&item);
 	
-	if (edge.is_passive())
-	  edges_passive.insert(&edge);
+	if (item.is_passive())
+	  items_passive.insert(&item);
 	else
-	  edges_active.insert(&edge);
+	  items_active.insert(&item);
 	
-	agenda_finishing.push_back(&edge);
+	agenda_finishing.push_back(&item);
       }
       
-      if (! edge.is_passive()) return;
+      if (! item.is_passive()) return;
       
-      // Edge is completed or scanned...
+      // Item is completed or scanned...
       // we will uncover structure...
             
       //
@@ -509,7 +509,7 @@ namespace cicada
       // collect the instance of "passive" item which corresponds to non-terminal!
       std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails;
       
-      const edge_type* curr = &edge;
+      const item_type* curr = &item;
       while (curr && ! curr->is_predicted()) {
 	if (curr->passive) {
 	  non_terminal_node_set_type::iterator niter = non_terminal_nodes.find(curr->passive);
@@ -524,13 +524,13 @@ namespace cicada
       std::reverse(tails.begin(), tails.end());
       
       hypergraph_type::id_type head_id;
-      if (edge.lhs == goal_symbol) {
+      if (item.lhs == goal_symbol) {
 	if (! target.is_valid())
 	  target.goal = target.add_node().id;
 	
 	head_id = target.goal;
       } else {
-	std::pair<non_terminal_node_set_type::iterator, bool> result = non_terminal_nodes.insert(std::make_pair(&edge, 0));
+	std::pair<non_terminal_node_set_type::iterator, bool> result = non_terminal_nodes.insert(std::make_pair(&item, 0));
 	if (result.second) 
 	  result.first->second = target.add_node().id;
 	
@@ -538,8 +538,8 @@ namespace cicada
       }
       
       hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
-      edge_new.rule = source.edges[edge.edge].rule;
-      edge_new.features = edge.dot->features;
+      edge_new.rule = source.edges[item.edge].rule;
+      edge_new.features = item.dot->features;
       
       target.connect_edge(edge_new.id, head_id);
 
@@ -579,7 +579,7 @@ namespace cicada
       
       typedef std::vector<edge_set_type, std::allocator<edge_set_type> > node_map_type;
       
-      edges.clear();
+      items.clear();
       
       traversals.clear();
       non_terminal_nodes.clear();
@@ -587,9 +587,9 @@ namespace cicada
       agenda_finishing.clear();
       agenda_exploration.clear();
       
-      edges_unique.clear();
-      edges_active.clear();
-      edges_passive.clear();
+      items_unique.clear();
+      items_active.clear();
+      items_passive.clear();
 
       int sentence_length = 0;
       {
@@ -776,7 +776,7 @@ namespace cicada
     symbol_type           goal_symbol;
     grammar_node_set_type grammar_nodes;
 
-    edge_set_type edges;
+    item_set_type items;
 
     traversal_set_type traversals;
     non_terminal_node_set_type non_terminal_nodes;
@@ -784,9 +784,9 @@ namespace cicada
     agenda_type agenda_finishing;
     agenda_type agenda_exploration;
     
-    edge_set_unique_type  edges_unique;
-    edge_set_active_type  edges_active;
-    edge_set_passive_type edges_passive;
+    item_set_unique_type  items_unique;
+    item_set_active_type  items_active;
+    item_set_passive_type items_passive;
   };
   
   inline
