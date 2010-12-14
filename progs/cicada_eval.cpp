@@ -327,6 +327,10 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
       finished[id] = true;
     }
   }
+  
+  for (size_t id = 0; id != finished.size(); ++ id)
+    if (! finished[id])
+      std::cerr << "WARNING: no tst data for segment:" << id << std::endl;
 }
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
