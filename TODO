@@ -36,5 +36,8 @@ Add alignment tool, which can read GIZA++ output and dump heuristic alignment?
 
 Add pharse-extract like script supporting phrase-extract only (step 5 and 6)
 
-
 Do we allow intersect with lattice, not the first sentence of targets...?
+
+Re-engineer kbest/viterbi framework...
+  I don't like current interface, separating weight and derivation
+  Is there a workaround, like use iterator-based enumeration?

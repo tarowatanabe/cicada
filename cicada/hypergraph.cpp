@@ -78,8 +78,6 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      using qi::lit;
-      
       escape_char.add
 	("\\\"", '\"')
 	("\\\\", '\\')
@@ -108,25 +106,25 @@ namespace cicada
       attribute_set %= '{' >> -(attribute % ',') >> '}';
       
       edge %= ('{'
-	       >> -(lit("\"tail\"")    >> ':' >> tail_node_set >> ',')
-	       >> -(lit("\"feature\"") >> ':' >> feature_set >> ',')
-	       >> -(lit("\"attribute\"") >> ':' >> attribute_set >> ',')
-	       >> lit("\"rule\"")    >> ':' >> qi::int_
-	       >> -(',' >> lit("\"first\"")    >> ':' >> qi::int_)
-	       >> -(',' >> lit("\"last\"")    >> ':' >> qi::int_)
+	       >> -(qi::lit("\"tail\"")      >> ':' >> tail_node_set >> ',')
+	       >> -(qi::lit("\"feature\"")   >> ':' >> feature_set >> ',')
+	       >> -(qi::lit("\"attribute\"") >> ':' >> attribute_set >> ',')
+	       >> qi::lit("\"rule\"")        >> ':' >> qi::int_
+	       >> -(',' >> qi::lit("\"first\"") >> ':' >> qi::int_) // backward compatibility
+	       >> -(',' >> qi::lit("\"last\"")  >> ':' >> qi::int_) // backward compatibility
 	       >> '}');
       
       edge_action = edge [add_edge(graph, rules)];
       
       // here, we will call add_node...
-      node = (lit('[')[add_node(graph)] >> -(edge_action % ',')  >> ']');
+      node = (qi::lit('[')[add_node(graph)] >> -(edge_action % ',')  >> ']');
       
       node_set = ('[' >> -(node % ',') >> ']');
       
       hypergraph = ('{'
-		    >> lit("\"rules\"") >> ':' >> rule_string_set >> ','
-		    >> lit("\"nodes\"") >> ':' >> node_set >> ','
-		    >> lit("\"goal\"") >> ':' >> qi::uint_ [finish_graph(graph)]
+		    >> qi::lit("\"rules\"") >> ':' >> rule_string_set >> ','
+		    >> qi::lit("\"nodes\"") >> ':' >> node_set >> ','
+		    >> qi::lit("\"goal\"")  >> ':' >> qi::uint_ [finish_graph(graph)]
 		    >> '}');
     }
     
