@@ -815,23 +815,6 @@ struct ExtractSCFG
     return double(utils::bithack::max(length1, length2)) / utils::bithack::min(length1, length2);
   }
   
-  bool is_aligned(const int source, const int target) const
-  {
-    const int source_size = alignment_source_target.size();
-    const int target_size = alignment_target_source.size();
-    
-    if (source == -1 && target == -1) return true; // aligned at BOS
-    if (source <= -1 || target <= -1) return false;
-    if (source == source_size && target == target_size) return true; // aligned at EOS
-    if (source >= source_size || target >= target_size) return false;
-    
-    point_set_type::const_iterator aiter_begin = alignment_source_target[source].begin();
-    point_set_type::const_iterator aiter_end   = alignment_source_target[source].end();
-    
-    // check if there exists alignment point!
-    return std::find(aiter_begin, aiter_end, target) != aiter_end;
-  }
-  
   void compute_spans(const sentence_type& source,
 		     const sentence_type& target,
 		     const alignment_type& alignment)
