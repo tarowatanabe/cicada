@@ -583,7 +583,7 @@ struct ExtractSCFG
 	    // second non-terminal...
 	    for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
 	      if (*iter != *niter2
-		  && (min_hole <= 2 || (niter1->source.second - niter2->source.first) >= min_hole)
+		  && (min_hole <= 1 || (niter2->source.second - niter2->source.first) >= min_hole)
 		  && is_parent(iter->source, niter2->source)
 		  && is_parent(iter->target, niter2->target)
 		  && is_disjoint(niter1->source, niter2->source)
