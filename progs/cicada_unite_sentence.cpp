@@ -51,6 +51,7 @@ struct TER
     enum transition_type {
       epsilon,
       match,
+      approximate,
       substitution,
       insertion,
       deletion,
@@ -69,14 +70,8 @@ const double TER::COSTS::shift        = 1.0;
 
 typedef cicada::Matcher matcher_type;
 
-struct Matcher
+struct Normalizer
 {
-  template <typename Word>
-  bool operator()(const Word& x, const Word& y) const
-  {
-    return x == y;
-  }
-
   template <typename Word>
   Word operator()(const Word& x) const
   {
@@ -84,18 +79,12 @@ struct Matcher
   }
 };
 
-struct MatcherLower
+struct NormalizerLower
 {
-  MatcherLower()
+  NormalizerLower()
     : lower(&cicada::Stemmer::create("lower")) {}
   
   cicada::Stemmer* lower;
-
-  template <typename Word>
-  bool operator()(const Word& x, const Word& y) const
-  {
-    return lower->operator[](x) == lower->operator[](y);
-  }
 
   template <typename Word>
   Word operator()(const Word& x) const
@@ -220,6 +209,7 @@ struct MinimumEditDistance : public M
       operations.push_back(op);
       
       switch (op) {
+      case TER::TRANSITION::approximate:
       case TER::TRANSITION::substitution:
       case TER::TRANSITION::match:        -- i; -- j; break;
       case TER::TRANSITION::insertion:    -- i; break;
@@ -391,6 +381,14 @@ struct TranslationErrorRate : public TER, public M
       switch (*piter) {
       case TRANSITION::match:
 	//std::cerr << " M";
+	++ hpos;
+	++ rpos;
+	herr.push_back(false);
+	rerr.push_back(false);
+	ralign.push_back(hpos);
+	break;
+      case TRANSITION::approximate:
+	//std::cerr << " A";
 	++ hpos;
 	++ rpos;
 	herr.push_back(false);
@@ -702,6 +700,7 @@ struct TERAligner : public TER, public M
       typename path_type::const_iterator piter_end = path.end();
       for (typename path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
 	switch (*piter) {
+	case TRANSITION::approximate:
 	case TRANSITION::match:
 	case TRANSITION::substitution:
 	  merged.push_back(ref[rpos]);
@@ -861,7 +860,7 @@ int main(int argc, char ** argv)
 	  ter_sent_type ters;
 	  
 	  boost::shared_ptr<cicada::eval::Scorer> scorer(match_lower
-							 ? cicada::eval::Scorer::create("ter:lower=true")
+							 ? cicada::eval::Scorer::create("ter:tokenizer=lower")
 							 : cicada::eval::Scorer::create("ter"));
 	  scorer->insert(sentences[sent]);
 	  
@@ -883,10 +882,10 @@ int main(int argc, char ** argv)
 	    features[feature_count] = count_weight;
 	  
 	  if (match_lower) {
-	    TERAligner<MatcherLower> aligner(debug);
+	    TERAligner<NormalizerLower> aligner(debug);
 	    aligner(merged, sentences[sent], merged_new, features);
 	  } else {
-	    TERAligner<Matcher> aligner(debug);
+	    TERAligner<Normalizer> aligner(debug);
 	    aligner(merged, sentences[sent], merged_new, features);
 	  }
 	
@@ -918,10 +917,10 @@ int main(int argc, char ** argv)
 	    
 	    double score_local = 0.0;
 	    if (match_lower) {
-	      TERAligner<MatcherLower> aligner(debug);
+	      TERAligner<NormalizerLower> aligner(debug);
 	      score_local = aligner(merged, sentences[id], merged_new, features);
 	    } else {
-	      TERAligner<Matcher> aligner(debug);
+	      TERAligner<Normalizer> aligner(debug);
 	      score_local = aligner(merged, sentences[id], merged_new, features);
 	    }
 	    if (debug)
@@ -1000,10 +999,10 @@ int main(int argc, char ** argv)
 	  features[feature_count] = count_weight;
 	
 	if (match_lower) {
-	  TERAligner<MatcherLower> aligner(debug);
+	  TERAligner<NormalizerLower> aligner(debug);
 	  aligner(merged, sentence, merged_new, features);
 	} else {
-	  TERAligner<Matcher> aligner(debug);
+	  TERAligner<Normalizer> aligner(debug);
 	  aligner(merged, sentence, merged_new, features);
 	}
 	
