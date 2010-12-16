@@ -188,6 +188,7 @@ grammar.hpp \
 grammar_mutable.hpp \
 grammar_static.hpp \
 graphviz.hpp \
+head_finder.hpp \
 hypergraph.hpp \
 inside_outside.hpp \
 kbest.hpp \
@@ -243,6 +244,7 @@ global_lexicon.cpp \
 grammar_mutable.cpp \
 grammar_static.cpp \
 graphviz.cpp \
+head_finder.cpp \
 hypergraph.cpp \
 lattice.cpp \
 matcher.cpp \

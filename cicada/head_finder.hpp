@@ -6,15 +6,22 @@
 #ifndef __CICADA__HEAD_FINDER__HPP__
 #define __CICADA__HEAD_FINDER__HPP__ 1
 
+// HeadFinder mostly taken from StanfordParser
+
 #include <string>
 #include <vector>
 
 #include <cicada/hypergraph.hpp>
 
+#include <utils/sgi_hash_map.hpp>
+#include <utils/hashmurmur.hpp>
+
+
 namespace cicada
 {
   class HeadFinder
   {
+  public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
 
@@ -29,9 +36,30 @@ namespace cicada
 
     typedef attribute_set_type::attribute_type attribute_type;
     
+    typedef enum {
+      left,
+      leftdis,
+      right,
+      rightdis,
+      leftexcept,
+      rightexcept,
+    } direction_type;
+
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > category_set_type;
+    typedef std::pair<direction_type, category_set_type> category_list_type;
+    typedef std::vector<category_list_type, std::allocator<category_list_type> > category_map_type;
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<symbol_type, category_map_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				    std::allocator<std::pair<const symbol_type, category_map_type> > > category_info_type;
+#else
+    typedef sgi::hash_map<symbol_type, category_map_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			  std::allocator<std::pair<const symbol_type, category_map_type> > > category_info_type;
+#endif    
+    
   public:    
     HeadFinder() : __algorithm() {}
-    HeadFinder(const std::stirng& x) : __algorithm(x) {}
+    HeadFinder(const std::string& x) : __algorithm(x) {}
     virtual ~HeadFinder() {}
     
   public:
@@ -47,7 +75,7 @@ namespace cicada
       rule_type::symbol_set_type::const_iterator riter_begin = rule.rhs.begin();
       rule_type::symbol_set_type::const_iterator riter_end   = rule.rhs.end();
       for (rule_type::symbol_set_type::const_iterator riter = rule.rhs.begin(); riter != riter_end; ++ riter)
-	if (riter->is_non_temrinal()) {
+	if (riter->is_non_terminal()) {
 	  ++ num_tails;
 	  pos_tail = riter - riter_begin;
 	}
