@@ -11,38 +11,30 @@ namespace cicada
   namespace eval
   {
 
-    struct WERScorerConstant
-    {
-      struct COSTS
-      {
-	static const double insertion;
-	static const double deletion;
-	static const double substitution;
-      };
-    };
-    
-    const double WERScorerConstant::COSTS::insertion    = 1.0;
-    const double WERScorerConstant::COSTS::deletion     = 1.0;
-    const double WERScorerConstant::COSTS::substitution = 1.0;
 
-    class WERScorerImpl : public WERScorerConstant
+    class WERScorerImpl
     {
     private:
       friend class WERScorer;
       
     public:
+      typedef WERScorer wer_scorer_type;
+      typedef wer_scorer_type::weights_type weights_type;
+      
       typedef cicada::Sentence sentence_type;
       typedef cicada::Symbol   word_type;
+      typedef cicada::Matcher  matcher_type;
       
       struct Score
       {
 	double score;
+	
 	double insertion;
 	double deletion;
 	double substitution;
 	
-	Score() : score(), insertion(0), deletion(0), substitution(0) {}
-
+	Score() : score(0), insertion(0), deletion(0), substitution(0) {}
+	
 	Score(const double& __score,
 	      const double& __insertion,
 	      const double& __deletion,
@@ -55,7 +47,7 @@ namespace cicada
       WERScorerImpl() { }
       WERScorerImpl(const sentence_type& __ref) : ref(__ref) {}
       
-      value_type operator()(const sentence_type& sentence)
+      value_type operator()(const sentence_type& sentence, const weights_type& weights, const matcher_type* matcher)
       {
 	const sentence_type& a = ref;
 	const sentence_type& b = sentence;
@@ -63,42 +55,44 @@ namespace cicada
 	const size_t a_size = a.size();
 	const size_t b_size = b.size();
 	
-	if (a_size == 0) return value_type(b_size * COSTS::insertion, b_size * COSTS::insertion, 0, 0);
-	if (b_size == 0) return value_type(a_size * COSTS::deletion, 0, a_size * COSTS::deletion, 0);
+	if (a_size == 0) return value_type(b_size * weights.insertion, b_size * weights.insertion, 0, 0);
+	if (b_size == 0) return value_type(a_size * weights.deletion, 0, a_size * weights.deletion, 0);
 	
 	std::vector<value_type, std::allocator<value_type> > curr(b_size + 1, value_type());
 	std::vector<value_type, std::allocator<value_type> > prev(b_size + 1, value_type());
 	
 	for (size_t j = 1; j <= b_size; ++ j) {
-	  prev[j].score     = prev[j - 1].score + COSTS::insertion;
-	  prev[j].insertion = prev[j - 1].insertion + COSTS::insertion;
+	  prev[j].score     = prev[j - 1].score + weights.insertion;
+	  prev[j].insertion = prev[j - 1].insertion + weights.insertion;
 	}
 	
 	for (size_t i = 1; i <= a_size; ++ i) {
-	  curr[0].score    = prev[0].score + COSTS::deletion;
-	  curr[0].deletion = prev[0].deletion + COSTS::deletion;
+	  curr[0].score    = prev[0].score + weights.deletion;
+	  curr[0].deletion = prev[0].deletion + weights.deletion;
 	  
 	  for (size_t j = 1; j <= b_size; ++ j) {
-	    const double subst = COSTS::substitution * (a[i - 1] != b[j - 1]);
+	    const double subst = (a[i - 1] == b[j - 1] ? 0.0 : (matcher && matcher->operator()(a[i - 1], b[j - 1])
+								? weights.match
+								: weights.substitution));
 	    
-	    const double score_del = prev[j].score     + COSTS::deletion;
-	    const double score_ins = curr[j - 1].score + COSTS::insertion;
+	    const double score_del = prev[j].score     + weights.deletion;
+	    const double score_ins = curr[j - 1].score + weights.insertion;
 	    //const double score_sub = prev[j - 1].score + subst;
 	    
 	    curr[j] = prev[j - 1];
 	    curr[j].score        += subst;
 	    curr[j].substitution += subst;
-
+	    
 	    if (score_ins < curr[j].score) {
 	      curr[j] = curr[j - 1];
-	      curr[j].score     += COSTS::insertion;
-	      curr[j].insertion += COSTS::insertion;
+	      curr[j].score     += weights.insertion;
+	      curr[j].insertion += weights.insertion;
 	    }
 	    
 	    if (score_del < curr[j].score) {
 	      curr[j] = prev[j];
-	      curr[j].score    += COSTS::deletion;
-	      curr[j].deletion += COSTS::deletion;
+	      curr[j].score    += weights.deletion;
+	      curr[j].deletion += weights.deletion;
 	    }
 	  }
 	  std::swap(prev, curr);
@@ -111,10 +105,15 @@ namespace cicada
     };
    
     WERScorer::WERScorer(const WERScorer& x)
-      : Scorer(static_cast<const Scorer&>(*this))
+      : Scorer(static_cast<const Scorer&>(*this)),
+	weights(x.weights),
+	matcher(0)
     {
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
+      
+      if (x.matcher)
+	matcher = &matcher_type::create(x.matcher->algorithm());
     }
     
     WERScorer::~WERScorer()
@@ -127,9 +126,14 @@ namespace cicada
       clear();
       
       static_cast<Scorer&>(*this) = static_cast<const Scorer&>(x);
-
+      
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
+      
+      weights = x.weights;
+      matcher = 0;
+      if (x.matcher)
+	matcher = &matcher_type::create(x.matcher->algorithm());
       
       return *this;
     }
@@ -162,7 +166,7 @@ namespace cicada
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));
 	
-	impl_type::value_type value = evaluator(sentence);
+	impl_type::value_type value = evaluator(sentence, weights, matcher);
 	
 	if (value.score < score_best) {
 	  score_best = value.score;

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <cicada/eval/score.hpp>
+#include <cicada/matcher.hpp>
 
 namespace cicada
 {
@@ -109,13 +110,28 @@ namespace cicada
     {
     public:
       typedef double count_type;
-      
+      typedef double weight_type;
+      typedef cicada::Matcher matcher_type;
+
+      struct weights_type
+      {
+	weight_type match;
+	weight_type substitution;
+	weight_type insertion;
+	weight_type deletion;
+	
+	weights_type() : match(0.2), substitution(1.0), insertion(1.0), deletion(1.0) {}
+      };
+
     private:
       typedef WERScorerImpl impl_type;
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      WERScorer() : impl() { }
+      WERScorer() : impl(), weights(), matcher(0) { }
+      WERScorer(const weights_type& __weights) : impl(), weights(__weights), matcher(0) {}
+      WERScorer(const weights_type& __weights, const matcher_type* __matcher) : impl(), weights(__weights), matcher(__matcher) {}
+      
       WERScorer(const WERScorer& x);
       ~WERScorer();
       WERScorer& operator=(const WERScorer& x);
@@ -131,6 +147,9 @@ namespace cicada
       
     private:
       impl_set_type impl;
+      weights_type  weights;
+      
+      const matcher_type* matcher;
     };
   };
 };

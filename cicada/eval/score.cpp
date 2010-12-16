@@ -45,14 +45,19 @@ per: position indenendent error rate\n\
 \ttokenizer=[tokenizer spec]\n\
 wer: word error rate\n\
 \ttokenizer=[tokenizer spec]\n\
+\tmatcher=[matcher spec] approximate matching\n\
+\tmatch=approximated match cost (default 0.2)\n\
+\tsubstitution=substitution cost (default 1)\n\
+\tinsertion=insertion cost (default 1)\n\
+\tdeletion=deletion cost (default 1)\n\
 ter: translation error rate\n\
 \ttokenizer=[tokenizer spec]\n\
+\tmatcher=[matcher spec] approximate matching\n\
 \tmatch=approximated match cost (default 0.2)\n\
 \tsubstitution=substitution cost (default 1)\n\
 \tinsertion=insertion cost (default 1)\n\
 \tdeletion=deletion cost (default 1)\n\
 \tshift=shift cost (default 1)\n\
-\tmatcher=[matcher spec] approximate matching\n\
 sk: string kernel\n\
 \tp=order of string kernel (default 4)\n\
 \tdecay=decay factor for string kernel (default 0.8)\n\
@@ -169,15 +174,28 @@ sb: skip bigram\n\
 	scorer->tokenizer = tokenizer;
       } else if (param.name() == "wer") {
 	const tokenizer_type* tokenizer = 0;
+	const Matcher* matcher = 0;
+	
+	WERScorer::weights_type weights;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "matcher") == 0)
+	    matcher = &Matcher::create(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "match") == 0)
+	    weights.match = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "substitution") == 0)
+	    weights.substitution = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "insertion") == 0)
+	    weights.insertion = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "deletion") == 0)
+	    weights.deletion = boost::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for wer: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
-	scorer = scorer_ptr_type(new WERScorer());
+	scorer = scorer_ptr_type(new WERScorer(weights, matcher));
 	scorer->tokenizer = tokenizer;
       } else if (param.name() == "ter") {
 	const tokenizer_type* tokenizer = 0;
@@ -185,22 +203,21 @@ sb: skip bigram\n\
 	
 	TERScorer::weights_type weights;
 	
-	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
 	    tokenizer = &tokenizer_type::create(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "match") == 0)
-	    weights.match = boost::lexical_cast<double>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "substitution") == 0)
-	    weights.substitution = boost::lexical_cast<double>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "insertion") == 0)
-	    weights.insertion = boost::lexical_cast<double>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "deletion") == 0)
-	    weights.deletion = boost::lexical_cast<double>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "shift") == 0)
-	    weights.shift = boost::lexical_cast<double>(piter->second);
-	  if (strcasecmp(piter->first.c_str(), "matcher") == 0)
+	  else if (strcasecmp(piter->first.c_str(), "matcher") == 0)
 	    matcher = &Matcher::create(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "match") == 0)
+	    weights.match = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "substitution") == 0)
+	    weights.substitution = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "insertion") == 0)
+	    weights.insertion = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "deletion") == 0)
+	    weights.deletion = boost::lexical_cast<double>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "shift") == 0)
+	    weights.shift = boost::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for ter: " << piter->first << "=" << piter->second << std::endl;
 	}
