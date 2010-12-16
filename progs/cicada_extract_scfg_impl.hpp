@@ -684,6 +684,9 @@ struct ExtractSCFG
     rule_pair.target += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
     for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
       rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
+
+    const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
+    const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
     
     rule_pair.alignment.clear();
     for (int src = spans.source.first; src != spans.source.second; ++ src) 
@@ -697,8 +700,8 @@ struct ExtractSCFG
 	    const int mask_target = - (*aiter >= spans_nt1.target.second);
 	    
 	    // we shift -1, since we have to take into account the <x1> token...
-	    const int shift_source = (mask_source & (spans_nt1.source.second - spans_nt1.source.first - 1)) + spans.source.first;
-	    const int shift_target = (mask_target & (spans_nt1.target.second - spans_nt1.target.first - 1)) + spans.target.first;
+	    const int shift_source = (mask_source & (nt1_source_size - 1)) + spans.source.first;
+	    const int shift_target = (mask_target & (nt1_target_size - 1)) + spans.target.first;
 	    
 	    //const int shift_source = (src >= spans_nt1.source.second ? spans_nt1.source.second - spans_nt1.source.first - 1 : 0) + ...;
 	    //const int shift_target = (trg >= spans_nt1.target.second ? spans_nt1.target.second - spans_nt1.target.first - 1 : 0) + ...;
@@ -758,6 +761,11 @@ struct ExtractSCFG
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
     }
 
+    const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
+    const int nt2_source_size = spans_nt2.source.second - spans_nt2.source.first;
+    const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
+    const int nt2_target_size = spans_nt2.target.second - spans_nt2.target.first;
+
     rule_pair.alignment.clear();
     for (int src = spans.source.first; src != spans.source.second; ++ src) 
       if (is_out_of_span(spans_nt1.source, src) && is_out_of_span(spans_nt2.source, src)) {
@@ -773,11 +781,9 @@ struct ExtractSCFG
 	    const int mask_target2 = - (*aiter >= spans_nt2.target.second);
 	    
 	    // we shift -1, since we have to take into account the <x1> token... (also for <x2>)
-	    const int shift_source = ((mask_source1 & (spans_nt1.source.second - spans_nt1.source.first - 1))
-				      + (mask_source2 & (spans_nt2.source.second - spans_nt2.source.first - 1))
+	    const int shift_source = ((mask_source1 & (nt1_source_size - 1)) + (mask_source2 & (nt2_source_size - 1))
 				      + spans.source.first);
-	    const int shift_target = ((mask_target1 & (spans_nt1.target.second - spans_nt1.target.first - 1))
-				      + (mask_target2 & (spans_nt2.target.second - spans_nt2.target.first - 1))
+	    const int shift_target = ((mask_target1 & (nt1_target_size - 1)) + (mask_target2 & (nt2_target_size - 1))
 				      + spans.target.first);
 	    
 	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
