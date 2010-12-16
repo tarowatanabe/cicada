@@ -10,6 +10,7 @@
 
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include <cicada/hypergraph.hpp>
 
@@ -39,9 +40,9 @@ namespace cicada
     typedef enum {
       left,
       leftdis,
+      leftexcept,
       right,
       rightdis,
-      leftexcept,
       rightexcept,
     } direction_type;
 
@@ -140,6 +141,97 @@ namespace cicada
     
     virtual size_type find_marked_head(const rule_type& rule, const symbol_type& parent) const=0;
     virtual size_type find_head(const rule_type& rule, const symbol_type& parent) const=0;
+
+  protected:
+    
+    template <typename Iterator>
+    Iterator traverse_left(const category_set_type& categories, Iterator first, Iterator last) const
+    {
+      category_set_type::const_iterator citer_end = categories.end();
+      for (category_set_type::const_iterator citer = categories.begin(); citer != citer_end; ++ citer) {
+	Iterator iter = std::find(first, last, *citer);
+	if (iter != last)
+	  return iter;
+      }
+      return last;
+    }
+    
+    
+    template <typename Iterator>
+    Iterator traverse_leftdis(const category_set_type& categories, Iterator first, Iterator last) const
+    {
+      for (/**/; first != last; ++ first) 
+	if (first->is_non_teminal()) {
+	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *first);
+	  if (citer != categories.end())
+	    return first;
+	}
+      return last;
+    }
+
+    template <typename Iterator>
+    Iterator traverse_leftexcept(const category_set_type& categories, Iterator first, Iterator last) const
+    {
+      for (/**/; first != last; ++ first) 
+	if (first->is_non_teminal()) {
+	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *first);
+	  if (citer == categories.end())
+	    return first;
+	}
+      return last;
+    }
+
+    template <typename Iterator>
+    Iterator traverse_right(const category_set_type& categories, Iterator first, Iterator last) const
+    {
+      category_set_type::const_iterator citer_end = categories.end();
+      for (category_set_type::const_iterator citer = categories.begin(); citer != citer_end; ++ citer) {
+	for (Iterator iter = last; iter != first; -- iter)
+	  if (*citer == *(iter - 1))
+	    return iter - 1;
+      }
+      return last;
+    }
+
+    template <typename Iterator>
+    Iterator traverse_rightdis(const category_set_type& categories, Iterator first, Iterator last) const
+    {
+      
+      for (Iterator iter = last; iter != first; -- iter)
+	if (first->is_non_teminal()) {
+	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *(iter - 1));
+	  if (citer != categories.end())
+	    return iter - 1;
+	}
+      return last;
+    }
+    
+    template <typename Iterator>
+    Iterator traverse_rightexcept(const category_set_type& categories, Iterator first, Iterator last) const
+    {
+      for (Iterator iter = last; iter != first; -- iter) 
+	if (first->is_non_teminal()) {
+	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *(iter - 1));
+	  if (citer == categories.end())
+	    return iter - 1;
+	}
+      return last;
+    }
+
+    template <size_t N>
+    category_set_type assign_category(const char* (&nt)[N]) const
+    {
+      category_set_type categories;
+      for (size_t i = 0; i != N; ++ i)
+	categories.push_back('[' + std::string(nt[i]) + ']');
+      return categories;
+    }
+
+    category_set_type assign_category(const char* (&nt)[0])
+    {
+      return category_set_type();
+    }
+    
     
   public:
     static HeadFinder& create(const std::string& parameter);

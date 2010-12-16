@@ -9,6 +9,7 @@ libcicada-feature.la \
 libcicada-matcher.la \
 libcicada-semiring.la \
 libcicada-eval.la \
+libcicada-head.la \
 libcicada-optimize.la \
 libcicada-stemmer.la 
 
@@ -16,6 +17,7 @@ libcicadaincludedir= $(pkgincludedir)/cicada
 
 semiringdir  = $(pkgincludedir)/cicada/semiring
 evaldir      = $(pkgincludedir)/cicada/eval
+headdir      = $(pkgincludedir)/cicada/head
 optimizedir  = $(pkgincludedir)/cicada/optimize
 featuredir   = $(pkgincludedir)/cicada/feature
 stemmerdir   = $(pkgincludedir)/cicada/stemmer
@@ -56,6 +58,14 @@ eval/ter.cpp \
 eval/wer.cpp \
 eval/wlcs.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
+
+dist_head_HEADERS = \
+head/collins.hpp
+
+libcicada_head_la_SOURCES = \
+head/collins.cpp
+libcicada_head_la_CPPFLAGS = $(AM_CPPFLAGS)
+
 
 dist_optimize_HEADERS = \
 optimize/line_search.hpp \
@@ -277,6 +287,7 @@ libcicada_la_LDFLAGS = \
 
 libcicada_la_LIBADD = \
 	libcicada-eval.la \
+	libcicada-head.la \
 	libcicada-feature.la \
 	libcicada-matcher.la \
 	libcicada-optimize.la \
