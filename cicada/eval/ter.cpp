@@ -538,7 +538,12 @@ namespace cicada
     };
    
     TERScorer::TERScorer(const TERScorer& x)
-      : Scorer(static_cast<const Scorer&>(*this))
+      : Scorer(static_cast<const Scorer&>(*this)),
+	match(x.match),
+	substitution(x.substitution),
+	insertion(x.insertion),
+	deletion(x.deletion),
+	shift(x.shift)
     {
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
@@ -557,6 +562,12 @@ namespace cicada
 
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
+      
+      match        = x.match;
+      substitution = x.substitution;
+      insertion    = x.insertion;
+      deletion     = x.deletion;
+      shift        = x.shift;
       
       return *this;
     }

@@ -158,12 +158,17 @@ int main(int argc, char** argv)
 	int better = 0;
 	int worse  = 0;
 	
-	score_ptr_type score(scores1.front()->zero());
-	for (size_t i = 0; i != scores1.size(); ++ i)
-	  *score += *scores1[i];
+	score_ptr_type score1(scores1.front()->zero());
+	score_ptr_type score2(scores2.front()->zero());
+	for (size_t i = 0; i != scores1.size(); ++ i) {
+	  *score1 += *scores1[i];
+	  *score2 += *scores2[i];
+	}
 	
-	const double eval1 = score->score().first;
-
+	const double eval1 = score1->score().first;
+	const double eval2 = score2->score().first;
+	
+	score_ptr_type score = score1;
 	for (size_t i = 0; i != scores2.size(); ++ i) {
 	  *score -= *scores1[i];
 	  *score += *scores2[i];
@@ -191,7 +196,8 @@ int main(int argc, char** argv)
 	const double se = std::sqrt(mean * (1.0 - mean) / n);
 	
 	utils::compress_ostream os(output_file);
-	os << "system2 better: " << better << " worse: " << worse << '\n'
+	os << "system1: " << eval1 << " system2: " << eval2 << '\n'
+	   << "system2 better: " << better << " worse: " << worse << '\n'
 	   << " Pr(better|different): " << mean << '\n'
 	   << " 95%-confidence: " << (mean-1.96*se) << ' ' << (mean+1.96*se) << '\n'
 	   << " 99%-confidence: " << (mean-2.58*se) << ' ' << (mean+2.58*se) << '\n';

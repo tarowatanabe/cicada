@@ -121,7 +121,21 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      TERScorer() : impl() { }
+      TERScorer()
+	: impl(),
+	  match(0.2), substitution(1.0), insertion(1.0), deletion(1.0), shift(1.0) { }
+      TERScorer(const double& __match,
+		const double& __substitution,
+		const double& __insertion,
+		const double& __deletion,
+		const double& __shift)
+	: impl(),
+	  match(__match), 
+	  substitution(__substitution),
+	  insertion(__insertion),
+	  deletion(__deletion),
+	  shift(__shift) {}
+      
       TERScorer(const TERScorer& x);
       ~TERScorer();
       TERScorer& operator=(const TERScorer& x);
@@ -137,6 +151,12 @@ namespace cicada
       
     private:
       impl_set_type impl;
+      
+      double match;
+      double substitution;
+      double insertion;
+      double deletion;
+      double shift;
     };
   };
 };
