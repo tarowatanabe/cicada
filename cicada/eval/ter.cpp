@@ -24,18 +24,11 @@ namespace cicada
 
     struct TERScorerConstant
     {
-      struct COSTS
-      {
-	static const double insertion;
-	static const double deletion;
-	static const double substitution;
-	static const double shift;
-      };
-      
       struct TRANSITION
       {
 	enum transition_type {
 	  match,
+	  approximate,
 	  substitution,
 	  insertion,
 	  deletion,
@@ -45,12 +38,7 @@ namespace cicada
       static const int max_shift_size = 10;
       static const int max_shift_dist = 50;
     };
-    
-    const double TERScorerConstant::COSTS::insertion    = 1.0;
-    const double TERScorerConstant::COSTS::deletion     = 1.0;
-    const double TERScorerConstant::COSTS::substitution = 1.0;
-    const double TERScorerConstant::COSTS::shift        = 1.0;
-    
+        
     // Do we really implement this...???
     class TERScorerImpl : public TERScorerConstant
     {
@@ -58,8 +46,13 @@ namespace cicada
       friend class TERScorer;
       
     public:
+      typedef TERScorer ter_scorer_type;
+      typedef ter_scorer_type::weights_type weights_type;
+
       typedef cicada::Sentence sentence_type;
       typedef cicada::Symbol   word_type;
+
+      typedef cicada::Matcher matcher_type;
       
       typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
 
@@ -67,12 +60,13 @@ namespace cicada
       {
 	double score;
 	int match;
+	int approximate;
 	int insertion;
 	int deletion;
 	int substitution;
 	int shift;
 	
-	Score() : score(), match(0), insertion(0), deletion(0), substitution(0), shift(0) {}
+	Score() : score(), match(0), approximate(0), insertion(0), deletion(0), substitution(0), shift(0) {}
       };
 
       struct Shift
@@ -111,31 +105,29 @@ namespace cicada
 			    std::allocator<std::pair<const ngram_type, index_set_type> > > ngram_index_map_type;
 #endif
       
-      
       TERScorerImpl(const sentence_type& __ref)
 	: ref(__ref) {  }
       
-      
-      value_type operator()(const sentence_type& sentence) const
+      value_type operator()(const sentence_type& sentence, const weights_type& weights, const matcher_type* matcher) const
       {
 	if (sentence.empty()) {
 	  value_type value;
 	  
-	  value.score    = COSTS::deletion * ref.size();
+	  value.score    = weights.deletion * ref.size();
 	  value.deletion = ref.size();
 	  
 	  return value;
 	} else if (ref.empty()) {
 	  value_type value;
 	  
-	  value.score    = COSTS::insertion * sentence.size();
+	  value.score     = weights.insertion * sentence.size();
 	  value.insertion = sentence.size();
 	  
 	  return value;
 	} else {
 	  value_type value;
 	  
-	  calculate_shifts(sentence, ref, value);
+	  calculate_shifts(sentence, ref, value, weights, matcher);
 	  
 	  return value;
 	}
@@ -143,13 +135,13 @@ namespace cicada
 
     private:
 
-      double calculate_shifts(const sentence_type& hyp_orig, const sentence_type& ref, value_type& value) const
+      double calculate_shifts(const sentence_type& hyp_orig, const sentence_type& ref, value_type& value, const weights_type& weights, const matcher_type* matcher) const
       {
 	value = value_type();
 	
 	sentence_type hyp = hyp_orig;
 	path_type     path;
-	double        cost = minimum_edit_distance(hyp, ref, path);
+	double        cost = minimum_edit_distance(hyp, ref, path, weights, matcher);
 
 	//std::cerr << "initial cost: " << cost << std::endl;
 	
@@ -165,10 +157,10 @@ namespace cicada
 	  path_new.clear();
 	  cost_new = 0;
 
-	  if (! calculate_best_shift(hyp, path, cost, hyp_new, path_new, cost_new, ngram_index))
+	  if (! calculate_best_shift(hyp, path, cost, hyp_new, path_new, cost_new, ngram_index, weights, matcher))
 	    break;
 	  
-	  value.score += COSTS::shift;
+	  value.score += weights.shift;
 	  ++ value.shift;
 	  
 	  hyp.swap(hyp_new);
@@ -182,6 +174,7 @@ namespace cicada
 	for (path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
 	  switch (*piter) {
 	  case TRANSITION::match:        ++ value.match; break;
+	  case TRANSITION::approximate:  ++ value.approximate; break;
 	  case TRANSITION::substitution: ++ value.substitution; break;
 	  case TRANSITION::insertion:    ++ value.insertion; break;
 	  case TRANSITION::deletion:     ++ value.deletion; break;
@@ -245,6 +238,14 @@ namespace cicada
 	    rerr.push_back(false);
 	    ralign.push_back(hpos);
 	    break;
+	  case TRANSITION::approximate:
+	    // std::cerr << " A";
+	    ++ hpos;
+	    ++ rpos;
+	    herr.push_back(false);
+	    rerr.push_back(false);
+	    ralign.push_back(hpos);
+	    break;
 	  case TRANSITION::substitution:
 	    //std::cerr << " S";
 	    ++ hpos;
@@ -275,7 +276,9 @@ namespace cicada
 				sentence_type& hyp_best,
 				path_type& path_best,
 				double& cost_best,
-				const ngram_index_map_type& ngram_index) const
+				const ngram_index_map_type& ngram_index,
+				const weights_type& weights,
+				const matcher_type* matcher) const
       {
 	//std::cerr << "hyp: " << hyp << std::endl;
 	//std::cerr << "ref: " << ref << std::endl;
@@ -334,8 +337,8 @@ namespace cicada
 	      
 	      perform_shift(hyp, shift, hyp_shifted);
 	    
-	      const double cost_shifted = minimum_edit_distance(hyp_shifted, ref, path_shifted);
-	      const double gain = (cost_best + cost_shift_best) - (cost_shifted + COSTS::shift);
+	      const double cost_shifted = minimum_edit_distance(hyp_shifted, ref, path_shifted, weights, matcher);
+	      const double gain = (cost_best + cost_shift_best) - (cost_shifted + weights.shift);
 	      
 	      //std::cerr << "hyp original: " << hyp << std::endl;
 	      //std::cerr << "hyp shifted:  " << hyp_shifted << std::endl;
@@ -343,7 +346,7 @@ namespace cicada
 	    
 	      if (gain > 0 || (cost_shift_best == 0 && gain == 0)) {
 		cost_best       = cost_shifted;
-		cost_shift_best = COSTS::shift;
+		cost_shift_best = weights.shift;
 		
 		path_best.swap(path_shifted);
 		hyp_best.swap(hyp_shifted);
@@ -472,7 +475,7 @@ namespace cicada
 	}
       }
       
-      double minimum_edit_distance(const sentence_type& hyp, const sentence_type& ref, path_type& path) const
+      double minimum_edit_distance(const sentence_type& hyp, const sentence_type& ref, path_type& path, const weights_type& weights, const matcher_type* matcher) const
       {
 	typedef utils::vector2<transition_type, std::allocator<transition_type> > matrix_transition_type;
 	typedef utils::vector2<double, std::allocator<double> > matrix_cost_type;
@@ -481,11 +484,11 @@ namespace cicada
 	matrix_cost_type       costs(hyp.size() + 1, ref.size() + 1, 0.0);
 	
 	for (int i = 1; i <= static_cast<int>(hyp.size()); ++ i) {
-	  costs(i, 0) = costs(i - 1, 0) + COSTS::insertion;
+	  costs(i, 0) = costs(i - 1, 0) + weights.insertion;
 	  trans(i, 0) = TRANSITION::insertion;
 	}
 	for (int j = 1; j <= static_cast<int>(ref.size()); ++ j) {
-	  costs(0, j) = costs(0, j - 1) + COSTS::deletion;
+	  costs(0, j) = costs(0, j - 1) + weights.deletion;
 	  trans(0, j) = TRANSITION::deletion;
 	}
 	
@@ -497,17 +500,20 @@ namespace cicada
 	    if (hyp[i - 1] == ref[j - 1]) {
 	      cur_cost = costs(i - 1, j - 1);
 	      cur_tran = TRANSITION::match;
+	    } else if (matcher && matcher->operator()(hyp[i - 1], ref[j - 1])) {
+	      cur_cost = costs(i - 1, j - 1) + weights.match;
+	      cur_tran = TRANSITION::approximate;
 	    } else {
-	      cur_cost = costs(i - 1, j - 1) + COSTS::substitution;
+	      cur_cost = costs(i - 1, j - 1) + weights.substitution;
 	      cur_tran = TRANSITION::substitution;
 	    }
 	    
-	    const double ins = costs(i - 1, j) + COSTS::insertion;
+	    const double ins = costs(i - 1, j) + weights.insertion;
 	    if (cur_cost > ins) {
 	      cur_cost = ins;
 	      cur_tran = TRANSITION::insertion;
 	    }
-	    const double del = costs(i, j - 1) + COSTS::deletion;
+	    const double del = costs(i, j - 1) + weights.deletion;
 	    if (cur_cost > del) {
 	      cur_cost = del;
 	      cur_tran = TRANSITION::deletion;
@@ -521,6 +527,7 @@ namespace cicada
 	  const transition_type& t = trans(i, j);
 	  path.push_back(t);
 	  switch (t) {
+	  case TRANSITION::approximate:
 	  case TRANSITION::substitution:
 	  case TRANSITION::match:        -- i; -- j; break;
 	  case TRANSITION::insertion:    -- i; break;
@@ -539,14 +546,15 @@ namespace cicada
    
     TERScorer::TERScorer(const TERScorer& x)
       : Scorer(static_cast<const Scorer&>(*this)),
-	match(x.match),
-	substitution(x.substitution),
-	insertion(x.insertion),
-	deletion(x.deletion),
-	shift(x.shift)
+	impl(),
+	weights(x.weights),
+	matcher(0)
     {
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
+      
+      if (x.matcher)
+	matcher = &matcher_type::create(x.matcher->algorithm());
     }
     
     TERScorer::~TERScorer()
@@ -563,11 +571,10 @@ namespace cicada
       for (impl_set_type::const_iterator iter = x.impl.begin(); iter != x.impl.end(); ++ iter)
 	impl.push_back(new impl_type(*(*iter)));
       
-      match        = x.match;
-      substitution = x.substitution;
-      insertion    = x.insertion;
-      deletion     = x.deletion;
-      shift        = x.shift;
+      weights = x.weights;
+      matcher = 0;
+      if (x.matcher)
+	matcher = &matcher_type::create(x.matcher->algorithm());
       
       return *this;
     }
@@ -600,15 +607,15 @@ namespace cicada
       for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	impl_type& evaluator = const_cast<impl_type&>(*(*iter));
 	
-	const impl_type::value_type value = evaluator(sentence);
+	const impl_type::value_type value = evaluator(sentence, weights, matcher);
 	
 	if (value.score < score_best) {
 	  score_best = value.score;
 	  
-	  ter->insertion    = value.insertion;
-	  ter->deletion     = value.deletion;
-	  ter->substitution = value.substitution;
-	  ter->shift        = value.shift;
+	  ter->insertion    = weights.insertion    * value.insertion;
+	  ter->deletion     = weights.deletion     * value.deletion;
+	  ter->substitution = weights.substitution * value.substitution + weights.match * value.approximate;
+	  ter->shift        = weights.shift        * value.shift;
 	}
 
 	ter->references += evaluator.ref.size();

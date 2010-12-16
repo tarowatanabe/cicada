@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <cicada/eval/score.hpp>
+#include <cicada/matcher.hpp>
 
 namespace cicada
 {
@@ -23,7 +24,6 @@ namespace cicada
       
     public:
       typedef double count_type;
-      
       
     public:
       TER() : insertion(0), deletion(0), substitution(0), shift(0), references(0) {}
@@ -115,26 +115,28 @@ namespace cicada
     {
     public:
       typedef double count_type;
+      typedef double weight_type;
+      typedef cicada::Matcher matcher_type;
+
+      struct weights_type
+      {
+	weight_type match;
+	weight_type substitution;
+	weight_type insertion;
+	weight_type deletion;
+	weight_type shift;
+	
+	weights_type() : match(0.2), substitution(1.0), insertion(1.0), deletion(1.0), shift(1.0) {}
+      };
       
     private:
       typedef TERScorerImpl impl_type;
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      TERScorer()
-	: impl(),
-	  match(0.2), substitution(1.0), insertion(1.0), deletion(1.0), shift(1.0) { }
-      TERScorer(const double& __match,
-		const double& __substitution,
-		const double& __insertion,
-		const double& __deletion,
-		const double& __shift)
-	: impl(),
-	  match(__match), 
-	  substitution(__substitution),
-	  insertion(__insertion),
-	  deletion(__deletion),
-	  shift(__shift) {}
+      TERScorer() : impl(), weights(), matcher(0) { }
+      TERScorer(const weights_type& __weights) : impl(), weights(__weights), matcher(0) {}
+      TERScorer(const weights_type& __weights, const matcher_type* __matcher) : impl(), weights(__weights), matcher(__matcher) {}
       
       TERScorer(const TERScorer& x);
       ~TERScorer();
@@ -151,12 +153,9 @@ namespace cicada
       
     private:
       impl_set_type impl;
+      weights_type  weights;
       
-      double match;
-      double substitution;
-      double insertion;
-      double deletion;
-      double shift;
+      const matcher_type* matcher;
     };
   };
 };

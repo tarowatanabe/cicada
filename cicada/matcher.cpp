@@ -116,12 +116,11 @@ wordnet: matching by wordnet synsets\n\
 	  std::cerr << "unsupported parameter for wordnet matcher: " << piter->first << "=" << piter->second << std::endl;
       }
       
-      const std::string name("lower");
-      
+      const std::string name("wordnet");
       matcher_map_type::iterator iter = matchers_map.find(name);
       if (iter == matchers_map.end()) {
 	iter = matchers_map.insert(std::make_pair(name, matcher_ptr_type(new matcher::WordNet(path)))).first;
-	iter->second->__algorithm = param;
+	iter->second->__algorithm = parameter;
       }
       
       return *(iter->second);
