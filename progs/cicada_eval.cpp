@@ -165,8 +165,8 @@ int main(int argc, char** argv)
 	  *score2 += *scores2[i];
 	}
 	
-	const double eval1 = score1->score().first;
-	const double eval2 = score2->score().first;
+	const std::pair<double, double> eval1 = score1->score();
+	const std::pair<double, double> eval2 = score2->score();
 	
 	score_ptr_type score = score1;
 	for (size_t i = 0; i != scores2.size(); ++ i) {
@@ -176,17 +176,17 @@ int main(int argc, char** argv)
 	  const double eval2 = score->score().first;
 
 	  if (error_metric) {
-	    if (eval2 < eval1)
+	    if (eval2 < eval1.first)
 	      better += 1;
-	    else if (eval2 > eval1)
+	    else if (eval2 > eval1.first)
 	      worse += 1;
 	  } else {
-	    if (eval2 > eval1)
+	    if (eval2 > eval1.first)
 	      better += 1;
-	    else if (eval2 < eval1)
+	    else if (eval2 < eval1.first)
 	      worse += 1;
 	  }
-
+	  
 	  *score -= *scores2[i];
 	  *score += *scores1[i];
 	}
@@ -196,22 +196,23 @@ int main(int argc, char** argv)
 	const double se = std::sqrt(mean * (1.0 - mean) / n);
 	
 	utils::compress_ostream os(output_file);
-	os << "system1: " << eval1 << " system2: " << eval2 << '\n'
+	os << "system1: " << eval1.first << " penalty: " << eval1.second
+	   << " system2: " << eval2.first << " penalty: " << eval2.second << '\n'
 	   << "system2 better: " << better << " worse: " << worse << '\n'
-	   << " Pr(better|different): " << mean << '\n'
-	   << " 95%-confidence: " << (mean-1.96*se) << ' ' << (mean+1.96*se) << '\n'
-	   << " 99%-confidence: " << (mean-2.58*se) << ' ' << (mean+2.58*se) << '\n';
+	   << "Pr(better|different): " << mean << '\n'
+	   << "95%-confidence: " << (mean-1.96*se) << ' ' << (mean+1.96*se) << '\n'
+	   << "99%-confidence: " << (mean-2.58*se) << ' ' << (mean+2.58*se) << '\n';
 	
 	if (mean - 2.58*se > 0.5)
-	  os << " system2 is significantly better (p < 0.01)";
+	  os << "system2 is significantly better (p < 0.01)";
 	else if (mean + 2.58*se < 0.5)
-	  os << " system2 is significantly worse (p < 0.01)";
+	  os << "system2 is significantly worse (p < 0.01)";
 	else if (mean - 1.96*se > 0.5)
-	  os << " system2 is significantly better (p < 0.05)";
+	  os << "system2 is significantly better (p < 0.05)";
 	else if (mean + 1.96*se < 0.5)
-	  os << " system2 is significantly worse (p < 0.05)";
+	  os << "system2 is significantly worse (p < 0.05)";
 	else
-	  os << " no significant difference";
+	  os << "no significant difference";
 	os << '\n';
       }
     } else if (bootstrap) {
