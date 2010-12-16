@@ -13,6 +13,7 @@
 #include "cicada/graphviz.hpp"
 
 #include "cicada/stemmer.hpp"
+#include "cicada/matcher.hpp"
 #include "cicada/eval/ter.hpp"
 
 #include "utils/sgi_hash_map.hpp"
@@ -26,6 +27,17 @@
 
 struct TER
 {
+  struct weights_type
+  {
+    double match;
+    double substitution;
+    double insertion;
+    double deletion;
+    double shift;
+    
+    weights_type() : match(0.2), substitution(1.0), insertion(1.0), deletion(1.0), shift(1.0) {}
+  };
+
   struct COSTS
   {
     static const double insertion;
@@ -55,6 +67,7 @@ const double TER::COSTS::deletion     = 1.0;
 const double TER::COSTS::substitution = 1.0;
 const double TER::COSTS::shift        = 1.0;
 
+typedef cicada::Matcher matcher_type;
 
 struct Matcher
 {
@@ -761,6 +774,9 @@ path_type count_feature_file;
 bool merge_all = false;
 bool match_lower = false;
 
+std::string       matcher;
+TER::weights_type weights;
+
 std::string confidence;
 std::string count;
 double count_weight = 1.0;
@@ -1029,9 +1045,16 @@ void options(int argc, char** argv)
     
     ("confidence-feature-file", po::value<path_type>(&confidence_feature_file), "confidence feature file")
     ("count-feature-file",      po::value<path_type>(&count_feature_file),      "count feature file")
-
-    ("merge", po::bool_switch(&merge_all),   "merge all the lattice")
-    ("lower", po::bool_switch(&match_lower), "lower-casing")
+    
+    ("merge",   po::bool_switch(&merge_all),      "merge all the lattice")
+    ("lower",   po::bool_switch(&match_lower),    "lower-casing")
+    ("matcher", po::value<std::string>(&matcher), "approximate matcher")
+    
+    ("match",        po::value<double>(&weights.match),        "approximated matching cost")
+    ("substitution", po::value<double>(&weights.substitution), "substitution cost")
+    ("insertion",    po::value<double>(&weights.insertion),    "insertion cost")
+    ("deletion",     po::value<double>(&weights.deletion),     "deletion cost")
+    ("shift",        po::value<double>(&weights.shift),        "shift cost")
     
     ("confidence",   po::value<std::string>(&confidence),    "add confidence weight feature name")
     ("count",        po::value<std::string>(&count),         "add count weight feature name")
