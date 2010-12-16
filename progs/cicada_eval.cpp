@@ -131,7 +131,7 @@ int main(int argc, char** argv)
 	  score_ptr_type score2(scores2.front()->zero());
 	  for (size_t i = 0; i != scores1.size(); ++ i) {
 	    const int seg = generator(scores1.size());
-	  
+	    
 	    *score1 += *scores1[seg];
 	    *score2 += *scores2[seg];
 	  }
@@ -173,18 +173,21 @@ int main(int argc, char** argv)
 	  *score -= *scores1[i];
 	  *score += *scores2[i];
 	  
-	  const double eval2 = score->score().first;
+	  const std::pair<double, double> eval2 = score->score();
 
+	  if (debug >= 2)
+	    std::cerr << "system2: " << eval2.first << " penalty: " << eval2.second << std::endl;
+	  
 	  if (error_metric) {
-	    if (eval2 < eval1.first)
-	      better += 1;
-	    else if (eval2 > eval1.first)
-	      worse += 1;
+	    if (eval2.first < eval1.first)
+	      ++ better;
+	    else if (eval2.first > eval1.first)
+	      ++ worse;
 	  } else {
-	    if (eval2 > eval1.first)
-	      better += 1;
-	    else if (eval2 < eval1.first)
-	      worse += 1;
+	    if (eval2.first > eval1.first)
+	      ++ better;
+	    else if (eval2.first < eval1.first)
+	      ++ worse;
 	  }
 	  
 	  *score -= *scores2[i];

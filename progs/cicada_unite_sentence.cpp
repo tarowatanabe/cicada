@@ -38,14 +38,6 @@ struct TER
     weights_type() : match(0.2), substitution(1.0), insertion(1.0), deletion(1.0), shift(1.0) {}
   };
 
-  struct COSTS
-  {
-    static const double insertion;
-    static const double deletion;
-    static const double substitution;
-    static const double shift;
-  };
-  
   struct TRANSITION
   {
     enum transition_type {
@@ -62,11 +54,6 @@ struct TER
   static const int max_shift_size = 10;
   static const int max_shift_dist = 50;
 };
-
-const double TER::COSTS::insertion    = 1.0;
-const double TER::COSTS::deletion     = 1.0;
-const double TER::COSTS::substitution = 1.0;
-const double TER::COSTS::shift        = 1.0;
 
 typedef cicada::Matcher matcher_type;
 
@@ -112,7 +99,10 @@ struct MinimumEditDistance : public M
 #endif
   typedef std::vector<word_set_type, std::allocator<word_set_type> > word_map_type;
 
-  MinimumEditDistance(const int __debug=0) : debug(__debug) {}
+  MinimumEditDistance(const TER::weights_type& __weights,
+		      const matcher_type* __matcher,
+		      const int __debug)
+    : weights(__weights), matcher(__matcher), debug(__debug) {}
   
   matrix_cost_type      costs;
   matrix_operation_type ops;
@@ -150,13 +140,13 @@ struct MinimumEditDistance : public M
     ops.resize(hyp.size() + 1, refs.size() + 1);
     
     for (int i = 1; i <= static_cast<int>(hyp.size()); ++ i) {
-      costs(i, 0) = costs(i - 1, 0) + TER::COSTS::insertion;
+      costs(i, 0) = costs(i - 1, 0) + weights.insertion;
       ops(i, 0) = TER::TRANSITION::insertion;
     }
     
     for (int j = 1; j <= static_cast<int>(refs.size()); ++ j)
       if (refs[j - 1].find(vocab_type::EPSILON) == refs[j - 1].end()) {
-	costs(0, j) = costs(0, j - 1) + TER::COSTS::deletion;
+	costs(0, j) = costs(0, j - 1) + weights.deletion;
 	ops(0, j) = TER::TRANSITION::deletion;
       } else {
 	costs(0, j) = costs(0, j - 1);
@@ -171,12 +161,21 @@ struct MinimumEditDistance : public M
 	word_set_type::const_iterator riter_end     = refs[j - 1].end();
 	word_set_type::const_iterator riter_match   = refs[j - 1].find(M::operator()(hyp[i - 1]));
 	word_set_type::const_iterator riter_epsilon = refs[j - 1].find(vocab_type::EPSILON);
+
+	word_set_type::const_iterator riter_approx = riter_end;
+	if (matcher && riter_match == riter_end)
+	  for (word_set_type::const_iterator witer = refs[j - 1].begin(); witer != riter_end && riter_approx == riter_end; ++ witer)
+	    if (*witer != vocab_type::EPSILON && matcher->operator()(M::operator()(hyp[i - 1]), *witer))
+	      riter_approx = witer;
 	
 	if (riter_match != riter_end) {
 	  cur_cost = costs(i - 1, j - 1);
 	  cur_op   = TER::TRANSITION::match;
+	} else if (riter_approx != riter_end) {
+	  cur_cost = costs(i - 1, j - 1) + weights.match;
+	  cur_op   = TER::TRANSITION::approximate;
 	} else {
-	  cur_cost = costs(i - 1, j - 1) + TER::COSTS::substitution;
+	  cur_cost = costs(i - 1, j - 1) + weights.substitution;
 	  cur_op   = TER::TRANSITION::substitution;
 	}
 	
@@ -187,14 +186,14 @@ struct MinimumEditDistance : public M
 	    cur_op   = TER::TRANSITION::epsilon;
 	  }
 	} else {
-	  const double del = costs(i, j - 1) + TER::COSTS::deletion;
+	  const double del = costs(i, j - 1) + weights.deletion;
 	  if (cur_cost > del) {
 	    cur_cost = del;
 	    cur_op   = TER::TRANSITION::deletion;
 	  }
 	}
 	
-	const double ins = costs(i - 1, j) + TER::COSTS::insertion;
+	const double ins = costs(i - 1, j) + weights.insertion;
 	if (cur_cost > ins) {
 	  cur_cost = ins;
 	  cur_op   = TER::TRANSITION::insertion;
@@ -228,6 +227,8 @@ struct MinimumEditDistance : public M
     return costs(hyp.size(), refs.size());
   }
 
+  TER::weights_type   weights;
+  const matcher_type* matcher;
   int debug;
 };
 
@@ -303,10 +304,17 @@ struct TranslationErrorRate : public TER, public M
   typedef std::set<shift_type, std::less<shift_type>, std::allocator<shift_type> > shift_set_type;
   typedef std::vector<shift_set_type, std::allocator<shift_set_type> > shift_matrix_type;
 
-  TranslationErrorRate(const int __debug=0)
-    : minimum_edit_distance(debug), debug(__debug) {}
+  TranslationErrorRate(const TER::weights_type& __weights,
+		       const matcher_type* __matcher,
+		       const int __debug)
+    : minimum_edit_distance(__weights, __matcher, debug),
+      weights(__weights),
+      matcher(__matcher),
+      debug(__debug) {}
   
   med_type minimum_edit_distance;
+  TER::weights_type   weights;
+  const matcher_type* matcher;
   int debug;
 
   double operator()(const lattice_type& ref, const sentence_type& hyp, value_type& value, path_type& path, sentence_type& hyp_reordered)
@@ -341,7 +349,7 @@ struct TranslationErrorRate : public TER, public M
       if (! calculate_best_shift(ref, hyp, path, cost, hyp_new, path_new, cost_new, lattice_unique))
 	break;
       
-      value.score += COSTS::shift;
+      value.score += weights.shift;
       ++ value.shift;
       
       hyp.swap(hyp_new);
@@ -480,7 +488,7 @@ struct TranslationErrorRate : public TER, public M
 	  perform_shift(hyp, shift, hyp_shifted);
 	  
 	  const double cost_shifted = minimum_edit_distance(hyp_shifted, path_shifted);
-	  const double gain = (cost_best + cost_shift_best) - (cost_shifted + COSTS::shift);
+	  const double gain = (cost_best + cost_shift_best) - (cost_shifted + weights.shift);
 	      
 	  //std::cerr << "hyp original: " << hyp << std::endl;
 	  //std::cerr << "hyp shifted:  " << hyp_shifted << std::endl;
@@ -488,7 +496,7 @@ struct TranslationErrorRate : public TER, public M
 	    
 	  if (gain > 0 || (cost_shift_best == 0 && gain == 0)) {
 	    cost_best       = cost_shifted;
-	    cost_shift_best = COSTS::shift;
+	    cost_shift_best = weights.shift;
 		
 	    path_best.swap(path_shifted);
 	    hyp_best.swap(hyp_shifted);
@@ -674,8 +682,10 @@ struct TERAligner : public TER, public M
 
   typedef typename ter_type::path_type  path_type;
   typedef typename ter_type::value_type value_type;
-
-  TERAligner(const int __debug=0) : ter(__debug) {}
+  
+  TERAligner(const TER::weights_type& weights,
+	     const matcher_type* matcher,
+	     const int __debug) : ter(weights, matcher, __debug) {}
   
   double operator()(const lattice_type& ref, const sentence_type& hyp, lattice_type& merged, const feature_set_type& features)
   {
@@ -839,6 +849,10 @@ int main(int argc, char ** argv)
       throw std::runtime_error("confidence feature list size does not match # of sentences");
     if (! features_count.empty() && sentences.size() != features_count.size())
       throw std::runtime_error("count feature list does not match # of sentences");
+
+    const matcher_type* __matcher = 0;
+    if (! matcher.empty())
+      __matcher = &matcher_type::create(matcher);
     
     if (merge_all) {
       typedef std::multimap<double, int, std::less<double>, std::allocator<std::pair<const double, int> > > ter_sent_type;
@@ -882,10 +896,10 @@ int main(int argc, char ** argv)
 	    features[feature_count] = count_weight;
 	  
 	  if (match_lower) {
-	    TERAligner<NormalizerLower> aligner(debug);
+	    TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
 	    aligner(merged, sentences[sent], merged_new, features);
 	  } else {
-	    TERAligner<Normalizer> aligner(debug);
+	    TERAligner<Normalizer> aligner(weights, __matcher, debug);
 	    aligner(merged, sentences[sent], merged_new, features);
 	  }
 	
@@ -917,10 +931,10 @@ int main(int argc, char ** argv)
 	    
 	    double score_local = 0.0;
 	    if (match_lower) {
-	      TERAligner<NormalizerLower> aligner(debug);
+	      TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
 	      score_local = aligner(merged, sentences[id], merged_new, features);
 	    } else {
-	      TERAligner<Normalizer> aligner(debug);
+	      TERAligner<Normalizer> aligner(weights, __matcher, debug);
 	      score_local = aligner(merged, sentences[id], merged_new, features);
 	    }
 	    if (debug)
@@ -999,10 +1013,10 @@ int main(int argc, char ** argv)
 	  features[feature_count] = count_weight;
 	
 	if (match_lower) {
-	  TERAligner<NormalizerLower> aligner(debug);
+	  TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
 	  aligner(merged, sentence, merged_new, features);
 	} else {
-	  TERAligner<Normalizer> aligner(debug);
+	  TERAligner<Normalizer> aligner(weights, __matcher, debug);
 	  aligner(merged, sentence, merged_new, features);
 	}
 	
