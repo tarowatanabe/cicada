@@ -28,7 +28,7 @@ namespace cicada
       {
 	enum transition_type {
 	  match,
-	  approximate,
+	  approximation,
 	  substitution,
 	  insertion,
 	  deletion,
@@ -60,13 +60,13 @@ namespace cicada
       {
 	double score;
 	int match;
-	int approximate;
+	int approximation;
 	int insertion;
 	int deletion;
 	int substitution;
 	int shift;
 	
-	Score() : score(), match(0), approximate(0), insertion(0), deletion(0), substitution(0), shift(0) {}
+	Score() : score(), match(0), approximation(0), insertion(0), deletion(0), substitution(0), shift(0) {}
       };
 
       struct Shift
@@ -173,11 +173,11 @@ namespace cicada
 	path_type::const_iterator piter_end = path.end();
 	for (path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
 	  switch (*piter) {
-	  case TRANSITION::match:        ++ value.match; break;
-	  case TRANSITION::approximate:  ++ value.approximate; break;
-	  case TRANSITION::substitution: ++ value.substitution; break;
-	  case TRANSITION::insertion:    ++ value.insertion; break;
-	  case TRANSITION::deletion:     ++ value.deletion; break;
+	  case TRANSITION::match:         ++ value.match; break;
+	  case TRANSITION::approximation: ++ value.approximation; break;
+	  case TRANSITION::substitution:  ++ value.substitution; break;
+	  case TRANSITION::insertion:     ++ value.insertion; break;
+	  case TRANSITION::deletion:      ++ value.deletion; break;
 	  }
 	}
 	
@@ -238,7 +238,7 @@ namespace cicada
 	    rerr.push_back(false);
 	    ralign.push_back(hpos);
 	    break;
-	  case TRANSITION::approximate:
+	  case TRANSITION::approximation:
 	    // std::cerr << " A";
 	    ++ hpos;
 	    ++ rpos;
@@ -502,7 +502,7 @@ namespace cicada
 	      cur_tran = TRANSITION::match;
 	    } else if (matcher && matcher->operator()(hyp[i - 1], ref[j - 1])) {
 	      cur_cost = costs(i - 1, j - 1) + weights.match;
-	      cur_tran = TRANSITION::approximate;
+	      cur_tran = TRANSITION::approximation;
 	    } else {
 	      cur_cost = costs(i - 1, j - 1) + weights.substitution;
 	      cur_tran = TRANSITION::substitution;
@@ -527,7 +527,7 @@ namespace cicada
 	  const transition_type& t = trans(i, j);
 	  path.push_back(t);
 	  switch (t) {
-	  case TRANSITION::approximate:
+	  case TRANSITION::approximation:
 	  case TRANSITION::substitution:
 	  case TRANSITION::match:        -- i; -- j; break;
 	  case TRANSITION::insertion:    -- i; break;
@@ -614,7 +614,7 @@ namespace cicada
 	  
 	  ter->insertion    = weights.insertion    * value.insertion;
 	  ter->deletion     = weights.deletion     * value.deletion;
-	  ter->substitution = weights.substitution * value.substitution + weights.match * value.approximate;
+	  ter->substitution = weights.substitution * value.substitution + weights.match * value.approximation;
 	  ter->shift        = weights.shift        * value.shift;
 	}
 

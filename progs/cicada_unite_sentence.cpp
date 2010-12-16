@@ -43,7 +43,7 @@ struct TER
     enum transition_type {
       epsilon,
       match,
-      approximate,
+      approximation,
       substitution,
       insertion,
       deletion,
@@ -173,7 +173,7 @@ struct MinimumEditDistance : public M
 	  cur_op   = TER::TRANSITION::match;
 	} else if (riter_approx != riter_end) {
 	  cur_cost = costs(i - 1, j - 1) + weights.match;
-	  cur_op   = TER::TRANSITION::approximate;
+	  cur_op   = TER::TRANSITION::approximation;
 	} else {
 	  cur_cost = costs(i - 1, j - 1) + weights.substitution;
 	  cur_op   = TER::TRANSITION::substitution;
@@ -208,7 +208,7 @@ struct MinimumEditDistance : public M
       operations.push_back(op);
       
       switch (op) {
-      case TER::TRANSITION::approximate:
+      case TER::TRANSITION::approximation:
       case TER::TRANSITION::substitution:
       case TER::TRANSITION::match:        -- i; -- j; break;
       case TER::TRANSITION::insertion:    -- i; break;
@@ -395,7 +395,7 @@ struct TranslationErrorRate : public TER, public M
 	rerr.push_back(false);
 	ralign.push_back(hpos);
 	break;
-      case TRANSITION::approximate:
+      case TRANSITION::approximation:
 	//std::cerr << " A";
 	++ hpos;
 	++ rpos;
@@ -710,7 +710,7 @@ struct TERAligner : public TER, public M
       typename path_type::const_iterator piter_end = path.end();
       for (typename path_type::const_iterator piter = path.begin(); piter != piter_end; ++ piter) {
 	switch (*piter) {
-	case TRANSITION::approximate:
+	case TRANSITION::approximation:
 	case TRANSITION::match:
 	case TRANSITION::substitution:
 	  merged.push_back(ref[rpos]);
