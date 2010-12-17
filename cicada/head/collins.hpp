@@ -23,15 +23,15 @@ namespace cicada
       {
 	const symbol_type& mother = edge.rule->lhs;
 	
-	rule_type::symbol_set_type::const_iterator riter_begin = edge.rule->rhs.begin();
-	rule_type::symbol_set_type::const_iterator riter_end   = edge.rule->rhs.end();
-	
 	category_info_type::const_iterator citer = categories.find(mother);
 	if (citer == categories.end())
 	  return size_type(-1);
+
+	rule_type::symbol_set_type::const_iterator riter_begin = edge.rule->rhs.begin();
+	rule_type::symbol_set_type::const_iterator riter_end   = edge.rule->rhs.end();
 	
 	category_map_type::const_iterator iter_begin = citer->second.begin();
-	category_map_type::const_iterator iter_end = citer->second.end();
+	category_map_type::const_iterator iter_end   = citer->second.end();
 	for (category_map_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
 	  const bool fallback = (iter == iter_end - 1);
 

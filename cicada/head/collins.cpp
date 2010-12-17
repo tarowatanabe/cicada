@@ -11,8 +11,8 @@ namespace cicada
   namespace head
   {
     static const char* __collins_ADJP[]   = {"NNS", "QP", "NN", "$", "ADVP", "JJ", "VBN", "VBG",
-					    "ADJP", "JJR", "NP", "JJS", "DT", "FW", "RBR", "RBS",
-					    "SBAR", "RB"};
+					     "ADJP", "JJR", "NP", "JJS", "DT", "FW", "RBR", "RBS",
+					     "SBAR", "RB"};
     static const char* __collins_ADVP[]   = {"RB", "RBR", "RBS", "FW", "ADVP", "TO", "CD", "JJR",
 					    "JJ", "IN", "NP", "JJS", "NN"};
     static const char* __collins_CONJP[]  = {"CC", "RB", "IN"};
