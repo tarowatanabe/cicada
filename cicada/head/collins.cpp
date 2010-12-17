@@ -53,8 +53,14 @@ namespace cicada
     static const char* __collins_EDITED[] = {};
     static const char* __collins_XS[]     = {"IN"};
     
+    static const char* __collins_puncts[] = {"''", "``", "-LRB-", "-RRB-", ".", ":", ",", "PERIOD", "COLON", "COMMA"};
+
     Collins::Collins() : HeadFinder("collins")
     {
+      
+      punctuations = assign_category(__collins_puncts);
+      std::sort(punctuations.begin(), punctuations.end());
+      
       categories["[ADJP]"]     = boost::assign::list_of<category_list_type>(left,     assign_category(__collins_ADJP));
       categories["[ADVP]"]     = boost::assign::list_of<category_list_type>(right,    assign_category(__collins_ADVP));
       categories["[CONJP]"]    = boost::assign::list_of<category_list_type>(right,    assign_category(__collins_CONJP));

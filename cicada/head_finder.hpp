@@ -28,6 +28,7 @@ namespace cicada
 
     typedef HyperGraph hypergraph_type;
     
+    typedef hypergraph_type::edge_type        edge_type;
     typedef hypergraph_type::symbol_type      symbol_type;
     typedef hypergraph_type::rule_type        rule_type;
     typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
@@ -64,18 +65,18 @@ namespace cicada
     virtual ~HeadFinder() {}
     
   public:
-    size_type operator()(const rule_type& rule) const
+    size_type operator()(const hypergraph_type& graph, const edge_type& edge) const
     {
-      return operator()(rule, symbol_type());
+      return operator()(graph, edge, symbol_type());
     }
 
-    size_type operator()(const rule_type& rule, const symbol_type& parent) const
+    size_type operator()(const hypergraph_type& graph, const edge_type& edge, const symbol_type& parent) const
     {
       size_type num_tails = 0;
       size_type pos_tail = 0;
-      rule_type::symbol_set_type::const_iterator riter_begin = rule.rhs.begin();
-      rule_type::symbol_set_type::const_iterator riter_end   = rule.rhs.end();
-      for (rule_type::symbol_set_type::const_iterator riter = rule.rhs.begin(); riter != riter_end; ++ riter)
+      rule_type::symbol_set_type::const_iterator riter_begin = edge.rule->rhs.begin();
+      rule_type::symbol_set_type::const_iterator riter_end   = edge.rule->rhs.end();
+      for (rule_type::symbol_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter)
 	if (riter->is_non_terminal()) {
 	  ++ num_tails;
 	  pos_tail = riter - riter_begin;
@@ -85,11 +86,11 @@ namespace cicada
       case 0: return size_type(-1); // leaf ... no-head
       case 1: return pos_tail;      // single tail ... this is the head
       default:
-	const size_type head_marked = find_marked_head(rule, parent);
+	const size_type head_marked = find_marked_head(graph, edge, parent);
 	if (head_marked != size_type(-1))
 	  return head_marked;
 	else
-	  return find_head(rule, parent);
+	  return find_head(graph, edge, parent);
       }
     }
     
@@ -126,8 +127,8 @@ namespace cicada
 	hypergraph_type::edge_type& edge = *eiter;
 	
 	const size_type index = (! out_edges[edge.head].empty()
-				 ? operator()(*edge.rule, graph.edges[out_edges[edge.head].front()].rule->lhs)
-				 : operator()(*edge.rule));
+				 ? operator()(graph, edge, graph.edges[out_edges[edge.head].front()].rule->lhs)
+				 : operator()(graph, edge));
 	
 	if (index == size_type(-1))
 	  edge.attributes.erase(attribute);
@@ -139,8 +140,8 @@ namespace cicada
   protected:
     // actual members called by operator()(const rule_type& rule)
     
-    virtual size_type find_marked_head(const rule_type& rule, const symbol_type& parent) const=0;
-    virtual size_type find_head(const rule_type& rule, const symbol_type& parent) const=0;
+    virtual size_type find_marked_head(const hypergraph_type& graph, const edge_type& edge, const symbol_type& parent) const=0;
+    virtual size_type find_head(const hypergraph_type& graph, const edge_type& edge, const symbol_type& parent) const=0;
 
   protected:
     
@@ -161,7 +162,7 @@ namespace cicada
     Iterator traverse_leftdis(const category_set_type& categories, Iterator first, Iterator last) const
     {
       for (/**/; first != last; ++ first) 
-	if (first->is_non_teminal()) {
+	if (first->is_non_terminal()) {
 	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *first);
 	  if (citer != categories.end())
 	    return first;
@@ -173,7 +174,7 @@ namespace cicada
     Iterator traverse_leftexcept(const category_set_type& categories, Iterator first, Iterator last) const
     {
       for (/**/; first != last; ++ first) 
-	if (first->is_non_teminal()) {
+	if (first->is_non_terminal()) {
 	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *first);
 	  if (citer == categories.end())
 	    return first;
@@ -198,7 +199,7 @@ namespace cicada
     {
       
       for (Iterator iter = last; iter != first; -- iter)
-	if (first->is_non_teminal()) {
+	if (first->is_non_terminal()) {
 	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *(iter - 1));
 	  if (citer != categories.end())
 	    return iter - 1;
@@ -210,7 +211,7 @@ namespace cicada
     Iterator traverse_rightexcept(const category_set_type& categories, Iterator first, Iterator last) const
     {
       for (Iterator iter = last; iter != first; -- iter) 
-	if (first->is_non_teminal()) {
+	if (first->is_non_terminal()) {
 	  category_set_type::const_iterator citer = std::find(categories.begin(), categories.end(), *(iter - 1));
 	  if (citer == categories.end())
 	    return iter - 1;
