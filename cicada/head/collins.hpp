@@ -30,8 +30,6 @@ namespace cicada
 	if (citer == categories.end())
 	  return size_type(-1);
 	
-	const category_map_type& cats = citer->second;
-	
 	category_map_type::const_iterator iter_begin = citer->second.begin();
 	category_map_type::const_iterator iter_end = citer->second.end();
 	for (category_map_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
@@ -109,10 +107,8 @@ namespace cicada
 	  if (pos < 0)
 	    pos = (iter - 1) - first;
 	  
-	  if (pos >= tails.size())
+	  if (pos >= static_cast<int>(tails.size()))
 	    throw std::runtime_error("invalid tails");
-	  
-	  const hypergraph_type::id_type node_id = tails[pos];
 	  
 	  if (graph.nodes[tails[pos]].edges.empty())
 	    throw std::runtime_error("no edges");
