@@ -72,15 +72,22 @@ namespace cicada
 	      if (iiter->is_non_terminal())
 		iterators.push_back(iiter);
 	    
-	    iterator_set_type::const_iterator iiter = std::find(iterators.begin(), iterators.end(), riter);
+	    iterator_set_type::const_iterator iiter_begin = iterators.begin();
+	    iterator_set_type::const_iterator iiter_end   = iterators.end();
+	    iterator_set_type::const_iterator iiter = std::find(iiter_begin, iiter_end, riter);
 	    if (iiter >= iterators.begin() + 2) {
 	      const symbol_type cat_prev = (*(iiter - 1))->non_terminal();
 	      if (cat_prev == "[CC]" || cat_prev == "[CONJP]") {
 		// skip punctuation that is pre-terminal...
 		
+		iterator_set_type::const_iterator iiter_new = skip_pre_terminals(graph, edge.tails, iiter_begin, iiter - 1, iiter_end);
 		
+		if (iiter_new != iiter_end)
+		  iiter = iiter_new;
 	      }
 	    }
+	    
+	    return *iiter - riter_begin;
 	  }
 	}
 	
@@ -93,17 +100,36 @@ namespace cicada
       Iterator skip_pre_terminals(const hypergraph_type& graph, const Tails& tails, Iterator first, Iterator iter, Iterator last) const
       {
 	for (/**/; iter != first; -- iter) {
+	  const symbol_type& cat = *(*(iter - 1));
 	  
+	  if (! is_punctuation(cat.non_terminal())) return iter - 1;
 	  
+	  // cat is punctuation...
+	  int pos = cat.non_terminal_index() - 1;
+	  if (pos < 0)
+	    pos = (iter - 1) - first;
+	  
+	  if (pos >= tails.size())
+	    throw std::runtime_error("invalid tails");
+	  
+	  const hypergraph_type::id_type node_id = tails[pos];
+	  
+	  if (graph.nodes[tails[pos]].edges.empty())
+	    throw std::runtime_error("no edges");
+	  
+	  const edge_type& edge = graph.edges[graph.nodes[tails[pos]].edges.front()];
+	  
+	  // we have tail, meaning that cat is NOT pre-terminal
+	  if (! edge.tails.empty()) return iter - 1;
 	}
 	
 	return last;
       }
-
+      
       bool is_punctuation(const symbol_type& cat) const
       {
 	category_set_type::const_iterator citer = std::lower_bound(punctuations.begin(), punctuations.end(), cat);
-	return (citer != punctuations.end() && *citer == cat ? citer : punctutations.end());
+	return citer != punctuations.end() && *citer == cat;
       }
       
       
