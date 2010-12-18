@@ -47,7 +47,7 @@ namespace cicada
 						"ADJP", "JJP", "NP"};
     static const char* __modcollins_SQ[]     = {"VBZ", "VBD", "VBP", "VB", "MD", "AUX", "AUXG", "VP",
 						"SQ"};
-    static const char* __modcollins_UCP[]    = {};
+    //static const char* __modcollins_UCP[]    = {}; // use puncts
     static const char* __modcollins_VP[]     = {"TO", "VBD", "VBN", "MD", "VBZ", "VB", "VBG", "VBP",
 						"VP", "AUX", "AUXG", "ADJP", "JJP", "NN", "NNS", "JJ",
 						"NP", "NNP"};
@@ -89,38 +89,55 @@ namespace cicada
 	(left,        assign_category(__modcollins_ADJP4))
 	(rightexcept, assign_category(__modcollins_puncts));
       categories["[JJP]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_JJP));
-      categories["[ADVP]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_ADVP0));
-      categories["[CONJP]"]  = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_CONJP));
-      categories["[FRAG]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_puncts)); // FRAG..
+      categories["[ADVP]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_ADVP0))
+	(rightdis,    assign_category(__modcollins_ADVP1))
+	(rightdis,    assign_category(__modcollins_ADVP2))
+	(rightexcept, assign_category(__modcollins_puncts));
+      categories["[CONJP]"]  = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_CONJP));
+      categories["[FRAG]"]   = boost::assign::list_of<category_list_type>(rightexcept, assign_category(__modcollins_puncts)); // FRAG..
       categories["[INTJ]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_INTJ));
-      categories["[LST]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_LST));
+      categories["[LST]"]    = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_LST));
       categories["[NAC]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_NAC));
-      categories["[NX]"]     = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_NX));
-      categories["[PP]"]     = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_PP0));
-      categories["[PRN]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_PRN));
+      categories["[NX]"]     = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_NX));
+      categories["[PP]"]     = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_PP0))
+	(right, assign_category(__modcollins_PP1));
+      categories["[PRN]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_PRN))
+	(leftexcept, assign_category(__modcollins_puncts));
+      categories["[PRT]"]    = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_PRT));
       categories["[QP]"]     = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_QP));
-      categories["[RRC]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_RRC));
+      categories["[RRC]"]    = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_RRC));
       categories["[S]"]      = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_S));
       categories["[SBAR]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_SBAR));
       categories["[SBARQ]"]  = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_SBARQ));
       categories["[SINV]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_SINV));
       categories["[SQ]"]     = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_SQ));
-      categories["[UCP]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_UCP));
+      categories["[UCP]"]    = boost::assign::list_of<category_list_type>(rightexcept, assign_category(__modcollins_puncts)); // UCP
       categories["[VP]"]     = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_VP));
       categories["[WHADJP]"] = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_WHADJP));
       categories["[WHADVP]"] = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_WHADVP));
       categories["[WHNP]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_WHNP));
-      categories["[WHPP]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_WHPP));
-      categories["[X]"]      = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_X));
-      categories["[NP]"]     = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_NP0));
-      categories["[NML]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_NML0));
-      categories["[POSSP]"]  = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_POSSP));
-      categories["[ROOT]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_ROOT));
-      categories["[TYPO]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_TYPO));
-      categories["[ADV]"]    = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_ADV));
-      categories["[EDITED]"] = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_EDITED));
-      categories["[META]"]   = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_META));
-      categories["[XS]"]     = boost::assign::list_of<category_list_type>(left, assign_category(__modcollins_XS));
+      categories["[WHPP]"]   = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_WHPP));
+      categories["[X]"]      = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_X))
+	(rightexcept, assign_category(__modcollins_puncts));
+      categories["[NP]"]     = boost::assign::list_of<category_list_type>(rightdis, assign_category(__modcollins_NP0))
+	(left,        assign_category(__modcollins_NP1))
+	(rightdis,    assign_category(__modcollins_NP2))
+	(right,       assign_category(__modcollins_NP3))
+	(rightdis,    assign_category(__modcollins_NP4))
+	(rightexcept, assign_category(__modcollins_puncts));
+      categories["[NML]"]    = boost::assign::list_of<category_list_type>(rightdis, assign_category(__modcollins_NML0))
+	(left,        assign_category(__modcollins_NML1))
+	(rightdis,    assign_category(__modcollins_NML2))
+	(right,       assign_category(__modcollins_NML3))
+	(rightdis,    assign_category(__modcollins_NML4))
+	(rightexcept, assign_category(__modcollins_puncts));
+      categories["[POSSP]"]  = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_POSSP));
+      categories["[ROOT]"]   = boost::assign::list_of<category_list_type>(left,  assign_category(__modcollins_ROOT));
+      categories["[TYPO]"]   = boost::assign::list_of<category_list_type>(left,  assign_category(__modcollins_TYPO));
+      categories["[ADV]"]    = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_ADV));
+      categories["[EDITED]"] = boost::assign::list_of<category_list_type>(left,  assign_category(__modcollins_EDITED));
+      categories["[META]"]   = boost::assign::list_of<category_list_type>(left,  assign_category(__modcollins_META));
+      categories["[XS]"]     = boost::assign::list_of<category_list_type>(right, assign_category(__modcollins_XS));
     }
     
   };
