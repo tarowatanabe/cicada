@@ -61,11 +61,14 @@ libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_head_HEADERS = \
 head/chinese.hpp \
-head/collins.hpp 
+head/collins.hpp \
+head/collins_modified.hpp 
 
 libcicada_head_la_SOURCES = \
 head/chinese.cpp \
-head/collins.cpp
+head/collins.cpp \
+head/collins_modified.cpp
+
 libcicada_head_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 
