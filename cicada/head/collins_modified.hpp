@@ -3,8 +3,8 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__HEAD__COLLINS__HPP__
-#define __CICADA__HEAD__COLLINS__HPP__ 1
+#ifndef __CICADA__HEAD__COLLINS_MODIFIED__HPP__
+#define __CICADA__HEAD__COLLINS_MODIFIED__HPP__ 1
 
 #include <vector>
 
@@ -15,10 +15,10 @@ namespace cicada
   namespace head
   {
     
-    class Collins : public cicada::HeadFinder
+    class CollinsModified : public cicada::HeadFinder
     {
     public:
-      Collins();
+      CollinsModified();
       
       size_type find_marked_head(const hypergraph_type& graph, const edge_type& edge, const symbol_type& parent) const { return size_type(-1); }
       size_type find_head(const hypergraph_type& graph, const edge_type& edge, const symbol_type& parent) const
