@@ -29,7 +29,7 @@ namespace cicada
 	category_info_type::const_iterator citer = categories.find(mother);
 	if (citer == categories.end()) {
 	  // default to right most...
-	  riter = riter_end;
+	  rule_type::symbol_set_type::const_iterator riter = riter_end;
 	  while (riter != riter_begin && ! (riter - 1)->is_non_terminal()) -- riter;
 	  -- riter;
 	  return riter - riter_begin;

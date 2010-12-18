@@ -60,9 +60,11 @@ eval/wlcs.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_head_HEADERS = \
-head/collins.hpp
+head/chinese.hpp \
+head/collins.hpp 
 
 libcicada_head_la_SOURCES = \
+head/chinese.cpp \
 head/collins.cpp
 libcicada_head_la_CPPFLAGS = $(AM_CPPFLAGS)
 
