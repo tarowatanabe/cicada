@@ -157,6 +157,15 @@ namespace cicada
 	      const symbol_type* context_end  = std::find(context, context + order * 2, vocab_type::EMPTY);
 	      const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
 	      
+	      if (biter != buffer.end()) {
+		if (! ngrams.empty()) {
+		  ngram_score(biter, buffer.end(), features);
+		  if (biter_first != biter)
+		    ngram_score(biter_first, biter, buffer.end(), features);
+		}
+		biter = buffer.end();
+	      }
+	      
 	      buffer.insert(buffer.end(), context, context_star);
 	      if (! ngrams.empty())
 		ngram_score(biter_first, biter, buffer.end(), features);
@@ -176,8 +185,12 @@ namespace cicada
 	  }
 	  
 	  if (biter != buffer.end()) {
-	    if (! ngrams.empty())
-	      ngram_score(biter_first, biter, buffer.end(), features);
+	    if (! ngrams.empty()) {
+	      ngram_score(biter, buffer.end(), features);
+	      if (biter_first != biter)
+		ngram_score(biter_first, biter, buffer.end(), features);
+	    }
+	    biter = buffer.end();
 	  }
 	  
 	  // construct state vector..

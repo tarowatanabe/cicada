@@ -212,10 +212,12 @@ namespace cicada
 	    
 	    // collect ngram counts
 	    if (biter != buffer.end()) {
-	      collect_counts(biter_first, biter, buffer.end(), weight, counts);
+	      collect_counts(biter, buffer.end(), weight, counts);
+	      if (biter_first != biter)
+		collect_counts(biter_first, biter, buffer.end(), weight, counts);
 	      biter = buffer.end();
 	    }
-		
+	    
 	    int antecedent_index = citer->non_terminal_index() - 1;
 	    if (antecedent_index < 0)
 	      antecedent_index = non_terminal_pos;
@@ -224,7 +226,8 @@ namespace cicada
 	    const context_pair_type& context_pair = contexts[tails[antecedent_index]];
 	    
 	    buffer.insert(buffer.end(), context_pair.first.begin(), context_pair.first.end());
-	    collect_counts(biter_first, biter, buffer.end(), weight, counts);
+	    if (biter_first != biter && biter != buffer.end())
+	      collect_counts(biter_first, biter, buffer.end(), weight, counts);
 	    biter = buffer.end();
 	    
 	    if (! context_pair.second.empty()) {
@@ -243,7 +246,9 @@ namespace cicada
 	}
 	    
 	if (biter != buffer.end()) {
-	  collect_counts(biter_first, biter, buffer.end(), weight, counts);
+	  collect_counts(biter, buffer.end(), weight, counts);
+	  if (biter_first != biter)
+	    collect_counts(biter_first, biter, buffer.end(), weight, counts);
 	  biter = buffer.end();
 	}
 	

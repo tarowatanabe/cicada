@@ -201,10 +201,15 @@ namespace cicada
 	      const symbol_type* antecedent_end  = std::find(antecedent_first, antecedent_last, vocab_type::EMPTY);
 	      const symbol_type* antecedent_star = std::find(antecedent_first, antecedent_end, vocab_type::STAR);
 	      
+	      if (biter != buffer.end()) {
+		bleu += bleu_score(biter, buffer.end());
+		if (biter_first != biter)
+		  bleu += bleu_score(biter_first, biter, buffer.end());
+		biter = buffer.end();
+	      }
+	      
 	      buffer.insert(buffer.end(), antecedent_first, antecedent_star);
-	      if (biter_first == biter)
-		bleu += bleu_score(biter_first, buffer.end());
-	      else
+	      if (biter_first != biter && biter != buffer.end())
 		bleu += bleu_score(biter_first, biter, buffer.end());
 	      biter = buffer.end();
 	      
@@ -221,12 +226,12 @@ namespace cicada
 	    } else if (*titer != vocab_type::EPSILON)
 	      buffer.push_back(*titer);
 	  }
-
+	  
 	  if (biter != buffer.end()) {
-	    if (biter_first == biter)
-	      bleu += bleu_score(biter_first, buffer.end());
-	    else
+	    bleu += bleu_score(biter, buffer.end());
+	    if (biter_first != biter)
 	      bleu += bleu_score(biter_first, biter, buffer.end());
+	    biter = buffer.end();
 	  }
 	  
 	  if (star_first >= 0) {

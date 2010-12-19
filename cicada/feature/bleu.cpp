@@ -245,17 +245,22 @@ namespace cicada
 	      const count_set_type& counts_antecedent = states_counts[*antecedent_count];
 	      
 	      bleu_antecedent += bleu_score(counts_antecedent, *antecedent_hypothesis, true);
-
+	      
 	      // merge statistics...
 	      counts.resize(utils::bithack::max(counts.size(), counts_antecedent.size()), count_type(0));
 	      std::transform(counts_antecedent.begin(), counts_antecedent.end(), counts.begin(), counts.begin(), std::plus<count_type>());
-
+	      
 	      *context_hypothesis += *antecedent_hypothesis;
 	      
+	      if (biter != buffer.end()) {
+		collect_counts(biter, buffer.end(), counts);
+		if (biter_first != biter)
+		  collect_counts(biter_first, biter, buffer.end(), counts);
+		biter = buffer.end();
+	      }
+	      
 	      buffer.insert(buffer.end(), antecedent_first, antecedent_star);
-	      if (biter_first == biter)
-		collect_counts(biter_first, buffer.end(), counts);
-	      else
+	      if (biter_first != biter && biter != buffer.end())
 		collect_counts(biter_first, biter, buffer.end(), counts);
 	      biter = buffer.end();
 	      
@@ -274,12 +279,12 @@ namespace cicada
 	      *context_hypothesis += 1;
 	    }
 	  }
-
+	  
 	  if (biter != buffer.end()) {
-	    if (biter_first == biter)
-	      collect_counts(biter_first, buffer.end(), counts);
-	    else
+	    collect_counts(biter, buffer.end(), counts);
+	    if (biter_first != biter)
 	      collect_counts(biter_first, biter, buffer.end(), counts);
+	    biter = buffer.end();
 	  }
 	  
 	  if (star_first >= 0) {
@@ -316,7 +321,9 @@ namespace cicada
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 	  
-	  return bleu_score(counts, *context_hypothesis, ! final) - bleu_antecedent;
+	  const double bleu =  bleu_score(counts, *context_hypothesis, ! final) - bleu_antecedent;
+
+	  return bleu;
 	}
       }
 
@@ -457,7 +464,7 @@ namespace cicada
 	      
 	      if (ngrams.is_root(id)) break;
 	      if (iter2 < iter) continue;
-	      
+
 	      ++ counts[nodes[id].order - 1];
 	    }
 	  }

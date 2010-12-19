@@ -43,7 +43,7 @@ namespace cicada
       }
       
       if (size <= 0)
-	throw std::runtime_error("invalid bleu-multi size");
+	throw std::runtime_error("invalid bleu-multi size: " + boost::lexical_cast<std::string>(size));
       
       if (names.size() > size)
 	throw std::runtime_error("feature-name size and bleu size do not match");
@@ -57,12 +57,13 @@ namespace cicada
 	  names[i] = "bleu-multi:" + boost::lexical_cast<std::string>(i);
 	
 	parameter_type param_bleu(param);
+	param_bleu.name() = "bleu";
 	param_bleu.erase("name");
 	param_bleu.erase("size");
 	
 	param_bleu.push_back(std::make_pair("name", names[i]));
 	
-	bleus.push_back(feature_function_type::create(boost::lexical_cast<std::string>(param)));
+	bleus.push_back(feature_function_type::create(boost::lexical_cast<std::string>(param_bleu)));
 	
 	base_type::__state_size += bleus.back()->state_size();
       }
@@ -108,7 +109,7 @@ namespace cicada
 	for (size_t k = 0; k != states.size(); ++ k)
 	  states_bleu[k] = static_cast<char*>(states[k]) + size;
 	
-	bleus[i]->apply_complete(state_bleu, states_bleu, edge, features, estimates, final);
+	bleus[i]->apply(state_bleu, states_bleu, edge, features, estimates, final);
 	size += bleus[i]->state_size();
       }
     }

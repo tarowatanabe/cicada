@@ -186,10 +186,15 @@ namespace cicada
 
 	      *context_hypothesis += *antecedent_hypothesis;
 	      
+	      if (biter != buffer.end()) {
+		collect_counts(biter, buffer.end(), counts);
+		if (biter_first != biter)
+		  collect_counts(biter_first, biter, buffer.end(), counts);
+		biter = buffer.end();
+	      }
+	      
 	      buffer.insert(buffer.end(), antecedent_first, antecedent_star);
-	      if (biter_first == biter)
-		collect_counts(biter_first, buffer.end(), counts);
-	      else
+	      if (biter_first != biter && biter != buffer.end())
 		collect_counts(biter_first, biter, buffer.end(), counts);
 	      biter = buffer.end();
 	      
@@ -210,10 +215,10 @@ namespace cicada
 	  }
 
 	  if (biter != buffer.end()) {
-	    if (biter_first == biter)
-	      collect_counts(biter_first, buffer.end(), counts);
-	    else
+	    collect_counts(biter, buffer.end(), counts);
+	    if (biter_first != biter)
 	      collect_counts(biter_first, biter, buffer.end(), counts);
+	    biter = buffer.end();
 	  }
 	  
 	  if (star_first >= 0) {
