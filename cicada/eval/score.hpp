@@ -121,6 +121,18 @@ namespace cicada
       virtual void clear() = 0;
       virtual void insert(const sentence_type& sentence) = 0;
 
+      void insert(const sentence_set_type& sentences)
+      {
+	insert(sentences.begin(), sentences.end());
+      }
+      
+      template <typename Iterator>
+      void insert(Iterator first, Iterator last)
+      {
+	for (/**/; first != last; ++ first)
+	  insert(*first);
+      }
+
       score_ptr_type operator()(const sentence_type& sentence) const { return score(sentence); }
       virtual score_ptr_type score(const sentence_type& sentence) const = 0;
       virtual bool error_metric() const = 0;

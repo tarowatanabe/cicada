@@ -92,8 +92,8 @@ void read_refset(const path_set_type& files,
     }
   }
   
-  scorers.clear();
-  bleus.clear();
+  scorers = scorer_document_type(scorer_name);
+  bleus = feature_function_ptr_set_type();
   
   scorers.resize(document.size());
   bleus.resize(document.size());
@@ -111,10 +111,7 @@ void read_refset(const path_set_type& files,
     scorers[seg] = scorer_type::create(scorer_name);
     bleus[seg] = feature_function_type::create(scorer_name);
     
-    sentence_set_type::const_iterator siter_end = document[seg].end();
-    for (sentence_set_type::const_iterator siter = document[seg].begin(); siter != siter_end; ++ siter)
-      scorers[seg]->insert(*siter);
-    
+    scorers[seg]->insert(document[seg]);
     bleus[seg]->assign(__id, __hypergraph, __lattice, __spans, document[seg], __ngram_counts);
   }
 }
