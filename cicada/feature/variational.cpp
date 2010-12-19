@@ -168,7 +168,8 @@ namespace cicada
 	      
 	      buffer.insert(buffer.end(), context, context_star);
 	      if (! ngrams.empty())
-		ngram_score(biter_first, biter, buffer.end(), features);
+		if (biter_first != biter && biter != buffer.end())
+		  ngram_score(biter_first, biter, buffer.end(), features);
 	      biter = buffer.end();
 	      
 	      if (context_star != context_end) {
