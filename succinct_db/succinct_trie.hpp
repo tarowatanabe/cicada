@@ -128,6 +128,7 @@ namespace succinctdb
   }
   
   template <typename Key, typename Alloc>
+  inline
   bool operator!=(const __succinct_trie_iterator_node<Key,Alloc>& x, const __succinct_trie_iterator_node<Key,Alloc>& y)
   {
     return ! (x == y);
