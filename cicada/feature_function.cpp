@@ -10,6 +10,7 @@
 #include "feature/bleu.hpp"
 #include "feature/bleu_expected.hpp"
 #include "feature/bleu_linear.hpp"
+#include "feature/bleu_multi.hpp"
 #include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/lexicalized_reordering.hpp"
@@ -47,6 +48,12 @@ bleu-linear: linear corpus-BLEU\n\
 \tokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu-linear)\n\
 \trefset=reference set file\n\
+bleu-multi: multiple BLEU\n\
+\torder=<order>\n\
+\texact=[true|false] clipped ngram computation\n\
+\tokenizer=[tokenizer spec]\n\
+\tname=feature-name(default: bleu-multi:integer)\n\
+\tsize=# of BLEU features\n\
 distortion: phrase-based distortion\n\
 global-lexicon: global lexicon feature\n\
 \tfile=global lexicon file\n\
@@ -108,6 +115,8 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::BleuExpected(parameter));
     else if (param.name() == "bleu-linear")
       return feature_function_ptr_type(new feature::BleuLinear(parameter));
+    else if (param.name() == "bleu-multi" || param.name() == "bleu-multiple")
+      return feature_function_ptr_type(new feature::BleuMulti(parameter));
     else if (param.name() == "distortion")
       return feature_function_ptr_type(new feature::Distortion(parameter));
     else if (param.name() == "global-lexicon")
