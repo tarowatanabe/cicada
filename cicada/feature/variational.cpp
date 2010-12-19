@@ -159,9 +159,9 @@ namespace cicada
 	      
 	      if (biter != buffer.end()) {
 		if (! ngrams.empty()) {
-		  ngram_score(biter, buffer.end(), features);
 		  if (biter_first != biter)
 		    ngram_score(biter_first, biter, buffer.end(), features);
+		  ngram_score(biter, buffer.end(), features);
 		}
 		biter = buffer.end();
 	      }
@@ -187,9 +187,9 @@ namespace cicada
 	  
 	  if (biter != buffer.end()) {
 	    if (! ngrams.empty()) {
-	      ngram_score(biter, buffer.end(), features);
 	      if (biter_first != biter)
 		ngram_score(biter_first, biter, buffer.end(), features);
+	      ngram_score(biter, buffer.end(), features);
 	    }
 	    biter = buffer.end();
 	  }

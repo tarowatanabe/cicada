@@ -191,8 +191,13 @@ namespace cicada
 	  buffer.insert(buffer.begin(), vocab_type::BOS);
 	  buffer.insert(buffer.end(), vocab_type::EOS);
 	  
-	  collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end(), weight, counts);
-	  collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	  collect_counts(buffer.begin(), buffer.begin() + 1, weight, counts);
+	  if (buffer.begin() + 1 != buffer.end() - 1)
+	    collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
+	  
+	  if (buffer.begin() != buffer.end() - 1)
+	    collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	  collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
 	}
 	
 	return state;
@@ -212,9 +217,9 @@ namespace cicada
 	    
 	    // collect ngram counts
 	    if (biter != buffer.end()) {
-	      collect_counts(biter, buffer.end(), weight, counts);
 	      if (biter_first != biter)
 		collect_counts(biter_first, biter, buffer.end(), weight, counts);
+	      collect_counts(biter, buffer.end(), weight, counts);
 	      biter = buffer.end();
 	    }
 	    
@@ -246,9 +251,9 @@ namespace cicada
 	}
 	    
 	if (biter != buffer.end()) {
-	  collect_counts(biter, buffer.end(), weight, counts);
 	  if (biter_first != biter)
 	    collect_counts(biter_first, biter, buffer.end(), weight, counts);
+	  collect_counts(biter, buffer.end(), weight, counts);
 	  biter = buffer.end();
 	}
 	
@@ -275,15 +280,23 @@ namespace cicada
 		
 	    buffer.insert(buffer.begin(), vocab_type::BOS);
 	    buffer.insert(buffer.end(), vocab_type::EOS);
-
+	    
+	    collect_counts(buffer.begin(), buffer.begin() + 1, weight, counts);
 	    collect_counts(buffer.begin(), buffer.begin() + 1, buffer.begin() + 1 + prefix_size, weight, counts);
+	    
 	    collect_counts(buffer.end() - suffix_size - 1, buffer.end() - 1, buffer.end(), weight, counts);
+	    collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
 	  } else {
 	    buffer.insert(buffer.begin(), vocab_type::BOS);
 	    buffer.insert(buffer.end(), vocab_type::EOS);
-
-	    collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end(), weight, counts);
-	    collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	    
+	    collect_counts(buffer.begin(), buffer.begin() + 1, weight, counts);
+	    if (buffer.begin() + 1 != buffer.end() - 1) 
+	      collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
+	    
+	    if (buffer.begin() != buffer.end() - 1)
+	      collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	    collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
 	  }
 	}
 	

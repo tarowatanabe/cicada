@@ -1,3 +1,7 @@
+2010-12-20
+Serious bugfix to ngram-related features with double counting.
+Added preliminary head-finder
+
 2010-12-13
 Added phrase-extract-like script, extract.py, for easily extracting/scoreing phrase/scfg/ghkm.
 Added alignment tool, cicada_alignment (do we need this?) (TODO: add ITG alignment + threading)

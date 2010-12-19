@@ -253,9 +253,9 @@ namespace cicada
 	      *context_hypothesis += *antecedent_hypothesis;
 	      
 	      if (biter != buffer.end()) {
-		collect_counts(biter, buffer.end(), counts);
 		if (biter_first != biter)
 		  collect_counts(biter_first, biter, buffer.end(), counts);
+		collect_counts(biter, buffer.end(), counts);
 		biter = buffer.end();
 	      }
 	      
@@ -281,9 +281,9 @@ namespace cicada
 	  }
 	  
 	  if (biter != buffer.end()) {
-	    collect_counts(biter, buffer.end(), counts);
 	    if (biter_first != biter)
 	      collect_counts(biter_first, biter, buffer.end(), counts);
+	    collect_counts(biter, buffer.end(), counts);
 	    biter = buffer.end();
 	  }
 	  
