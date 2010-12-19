@@ -195,8 +195,7 @@ namespace cicada
 	  if (buffer.begin() + 1 != buffer.end() - 1)
 	    collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
 	  
-	  if (buffer.begin() != buffer.end() - 1)
-	    collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	  collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
 	  collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
 	}
 	
@@ -294,8 +293,7 @@ namespace cicada
 	    if (buffer.begin() + 1 != buffer.end() - 1) 
 	      collect_counts(buffer.begin(), buffer.begin() + 1, buffer.end() - 1, weight, counts);
 	    
-	    if (buffer.begin() != buffer.end() - 1)
-	      collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
+	    collect_counts(buffer.begin(), buffer.end() - 1, buffer.end(), weight, counts);
 	    collect_counts(buffer.end() - 1, buffer.end(), weight, counts);
 	  }
 	}
