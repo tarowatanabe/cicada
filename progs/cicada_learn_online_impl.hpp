@@ -21,7 +21,7 @@
 #include <boost/tuple/tuple.hpp>
 
 #include <utils/base64.hpp>
-
+#include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/vector2.hpp>
 
@@ -30,7 +30,94 @@
 #include "cicada/apply.hpp"
 #include "cicada/inside_outside.hpp"
 #include "cicada/prune.hpp"
+#include "cicada/feature_function.hpp"
 
+#include "cicada_text_impl.hpp"
+
+typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+
+typedef cicada::eval::Scorer         scorer_type;
+typedef cicada::eval::ScorerDocument scorer_document_type;
+
+typedef scorer_type::scorer_ptr_type scorer_ptr_type;
+typedef scorer_type::score_ptr_type  score_ptr_type;
+typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
+
+typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
+
+typedef cicada::SentenceVector sentence_set_type;
+
+inline
+void read_refset(const path_set_type& files,
+		 const std::string& scorer_name,
+		 scorer_document_type& scorers,
+		 feature_function_ptr_set_type& bleus)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef cicada_sentence_parser<iter_type> parser_type;
+  
+  typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
+
+  sentence_document_type document;
+
+  if (files.empty())
+    throw std::runtime_error("no reference files?");
+
+  parser_type parser;
+  id_sentence_type id_sentence;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no reference file: " + fiter->file_string());
+
+    utils::compress_istream is(*fiter, 1024 * 1024);
+    is.unsetf(std::ios::skipws);
+    
+    iter_type iter(is);
+    iter_type iter_end;
+    
+    while (iter != iter_end) {
+      id_sentence.second.clear();
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	if (iter != iter_end)
+	  throw std::runtime_error("refset parsing failed");
+      
+      const int& id = id_sentence.first;
+      
+      if (id >= static_cast<int>(document.size()))
+	document.resize(id + 1);
+      
+      document[id].push_back(id_sentence.second);
+    }
+  }
+  
+  scorers.clear();
+  bleus.clear();
+  
+  scorers.resize(document.size());
+  bleus.resize(document.size());
+  
+  static const size_t __id = 0;
+  static const hypergraph_type __hypergraph;
+  static const lattice_type __lattice;
+  static const span_set_type __spans;
+  static const ngram_count_set_type __ngram_counts;
+  
+  for (size_t seg = 0; seg != document.size(); ++ seg) {
+    if (document[seg].empty())
+      throw std::runtime_error("no reference at segment: " + boost::lexical_cast<std::string>(seg));
+    
+    scorers[seg] = scorer_type::create(scorer_name);
+    bleus[seg] = feature_function_type::create(scorer_name);
+    
+    sentence_set_type::const_iterator siter_end = document[seg].end();
+    for (sentence_set_type::const_iterator siter = document[seg].begin(); siter != siter_end; ++ siter)
+      scorers[seg]->insert(*siter);
+    
+    bleus[seg]->assign(__id, __hypergraph, __lattice, __spans, document[seg], __ngram_counts);
+  }
+}
 
 template <typename Weight>
 struct weight_set_scaled_function
@@ -123,8 +210,7 @@ void encode_support_vectors(std::string& data,
 			    const size_t& id,
 			    const sentence_type& viterbi,
 			    const hypergraph_type& oracle,
-			    const hypergraph_type& violated,
-			    const sentence_set_type& targets)
+			    const hypergraph_type& violated)
 {
   data.clear();
   
@@ -135,11 +221,7 @@ void encode_support_vectors(std::string& data,
   os << ' ' << viterbi << " |||";
   os << ' ' << oracle << " |||";
   os << ' ' << violated;
-  
-  sentence_set_type::const_iterator titer_end = targets.end();
-  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
-    os << " ||| " << *titer;
-  
+    
   os.pop();
 }
 
@@ -148,8 +230,7 @@ void decode_support_vectors(const std::string& data,
 			    size_t& id,
 			    sentence_type& viterbi,
 			    hypergraph_type& oracle,
-			    hypergraph_type& violated,
-			    sentence_set_type& targets)
+			    hypergraph_type& violated)
 {
   namespace qi = boost::spirit::qi;
   namespace standard = boost::spirit::standard;
@@ -183,13 +264,6 @@ void decode_support_vectors(const std::string& data,
   
   if (! violated.assign(iter, end))
     throw std::runtime_error("invalid violated hypergraph");
-
-  targets.clear();
-  while (phrase_parse(iter, end, "|||", space)) {
-    targets.push_back(sentence_type());
-    if (! targets.back().assign(iter, end))
-      throw std::runtime_error("invalid sentence format");
-  }
   
   if (iter != end)
     throw std::runtime_error("still data remain?");
@@ -279,7 +353,6 @@ struct OptimizeCP
   typedef scorer_type::score_ptr_type  score_ptr_type;
   
   typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
-  typedef std::deque<scorer_ptr_type, std::allocator<scorer_ptr_type> > scorer_set_type;
 
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    gradient_type;
@@ -701,7 +774,7 @@ struct OptimizeCP
   LineSearch line_search;
 
   hypergraph_set_type hypergraphs;
-  scorer_set_type     scorers;
+  scorer_document_type scorers;
   
   ids_type      ids;
   labels_type   labels;
@@ -1087,8 +1160,8 @@ struct OptimizeMIRA
 
   LineSearch line_search;
 
-  hypergraph_set_type hypergraphs;
-  scorer_set_type     scorers;
+  hypergraph_set_type  hypergraphs;
+  scorer_document_type scorers;
 
   alpha_type    alpha;
   gradient_type gradient;

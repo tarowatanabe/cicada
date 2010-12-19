@@ -143,6 +143,12 @@ namespace cicada
       allocator(new state_allocator_type()),
       offsets(),
       states_size(0) {}
+
+  Model::Model(const feature_function_ptr_type& x)
+    : models(1, x),
+      allocator(new state_allocator_type()),
+      offsets(),
+      states_size(0) {}
   
   Model::Model(const Model& x)
     : models(x.models),

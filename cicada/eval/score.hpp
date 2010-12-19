@@ -165,6 +165,8 @@ namespace cicada
       typedef scorer_set_type::iterator       iterator;
       
     public:
+      ScorerDocument()
+	: parameter() {}
       ScorerDocument(const std::string& __parameter)
 	: parameter(__parameter) {}
       

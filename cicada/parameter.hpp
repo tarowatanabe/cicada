@@ -8,6 +8,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 namespace cicada
 {
@@ -24,20 +25,30 @@ namespace cicada
     typedef std::vector<value_type, std::allocator<value_type> > value_set_type;      
 
   public:
+    typedef value_set_type::size_type       size_type;
+    typedef value_set_type::difference_type difference_type;
+    
     typedef value_set_type::const_iterator       iterator;
     typedef value_set_type::const_iterator const_iterator;
       
   public:
     Parameter(const std::string& parameter)
       : __attr(), __values()  { parse(parameter); }
-      
+    Parameter() : __attr(), __values() {}
+    
     operator attribute_type() const { return __attr; }
-
+    
     const attribute_type& name() const { return __attr; }
+    attribute_type& name() { return __attr; }
+    
+    void push_back(const value_type& x) { __values.push_back(x); }
+    
     const_iterator begin() const { return __values.begin(); }
     const_iterator end() const { return __values.end(); }
+    
     bool empty() const { return __values.empty(); }
-
+    size_type size() const { return __values.size(); }
+    
     const_iterator find(const std::string& key) const
     {
       for (const_iterator iter = begin(); iter != end(); ++ iter)
@@ -45,6 +56,25 @@ namespace cicada
 	  return iter;
       return end();
     }
+
+    void erase(const std::string& key) 
+    {
+      while (! __values.empty()) {
+	bool found = false;
+	for (value_set_type::iterator iter = __values.begin(); iter != __values.end(); ++ iter)
+	  if (iter->first == key) {
+	    __values.erase(iter);
+	    found = true;
+	    break;
+	  }
+	
+	if (! found) break;
+      }
+    }
+    
+  public:
+    friend
+    std::ostream& operator<<(std::ostream& os, const Parameter& x);
       
   private:
     void parse(const std::string& parameter);

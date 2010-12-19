@@ -128,6 +128,7 @@ namespace cicada
     
   public:
     Model();
+    Model(const feature_function_ptr_type& x);
     Model(const Model& x);
     ~Model();
     

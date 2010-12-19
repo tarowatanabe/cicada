@@ -2,12 +2,15 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <iterator>
+
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
 #include "parameter.hpp"
 
 #include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
 
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
@@ -83,8 +86,40 @@ namespace cicada
     
     if (! result || iter != iter_end)
       throw std::runtime_error(std::string("parameter parsing failed: ") + parameter);
-
+    
     __attr   = parsed.first;
     __values.insert(__values.end(), parsed.second.begin(), parsed.second.end());
+  }
+  
+  std::ostream& operator<<(std::ostream& os, const Parameter& x)
+  {
+    typedef std::ostream_iterator<char> iterator_type;
+
+    boost::spirit::karma::symbols<char, const char*> escape_char;
+    boost::spirit::karma::rule<iterator_type, std::string()> escaped;
+    boost::spirit::karma::rule<iterator_type, value_parsed_type()> value;
+    
+    escape_char.add
+      ('\"', "\\\"")
+      ('\\', "\\\\")
+      ('\a', "\\a")
+      ('\b', "\\b")
+      ('\f', "\\f")
+      ('\n', "\\n")
+      ('\r', "\\r")
+      ('\t', "\\t")
+      ('\v', "\\v");
+    
+    escaped %= '"' << *(escape_char | boost::spirit::standard::char_) << '"';
+    value %= escaped << '=' << escaped;
+    
+    iterator_type iter(os);
+    boost::spirit::karma::generate(iter, escaped, x.__attr);
+    if (! x.__values.empty()) {
+      os << ':';
+      boost::spirit::karma::generate(iter, value % ',', x.__values);
+    }
+    
+    return os;
   }
 };

@@ -60,26 +60,12 @@
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
 
-typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
-
-typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
-
-typedef cicada::SentenceVector sentence_set_type;
-typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
-
-typedef cicada::eval::Scorer         scorer_type;
-typedef cicada::eval::ScorerDocument scorer_document_type;
-
-typedef scorer_type::scorer_ptr_type scorer_ptr_type;
-typedef scorer_type::score_ptr_type  score_ptr_type;
-typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
-
-
 typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
 
 path_type input_file = "-";
 path_type output_file = "-";
+path_set_type refset_files;
 
 bool input_id_mode = false;
 bool input_lattice_mode = false;
@@ -142,7 +128,12 @@ int cube_size = 200;
 int debug = 0;
 
 template <typename Optimizer>
-void optimize(operation_set_type& operations, model_type& model, weight_set_type& weights, weight_set_type& weights_average);
+void optimize(operation_set_type& operations,
+	      scorer_document_type& scorers,
+	      feature_function_ptr_set_type& bleus,
+	      model_type& model,
+	      weight_set_type& weights,
+	      weight_set_type& weights_average);
 
 void bcast_weights(const int rank, weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
@@ -244,6 +235,11 @@ int main(int argc, char ** argv)
     
     if (debug && mpi_rank == 0)
       std::cerr << "feature functions: " << model.size() << std::endl;
+    
+    scorer_document_type          scorers(scorer_name);
+    feature_function_ptr_set_type bleus;
+    
+    read_refset(refset_files, scorer_name, scorers, bleus);
 
     operation_set_type operations(ops.begin(), ops.end(),
 				  model,
@@ -269,9 +265,9 @@ int main(int argc, char ** argv)
     }
     
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
-      ::optimize<OptimizeMIRA>(operations, model, weights, weights_average);
+      ::optimize<OptimizeMIRA>(operations, scorers, bleus, model, weights, weights_average);
     else if (strcasecmp(algorithm.c_str(), "cp") == 0)
-      ::optimize<OptimizeCP>(operations, model, weights, weights_average);
+      ::optimize<OptimizeCP>(operations, scorers, bleus, model, weights, weights_average);
     else
       throw std::runtime_error("unsupported learning algorithm: " + algorithm);
     
@@ -313,10 +309,14 @@ struct Task
        queue_type& __queue_send,
        queue_type& __queue_recv,
        operation_set_type& __operations,
+       scorer_document_type& __scorers,
+       feature_function_ptr_set_type& __bleus,
        model_type& __model,
        optimizer_type& __optimizer)
     : queue(__queue), queue_send(__queue_send), queue_recv(__queue_recv),
       operations(__operations),
+      scorers(__scorers),
+      bleus(__bleus),
       model(__model),
       optimizer(__optimizer),
       batch_current(0),
@@ -327,6 +327,8 @@ struct Task
   queue_type&        queue_recv;
   
   operation_set_type&      operations;
+  scorer_document_type& scorers;
+  feature_function_ptr_set_type& bleus;
   model_type&        model;
   
   optimizer_type&    optimizer;
@@ -607,18 +609,20 @@ struct Task
   
   void operator()()
   {
-    scorer_ptr_type           scorer(scorer_type::create(scorer_name));
-    feature_function_ptr_type feature_function(feature_function_type::create(scorer_name));
-
-    cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(feature_function.get());
-    if (! __bleu)
-      throw std::runtime_error("not supported feature");
+    optimizer.scorers = scorers;
     
-    model_type model_bleu;
-    model_bleu.push_back(feature_function);
-
     weight_set_type weights_bleu;
-    weights_bleu[__bleu->feature_name()] = 1.0;
+    
+    for (size_t seg = 0; seg != bleus.size(); ++ seg) {
+      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(bleus[seg].get());
+      if (! __bleu) continue;
+      
+      weights_bleu[__bleu->feature_name()] = 1.0;
+      break;
+    }
+    
+    if (weights_bleu.empty())
+      throw std::runtime_error("no bleu scorer?");
     
     model_type model_sparse;
     for (model_type::const_iterator iter = model.begin(); iter != model.end(); ++ iter)
@@ -647,7 +651,6 @@ struct Task
     margin_collection_type  margins;
     feature_collection_type features;
 
-    sentence_set_type targets;
 
     bool terminated_merge = false;
     bool terminated_sample = false;
@@ -667,10 +670,13 @@ struct Task
 	} else {
 	  
 	  size_t id = size_t(-1);
-	  decode_support_vectors(buffer, id, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
+	  decode_support_vectors(buffer, id, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty);
 
 	  if (id == size_t(-1))
 	    throw std::runtime_error("invalid encoded feature vector");
+
+	  if (id >= scorers.size())
+	    throw std::runtime_error("id exceed scorer size");
 
 	  if (id >= scores.size())
 	    scores.resize(id + 1);
@@ -694,16 +700,11 @@ struct Task
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
 	  
-	  scorer->clear();
-	  sentence_set_type::const_iterator titer_end = targets.end();
-	  for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer) 
-	    scorer->insert(*titer);
+	  scorer_ptr_type scorer = scorers[id];
+	  cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(bleus[id].get());
 	  
-	  static const lattice_type __lattice;
-	  static const span_set_type __spans;
-	  static const ngram_count_set_type __ngram_counts;
+	  model_type model_bleu(bleus[id]);
 	  
-	  __bleu->assign(id, hypergraph_reward, __lattice, __spans, targets, __ngram_counts);
 	  if (! loss_segment)
 	    __bleu->assign(score);
 	  
@@ -719,12 +720,6 @@ struct Task
 	  }
 	  
 	  if (learn_optimized || mix_weights_optimized) {
-	    if (id >= optimizer.scorers.size())
-	      optimizer.scorers.resize(id + 1);
-	    
-	    if (! optimizer.scorers[id])
-	      optimizer.scorers[id] = scorer->clone();
-	    
 	    if (id >= optimizer.hypergraphs.size())
 	      optimizer.hypergraphs.resize(id + 1);
 	    
@@ -809,7 +804,6 @@ struct Task
       const lattice_type& lattice = operations.get_data().lattice;
       const span_set_type& spans = operations.get_data().spans;
       const hypergraph_type& hypergraph = operations.get_data().hypergraph;
-      const sentence_set_type& targets = operations.get_data().targets;
       
       if (debug)
 	std::cerr << "id: " << id << std::endl;
@@ -817,6 +811,9 @@ struct Task
       // collect max-feature from hypergraph
       cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
       
+      if (id >= scorers.size())
+	throw std::runtime_error("id exceed scorer size");
+
       // update scores...
       if (id >= scores.size())
 	scores.resize(id + 1);
@@ -837,17 +834,11 @@ struct Task
       if (loss_segment)
 	norm = 1;
       
-      // create scorers...
-      scorer->clear();
-      sentence_set_type::const_iterator titer_end = targets.end();
-      for (sentence_set_type::const_iterator titer = targets.begin(); titer != titer_end; ++ titer)
-	scorer->insert(*titer);
-
-      static const lattice_type __lattice;
-      static const span_set_type __spans;
-      static const ngram_count_set_type __ngram_counts;
+      scorer_ptr_type scorer = scorers[id];
+      cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(bleus[id].get());
       
-      __bleu->assign(id, hypergraph, __lattice, __spans, targets, __ngram_counts);
+      model_type model_bleu(bleus[id]);
+      
       if (! loss_segment)
 	__bleu->assign(score);
       
@@ -892,12 +883,6 @@ struct Task
       weights.erase(__bleu->feature_name());
 
       if (learn_optimized || mix_weights_optimized) {
-	if (id >= optimizer.scorers.size())
-	  optimizer.scorers.resize(id + 1);
-	
-	if (! optimizer.scorers[id])
-	  optimizer.scorers[id] = scorer->clone();
-	
 	if (id >= optimizer.hypergraphs.size())
 	  optimizer.hypergraphs.resize(id + 1);
 
@@ -969,7 +954,7 @@ struct Task
       }
       
       if (asynchronous_vectors) {
-	encode_support_vectors(buffer, id, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty, targets);
+	encode_support_vectors(buffer, id, boost::get<0>(yield_viterbi), hypergraph_reward, hypergraph_penalty);
 	
 	queue_send.push_swap(buffer);
       }
@@ -1059,7 +1044,12 @@ bool bcast_vectors(Iterator first, Iterator last, BufferIterator bfirst, Queue& 
 }
 
 template <typename Optimizer>
-void optimize(operation_set_type& operations, model_type& model, weight_set_type& weights, weight_set_type& weights_average)
+void optimize(operation_set_type& operations,
+	      scorer_document_type& scorers,
+	      feature_function_ptr_set_type& bleus,
+	      model_type& model,
+	      weight_set_type& weights,
+	      weight_set_type& weights_average)
 {
   typedef Optimizer optimizer_type;
   typedef Task<optimizer_type>  task_type;
@@ -1122,7 +1112,7 @@ void optimize(operation_set_type& operations, model_type& model, weight_set_type
 
   optimizer_type optimizer(weights, C, tolerance_solver, debug);
   
-  task_type task(queue, queue_reduce, queue_bcast, operations, model, optimizer);
+  task_type task(queue, queue_reduce, queue_bcast, operations, scorers, bleus, model, optimizer);
 
   dumper_type::queue_type queue_dumper;
   std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
@@ -1599,6 +1589,8 @@ void options(int argc, char** argv)
   opts_config.add_options()
     ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
+
+    ("refset", po::value<path_set_type>(&refset_files)->multitoken(), "refset file(s)")
     
     // options for input/output format
     ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")

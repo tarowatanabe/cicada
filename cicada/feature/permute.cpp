@@ -119,11 +119,11 @@ namespace cicada
 
       pimpl = permute.release();
       
-      // if collapsed, this is not a sparse feature!
+      // if collapsed, this is not a sparse feature.. but since we always apply feature, this is non-sparse
       
       base_type::__state_size = 0;
       base_type::__feature_name = "permute";
-      base_type::__sparse_feature = ! collapse;
+      //base_type::__sparse_feature = ! collapse;
     }
     
     Permute::~Permute() { std::auto_ptr<impl_type> tmp(pimpl); }
