@@ -13,10 +13,10 @@ Optional:
 	google-perftools (http://code.google.com/p/google-perftools/)
 	jemalloc (http://mxr.mozilla.org/mozilla-central/source/memory/jemalloc/)
 		 There is a different jemalloc (by the original author) from http://www.canonware.com/jemalloc/,
-		 but it is not tested. (I'm sure it will not work, I'm planning to support this, though)
+		 but it is not tested. (I'm sure it will not work... I'm planning to support this, though)
 	
-	You should install one of them for better memory performance
-	and to know how many bytes malloced in Linux
+	For Linux, you should install one of them for better memory performance
+	and to know how many bytes malloced.
 
 Included libraries:
 
