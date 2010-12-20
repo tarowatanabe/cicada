@@ -28,18 +28,13 @@ namespace cicada
     public:
       Combined() : scores(), weights() {}
       
-      std::pair<double, double> score() const
+      double score() const
       {
-	std::pair<double, double> result(0.0, 0.0);
-	
+	double result = 0.0;
 	weight_set_type::const_iterator witer = weights.begin();
 	score_ptr_set_type::const_iterator siter_end = scores.end();
-	for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter, ++ witer) {
-	  const std::pair<double, double> tmp = (*siter)->score();
-	  
-	  result.first  += (*witer) * tmp.first;
-	  result.second += (*witer) * tmp.second;
-	}
+	for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter, ++ witer)
+	  result += (*witer) * (*siter)->score();
 	
 	return result;
       }
@@ -129,6 +124,8 @@ namespace cicada
 	
 	return score_ptr_type(combined.release());
       }
+
+      std::string description() const;
       
     private:
       score_ptr_set_type scores;

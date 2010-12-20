@@ -136,8 +136,8 @@ int main(int argc, char** argv)
 	    *score2 += *scores2[seg];
 	  }
 	
-	  const double eval1 = score1->score().first;
-	  const double eval2 = score2->score().first;
+	  const double eval1 = score1->score();
+	  const double eval2 = score2->score();
 	
 	  if (error_metric) {
 	    if (eval1 < eval2)
@@ -165,28 +165,28 @@ int main(int argc, char** argv)
 	  *score2 += *scores2[i];
 	}
 	
-	const std::pair<double, double> eval1 = score1->score();
-	const std::pair<double, double> eval2 = score2->score();
+	const double eval1 = score1->score();
+	const double eval2 = score2->score();
 	
 	score_ptr_type score = score1;
 	for (size_t i = 0; i != scores2.size(); ++ i) {
 	  *score -= *scores1[i];
 	  *score += *scores2[i];
 	  
-	  const std::pair<double, double> eval2 = score->score();
-
+	  const double eval2 = score->score();
+	  
 	  if (debug >= 2)
-	    std::cerr << "system2: " << eval2.first << " penalty: " << eval2.second << std::endl;
+	    std::cerr << "system2: " << (*score) << std::endl;
 	  
 	  if (error_metric) {
-	    if (eval2.first < eval1.first)
+	    if (eval2 < eval1)
 	      ++ better;
-	    else if (eval2.first > eval1.first)
+	    else if (eval2 > eval1)
 	      ++ worse;
 	  } else {
-	    if (eval2.first > eval1.first)
+	    if (eval2 > eval1)
 	      ++ better;
-	    else if (eval2.first < eval1.first)
+	    else if (eval2 < eval1)
 	      ++ worse;
 	  }
 	  
@@ -199,8 +199,7 @@ int main(int argc, char** argv)
 	const double se = std::sqrt(mean * (1.0 - mean) / n);
 	
 	utils::compress_ostream os(output_file);
-	os << "system1: " << eval1.first << " penalty: " << eval1.second
-	   << " system2: " << eval2.first << " penalty: " << eval2.second << '\n'
+	os << "system1: " << eval1 << " system2: " << eval2 << '\n'
 	   << "system2 better: " << better << " worse: " << worse << '\n'
 	   << "Pr(better|different): " << mean << '\n'
 	   << "95%-confidence: " << (mean-1.96*se) << ' ' << (mean+1.96*se) << '\n'
@@ -247,7 +246,7 @@ int main(int argc, char** argv)
 	for (size_t i = 0; i != scores.size(); ++ i)
 	  *score += *scores[generator(scores.size())];
 	
-	sampled.push_back(score->score().first);
+	sampled.push_back(score->score());
       }
 
       std::sort(sampled.begin(), sampled.end());
@@ -272,10 +271,8 @@ int main(int argc, char** argv)
 	  
 	  score_ptr_type score_segment = scorers[seg]->score(hyps[seg]);
 	  
-	  if (debug) {
-	    const std::pair<double, double> value = score_segment->score();
-	    std::cerr << "segment: " << seg << " score: " << value.first << " penalty: " << value.second << std::endl;
-	  }
+	  if (debug)
+	    std::cerr << "segment: " << seg << ' ' << (*score_segment) << std::endl;
 	  
 	  if (! score)
 	    score = score_segment;
@@ -286,10 +283,8 @@ int main(int argc, char** argv)
       if (! score)
 	throw std::runtime_error("no statistics to compute error score");
       
-      const std::pair<double, double> value = score->score();
-      
       utils::compress_ostream os(output_file);
-      os << "score: " << value.first << " penalty: " << value.second << '\n';
+      os << *score << '\n';
     }
   }
   catch (const std::exception& err) {

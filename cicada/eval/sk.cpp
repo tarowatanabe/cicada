@@ -13,6 +13,14 @@ namespace cicada
 {
   namespace eval
   {
+
+    static const char* __sk_name = "sk";
+
+    const char* SK::__description() const
+    {
+      return __sk_name;
+    };
+    
     class SKScorerImpl
     {
     public:

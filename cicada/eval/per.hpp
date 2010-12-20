@@ -28,10 +28,10 @@ namespace cicada
     public:
       PER() : insertion(0), deletion(0), substitution(0), references(0) {}
       
-      std::pair<double, double> score() const
+      double score() const
       {
 	const count_type edits = insertion + deletion + substitution;
-	return std::make_pair(edits / references, 0.0);
+	return edits / references;
       }
 
       void assign(const score_type& score)
@@ -96,6 +96,8 @@ namespace cicada
 	return score_ptr_type(new PER(*this));
       }
       
+      std::string description() const;
+
     private:
       count_type insertion;
       count_type deletion;

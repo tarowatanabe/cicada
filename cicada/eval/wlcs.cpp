@@ -24,6 +24,13 @@ namespace cicada
 {
   namespace eval
   {
+    static const char* __wlcs_name = "wlcs";
+
+    const char* WLCS::__description() const
+    {
+      return __wlcs_name;
+    };
+
     class WLCSScorerImpl
     {
     public:

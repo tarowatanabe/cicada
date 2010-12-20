@@ -4,6 +4,8 @@
 
 #include <set>
 #include <algorithm>
+#include <sstream>
+#include <iterator>
 
 #include "per.hpp"
 
@@ -13,6 +15,16 @@ namespace cicada
 {
   namespace eval
   {
+
+    std::string PER::description() const
+    {
+      std::ostringstream stream;
+      stream << "per: " << score()
+	     << " " << insertion << '|' << deletion << '|' << substitution
+	     << " length: " << references;
+      
+      return stream.str();
+    }
 
     struct PERScorerConstant
     {

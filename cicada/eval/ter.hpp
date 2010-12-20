@@ -28,10 +28,10 @@ namespace cicada
     public:
       TER() : insertion(0), deletion(0), substitution(0), shift(0), references(0) {}
       
-      std::pair<double, double> score() const
+      double score() const
       {
 	const count_type edits = insertion + deletion + substitution + shift;
-	return std::make_pair(edits / references, 0.0);
+	return edits / references;
       }
 
       void assign(const score_type& score)
@@ -100,6 +100,8 @@ namespace cicada
       {
 	return score_ptr_type(new TER(*this));
       }
+
+      std::string description() const;
       
     private:
       count_type insertion;

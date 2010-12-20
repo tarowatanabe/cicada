@@ -22,6 +22,16 @@ namespace cicada
   namespace eval
   {
 
+    std::string TER::description() const
+    {
+      std::ostringstream stream;
+      stream << "ter: " << score()
+	     << " " << insertion << '|' << deletion << '|' << substitution << '|' << shift
+	     << " length: " << references;
+      
+      return stream.str();
+    }
+
     struct TERScorerConstant
     {
       struct TRANSITION

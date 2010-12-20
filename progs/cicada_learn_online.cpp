@@ -642,16 +642,8 @@ struct Task
 	    *score_1best += *scores[id];
 
 	  
-	  if (debug >= 2) {
-	    const std::pair<double, double> bleu_1best = score_1best->score();
-	    const std::pair<double, double> bleu_viterbi = score->score();
-	    
-	    std::cerr << "bleu: " << bleu_1best.first
-		      << " peanlty: " << bleu_1best.second
-		      << " viterbi: " << bleu_viterbi.first
-		      << " penalty: " << bleu_viterbi.second
-		      << std::endl;
-	  }
+	  if (debug >= 2)
+	    std::cerr << "1best: " << (*score_1best) << " viterbi: " << (*score) << std::endl;
 
 	  if (id >= hypergraph_oracles.size())
 	    hypergraph_oracles.resize(id + 1);
@@ -814,23 +806,15 @@ struct Task
 	*score_1best += *scores[id];
       
       if (debug) {
-	const std::pair<double, double> bleu_1best = score_1best->score();
-	const std::pair<double, double> bleu_viterbi = score->score();
-	
 	std::cerr << "viterbi: " << boost::get<0>(yield_viterbi) << std::endl;
 	
 	std::cerr << "hypergraph density:"
 		  << " oracle: " << (double(hypergraph_reward.edges.size()) / hypergraph_reward.nodes.size())
 		  << " violated: " << (double(hypergraph_penalty.edges.size()) / hypergraph_penalty.nodes.size())
 		  << std::endl;
-	
-	std::cerr << "bleu: " << bleu_1best.first
-		  << " peanlty: " << bleu_1best.second
-		  << " viterbi: " << bleu_viterbi.first
-		  << " penalty: " << bleu_viterbi.second
-		  << " oracle: " << score_reward->score().first
-		  << " violated: " << score_penalty->score().first
-		  << std::endl;
+
+	std::cerr << "1best: " << (*score_1best) << " viterbi: " << (*score) << std::endl
+		  << "oracle: " << (*score_reward) << " violated: " << (*score_penalty) << std::endl;
       }
 
       if (learn_factored)

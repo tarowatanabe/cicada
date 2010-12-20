@@ -355,7 +355,7 @@ struct TaskOracle
       }
     
     double objective_optimum = (score_optimum
-				? score_optimum->score().first * score_factor
+				? score_optimum->score() * score_factor
 				: - std::numeric_limits<double>::infinity());
 
     hypergraph_type graph_oracle;
@@ -402,7 +402,7 @@ struct TaskOracle
       else
 	score_curr = score_sample;
       
-      const double objective = score_curr->score().first * score_factor;
+      const double objective = score_curr->score() * score_factor;
       
       if (objective > objective_optimum || ! scores[id]) {
 	score_optimum = score_curr;
@@ -475,7 +475,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
 	  *score_optimum += *scores[id];
       }
     
-    const double objective = score_optimum->score().first * score_factor;
+    const double objective = score_optimum->score() * score_factor;
     if (mpi_rank == 0 && debug)
       std::cerr << "oracle score: " << objective << std::endl;
 

@@ -21,12 +21,12 @@ namespace cicada
       F() : match_ref(0), match_hyp(0), norm_ref(0), norm_hyp(0) {}
       
     public:
-      std::pair<double, double> score() const
+      double score() const
       {
 	const double precision = (norm_hyp != 0.0 ? match_hyp / norm_hyp : 0.0);
 	const double recall    = (norm_ref != 0.0 ? match_ref / norm_ref : 0.0);
 	
-	return std::make_pair(precision * recall / (0.5 * recall + 0.5 * precision), 0.0);
+	return precision * recall / (0.5 * recall + 0.5 * precision);
       }
 
       void assign(const score_type& score)
@@ -81,15 +81,10 @@ namespace cicada
 	norm_hyp  /= scale;
       }
 
-      score_ptr_type zero() const
-      {
-	return score_ptr_type(new F());
-      }
-
-      score_ptr_type clone() const
-      {
-	return score_ptr_type(new F(*this));
-      }
+      std::string description() const;
+      
+    protected:
+      virtual const char* __description() const = 0;
       
     protected:
       count_type match_ref;

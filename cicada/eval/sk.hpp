@@ -19,6 +19,20 @@ namespace cicada
     class SK : public F
     {
       friend class SKScorer;
+
+    public:      
+      score_ptr_type zero() const
+      {
+	return score_ptr_type(new SK());
+      }
+      
+      score_ptr_type clone() const
+      {
+	return score_ptr_type(new SK(*this));
+      }
+
+    protected:
+      const char* __description() const;
     };
 
     class SKScorerImpl;

@@ -24,6 +24,13 @@ namespace cicada
 {
   namespace eval
   {
+    static const char* __sb_name = "sb";
+
+    const char* SB::__description() const
+    {
+      return __sb_name;
+    };
+
     class SBScorerImpl
     {
     public:

@@ -50,6 +50,9 @@ eval/wer.hpp \
 eval/wlcs.hpp
 
 libcicada_eval_la_SOURCES = \
+eval/bleu.cpp \
+eval/combined.cpp \
+eval/f.cpp \
 eval/per.cpp \
 eval/score.cpp \
 eval/sb.cpp \

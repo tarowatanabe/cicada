@@ -889,7 +889,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 
     const double score_factor = (scorers.error_metric() ? 1.0 : - 1.0);
     
-    return score->score().first * score_factor;
+    return score->score() * score_factor;
   } else {
     bcast_weights(0, weights);
 

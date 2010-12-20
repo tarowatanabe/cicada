@@ -880,7 +880,7 @@ int main(int argc, char ** argv)
 	  
 	  for (size_t id = 0; id != sentences.size(); ++ id)
 	    if (id != sent && ! sentences[id].empty()) 
-	      ters.insert(std::make_pair(scorer->score(sentences[id])->score().first, id));
+	      ters.insert(std::make_pair(scorer->score(sentences[id])->score(), id));
 	  
 	  int rank = 1;
 	  const double conf = 1.0 / (1.0 + rank);

@@ -2,6 +2,9 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <sstream>
+#include <iterator>
+
 #include "wer.hpp"
 
 #include <boost/functional/hash.hpp>
@@ -10,6 +13,16 @@ namespace cicada
 {
   namespace eval
   {
+
+    std::string WER::description() const
+    {
+      std::ostringstream stream;
+      stream << "wer: " << score()
+	     << " " << insertion << '|' << deletion << '|' << substitution
+	     << " length: " << references;
+      
+      return stream.str();
+    }
 
 
     class WERScorerImpl

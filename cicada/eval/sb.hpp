@@ -19,6 +19,21 @@ namespace cicada
     class SB : public F
     {
       friend class SBScorer;
+    public:
+      
+      score_ptr_type zero() const
+      {
+	return score_ptr_type(new SB());
+      }
+      
+      score_ptr_type clone() const
+      {
+	return score_ptr_type(new SB(*this));
+      }
+
+      
+    protected:
+      const char* __description() const;
     };
 
     class SBScorerImpl;

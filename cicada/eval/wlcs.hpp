@@ -19,6 +19,20 @@ namespace cicada
     class WLCS : public F
     {
       friend class WLCSScorer;
+      
+    public:
+      score_ptr_type zero() const
+      {
+	return score_ptr_type(new WLCS());
+      }
+      
+      score_ptr_type clone() const
+      {
+	return score_ptr_type(new WLCS(*this));
+      }
+
+    protected:
+      const char* __description() const;
     };
 
     class WLCSScorerImpl;

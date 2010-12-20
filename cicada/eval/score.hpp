@@ -7,8 +7,10 @@
 #define __CICADA__EVAL__SCORE__HPP__ 1
 
 // base-class for scoring...
+#include <string>
 #include <vector>
 #include <utility>
+#include <ostream>
 
 #include <cicada/sentence.hpp>
 #include <cicada/sentence_vector.hpp>
@@ -30,8 +32,8 @@ namespace cicada
       virtual ~Score() {}
       
       
-      std::pair<double, double> operator()() const { return score(); }
-      virtual std::pair<double, double> score() const = 0;
+      double operator()() const { return score(); }
+      virtual double score() const = 0;
       
       virtual void assign(const score_type& score) = 0;
       
@@ -44,8 +46,9 @@ namespace cicada
       virtual score_ptr_type zero() const = 0;
       virtual score_ptr_type clone() const = 0;
       
-    public:
+      virtual std::string description() const = 0;
       
+    public:      
       score_type& operator=(const score_type& score)
       {
 	this->assign(score);
@@ -78,7 +81,13 @@ namespace cicada
       
     };
     
-
+    inline
+    std::ostream& operator<<(std::ostream& os, const Score& x)
+    {
+      os << x.description();
+      return os;
+    }
+    
 
     class Scorer
     {

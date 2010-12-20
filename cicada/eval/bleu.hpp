@@ -38,7 +38,7 @@ namespace cicada
 	: ngrams_reference(order, 0),  ngrams_hypothesis(order, 0),
 	  length_reference(0), length_hypothesis(0) {}
       
-      std::pair<double, double> score() const
+      double score() const
       {
 	const double penalty = std::min(1.0 - length_reference / length_hypothesis, 0.0);
 	
@@ -57,7 +57,7 @@ namespace cicada
 	score /= ngrams_hypothesis.size();
 	score += penalty;
 	
-	return std::make_pair(std::exp(score), std::exp(penalty));
+	return std::exp(score);
       }
 
       void assign(const score_type& score)
@@ -126,6 +126,8 @@ namespace cicada
       {
 	return score_ptr_type(new Bleu(*this));
       }
+
+      std::string description() const;
 
 
       ngram_counts_type ngrams_reference;
