@@ -90,24 +90,23 @@ namespace cicada
       {
 	if (ngrams.empty()) {
 	  char* buf = reinterpret_cast<char*>(state);
-	  std::fill(buf, buf + sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(id_type) * 2, 0);
+	  std::fill(buf, buf + sizeof(symbol_type) * order * 2 + sizeof(int) + sizeof(id_type), 0);
 	  return 0.0;
 	}
-
+	
 	const rule_type& rule = *edge.rule;
 	
 	const phrase_type& target = rule.rhs;
 	
 	count_set_type counts;
-
+	
 	symbol_type* context_first = reinterpret_cast<symbol_type*>(state);
 	symbol_type* context_last  = context_first + order * 2;
-
+	
 	std::fill(context_first, context_last, vocab_type::EMPTY);
 	
-	int*     context_parsed     = reinterpret_cast<int*>(context_last);
-	int*     context_hypothesis = context_parsed + 1;
-	id_type* context_count       = reinterpret_cast<id_type*>(context_hypothesis + 1);
+	int*     context_hypothesis = reinterpret_cast<int*>(context_last);
+	id_type* context_count      = reinterpret_cast<id_type*>(context_hypothesis + 1);
 
 	const int context_size = order - 1;
 	
@@ -136,7 +135,6 @@ namespace cicada
 	    std::copy(suffix.first, suffix.second, context_first + (prefix.second - prefix.first) + 1);
 	  }
 	  
-	  *context_parsed = 0;
 	  *context_hypothesis = buffer.size();
 	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
@@ -172,9 +170,8 @@ namespace cicada
 	      const symbol_type* antecedent_end  = std::find(antecedent_first, antecedent_last, vocab_type::EMPTY);
 	      const symbol_type* antecedent_star = std::find(antecedent_first, antecedent_end, vocab_type::STAR);
 	      
-	      const int*     antecedent_parsed     = reinterpret_cast<const int*>(antecedent_last);
-	      const int*     antecedent_hypothesis = antecedent_parsed + 1;
-	      const id_type* antecedent_count       = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
+	      const int*     antecedent_hypothesis = reinterpret_cast<const int*>(antecedent_last);
+	      const id_type* antecedent_count      = reinterpret_cast<const id_type*>(antecedent_hypothesis + 1);
 
 	      const count_set_type& counts_antecedent = states_counts[*antecedent_count];
 	      
@@ -250,8 +247,6 @@ namespace cicada
 	    }
 	  }
 
-	  *context_parsed = 0;
-	  
 	  states_count_set_type::iterator citer = const_cast<states_count_set_type&>(states_counts).insert(counts).first;
 	  *context_count = citer - const_cast<states_count_set_type&>(states_counts).begin();
 
@@ -498,8 +493,8 @@ namespace cicada
       
       std::auto_ptr<impl_type> bleu_impl(new impl_type(order));
       
-      // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
-      base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) * 2 + sizeof(impl_type::id_type) * 2;
+      // two-side context + length + counts-id
+      base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) + sizeof(impl_type::id_type);
       base_type::__feature_name = "bleu-expected";
       
       pimpl = bleu_impl.release();
