@@ -82,6 +82,7 @@ namespace cicada
       }
 
       std::string description() const;
+      std::string encode() const;
       
     protected:
       virtual const char* __description() const = 0;

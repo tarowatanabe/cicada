@@ -128,6 +128,7 @@ namespace cicada
       }
 
       std::string description() const;
+      std::string encode() const;
 
 
       ngram_counts_type ngrams_reference;

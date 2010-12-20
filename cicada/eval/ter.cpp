@@ -8,6 +8,8 @@
 
 #include "ter.hpp"
 
+#include "utils/base64.hpp"
+
 #include <google/dense_hash_set>
 
 #include <boost/functional/hash.hpp>
@@ -31,6 +33,35 @@ namespace cicada
       
       return stream.str();
     }
+
+    inline
+    std::string escape_base64(const std::string& x)
+    {
+      std::string result;
+      
+      std::string::const_iterator iter_end = x.end();
+      for (std::string::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+	if (*iter == '/')
+	  result += "\\/";
+	else
+	  result += *iter;
+      
+      return result;
+    }
+
+    std::string TER::encode() const
+    {
+      std::ostringstream stream;
+      stream << '{' << "\"eval\":\"ter\",";
+      stream << "\"insertion\":\"" <<  escape_base64(utils::encode_base64(insertion)) << "\",";
+      stream << "\"deletion\":\"" <<  escape_base64(utils::encode_base64(deletion)) << "\",";
+      stream << "\"substitution\":\"" <<  escape_base64(utils::encode_base64(substitution)) << "\",";
+      stream << "\"shift\":\"" <<  escape_base64(utils::encode_base64(shift)) << "\",";
+      stream << "\"reference\":\"" <<  escape_base64(utils::encode_base64(references)) << "\"";
+      stream << '}';
+      return stream.str();
+    }
+    
 
     struct TERScorerConstant
     {

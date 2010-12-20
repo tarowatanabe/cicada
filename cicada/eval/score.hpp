@@ -47,6 +47,7 @@ namespace cicada
       virtual score_ptr_type clone() const = 0;
       
       virtual std::string description() const = 0;
+      virtual std::string encode() const = 0;
       
     public:      
       score_type& operator=(const score_type& score)

@@ -4,6 +4,8 @@
 
 #include "bleu.hpp"
 
+#include "utils/base64.hpp"
+
 namespace cicada
 {
   namespace eval
@@ -42,5 +44,38 @@ namespace cicada
       return stream.str();
     }
     
+    inline
+    std::string escape_base64(const std::string& x)
+    {
+      std::string result;
+      
+      std::string::const_iterator iter_end = x.end();
+      for (std::string::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+	if (*iter == '/')
+	  result += "\\/";
+	else
+	  result += *iter;
+      
+      return result;
+    }
+    
+    std::string Bleu::encode() const
+    {
+      std::ostringstream stream;
+      stream << '{' << "\"eval\":\"bleu\",";
+      stream << "\"reference\":[";
+      stream << "\"" << escape_base64(utils::encode_base64(length_reference)) << "\"";
+      for (size_t i = 0; i != ngrams_reference.size(); ++ i)
+	stream << ",\"" << escape_base64(utils::encode_base64(ngrams_reference[i])) << "\"";
+      stream << "],";
+      stream << "\"hypothesis\":[";
+      stream << "\"" << escape_base64(utils::encode_base64(length_hypothesis)) << "\"";
+      for (size_t i = 0; i != ngrams_hypothesis.size(); ++ i)
+	stream << ",\"" << escape_base64(utils::encode_base64(ngrams_hypothesis[i])) << "\"";
+      stream << "]";
+      stream << '}';
+      
+      return stream.str();
+    }
   };
 };

@@ -7,6 +7,8 @@
 
 #include "wer.hpp"
 
+#include "utils/base64.hpp"
+
 #include <boost/functional/hash.hpp>
 
 namespace cicada
@@ -23,6 +25,34 @@ namespace cicada
       
       return stream.str();
     }
+
+    inline
+    std::string escape_base64(const std::string& x)
+    {
+      std::string result;
+      
+      std::string::const_iterator iter_end = x.end();
+      for (std::string::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+	if (*iter == '/')
+	  result += "\\/";
+	else
+	  result += *iter;
+      
+      return result;
+    }
+
+    std::string WER::encode() const
+    {
+      std::ostringstream stream;
+      stream << '{' << "\"eval\":\"wer\",";
+      stream << "\"insertion\":\"" <<  escape_base64(utils::encode_base64(insertion)) << "\",";
+      stream << "\"deletion\":\"" <<  escape_base64(utils::encode_base64(deletion)) << "\",";
+      stream << "\"substitution\":\"" <<  escape_base64(utils::encode_base64(substitution)) << "\",";
+      stream << "\"reference\":\"" <<  escape_base64(utils::encode_base64(references)) << "\"";
+      stream << '}';
+      return stream.str();
+    }
+
 
 
     class WERScorerImpl

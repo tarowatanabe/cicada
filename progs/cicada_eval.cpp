@@ -282,6 +282,9 @@ int main(int argc, char** argv)
       
       if (! score)
 	throw std::runtime_error("no statistics to compute error score");
+
+      if (debug >= 2)
+	std::cerr << score->encode() << std::endl;
       
       utils::compress_ostream os(output_file);
       os << *score << '\n';

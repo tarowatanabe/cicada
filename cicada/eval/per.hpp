@@ -97,6 +97,7 @@ namespace cicada
       }
       
       std::string description() const;
+      std::string encode() const;
 
     private:
       count_type insertion;
