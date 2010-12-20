@@ -1,6 +1,8 @@
 2010-12-20
 Serious bugfix to ngram-related features with double counting.
+Serious bugfix to expected ngram collections
 Added preliminary head-finder
+Added approximate matcher to cicada_unite_sentence and TER/WER
 
 2010-12-13
 Added phrase-extract-like script, extract.py, for easily extracting/scoreing phrase/scfg/ghkm.
