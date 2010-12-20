@@ -47,7 +47,7 @@ namespace cicada
 
       typedef cicada::WeightVector<double, std::allocator<double> > weight_set_type;
       
-      PermuteImpl() : collapse(false), feature("permute") {}
+      PermuteImpl() : feature("permute"), collapse(false) {}
 
       struct __rule_permute : public boost::static_visitor<bool>
       {
