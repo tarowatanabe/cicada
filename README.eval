@@ -50,7 +50,7 @@ Evaluator score format:
 {"eval":"sb", "reference":["base64", ""], "hypothesis":["base64", ...]}
 {"eval":"wlcs", "reference":["base64", ""], "hypothesis":["base64", ...]}
 {"eval":"combined", [{"eval":"bleu", ...}, {"eval":"ter", ...}], ["base64", "base64",.... list of weights]}
-and doubles are encoded as base64 (string!)
+and doubles are encoded as base64 (string!). We can insert spaces, but encoder will generate a string w/o spaces.
 
 [1]
 @inproceedings{koehn:2004:EMNLP,
