@@ -117,10 +117,10 @@ namespace cicada
 	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const edge_type& edge = graph.edges[*eiter];
 	  
-	  weight_type weight = function(edge) * inside[node.id] / weight_goal;
+	  weight_type weight = function(edge) * outside[node.id] / weight_goal;
 	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
 	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
-	    weight *= outside[*niter];
+	    weight *= inside[*niter];
 	  
 	  index_set_type j_ends(edge.tails.size(), 0);
 	  index_set_type j(edge.tails.size(), 0);

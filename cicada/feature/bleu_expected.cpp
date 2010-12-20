@@ -274,8 +274,6 @@ namespace cicada
 	// for count set representation
 	states_counts.clear();
 	
-	minimum_size = 0;
-
 	score.reset();
       }
 
@@ -456,12 +454,6 @@ namespace cicada
 	if (length == 0) return 0.0;
 	
 	return (length < unigram && scaling ? unigram : double(length));
-#if 0
-	if (length == 0) return 0.0;
-	
-	// we will scale hypothesis length by the # of output words
-	return (length < minimum_size && scaling ? double(minimum_size) : double(length));
-#endif
       }
       
       double ref_size(const double hypothesis_size) const
@@ -479,8 +471,6 @@ namespace cicada
       
       states_count_set_type states_counts;
       
-      int minimum_size;
-
       score_ptr_type score;
 
       int order;
@@ -618,12 +608,6 @@ namespace cicada
 			      const ngram_count_set_type& ngram_counts)
     {
       pimpl->clear();
-      
-#if 0
-      std::vector<length_function::value_type, std::allocator<length_function::value_type> > lengths(hypergraph.nodes.size());
-      cicada::inside(hypergraph, lengths, length_function());
-      pimpl->minimum_size = - log(lengths.back());
-#endif
 
       ngram_count_set_type::const_iterator niter_end = ngram_counts.end();
       for (ngram_count_set_type::const_iterator niter = ngram_counts.begin(); niter != niter_end; ++ niter) {
@@ -631,8 +615,8 @@ namespace cicada
 	
 	pimpl->insert(niter->first.begin(), niter->first.end(), niter->second);
       }
-      
-      //std::cerr << "source length: " << source_length << std::endl;
+
+      //std::cerr << "unigram: " << pimpl->unigram << std::endl;
     }
     
 
