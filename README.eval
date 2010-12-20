@@ -36,6 +36,23 @@ Tips: cicada_oracle{,_mpi} assumes "forests" as a input. If you want to compute
 converting the sentence set as a lattice using cicada_unite_lattice, then, use cicada
 to intersect with a straight glue-rule.
 
+
+encode/decode API for scorer:
+
+std::string score.encode();
+score_ptr score::decode(std::string);
+
+Evaluator score format:
+{"eval":"bleu", "order":4, "reference":["base64" (length), "base64" (1gram), "base64", "base64", "base64"], "hypothesis":[...]}
+{"eval":"ter", "insertion":"base64", "deletion":"", ...}
+{"eval":"wer", "insertion":"base64", "deletion":"", ...}
+{"eval":"per", "insertion":"base64", "deletion":"", ...}
+{"eval":"sk", "reference":["base64", ""], "hypothesis":["base64", ...]}
+{"eval":"sb", "reference":["base64", ""], "hypothesis":["base64", ...]}
+{"eval":"wlcs", "reference":["base64", ""], "hypothesis":["base64", ...]}
+{"eval":"combined", [{"eval":"bleu", ...}, {"eval":"ter", ...}], ["base64", "base64",.... list of weights]}
+and doubles are encoded as base64 (string!)
+
 [1]
 @inproceedings{koehn:2004:EMNLP,
   author    = {Koehn, Philipp},
