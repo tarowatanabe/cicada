@@ -29,6 +29,18 @@ namespace cicada
 	return precision * recall / (0.5 * recall + 0.5 * precision);
       }
 
+      bool equal(const score_type& score) const
+      {
+	const F* rhs = dynamic_cast<const F*>(&score);
+	if (! rhs)
+	  throw std::runtime_error("invalid F measure");
+	
+	return (match_ref == rhs->match_ref
+		&& match_hyp == rhs->match_hyp
+		&& norm_ref == rhs->norm_ref
+		&& norm_hyp == rhs->norm_hyp);
+      }
+
       void assign(const score_type& score)
       {
 	const F* rhs = dynamic_cast<const F*>(&score);

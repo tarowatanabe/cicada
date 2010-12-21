@@ -60,6 +60,18 @@ namespace cicada
 	return std::exp(score);
       }
 
+      bool equal(const score_type& score) const
+      {
+	const Bleu* rhs = dynamic_cast<const Bleu*>(&score);
+	if (! rhs)
+	  throw std::runtime_error("invalid BLEU score");
+	
+	return (ngrams_reference == rhs->ngrams_reference
+		&& ngrams_hypothesis == rhs->ngrams_hypothesis
+		&& length_reference == rhs->length_reference
+		&& length_hypothesis == rhs->length_hypothesis);
+      }
+
       void assign(const score_type& score)
       {
 	const Bleu* rhs = dynamic_cast<const Bleu*>(&score);

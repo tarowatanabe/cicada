@@ -34,6 +34,20 @@ namespace cicada
 	return edits / references;
       }
 
+      bool equal(const score_type& score) const
+      {
+	const TER* rhs = dynamic_cast<const TER*>(&score);
+	if (! rhs)
+	  throw std::runtime_error("invalid TER score");
+	
+	return (insertion == rhs->insertion
+		&& deletion == rhs->deletion
+		&& substitution == rhs->substitution
+		&& shift == rhs->shift
+		&& references == rhs->references);
+      }
+      
+
       void assign(const score_type& score)
       {
 	const TER* rhs = dynamic_cast<const TER*>(&score);

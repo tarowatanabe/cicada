@@ -38,6 +38,24 @@ namespace cicada
 	
 	return result;
       }
+      
+      bool equal(const score_type& score) const
+      {
+	const Combined* rhs = dynamic_cast<const Combined*>(&score);
+	if (! rhs)
+	  throw std::runtime_error("invalid combined score");
+
+	if (scores.size() != rhs->scores.size() || weights != rhs->weights)
+	  return false;
+	
+	score_ptr_set_type::const_iterator iter = scores.begin();
+	score_ptr_set_type::const_iterator siter_end = rhs->scores.end();
+	for (score_ptr_set_type::const_iterator siter = rhs->scores.begin(); siter != siter_end; ++ siter, ++ iter)
+	  if (*(*iter) != *(*siter))
+	    return false;
+	
+	return true;
+      }
 
       void assign(const score_type& score)
       {

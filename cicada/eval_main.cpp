@@ -26,13 +26,8 @@ void process(const std::string& name, const sentence_set_type& refset, const sen
   
   if (! decoded)
     std::cerr << "decoding failed" << std::endl;
-  else if (decoded->encode() != encoded) {
+  else if (*decoded != *score)
     std::cerr << "encoding/decoding failed" << std::endl;
-    std::cerr << "original: " << encoded << std::endl
-	      << "new: " << decoded->encode() << std::endl;
-    std::cerr << "if your difference is merely the last two bits, there will be no problem." << std::endl
-	      << "this is due by filling 11 * 6 bits container by 64-bits, where the container is not initialized..." << std::endl;
-  }
 }
 
 int main(int argc, char** argv)

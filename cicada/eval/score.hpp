@@ -34,6 +34,8 @@ namespace cicada
       
       double operator()() const { return score(); }
       virtual double score() const = 0;
+
+      virtual bool equal(const score_type& score) const = 0;
       
       virtual void assign(const score_type& score) = 0;
       
@@ -53,6 +55,17 @@ namespace cicada
       static score_ptr_type decode(const std::string& encoded);
       
     public:      
+      friend
+      bool operator==(const score_type& x, const score_type& y)
+      {
+	return x.equal(y);
+      }
+      friend
+      bool operator!=(const score_type& x, const score_type& y)
+      {
+	return ! x.equal(y);
+      }
+      
       score_type& operator=(const score_type& score)
       {
 	this->assign(score);

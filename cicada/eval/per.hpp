@@ -34,6 +34,19 @@ namespace cicada
 	return edits / references;
       }
 
+      bool equal(const score_type& score) const
+      {
+	const PER* rhs = dynamic_cast<const PER*>(&score);
+	if (! rhs)
+	  throw std::runtime_error("invalid PER score");
+
+	return (insertion == rhs->insertion
+		&& deletion == rhs->deletion
+		&& substitution == rhs->substitution
+		&& references == rhs->references);
+      }
+      
+
       void assign(const score_type& score)
       {
 	const PER* rhs = dynamic_cast<const PER*>(&score);
