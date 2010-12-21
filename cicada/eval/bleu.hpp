@@ -13,12 +13,10 @@
 #include <algorithm>
 #include <vector>
 #include <utility>
-#include <map>
 
 #include <cicada/eval/score.hpp>
 
 #include <utils/compact_trie_dense.hpp>
-#include <utils/bithack.hpp>
 
 #include <boost/numeric/conversion/bounds.hpp>
 
@@ -175,95 +173,9 @@ namespace cicada
 	sizes.clear();
       }
       
-      void insert(const sentence_type& __sentence)
-      {
-	typedef ngram_set_type::id_type id_type;
-	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
+      void insert(const sentence_type& __sentence);
 
-	sentence_type sentence;
-	counts_type counts;
-	
-	tokenize(__sentence, sentence);
-	
-	sentence_type::const_iterator siter_end = sentence.end();
-	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	  ngram_set_type::id_type id = ngrams.root();
-	  
-	  for (sentence_type::const_iterator iter = siter; iter != std::min(siter + order, siter_end); ++ iter) {
-	    id = ngrams.insert(id, *iter);
-	    ++ counts[id];
-	  }
-	}
-	
-	counts_type::const_iterator citer_end = counts.end();
-	for (counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-	  ngrams[citer->first] = std::max(ngrams[citer->first], citer->second);
-	
-	sizes.push_back(sentence.size());
-	
-	std::sort(sizes.begin(), sizes.end());
-      }
-
-      score_ptr_type score(const sentence_type& __sentence) const
-      {
-	typedef ngram_set_type::id_type id_type;
-	typedef std::map<id_type, count_type, std::less<id_type>, std::allocator<std::pair<const id_type, count_type> > > counts_type;
-	
-	typedef std::vector<counts_type, std::allocator<counts_type> > counts_set_type;
-	
-	sentence_type sentence;
-	tokenize(__sentence, sentence);
-	
-	std::auto_ptr<Bleu> bleu(new Bleu(order));
-	counts_set_type counts(order);
-	
-	const int hypothesis_size = sentence.size();
-	
-	int reference_size = 0;
-	int min_diff = boost::numeric::bounds<int>::highest();
-	
-	for (size_set_type::const_iterator siter = sizes.begin(); siter != sizes.end(); ++ siter) {
-	  const int diff = utils::bithack::abs(*siter - hypothesis_size);
-	  
-	  if (diff < min_diff) {
-	    min_diff = diff;
-	    reference_size = *siter;
-	  } else if (diff == min_diff)
-	    reference_size = utils::bithack::min(reference_size, *siter);
-	}
-	
-	bleu->length_hypothesis += hypothesis_size;
-	bleu->length_reference  += reference_size;
-	
-	// collect total counts...
-	for (int n = 0; n < utils::bithack::min(order, hypothesis_size); ++ n)
-	  bleu->ngrams_reference[n] += hypothesis_size - n;
-	
-	// collect ngrams matched with references
-	sentence_type::const_iterator siter_end = sentence.end();
-	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
-	
-	  int n = 0;
-	  id_type id = ngrams.root();
-	  for (sentence_type::const_iterator iter = siter; iter != std::min(siter + order, siter_end); ++ iter, ++ n) {
-	    id = ngrams.find(id, *iter);
-	    
-	    if (ngrams.is_root(id)) break;
-	    
-	    // ngram at [siter, iter] with id
-	    ++ counts[n][id];
-	  }
-	}
-
-	// collect clip counts...
-	for (int n = 0; n < order; ++ n) {
-	  counts_type::const_iterator citer_end = counts[n].end();
-	  for (counts_type::const_iterator citer = counts[n].begin(); citer != citer_end; ++ citer)
-	    bleu->ngrams_hypothesis[n] += std::min(citer->second, ngrams[citer->first]);
-	}
-	
-	return score_ptr_type(bleu.release());
-      }
+      score_ptr_type score(const sentence_type& __sentence) const;
 
     private:
       ngram_set_type ngrams;
