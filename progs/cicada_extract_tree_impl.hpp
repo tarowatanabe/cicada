@@ -1245,11 +1245,19 @@ struct ExtractTree
   derivation_graph_type graph_source;
   derivation_graph_type graph_target;
   
-  void operator()(const hypergraph_type& source,
-		  const hypergraph_type& target,
+  void operator()(const hypergraph_type& __source,
+		  const hypergraph_type& __target,
 		  const alignment_type&  alignment,
 		  rule_pair_set_type& rules)
+
+    
   {
+    hypergraph_type source;
+    hypergraph_type target;
+    
+    cicada::span_forest(__source, source);
+    cicada::span_forest(__target, target);
+
 #if 0
     std::cerr << "source: " << source << std::endl
 	      << "target: " << target << std::endl

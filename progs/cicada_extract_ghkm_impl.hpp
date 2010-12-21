@@ -30,6 +30,7 @@
 #include "cicada/operation/functional.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/inside_outside.hpp"
+#include "cicada/span_forest.hpp"
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/sgi_hash_set.hpp"
@@ -503,17 +504,20 @@ struct ExtractGHKM
   weight_set_type weights_inside;
   weight_set_type weights_outside;
   
-  void operator()(const hypergraph_type& graph,
+  void operator()(const hypergraph_type& __graph,
 		  const sentence_type& sentence,
 		  const alignment_type& alignment,
 		  rule_pair_set_type& rules)
   {
+    hypergraph_type graph;
+    cicada::span_forest(__graph, graph);
+    
 #if 0
     std::cerr << "hypergraph: " << graph << std::endl
 	      << "sentence: " << sentence << std::endl
 	      << "alignment: " << alignment << std::endl;
 #endif
-
+    
     ranges.clear();
     spans.clear();
     complements.clear();

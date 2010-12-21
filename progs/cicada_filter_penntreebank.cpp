@@ -29,7 +29,6 @@
 #include <boost/shared_ptr.hpp>
 
 #include "cicada/hypergraph.hpp"
-#include "cicada/span_forest.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -465,10 +464,9 @@ int main(int argc, char** argv)
 	if (debug)
 	  std::cerr << "transformed into hypergraph" << std::endl;
 
-	if (! graph.edges.empty()) {
+	if (! graph.edges.empty())
 	  graph.topologically_sort();
-	  cicada::span_forest(graph);
-	} else
+	else
 	  graph.clear();
 	
 	if (rule) {
