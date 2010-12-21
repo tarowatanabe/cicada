@@ -42,11 +42,3 @@ Do we allow intersect with lattice, not the first sentence of targets...?
 Re-engineer kbest/viterbi framework...
   I don't like current interface, separating weight and derivation
   Is there a workaround, like use iterator-based enumeration?
-
-Tweak evaluator API:
-  Simply return single score, not pair consisting of score/penalty terms.
-  Add description interface to dump human readable result (in std::string?)
-  Add iostream interface + create(first, last), create(std::string) etc. in order to exchange counts etc.
-  Define JSON format + base64 encoding for doubles
-  Do we use iostream for hunam readable output, and encode/decode/create for internals?
-  

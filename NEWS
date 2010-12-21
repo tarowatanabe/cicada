@@ -1,3 +1,7 @@
+2010-12-22???
+Added new API for mt-evaluation score allowing ascii-dumping by desciption/encode and recovery by decode.
+GHKM and Tree extractor first computes terminal span, and removed span-forest from cicada_fitler_{penntreebank,cabocha}
+
 2010-12-20
 Serious bugfix to ngram-related features with double counting.
 Serious bugfix to expected ngram collections

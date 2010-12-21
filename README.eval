@@ -41,16 +41,18 @@ encode/decode API for scorer:
 std::string score.encode();
 score_ptr score::decode(std::string);
 
-Evaluator score format:
+Evaluator score JSON format:
 {"eval":"bleu", "reference":["base64" (length), "base64" (1gram), "base64", "base64", "base64"], "hypothesis":[...]}
-{"eval":"ter", "edits": ["base64", ...]}
-{"eval":"wer", "edits": ["base64", ...]}
-{"eval":"per", "edits": ["base64", ...]}
-{"eval":"sk", "reference":["base64", ""], "hypothesis":["base64", ...]}
-{"eval":"sb", "reference":["base64", ""], "hypothesis":["base64", ...]}
-{"eval":"wlcs", "reference":["base64", ""], "hypothesis":["base64", ...]}
+{"eval":"ter", "edits": ["base64", ... (insertion,deletion,substitution,shift,reference)]}
+{"eval":"wer", "edits": ["base64", ... (insertion,deletion,substitution,reference)]}
+{"eval":"per", "edits": ["base64", ... (insertion,deletion,substitution,reference)]}
+{"eval":"sk", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
+{"eval":"sb", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
+{"eval":"wlcs", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
 {"eval":"combined", "score":[{"eval":"bleu", ...}, {"eval":"ter", ...}], "weight":["base64", "base64",.... list of weights]}
 and doubles are encoded as base64 (string!). We can insert spaces, but encoder will generate a string w/o spaces.
+Remark, that double's 64bits will be encoded by 66-bit string (11 * 6bits), thus base64 encoding of double may be
+slightly different by the last two digits.
 
 [1]
 @inproceedings{koehn:2004:EMNLP,
