@@ -30,6 +30,7 @@
 #include "cicada/operation/functional.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/inside_outside.hpp"
+#include "cicada/span_forest.hpp"
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/sgi_hash_set.hpp"
