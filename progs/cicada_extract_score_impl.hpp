@@ -619,7 +619,7 @@ struct RootCountParser
   public:
     operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
   };
-
+  
   template <typename Iterator>
   struct root_count_parser : boost::spirit::qi::grammar<Iterator, root_count_type(), boost::spirit::standard::space_type>
   {

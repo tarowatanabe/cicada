@@ -43,13 +43,13 @@ score_ptr score::decode(std::string);
 
 Evaluator score format:
 {"eval":"bleu", "reference":["base64" (length), "base64" (1gram), "base64", "base64", "base64"], "hypothesis":[...]}
-{"eval":"ter", "insertion":"base64", "deletion":"", ...}
-{"eval":"wer", "insertion":"base64", "deletion":"", ...}
-{"eval":"per", "insertion":"base64", "deletion":"", ...}
+{"eval":"ter", "edits": ["base64", ...]}
+{"eval":"wer", "edits": ["base64", ...]}
+{"eval":"per", "edits": ["base64", ...]}
 {"eval":"sk", "reference":["base64", ""], "hypothesis":["base64", ...]}
 {"eval":"sb", "reference":["base64", ""], "hypothesis":["base64", ...]}
 {"eval":"wlcs", "reference":["base64", ""], "hypothesis":["base64", ...]}
-{"eval":"combined", [{"eval":"bleu", ...}, {"eval":"ter", ...}], ["base64", "base64",.... list of weights]}
+{"eval":"combined", "score":[{"eval":"bleu", ...}, {"eval":"ter", ...}], "weight":["base64", "base64",.... list of weights]}
 and doubles are encoded as base64 (string!). We can insert spaces, but encoder will generate a string w/o spaces.
 
 [1]

@@ -2,12 +2,13 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include "decode.hpp"
+#include "encode.hpp"
+
 #include <sstream>
 #include <iterator>
 
 #include "wer.hpp"
-
-#include "utils/base64.hpp"
 
 #include <boost/functional/hash.hpp>
 
@@ -25,35 +26,78 @@ namespace cicada
       
       return stream.str();
     }
-
-    inline
-    std::string escape_base64(const std::string& x)
-    {
-      std::string result;
-      
-      std::string::const_iterator iter_end = x.end();
-      for (std::string::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-	if (*iter == '/')
-	  result += "\\/";
-	else
-	  result += *iter;
-      
-      return result;
-    }
-
+    
     std::string WER::encode() const
     {
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"wer\",";
-      stream << "\"insertion\":\"" <<  escape_base64(utils::encode_base64(insertion)) << "\",";
-      stream << "\"deletion\":\"" <<  escape_base64(utils::encode_base64(deletion)) << "\",";
-      stream << "\"substitution\":\"" <<  escape_base64(utils::encode_base64(substitution)) << "\",";
-      stream << "\"reference\":\"" <<  escape_base64(utils::encode_base64(references)) << "\"";
-      stream << '}';
+      stream << "\"edits\":[";
+      stream << '\"' << escaper(insertion) << "\",";
+      stream << '\"' << escaper(deletion) << "\",";
+      stream << '\"' << escaper(substitution) << "\",";
+      stream << '\"' << escaper(references) << '\"';
+      stream << "]}";
       return stream.str();
     }
 
+    typedef boost::fusion::tuple<double, double, double, double> wer_parsed_type;
+    
+    template <typename Iterator>
+    struct wer_parser : boost::spirit::qi::grammar<Iterator, wer_parsed_type(), boost::spirit::standard::space_type>
+    {
+      wer_parser() : wer_parser::base_type(wer_parsed)
+      {
+	namespace qi = boost::spirit::qi;
+	namespace standard = boost::spirit::standard;
+	
+	wer_parsed %= (qi::lit('{')
+		       >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"wer\"") >> qi::lit(',')
+		       >> qi::lit("\"edits\"") >> qi::lit(':')
+		       >> qi::lit('[')
+		       >> double_value >> qi::lit(',')
+		       >> double_value >> qi::lit(',')
+		       >> double_value >> qi::lit(',')
+		       >> double_value
+		       >> qi::lit(']')
+		       >> qi::lit('}'));
+      }
+      
+      typedef boost::spirit::standard::space_type space_type;
+      
+      double_base64_parser<Iterator> double_value;
+      boost::spirit::qi::rule<Iterator, wer_parsed_type(), space_type> wer_parsed;
+    };
 
+    Score::score_ptr_type WER::decode(std::string::const_iterator& iter, std::string::const_iterator end)
+    {
+      typedef std::string::const_iterator iterator_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      wer_parser<iterator_type> parser;
+      wer_parsed_type           parsed;
+      
+      const bool result = qi::phrase_parse(iter, end, parser, standard::space, parsed);
+      if (! result)
+	return score_ptr_type();
+      
+      std::auto_ptr<WER> wer(new WER());
+      wer->insertion    = boost::fusion::get<0>(parsed);
+      wer->deletion     = boost::fusion::get<1>(parsed);
+      wer->substitution = boost::fusion::get<2>(parsed);
+      wer->references   = boost::fusion::get<3>(parsed);
+      
+      return score_ptr_type(wer.release());
+    }
+    
+    Score::score_ptr_type WER::decode(const std::string& encoded)
+    {
+      std::string::const_iterator iter     = encoded.begin();
+      std::string::const_iterator iter_end = encoded.end();
+      
+      return decode(iter, iter_end);
+    }
 
     class WERScorerImpl
     {

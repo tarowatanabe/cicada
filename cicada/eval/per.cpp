@@ -2,14 +2,15 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include "decode.hpp"
+#include "encode.hpp"
+
 #include <set>
 #include <algorithm>
 #include <sstream>
 #include <iterator>
 
 #include "per.hpp"
-
-#include "utils/base64.hpp"
 
 #include <boost/functional/hash.hpp>
 
@@ -28,34 +29,78 @@ namespace cicada
       return stream.str();
     }
 
-    inline
-    std::string escape_base64(const std::string& x)
-    {
-      std::string result;
-      
-      std::string::const_iterator iter_end = x.end();
-      for (std::string::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-	if (*iter == '/')
-	  result += "\\/";
-	else
-	  result += *iter;
-      
-      return result;
-    }
-
     std::string PER::encode() const
     {
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"per\",";
-      stream << "\"insertion\":\"" <<  escape_base64(utils::encode_base64(insertion)) << "\",";
-      stream << "\"deletion\":\"" <<  escape_base64(utils::encode_base64(deletion)) << "\",";
-      stream << "\"substitution\":\"" <<  escape_base64(utils::encode_base64(substitution)) << "\",";
-      stream << "\"reference\":\"" <<  escape_base64(utils::encode_base64(references)) << "\"";
-      stream << '}';
+      stream << "\"edits\":[";
+      stream << '\"' << escaper(insertion) << "\",";
+      stream << '\"' << escaper(deletion) << "\",";
+      stream << '\"' << escaper(substitution) << "\",";
+      stream << '\"' << escaper(references) << '\"';
+      stream << "]}";
       return stream.str();
     }
+    
+    typedef boost::fusion::tuple<double, double, double, double> per_parsed_type;
+    
+    template <typename Iterator>
+    struct per_parser : boost::spirit::qi::grammar<Iterator, per_parsed_type(), boost::spirit::standard::space_type>
+    {
+      per_parser() : per_parser::base_type(per_parsed)
+      {
+	namespace qi = boost::spirit::qi;
+	namespace standard = boost::spirit::standard;
+	
+	per_parsed %= (qi::lit('{')
+		       >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"per\"") >> qi::lit(',')
+		       >> qi::lit("\"edits\"") >> qi::lit(':')
+		       >> qi::lit('[')
+		       >> double_value >> qi::lit(',')
+		       >> double_value >> qi::lit(',')
+		       >> double_value >> qi::lit(',')
+		       >> double_value
+		       >> qi::lit(']')
+		       >> qi::lit('}'));
+      }
+      
+      typedef boost::spirit::standard::space_type space_type;
+      
+      double_base64_parser<Iterator> double_value;
+      boost::spirit::qi::rule<Iterator, per_parsed_type(), space_type> per_parsed;
+    };
 
-
+    Score::score_ptr_type PER::decode(std::string::const_iterator& iter, std::string::const_iterator end)
+    {
+      typedef std::string::const_iterator iterator_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      per_parser<iterator_type> parser;
+      per_parsed_type           parsed;
+      
+      const bool result = qi::phrase_parse(iter, end, parser, standard::space, parsed);
+      if (! result)
+	return score_ptr_type();
+      
+      std::auto_ptr<PER> per(new PER());
+      per->insertion    = boost::fusion::get<0>(parsed);
+      per->deletion     = boost::fusion::get<1>(parsed);
+      per->substitution = boost::fusion::get<2>(parsed);
+      per->references   = boost::fusion::get<3>(parsed);
+      
+      return score_ptr_type(per.release());
+    }
+    
+    Score::score_ptr_type PER::decode(const std::string& encoded)
+    {
+      std::string::const_iterator iter     = encoded.begin();
+      std::string::const_iterator iter_end = encoded.end();
+      
+      return decode(iter, iter_end);
+    }
+    
     struct PERScorerConstant
     {
       struct COSTS

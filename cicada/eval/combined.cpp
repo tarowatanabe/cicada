@@ -1,9 +1,14 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
+#include "decode.hpp"
+#include "encode.hpp"
+
 #include <sstream>
 #include <iterator>
 
 #include "combined.hpp"
-
-#include "utils/base64.hpp"
 
 namespace cicada
 {
@@ -25,22 +30,6 @@ namespace cicada
       
       return stream.str();
     }
-
-    inline
-    std::string escape_base64(const std::string& x)
-    {
-      std::string result;
-      
-      std::string::const_iterator iter_end = x.end();
-      for (std::string::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-	if (*iter == '/')
-	  result += "\\/";
-	else
-	  result += *iter;
-      
-      return result;
-    }
-    
     
     std::string Combined::encode() const
     {
@@ -49,21 +38,69 @@ namespace cicada
       stream << "\"score\":[";
       if (! scores.empty()) {
 	for (size_t i = 0; i != scores.size() - 1; ++ i)
-	  stream << (*scores[i]) << ',';
-	stream << (*scores.back());
+	  stream << scores[i]->encode() << ',';
+	stream << scores.back()->encode();
       }
       stream << "],";
       stream << "\"weight\":[";
       if (! weights.empty()) {
 	for (size_t i = 0; i != weights.size() - 1; ++ i)
-	  stream << "\"" << escape_base64(utils::encode_base64(weights[i])) << "\",";
-	stream << "\"" << escape_base64(utils::encode_base64(weights.back())) << "\"";
+	  stream << '\"' << escaper(weights[i]) << "\",";
+	stream << '\"' << escaper(weights.back()) << '\"';
       }
       stream << "]";
       stream << '}';
       
       return stream.str();
     }    
+    
+    Score::score_ptr_type Combined::decode(std::string::const_iterator& iter, std::string::const_iterator end)
+    {
+      typedef std::string::const_iterator iterator_type;
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+
+      std::auto_ptr<Combined> combined(new Combined());
+
+      if (! qi::phrase_parse(iter, end, qi::lit('{') >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"combined\"") >> qi::lit(','), standard::space))
+	return score_ptr_type();
+      if (! qi::phrase_parse(iter, end, qi::lit("\"score\"") >> qi::lit(':') >> qi::lit('['), standard::space))
+	return score_ptr_type();
+      
+      while (iter != end) {
+	score_ptr_type score = Score::decode(iter, end);
+
+	if (! score)
+	  std::cerr << "remaining: " << std::string(iter, end) << std::endl;
+	
+	if (! score) break;
+	
+	combined->scores.push_back(score);
+	
+	if (! qi::phrase_parse(iter, end, qi::lit(','), standard::space))
+	  break;
+      }
+      
+      if (! qi::phrase_parse(iter, end, qi::lit(']') >> qi::lit(','), standard::space))
+	return score_ptr_type();
+      
+      double_base64_parser<iterator_type> double_value;
+      if (! qi::phrase_parse(iter, end, (qi::lit("\"weight\"") >> qi::lit(':') >> qi::lit('[') >> (double_value % ',') >> qi::lit(']') >> qi::lit('}')),
+			     standard::space,
+			     combined->weights))
+	return score_ptr_type();
+      
+      return score_ptr_type(combined.release());
+    }
+    
+    Score::score_ptr_type Combined::decode(const std::string& encoded)
+    {
+      std::string::const_iterator iter     = encoded.begin();
+      std::string::const_iterator iter_end = encoded.end();
+      
+      return decode(iter, iter_end);
+    }
+
   };
-  
 };

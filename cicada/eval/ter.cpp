@@ -1,14 +1,15 @@
 //
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
+
+#include "decode.hpp"
+#include "encode.hpp"
  
 #include <algorithm>
 #include <set>
 #include <iterator>
 
 #include "ter.hpp"
-
-#include "utils/base64.hpp"
 
 #include <google/dense_hash_set>
 
@@ -34,34 +35,81 @@ namespace cicada
       return stream.str();
     }
 
-    inline
-    std::string escape_base64(const std::string& x)
-    {
-      std::string result;
-      
-      std::string::const_iterator iter_end = x.end();
-      for (std::string::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-	if (*iter == '/')
-	  result += "\\/";
-	else
-	  result += *iter;
-      
-      return result;
-    }
 
     std::string TER::encode() const
     {
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"ter\",";
-      stream << "\"insertion\":\"" <<  escape_base64(utils::encode_base64(insertion)) << "\",";
-      stream << "\"deletion\":\"" <<  escape_base64(utils::encode_base64(deletion)) << "\",";
-      stream << "\"substitution\":\"" <<  escape_base64(utils::encode_base64(substitution)) << "\",";
-      stream << "\"shift\":\"" <<  escape_base64(utils::encode_base64(shift)) << "\",";
-      stream << "\"reference\":\"" <<  escape_base64(utils::encode_base64(references)) << "\"";
-      stream << '}';
+      stream << "\"edits\":[";
+      stream << '\"' << escaper(insertion) << "\",";
+      stream << '\"' << escaper(deletion) << "\",";
+      stream << '\"' << escaper(substitution) << "\",";
+      stream << '\"' << escaper(shift) << "\",";
+      stream << '\"' << escaper(references) << '\"';
+      stream << "]}";
       return stream.str();
     }
+
+    typedef boost::fusion::tuple<double, double, double, double, double> ter_parsed_type;
     
+    template <typename Iterator>
+    struct ter_parser : boost::spirit::qi::grammar<Iterator, ter_parsed_type(), boost::spirit::standard::space_type>
+    {
+      ter_parser() : ter_parser::base_type(ter_parsed)
+      {
+	namespace qi = boost::spirit::qi;
+	namespace standard = boost::spirit::standard;
+	
+	ter_parsed %= (qi::lit('{')
+		       >> qi::lit("\"eval\"") >> qi::lit(':') >> qi::lit("\"ter\"") >> qi::lit(',')
+		       >> qi::lit("\"edits\"") >> qi::lit(':')
+		       >> qi::lit('[')
+		       >> double_value >> qi::lit(',')
+		       >> double_value >> qi::lit(',')
+		       >> double_value >> qi::lit(',')
+		       >> double_value >> qi::lit(',')
+		       >> double_value
+		       >> qi::lit(']')
+		       >> qi::lit('}'));
+      }
+      
+      typedef boost::spirit::standard::space_type space_type;
+      
+      double_base64_parser<Iterator> double_value;
+      boost::spirit::qi::rule<Iterator, ter_parsed_type(), space_type> ter_parsed;
+    };
+    
+    Score::score_ptr_type TER::decode(std::string::const_iterator& iter, std::string::const_iterator end)
+    {
+      typedef std::string::const_iterator iterator_type;
+
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      ter_parser<iterator_type> parser;
+      ter_parsed_type           parsed;
+      
+      const bool result = qi::phrase_parse(iter, end, parser, standard::space, parsed);
+      if (! result)
+	return score_ptr_type();
+      
+      std::auto_ptr<TER> ter(new TER());
+      ter->insertion    = boost::fusion::get<0>(parsed);
+      ter->deletion     = boost::fusion::get<1>(parsed);
+      ter->substitution = boost::fusion::get<2>(parsed);
+      ter->shift        = boost::fusion::get<3>(parsed);
+      ter->references   = boost::fusion::get<4>(parsed);
+      
+      return score_ptr_type(ter.release());
+    }
+    
+    Score::score_ptr_type TER::decode(const std::string& encoded)
+    {
+      std::string::const_iterator iter     = encoded.begin();
+      std::string::const_iterator iter_end = encoded.end();
+      
+      return decode(iter, iter_end);
+    }
 
     struct TERScorerConstant
     {

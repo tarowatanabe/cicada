@@ -45,10 +45,10 @@ namespace cicada
       if (size <= 0)
 	throw std::runtime_error("invalid bleu-multi size: " + boost::lexical_cast<std::string>(size));
       
-      if (names.size() > size)
+      if (static_cast<int>(names.size()) > size)
 	throw std::runtime_error("feature-name size and bleu size do not match");
       
-      if (names.size() < size)
+      if (static_cast<int>(names.size()) < size)
 	names.resize(size);
       
       base_type::__state_size = 0;

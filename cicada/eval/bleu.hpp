@@ -130,6 +130,8 @@ namespace cicada
       std::string description() const;
       std::string encode() const;
 
+      static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
+      static score_ptr_type decode(const std::string& encoded);
 
       ngram_counts_type ngrams_reference;
       ngram_counts_type ngrams_hypothesis;

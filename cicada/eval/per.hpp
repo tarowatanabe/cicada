@@ -99,6 +99,9 @@ namespace cicada
       std::string description() const;
       std::string encode() const;
 
+      static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
+      static score_ptr_type decode(const std::string& encoded);
+      
     private:
       count_type insertion;
       count_type deletion;

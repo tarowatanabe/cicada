@@ -316,6 +316,7 @@ noinst_PROGRAMS = \
 alignment_main \
 attribute_vector_main \
 cluster_main \
+eval_main \
 grammar_mutable_main \
 grammar_static_main \
 hypergraph_main \
@@ -341,6 +342,9 @@ attribute_vector_main_LDADD = libcicada.la
 
 cluster_main_SOURCES = cluster_main.cpp
 cluster_main_LDADD = libcicada.la
+
+eval_main_SOURCES = eval_main.cpp
+eval_main_LDADD = libcicada.la
 
 grammar_mutable_main_SOURCES = grammar_mutable_main.cpp
 grammar_mutable_main_LDADD = libcicada.la

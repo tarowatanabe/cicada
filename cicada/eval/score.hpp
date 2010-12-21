@@ -48,6 +48,9 @@ namespace cicada
       
       virtual std::string description() const = 0;
       virtual std::string encode() const = 0;
+
+      static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
+      static score_ptr_type decode(const std::string& encoded);
       
     public:      
       score_type& operator=(const score_type& score)

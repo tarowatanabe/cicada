@@ -2,6 +2,8 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include "eval/decode.hpp"
+
 #include "eval/score.hpp"
 #include "eval/per.hpp"
 #include "eval/wer.hpp"
@@ -30,6 +32,53 @@ namespace cicada
   namespace eval
   {
 
+    Score::score_ptr_type Score::decode(std::string::const_iterator& iter, std::string::const_iterator end)
+    {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      boost::spirit::qi::rule<std::string::const_iterator, std::string(), standard::space_type> quoted;
+      
+      quoted %= "\"" >> qi::lexeme[+(~standard::char_('\"'))] >> "\"";
+      
+      std::pair<std::string, std::string> scorer;
+
+      std::string::const_iterator iter_saved = iter;
+      
+      const bool result = qi::phrase_parse(iter, end, (qi::lit('{') >> quoted >> qi::lit(':') >> quoted), standard::space, scorer);
+      if (! result || scorer.first != "eval" || scorer.second.empty())
+	return score_ptr_type();
+      
+      iter = iter_saved;
+      
+      if (scorer.second == "bleu")
+	return Bleu::decode(iter, end);
+      else if (scorer.second == "wer")
+	return WER::decode(iter, end);
+      else if (scorer.second == "per")
+	return PER::decode(iter, end);
+      else if (scorer.second == "ter")
+	return TER::decode(iter, end);
+      else if (scorer.second == "sk")
+	return SK::decode(iter, end);
+      else if (scorer.second == "sb")
+	return SB::decode(iter, end);
+      else if (scorer.second == "wlcs")
+	return WLCS::decode(iter, end);
+      else if (scorer.second == "combined")
+	return Combined::decode(iter, end);
+      else
+	return score_ptr_type();
+    }
+
+    Score::score_ptr_type Score::decode(const std::string& encoded)
+    {
+      std::string::const_iterator iter     = encoded.begin();
+      std::string::const_iterator iter_end = encoded.end();
+      
+      return decode(iter, iter_end);
+    }
+    
     const char* Scorer::lists()
     {
       static const char* desc = "\
@@ -42,8 +91,8 @@ bleu:\n\
 \torder=<order, default=4> ngram order\n\
 \ttokenizer=[tokenizer spec]\n\
 per: position indenendent error rate\n\
-\ttokenizer=[tokenizer spec]\n\
-wer: word error rate\n\
+\ttokenizer=[tokenizer spec]\n			\
+wer: word error rate\n				\
 \ttokenizer=[tokenizer spec]\n\
 \tmatcher=[matcher spec] approximate matching\n\
 \tmatch=approximated match cost (default 0.2)\n\
