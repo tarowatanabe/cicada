@@ -42,3 +42,12 @@ Do we allow intersect with lattice, not the first sentence of targets...?
 Re-engineer kbest/viterbi framework...
   I don't like current interface, separating weight and derivation
   Is there a workaround, like use iterator-based enumeration?
+
+Better training via MERT like procedure:
+  We already have LFBGS(L1,L2) and SGD(L1, L2).
+  Add MIRA etc. originally implemented for learn_online...
+
+Support word alignment training!
+  We know feature-rich unsupervised training!
+  Use of syntax-tree combined with alignment
+  cube-pruning to transform source-syntactic tree into alignment-derivation! (use of "alignment" as our output...)

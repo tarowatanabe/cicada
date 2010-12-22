@@ -521,7 +521,7 @@ struct OptimizerSGDL1 : public OptimizerBase
 	  apply(weights[miter->first], penalties[miter->first], penalty);
 	}
       
-      objective += double(log(Z_correct) - log(Z)) * weight_scale;
+      objective += double(log(Z_correct) - log(Z));
       ++ samples;
     }
   }
@@ -542,4 +542,94 @@ struct OptimizerSGDL1 : public OptimizerBase
   
   penalty_set_type penalties;
   double penalty;
+};
+
+// we will implement MIRA/CP 
+// we have two options: compute oracle by hill-climbing, or use dynamically computed oracle...
+struct OptimizeMarginBase
+{
+  struct weight_set_function
+  {
+    typedef cicada::semiring::Logprob<double> value_type;
+
+    weight_set_function(const weight_set_type& __weights)
+      : weights(__weights) {}
+
+    const weight_set_type& weights;
+      
+    value_type operator()(const feature_set_type& x) const
+    {
+      return cicada::semiring::traits<value_type>::log(x.dot(weights));
+    }
+  };
+  
+  OptimizeMarginBase(const hypergraph_set_type&           __graphs,
+		     const feature_function_ptr_set_type& __features)
+    : graphs(__graphs),
+      features(__features)
+  {
+    // initialize weights and weights bleu...
+    for (size_t i = 0; i != features.size(); ++ i)
+      if (features[i]) {
+	feature_bleu = features[i]->feature_name();
+	break;
+      }
+    
+    weights_bleu[feature_bleu] = loss_scale;
+  }
+
+  bool operator()(const int id)
+  {
+    if (! graphs[id].is_valid()) return false;
+    
+    model_type model;
+    model.push_back(features[id]);
+    
+    weights[feature_bleu] = loss_scale;
+    cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights), cube_size);
+    
+    weights[feature_bleu] = - loss_scale;
+    cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights), cube_size);
+
+    // we will collect features....
+    
+  }
+  
+  const hypergraph_set_type&           graphs;
+  const feature_function_ptr_set_type& features;
+
+  weight_set_type weights;
+  weight_set_type weights_bleu;
+  weight_set_type::feature_type feature_bleu;
+  
+  double objective;
+  
+
+  hypergraph_type graph_reward;
+  hypergraph_type graph_penalty;
+};
+
+
+struct OptimizeMIRA : public OptimizeMarginBase
+{  
+  typedef OptimizeMarginBase base_type;
+
+  void initialize()
+  {
+
+  }
+
+  void operator()(const int seg)
+  {
+    if (base_type::operator()(seg)) {
+      
+      
+    }
+  }
+  
+
+  void finalize()
+  {
+
+  }
 };
