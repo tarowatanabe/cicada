@@ -614,14 +614,14 @@ struct OptimizeMarginBase
     weights[feature_bleu] = - loss_scale;
     cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
     
-    count_set_type counts_reward(hypergraph_reward.nodes.size());
-    count_set_type counts_penalty(hypergraph_penalty.nodes.size());
+    count_set_type counts_reward(graph_reward.nodes.size());
+    count_set_type counts_penalty(graph_penalty.nodes.size());
     
     accumulated_type accumulated_reward;
     accumulated_type accumulated_penalty;
     
-    cicada::inside_outside(hypergraph_reward,  counts_reward,  accumulated_reward,  count_function(), feature_count_function());
-    cicada::inside_outside(hypergraph_penalty, counts_penalty, accumulated_penalty, count_function(), feature_count_function());
+    cicada::inside_outside(graph_reward,  counts_reward,  accumulated_reward,  count_function(), feature_count_function());
+    cicada::inside_outside(graph_penalty, counts_penalty, accumulated_penalty, count_function(), feature_count_function());
     
     features_reward.assign(accumulated_reward.accumulated.begin(),   accumulated_reward.accumulated.end());
     features_penalty.assign(accumulated_penalty.accumulated.begin(), accumulated_penalty.accumulated.end());
