@@ -2,6 +2,7 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <cicada/operation/functional.hpp>
 #include <cicada/optimize/line_search.hpp>
 
 struct LineSearch
@@ -136,21 +137,6 @@ struct OptimizerBase
     const weight_set_type& weights;
   };
 
-  struct weight_set_function
-  {
-    typedef cicada::semiring::Logprob<double> value_type;
-
-    weight_set_function(const weight_set_type& __weights)
-      : weights(__weights) {}
-
-    const weight_set_type& weights;
-      
-    value_type operator()(const feature_set_type& x) const
-    {
-      return cicada::semiring::traits<value_type>::log(x.dot(weights));
-    }
-  };
-
   struct weight_function
   {
     typedef weight_type value_type;
@@ -257,10 +243,10 @@ struct OptimizerBase
     
     if (! apply_exact) {
       weights[feature_bleu] = loss_scale / weight_scale;
-      cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights), cube_size);
+      cicada::apply_cube_prune(model, graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
       
       weights[feature_bleu] = - loss_scale / weight_scale;
-      cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights), cube_size);
+      cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
       
       weights[feature_bleu] = 0.0;
       
@@ -548,21 +534,58 @@ struct OptimizerSGDL1 : public OptimizerBase
 // we have two options: compute oracle by hill-climbing, or use dynamically computed oracle...
 struct OptimizeMarginBase
 {
-  struct weight_set_function
+  typedef std::vector<int, std::allocator<int> > count_set_type;
+  
+  struct Accumulated
   {
-    typedef cicada::semiring::Logprob<double> value_type;
-
-    weight_set_function(const weight_set_type& __weights)
-      : weights(__weights) {}
-
-    const weight_set_type& weights;
-      
-    value_type operator()(const feature_set_type& x) const
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+    
+    typedef accumulated_type value_type;
+    
+    accumulated_type& operator[](size_t index)
     {
-      return cicada::semiring::traits<value_type>::log(x.dot(weights));
+      return accumulated;
+    }
+    
+    void clear() { accumulated.clear(); }
+    
+    value_type accumulated;
+  };
+  typedef Accumulated accumulated_type;
+
+  struct count_function
+  {
+    typedef int value_type;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& x) const
+    {
+      return 1;
     }
   };
-  
+
+  struct feature_count_function
+  {
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+    typedef accumulated_type value_type;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& edge) const
+    {
+      accumulated_type accumulated;
+      
+      feature_set_type::const_iterator fiter_end = edge.features.end();
+      for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	if (fiter->second != 0.0)
+	  accumulated[fiter->first] = weight_type(fiter->second);
+      
+      return accumulated;
+    }
+  };
+
+
   OptimizeMarginBase(const hypergraph_set_type&           __graphs,
 		     const feature_function_ptr_set_type& __features)
     : graphs(__graphs),
@@ -586,13 +609,28 @@ struct OptimizeMarginBase
     model.push_back(features[id]);
     
     weights[feature_bleu] = loss_scale;
-    cicada::apply_cube_prune(model, graphs[id], graph_reward, weight_set_function(weights), cube_size);
+    cicada::apply_cube_prune(model, graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
     
     weights[feature_bleu] = - loss_scale;
-    cicada::apply_cube_prune(model, graphs[id], graph_penalty, weight_set_function(weights), cube_size);
-
-    // we will collect features....
+    cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
     
+    count_set_type counts_reward(hypergraph_reward.nodes.size());
+    count_set_type counts_penalty(hypergraph_penalty.nodes.size());
+    
+    accumulated_type accumulated_reward;
+    accumulated_type accumulated_penalty;
+    
+    cicada::inside_outside(hypergraph_reward,  counts_reward,  accumulated_reward,  count_function(), feature_count_function());
+    cicada::inside_outside(hypergraph_penalty, counts_penalty, accumulated_penalty, count_function(), feature_count_function());
+    
+    features_reward.assign(accumulated_reward.accumulated.begin(),   accumulated_reward.accumulated.end());
+    features_penalty.assign(accumulated_penalty.accumulated.begin(), accumulated_penalty.accumulated.end());
+    
+    features_reward  *= (1.0 / counts_reward.back());
+    features_penalty *= (1.0 / counts_penalty.back());
+    
+    features_reward.erase(feature_bleu);
+    features_penalty.erase(feature_bleu);
   }
   
   const hypergraph_set_type&           graphs;
@@ -604,25 +642,28 @@ struct OptimizeMarginBase
   
   double objective;
   
-
   hypergraph_type graph_reward;
   hypergraph_type graph_penalty;
+
+  feature_set_type features_reward;
+  feature_set_type features_penalty;
 };
 
 
 struct OptimizeMIRA : public OptimizeMarginBase
 {  
   typedef OptimizeMarginBase base_type;
-
+  
   void initialize()
   {
-
+    weights[feature_bleu] = 0.0;
+    objective = 0.0;
   }
-
+  
   void operator()(const int seg)
   {
     if (base_type::operator()(seg)) {
-      
+      // compute difference and update!
       
     }
   }
