@@ -84,6 +84,7 @@ optimize/line_search.cpp
 libcicada_optimize_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_feature_HEADERS = \
+feature/alignment.hpp \
 feature/antecedent.hpp \
 feature/bleu.hpp \
 feature/bleu_expected.hpp \

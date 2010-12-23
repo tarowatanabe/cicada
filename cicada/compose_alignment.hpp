@@ -47,9 +47,10 @@ namespace cicada
     ComposeAlignment(const symbol_type& non_terminal,
 		     const grammar_type& __grammar)
       : grammar(__grammar),
-	attr_target_word("target-word"),
 	attr_source_position("source-position"),
-	attr_target_position("target-position")
+	attr_target_position("target-position"),
+	attr_source_size("source-size"),
+	attr_target_size("target-size")
     {
       // initializer...
       rule_goal = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminal.non_terminal(1))));
@@ -95,7 +96,6 @@ namespace cicada
 	      
 	      edge.attributes[attr_source_position] = attribute_set_type::int_type(src);
 	      edge.attributes[attr_target_position] = attribute_set_type::int_type(trg);
-	      edge.attributes[attr_target_word] = static_cast<const std::string&>(target_symbol);
 	      
 	      graph.connect_edge(edge.id, node.id);
 	    }
@@ -116,6 +116,8 @@ namespace cicada
 
       hypergraph_type::edge_type& edge = graph.add_edge(&node_prev, (&node_prev) + 1);
       edge.rule = rule_goal;
+      edge.attributes[attr_source_size] = attribute_set_type::int_type(source.size());
+      edge.attributes[attr_target_size] = attribute_set_type::int_type(target.size());
       
       hypergraph_type::node_type& node = graph.add_node();
       
@@ -147,6 +149,8 @@ namespace cicada
       for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
 	hypergraph_type::node_type& node = graph.add_node();
 
+	const bool is_goal = (node.id == graph.goal);
+
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = niter->edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = niter->edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
@@ -157,6 +161,12 @@ namespace cicada
 	    edge.rule       = edge_source.rule;
 	    edge.features   = edge_source.features;
 	    edge.attributes = edge_source.attributes;
+
+	    if (is_goal) {
+	      edge.attributes[attr_source_size] = attribute_set_type::int_type(spans[edge_source.id].second
+									       - spans[edge_source.id].first);
+	      edge.attributes[attr_target_size] = attribute_set_type::int_type(target.size());
+	    }
 	    
 	    graph.connect_edge(edge.id, node.id);
 	  } else {
@@ -186,7 +196,12 @@ namespace cicada
 		  // we need to compute source-pos!
 		  edge.attributes[attr_source_position] = attribute_set_type::int_type(src);
 		  edge.attributes[attr_target_position] = attribute_set_type::int_type(trg);
-		  edge.attributes[attr_target_word] = static_cast<const std::string&>(target_symbol);
+		  
+		  if (is_goal) {
+		    edge.attributes[attr_source_size] = attribute_set_type::int_type(spans[edge_source.id].second
+										     - spans[edge_source.id].first);
+		    edge.attributes[attr_target_size] = attribute_set_type::int_type(target.size());
+		  }
 		  
 		  graph.connect_edge(edge.id, node.id);
 		}
@@ -199,9 +214,10 @@ namespace cicada
     
     const grammar_type& grammar;
     
-    const attribute_type attr_target_word;
     const attribute_type attr_source_position;
     const attribute_type attr_target_position;
+    const attribute_type attr_source_size;
+    const attribute_type attr_target_size;
     
     rule_ptr_type rule_goal;
     rule_ptr_type rule_x1_x2;
