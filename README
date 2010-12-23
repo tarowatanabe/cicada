@@ -4,7 +4,7 @@ A statistical machine translation toolkit based on a semiring parsing framework[
 Based on the generic framework, we can
    - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree), word alignment
    - translate sentence, lattice and/or parse tree
-   - align between {hypergraph,lattice}-to-lattice 
+   - align between {hypergraph,lattice}-to-lattice (currently, we assume penn-treebank style hypergraph and sentence-like lattice)
    - analyze forest/tree/lattice
 
 Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
@@ -17,7 +17,7 @@ Basically, we have four distinct structures:
 
 Alignment can be carried out by:
    - A lattice is composed with dictionary, generating alignment hypergraph.
-   - A hypergraph is composed with dictinary, generating alignment hypergraph.
+   - A hypergraph is composed with dictinary, generating alignment hypergraph [20].
 
 Translation can be carried out by:
    - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2].
@@ -310,4 +310,17 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {199--207},
   url       = {http://www.aclweb.org/anthology/W/W08/W08-0333}
+}
+
+[20]
+@InProceedings{riesa-marcu:2010:ACL,
+  author    = {Riesa, Jason  and  Marcu, Daniel},
+  title     = {Hierarchical Search for Word Alignment},
+  booktitle = {Proceedings of the 48th Annual Meeting of the Association for Computational Linguistics},
+  month     = {July},
+  year      = {2010},
+  address   = {Uppsala, Sweden},
+  publisher = {Association for Computational Linguistics},
+  pages     = {157--166},
+  url       = {http://www.aclweb.org/anthology/P10-1017}
 }
