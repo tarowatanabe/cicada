@@ -10,7 +10,7 @@
 
 #include <cicada/grammar_mutable.hpp>
 #include <cicada/grammar_static.hpp>
-#include <cicada/grammar_hiero.hpp>
+#include <cicada/grammar_simple.hpp>
 
 #include <boost/shared_ptr.hpp>
 

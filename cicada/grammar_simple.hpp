@@ -3,8 +3,8 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__GRAMMAR_HIERO__HPP__
-#define __CICADA__GRAMMAR_HIERO__HPP__ 1
+#ifndef __CICADA__GRAMMAR_SIMPLE__HPP__
+#define __CICADA__GRAMMAR_SIMPLE__HPP__ 1
 
 // very siple mutable grammar class..
 
@@ -71,6 +71,122 @@ namespace cicada
   private:
     bool straight;
     bool inverted;
+  };
+
+  class GrammarPair : public GrammarMutable
+  {
+  public:
+    typedef Lattice    lattice_type;
+    typedef HyperGraph hypergraph_type;
+    
+  public:
+    GrammarPair(const hypergraph_type& source, const lattice_type& target, const symbol_type& non_terminal)
+    {
+      typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
+      typedef google::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> > symbol_pair_set_type;
+      
+      symbol_pair_set_type symbols;
+      symbols.set_empty_key(symbol_pair_type());
+      
+      feature_set_type features;
+      
+      attribute_set_type attributes;
+      attributes["pair"] = attribute_set_type::int_type(1);
+      
+      hypergraph_type::edge_set_type::const_iterator eiter_end = source.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = source.edges.begin(); eiter != eiter_end; ++ eiter) 
+	if (eiter->rule) {
+	  const rule_type& rule = *(eiter->rule);
+	  
+	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
+	    if (*siter != vocab_type::EPSILON && siter->is_terminal()) {
+	      
+	      if (symbols.find(std::make_pair(*siter, vocab_type::EPSILON)) == symbols.end()) {
+		rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
+		rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
+		
+		// inverted!
+		insert(rule_target, rule_source, features, attributes);
+		
+		symbols.insert(std::make_pair(*siter, vocab_type::EPSILON));
+	      }
+
+	      for (size_t trg = 0; trg != target.size(); ++ trg) {
+		const lattice_type::arc_set_type& arcs_target = target[trg];
+		
+		lattice_type::arc_set_type::const_iterator titer_end = arcs_target.end();
+		for (lattice_type::arc_set_type::const_iterator titer = arcs_target.begin(); titer != titer_end; ++ titer)
+		  if (titer->label != vocab_type::EPSILON && symbols.find(std::make_pair(*siter, titer->label)) == symbols.end()) {
+		    rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
+		    rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, titer->label))));
+		    
+		    // inverted!
+		    insert(rule_target, rule_source, features, attributes);
+		    
+		    symbols.insert(std::make_pair(*siter, titer->label));
+		  }
+	      }
+	    }
+	}
+    }
+
+    GrammarPair(const lattice_type& source, const lattice_type& target, const symbol_type& non_terminal)
+    {
+      typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
+      typedef google::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> > symbol_pair_set_type;
+      
+      symbol_pair_set_type symbols;
+      symbols.set_empty_key(symbol_pair_type());
+
+      feature_set_type features;
+      
+      attribute_set_type attributes;
+      attributes["pair"] = attribute_set_type::int_type(1);
+      
+      for (size_t src = 0; src != source.size(); ++ src) {
+	const lattice_type::arc_set_type& arcs_source = source[src];
+	
+	lattice_type::arc_set_type::const_iterator siter_end = arcs_source.end();
+	for (lattice_type::arc_set_type::const_iterator siter = arcs_source.begin(); siter != siter_end; ++ siter)
+	  if (siter->label != vocab_type::EPSILON) {
+	    
+	    if (symbols.find(std::make_pair(siter->label, vocab_type::EPSILON)) == symbols.end()) {
+	      rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, siter->label))));
+	      rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
+	      
+	      // inverted!
+	      insert(rule_target, rule_source, features, attributes);
+	      
+	      symbols.insert(std::make_pair(siter->label, vocab_type::EPSILON));
+	    }
+
+	    
+	    for (size_t trg = 0; trg != target.size(); ++ trg) {
+	      const lattice_type::arc_set_type& arcs_target = target[trg];
+	      
+	      lattice_type::arc_set_type::const_iterator titer_end = arcs_target.end();
+	      for (lattice_type::arc_set_type::const_iterator titer = arcs_target.begin(); titer != titer_end; ++ titer)
+		if (titer->label != vocab_type::EPSILON && symbols.find(std::make_pair(siter->label, titer->label)) == symbols.end()) {
+		  rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, siter->label))));
+		  rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, titer->label))));
+		  
+		  // inverted!
+		  insert(rule_target, rule_source, features, attributes);
+		  
+		  symbols.insert(std::make_pair(siter->label, titer->label));
+		}
+	    }
+	  }
+      }
+    }
+    
+    bool valid_span(int first, int last, int distance) const
+    {
+      // we need this last - first == 1 when intersecting with lattice...
+      return distance <= 1 || last - first == 1;
+    }
+    
   };
 
   class GrammarInsertion : public GrammarMutable

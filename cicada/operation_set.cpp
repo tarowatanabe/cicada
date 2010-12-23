@@ -80,6 +80,8 @@ prune: pruning\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
 intersect: compute intersection\n\
+\tlattice=[true|false] intersect with lattice\n\
+\ttarget=[true|false] intersect with one of target\n\
 normalize: feature value normalizer\n\
 \tprefix=feature name prefix\n\
 remove-epsilon: remove epsilon for lattice\n\
@@ -162,7 +164,7 @@ output: kbest or hypergraph output\n\
       else if (param.name() == "span-forest")
 	operations.push_back(operation_ptr_type(new operation::SpanForest(*piter, debug)));
       else if (param.name() == "intersect")
-	operations.push_back(operation_ptr_type(new operation::Intersect(debug)));
+	operations.push_back(operation_ptr_type(new operation::Intersect(*piter, debug)));
       else if (param.name() == "normalize")
 	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
       else if (param.name() == "remove-epsilon")

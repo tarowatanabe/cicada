@@ -53,3 +53,5 @@ Support word alignment training!
   cube-pruning to transform source-syntactic tree into alignment-derivation! (use of "alignment" as our output...)
   Can we integrate supervised learning and unsupervised learning sharing the same code...?
       We can potentially share by modifying "intersection"
+  How to encode lexical feature...?
+    use grammar! (source target word mapping with features!)

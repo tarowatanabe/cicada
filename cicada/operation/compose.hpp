@@ -11,7 +11,7 @@
 #include <cicada/operation.hpp>
 #include <cicada/parameter.hpp>
 #include <cicada/compose.hpp>
-#include <cicada/grammar_hiero.hpp>
+#include <cicada/grammar_simple.hpp>
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>

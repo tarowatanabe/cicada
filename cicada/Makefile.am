@@ -191,6 +191,7 @@ binarize.hpp \
 cluster.hpp \
 cluster_stemmer.hpp \
 compose.hpp \
+compose_alignment.hpp \
 compose_cky.hpp \
 compose_earley.hpp \
 compose_phrase.hpp \
@@ -206,6 +207,7 @@ generate_earley.hpp \
 global_lexicon.hpp \
 grammar.hpp \
 grammar_mutable.hpp \
+grammar_simple.hpp \
 grammar_static.hpp \
 graphviz.hpp \
 head_finder.hpp \

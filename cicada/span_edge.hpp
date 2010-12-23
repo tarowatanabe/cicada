@@ -70,7 +70,7 @@ namespace cicada
 	
 	int span_pos = spans_node[node_id].first;
 
-	spans[*eiter].first = spans_pos;
+	spans[*eiter].first = span_pos;
 	
 	int non_terminal_pos = 0;
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
