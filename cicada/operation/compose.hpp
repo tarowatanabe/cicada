@@ -302,6 +302,99 @@ namespace cicada
   
       int debug;
     };
+
+
+    class ComposeAlignment : public Operation
+    {
+    public:
+      ComposeAlignment(const std::string& parameter,
+		       const grammar_type& __grammar,
+		       const std::string& __goal,
+		       const std::string& __non_terminal,
+		       const int __debug)
+	: grammar(__grammar),
+	  goal(__goal), non_terminal(__non_terminal), 
+	  lattice_mode(false),
+	  forest_mode(false),
+	  debug(__debug)
+      { 
+	typedef cicada::Parameter param_type;
+    
+	param_type param(parameter);
+	if (param.name() != "compose-phrase")
+	  throw std::runtime_error("this is not a phrase composer");
+
+	bool source = false;
+	bool target = false;
+	
+	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "lattice") == 0)
+	    lattice_mode = boost::lexical_cast<bool>(piter->second);
+	  else if (strcasecmp(piter->first.c_str(), "forest") == 0) {
+	    forest_mode = boost::lexical_cast<bool>(piter->second);
+	  } else
+	    std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	if (lattice_mode && forest_mode)
+	  throw std::runtime_error("either lattice or forest");
+
+	if (! lattice_mode && ! forest_mode)
+	  lattice_mode = true;
+      }
+  
+      void operator()(data_type& data) const
+      {
+	const lattice_type& lattice = data.lattice;
+	hypergraph_type& hypergraph = data.hypergraph;
+	hypergraph_type composed;
+	
+	lattice_type target;
+	if (! data.targets.empty())
+	  target = lattice_type(data.targets.front());
+	
+	if (debug)
+	  std::cerr << "composition: alignment" << std::endl;
+	
+	utils::resource start;
+	
+	grammar_type grammar_alignment(grammar);
+	if (lattice_mode)
+	  grammar_alignment.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPair(lattice, target, non_terminal)));
+	else
+	  grammar_alignment.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPair(hypergraph, target, non_terminal)));
+	
+	if (lattice_mode)
+	  cicada::compose_alignment(non_terminal, grammar_alignment, lattice, target, composed);
+	else
+	  cicada::compose_alignment(non_terminal, grammar_alignment, hypergraph, target, composed);
+    
+	utils::resource end;
+    
+	if (debug)
+	  std::cerr << "compose cpu time: " << (end.cpu_time() - start.cpu_time())
+		    << " user time: " << (end.user_time() - start.user_time())
+		    << std::endl;
+    
+	if (debug)
+	  std::cerr << "# of nodes: " << composed.nodes.size()
+		    << " # of edges: " << composed.edges.size()
+		    << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
+		    << std::endl;
+    
+	hypergraph.swap(composed);
+      }
+  
+      const grammar_type& grammar;
+  
+      std::string goal;
+      std::string non_terminal;
+
+      bool lattice_mode;
+      bool forest_mode;
+  
+      int debug;
+    };
     
   };
 };
