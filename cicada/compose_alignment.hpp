@@ -207,6 +207,20 @@ namespace cicada
     rule_ptr_type rule_x1_x2;
   };
   
+  inline
+  void compose_alignment(const Symbol& non_terminal, const Grammar& grammar, const Lattice& source, const Lattice& target, HyperGraph& graph)
+  {
+    ComposeAlignment __composer(non_terminal, grammar);
+    __composer(source, target, graph);
+  }
+
+  inline
+  void compose_alignment(const Symbol& non_terminal, const Grammar& grammar, const HyperGraph& source, const Lattice& target, HyperGraph& graph)
+  {
+    ComposeAlignment __composer(non_terminal, grammar);
+    __composer(source, target, graph);
+  }
+
 };
 
 #endif
