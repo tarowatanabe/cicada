@@ -158,6 +158,7 @@ namespace cicada
 	  insertion_prefix(),
 	  yield_string(false),
 	  yield_tree(false),
+	  yield_alignment(false),
 	  graphviz(false),
 	  statistics(false),
 	  debug(__debug)
@@ -195,6 +196,8 @@ namespace cicada
 	      yield_string = true;
 	    else if (strcasecmp(value.c_str(), "derivation") == 0 || strcasecmp(value.c_str(), "tree") == 0)
 	      yield_tree = true;
+	    else if (strcasecmp(value.c_str(), "alignment") == 0 || strcasecmp(value.c_str(), "align") == 0)
+	      yield_alignment = true;
 	    else
 	      throw std::runtime_error("unknown yield: " + value);
 	  } else
@@ -211,11 +214,11 @@ namespace cicada
     
 	if (! directory.empty() && ! file.empty())
 	  throw std::runtime_error("you cannot output both in directory and file");
-    
-	if (yield_string && yield_tree)
-	  throw std::runtime_error("only string or tree yield for kbest");
-    
-	if (! yield_string && ! yield_tree)
+	
+	if (int(yield_string) + yield_tree + yield_alignment > 1)
+	  throw std::runtime_error("only string, tree or alignment yield for kbest");
+	
+	if (int(yield_string) + yield_tree + yield_alignment == 0)
 	  yield_string = true;
 	
 	if (graphviz && statistics)
@@ -351,27 +354,67 @@ namespace cicada
       
 	  if (weights_one) {
 	    if (kbest_unique) {
-	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function_one<weight_type>(), kbest_filter_unique(hypergraph));
+	      if (yield_alignment)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_alignment_traversal(),
+				  weight_function_one<weight_type>(),
+				  kbest_alignment_filter_unique(hypergraph));
+	      else if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_traversal(insertion_prefix),
+				  weight_function_one<weight_type>(),
+				  kbest_filter_unique(hypergraph));
 	      else
-		kbest_derivations(os, id, hypergraph, kbest_size, weight_function_one<weight_type>(), kbest_filter());
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  weight_function_one<weight_type>(),
+				  kbest_filter());
 	    } else {
-	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function_one<weight_type>(), kbest_filter());
+	      if (yield_alignment)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_alignment_traversal(),
+				  weight_function_one<weight_type>(),
+				  kbest_alignment_filter());
+	      else if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_traversal(insertion_prefix),
+				  weight_function_one<weight_type>(),
+				  kbest_filter());
 	      else
-		kbest_derivations(os, id, hypergraph, kbest_size, weight_function_one<weight_type>(), kbest_filter());
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  weight_function_one<weight_type>(),
+				  kbest_filter());
 	    }
 	  } else {
 	    if (kbest_unique) {
-	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function<weight_type>(*weights_kbest), kbest_filter_unique(hypergraph));
+	      if (yield_alignment)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_alignment_traversal(),
+				  weight_function<weight_type>(*weights_kbest),
+				  kbest_alignment_filter_unique(hypergraph));
+	      else if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_traversal(insertion_prefix),
+				  weight_function<weight_type>(*weights_kbest),
+				  kbest_filter_unique(hypergraph));
 	      else
-		kbest_derivations(os, id, hypergraph, kbest_size, weight_function<weight_type>(*weights_kbest), kbest_filter());
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  weight_function<weight_type>(*weights_kbest),
+				  kbest_filter());
 	    } else {
-	      if (yield_string)
-		kbest_derivations(os, id, hypergraph, kbest_size, kbest_traversal(insertion_prefix), weight_function<weight_type>(*weights_kbest), kbest_filter());
+	      if (yield_alignment)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_alignment_traversal(),
+				  weight_function<weight_type>(*weights_kbest),
+				  kbest_alignment_filter());
+	      else if (yield_string)
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  kbest_traversal(insertion_prefix),
+				  weight_function<weight_type>(*weights_kbest),
+				  kbest_filter());
 	      else
-		kbest_derivations(os, id, hypergraph, kbest_size, weight_function<weight_type>(*weights_kbest), kbest_filter());
+		kbest_derivations(os, id, hypergraph, kbest_size,
+				  weight_function<weight_type>(*weights_kbest),
+				  kbest_filter());
 	    }
 	  }
 	}
@@ -398,6 +441,7 @@ namespace cicada
 
       bool yield_string;
       bool yield_tree;
+      bool yield_alignment;
 
       bool graphviz;
       bool statistics;

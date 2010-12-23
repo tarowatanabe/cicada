@@ -15,15 +15,15 @@ Basically, we have four distinct structures:
    - tree-grammar: a collectin of WFSTT (tree-transducer) implemented as a (nested) trie structure.
    - hypergraph: a compact representation of set of trees (or forest).
 
-Alignment can be carried out by:
-   - A lattice is composed with dictionary, generating alignment hypergraph.
-   - A hypergraph is composed with dictinary, generating alignment hypergraph [20].
-
 Translation can be carried out by:
    - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2].
    - A lattice (or sentence) is composed with a phrasal grammar, generating a phrasal hypergraph [4].
    - A hypergraph/forest (or parse-tree) is composed with a phrasal grammar, generating another hypergraph [3].
    - A hypergraph/forest (or parse-tree) is composed with a tree grammar, generating another hypergraph [4]. (experimental)
+
+Alignment can be carried out by:
+   - A lattice is composed with dictionary, generating alignment hypergraph, or
+   - A hypergraph is composed with dictinary, generating alignment hypergraph [20].
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
