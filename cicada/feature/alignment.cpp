@@ -170,19 +170,23 @@ namespace cicada
 	  *reinterpret_cast<int*>(state) = (boost::apply_visitor(__attribute_integer(), titer->second) < 0);
 	} else if (states.size() == 1)
 	  *reinterpret_cast<int*>(state) = *reinterpret_cast<const int*>(states[0]);
-	else if (states.size() == 2) {
-	  const int& prev = *reinterpret_cast<const int*>(states[0]);
-	  const int& next = *reinterpret_cast<const int*>(states[1]);
-	  *reinterpret_cast<int*>(state) = next;
+	else {
+	  // we assume penn-treebank style grammar....
 	  
-	  if (prev)
-	    features[next ? feature_none_none : feature_none_word] = 1.0;
-	  else 
-	    features[next ? feature_word_none : feature_word_word] = 1.0;
-	  
-	} else
-	  throw std::runtime_error("we do not support non alignment forest: states: " + boost::lexical_cast<std::string>(states.size()));
-	
+	  int prev = *reinterpret_cast<const int*>(states.front());
+	  state_ptr_set_type::const_iterator siter_end = states.end();
+	  for (state_ptr_set_type::const_iterator siter = states.begin() + 1; siter != siter_end; ++ siter) {
+	    const int next = *reinterpret_cast<const int*>(*siter);
+	    
+	    if (prev)
+	      features[next ? feature_none_none : feature_none_word] += 1.0;
+	    else 
+	      features[next ? feature_word_none : feature_word_word] += 1.0;
+	    
+	    prev = next;
+	  }
+	  *reinterpret_cast<int*>(state) = prev;
+	} 
       }
     };
   };
