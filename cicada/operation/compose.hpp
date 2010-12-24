@@ -321,17 +321,17 @@ namespace cicada
 	typedef cicada::Parameter param_type;
     
 	param_type param(parameter);
-	if (param.name() != "compose-phrase")
-	  throw std::runtime_error("this is not a phrase composer");
+	if (param.name() != "compose-alignment")
+	  throw std::runtime_error("this is not a alignment composer");
 
 	bool source = false;
 	bool target = false;
 	
 	for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (strcasecmp(piter->first.c_str(), "lattice") == 0)
-	    lattice_mode = boost::lexical_cast<bool>(piter->second);
+	    lattice_mode = utils::lexical_cast<bool>(piter->second);
 	  else if (strcasecmp(piter->first.c_str(), "forest") == 0) {
-	    forest_mode = boost::lexical_cast<bool>(piter->second);
+	    forest_mode = utils::lexical_cast<bool>(piter->second);
 	  } else
 	    std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
 	}

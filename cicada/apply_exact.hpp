@@ -111,7 +111,8 @@ namespace cicada
 	  edge_type& edge_new = graph_out.add_edge(tails.begin(), tails.end());
 	  edge_new.head = v;
 	  edge_new.rule = edge.rule;
-	  edge_new.features = edge.features;
+	  edge_new.features   = edge.features;
+	  edge_new.attributes = edge.attributes;
 
 	  feature_set_type estimates;
 	  const state_type state = model.apply(node_states, edge_new, edge_new.features, estimates, is_goal);

@@ -6,6 +6,7 @@
 
 #include "parameter.hpp"
 
+#include "feature/alignment.hpp"
 #include "feature/antecedent.hpp"
 #include "feature/bleu.hpp"
 #include "feature/bleu_expected.hpp"
@@ -87,6 +88,10 @@ variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
+relative-position: relative alignment feature\n\
+\tcluster=[word class file]\n\
+\tstemmer=[stemmer spec]\n\
+null-jump: jump from <none>\n\
 ";
     return desc;
   }
@@ -134,6 +139,10 @@ rule-penalty: rule penalty feature\n\
       return feature_function_ptr_type(new feature::WordPenalty());
     else if (param.name() == "rule-penalty")
       return feature_function_ptr_type(new feature::RulePenalty());
+    else if (param.name() == "relative-position")
+      return feature_function_ptr_type(new feature::RelativePosition(parameter));
+    else if (param.name() == "null-jump")
+      return feature_function_ptr_type(new feature::NullJump(parameter));
     else
       throw std::runtime_error("unknown featuer: " + parameter);
     

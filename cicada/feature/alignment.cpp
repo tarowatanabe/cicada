@@ -134,6 +134,13 @@ namespace cicada
       
       NullJump::NullJump(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
       {
+	typedef cicada::Parameter parameter_type;
+	
+	const parameter_type param(parameter);
+	
+	if (param.name() != "null-jump")
+	  throw std::runtime_error("is this really relative position feature function? " + parameter);
+
 	__state_size   = sizeof(int);
 	__feature_name = "null-jump";
 
@@ -155,6 +162,7 @@ namespace cicada
 	// how do we define distortion covered by forest...
 	
 	if (states.empty()) {
+	  
 	  attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
 	  if (titer == edge.attributes.end())
 	    throw std::runtime_error("we do not support non alignment forest");
@@ -173,7 +181,7 @@ namespace cicada
 	    features[next ? feature_word_none : feature_word_word] = 1.0;
 	  
 	} else
-	  throw std::runtime_error("we do not support non alignment forest");
+	  throw std::runtime_error("we do not support non alignment forest: states: " + boost::lexical_cast<std::string>(states.size()));
 	
       }
     };
