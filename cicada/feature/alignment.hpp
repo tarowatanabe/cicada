@@ -23,7 +23,7 @@ namespace cicada
 	: f(parameter, FeatureFunction::__state_size, FeatureFunction::__feature_name)
       {
 	if (__state_size == 0)
-	  throw std::runtime_error("Are we stateless feature...?")
+	  throw std::runtime_error("Are we stateless feature...?");
       }
       
       virtual void apply(state_ptr_type& state,
@@ -31,7 +31,10 @@ namespace cicada
 			 const edge_type& edge,
 			 feature_set_type& features,
 			 feature_set_type& estimates,
-			 const bool final) const { f(*this, state, states, edge, features, estiamtes, final); }
+			 const bool final) const
+      {
+	f(*this, state, states, edge, features, estimates, final);
+      }
       virtual void apply_coarse(state_ptr_type& state,
 				const state_ptr_set_type& states,
 				const edge_type& edge,
@@ -56,14 +59,20 @@ namespace cicada
 				  const edge_type& edge,
 				  feature_set_type& features,
 				  feature_set_type& estimates,
-				  const bool final) const { f(*this, state, states, edge, features, estiamtes, final); }
+				  const bool final) const
+      {
+	f(*this, state, states, edge, features, estimates, final);
+      }
 
       virtual void assign(const size_type& id,
 			  const hypergraph_type& hypergraph,
 			  const lattice_type& lattice,
 			  const span_set_type& spans,
 			  const sentence_set_type& targets,
-			  const ngram_count_set_type& ngram_counts) { f(*this, id, hypergraph, lattice, spans, targets, ngram_counts); }
+			  const ngram_count_set_type& ngram_counts)
+      {
+	f(*this, id, hypergraph, lattice, spans, targets, ngram_counts);
+      }
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new AlignmentBaseState<F>(*this)); }
       
@@ -89,19 +98,28 @@ namespace cicada
 			 const edge_type& edge,
 			 feature_set_type& features,
 			 feature_set_type& estimates,
-			 const bool final) const { f(*this, state, states, edge, features, estiamtes, final); }
+			 const bool final) const
+      {
+	f(*this, state, states, edge, features, estimates, final);
+      }
       virtual void apply_coarse(state_ptr_type& state,
 				const state_ptr_set_type& states,
 				const edge_type& edge,
 				feature_set_type& features,
 				feature_set_type& estimates,
-				const bool final) const { f(*this, state, states, edge, features, estiamtes, final); }
+				const bool final) const
+      {
+	f(*this, state, states, edge, features, estimates, final);
+      }
       virtual void apply_predict(state_ptr_type& state,
 				 const state_ptr_set_type& states,
 				 const edge_type& edge,
 				 feature_set_type& features,
 				 feature_set_type& estimates,
-				 const bool final) const { f(*this, state, states, edge, features, estiamtes, final); }
+				 const bool final) const
+      {
+	f(*this, state, states, edge, features, estimates, final);
+      }
       virtual void apply_scan(state_ptr_type& state,
 			      const state_ptr_set_type& states,
 			      const edge_type& edge,
@@ -121,7 +139,10 @@ namespace cicada
 			  const lattice_type& lattice,
 			  const span_set_type& spans,
 			  const sentence_set_type& targets,
-			  const ngram_count_set_type& ngram_counts) { f(*this, id, hypergraph, lattice, spans, targets, ngram_counts); }
+			  const ngram_count_set_type& ngram_counts)
+      {
+	f(*this, id, hypergraph, lattice, spans, targets, ngram_counts);
+      }
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new AlignmentBase<F>(*this)); }
       
@@ -139,7 +160,7 @@ namespace cicada
 	
 	typedef cicada::Symbol     symbol_type;
 	typedef cicada::Vocab      vocab_type;
-	typedef cicada::Feature    feature_type;
+	typedef cicada::Sentence   sentence_type;
 	typedef cicada::HyperGraph hypergraph_type;
 	typedef cicada::SpanVector span_set_type;
 	typedef cicada::Lattice    lattice_type;
@@ -166,9 +187,9 @@ namespace cicada
       {
       public:
 	typedef ClusterStemmer normalizer_type;
-	typedef std::vector<normlaizer_type, std::allocator<normalizer_type> > normalizer_set_type;
+	typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
 	
-	RelativePositoin(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
+	RelativePosition(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
 	
 	void operator()(const feature_function_type& feature_function,
 			state_ptr_type& state,
@@ -189,8 +210,8 @@ namespace cicada
       private:
 	normalizer_set_type normalizers;
 	const sentence_type* sentence;
-	int source_length;
-	int target_length;
+	int source_size;
+	int target_size;
       };
       
       struct NullJump : public Base
@@ -211,15 +232,20 @@ namespace cicada
 			const lattice_type& lattice,
 			const span_set_type& spans,
 			const sentence_set_type& targets,
-			const ngram_count_set_type& ngram_counts);
+			const ngram_count_set_type& ngram_counts) {}
+
+	feature_type feature_none_none;
+	feature_type feature_none_word;
+	feature_type feature_word_none;
+	feature_type feature_word_word;
       };
-      
-      
-      // actual classes...
-      typedef AlignmentBase<align::RelativePosition> RelativePosition;
-      typedef AlignmentBaseState<align::NullJump>    NullJump;
-      
+            
     };
+
+    // actual classes...
+    typedef AlignmentBase<align::RelativePosition> RelativePosition;
+    typedef AlignmentBaseState<align::NullJump>    NullJump;
+    
   };
 };
 

@@ -103,6 +103,7 @@ feature/span.hpp \
 feature/variational.hpp
 
 libcicada_feature_la_SOURCES = \
+feature/alignment.cpp \
 feature/antecedent.cpp \
 feature/bleu.cpp \
 feature/bleu_expected.cpp \
