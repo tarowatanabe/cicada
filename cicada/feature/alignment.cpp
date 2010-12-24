@@ -128,7 +128,6 @@ namespace cicada
 	
 	source_size = std::max(0, source_size);
 	target_size = std::max(0, target_size);
-	
       }
 
       
@@ -188,6 +187,66 @@ namespace cicada
 	  *reinterpret_cast<int*>(state) = prev;
 	} 
       }
+
+      TargetBigram::TargetBigram(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
+	: normalizers(), sentence(0)
+      {
+	typedef cicada::Parameter parameter_type;
+	
+	const parameter_type param(parameter);
+	
+	if (param.name() != "target-bigram")
+	  throw std::runtime_error("is this really relative position feature function? " + parameter);
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
+	    if (! boost::filesystem::exists(piter->second))
+	      throw std::runtime_error("no cluster file: " + piter->second);
+	    
+	    normalizers.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
+	  } else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
+	    normalizers.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
+	  else
+	    std::cerr << "WARNING: unsupported parameter for target-bigram: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	__state_size = sizeof(symbol_type);
+	__feature_name = "target-bigram";
+      }
+      
+      
+      void TargetBigram::operator()(const feature_function_type& feature_function,
+				    state_ptr_type& state,
+				    const state_ptr_set_type& states,
+				    const edge_type& edge,
+				    feature_set_type& features,
+				    feature_set_type& estimates,
+				    const bool final) const
+      {
+	attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	
+	if (titer == edge.attributes.end()) return;
+	
+	const int target_pos = boost::apply_visitor(__attribute_integer(), titer->second);
+	
+	
+	
+      }
+      
+      void TargetBigram::operator()(const feature_function_type& feature_function,
+				    const size_type& id,
+				    const hypergraph_type& hypergraph,
+				    const lattice_type& lattice,
+				    const span_set_type& spans,
+				    const sentence_set_type& targets,
+				    const ngram_count_set_type& ngram_counts)
+      {
+	sentence = 0;
+	if (! targets.empty())
+	  sentence = &targets.front();
+      }
+
+      
     };
   };
 };
