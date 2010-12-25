@@ -92,6 +92,9 @@ relative-position: relative alignment feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 null-jump: jump from <none>\n\
+target-bigram: target bigram feature\n\
+\tcluster=[word class file]\n\
+\tstemmer=[stemmer spec]\n\
 ";
     return desc;
   }
@@ -143,6 +146,8 @@ null-jump: jump from <none>\n\
       return feature_function_ptr_type(new feature::RelativePosition(parameter));
     else if (param.name() == "null-jump")
       return feature_function_ptr_type(new feature::NullJump(parameter));
+    else if (param.name() == "target-bigram")
+      return feature_function_ptr_type(new feature::TargetBigram(parameter));
     else
       throw std::runtime_error("unknown featuer: " + parameter);
     

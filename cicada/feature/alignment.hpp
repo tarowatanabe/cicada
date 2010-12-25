@@ -268,12 +268,44 @@ namespace cicada
 	normalizer_set_type normalizers;
 	const sentence_type* sentence;
       };
+
+      class WordPair : public Base
+      {
+      public:
+	typedef ClusterStemmer normalizer_type;
+	typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
+
+	WordPair(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
+	
+	void operator()(const feature_function_type& feature_function,
+			state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final) const;
+	
+	void operator()(const feature_function_type& feature_function,
+			const size_type& id,
+			const hypergraph_type& hypergraph,
+			const lattice_type& lattice,
+			const span_set_type& spans,
+			const sentence_set_type& targets,
+			const ngram_count_set_type& ngram_counts);
+	
+      private:
+	normalizer_set_type normalizers_source;
+	normalizer_set_type normalizers_target;
+	const sentence_type* sentence;
+      };
+
     };
 
     // actual classes...
     typedef AlignmentBase<align::RelativePosition>  RelativePosition;
     typedef AlignmentBaseState<align::NullJump>     NullJump;
     typedef AlignmentBaseState<align::TargetBigram> TargetBigram;
+    typedef AlignmentBase<align::WordPair>          WordPair;
     
   };
 };
