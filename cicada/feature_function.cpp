@@ -95,6 +95,11 @@ null-jump: jump from <none>\n\
 target-bigram: target bigram feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
+word-pair: word pair feature\n\
+\tcluster-source=[word class file]\n\
+\tcluster-target=[word class file]\n\
+\tstemmer-source=[stemmer spec]\n\
+\tstemmer-target=[stemmer spec]\n\
 ";
     return desc;
   }
@@ -148,6 +153,8 @@ target-bigram: target bigram feature\n\
       return feature_function_ptr_type(new feature::NullJump(parameter));
     else if (param.name() == "target-bigram")
       return feature_function_ptr_type(new feature::TargetBigram(parameter));
+    else if (param.name() == "word-pair")
+      return feature_function_ptr_type(new feature::WordPair(parameter));
     else
       throw std::runtime_error("unknown featuer: " + parameter);
     

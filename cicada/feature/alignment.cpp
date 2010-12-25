@@ -384,7 +384,7 @@ namespace cicada
 	  else if (strcasecmp(piter->first.c_str(), "stemmer-target") == 0)
 	    normalizers_target.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
 	  else
-	    std::cerr << "WARNING: unsupported parameter for target-bigram: " << piter->first << "=" << piter->second << std::endl;
+	    std::cerr << "WARNING: unsupported parameter for word-pair: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
 	__state_size = 0;
