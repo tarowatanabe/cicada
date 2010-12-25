@@ -130,27 +130,53 @@ namespace cicada
 	target_size = std::max(0, target_size);
       }
 
-      
-      NullJump::NullJump(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
+            
+      Path::Path(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
       {
 	typedef cicada::Parameter parameter_type;
 	
 	const parameter_type param(parameter);
 	
-	if (param.name() != "null-jump")
-	  throw std::runtime_error("is this really relative position feature function? " + parameter);
-
+	if (param.name() != "path")
+	  throw std::runtime_error("is this really path feature function? " + parameter);
+	
 	__state_size   = sizeof(int);
-	__feature_name = "null-jump";
-
-	feature_none_none = "null-jump:none-none";
-	feature_none_word = "null-jump:none-word";
-	feature_word_none = "null-jump:word-none";
-	feature_word_word = "null-jump:word-word";
+	__feature_name = "path";
       }
       
       // define state-full features...
-      void NullJump::operator()(const feature_function_type& feature_function,
+      void Path::operator()(const feature_function_type& feature_function,
+			    state_ptr_type& state,
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features,
+			    feature_set_type& estimates,
+			    const bool final) const
+      {
+	
+	
+      }
+      
+      NullPath::NullPath(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
+      {
+	typedef cicada::Parameter parameter_type;
+	
+	const parameter_type param(parameter);
+	
+	if (param.name() != "null-path")
+	  throw std::runtime_error("is this really null-path feature function? " + parameter);
+
+	__state_size   = sizeof(int);
+	__feature_name = "null-path";
+
+	feature_none_none = "null-path:none-none";
+	feature_none_word = "null-path:none-word";
+	feature_word_none = "null-path:word-none";
+	feature_word_word = "null-path:word-word";
+      }
+      
+      // define state-full features...
+      void NullPath::operator()(const feature_function_type& feature_function,
 				state_ptr_type& state,
 				const state_ptr_set_type& states,
 				const edge_type& edge,

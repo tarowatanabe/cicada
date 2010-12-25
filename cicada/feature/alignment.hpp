@@ -213,10 +213,32 @@ namespace cicada
 	int source_size;
 	int target_size;
       };
-      
-      struct NullJump : public Base
+
+      struct Path : public Base
       {
-	NullJump(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
+	Path(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
+	
+	void operator()(const feature_function_type& feature_function,
+			state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final) const;
+	
+	void operator()(const feature_function_type& feature_function,
+			const size_type& id,
+			const hypergraph_type& hypergraph,
+			const lattice_type& lattice,
+			const span_set_type& spans,
+			const sentence_set_type& targets,
+			const ngram_count_set_type& ngram_counts) {}
+	
+      };
+      
+      struct NullPath : public Base
+      {
+	NullPath(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
 	
 	void operator()(const feature_function_type& feature_function,
 			state_ptr_type& state,
@@ -303,7 +325,8 @@ namespace cicada
 
     // actual classes...
     typedef AlignmentBase<align::RelativePosition>  RelativePosition;
-    typedef AlignmentBaseState<align::NullJump>     NullJump;
+    typedef AlignmentBaseState<align::Path>         Path;
+    typedef AlignmentBaseState<align::NullPath>     NullPath;
     typedef AlignmentBaseState<align::TargetBigram> TargetBigram;
     typedef AlignmentBase<align::WordPair>          WordPair;
     

@@ -91,7 +91,7 @@ rule-penalty: rule penalty feature\n\
 relative-position: relative alignment feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
-null-jump: jump from <none>\n\
+null-path: path involving epsilon\n\
 target-bigram: target bigram feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
@@ -149,8 +149,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::RulePenalty());
     else if (param.name() == "relative-position")
       return feature_function_ptr_type(new feature::RelativePosition(parameter));
-    else if (param.name() == "null-jump")
-      return feature_function_ptr_type(new feature::NullJump(parameter));
+    else if (param.name() == "null-path")
+      return feature_function_ptr_type(new feature::NullPath(parameter));
     else if (param.name() == "target-bigram")
       return feature_function_ptr_type(new feature::TargetBigram(parameter));
     else if (param.name() == "word-pair")
