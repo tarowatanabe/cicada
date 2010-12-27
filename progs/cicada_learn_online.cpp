@@ -199,8 +199,6 @@ struct Task
 
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
   typedef Optimizer optimizer_type;
-
-  typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
   
   Task(queue_type& __queue,
        queue_type& __queue_send,
@@ -225,7 +223,7 @@ struct Task
   double norm;
   std::vector<int, std::allocator<int> > norms;
 
-  hypergraph_set_type  hypergraph_oracles;
+  hypergraph_set_type hypergraph_oracles;
   
   grammar_type grammar;
   model_type model;
@@ -502,14 +500,13 @@ struct Task
     
     read_refset(refset_files, scorer_name, scorers, bleus);
 
-    hypergraph_set_type graphs_oracle;
     score_ptr_type      score_oracle;
     score_ptr_set_type  scores_oracle;
     if (! oracle_files.empty())
-      read_oracle(oracle_files, scorers, graphs_oracle, score_oracle, scores_oracle, bleus);
+      read_oracle(oracle_files, scorers, hypergraph_oracles, score_oracle, scores_oracle, bleus);
     
     // a flag to tell optimization with fixed oracle
-    const bool optimize_fixed_oracle = (! graphs_oracle.empty());
+    const bool optimize_fixed_oracle = (! scores_oracle.empty());
 
     optimizer.scorers = scorers;
     
@@ -605,22 +602,22 @@ struct Task
 	    norm *= 0.9;
 	    norm += 1;
 	  }
-
+	  
 	  if (loss_segment)
 	    norm = 1;
 	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
-
+	  
 	  scorer_ptr_type scorer = scorers[id];
-	  cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(bleus[id].get());
 
-	  model_type model_bleu(bleus[id]);
+	  cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(bleus[id].get());
 	  
-	  if (! loss_segment)
+	  if (! optimize_fixed_oracle && ! loss_segment) {
 	    __bleu->assign(score);
-	  
-	  if (! loss_segment) {
+	    
+	    model_type model_bleu(bleus[id]);
+	    
 	    hypergraph_type hypergraph_reward_rescored;
 	    hypergraph_type hypergraph_penalty_rescored;
 	    
@@ -636,10 +633,11 @@ struct Task
 	      optimizer.hypergraphs.resize(id + 1);
 	    
 	    optimizer.hypergraphs[id].clear();
+	    
 	    optimizer.hypergraphs[id].unite(hypergraph_reward);
 	    optimizer.hypergraphs[id].unite(hypergraph_penalty);
 	  }
-	    
+	  
 	  scores[id] = scorer->score(boost::get<0>(yield_viterbi));
 	  if (! score)
 	    score = scores[id]->clone();
@@ -650,15 +648,16 @@ struct Task
 	    score_1best = scores[id]->clone();
 	  else
 	    *score_1best += *scores[id];
-
 	  
 	  if (debug >= 2)
 	    std::cerr << "1best: " << (*score_1best) << " viterbi: " << (*score) << std::endl;
-
-	  if (id >= hypergraph_oracles.size())
-	    hypergraph_oracles.resize(id + 1);
 	  
-	  hypergraph_oracles[id] = hypergraph_reward;
+	  if (! optimize_fixed_oracle) {
+	    if (id >= hypergraph_oracles.size())
+	      hypergraph_oracles.resize(id + 1);
+	    
+	    hypergraph_oracles[id] = hypergraph_reward;
+	  }
 	  
 	  if (learn_factored)
 	    add_support_vectors_factored(id, hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), ids, labels, margins, features);
@@ -739,41 +738,45 @@ struct Task
       
       model_type model_bleu(bleus[id]);
       
-      if (! loss_segment)
+      if (! optimize_fixed_oracle && ! loss_segment)
 	__bleu->assign(score);
       
       // compute bleu-rewarded instance
       weights[__bleu->feature_name()] =  loss_scale * norm;
       
-      if (id >= hypergraph_oracles.size())
-	hypergraph_oracles.resize(id + 1);
-      
-      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+      if (optimize_fixed_oracle)
+	prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+      else
+	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
 
-      if (id >= hypergraph_oracles.size())
-	hypergraph_oracles.resize(id + 1);
+      if (! optimize_fixed_oracle) {
+	// we will check if we have better oracles, already... if so, use the old oracles...
+	
+	if (id >= hypergraph_oracles.size())
+	  hypergraph_oracles.resize(id + 1);
+	
+	if (hypergraph_oracles[id].is_valid()) {
+	  typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+	  
+	  hypergraph_type hypergraph_oracle;
+	  
+	  cicada::apply_exact(model_bleu, hypergraph_oracles[id], hypergraph_oracle);
+	  
+	  bleu_set_type bleu_curr(hypergraph_reward.nodes.size());
+	  bleu_set_type bleu_prev(hypergraph_oracle.nodes.size());
+	  
+	  cicada::inside(hypergraph_reward, bleu_curr, bleu_function(__bleu->feature_name(), 1.0));
+	  cicada::inside(hypergraph_oracle, bleu_prev, bleu_function(__bleu->feature_name(), 1.0));
 
-      if (hypergraph_oracles[id].is_valid()) {
-	typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
-	
-	hypergraph_type hypergraph_oracle;
-	
-	cicada::apply_exact(model_bleu, hypergraph_oracles[id], hypergraph_oracle);
-	
-	bleu_set_type bleu_curr(hypergraph_reward.nodes.size());
-	bleu_set_type bleu_prev(hypergraph_oracle.nodes.size());
-	
-	cicada::inside(hypergraph_reward, bleu_curr, bleu_function(__bleu->feature_name(), 1.0));
-	cicada::inside(hypergraph_oracle, bleu_prev, bleu_function(__bleu->feature_name(), 1.0));
-	
-	if (bleu_curr.back() >= bleu_prev.back())
-	  hypergraph_oracles[id] = hypergraph_reward;
-	else {
-	  hypergraph_oracles[id] = hypergraph_oracle;
-	  hypergraph_reward.swap(hypergraph_oracle);
-
-	  weight_type weight;
-	  cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
+	  if (bleu_curr.back() >= bleu_prev.back())
+	    hypergraph_oracles[id] = hypergraph_reward;
+	  else {
+	    hypergraph_oracles[id] = hypergraph_oracle;
+	    hypergraph_reward.swap(hypergraph_oracle);
+	    
+	    weight_type weight;
+	    cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
+	  }
 	}
       }
       
