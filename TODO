@@ -55,3 +55,7 @@ Support word alignment training!
       We can potentially share by modifying "intersection"
   How to encode lexical feature...?
     use grammar! (source target word mapping with features!)
+
+cicada-learn-onine with fixed oracle translation
+  Use cicada-orable to compute oracle translation + cicada to compute non-local features
+  

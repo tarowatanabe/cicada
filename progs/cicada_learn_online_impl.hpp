@@ -45,7 +45,228 @@ typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_s
 
 typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 
+typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+
 typedef cicada::SentenceVector sentence_set_type;
+
+struct TaskOracle
+{
+  TaskOracle(const scorer_document_type&    __scorers,
+	     hypergraph_set_type&           __graphs,
+	     score_ptr_type&                __score,
+	     score_ptr_set_type&            __scores,
+	     feature_function_ptr_set_type& __features)
+    : scorers(__scorers),
+      graphs(__graphs),
+      score(__score),
+      scores(__scores),
+      features(__features)
+  { }
+
+  struct bleu_function
+  {
+    typedef hypergraph_type::feature_set_type feature_set_type;
+    
+    typedef cicada::semiring::Logprob<double> value_type;
+
+    bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
+      : name(__name), factor(__factor) {}
+    
+    weight_set_type::feature_type name;
+    double factor;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& edge) const
+    {
+      return cicada::semiring::traits<value_type>::log(edge.features[name] * factor);
+    }
+  };
+  
+  struct kbest_traversal
+  {
+    typedef sentence_type value_type;
+    
+    template <typename Edge, typename Iterator>
+    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+    {
+      // extract target-yield, features
+      
+      yield.clear();
+      
+      int non_terminal_pos = 0;
+      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	if (titer->is_non_terminal()) {
+	  int pos = titer->non_terminal_index() - 1;
+	  if (pos < 0)
+	    pos = non_terminal_pos;
+	  ++ non_terminal_pos;
+	  
+	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
+	} else if (*titer != vocab_type::EPSILON)
+	  yield.push_back(*titer);
+    }
+  };
+  
+  void operator()()
+  {
+    // we will try maximize    
+    const bool error_metric = scorers.error_metric();
+    const double score_factor = (error_metric ? - 1.0 : 1.0);
+    
+    weight_set_type::feature_type feature_bleu;
+    for (size_t i = 0; i != features.size(); ++ i)
+      if (features[i]) {
+	feature_bleu = features[i]->feature_name();
+	break;
+      }
+    
+    double objective_optimum = (score
+				? score->score() * score_factor
+				: - std::numeric_limits<double>::infinity());
+    
+    hypergraph_type graph_oracle;
+    
+    for (size_t id = 0; id != graphs.size(); ++ id) {
+      if (! graphs[id].is_valid()) continue;
+      
+      score_ptr_type score_curr;
+      if (score)
+	score_curr = score->clone();
+      
+      if (scores[id])
+	*score_curr -= *scores[id];
+      
+      dynamic_cast<cicada::feature::Bleu*>(features[id].get())->assign(score_curr);
+      
+      model_type model;
+      model.push_back(features[id]);
+      
+      graph_oracle.clear();
+      
+      cicada::apply_exact(model, graphs[id], graph_oracle);
+      
+      cicada::semiring::Logprob<double> weight;
+      sentence_type sentence;
+      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), bleu_function(feature_bleu, score_factor));
+      
+      score_ptr_type score_sample = scorers[id]->score(sentence);
+      if (score_curr)
+	*score_curr += *score_sample;
+      else
+	score_curr = score_sample;
+      
+      const double objective = score_curr->score() * score_factor;
+      
+      if (objective > objective_optimum || ! scores[id]) {
+	score = score_curr;
+	objective_optimum = objective;
+	scores[id] = score_sample;
+      }
+    }
+    
+    // we will fix our score and compute oracle hypergraph with correct score...
+    // score object will be registered to BLEU feature function...
+    for (size_t id = 0; id != graphs.size(); ++ id) {
+      if (! graphs[id].is_valid()) continue;
+      
+      // we will keep adjust scores...
+      score_ptr_type score_curr = score->clone();
+      *score_curr -= *scores[id];
+      scores[id] = score_curr;
+      
+      dynamic_cast<cicada::feature::Bleu*>(features[id].get())->assign(scores[id]);
+      
+      model_type model;
+      model.push_back(features[id]);
+      
+      graph_oracle.clear();
+      
+      cicada::apply_exact(model, graphs[id], graph_oracle);
+      
+      graphs[id].swap(graph_oracle);
+    }
+  }
+  
+  const scorer_document_type&    scorers;
+  hypergraph_set_type&           graphs;
+  score_ptr_type&                score;
+  score_ptr_set_type&            scores;
+  feature_function_ptr_set_type& features;
+};
+
+inline
+void read_oracle(const path_set_type& files,
+		 const scorer_document_type& scorers,
+		 hypergraph_set_type& graphs,
+		 score_ptr_type& score,
+		 score_ptr_set_type& scores,
+		 feature_function_ptr_set_type& bleus)
+{
+  if (files.empty())
+    throw std::runtime_error("no oracle files?");
+  
+  graphs.clear();
+  graphs.resize(scorers.size());
+  
+  score.reset();
+  scores.clear();
+  scores.resize(scorers.size());
+  
+  path_set_type::const_iterator fiter_end = files.end();
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
+    
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (int i = 0; /**/; ++ i) {
+	const path_type path = (*fiter) / (boost::lexical_cast<std::string>(i) + ".gz");
+	
+	if (! boost::filesystem::exists(path)) break;
+	
+	utils::compress_istream is(path, 1024 * 1024);
+	
+	size_t id;
+	std::string sep;
+	hypergraph_type hypergraph;
+	
+	while (is >> id >> sep >> hypergraph) {
+	  
+	  if (sep != "|||")
+	    throw std::runtime_error("format error?: " + fiter->file_string());
+	  
+	  if (id >= graphs.size())
+	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + fiter->file_string());
+	  
+	  graphs[id].unite(hypergraph);
+	}
+      }
+    } else {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      
+      size_t id;
+      std::string sep;
+      hypergraph_type hypergraph;
+      
+      while (is >> id >> sep >> hypergraph) {
+	
+	if (sep != "|||")
+	  throw std::runtime_error("format error?: " + fiter->file_string());
+	
+	if (id >= graphs.size())
+	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + fiter->file_string());
+	
+	graphs[id].unite(hypergraph);
+      }
+    }
+  }
+  
+  // compute oracle translation...
+  // we assume that oracle translations are already computed, thus we can simply use
+  // apply-exact...
+  
+  // no threading for simplicity...
+  
+  TaskOracle(scorers, graphs, score, scores, bleus)();
+}
 
 inline
 void read_refset(const path_set_type& files,
@@ -206,6 +427,24 @@ inline
 void encode_support_vectors(std::string& data,
 			    const size_t& id,
 			    const sentence_type& viterbi,
+			    const hypergraph_type& violated)
+{
+  data.clear();
+  
+  boost::iostreams::filtering_ostream os;
+  os.push(boost::iostreams::back_inserter(data));
+  
+  os << id << " |||";
+  os << ' ' << viterbi << " |||";
+  os << ' ' << violated;
+    
+  os.pop();
+}
+
+inline
+void encode_support_vectors(std::string& data,
+			    const size_t& id,
+			    const sentence_type& viterbi,
 			    const hypergraph_type& oracle,
 			    const hypergraph_type& violated)
 {
@@ -220,6 +459,43 @@ void encode_support_vectors(std::string& data,
   os << ' ' << violated;
     
   os.pop();
+}
+
+inline
+void decode_support_vectors(const std::string& data,
+			    size_t& id,
+			    sentence_type& viterbi,
+			    hypergraph_type& violated)
+{
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  namespace phoenix = boost::phoenix;
+  
+  using qi::phrase_parse;
+  using qi::_1;
+  using qi::ulong_;
+  using qi::int_;
+  using standard::space;
+  
+  using phoenix::ref;
+  
+  std::string::const_iterator iter = data.begin();
+  std::string::const_iterator end = data.end();
+  
+  if (! phrase_parse(iter, end, ulong_ [ref(id) = _1] >> "|||", space))
+    throw std::runtime_error("invalid id and source-length");
+  
+  if (! viterbi.assign(iter, end))
+    throw std::runtime_error("invalid sentence");
+  
+  if (! phrase_parse(iter, end, "|||", space))
+    throw std::runtime_error("expected separator");
+  
+  if (! violated.assign(iter, end))
+    throw std::runtime_error("invalid violated hypergraph");
+  
+  if (iter != end)
+    throw std::runtime_error("still data remain?");
 }
 
 inline
@@ -349,8 +625,6 @@ struct OptimizeCP
   typedef scorer_type::scorer_ptr_type scorer_ptr_type;
   typedef scorer_type::score_ptr_type  score_ptr_type;
   
-  typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
-
   typedef std::vector<double, std::allocator<double> >    alpha_type;
   typedef std::vector<double, std::allocator<double> >    gradient_type;
   typedef std::vector<double, std::allocator<double> >    error_bound_type;
@@ -832,7 +1106,6 @@ struct OptimizeMIRA
   typedef scorer_type::scorer_ptr_type scorer_ptr_type;
   typedef scorer_type::score_ptr_type  score_ptr_type;
   
-  typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
   typedef std::deque<scorer_ptr_type, std::allocator<scorer_ptr_type> > scorer_set_type;
 
   typedef std::vector<double, std::allocator<double> >    alpha_type;

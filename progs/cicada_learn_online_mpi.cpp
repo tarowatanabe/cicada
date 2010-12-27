@@ -66,6 +66,7 @@ typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
 path_type input_file = "-";
 path_type output_file = "-";
 path_set_type refset_files;
+path_set_type oracle_files;
 
 bool input_id_mode = false;
 bool input_lattice_mode = false;
@@ -240,6 +241,12 @@ int main(int argc, char ** argv)
     feature_function_ptr_set_type bleus;
     
     read_refset(refset_files, scorer_name, scorers, bleus);
+    
+    hypergraph_set_type graphs_oracle;
+    score_ptr_type      score_oracle;
+    score_ptr_set_type  scores_oracle;
+    if (! oracle_files.empty())
+      read_oracle(oracle_files, scorers, graphs_oracle, score_oracle, scores_oracle, bleus);
 
     operation_set_type operations(ops.begin(), ops.end(),
 				  model,
@@ -1575,6 +1582,7 @@ void options(int argc, char** argv)
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
     ("refset", po::value<path_set_type>(&refset_files)->multitoken(), "refset file(s)")
+    ("oracle", po::value<path_set_type>(&oracle_files)->multitoken(), "oracle forest file(s)")
     
     // options for input/output format
     ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")
