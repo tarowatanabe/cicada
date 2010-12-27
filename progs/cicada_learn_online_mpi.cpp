@@ -332,7 +332,7 @@ struct Task
       batch_current(0),
       score_1best(), score(), scores(), norm(0.0)
   {
-    optimize_fixed_oracle = ! hypegraph_oracles.empty();
+    optimize_fixed_oracle = ! hypergraph_oracles.empty();
   }
 
   queue_type&        queue;
