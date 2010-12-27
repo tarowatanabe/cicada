@@ -361,9 +361,10 @@ struct Task
 			yield_type& yield, 
 			const weight_set_type& weights,
 			const weight_set_type& weights_prune,
-			const double margin)
+			const double margin,
+			const bool invert=false)
   {
-    cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, 1.0), cube_size);
+    cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, invert ? - 1.0 : 1.0), cube_size);
     
     cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
@@ -371,7 +372,7 @@ struct Task
       static const size_type __id = 0;
       static const sentence_set_type __targets;
       static const ngram_count_set_type __ngram_counts;
-
+      
       model_sparse.assign(__id, modified, lattice, spans, __targets, __ngram_counts);
       
       model_sparse.apply_feature(true);
@@ -383,7 +384,7 @@ struct Task
     
     weight_type weight;
     
-    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
+    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, invert ? - 1.0 : 1.0));
   }
 
   void add_support_vectors_regression(const size_t& id,
@@ -603,14 +604,13 @@ struct Task
 	    norm += 1;
 	  }
 	  
-	  if (loss_segment)
+	  if (loss_segment || optimize_fixed_oracle)
 	    norm = 1;
 	  
 	  if (score_1best && scores[id])
 	    *score_1best -= *scores[id];
 	  
 	  scorer_ptr_type scorer = scorers[id];
-
 	  cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(bleus[id].get());
 	  
 	  if (! optimize_fixed_oracle && ! loss_segment) {
@@ -730,7 +730,7 @@ struct Task
 	norm += 1;
       }
 
-      if (loss_segment)
+      if (loss_segment || optimize_fixed_oracle)
 	norm = 1;
       
       scorer_ptr_type scorer = scorers[id];
@@ -742,12 +742,17 @@ struct Task
 	__bleu->assign(score);
       
       // compute bleu-rewarded instance
-      weights[__bleu->feature_name()] =  loss_scale * norm;
       
-      if (optimize_fixed_oracle)
+      if (optimize_fixed_oracle) {
+	// we will search for the smallest derivation(s) with the best BLEU
+	weights[__bleu->feature_name()] =  - loss_scale * norm;
+	
+	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin, true);
+      } else {
+	weights[__bleu->feature_name()] =  loss_scale * norm;
+	
 	prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
-      else
-	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+      }
 
       if (! optimize_fixed_oracle) {
 	// we will check if we have better oracles, already... if so, use the old oracles...

@@ -131,6 +131,7 @@ int debug = 0;
 template <typename Optimizer>
 void optimize(operation_set_type& operations,
 	      scorer_document_type& scorers,
+	      hypergraph_set_type& hypergraph_oracles,
 	      feature_function_ptr_set_type& bleus,
 	      model_type& model,
 	      weight_set_type& weights,
@@ -272,9 +273,9 @@ int main(int argc, char ** argv)
     }
     
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
-      ::optimize<OptimizeMIRA>(operations, scorers, bleus, model, weights, weights_average);
+      ::optimize<OptimizeMIRA>(operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
     else if (strcasecmp(algorithm.c_str(), "cp") == 0)
-      ::optimize<OptimizeCP>(operations, scorers, bleus, model, weights, weights_average);
+      ::optimize<OptimizeCP>(operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
     else
       throw std::runtime_error("unsupported learning algorithm: " + algorithm);
     
@@ -317,17 +318,22 @@ struct Task
        queue_type& __queue_recv,
        operation_set_type& __operations,
        scorer_document_type& __scorers,
+       hypergraph_set_type& __hypergraph_oracles,
        feature_function_ptr_set_type& __bleus,
        model_type& __model,
        optimizer_type& __optimizer)
     : queue(__queue), queue_send(__queue_send), queue_recv(__queue_recv),
       operations(__operations),
       scorers(__scorers),
+      hypergraph_oracles(__hypergraph_oracles),
       bleus(__bleus),
       model(__model),
       optimizer(__optimizer),
       batch_current(0),
-      score_1best(), score(), scores(), norm(0.0) {}
+      score_1best(), score(), scores(), norm(0.0)
+  {
+    optimize_fixed_oracle = ! hypegraph_oracles.empty();
+  }
 
   queue_type&        queue;
   queue_type&        queue_send;
@@ -335,6 +341,8 @@ struct Task
   
   operation_set_type&      operations;
   scorer_document_type& scorers;
+  
+  hypergraph_set_type&  hypergraph_oracles;
   feature_function_ptr_set_type& bleus;
   model_type&        model;
   
@@ -348,7 +356,7 @@ struct Task
   double norm;
   std::vector<int, std::allocator<int> > norms;
 
-  hypergraph_set_type  hypergraph_oracles;
+  bool optimize_fixed_oracle;
   
   typedef cicada::semiring::Logprob<double> weight_type;
   
@@ -482,9 +490,10 @@ struct Task
 			yield_type& yield, 
 			const weight_set_type& weights,
 			const weight_set_type& weights_prune,
-			const double margin)
+			const double margin,
+			const bool invert=false)
   {
-    cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, 1.0), cube_size);
+    cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, invert ? - 1.0 : 1.0), cube_size);
     
     cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
@@ -504,7 +513,7 @@ struct Task
     
     weight_type weight;
     
-    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
+    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, invert ? - 1.0 : 1.0));
   }
 
   void add_support_vectors_regression(const size_t& id,
@@ -701,7 +710,7 @@ struct Task
 	    norm += 1;
 	  }
 
-	  if (loss_segment)
+	  if (loss_segment || optimize_fixed_oracle)
 	    norm = 1;
 	  
 	  if (score_1best && scores[id])
@@ -710,12 +719,11 @@ struct Task
 	  scorer_ptr_type scorer = scorers[id];
 	  cicada::feature::Bleu* __bleu = dynamic_cast<cicada::feature::Bleu*>(bleus[id].get());
 	  
-	  model_type model_bleu(bleus[id]);
-	  
-	  if (! loss_segment)
+	  if (! optimize_fixed_oracle && ! loss_segment) {
 	    __bleu->assign(score);
-	  
-	  if (! loss_segment) {
+	    
+	    model_type model_bleu(bleus[id]);
+	    
 	    hypergraph_type hypergraph_reward_rescored;
 	    hypergraph_type hypergraph_penalty_rescored;
 	    
@@ -749,10 +757,12 @@ struct Task
 	  if (debug >= 2)
 	    std::cerr << "1best: " << (*score_1best) << " viterbi: " << (*score) << std::endl;
 	  
-	  if (id >= hypergraph_oracles.size())
-	    hypergraph_oracles.resize(id + 1);
-	  
-	  hypergraph_oracles[id] = hypergraph_reward;
+	  if (! optimize_fixed_oracle) {
+	    if (id >= hypergraph_oracles.size())
+	      hypergraph_oracles.resize(id + 1);
+	    
+	    hypergraph_oracles[id] = hypergraph_reward;
+	  }
 
 	  if (learn_factored)
 	    add_support_vectors_factored(id, hypergraph_reward, hypergraph_penalty, __bleu->feature_name(), ids, labels, margins, features);
@@ -830,7 +840,7 @@ struct Task
 	norm += 1;
       }
       
-      if (loss_segment)
+      if (loss_segment || optimize_fixed_oracle)
 	norm = 1;
       
       scorer_ptr_type scorer = scorers[id];
@@ -838,41 +848,53 @@ struct Task
       
       model_type model_bleu(bleus[id]);
       
-      if (! loss_segment)
+      if (! optimize_fixed_oracle && ! loss_segment)
 	__bleu->assign(score);
       
       // compute bleu-rewarded instance
-      weights[__bleu->feature_name()] =  loss_scale * norm;
-      
-      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
-      
-      if (id >= hypergraph_oracles.size())
-	hypergraph_oracles.resize(id + 1);
 
-      if (hypergraph_oracles[id].is_valid()) {
-	typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+      if (optimize_fixed_oracle) {
+	// we will search for the smallest derivation(s) with the best BLEU
+	weights[__bleu->feature_name()] =  - loss_scale * norm;
 	
-	hypergraph_type hypergraph_oracle;
+	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin, true);
+      } else {
+	weights[__bleu->feature_name()] =  loss_scale * norm;
 	
-	cicada::apply_exact(model_bleu, hypergraph_oracles[id], hypergraph_oracle);
-	
-	bleu_set_type bleu_curr(hypergraph_reward.nodes.size());
-	bleu_set_type bleu_prev(hypergraph_oracle.nodes.size());
-	
-	cicada::inside(hypergraph_reward, bleu_curr, bleu_function(__bleu->feature_name(), 1.0));
-	cicada::inside(hypergraph_oracle, bleu_prev, bleu_function(__bleu->feature_name(), 1.0));
-	
-	if (bleu_curr.back() >= bleu_prev.back())
-	  hypergraph_oracles[id] = hypergraph_reward;
-	else {
-	  hypergraph_oracles[id] = hypergraph_oracle;
-	  hypergraph_reward.swap(hypergraph_oracle);
-	  
-	  weight_type weight;
-	  cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
-	}
+	prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
       }
       
+      if (! optimize_fixed_oracle) {
+	// we will check if we have better oracles, already... if so, use the old oracles...
+	
+	if (id >= hypergraph_oracles.size())
+	  hypergraph_oracles.resize(id + 1);
+	
+	if (hypergraph_oracles[id].is_valid()) {
+	  typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+	  
+	  hypergraph_type hypergraph_oracle;
+	  
+	  cicada::apply_exact(model_bleu, hypergraph_oracles[id], hypergraph_oracle);
+	  
+	  bleu_set_type bleu_curr(hypergraph_reward.nodes.size());
+	  bleu_set_type bleu_prev(hypergraph_oracle.nodes.size());
+	  
+	  cicada::inside(hypergraph_reward, bleu_curr, bleu_function(__bleu->feature_name(), 1.0));
+	  cicada::inside(hypergraph_oracle, bleu_prev, bleu_function(__bleu->feature_name(), 1.0));
+	  
+	  if (bleu_curr.back() >= bleu_prev.back())
+	    hypergraph_oracles[id] = hypergraph_reward;
+	  else {
+	    hypergraph_oracles[id] = hypergraph_oracle;
+	    hypergraph_reward.swap(hypergraph_oracle);
+	    
+	    weight_type weight;
+	    cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
+	  }
+	}
+      }
+	
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
       
@@ -1037,6 +1059,7 @@ bool bcast_vectors(Iterator first, Iterator last, BufferIterator bfirst, Queue& 
 template <typename Optimizer>
 void optimize(operation_set_type& operations,
 	      scorer_document_type& scorers,
+	      hypergraph_set_type& hypergraph_oracles,
 	      feature_function_ptr_set_type& bleus,
 	      model_type& model,
 	      weight_set_type& weights,
@@ -1103,7 +1126,7 @@ void optimize(operation_set_type& operations,
 
   optimizer_type optimizer(weights, C, tolerance_solver, debug);
   
-  task_type task(queue, queue_reduce, queue_bcast, operations, scorers, bleus, model, optimizer);
+  task_type task(queue, queue_reduce, queue_bcast, operations, scorers, hypergraph_oracles, bleus, model, optimizer);
 
   dumper_type::queue_type queue_dumper;
   std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
