@@ -1,3 +1,7 @@
+//
+//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
 // cicada alignment tool:
 //
 // we can produce intersection/union/grow-{,diag}-{final,final-and}/source/target/itg/max-match from GIZA++ alingment

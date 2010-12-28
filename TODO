@@ -48,3 +48,9 @@ Support word alignment training!
   How to encode lexical feature...?
     use grammar! (source target word mapping with features!)
   
+
+Added cicada_lexicon_{model1,dice} series for alignment training
+  Support Dirichlet prior, symmetric training, non-symmetric training etc.
+    We will learn two direction in once!
+  Use threading for faster estimation.
+  Do we add HMM models? Probably no, since we are primarily working with syntactic alignment

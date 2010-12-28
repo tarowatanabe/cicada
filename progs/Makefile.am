@@ -24,6 +24,7 @@ bin_PROGRAMS = \
 	cicada \
 	cicada_mpi \
 	cicada_alignment \
+	cicada_cluster_word \
 	cicada_eval \
 	cicada_extract_ghkm \
 	cicada_extract_ghkm_mpi \
@@ -49,6 +50,7 @@ bin_PROGRAMS = \
 	cicada_learn_mpi \
 	cicada_learn_online \
 	cicada_learn_online_mpi \
+	cicada_lexicon_dice \
 	cicada_mert \
 	cicada_mert_mpi \
 	cicada_maxlike \
@@ -71,6 +73,9 @@ cicada_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 
 cicada_alignment_SOURCES = cicada_alignment.cpp
 cicada_alignment_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_cluster_word_SOURCES = cicada_cluster_word.cpp
+cicada_cluster_word_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_eval_SOURCES = cicada_eval.cpp
 cicada_eval_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -153,6 +158,9 @@ cicada_learn_online_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 cicada_learn_online_mpi_SOURCES  = cicada_learn_online_mpi.cpp
 cicada_learn_online_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_learn_online_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_lexicon_dice_SOURCES = cicada_lexicon_dice.cpp
+cicada_lexicon_dice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
