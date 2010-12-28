@@ -6,6 +6,7 @@
 #define __CICADA__EXTRACT_SCORE_IMPL__HPP__ 1
 
 #include <unistd.h>
+#include <cstring>
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
@@ -1254,6 +1255,7 @@ struct PhrasePairModifyReducer
 	utils::compress_istream is2(file2, 1024 * 1024);
 	
 	utils::compress_ostream os(counts_file, 1024 * 1024);
+	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
 	
 	merge_counts(is1, is2, os);
       }
@@ -1302,7 +1304,8 @@ struct PhrasePairModifyReducer
     
     // final dump!
     utils::compress_ostream os(counts_file, 1024 * 1024);
-
+    os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+    
     sorted_type::const_iterator siter_end = sorted.end();
     for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
       generator(os, *(*siter)) << '\n';
