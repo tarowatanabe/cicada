@@ -334,17 +334,20 @@ struct ExtractSCFG
 	      const int __max_fertility,
 	      const int __max_span,
 	      const int __min_hole,
+	      const bool __ternary,
 	      const bool __inverse)
     : max_length(__max_length),
       max_fertility(__max_fertility),
       max_span(__max_span),
       min_hole(__min_hole),
+      ternary(__ternary),
       inverse(__inverse) {}
 		
   int max_length;
   int max_fertility;
   int max_span;
   int min_hole;
+  bool ternary;
   bool inverse;
 
   alignment_multiple_type alignment_source_target;
@@ -606,6 +609,38 @@ struct ExtractSCFG
 		    
 		    rule_pair_list.push_back(rule_pair);
 		  }
+
+		
+		if (ternary)
+		  for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
+		    if (*iter != *niter3
+			&& (min_hole <= 1 || (niter3->source.second - niter3->source.first) >= min_hole)
+			&& is_parent(iter->source, niter3->source)
+			&& is_parent(iter->target, niter3->target)
+			&& is_disjoint(niter1->source, niter3->source)
+			&& is_disjoint(niter1->target, niter3->target)
+			&& is_disjoint(niter2->source, niter3->source)
+			&& is_disjoint(niter2->target, niter3->target)
+			&& ! is_adjacent(niter1->source, niter3->source)
+			&& ! is_adjacent(niter2->source, niter3->source)) {
+		      
+		      const int source_count3 = alignment_count_source[niter3->source.second] - alignment_count_source[niter3->source.first];
+		      //const int target_count3 = alignment_count_target[niter3->target.second] - alignment_count_target[niter3->target.first];
+		      
+		      if (source_count == source_count1 + source_count2 + source_count3) continue;
+		      
+		      const int source_length3 = source_length2 - (niter3->source.second - niter3->source.first);
+		      const int target_length3 = target_length2 - (niter3->target.second - niter3->target.first);
+		      
+		      if (max_length <= 0 || source_length3 <= max_length || target_length3 <= max_length)
+			if (max_fertility <= 0 || fertility(source_length3, target_length3) < max_fertility) {
+			  // extract rule...
+			  
+			  extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair);
+			  
+			  rule_pair_list.push_back(rule_pair);
+			}
+		    }
 	      }
 	  }
 	
@@ -760,7 +795,7 @@ struct ExtractSCFG
       for (int trg = spans_nt1.target.second; trg != spans.target.second; ++ trg)
 	rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
     }
-
+    
     const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
     const int nt2_source_size = spans_nt2.source.second - spans_nt2.source.first;
     const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
@@ -781,16 +816,137 @@ struct ExtractSCFG
 	    const int mask_target2 = - (*aiter >= spans_nt2.target.second);
 	    
 	    // we shift -1, since we have to take into account the <x1> token... (also for <x2>)
-	    const int shift_source = ((mask_source1 & (nt1_source_size - 1)) + (mask_source2 & (nt2_source_size - 1))
-				      + spans.source.first);
-	    const int shift_target = ((mask_target1 & (nt1_target_size - 1)) + (mask_target2 & (nt2_target_size - 1))
-				      + spans.target.first);
+	    const int shift_source = (spans.source.first
+				      + (mask_source1 & (nt1_source_size - 1))
+				      + (mask_source2 & (nt2_source_size - 1)));
+	    const int shift_target = (spans.target.first
+				      + (mask_target1 & (nt1_target_size - 1))
+				      + (mask_target2 & (nt2_target_size - 1)));
 	    
 	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
 	  }
       }
   }
 
+  struct less_source
+  {
+    template <typename Tp>
+    bool operator()(const Tp& x, const Tp& y) const
+    {
+      return x.source < y.source;
+    }
+  };
+  
+  struct less_first
+  {
+    template <typename Tp>
+    bool operator()(const Tp& x, const Tp& y) const
+    {
+      return x.first < y.first;
+    }
+  };
+  
+  template <typename Category>
+  void extract_rule(const sentence_type& source,
+		    const sentence_type& target,
+		    const span_pair_type& spans,
+		    const span_pair_type& __spans_nt1,
+		    const span_pair_type& __spans_nt2,
+		    const span_pair_type& __spans_nt3,
+		    const Category& category,
+		    rule_pair_type& rule_pair)
+  {
+    typedef std::pair<span_type, symbol_type> span_category_type;
+    
+    // sort by source-side span...
+    std::vector<span_pair_type, std::allocator<span_pair_type> > spans_nt(3);
+    spans_nt[0] = __spans_nt1;
+    spans_nt[1] = __spans_nt2;
+    spans_nt[2] = __spans_nt3;
+    
+    std::sort(spans_nt.begin(), spans_nt.end(), less_source());
+    
+    const span_pair_type& spans_nt1 = spans_nt[0];
+    const span_pair_type& spans_nt2 = spans_nt[1];
+    const span_pair_type& spans_nt3 = spans_nt[2];
+
+    const symbol_type lhs = category(spans);
+    const symbol_type nt1 = category(spans_nt1);
+    const symbol_type nt2 = category(spans_nt2);
+    const symbol_type nt3 = category(spans_nt3);
+    
+    rule_pair.source = static_cast<const std::string&>(lhs);
+    for (int src = spans.source.first; src != spans_nt1.source.first; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt1.non_terminal(1));
+    for (int src = spans_nt1.source.second; src != spans_nt2.source.first; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt2.non_terminal(2));
+    for (int src = spans_nt2.source.second; src != spans_nt3.source.first; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    rule_pair.source += ' ' + static_cast<const std::string&>(nt3.non_terminal(3));
+    for (int src = spans_nt3.source.second; src != spans.source.second; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
+    
+    // sort by target-side span with category,...
+    std::vector<span_category_type, std::allocator<span_category_type> > spans_cat(3);
+    spans_cat[0] = std::make_pair(spans_nt1.target, nt1.non_terminal(1));
+    spans_cat[1] = std::make_pair(spans_nt2.target, nt2.non_terminal(2));
+    spans_cat[2] = std::make_pair(spans_nt3.target, nt3.non_terminal(3));
+    
+    std::sort(spans_cat.begin(), spans_cat.end(), less_first());
+    
+    rule_pair.target = static_cast<const std::string&>(lhs);
+    for (int src = spans.target.first; src != spans_cat[0].first.first; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    rule_pair.target += ' ' + static_cast<const std::string&>(spans_cat[0].second);
+    for (int src = spans_cat[0].first.second; src != spans_cat[1].first.first; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    rule_pair.target += ' ' + static_cast<const std::string&>(spans_cat[1].second);
+    for (int src = spans_cat[1].first.second; src != spans_cat[2].first.first; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    rule_pair.target += ' ' + static_cast<const std::string&>(spans_cat[2].second);
+    for (int src = spans_cat[2].first.second; src != spans.target.second; ++ src)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[src]);
+    
+    const int nt1_source_size = spans_nt1.source.second - spans_nt1.source.first;
+    const int nt2_source_size = spans_nt2.source.second - spans_nt2.source.first;
+    const int nt3_source_size = spans_nt3.source.second - spans_nt3.source.first;
+    const int nt1_target_size = spans_nt1.target.second - spans_nt1.target.first;
+    const int nt2_target_size = spans_nt2.target.second - spans_nt2.target.first;
+    const int nt3_target_size = spans_nt3.target.second - spans_nt3.target.first;
+    
+    rule_pair.alignment.clear();
+    for (int src = spans.source.first; src != spans.source.second; ++ src)
+      if (is_out_of_span(spans_nt1.source, src) && is_out_of_span(spans_nt2.source, src) && is_out_of_span(spans_nt3.source, src)) {
+	point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
+	point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
+	
+	for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	  if (is_out_of_span(spans_nt1.target, *aiter) && is_out_of_span(spans_nt2.target, *aiter) && is_out_of_span(spans_nt3.target, *aiter)) {
+	    const int mask_source1 = - (src >= spans_nt1.source.second);
+	    const int mask_source2 = - (src >= spans_nt2.source.second);
+	    const int mask_source3 = - (src >= spans_nt3.source.second);
+	    
+	    const int mask_target1 = - (*aiter >= spans_nt1.target.second);
+	    const int mask_target2 = - (*aiter >= spans_nt2.target.second);
+	    const int mask_target3 = - (*aiter >= spans_nt3.target.second);
+	    
+	    // we shift -1, since we have to take into account the <x1> token... (also for <x2>)
+	    const int shift_source = (spans.source.first
+				      + (mask_source1 & (nt1_source_size - 1))
+				      + (mask_source2 & (nt2_source_size - 1))
+				      + (mask_source3 & (nt3_source_size - 1)));
+	    const int shift_target = (spans.target.first
+				      + (mask_target1 & (nt1_target_size - 1))
+				      + (mask_target2 & (nt2_target_size - 1))
+				      + (mask_target3 & (nt3_target_size - 1)));
+	    
+	    rule_pair.alignment.push_back(std::make_pair(src - shift_source, *aiter - shift_target));
+	  }
+      }
+  }
+  
   bool is_out_of_span(const span_type& span, const int pos) const
   {
     return pos < span.first || span.second <= pos;
@@ -946,11 +1102,12 @@ struct Task
        const int max_fertility,
        const int max_span,
        const int min_hole,
+       const bool ternary,
        const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_length, max_fertility, max_span, min_hole, inverse),
+      extractor(max_length, max_fertility, max_span, min_hole, ternary, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;
