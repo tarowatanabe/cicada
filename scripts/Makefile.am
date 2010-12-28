@@ -1,3 +1,3 @@
 
 bin_SCRIPTS = \
-	extract.py
+	cicada-extract.py

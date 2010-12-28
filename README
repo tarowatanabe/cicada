@@ -63,6 +63,8 @@ Various learning components are implemented:
    - Small/Large feature set on small devset learned by hypergraph-MaxEnt(optimized by LBFGS or SGD)
      + softmax-margin [9] (New! But still open problems!)
 
+Word clustering tool is also included to support word alignment learning + translation [20]
+
 References:
 
 [1]
@@ -324,3 +326,17 @@ References:
   pages     = {157--166},
   url       = {http://www.aclweb.org/anthology/P10-1017}
 }
+
+[21]
+@InProceedings{uszkoreit-brants:2008:ACLMain,
+  author    = {Uszkoreit, Jakob  and  Brants, Thorsten},
+  title     = {Distributed Word Clustering for Large Scale Class-Based Language Modeling in Machine Translation},
+  booktitle = {Proceedings of ACL-08: HLT},
+  month     = {June},
+  year      = {2008},
+  address   = {Columbus, Ohio},
+  publisher = {Association for Computational Linguistics},
+  pages     = {755--762},
+  url       = {http://www.aclweb.org/anthology/P/P08/P08-1086}
+}
+
