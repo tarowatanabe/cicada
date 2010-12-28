@@ -1525,6 +1525,7 @@ public:
     counts_size = size_type(-1);
     boost::iostreams::filtering_ostream os_counts;
     os_counts.push(boost::iostreams::file_sink(path_counts.file_string()), 1024 * 1024);
+    os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
     
     pqueue_type pqueue;
     istream_ptr_set_type istreams;

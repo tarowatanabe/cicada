@@ -22,10 +22,6 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
 
-Add matcher interface?
-  - for lattice generation, it is reported stemming or word net synset does help to generalize matching.
-    Do we implement this as our string baseline?
-
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
     I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
@@ -34,10 +30,6 @@ Add head-finder?
     Head finder requires child/parent node, therefore, requires the whole hypergraph...
 
 Add alignment tool, which can read GIZA++ output and dump heuristic alignment?
-
-Add pharse-extract like script supporting phrase-extract only (step 5 and 6)
-
-Do we allow intersect with lattice, not the first sentence of targets...?
 
 Re-engineer kbest/viterbi framework...
   I don't like current interface, separating weight and derivation
@@ -55,7 +47,4 @@ Support word alignment training!
       We can potentially share by modifying "intersection"
   How to encode lexical feature...?
     use grammar! (source target word mapping with features!)
-
-cicada-learn-onine with fixed oracle translation
-  Use cicada-orable to compute oracle translation + cicada to compute non-local features
   
