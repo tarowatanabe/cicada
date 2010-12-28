@@ -79,6 +79,9 @@ opt_parser = OptionParser(
     make_option("--max-height", default=4, action="store", type="int",
                 metavar="MAX_HEIGHT",help="maximum rule height"),
     
+    make_option("--ternary", default=None, action="store_true",
+                help="extract ternary rule"),
+
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
                 metavar="MAX_MALLOC", help="maximum memory for process (not thread!)"),
@@ -407,7 +410,7 @@ class ExtractSCFG(Extract):
     
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
-                 max_length=7, max_fertility=4, max_span=15, min_hole=1,
+                 max_length=7, max_fertility=4, max_span=15, min_hole=1, ternary=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
         
@@ -444,6 +447,9 @@ class ExtractSCFG(Extract):
         command += " --max-fertility %d" %(max_fertility)
         command += " --max-span %d"      %(max_span)
         command += " --min-hole %d"      %(min_hole)
+
+        if ternary:
+            command += " --ternary"
         
         command += " --max-malloc %g" %(max_malloc)
 
@@ -662,6 +668,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_fertility=options.max_fertility,
                               max_span=options.max_span,
                               min_hole=options.min_hole,
+                              ternary=options.ternary,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
     elif options.ghkm:
         extract = ExtractGHKM(toolkit=toolkit, corpus=corpus, alignment=alignment,
