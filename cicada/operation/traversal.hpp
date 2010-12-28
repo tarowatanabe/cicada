@@ -94,8 +94,10 @@ namespace cicada
 	}
 	
 	// collect features...
-	for (/**/; first != last; ++ first)
+	for (/**/; first != last; ++ first) {
+	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*first).begin(), boost::get<0>(*first).end());
 	  boost::get<1>(yield) += boost::get<1>(*first);
+	}
       }
     };
 
