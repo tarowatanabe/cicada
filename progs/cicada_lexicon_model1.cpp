@@ -185,7 +185,7 @@ int main(int argc, char ** argv)
     if (int(individual_mode) + symmetric_mode + posterior_mode == 0)
       individual_mode = true;
     
-    threads = std::max(threads, 1);
+    threads = utils::bithack::max(threads, 1);
     
     ttable_type ttable_source_target(smooth);
     ttable_type ttable_target_source(smooth);

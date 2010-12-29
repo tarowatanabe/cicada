@@ -20,6 +20,7 @@
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/random.hpp>
 
 #include <utils/alloc_vector.hpp>
 #include <utils/compress_stream.hpp>
@@ -112,8 +113,10 @@ void read_corpus(const path_type& file,
 		 word_class_count_set_type& words);
 void initial_cluster(const word_class_count_set_type& words,
 		     cluster_set_type& clusters);
+template <typename Generator>
 double cluster_words(const word_class_count_set_type& words,
 		     cluster_set_type& clusters,
+		     Generator& generator,
 		     const bool randomize=false);
 void dump_clusters(const path_type& file,
 		   const word_class_count_set_type& words,
@@ -125,7 +128,9 @@ int main(int argc, char** argv)
     if (getoptions(argc, argv) != 0) 
       return 1;
     
-    srandom(getpid() * time(0));
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
     
     word_class_count_set_type words;
     
@@ -139,7 +144,7 @@ int main(int argc, char** argv)
       std::cerr << "objective: " << likelihood_cluster(clusters) << std::endl;
 
     for (int i = 0; i < max_iteration; ++ i) {
-      const double delta = cluster_words(words, clusters, i != 0);
+      const double delta = cluster_words(words, clusters, generator, i != 0);
       
       if (debug)
 	std::cerr << "iteration: " << i 
@@ -389,8 +394,10 @@ struct Task
   }
 };
 
+template <typename Generator>
 double cluster_words(const word_class_count_set_type& words,
 		     cluster_set_type& clusters,
+		     Generator& generator,
 		     const bool randomize)
 {
   typedef uint32_t pos_type;
@@ -400,7 +407,7 @@ double cluster_words(const word_class_count_set_type& words,
   for (size_t pos = 0; pos < positions.size(); ++ pos)
     positions[pos] = pos;
   if (randomize)
-    std::random_shuffle(positions.begin(), positions.end());
+    std::random_shuffle(positions.begin(), positions.end(), generator);
   
   if (num_thread > 1) {
     // evenly split data...
