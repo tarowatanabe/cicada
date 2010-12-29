@@ -27,7 +27,7 @@ Alignment can be carried out by:
      
      In order to support word alignment training, we can learn Model1 lexicon model
      by symmetized learning [22] or posterior constrained learning [23] with smoothing
-     by variational Bayes.
+     via variational Bayes.
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].

@@ -145,10 +145,8 @@ path_type output_target_source_file = "-";
 
 int iteration = 5;
 
-bool individual_mode = false;
 bool symmetric_mode = false;
 bool posterior_mode = false;
-
 bool variational_bayes_mode = false;
 
 // parameter...
@@ -161,8 +159,9 @@ int threads = 2;
 int debug = 0;
 
 struct LearnIndividual;
+struct LearnIndividualPosterior;
 struct LearnSymmetric;
-struct LearnPosterior;
+struct LearnSymmetricPosterior;
 
 struct Maximize;
 struct MaximizeBayes;
@@ -179,31 +178,36 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(individual_mode) + symmetric_mode + posterior_mode > 1)
-      throw std::runtime_error("specify either individual|symmetric|posterior");
-    
-    if (int(individual_mode) + symmetric_mode + posterior_mode == 0)
-      individual_mode = true;
-    
     threads = utils::bithack::max(threads, 1);
     
     ttable_type ttable_source_target(smooth);
     ttable_type ttable_target_source(smooth);
 
     if (variational_bayes_mode) {
-      if (individual_mode)
-	learn<LearnIndividual, MaximizeBayes>(ttable_source_target, ttable_target_source);
-      else if (symmetric_mode)
-	learn<LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source);
-      else 
-	learn<LearnPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
+      if (symmetric_mode) {
+	if (posterior_mode)
+	  learn<LearnSymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	else
+	  learn<LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source);
+      } else {
+	if (posterior_mode)
+	  learn<LearnIndividualPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	else
+	  learn<LearnIndividual, MaximizeBayes>(ttable_source_target, ttable_target_source);
+      }
+      
     } else {
-      if (individual_mode)
-	learn<LearnIndividual, Maximize>(ttable_source_target, ttable_target_source);
-      else if (symmetric_mode)
-	learn<LearnSymmetric, Maximize>(ttable_source_target, ttable_target_source);
-      else 
-	learn<LearnPosterior, Maximize>(ttable_source_target, ttable_target_source);
+      if (symmetric_mode) {
+	if (posterior_mode)
+	  learn<LearnSymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source);
+	else
+	  learn<LearnSymmetric, Maximize>(ttable_source_target, ttable_target_source);
+      } else {
+	if (posterior_mode)
+	  learn<LearnIndividualPosterior, Maximize>(ttable_source_target, ttable_target_source);
+	else
+	  learn<LearnIndividual, Maximize>(ttable_source_target, ttable_target_source);
+      }
     }
       
     // final dumping...
@@ -516,10 +520,14 @@ struct LearnIndividual : public LearnBase
   LearnIndividual(const ttable_type& __ttable_source_target,
 		  const ttable_type& __ttable_target_source)
     : LearnBase(__ttable_source_target, __ttable_target_source) {}
-
+  
   typedef std::vector<double, std::allocator<double> > prob_set_type;
-
-  void operator()(const sentence_type& source, const sentence_type& target)
+  
+  void learn(const sentence_type& source,
+	     const sentence_type& target,
+	     const ttable_type& ttable,
+	     ttable_type& counts,
+	     double& objective)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
@@ -527,8 +535,7 @@ struct LearnIndividual : public LearnBase
     const double prob_null  = p0;
     const double prob_align = 1.0 - p0;
     
-    double logsum_source_target = 0.0;
-    double logsum_target_source = 0.0;
+    double logsum = 0.0;
     
     probs.resize(source_size + 1);
     
@@ -537,59 +544,146 @@ struct LearnIndividual : public LearnBase
       double prob_sum = 0.0;
       
       prob_set_type::iterator piter = probs.begin();
-      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+      *piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
       prob_sum += *piter;
       ++ piter;
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter) {
-	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
+	*piter = ttable(source[src], target[trg]) * prob_align * prob_align_norm;
 	prob_sum += *piter;
       }
       
-      logsum_source_target += utils::mathop::log(prob_sum);
+      logsum += utils::mathop::log(prob_sum);
       
       const double factor = 1.0 / prob_sum;
       piter = probs.begin();
-      counts_source_target[vocab_type::NONE][target[trg]] += (*piter) * factor;
+      counts[vocab_type::NONE][target[trg]] += (*piter) * factor;
       ++ piter;
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter)
-	counts_source_target[source[src]][target[trg]] += (*piter) * factor;
+	counts[source[src]][target[trg]] += (*piter) * factor;
     }
     
-    // inverse direction...
-    probs.resize(target_size + 1);
-    
-    for (size_type src = 0; src != source_size; ++ src) {
-      const double prob_align_norm = 1.0 / target_size;
-      double prob_sum = 0.0;
-      
-      prob_set_type::iterator piter = probs.begin();
-      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
-      prob_sum += *piter;
-      ++ piter;
-      
-      for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
-	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
-	prob_sum += *piter;
-      }
-      
-      logsum_target_source += utils::mathop::log(prob_sum);
-      
-      const double factor = 1.0 / prob_sum;
-      piter = probs.begin();
-      counts_target_source[vocab_type::NONE][source[src]] += (*piter) * factor;
-      ++ piter;
-      
-      for (size_type trg = 0; trg != target_size; ++ trg, ++ piter)
-	counts_target_source[target[trg]][source[src]] += (*piter) * factor;
-    }
-    
-    objective_source_target += logsum_source_target / target_size;
-    objective_target_source += logsum_target_source / source_size;
+    objective += logsum / target_size;
+  }
+  
+  void operator()(const sentence_type& source, const sentence_type& target)
+  {
+    learn(source, target, ttable_source_target, counts_source_target, objective_source_target);
+    learn(target, source, ttable_target_source, counts_target_source, objective_target_source);
   }
 
   prob_set_type probs;
+};
+
+struct LearnIndividualPosterior : public LearnBase
+{
+  LearnIndividualPosterior(const ttable_type& __ttable_source_target,
+			   const ttable_type& __ttable_target_source)
+    : LearnBase(__ttable_source_target, __ttable_target_source) {}
+
+  typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
+  typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;
+  
+  void learn(const sentence_type& source,
+	     const sentence_type& target,
+	     const ttable_type& ttable,
+	     ttable_type& counts,
+	     double& objective)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    const double prob_null  = p0;
+    const double prob_align = 1.0 - p0;
+    
+    double logsum = 0.0;
+
+    posterior.reserve(target_size + 1, source_size + 1);
+    posterior.resize(target_size + 1, source_size + 1, 0.0);
+    
+    probs.reserve(target_size + 1, source_size + 1);
+    probs.resize(target_size + 1, source_size + 1, 0.0);
+    
+    phi.clear();
+    phi.resize(source_size + 1, 0.0);
+    
+    exp_phi.clear();
+    exp_phi.resize(source_size + 1, 1.0);
+    
+    for (size_type trg = 0; trg != target_size; ++ trg) {
+      const double prob_align_norm = 1.0 / source_size;
+      double prob_sum = 0.0;
+      
+      posterior_set_type::iterator piter     = probs.begin(trg + 1);
+      posterior_set_type::iterator piter_end = probs.end(trg + 1);
+      *piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
+      prob_sum += *piter;
+      ++ piter;
+      
+      for (size_type src = 0; src != source_size; ++ src, ++ piter) {
+	*piter = ttable(source[src], target[trg]) * prob_align * prob_align_norm;
+	prob_sum += *piter;
+      }
+      
+      logsum += utils::mathop::log(prob_sum);
+      
+      const double factor = 1.0 / prob_sum;
+      piter = probs.begin(trg + 1);
+      posterior_set_type::iterator siter = posterior.begin(trg + 1);
+      for (/**/; piter != piter_end; ++ piter, ++ siter)
+	(*siter) = (*piter) * factor;
+    }
+    
+    objective += logsum / target_size;
+    
+    for (int iter = 0; iter < 5; ++ iter) {
+      // update phi.. but ignore NULL...
+      
+      bool updated = false;
+      for (int src = 1; src <= source_size; ++ src) {
+	double sum = 0.0;
+	for (int trg = 1; trg <= target_size; ++ trg)
+	  sum += posterior(trg, src);
+	
+	phi[src] += 1.0 - sum;
+	if (phi[src] > 0.0)
+	  phi[src] = 0.0;
+	
+	updated |= (phi[src] != 0.0);
+	exp_phi[src] = utils::mathop::exp(phi[src]);
+      }
+      
+      if (! updated) break;
+      
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	double sum = 0.0;
+	for (int src = 0; src <= source_size; ++ src)
+	  sum += probs(trg, src) * exp_phi[src];
+	
+	const double factor = 1.0 / sum;
+	for (int src = 0; src <= source_size; ++ src)
+	  posterior(trg, src) = probs(trg, src) * factor * exp_phi[src];
+      }
+    }
+    
+    // update...
+    for (int trg = 1; trg <= target_size; ++ trg)
+      for (int src = 0; src <= source_size; ++ src)
+	counts[src == 0 ? vocab_type::NONE : source[src - 1]][target[trg - 1]] += posterior(trg, src);
+  }
+
+  void operator()(const sentence_type& source, const sentence_type& target)
+  {
+    learn(source, target, ttable_source_target, counts_source_target, objective_source_target);
+    learn(target, source, ttable_target_source, counts_target_source, objective_target_source);
+  }
+
+  posterior_set_type posterior;
+  posterior_set_type probs;
+  
+  prob_set_type      phi;
+  prob_set_type      exp_phi;
 };
 
 struct LearnSymmetric : public LearnBase
@@ -705,10 +799,10 @@ struct LearnSymmetric : public LearnBase
   posterior_set_type posterior_target_source;
 };
 
-struct LearnPosterior : public LearnBase
+struct LearnSymmetricPosterior : public LearnBase
 {
-  LearnPosterior(const ttable_type& __ttable_source_target,
-		 const ttable_type& __ttable_target_source)
+  LearnSymmetricPosterior(const ttable_type& __ttable_source_target,
+			  const ttable_type& __ttable_target_source)
     : LearnBase(__ttable_source_target, __ttable_target_source) {}
 
   typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
@@ -810,9 +904,9 @@ struct LearnPosterior : public LearnBase
 	  const double epsi = posterior_source_target(trg, src) - posterior_target_source(src, trg);
 	  const double update = - epsi;
 	  
-	  updated |= std::fabs(update) >= 1e-20;
-	  
 	  phi(trg, src) += update;
+	  
+	  updated |= (phi(trg, src) != 0.0);
 	  exp_phi(trg, src) = utils::mathop::exp(phi(trg, src));
 	}
       
@@ -879,7 +973,6 @@ void options(int argc, char** argv)
 
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max iteration")
     
-    ("individual", po::bool_switch(&individual_mode), "individual model1 training")
     ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric model1 training")
     ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained model1 training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
