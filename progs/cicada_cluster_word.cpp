@@ -21,6 +21,7 @@
 #include <boost/program_options.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/random.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <utils/alloc_vector.hpp>
 #include <utils/compress_stream.hpp>
@@ -530,12 +531,9 @@ void dump_clusters(const path_type& file,
   
   // sri-mode classes...
   class_set_type classes(clusters.size());
-  for (int i = 0; i < clusters.size(); ++ i) {
-    std::ostringstream class_stream;
-    class_stream << "<class-" << (i+1) << ">";
-    classes[i] = class_stream.str();
-  }
-
+  for (int i = 0; i < clusters.size(); ++ i)
+    classes[i] = "<class-" + boost::lexical_cast<std::string>(i+1) + ">";
+  
   word_class_count_set_type::const_iterator witer_end = words.end();
   for (word_class_count_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer)
     os << classes[witer->cluster] << '\t' << witer->word << '\n';
