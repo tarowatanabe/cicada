@@ -165,7 +165,7 @@ struct LearnSymmetric;
 struct LearnPosterior;
 
 struct Maximize;
-struct MaximizeVB;
+struct MaximizeBayes;
 
 void dump(const path_type& path, const ttable_type& lexicon);
 template <typename Learner, typename Maximizer>
@@ -192,11 +192,11 @@ int main(int argc, char ** argv)
 
     if (variational_bayes_mode) {
       if (individual_mode)
-	learn<LearnIndividual, MaximizeVB>(ttable_source_target, ttable_target_source);
+	learn<LearnIndividual, MaximizeBayes>(ttable_source_target, ttable_target_source);
       else if (symmetric_mode)
-	learn<LearnSymmetric, MaximizeVB>(ttable_source_target, ttable_target_source);
+	learn<LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source);
       else 
-	learn<LearnPosterior, MaximizeVB>(ttable_source_target, ttable_target_source);
+	learn<LearnPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
     } else {
       if (individual_mode)
 	learn<LearnIndividual, Maximize>(ttable_source_target, ttable_target_source);
@@ -464,7 +464,7 @@ struct Maximize
   }
 };
 
-struct MaximizeVB
+struct MaximizeBayes
 {
   template <typename Counts>
   void operator()(Counts& counts)
