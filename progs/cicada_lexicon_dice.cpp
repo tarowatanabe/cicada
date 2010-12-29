@@ -2,6 +2,9 @@
 //  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <iostream>
+#include <map>
+
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
 
@@ -114,7 +117,11 @@ int main(int argc, char ** argv)
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     os.precision(10);
-
+    
+    typedef std::multimap<double, word_type, std::greater<double>, std::allocator<std::pair<const double, word_type> > > sorted_type;
+    
+    sorted_type sorted;
+    
     // dump..
     count_dict_type::const_iterator siter_begin = dict.begin();
     count_dict_type::const_iterator siter_end   = dict.end();
@@ -122,10 +129,19 @@ int main(int argc, char ** argv)
       if (*siter) {
 	const word_type source(word_type::id_type(siter - siter_begin));
 	const count_map_type& target = *(*siter);
+
+	sorted.clear();
 	
 	count_map_type::const_iterator titer_end = target.end();
-	for (count_map_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  os << titer->first << ' ' << source << ' ' <<  ((2.0 * titer->second) / (sources[source.id()] + targets[titer->first.id()])) << '\n';
+	for (count_map_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
+	  const double score = ((2.0 * titer->second) / (sources[source.id()] + targets[titer->first.id()]));
+	  
+	  sorted.insert(std::make_pair(score, titer->first));
+	}
+	
+	sorted_type::const_iterator iter_end = sorted.end();
+	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	  os << iter->second << ' ' << source << ' ' << iter->first << '\n';
       }
     
   }

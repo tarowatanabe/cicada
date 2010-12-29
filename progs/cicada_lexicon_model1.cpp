@@ -219,11 +219,24 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+struct greater_second
+{
+  template <typename Tp>
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second > y->second;
+  }
+};
 
 void dump(const path_type& path, const ttable_type& lexicon)
 {
+  typedef ttable_type::count_map_type::value_type value_type;
+  typedef std::vector<const value_type*, std::allocator<const value_type*> > sorted_type;
+
   utils::compress_ostream os(path, 1024 * 1024);
   os.precision(10);
+
+  sorted_type sorted;
   
   ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
   ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
@@ -232,10 +245,19 @@ void dump(const path_type& path, const ttable_type& lexicon)
       const word_type source(word_type::id_type(siter - siter_begin));
       const ttable_type::count_map_type& dict = *(*siter);
       
+      sorted.clear();
+      sorted.reserve(dict.size());
+      
       ttable_type::count_map_type::const_iterator titer_end = dict.end();
       for (ttable_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
 	if (titer->second >= 0.0)
-	  os << titer->first << ' ' << source << ' '  << titer->second << '\n';
+	  sorted.push_back(&(*titer));
+      
+      std::sort(sorted.begin(), sorted.end(), greater_second());
+
+      sorted_type::const_iterator iter_end = sorted.end();
+      for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
     }
 }
 
