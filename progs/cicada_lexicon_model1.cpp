@@ -6,6 +6,7 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
+#include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/alloc_vector.hpp"
@@ -206,16 +207,10 @@ int main(int argc, char ** argv)
     }
       
     // final dumping...
-    // use two threads?
     boost::thread_group workers;
     workers.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_source_target_file), boost::cref(ttable_source_target))));
     workers.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_target_source_file), boost::cref(ttable_target_source))));
     workers.join_all();
-    
-    //dump(output_source_target_file, ttable_source_target);
-    
-    //dump(output_target_source_file, ttable_target_source);
-    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -343,6 +338,8 @@ void learn(ttable_type& ttable_source_target,
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << iter << std::endl;
+
+    utils::resource accumulate_start;
     
     boost::thread_group workers_learn;
     for (size_t i = 0; i != learners.size(); ++ i)
@@ -353,7 +350,7 @@ void learn(ttable_type& ttable_source_target,
     
     bitext_type     bitext;
     bitext_set_type bitexts;
-
+    
     size_t num_bitext = 0;
     
     for (;;) {
@@ -379,13 +376,15 @@ void learn(ttable_type& ttable_source_target,
 	bitexts.clear();
       }
     }
-    
-    if (debug)
-      std::cerr << std::endl;
-    
+
     if (! bitexts.empty())
       queue.push_swap(bitexts);
     
+    if (debug && num_bitext >= 10000)
+      std::cerr << std::endl;
+    if (debug)
+      std::cerr << "# of bitexts: " << num_bitext << std::endl;
+        
     for (size_t i = 0; i != learners.size(); ++ i) {
       bitexts.clear();
       queue.push_swap(bitexts);
@@ -416,6 +415,13 @@ void learn(ttable_type& ttable_source_target,
 		<< "perplexity for P(source | target): " << objective_target_source << '\n';
     
     workers_maximize.join_all();
+    
+    utils::resource accumulate_end;
+    
+    if (debug)
+      std::cerr << "cpu time:  " << accumulate_end.cpu_time() - accumulate_start.cpu_time() << std::endl
+		<< "user time: " << accumulate_end.user_time() - accumulate_start.user_time() << std::endl;
+    
   }
 }
 
