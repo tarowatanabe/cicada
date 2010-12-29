@@ -152,7 +152,7 @@ bool variational_bayes_mode = false;
 
 // parameter...
 double p0    = 1e-4;
-double prior = 1e-4;
+double prior = 0.1;
 double smooth = 1e-20;
 
 int threads = 2;
@@ -210,12 +210,12 @@ int main(int argc, char ** argv)
     boost::thread_group workers;
     workers.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_source_target_file), boost::cref(ttable_source_target))));
     workers.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_target_source_file), boost::cref(ttable_target_source))));
+    workers.join_all();
     
     //dump(output_source_target_file, ttable_source_target);
     
     //dump(output_target_source_file, ttable_target_source);
-
-    workers.join_all();
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -228,6 +228,7 @@ int main(int argc, char ** argv)
 void dump(const path_type& path, const ttable_type& lexicon)
 {
   utils::compress_ostream os(path, 1024 * 1024);
+  os.precision(10);
   
   ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
   ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
@@ -258,7 +259,7 @@ struct TaskMaximize : public Maximizer
     ttable_type& ttable_source_target = const_cast<ttable_type&>(learners.front().ttable_source_target);
     ttable_type& ttable_target_source = const_cast<ttable_type&>(learners.front().ttable_target_source);
     
-    for (word_type::id_type source_id = id; id < ttable_source_target.size(); id += learners.size()) {
+    for (word_type::id_type source_id = id; source_id < ttable_source_target.size(); source_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i)
 	if (learners[i].counts_source_target.exists(source_id))
 	  ttable_source_target[source_id] += learners[i].counts_source_target[source_id];
@@ -267,7 +268,7 @@ struct TaskMaximize : public Maximizer
 	Maximizer::operator()(ttable_source_target[source_id]);
     }
     
-    for (word_type::id_type target_id = id; id < ttable_target_source.size(); id += learners.size()) {
+    for (word_type::id_type target_id = id; target_id < ttable_target_source.size(); target_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i)
 	if (learners[i].counts_target_source.exists(target_id))
 	  ttable_target_source[target_id] += learners[i].counts_target_source[target_id];
@@ -278,7 +279,7 @@ struct TaskMaximize : public Maximizer
   }
   
   const LearnerSet& learners;
-  int id;
+  const int id;
 };
 
 template <typename Learner>
@@ -304,6 +305,8 @@ struct TaskLearn : public Learner
   
   void operator()()
   {
+    Learner::initialize();
+
     bitext_set_type bitexts;
     
     for (;;) {
@@ -333,16 +336,15 @@ void learn(ttable_type& ttable_source_target,
   typedef std::vector<learner_type, std::allocator<learner_type> > learner_set_type;
   
   typedef TaskMaximize<learner_set_type, Maximizer> maximizer_type;
-  
 
+  queue_type       queue;
+  learner_set_type learners(threads, learner_type(queue, ttable_source_target, ttable_target_source));
+  
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << iter << std::endl;
-
-    queue_type       queue;
-    learner_set_type learners(threads, learner_type(queue, ttable_source_target, ttable_target_source));
-    boost::thread_group workers_learn;
     
+    boost::thread_group workers_learn;
     for (size_t i = 0; i != learners.size(); ++ i)
       workers_learn.add_thread(new boost::thread(boost::ref(learners[i])));
     
@@ -391,7 +393,7 @@ void learn(ttable_type& ttable_source_target,
     
     workers_learn.join_all();
     
-    // merge and normalize...! here, we can perform binary merging...
+    // merge and normalize...! 
     ttable_source_target.resize(word_type::allocated());
     ttable_target_source.resize(word_type::allocated());
     
@@ -400,7 +402,7 @@ void learn(ttable_type& ttable_source_target,
 
     double objective_source_target = 0;
     double objective_target_source = 0;
-
+    
     boost::thread_group workers_maximize;
     for (size_t i = 0; i != learners.size(); ++ i) {
       objective_source_target += learners[i].objective_source_target;
@@ -428,8 +430,9 @@ struct Maximize
       sum += iter->second;
     
     const double factor = 1.0 / sum;
-    for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter)
+    for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter) {
       iter->second *= factor;
+    }
   }
 };
 
@@ -456,11 +459,20 @@ struct LearnBase
   
   LearnBase(const ttable_type& __ttable_source_target,
 	    const ttable_type& __ttable_target_source)
-    : ttable_source_target(__ttable_target_source),
-      ttable_target_source(__ttable_source_target),
+    : ttable_source_target(__ttable_source_target),
+      ttable_target_source(__ttable_target_source),
       objective_source_target(0),
       objective_target_source(0)
   {}
+
+  void initialize()
+  {
+    counts_source_target.initialize();
+    counts_target_source.initialize();
+    
+    objective_source_target = 0.0;
+    objective_target_source = 0.0;
+  }
   
   const ttable_type& ttable_source_target;
   const ttable_type& ttable_target_source;
@@ -701,9 +713,6 @@ struct LearnPosterior : public LearnBase
     phi.resize(target_size + 1, source_size + 1, 0.0);
     exp_phi.resize(target_size + 1, source_size + 1, 1.0);
     
-    
-    
-
     double logsum_source_target = 0.0;
     double logsum_target_source = 0.0;
     
@@ -853,6 +862,7 @@ void options(int argc, char** argv)
 
     ("threads", po::value<int>(&threads), "# of threads")
     
+    ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
 
   po::store(po::parse_command_line(argc, argv, desc, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
