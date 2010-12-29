@@ -51,6 +51,7 @@ bin_PROGRAMS = \
 	cicada_learn_online \
 	cicada_learn_online_mpi \
 	cicada_lexicon_dice \
+	cicada_lexicon_model1 \
 	cicada_mert \
 	cicada_mert_mpi \
 	cicada_maxlike \
@@ -161,6 +162,9 @@ cicada_learn_online_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boo
 
 cicada_lexicon_dice_SOURCES = cicada_lexicon_dice.cpp
 cicada_lexicon_dice_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_lexicon_model1_SOURCES = cicada_lexicon_model1.cpp
+cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_SOURCES = cicada_mert.cpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

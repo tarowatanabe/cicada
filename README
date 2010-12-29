@@ -24,6 +24,9 @@ Translation can be carried out by:
 Alignment can be carried out by:
    - A lattice is composed with dictionary, generating alignment hypergraph, or
    - A hypergraph is composed with dictinary, generating alignment hypergraph [20].
+     
+     In order to support alignment training, we can learn Model1 lexicon model by symmetized learning [22]
+     or posterior constrained learning [23] with smoothing by variational Bayes.
 
 After the hypergraph generation, you can:
    - Additional features are evaluated to generate another hypergraph [4].
@@ -340,3 +343,28 @@ References:
   url       = {http://www.aclweb.org/anthology/P/P08/P08-1086}
 }
 
+[22]
+@InProceedings{liang-taskar-klein:2006:HLT-NAACL06-Main,
+  author    = {Liang, Percy  and  Taskar, Ben  and  Klein, Dan},
+  title     = {Alignment by Agreement},
+  booktitle = {Proceedings of the Human Language Technology Conference of the NAACL, Main Conference},
+  month     = {June},
+  year      = {2006},
+  address   = {New York City, USA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {104--111},
+  url       = {http://www.aclweb.org/anthology/N/N06/N06-1014}
+}
+
+[23]
+@InProceedings{ganchev-gracca-taskar:2008:ACLMain,
+  author    = {Ganchev, Kuzman  and  Gra\c{c}a, Jo\~{a}o V.  and  Taskar, Ben},
+  title     = {Better Alignments = Better Translations?},
+  booktitle = {Proceedings of ACL-08: HLT},
+  month     = {June},
+  year      = {2008},
+  address   = {Columbus, Ohio},
+  publisher = {Association for Computational Linguistics},
+  pages     = {986--993},
+  url       = {http://www.aclweb.org/anthology/P/P08/P08-1112}
+}

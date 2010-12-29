@@ -23,7 +23,6 @@
 
 #include <utils/alloc_vector.hpp>
 #include <utils/compress_stream.hpp>
-#include <utils/lockfree_queue.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/space_separator.hpp>
