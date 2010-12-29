@@ -50,7 +50,7 @@ Support word alignment training!
   
 
 Added cicada_lexicon_{model1,dice} series for alignment training
-  Support Dirichlet prior, symmetric training, non-symmetric training etc.
-    We will learn two direction in once!
-  Use threading for faster estimation.
   Do we add HMM models? Probably no, since we are primarily working with syntactic alignment
+
+Support syntactic features for alignment composed forest:
+  Basic idea is to use "target-pos" to grab target-word position + assigned sentence
