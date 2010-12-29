@@ -95,17 +95,16 @@ int main(int argc, char ** argv)
       sentence_type::const_iterator titer_end   = target.end();
 
       for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
-	if (titer->id() >= target.size())
+	if (titer->id() >= targets.size())
 	  targets.resize(titer->id() + 1, 0);
-	
 	++ targets[titer->id()];
       }
       
       for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
-	if (siter->id() >= source.size())
+	if (siter->id() >= sources.size())
 	  sources.resize(siter->id() + 1, 0);
-	
 	++ sources[siter->id()];
+	
 	for (sentence_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	  ++ dict[siter->id()][*titer];
       }
@@ -126,7 +125,7 @@ int main(int argc, char ** argv)
 	
 	count_map_type::const_iterator titer_end = target.end();
 	for (count_map_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	  os << titer->first << ' ' << source << ' ' <<  (2.0 * titer->second / (sources[source.id()] + targets[titer->first.id()])) << '\n';
+	  os << titer->first << ' ' << source << ' ' <<  ((2.0 * titer->second) / (sources[source.id()] + targets[titer->first.id()])) << '\n';
       }
     
   }
