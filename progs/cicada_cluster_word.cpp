@@ -429,6 +429,7 @@ double cluster_words(const word_class_count_set_type& words,
     
     for (size_t pos = 0; pos < words.size(); ++ pos)
       queue.push(positions[pos]);
+    
     for (int i = 0; i < num_thread; ++ i)
       queue.push(size_t(-1));
     
