@@ -16,7 +16,6 @@
 
 
 #include <boost/filesystem.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -24,8 +23,6 @@
 
 #include <utils/alloc_vector.hpp>
 #include <utils/compress_stream.hpp>
-#include <utils/sgi_hash_map.hpp>
-#include <utils/sgi_hash_set.hpp>
 #include <utils/lockfree_queue.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/simple_vector.hpp>
@@ -35,6 +32,8 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/sentence.hpp>
+
+#include <google/dense_hash_map>
 
 typedef int64_t          count_type;
 typedef int32_t          cluster_id_type;
@@ -78,19 +77,13 @@ typedef std::vector<word_class_count_type, std::allocator<word_class_count_type 
 
 struct Cluster
 {
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, 
-				  std::allocator<std::pair<const word_type, count_type> > > word_count_type;
-#else
-  typedef sgi::hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, 
-			std::allocator<std::pair<const word_type, count_type> > > word_count_type;
-#endif
-
+  typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > word_count_type;
+  
   word_count_type words;
   count_type count;
   count_type size;
   
-  Cluster() : words(), count(0), size(0) {}
+  Cluster() : words(), count(0), size(0) { words.set_empty_key(word_type()); }
 
   void clear()
   {
@@ -571,18 +564,12 @@ void initial_cluster(const word_class_count_set_type& words,
 
 struct WordCount
 {
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, 
-				  std::allocator<std::pair<const word_type, count_type> > > word_count_type;
-#else
-  typedef sgi::hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type>, 
-			std::allocator<std::pair<const word_type, count_type> > > word_count_type;
-#endif
+  typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > word_count_type;
   
   word_count_type words;
   count_type count;
   
-  WordCount() : words(), count(0) {}
+  WordCount() : words(), count(0) { words.set_empty_key(word_type()); }
 };
 
 void read_corpus(const path_type& file,
@@ -591,7 +578,7 @@ void read_corpus(const path_type& file,
   // we don't care EOS! since it is one-sided word-class...
   
   typedef WordCount word_count_type;
-  typedef std::vector<boost::shared_ptr<word_count_type>, std::allocator<boost::shared_ptr<word_count_type> > > word_count_set_type;
+  typedef utils::alloc_vector<word_count_type, std::allocator<word_count_type> > word_count_set_type;
   typedef std::multimap<const word_count_type*, word_type, greater_countp<word_count_type>, std::allocator<std::pair<const word_count_type* const, word_type> > > sorted_type;
 
   
@@ -615,12 +602,7 @@ void read_corpus(const path_type& file,
     for (sentence_type::const_iterator siter = sent.begin() + 1; siter != siter_end; ++ siter) {
       // we consider *(siter - 1) and *siter
       
-      if (siter->id() >= word_counts.size()) 
-	word_counts.resize(siter->id() + 1);
-      if (! word_counts[siter->id()])
-	word_counts[siter->id()] = boost::shared_ptr<word_count_type>(new word_count_type());
-      
-      word_count_type& word_class = *word_counts[siter->id()];
+      word_count_type& word_class = word_counts[siter->id()];
       
       ++ word_class.count;
       ++ word_class.words[(siter - 1)->id()];
