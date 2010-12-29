@@ -83,7 +83,11 @@ struct Cluster
   count_type count;
   count_type size;
   
-  Cluster() : words(), count(0), size(0) { words.set_empty_key(word_type()); }
+  Cluster() : words(), count(0), size(0)
+  {
+    words.set_empty_key(word_type());
+    words.set_deleted_key(word_type(word_type::id_type(-1)));
+  }
 
   void clear()
   {
