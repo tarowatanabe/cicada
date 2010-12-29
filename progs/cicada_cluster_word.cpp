@@ -38,7 +38,7 @@
 typedef int64_t          count_type;
 typedef int32_t          cluster_id_type;
 
-typedef cicada::Symbol     word_type;
+typedef cicada::Symbol   word_type;
 typedef cicada::Vocab    vocab_type;
 typedef cicada::Sentence sentence_type;
 
