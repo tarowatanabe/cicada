@@ -34,6 +34,7 @@ namespace cicada
 antecedent: antecedent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
+\talignment=[true|false] alignment forest mode\n\
 bleu: BLEU\n\
 \torder=<order>\n\
 \texact=[true|false] clipped ngram computation\n\
@@ -76,6 +77,7 @@ ngram: ngram language model\n\
 ngram-tree: ngram tree feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
+\talignment=[true|false] alignment forest mode\n\
 parent: parent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\

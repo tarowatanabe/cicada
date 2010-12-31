@@ -20,6 +20,7 @@ namespace cicada
 {
   namespace feature
   {
+    static const cicada::Attribute __attr_target_position("target-position");
     
     class AntecedentImpl
     {
@@ -41,7 +42,8 @@ namespace cicada
       
       typedef feature_function_type::edge_type edge_type;
 
-      typedef feature_function_type::feature_set_type feature_set_type;
+      typedef feature_function_type::feature_set_type   feature_set_type;
+      typedef feature_function_type::attribute_set_type attribute_set_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -54,7 +56,9 @@ namespace cicada
       
       AntecedentImpl()
 	: tree_map(symbol_type()),
-	  forced_feature(false) {}
+	  sentence(0),
+	  forced_feature(false),
+	  alignment_mode(false) {}
       
       
       void clear()
@@ -66,8 +70,20 @@ namespace cicada
       
       tree_map_type  tree_map;
 
+      const sentence_type* sentence;
+
       bool forced_feature;
+      bool alignment_mode;
       
+      struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
+      {
+	typedef cicada::AttributeVector attribute_set_type;
+	
+	attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -2; }
+	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -2; }
+      };
+
       void antecedent_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
 			    const edge_type& edge,
@@ -82,15 +98,32 @@ namespace cicada
 	  symbol_type prefix = vocab_type::EPSILON;
 	  symbol_type suffix = vocab_type::EPSILON;
 	  int span_size = 0;
-
-	  phrase_type::const_iterator piter_end = phrase.end();
-	  for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
-	    if (*piter != vocab_type::EPSILON) {
-	      if (prefix == vocab_type::EPSILON)
-		prefix = *piter;
-	      suffix = *piter;
-	      ++ span_size;
+	  
+	  if (alignment_mode) {
+	    attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	    if (titer == edge.attributes.end())
+	      throw std::runtime_error("we do not support non alignment forest");
+	    
+	    const int target_pos = boost::apply_visitor(__attribute_integer(), titer->second);
+	    
+	    if (sentence && target_pos >= 0) {
+	      const symbol_type& target = sentence->operator[](target_pos);
+	      
+	      prefix = target;
+	      suffix = target;
+	      span_size = 1;
 	    }
+	    
+	  } else {
+	    phrase_type::const_iterator piter_end = phrase.end();
+	    for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
+	      if (*piter != vocab_type::EPSILON) {
+		if (prefix == vocab_type::EPSILON)
+		  prefix = *piter;
+		suffix = *piter;
+		++ span_size;
+	      }
+	  }
 	  
 	  id_type*     context_tree   = reinterpret_cast<id_type*>(state);
 	  symbol_type* context_symbol = reinterpret_cast<symbol_type*>(context_tree + 1);
@@ -228,6 +261,7 @@ namespace cicada
 	throw std::runtime_error("is this really antecedent feature function? " + parameter);
 
       impl_type::normalizer_set_type normalizers;
+      bool alignment_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
@@ -237,6 +271,8 @@ namespace cicada
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
 	} else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
+	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
+	  alignment_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for antecedent: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -244,6 +280,7 @@ namespace cicada
       std::auto_ptr<impl_type> antecedent_impl(new impl_type());
       
       antecedent_impl->normalizers.swap(normalizers);
+      antecedent_impl->alignment_mode= alignment_mode;
       
       // antecedent conext + terminal-boundary + span-size
       base_type::__state_size = sizeof(impl_type::id_type) + sizeof(symbol_type) * 2 + sizeof(int);
@@ -326,6 +363,18 @@ namespace cicada
     void Antecedent::initialize()
     {
       pimpl->clear();
+    }
+
+    void Antecedent::assign(const size_type& id,
+			    const hypergraph_type& hypergraph,
+			    const lattice_type& lattice,
+			    const span_set_type& spans,
+			    const sentence_set_type& targets,
+			    const ngram_count_set_type& ngram_counts)
+    {
+      pimpl->sentence = 0;
+      if (! targets.empty())
+	pimpl->sentence = &targets.front();
     }
   };
 };
