@@ -20,6 +20,7 @@ namespace cicada
 {
   namespace feature
   {
+    static const cicada::Attribute __attr_target_position("target-position");
     
     class NGramTreeImpl
     {
@@ -40,7 +41,8 @@ namespace cicada
       
       typedef feature_function_type::edge_type edge_type;
 
-      typedef feature_function_type::feature_set_type feature_set_type;
+      typedef feature_function_type::feature_set_type   feature_set_type;
+      typedef feature_function_type::attribute_set_type attribute_set_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -66,7 +68,9 @@ namespace cicada
       
       NGramTreeImpl()
 	: tree_map(symbol_type()),
-	  forced_feature(false) {}
+	  sentence(0),
+	  forced_feature(false),
+	  alignment_mode(false) {}
       
       void clear()
       {
@@ -79,7 +83,19 @@ namespace cicada
       
       phrase_span_set_type phrase_spans_impl;
 
+      const sentence_type* sentence;
+      
       bool forced_feature;
+      bool alignment_mode;
+      
+      struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
+      {
+	typedef cicada::AttributeVector attribute_set_type;
+	
+	attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -2; }
+	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -2; }
+      };
       
       void ngram_tree_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
@@ -94,8 +110,22 @@ namespace cicada
 	  // we do not add feature here, since we know nothing abount surrounding context...
 	  symbol_type prefix = vocab_type::EPSILON;
 	  symbol_type suffix = vocab_type::EPSILON;
-	  
-	  compute_bound(phrase.begin(), phrase.end(), prefix, suffix);
+
+	  if (alignment_mode) {
+	    attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	    if (titer == edge.attributes.end())
+	      throw std::runtime_error("we do not support non alignment forest");
+	    
+	    const int target_pos = boost::apply_visitor(__attribute_integer(), titer->second);
+	    
+	    if (sentence && target_pos >= 0) {
+	      const symbol_type& target = sentence->operator[](target_pos);
+	      
+	      compute_bound(&target, (&target) + 1, prefix, suffix);
+	    }
+	      
+	  } else
+	    compute_bound(phrase.begin(), phrase.end(), prefix, suffix);
 	  
 	  id_type* context = reinterpret_cast<id_type*>(state);
 	  //context[0] = tree_id(edge.rule->lhs, tree_id(prefix, tree_map.root()));
@@ -261,6 +291,8 @@ namespace cicada
       {
 	return "ngram-tree:" +  compose_tree(node, prev, next);
       }
+
+      
     };
 
     
@@ -275,6 +307,7 @@ namespace cicada
 	throw std::runtime_error("is this really ngram tree feature function? " + parameter);
       
       impl_type::normalizer_set_type normalizers;
+      bool alignment_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
@@ -284,6 +317,8 @@ namespace cicada
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
 	} else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
+	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
+	  alignment_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -291,6 +326,7 @@ namespace cicada
       std::auto_ptr<impl_type> ngram_tree_impl(new impl_type());
 
       ngram_tree_impl->normalizers.swap(normalizers);
+      ngram_tree_impl->alignment_mode = alignment_mode;
       
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type) * 2;
@@ -372,5 +408,18 @@ namespace cicada
     {
       pimpl->clear();
     }
+    
+    void NGramTree::assign(const size_type& id,
+			   const hypergraph_type& hypergraph,
+			   const lattice_type& lattice,
+			   const span_set_type& spans,
+			   const sentence_set_type& targets,
+			   const ngram_count_set_type& ngram_counts)
+    {
+      pimpl->sentence = 0;
+      if (! targets.empty())
+	pimpl->sentence = &targets.front();
+    }
+
   };
 };

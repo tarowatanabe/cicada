@@ -412,6 +412,9 @@ namespace cicada
 	  else
 	    std::cerr << "WARNING: unsupported parameter for word-pair: " << piter->first << "=" << piter->second << std::endl;
 	}
+
+	if (normalizers_source.size() != normalizers_target.size())
+	  throw std::runtime_error("# of normalizers do not match");
 	
 	__state_size = 0;
 	__feature_name = "word-pair";
@@ -446,24 +449,24 @@ namespace cicada
 	  const feature_type feature = (static_cast<const std::string&>(feature_function.feature_name())
 					+ ':' + static_cast<const std::string&>(*riter)
 					+ ':' + static_cast<const std::string&>(target));
-
+	  
 	  features[feature] += 1.0;
 	  
 	  normalizer_set_type::const_iterator siter_end = normalizers_source.end();
-	  for (normalizer_set_type::const_iterator siter = normalizers_source.begin(); siter != siter_end; ++ siter) {
+	  normalizer_set_type::const_iterator titer_end = normalizers_target.end();
+	  normalizer_set_type::const_iterator siter = normalizers_source.begin();
+	  normalizer_set_type::const_iterator titer = normalizers_target.begin();
+	  
+	  for (/**/; siter != siter_end; ++ siter, ++ titer) {
 	    const symbol_type source_norm = siter->operator()(*riter);
+	    const symbol_type target_norm = titer->operator()(target);
 	    
-	    normalizer_set_type::const_iterator titer_end = normalizers_target.end();
-	    for (normalizer_set_type::const_iterator titer = normalizers_target.begin(); titer != titer_end; ++ titer) {
-	      const symbol_type target_norm = titer->operator()(target);
+	    if (*riter != source_norm || target != target_norm) {
+	      const feature_type feature = (static_cast<const std::string&>(feature_function.feature_name())
+					    + ':' + static_cast<const std::string&>(source_norm)
+					    + ':' + static_cast<const std::string&>(target_norm));
 	      
-	      if (*riter != source_norm || target != target_norm) {
-		const feature_type feature = (static_cast<const std::string&>(feature_function.feature_name())
-					      + ':' + static_cast<const std::string&>(source_norm)
-					      + ':' + static_cast<const std::string&>(target_norm));
-		
-		features[feature] += 1.0;
-	      }
+	      features[feature] += 1.0;
 	    }
 	  }
 	}

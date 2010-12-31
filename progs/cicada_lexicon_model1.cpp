@@ -183,38 +183,45 @@ int main(int argc, char ** argv)
     ttable_type ttable_source_target(smooth);
     ttable_type ttable_target_source(smooth);
 
-    if (variational_bayes_mode) {
-      if (symmetric_mode) {
-	if (posterior_mode)
-	  learn<LearnSymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
-	else
-	  learn<LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source);
+    if (iteration > 0) {
+      if (variational_bayes_mode) {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    learn<LearnSymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	  else
+	    learn<LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	} else {
+	  if (posterior_mode)
+	    learn<LearnIndividualPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	  else
+	    learn<LearnIndividual, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	}
+	
       } else {
-	if (posterior_mode)
-	  learn<LearnIndividualPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
-	else
-	  learn<LearnIndividual, MaximizeBayes>(ttable_source_target, ttable_target_source);
-      }
-      
-    } else {
-      if (symmetric_mode) {
-	if (posterior_mode)
-	  learn<LearnSymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source);
-	else
-	  learn<LearnSymmetric, Maximize>(ttable_source_target, ttable_target_source);
-      } else {
-	if (posterior_mode)
-	  learn<LearnIndividualPosterior, Maximize>(ttable_source_target, ttable_target_source);
-	else
-	  learn<LearnIndividual, Maximize>(ttable_source_target, ttable_target_source);
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    learn<LearnSymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source);
+	  else
+	    learn<LearnSymmetric, Maximize>(ttable_source_target, ttable_target_source);
+	} else {
+	  if (posterior_mode)
+	    learn<LearnIndividualPosterior, Maximize>(ttable_source_target, ttable_target_source);
+	  else
+	    learn<LearnIndividual, Maximize>(ttable_source_target, ttable_target_source);
+	}
       }
     }
       
     // final dumping...
-    boost::thread_group workers;
-    workers.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_source_target_file), boost::cref(ttable_source_target))));
-    workers.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_target_source_file), boost::cref(ttable_target_source))));
-    workers.join_all();
+    boost::thread_group workers_dump;
+
+    if (! output_source_target_file.empty())
+      workers_dump.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_source_target_file), boost::cref(ttable_source_target))));
+    
+    if (! output_target_source_file.empty())
+      workers_dump.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_target_source_file), boost::cref(ttable_target_source))));
+    
+    workers_dump.join_all();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
