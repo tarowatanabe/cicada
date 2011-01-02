@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include "parameter.hpp"
 #include "head_finder.hpp"

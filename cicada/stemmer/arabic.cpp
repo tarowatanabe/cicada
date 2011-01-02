@@ -1,6 +1,6 @@
 // -*- encoding: utf-8 -*-
 //
-//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #include "stemmer/arabic.hpp"

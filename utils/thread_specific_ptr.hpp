@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__THREAD_SPECIFIC_PTR__HPP__

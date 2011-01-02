@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2009-2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __UTILS__HASHMURMUR__HPP__
@@ -10,6 +10,9 @@
 #include <stdint.h>
 
 // murmurhash2 by Austin Appleby
+// All code is released to the public domain. For business purposes, Murmurhash is
+// under the MIT license. 
+//
 // we assume only POD data... but potentially optimized with template metaprogramming
 // if we know the size in advance...
 

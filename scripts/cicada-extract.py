@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+#
+#  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+#
 
 ### a wrapper script (similar to phrase-extract in moses)
 ### we support only "extraction" meaning only step 5 and 6
