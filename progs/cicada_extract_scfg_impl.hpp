@@ -1,5 +1,5 @@
 //
-//  Copyright(C) 2010 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__EXTRACT_SCFG_IMPL__HPP__
