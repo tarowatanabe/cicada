@@ -454,7 +454,7 @@ extern char *insert_line(char *, char *, FILE *);
 
 extern char **helptext[NUMPARTS + 1];
 
-static char *license = "\
+static const char *license = "\
 This software and database is being provided to you, the LICENSEE, by  \n\
 Princeton University under the following license.  By obtaining, using  \n\
 and/or copying this software and database, you agree that you have  \n\
