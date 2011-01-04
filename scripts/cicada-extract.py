@@ -2,7 +2,6 @@
 #
 #  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
-
 ### a wrapper script (similar to phrase-extract in moses)
 ### we support only "extraction" meaning only step 5 and 6
 
@@ -15,6 +14,8 @@ import os, os.path
 import string
 import re
 import subprocess
+
+from optparse import OptionParser, make_option
 
 opt_parser = OptionParser(
     option_list=[
@@ -320,7 +321,7 @@ class Corpus:
         self.source_forest = compressed_file(corpus+'.'+ff)
         self.target_forest = compressed_file(corpus+'.'+fe)
 
-class Alignemnt:
+class Alignment:
     def __init__(self, model_dir="", alignment=""):
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
@@ -646,7 +647,6 @@ if options.pbs:
 corpus = Corpus(corpus=options.corpus,
                 f=options.f,
                 e=options.e,
-                a=options.a,
                 sf=options.sf,
                 se=options.se,
                 ff=options.ff,
