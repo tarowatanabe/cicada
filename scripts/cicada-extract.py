@@ -4,6 +4,7 @@
 #
 ### a wrapper script (similar to phrase-extract in moses)
 ### we support only "extraction" meaning only step 5 and 6
+### TODO: use argparse for command-lines...?
 
 import threading
 import multiprocessing
@@ -24,17 +25,17 @@ opt_parser = OptionParser(
     make_option("--root-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="root directory for outputs"),
     make_option("--corpus-dir", default="", action="store", type="string",
-                metavar="PREFIX", help="corpus directory (default: $root_dir/corpus)"),
+                metavar="PREFIX", help="corpus directory (default: ${root_dir}/corpus)"),
     make_option("--giza-f2e", default="", action="store", type="string",
-                metavar="DIRECTORY", help="giza directory for P(f|e) (default: $root_dir/giza.$f-$e)"),
+                metavar="DIRECTORY", help="giza directory for P(f|e) (default: ${root_dir}/giza.${f}-${e})"),
     make_option("--giza-e2f", default="", action="store", type="string",
-                metavar="DIRECTORY", help="giza directory for P(e|f) (default: $root_dir/giza.$e-$f)"),
+                metavar="DIRECTORY", help="giza directory for P(e|f) (default: ${root_dir}/giza.${e}-${f})"),
     make_option("--model-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="model directory (default: $root_dir/model)"),
+                metavar="DIRECTORY", help="model directory (default: ${root_dir}/model)"),
     make_option("--alignment-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="alignment directory (default: the same as the model directory)"),
+                metavar="DIRECTORY", help="alignment directory (default: ${model_dir})"),
     make_option("--lexical-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="lexical transltion table directory (default: the same as the model directory)"),
+                metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir)"),
     
     ### source/target flags
     make_option("--f", default="F", action="store", type="string",
