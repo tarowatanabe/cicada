@@ -483,12 +483,11 @@ struct Maximize
     double sum = 0.0;
     typename Counts::iterator iter_end = counts.end();
     for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter)
-      sum += iter->second;
+      sum += iter->second + prior;
     
     const double factor = 1.0 / sum;
-    for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter) {
-      iter->second *= factor;
-    }
+    for (typename Counts::iterator iter = counts.begin(); iter != iter_end; ++ iter)
+      iter->second = (iter->second + prior) * factor;
   }
 };
 

@@ -9,7 +9,7 @@ We support various phrase/rule/tree extraction. Basically, we will run in two st
 
 You can try "cicada-extract.py" which runs like phrase-extract in Moses, but starting from step 4 (and 6).
 For details, see the last part of this document.
-Internally, cicada-extract.py call following binaries:
+Internally, cicada-extract.py calls following binaries:
 
 cicada_extract_phrase{,_mpi}
 	Extract phrase
@@ -21,7 +21,8 @@ cicada_extract_phrase{,_mpi}
 		   count(next, swap, lhs, rhs)
 
 cicada_extract_rule{,_mpi}
-	Extract synchronous-CFG + support syntax augmentation.
+	Extract synchronous-CFG + syntax augmentation (aka SAMT) when extracted with "span" data.
+	You can generate span by "cicada_filter_penntreebank"
 	Output scores:
 	       root lhs ||| root rhs ||| count(lhs, rhs)
 
