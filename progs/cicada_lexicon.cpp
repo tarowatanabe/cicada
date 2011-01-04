@@ -137,7 +137,8 @@ path_type output_target_source_file = "-";
 
 bool variational_bayes_mode = false;
 double prior = 0.1;
-bool   logprob_mode = false;
+bool inverse_mode = false;
+bool logprob_mode = false;
 
 int threads = 2;
 
@@ -313,6 +314,8 @@ struct TaskLearn
     bitext_set_type bitexts;
     aligned_type aligned_source;
     aligned_type aligned_target;
+
+    alignment_type align;
     
     for (;;) {
       bitexts.clear();
@@ -321,6 +324,15 @@ struct TaskLearn
       
       bitext_set_type::iterator biter_end = bitexts.end();
       for (bitext_set_type::iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
+	
+	if (inverse_mode) {
+	  align.clear();
+	  alignment_type::const_iterator aiter_end = biter->alignment.end();
+	  for (alignment_type::const_iterator aiter = biter->alignment.begin(); aiter != aiter_end; ++ aiter)
+	    align.push_back(std::make_pair(aiter->target, aiter->source));
+	  biter->alignment.swap(align);
+	}
+
 	std::sort(biter->alignment.begin(), biter->alignment.end());
 	
 	aligned_source.clear();
@@ -516,6 +528,7 @@ void options(int argc, char** argv)
     
     ("prior",  po::value<double>(&prior)->default_value(prior),   "Dirichlet prior for variational Bayes")
     
+    ("inverse",   po::bool_switch(&inverse_mode),                          "inverse alignment")
     ("logprob",   po::bool_switch(&logprob_mode),                          "dump in log-domain")
 
     ("threads", po::value<int>(&threads), "# of threads")
