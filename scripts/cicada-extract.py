@@ -32,9 +32,9 @@ opt_parser = OptionParser(
     make_option("--model-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="model directory (default: $root_dir/model)"),
     make_option("--alignment-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="alignment directory (default: the same as model directory)"),
+                metavar="DIRECTORY", help="alignment directory (default: the same as the model directory)"),
     make_option("--lexical-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="lexical transltion table directory (default: the same as model directory)"),
+                metavar="DIRECTORY", help="lexical transltion table directory (default: the same as the model directory)"),
     
     ### source/target flags
     make_option("--f", default="F", action="store", type="string",
@@ -94,7 +94,7 @@ opt_parser = OptionParser(
 
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
-                metavar="MALLOC", help="maximum memory in GB"),
+                metavar="MALLOC", help="maximum memory in GB (default: 8)"),
 
     # CICADA Toolkit directory
     make_option("--toolkit-dir", default="", action="store", type="string",
@@ -159,7 +159,7 @@ class PBS:
         self.tmpdir_spec = None
 
         if os.environ.has_key('TMPDIR'):
-            self.tmpdir_spec = os.environ['TMPDIR']
+            self.tmpdir = os.environ['TMPDIR']
 
         if os.environ.has_key('TMPDIR_SPEC'):
             self.tmpdir_spec = os.environ['TMPDIR_SPEC']
@@ -330,7 +330,7 @@ class Corpus:
         self.target_forest = compressed_file(corpus+'.'+fe)
 
 class Alignment:
-    def __init__(self, alignment_dir="", alignment=""):        
+    def __init__(self, alignment_dir="", alignment=""):
         self.alignment = compressed_file(os.path.join(alignment_dir, 'aligned.'+alignment))
 
         if not os.path.exists(self.alignment):
@@ -348,7 +348,11 @@ class Lexicon:
         self.source_target = compressed_file(os.path.join(lexical_dir, 'lex.f2n'))
         self.target_source = compressed_file(os.path.join(lexical_dir, 'lex.n2f'))
         self.makedirs = lexical_dir
-        
+        self.data = []
+
+        self.data.append(corpus.source)
+        self.data.append(corpus.target)
+
         command = "%s" %(toolkit.cicada_lexicon)
         
         command += " --source \"%s\"" %(corpus.source)
@@ -369,6 +373,10 @@ class Lexicon:
         self.command = command
 
     def run(self):
+        for file in self.data:
+            if not os.path.exists(file):
+                raise ValueError, "no file: " + file
+
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
         
@@ -387,22 +395,28 @@ class Extract:
         self.mpi = mpi
         self.pbs = pbs
         self.makedirs = makedirs
+        self.data = []
+        self.logfile = ""
         
         if not hasattr(self, 'command'):
             self.command = ""
         
     def run(self):
+        for file in self.data:
+            if not os.path.exists(file):
+                raise ValueError, "no file: " + file
+
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
 
         if self.mpi:
             if self.pbs:
-                self.pbs.run(command=self.command, name="extract", mpi=self.mpi, memory=self.max_malloc, logfile="extract.log")
+                self.pbs.run(command=self.command, name="extract", mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
             else:
                 self.mpi.run(self.command)
         else:
             if self.pbs:
-                self.pbs.run(command=self.command, threads=self.threads, name="extract", memory=self.max_malloc, logfile="extract.log")
+                self.pbs.run(command=self.command, threads=self.threads, name="extract", memory=self.max_malloc, logfile=self.logfile)
             else:
                 run_command(self.command)
 
@@ -417,16 +431,13 @@ class ExtractPhrase(Extract):
         
         self.counts = os.path.join(model_dir, "phrase-counts")
 
-        if not os.path.exists(corpus.source):
-            raise ValueError, "no file: " + corpus.source
-        if not os.path.exists(corpus.target):
-            raise ValueError, "no file: " + corpus.target
+        self.data.append(corpus.source)
+        self.data.append(corpus.target)
+        self.logfile = "extract-phrase.log"
         
-        prog_name = ""
+        prog_name = toolkit.cicada_extract_phrase
         if mpi:
             prog_name = toolkit.cicada_extract_phrase_mpi
-        else:
-            prog_name = toolkit.cicada_extract_phrase
         
         command = prog_name
         
@@ -461,20 +472,17 @@ class ExtractSCFG(Extract):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
         
         self.counts = os.path.join(model_dir, "scfg-counts")
-
-        if not os.path.exists(corpus.source):
-            raise ValueError, "no file: " + corpus.source
-        if not os.path.exists(corpus.target):
-            raise ValueError, "no file: " + corpus.target
+        
+        self.data.append(corpus.source)
+        self.data.append(corpus.target)
+        self.logfile = "extract-scfg.log"
         
         if os.path.exists(corpus.source_span) and os.path.exists(corpus.target_span):
             raise ValueError, "both of source/target span specified... which one?"
         
-        prog_name = ""
+        prog_name = toolkit.cicada_extract_scfg
         if mpi:
             prog_name = toolkit.cicada_extract_scfg_mpi
-        else:
-            prog_name = toolkit.cicada_extract_scfg
         
         command = prog_name
         
@@ -519,17 +527,13 @@ class ExtractGHKM(Extract):
         
         self.counts = os.path.join(model_dir, "ghkm-counts")
 
-        if not os.path.exists(corpus.target):
-            raise ValueError, "no file: " + corpus.target
-
-        if not os.path.exists(corpus.source_forest):
-            raise ValueError, "we have no forest at source side"
+        self.data.append(corpus.source_forest)
+        self.data.append(corpus.target)
+        self.logfile = "extract-ghkm.log"
         
-        prog_name = ""
+        prog_name = toolkit.cicada_extract_ghkm
         if mpi:
             prog_name = toolkit.cicada_extract_ghkm_mpi
-        else:
-            prog_name = toolkit.cicada_extract_ghkm
         
         command = prog_name
         
@@ -571,17 +575,13 @@ class ExtractTree(Extract):
         
         self.counts = os.path.join(model_dir, "tree-counts")
 
-        if not os.path.exists(corpus.source_forest):
-            raise ValueError, "we have no forest at source side"
-
-        if not os.path.exists(corpus.target_forest):
-            raise ValueError, "we have no forest at target side"
+        self.data.append(corpus.source_forest)
+        self.data.append(corpus.target_forest)
+        self.logfile = "extract-tree.log"
         
-        prog_name = ""
+        prog_name = toolkit.cicada_extract_tree
         if mpi:
             prog_name = toolkit.cicada_extract_tree_mpi
-        else:
-            prog_name = toolkit.cicada_extract_tree
         
         command = prog_name
         
@@ -637,12 +637,12 @@ class ExtractScore(Extract):
 
         if not os.path.exists(self.counts):
             raise ValueError, "no counts? %s" %(self.counts)
+
+        self.logfile = "extract-score.log"
                 
-        prog_name = ""
+        prog_name = toolkit.cicada_extract_score
         if mpi:
             prog_name = toolkit.cicada_extract_score_mpi
-        else:
-            prog_name = toolkit.cicada_extract_score
         
         command = prog_name
         
@@ -678,7 +678,7 @@ if not options.alignment_dir:
 toolkit = Toolkit(options.toolkit_dir)
 
 mpi = None
-if options.mpi_host or options.mpi_host_file or options.mpi:
+if options.mpi_host or options.mpi_host_file or options.mpi > 0:
     mpi = MPI(dir=options.mpi_dir,
               hosts=options.mpi_host,
               hosts_file=options.mpi_host_file,
