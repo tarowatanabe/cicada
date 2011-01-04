@@ -78,6 +78,13 @@ namespace cicada
 				  feature_set_type& estimates,
 				  const bool final) const;
 
+      virtual void assign(const size_type& id,
+			  const hypergraph_type& hypergraph,
+			  const lattice_type& lattice,
+			  const span_set_type& spans,
+			  const sentence_set_type& targets,
+			  const ngram_count_set_type& ngram_counts);
+
       virtual void initialize();
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Parent(*this)); }

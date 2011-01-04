@@ -86,6 +86,8 @@ parent: parent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \texclude-terminal=[true|false] exclude terminal symbol\n\
+\talignment=[true|false] alignment forest mode\n\
+\tname=feature-name-prefix(default: antecedent)\n\
 permute: permutation feature\n\
 \tweights=weight file for collapsed feature\n\
 \tcollapse=[true|false] collapsed feature\n\

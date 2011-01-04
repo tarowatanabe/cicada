@@ -44,6 +44,8 @@ namespace cicada
 	return extract(word);
       }
     };
+
+    static const cicada::Attribute __attr_target_position("target-position");
     
     class ParentImpl
     {
@@ -64,7 +66,11 @@ namespace cicada
       
       typedef feature_function_type::edge_type edge_type;
 
-      typedef feature_function_type::feature_set_type feature_set_type;
+      typedef feature_function_type::feature_set_type   feature_set_type;
+      typedef feature_function_type::attribute_set_type attribute_set_type;
+      
+      typedef feature_set_type::feature_type     feature_type;
+      typedef attribute_set_type::attribute_type attribute_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -88,7 +94,7 @@ namespace cicada
       typedef utils::simple_vector<std::string, std::allocator<std::string> > normalized_set_type;
       typedef utils::chunk_vector<normalized_set_type, 4096 /sizeof(normalized_set_type), std::allocator<normalized_set_type> > normalized_map_type;
       
-      ParentImpl() :  exclude_terminal(false), forced_feature(false) {}
+      ParentImpl() :  exclude_terminal(false), sentence(0), forced_feature(false), alignment_mode(false) {}
       
       void clear()
       {
@@ -159,8 +165,23 @@ namespace cicada
       
       string_map_type     string_map;
       normalized_map_type normalized;
+
+      feature_type feature_name_prefix;
+
+      const sentence_type* sentence;
       
       bool forced_feature;
+      bool alignment_mode;
+
+
+      struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
+      {
+	typedef cicada::AttributeVector attribute_set_type;
+	
+	attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -2; }
+	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -2; }
+      };
       
       void parent_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
@@ -172,22 +193,52 @@ namespace cicada
 	const rule_type::symbol_set_type& phrase = edge.rule->rhs;
 	
 	if (states.empty()) {
-	  const std::string rule_string  = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());
-	  const id_type     id_string    = rule_id(rule_string);
 	  
-	  apply_feature(features, rule_string);
-	  
-	  for (size_t i = 0; i != normalizers.size(); ++ i) {
-	    std::string& rule_norm = const_cast<std::string&>(normalized[id_string][i]);
+	  if (alignment_mode) {
+	    symbol_type symbol = vocab_type::EPSILON;
 	    
-	    if (rule_norm.empty())
-	      rule_norm = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<normalizer_type>(normalizers[i]));
+	    attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	    if (titer == edge.attributes.end())
+	      throw std::runtime_error("we do not support non alignment forest");
 	    
-	    if (rule_string != rule_norm)
-	      apply_feature(features, rule_norm);
+	    const int target_pos = boost::apply_visitor(__attribute_integer(), titer->second);
+	    if (sentence && target_pos >= 0)
+	      symbol = sentence->operator[](target_pos);
+	    
+	    const std::string rule_string  = extract_phrase_rule(edge.rule->lhs, &symbol, (&symbol) + 1, __extractor_none());
+	    const id_type     id_string    = rule_id(rule_string);
+	    
+	    apply_feature(features, rule_string);
+	    
+	    for (size_t i = 0; i != normalizers.size(); ++ i) {
+	      std::string& rule_norm = const_cast<std::string&>(normalized[id_string][i]);
+	      
+	      if (rule_norm.empty())
+		rule_norm = extract_phrase_rule(edge.rule->lhs, &symbol, (&symbol) + 1, __extractor<normalizer_type>(normalizers[i]));
+	      
+	      if (rule_string != rule_norm)
+		apply_feature(features, rule_norm);
+	    }
+	    
+	    *reinterpret_cast<id_type*>(state) = id_string;
+	  } else {
+	    const std::string rule_string  = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());
+	    const id_type     id_string    = rule_id(rule_string);
+	    
+	    apply_feature(features, rule_string);
+	    
+	    for (size_t i = 0; i != normalizers.size(); ++ i) {
+	      std::string& rule_norm = const_cast<std::string&>(normalized[id_string][i]);
+	      
+	      if (rule_norm.empty())
+		rule_norm = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<normalizer_type>(normalizers[i]));
+	      
+	      if (rule_string != rule_norm)
+		apply_feature(features, rule_norm);
+	    }
+	    
+	    *reinterpret_cast<id_type*>(state) = id_string;
 	  }
-	  
-	  *reinterpret_cast<id_type*>(state) = id_string;
 	} else {
 	  int pos_non_terminal = 0;
 	  phrase_type::const_iterator piter_end = phrase.end();
@@ -256,7 +307,7 @@ namespace cicada
       void apply_feature(feature_set_type& features,
 			 const std::string& rule) const
       {
-	const std::string name = "parent:" + rule;
+	const std::string name = static_cast<const std::string&>(feature_name_prefix) + ":" + rule;
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
@@ -265,7 +316,7 @@ namespace cicada
 			 const std::string& parent,
 			 const std::string& rule) const
       {
-	const std::string name = "parent:" + parent + '(' + rule + ')';
+	const std::string name = static_cast<const std::string&>(feature_name_prefix) + ":" + parent + '(' + rule + ')';
 	if (forced_feature || feature_set_type::feature_type::exists(name))
 	  features[name] += 1.0;
       }
@@ -282,7 +333,8 @@ namespace cicada
 	throw std::runtime_error("is this really parent feature function? " + parameter);
 
       impl_type::normalizer_set_type normalizers;
-      
+      std::string name;
+      bool alignment_mode = false;
       bool exclude_terminal = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -295,6 +347,10 @@ namespace cicada
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
 	else if (strcasecmp(piter->first.c_str(), "exclude-terminal") == 0)
 	  exclude_terminal = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	  name = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
+	  alignment_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for parent: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -304,10 +360,12 @@ namespace cicada
       parent_impl->normalizers.swap(normalizers);
       
       parent_impl->exclude_terminal = exclude_terminal;
+      parent_impl->alignment_mode = alignment_mode;
+      parent_impl->feature_name_prefix = (name.empty() ? std::string("parent") : name);
       
       // parent conext 
       base_type::__state_size = sizeof(impl_type::id_type);
-      base_type::__feature_name = std::string("parent");
+      base_type::__feature_name = (name.empty() ? std::string("parent") : name);
       base_type::__sparse_feature = true;
       
       pimpl = parent_impl.release();
@@ -383,5 +441,18 @@ namespace cicada
     {
       pimpl->clear();
     }
+
+    void Parent::assign(const size_type& id,
+			const hypergraph_type& hypergraph,
+			const lattice_type& lattice,
+			const span_set_type& spans,
+			const sentence_set_type& targets,
+			const ngram_count_set_type& ngram_counts)
+    {
+      pimpl->sentence = 0;
+      if (! targets.empty())
+	pimpl->sentence = &targets.front();
+    }
+    
   };
 };
