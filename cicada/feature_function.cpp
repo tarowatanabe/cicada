@@ -87,7 +87,7 @@ parent: parent feature\n\
 \tstemmer=[stemmer spec]\n\
 \texclude-terminal=[true|false] exclude terminal symbol\n\
 \talignment=[true|false] alignment forest mode\n\
-\tname=feature-name-prefix(default: antecedent)\n\
+\tname=feature-name-prefix(default: parent)\n\
 permute: permutation feature\n\
 \tweights=weight file for collapsed feature\n\
 \tcollapse=[true|false] collapsed feature\n\
