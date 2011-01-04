@@ -60,6 +60,21 @@ namespace cicada
     
     return sum;
   }
+
+
+  template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
+  inline
+  Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const FeatureVector<Tp2, Alloc2>& y)
+  {
+    typedef FeatureVector<Tp2, Alloc2> feature_vector_type;
+    
+    Tp1 sum = Tp1();
+    typename feature_vector_type::const_iterator iter_end = y.end();
+    for (typename feature_vector_type::const_iterator iter = y.begin(); iter != iter_end; ++ iter)
+      sum += x[iter->first] * iter->second;
+    
+    return sum;
+  }
   
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
   inline
