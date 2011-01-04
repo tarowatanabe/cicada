@@ -173,7 +173,7 @@ double likelihood_cluster(const cluster_set_type& clusters)
 {
   double likelihood = 0.0;
   
-  for (int i = 0; i < clusters.size(); ++ i) {
+  for (size_t i = 0; i < clusters.size(); ++ i) {
     const cluster_type& cluster = clusters[i];
     
     likelihood -= utils::mathop::log(double(cluster.count)) * cluster.count;
@@ -372,7 +372,7 @@ struct Task
       
       const double delta_remove = remove_word(word_class, clusters[cluster_from], clusters_local[cluster_from]);
       
-      for (int cluster_to = 0; cluster_to < clusters.size(); ++ cluster_to)
+      for (int cluster_to = 0; cluster_to != static_cast<int>(clusters.size()); ++ cluster_to)
 	if (cluster_from != cluster_to) {
 	  const double delta_move = move_word(word_class, clusters[cluster_to], clusters_local[cluster_to]);
 	  
@@ -424,16 +424,16 @@ double cluster_words(const word_class_count_set_type& words,
     move_set_type moves(words.size(), -1);
     
     std::vector<thread_type*, std::allocator<thread_type*> > threads(num_thread);
-    for (int i = 0; i < threads.size(); ++ i)
+    for (size_t i = 0; i != threads.size(); ++ i)
       threads[i] = new thread_type(task_type(queue, words, clusters, moves));
     
-    for (size_t pos = 0; pos < words.size(); ++ pos)
+    for (size_t pos = 0; pos != words.size(); ++ pos)
       queue.push(positions[pos]);
     
     for (int i = 0; i < num_thread; ++ i)
       queue.push(size_t(-1));
     
-    for (int i = 0; i < threads.size(); ++ i) {
+    for (size_t i = 0; i != threads.size(); ++ i) {
       threads[i]->join();
       delete threads[i];
     }
@@ -460,7 +460,7 @@ double cluster_words(const word_class_count_set_type& words,
       }
     
     if (debug >= 2)
-      for (int cluster = 0; cluster < moved.size(); ++ cluster)
+      for (size_t cluster = 0; cluster != moved.size(); ++ cluster)
 	std::cerr << "cluster: " << cluster
 		  << " size: " << clusters[cluster].size
 		  << " moved: " << moved[cluster] << std::endl;
@@ -482,7 +482,7 @@ double cluster_words(const word_class_count_set_type& words,
       
       const double delta_remove = remove_word(word_class, clusters[cluster_from]);
       
-      for (int cluster_to = 0; cluster_to < clusters.size(); ++ cluster_to)
+      for (int cluster_to = 0; cluster_to < static_cast<int>(clusters.size()); ++ cluster_to)
 	if (cluster_from != cluster_to) {
 	  const double delta_move = move_word(word_class, cluster_to, clusters[cluster_to]);
 	  
@@ -511,7 +511,7 @@ double cluster_words(const word_class_count_set_type& words,
     }
     
     if (debug >= 2)
-      for (int cluster = 0; cluster < moved.size(); ++ cluster)
+      for (size_t cluster = 0; cluster != moved.size(); ++ cluster)
 	std::cerr << "cluster: " << cluster
 		  << " size: " << clusters[cluster].size
 		  << " moved: " << moved[cluster] << std::endl;
@@ -531,7 +531,7 @@ void dump_clusters(const path_type& file,
   
   // sri-mode classes...
   class_set_type classes(clusters.size());
-  for (int i = 0; i < clusters.size(); ++ i)
+  for (size_t i = 0; i != clusters.size(); ++ i)
     classes[i] = "<class-" + boost::lexical_cast<std::string>(i+1) + ">";
   
   word_class_count_set_type::const_iterator witer_end = words.end();
