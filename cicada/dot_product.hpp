@@ -130,7 +130,7 @@ namespace cicada
     for (/**/; iter1 != iter1_end; ++ iter1)
       sum += op(iter1->second, Tp2());
     for (/**/; iter2 != iter2_end; ++ iter2)
-      sum += op(Tp2(), iter2->second);
+      sum += op(Tp1(), iter2->second);
     
     return sum;
   }
