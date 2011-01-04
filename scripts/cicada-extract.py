@@ -286,9 +286,8 @@ class Toolkit:
 	    raise ValueError, str(self.bindirs) + "  does not exist"
 	
         for binprog in ('cicada-extract.py',
-                        'cicada',              'cicada_mpi',
-                        'cicada_learn',        'cicada_learn_mpi',
-                        'cicada_learn_online', 'cicada_learn_online_mpi',
+                        ## step 3
+                        'cicada_alignment',
                         ## step 4
                         'cicada_lexicon',
                         ## step 5
