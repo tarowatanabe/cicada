@@ -283,6 +283,8 @@ class Toolkit:
                         'cicada',              'cicada_mpi',
                         'cicada_learn',        'cicada_learn_mpi',
                         'cicada_learn_online', 'cicada_learn_online_mpi',
+                        ## step 4
+                        'cicada_lexicon',
                         ## step 5
                         'cicada_extract_phrase', 'cicada_extract_phrase_mpi',
                         'cicada_extract_scfg',   'cicada_extract_scfg_mpi',
@@ -333,7 +335,12 @@ class Alignment:
         
 
 class Lexicon:
-    def __init__(self, lexical_dir=""):
+    def __init__(self, toolkit=None, corpus=None, alignment=None, lexical_dir="",
+                 threads=4, mpi=None, pbs=None,
+                 debug=None):
+        self.threads = threads
+        self.mpi = mpi
+        self.pbs = pbs
         
         if not os.path.exists(lexical_dir):
             os.makedirs(lexical_dir)
@@ -341,11 +348,29 @@ class Lexicon:
         self.source_target = compressed_file(os.path.join(lexical_dir, 'lex.f2n'))
         self.target_source = compressed_file(os.path.join(lexical_dir, 'lex.n2f'))
         
-        if not os.path.exists(self.source_target):
-            raise ValueError, "no f2n lexicon data %s" %(self.source_target)
+        command = "%s" %(toolkit.cicada_lexicon)
+        
+        command += " --source \"%s\"" %(corpus.source)
+        command += " --target \"%s\"" %(corpus.target)
+        command += " --alignment \"%s\"" %(alignment.alignment)
+        
+        command += " --output-source-target \"%s\"" %(self.source_target)
+        command += " --output-target-source \"%s\"" %(self.target_source)
+        
+        command += " --variational-bayes"
 
-        if not os.path.exists(self.target_source):
-            raise ValueError, "no n2f lexicon data %s" %(self.target_source)
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+    def run(self):
+        if self.pbs:
+            self.pbs.run(command=self.command, threads=self.threads, name="lexicon", memory=8, logfile="lexicon.log")
+        else:
+            run_command(self.command)
 
 class Extract:
     def __init__(self, max_malloc=8, threads=4, mpi=None, pbs=None):
@@ -374,7 +399,8 @@ class ExtractPhrase(Extract):
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
                  max_length=7, max_fertility=4,
-                 max_malloc=8, threads=4, mpi=None, pbs=None):
+                 max_malloc=8, threads=4, mpi=None, pbs=None,
+                 debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
         
         self.counts = os.path.join(model_dir, "phrase-counts")
@@ -418,7 +444,8 @@ class ExtractSCFG(Extract):
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
                  max_length=7, max_fertility=4, max_span=15, min_hole=1, ternary=None,
-                 max_malloc=8, threads=4, mpi=None, pbs=None):
+                 max_malloc=8, threads=4, mpi=None, pbs=None,
+                 debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
         
         self.counts = os.path.join(model_dir, "scfg-counts")
@@ -474,7 +501,8 @@ class ExtractGHKM(Extract):
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
                  non_terminal="", max_nodes=15, max_height=4,
-                 max_malloc=8, threads=4, mpi=None, pbs=None):
+                 max_malloc=8, threads=4, mpi=None, pbs=None,
+                 debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
         
         self.counts = os.path.join(model_dir, "ghkm-counts")
@@ -525,7 +553,8 @@ class ExtractTree(Extract):
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
                  max_nodes=15, max_height=4,
-                 max_malloc=8, threads=4, mpi=None, pbs=None):
+                 max_malloc=8, threads=4, mpi=None, pbs=None,
+                 debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
         
         self.counts = os.path.join(model_dir, "tree-counts")
@@ -570,7 +599,8 @@ class ExtractScore(Extract):
     def __init__(self, toolkit=None, lexicon=None,
                  model_dir="",
                  phrase=None, scfg=None, ghkm=None, tree=None,
-                 max_malloc=8, threads=4, mpi=None, pbs=None):
+                 max_malloc=8, threads=4, mpi=None, pbs=None,
+                 debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs)
         
         option = ""
@@ -652,21 +682,31 @@ corpus = Corpus(corpus=options.corpus,
                 ff=options.ff,
                 fe=options.fe)
 
+alignment = None
+lexicon = None
 
-if options.first_step <= 5 and options.last_step >= 5:
+if options.first_step <= 4 and options.last_step >= 4:
     
-    if not os.path.exists(options.model_dir):
-        os.makedirs(options.model_dir)
-
     alignment = Alignment(options.model_dir, options.alignment)
     
+    lexicon = Lexicon(toolkit=toolkit, corpus=corpus, alignment=alignment,
+                      lexical_dir=options.lexical_dir,
+                      threads=options.threads, mpi=mpi, pbs=pbs,
+                      debug=options.debug)
+
+    print "(4) generate lexical translation table started  @", time.ctime()
+    lexicon.run()
+    print "(4) generate lexical translation table finished @", time.ctime()
+
+if options.first_step <= 5 and options.last_step >= 5:    
     extract = None
     if options.phrase:
         extract = ExtractPhrase(toolkit=toolkit, corpus=corpus, alignment=alignment,
                                 model_dir=model_dir,
                                 max_length=options.max_length,
                                 max_fertility=options.max_fertility,
-                                max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+                                max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                                debug=options.debug)
     elif options.scfg:
         extract = ExtractSCFG(toolkit=toolkit, corpus=corpus, alignment=alignment,
                               model_dir=model_dir,
@@ -675,20 +715,23 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_span=options.max_span,
                               min_hole=options.min_hole,
                               ternary=options.ternary,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                              debug=options.debug)
     elif options.ghkm:
         extract = ExtractGHKM(toolkit=toolkit, corpus=corpus, alignment=alignment,
                               model_dir=model_dir,
                               non_terminal=options.non_terminal,
                               max_nodes=options.max_nodes,
                               min_height=options.min_height,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                              debug=options.debug)
     elif options.tree:
         extract = ExtractTree(toolkit=toolkit, corpus=corpus, alignment=alignment,
                               model_dir=model_dir,
                               max_nodes=options.max_nodes,
                               min_height=options.min_height,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                              debug=options.debug)
     else:
         raise ValueError, "no count type?"
 
@@ -697,16 +740,11 @@ if options.first_step <= 5 and options.last_step >= 5:
     print "(5) extract phrase table finished @", time.ctime()
 
 if options.first_step <= 6 and options.last_step >= 6:
-
-    if not os.path.exists(options.lexical_dir):
-        os.makedirs(options.lexical_dir)
-
-    lexicon = Lexicon(lexical_dir=options.lexical_dir)
-    
     score = ExtractScore(toolkit=toolkit, lexicon=lexicon,
                          model_dir=model_dir,
                          phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
-                         max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs)
+                         max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
+                         debug=options.debug)
     
     print "(6) score phrase table started @", time.ctime()
     score.run()
