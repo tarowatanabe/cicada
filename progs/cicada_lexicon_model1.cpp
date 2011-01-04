@@ -20,6 +20,7 @@
 #include <boost/thread.hpp>
 
 #include <google/dense_hash_map>
+#include <google/dense_hash_set>
 
 typedef cicada::Symbol   word_type;
 typedef cicada::Sentence sentence_type;
@@ -138,6 +139,84 @@ struct ttable_type
   double smooth;
 };
 
+struct aligned_type
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  struct aligned_map_type
+  {
+    typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > map_type;
+
+    typedef map_type::value_type      value_type;
+    typedef map_type::size_type       size_type;
+    typedef map_type::difference_type difference_type;
+    
+    typedef map_type::const_iterator const_iterator;
+    typedef map_type::iterator       iterator;
+  
+    typedef map_type::const_reference const_reference;
+    typedef map_type::reference       reference;
+
+    aligned_map_type() { aligned.set_empty_key(word_type()); }
+    
+    inline const_iterator begin() const { return aligned.begin(); }
+    inline       iterator begin()       { return aligned.begin(); }
+    inline const_iterator end() const { return aligned.end(); }
+    inline       iterator end()       { return aligned.end(); }
+    
+    inline const_iterator find(const value_type& x) const { return aligned.find(x); }
+    inline       iterator find(const value_type& x)       { return aligned.find(x); }
+    
+    std::pair<iterator, bool> insert(const value_type& x) { return aligned.insert(x); }
+    
+    size_type size() const { return aligned.size(); }
+    bool empty() const { return aligned.empty(); }
+
+    void clear() { aligned.clear(); }
+    
+    aligned_map_type& operator+=(const aligned_map_type& x)
+    {
+      const_iterator citer_end = x.aligned.end();
+      for (const_iterator citer = x.aligned.begin(); citer != citer_end; ++ citer)
+	aligned.insert(*citer);
+      
+      return *this;
+    }
+    
+    map_type aligned;
+  };
+  
+  typedef utils::alloc_vector<aligned_map_type, std::allocator<aligned_map_type> > aligned_set_type;
+  
+  aligned_map_type& operator[](const word_type& word)
+  {
+    return aligned[word.id()];
+  }
+  
+  const aligned_map_type& operator[](const word_type& word) const
+  {
+    return aligned[word.id()];
+  }
+  
+  size_type size() const { return aligned.size(); }
+  bool empty() const { return aligned.empty(); }
+  bool exists(size_type pos) const { return aligned.exists(pos); }
+  bool exists(const word_type& word) const { return aligned.exists(word.id()); }
+  
+  void resize(size_type __size) { aligned.resize(__size); }
+  void clear() { aligned.clear(); }
+
+  void initialize()
+  {
+    for (size_type i = 0; i != aligned.size(); ++ i)
+      if (aligned.exists(i))
+	aligned[i].clear();
+  }
+  
+  aligned_set_type aligned;
+};
+
 path_type source_file = "-";
 path_type target_file = "-";
 path_type output_source_target_file = "-";
@@ -169,10 +248,12 @@ struct LearnSymmetricPosterior;
 struct Maximize;
 struct MaximizeBayes;
 
-void dump(const path_type& path, const ttable_type& lexicon);
+void dump(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned);
 template <typename Learner, typename Maximizer>
 void learn(ttable_type& ttable_source_target,
-	   ttable_type& ttable_target_source);
+	   ttable_type& ttable_target_source,
+	   aligned_type& aligned_source_target,
+	   aligned_type& aligned_target_source);
 
 void options(int argc, char** argv);
 
@@ -185,32 +266,35 @@ int main(int argc, char ** argv)
     
     ttable_type ttable_source_target(smooth);
     ttable_type ttable_target_source(smooth);
+    
+    aligned_type aligned_source_target;
+    aligned_type aligned_target_source;
 
     if (iteration > 0) {
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnSymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	    learn<LearnSymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	    learn<LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnIndividualPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	    learn<LearnIndividualPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnIndividual, MaximizeBayes>(ttable_source_target, ttable_target_source);
+	    learn<LearnIndividual, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
 	
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnSymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source);
+	    learn<LearnSymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnSymmetric, Maximize>(ttable_source_target, ttable_target_source);
+	    learn<LearnSymmetric, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnIndividualPosterior, Maximize>(ttable_source_target, ttable_target_source);
+	    learn<LearnIndividualPosterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<LearnIndividual, Maximize>(ttable_source_target, ttable_target_source);
+	    learn<LearnIndividual, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
       }
     }
@@ -219,10 +303,16 @@ int main(int argc, char ** argv)
     boost::thread_group workers_dump;
 
     if (! output_source_target_file.empty())
-      workers_dump.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_source_target_file), boost::cref(ttable_source_target))));
+      workers_dump.add_thread(new boost::thread(boost::bind(dump,
+							    boost::cref(output_source_target_file),
+							    boost::cref(ttable_source_target),
+							    boost::cref(aligned_source_target))));
     
     if (! output_target_source_file.empty())
-      workers_dump.add_thread(new boost::thread(boost::bind(dump, boost::cref(output_target_source_file), boost::cref(ttable_target_source))));
+      workers_dump.add_thread(new boost::thread(boost::bind(dump,
+							    boost::cref(output_target_source_file),
+							    boost::cref(ttable_target_source),
+							    boost::cref(aligned_target_source))));
     
     workers_dump.join_all();
   }
@@ -242,7 +332,7 @@ struct greater_second
   }
 };
 
-void dump(const path_type& path, const ttable_type& lexicon)
+void dump(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned)
 {
   typedef ttable_type::count_map_type::value_type value_type;
   typedef std::vector<const value_type*, std::allocator<const value_type*> > sorted_type;
@@ -250,6 +340,7 @@ void dump(const path_type& path, const ttable_type& lexicon)
   utils::compress_ostream os(path, 1024 * 1024);
   os.precision(10);
 
+  const aligned_type::aligned_map_type __empty;
   sorted_type sorted;
   
   ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
@@ -275,16 +366,20 @@ void dump(const path_type& path, const ttable_type& lexicon)
 	const double prob_max       = sorted.front()->second;
 	const double prob_threshold = prob_max * threshold;
 	
+	const aligned_type::aligned_map_type& viterbi = (aligned.exists(source) ? aligned[source] : __empty);
+	
 	// TODO: extra checking to keep Viterbi alignemnt in the final output!
 	
 	if (logprob_mode) {
 	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end && (*iter)->second >= prob_threshold; ++ iter)
+	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	    if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
 	    os << (*iter)->first << ' ' << source << ' '  << std::log((*iter)->second) << '\n';
 	} else {
 	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end && (*iter)->second >= prob_threshold; ++ iter)
-	    os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	    if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
+	      os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
 	}
       } else {
 	if (logprob_mode) {
@@ -307,27 +402,41 @@ struct TaskMaximize : public Maximizer
   typedef ptrdiff_t difference_type;
   
   TaskMaximize(const LearnerSet& __learners,
-	       const int __id)
-    : learners(__learners), id(__id) {}
+	       const int __id,
+	       ttable_type& __ttable_source_target,
+	       ttable_type& __ttable_target_source,
+	       aligned_type& __aligned_source_target,
+	       aligned_type& __aligned_target_source)
+    : learners(__learners),
+      id(__id),
+      ttable_source_target(__ttable_source_target),
+      ttable_target_source(__ttable_target_source),
+      aligned_source_target(__aligned_source_target),
+      aligned_target_source(__aligned_target_source) {}
   
   void operator()()
   {
-    ttable_type& ttable_source_target = const_cast<ttable_type&>(learners.front().ttable_source_target);
-    ttable_type& ttable_target_source = const_cast<ttable_type&>(learners.front().ttable_target_source);
-    
     for (word_type::id_type source_id = id; source_id < ttable_source_target.size(); source_id += learners.size()) {
-      for (size_t i = 0; i != learners.size(); ++ i)
+      for (size_t i = 0; i != learners.size(); ++ i) {
 	if (learners[i].counts_source_target.exists(source_id))
 	  ttable_source_target[source_id] += learners[i].counts_source_target[source_id];
+	
+	if (learners[i].aligned_source_target.exists(source_id))
+	  aligned_source_target[source_id] += learners[i].aligned_source_target[source_id];
+      }
       
       if (ttable_source_target.exists(source_id))
 	Maximizer::operator()(ttable_source_target[source_id]);
     }
     
     for (word_type::id_type target_id = id; target_id < ttable_target_source.size(); target_id += learners.size()) {
-      for (size_t i = 0; i != learners.size(); ++ i)
+      for (size_t i = 0; i != learners.size(); ++ i) {
 	if (learners[i].counts_target_source.exists(target_id))
 	  ttable_target_source[target_id] += learners[i].counts_target_source[target_id];
+	
+	if (learners[i].aligned_target_source.exists(target_id))
+	  aligned_target_source[target_id] += learners[i].aligned_target_source[target_id];
+      }
       
       if (ttable_target_source.exists(target_id))
 	Maximizer::operator()(ttable_target_source[target_id]);
@@ -336,6 +445,12 @@ struct TaskMaximize : public Maximizer
   
   const LearnerSet& learners;
   const int id;
+
+  ttable_type& ttable_source_target;
+  ttable_type& ttable_target_source;
+  
+  aligned_type& aligned_source_target;
+  aligned_type& aligned_target_source;
 };
 
 template <typename Learner>
@@ -381,7 +496,9 @@ struct TaskLearn : public Learner
 
 template <typename Learner, typename Maximizer>
 void learn(ttable_type& ttable_source_target,
-	   ttable_type& ttable_target_source)
+	   ttable_type& ttable_target_source,
+	   aligned_type& aligned_source_target,
+	   aligned_type& aligned_target_source)
 {
   typedef TaskLearn<Learner> learner_type;
   
@@ -456,9 +573,13 @@ void learn(ttable_type& ttable_source_target,
     // merge and normalize...! 
     ttable_source_target.resize(word_type::allocated());
     ttable_target_source.resize(word_type::allocated());
+    aligned_source_target.resize(word_type::allocated());
+    aligned_target_source.resize(word_type::allocated());
     
     ttable_source_target.initialize();
     ttable_target_source.initialize();
+    aligned_source_target.initialize();
+    aligned_target_source.initialize();
 
     double objective_source_target = 0;
     double objective_target_source = 0;
@@ -468,7 +589,9 @@ void learn(ttable_type& ttable_source_target,
       objective_source_target += learners[i].objective_source_target;
       objective_target_source += learners[i].objective_target_source;
       
-      workers_maximize.add_thread(new boost::thread(maximizer_type(learners, i)));
+      workers_maximize.add_thread(new boost::thread(maximizer_type(learners, i,
+								   ttable_source_target, ttable_target_source,
+								   aligned_source_target, aligned_target_source)));
     }
     
     if (debug)
@@ -537,6 +660,9 @@ struct LearnBase
     counts_source_target.initialize();
     counts_target_source.initialize();
     
+    aligned_source_target.initialize();
+    aligned_target_source.initialize();
+    
     objective_source_target = 0.0;
     objective_target_source = 0.0;
   }
@@ -545,6 +671,9 @@ struct LearnBase
   const ttable_type& ttable_target_source;
   ttable_type counts_source_target;
   ttable_type counts_target_source;
+  
+  aligned_type aligned_source_target;
+  aligned_type aligned_target_source;
   
   double objective_source_target;
   double objective_target_source;
@@ -562,6 +691,7 @@ struct LearnIndividual : public LearnBase
 	     const sentence_type& target,
 	     const ttable_type& ttable,
 	     ttable_type& counts,
+	     aligned_type& aligned,
 	     double& objective)
   {
     const size_type source_size = source.size();
@@ -578,14 +708,24 @@ struct LearnIndividual : public LearnBase
       const double prob_align_norm = 1.0 / source_size;
       double prob_sum = 0.0;
       
+      
       prob_set_type::iterator piter = probs.begin();
       *piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
       prob_sum += *piter;
+      
+      double prob_max    = *piter;
+      word_type word_max = vocab_type::NONE;
+      
       ++ piter;
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter) {
 	*piter = ttable(source[src], target[trg]) * prob_align * prob_align_norm;
 	prob_sum += *piter;
+	
+	if (*piter > prob_max) {
+	  prob_max = *piter;
+	  word_max = source[src];
+	}
       }
       
       logsum += utils::mathop::log(prob_sum);
@@ -597,6 +737,8 @@ struct LearnIndividual : public LearnBase
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter)
 	counts[source[src]][target[trg]] += (*piter) * factor;
+      
+      aligned[word_max].insert(target[trg]);
     }
     
     objective += logsum / target_size;
@@ -604,8 +746,8 @@ struct LearnIndividual : public LearnBase
   
   void operator()(const sentence_type& source, const sentence_type& target)
   {
-    learn(source, target, ttable_source_target, counts_source_target, objective_source_target);
-    learn(target, source, ttable_target_source, counts_target_source, objective_target_source);
+    learn(source, target, ttable_source_target, counts_source_target, aligned_source_target, objective_source_target);
+    learn(target, source, ttable_target_source, counts_target_source, aligned_target_source, objective_target_source);
   }
 
   prob_set_type probs;
@@ -624,6 +766,7 @@ struct LearnIndividualPosterior : public LearnBase
 	     const sentence_type& target,
 	     const ttable_type& ttable,
 	     ttable_type& counts,
+	     aligned_type& aligned,
 	     double& objective)
   {
     const size_type source_size = source.size();
@@ -654,11 +797,20 @@ struct LearnIndividualPosterior : public LearnBase
       posterior_set_type::iterator piter_end = probs.end(trg + 1);
       *piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
       prob_sum += *piter;
+      
+      double prob_max    = *piter;
+      word_type word_max = vocab_type::NONE;
+      
       ++ piter;
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter) {
 	*piter = ttable(source[src], target[trg]) * prob_align * prob_align_norm;
 	prob_sum += *piter;
+	
+	if (*piter > prob_max) {
+	  prob_max = *piter;
+	  word_max = source[src];
+	}
       }
       
       logsum += utils::mathop::log(prob_sum);
@@ -668,6 +820,8 @@ struct LearnIndividualPosterior : public LearnBase
       posterior_set_type::iterator siter = posterior.begin(trg + 1);
       for (/**/; piter != piter_end; ++ piter, ++ siter)
 	(*siter) = (*piter) * factor;
+      
+      aligned[word_max].insert(target[trg]);
     }
     
     objective += logsum / target_size;
@@ -710,8 +864,8 @@ struct LearnIndividualPosterior : public LearnBase
 
   void operator()(const sentence_type& source, const sentence_type& target)
   {
-    learn(source, target, ttable_source_target, counts_source_target, objective_source_target);
-    learn(target, source, ttable_target_source, counts_target_source, objective_target_source);
+    learn(source, target, ttable_source_target, counts_source_target, aligned_source_target, objective_source_target);
+    learn(target, source, ttable_target_source, counts_target_source, aligned_target_source, objective_target_source);
   }
 
   posterior_set_type posterior;
@@ -763,11 +917,20 @@ struct LearnSymmetric : public LearnBase
       prob_set_type::iterator piter_end = prob_source_target.end();
       *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
       prob_sum += *piter;
+      
+      double prob_max    = *piter;
+      word_type word_max = vocab_type::NONE;
+
       ++ piter;
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter) {
 	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
 	prob_sum += *piter;
+	
+	if (*piter > prob_max) {
+	  prob_max = *piter;
+	  word_max = source[src];
+	}
       }
       
       logsum_source_target += utils::mathop::log(prob_sum);
@@ -778,6 +941,8 @@ struct LearnSymmetric : public LearnBase
       posterior_set_type::iterator siter = posterior_source_target.begin(trg + 1);
       for (/**/; piter != piter_end; ++ piter, ++ siter)
 	(*siter) = (*piter) * factor;
+      
+      aligned_source_target[word_max].insert(target[trg]);
     }
     
     for (size_type src = 0; src != source_size; ++ src) {
@@ -788,11 +953,20 @@ struct LearnSymmetric : public LearnBase
       prob_set_type::iterator piter_end = prob_target_source.end();
       *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
       prob_sum += *piter;
+      
+      double prob_max    = *piter;
+      word_type word_max = vocab_type::NONE;
+
       ++ piter;
       
       for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
 	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
 	prob_sum += *piter;
+
+	if (*piter > prob_max) {
+	  prob_max = *piter;
+	  word_max = target[trg];
+	}
       }
       
       logsum_target_source += utils::mathop::log(prob_sum);
@@ -803,6 +977,8 @@ struct LearnSymmetric : public LearnBase
       posterior_set_type::iterator titer = posterior_target_source.begin(src + 1);
       for (/**/; piter != piter_end; ++ piter, ++ titer)
 	(*titer) = (*piter) * factor;
+      
+      aligned_target_source[word_max].insert(source[src]);
     }
     
     // accumulate!
@@ -881,11 +1057,20 @@ struct LearnSymmetricPosterior : public LearnBase
       posterior_set_type::iterator piter_end = prob_source_target.end(trg + 1);
       *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
       prob_sum += *piter;
+      
+      double prob_max    = *piter;
+      word_type word_max = vocab_type::NONE;
+
       ++ piter;
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter) {
 	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
 	prob_sum += *piter;
+	
+	if (*piter > prob_max) {
+	  prob_max = *piter;
+	  word_max = source[src];
+	}
       }
       
       logsum_source_target += utils::mathop::log(prob_sum);
@@ -896,6 +1081,8 @@ struct LearnSymmetricPosterior : public LearnBase
       posterior_set_type::iterator siter = posterior_source_target.begin(trg + 1);
       for (/**/; piter != piter_end; ++ piter, ++ siter)
 	(*siter) = (*piter) * factor;
+
+      aligned_source_target[word_max].insert(target[trg]);
     }
     
     for (size_type src = 0; src != source_size; ++ src) {
@@ -906,11 +1093,20 @@ struct LearnSymmetricPosterior : public LearnBase
       posterior_set_type::iterator piter_end = prob_target_source.end(src + 1);
       *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
       prob_sum += *piter;
+      
+      double prob_max    = *piter;
+      word_type word_max = vocab_type::NONE;
+
       ++ piter;
       
       for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
 	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
 	prob_sum += *piter;
+	
+	if (*piter > prob_max) {
+	  prob_max = *piter;
+	  word_max = target[trg];
+	}
       }
       
       logsum_target_source += utils::mathop::log(prob_sum);
@@ -921,6 +1117,8 @@ struct LearnSymmetricPosterior : public LearnBase
       posterior_set_type::iterator titer = posterior_target_source.begin(src + 1);
       for (/**/; piter != piter_end; ++ piter, ++ titer)
 	(*titer) = (*piter) * factor;
+      
+      aligned_target_source[word_max].insert(source[src]);
     }
     
     // perplexity..
