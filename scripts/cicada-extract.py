@@ -61,6 +61,10 @@ opt_parser = OptionParser(
     # steps
     make_option("--first-step", default=5, action="store", type="int"),
     make_option("--last-step", default=6, action="store", type="int"),
+
+
+    ## option for lexiocn
+    make_option("--lexicon-prior", default=0.1, action="store", type="float", help="lexicon model prior")
     
     # option for extraction
     make_option("--phrase", default=None, action="store_true", help="extract phrase"),
@@ -335,7 +339,7 @@ class Alignment:
         
 
 class Lexicon:
-    def __init__(self, toolkit=None, corpus=None, alignment=None, lexical_dir="",
+    def __init__(self, toolkit=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
                  threads=4, mpi=None, pbs=None,
                  debug=None):
         self.threads = threads
@@ -358,6 +362,7 @@ class Lexicon:
         command += " --output-target-source \"%s\"" %(self.target_source)
         
         command += " --variational-bayes"
+        command += " --prior %g" %(prior)
 
         if debug:
             command += " --debug=%d" %(debug)
@@ -691,6 +696,7 @@ if options.first_step <= 4 and options.last_step >= 4:
     
     lexicon = Lexicon(toolkit=toolkit, corpus=corpus, alignment=alignment,
                       lexical_dir=options.lexical_dir,
+                      prior=options.lexicon_prior,
                       threads=options.threads, mpi=mpi, pbs=pbs,
                       debug=options.debug)
 
