@@ -31,22 +31,24 @@ opt_parser = OptionParser(
                 metavar="DIRECTORY", help="giza directory for P(e|f) (default: $root_dir/giza.$e-$f)"),
     make_option("--model-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="model directory (default: $root_dir/model)"),
+    make_option("--alignment-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="alignment directory (default: the same as model directory)"),
     make_option("--lexical-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="lexical transltion table directory (default: $root_dir/model)"),
+                metavar="DIRECTORY", help="lexical transltion table directory (default: the same as model directory)"),
     
     ### source/target flags
     make_option("--f", default="F", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French') language suffix for training corpus"),
+                metavar="SUFFIX", help="source (or 'French')  language suffix for training corpus"),
     make_option("--e", default="E", action="store", type="string",
                 metavar="SUFFIX", help="target (or 'English') language suffix for training corpus"),
     ### span...
     make_option("--sf", default="SF", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French') span suffix for training corpus"),
+                metavar="SUFFIX", help="source (or 'French')  span suffix for training corpus"),
     make_option("--se", default="SE", action="store", type="string",
                 metavar="SUFFIX", help="target (or 'English') span suffix for training corpus"),
     ### forest!
     make_option("--ff", default="SF", action="store", type="string",
-                metavar="SUFFIX", help="source (or 'French') forest suffix for training corpus"),
+                metavar="SUFFIX", help="source (or 'French')  forest suffix for training corpus"),
     make_option("--fe", default="SE", action="store", type="string",
                 metavar="SUFFIX", help="target (or 'English') forest suffix for training corpus"),
     
@@ -56,43 +58,43 @@ opt_parser = OptionParser(
 
     # alignment method
     make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
-                help="alignment methods"),
+                help="alignment methods (default: grow-diag-final-and)"),
     
     # steps
-    make_option("--first-step", default=5, action="store", type="int"),
-    make_option("--last-step", default=6, action="store", type="int"),
+    make_option("--first-step", default=5, action="store", type="int", metavar='STEP', help="first step (default: 5)"),
+    make_option("--last-step",  default=6, action="store", type="int", metavar='STEP', help="last step  (default: 6)"),
 
 
-    ## option for lexiocn
-    make_option("--lexicon-prior", default=0.1, action="store", type="float", help="lexicon model prior"),
+    ## option for lexicon
+    make_option("--lexicon-prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
     
     # option for extraction
     make_option("--phrase", default=None, action="store_true", help="extract phrase"),
     make_option("--scfg",   default=None, action="store_true", help="extract SCFG"),
-    make_option("--ghkm",   default=None, action="store_true", help="extract GHKM"),
+    make_option("--ghkm",   default=None, action="store_true", help="extract GHKM (tree-to-string)"),
     make_option("--tree",   default=None, action="store_true", help="extract tree-to-tree"),
 
-    make_option("--non-terminal", default="[x]", action="store", type="string", help="default non-terminal for GHKM rule"),
+    make_option("--non-terminal", default="[x]", action="store", type="string", help="default non-terminal for GHKM rule (default: [x])"),
     
     make_option("--max-span", default=15, action="store", type="int",
-                metavar="MAX_LENGTH", help="maximum span size"),
+                metavar="LENGTH", help="maximum span size (default: 15)"),
     make_option("--min-hole", default=1, action="store", type="int",
-                metavar="MIN_LENGTH", help="maximum hole size"),
+                metavar="LENGTH", help="minimum hole size (default: 1)"),
     make_option("--max-length", default=7, action="store", type="int",
-                metavar="MAX_LENGTH", help="maximum phrase/rule length"),
+                metavar="LENGTH", help="maximum terminal length (default: 7)"),
     make_option("--max-fertility", default=4, action="store", type="int",
-                metavar="MAX_FERTILITY",help="maximum phrase/rule fertility"),
-    make_option("--max-nodes", default=4, action="store", type="int",
-                metavar="MAX_NODES",help="maximum rule nodes"),
+                metavar="FERTILITY",help="maximum terminal fertility (default: 4)"),
+    make_option("--max-nodes", default=15, action="store", type="int",
+                metavar="NODES",help="maximum rule nodes (default: 15)"),
     make_option("--max-height", default=4, action="store", type="int",
-                metavar="MAX_HEIGHT",help="maximum rule height"),
+                metavar="HEIGHT",help="maximum rule height (default: 4)"),
     
     make_option("--ternary", default=None, action="store_true",
                 help="extract ternary rule"),
 
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
-                metavar="MAX_MALLOC", help="maximum memory for process (not thread!)"),
+                metavar="MALLOC", help="maximum memory in GB"),
 
     # CICADA Toolkit directory
     make_option("--toolkit-dir", default="", action="store", type="string",
@@ -101,22 +103,22 @@ opt_parser = OptionParser(
     make_option("--mpi-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="MPI directory"),
 
-    # perform threading or MPI training
+    # perform threading or MPI training    
+    make_option("--mpi", default=0, action="store", type="int",
+                help="# of processes for MPI-based parallel processing. Identical to --np for mpirun"),
+    make_option("--mpi-host", default="", action="store", type="string",
+                help="list of hosts to run job. Identical to --host for mpirun", metavar="HOSTS"),
+    make_option("--mpi-host-file", default="", action="store", type="string",
+                help="host list file to run job. Identical to --hostfile for mpirun", metavar="FILE"),
+    
     make_option("--threads", default=2, action="store", type="int",
                 help="# of thrads for thread-based parallel processing"),
     
     make_option("--pbs", default=None, action="store_true",
                 help="PBS for launching processes"),
     make_option("--pbs-queue", default="ltg", action="store", type="string",
-                help="PBS queue for launching processes"),
-    
-    make_option("--mpi", default=0, action="store", type="int",
-                help="# of processes for MPI-based parallel processing. Identical to --np for mpirun"),
-    make_option("--mpi-host", default="", action="store", type="string",
-                help="list of hosts to run job. Identical to --host for mpirun"),
-    make_option("--mpi-host-file", default="", action="store", type="string",
-                help="host list file to run job. Identical to --hostfile for mpirun"),
-    
+                help="PBS queue for launching processes (default: ltg)", metavar="NAME"),
+
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
     ])
@@ -328,8 +330,8 @@ class Corpus:
         self.target_forest = compressed_file(corpus+'.'+fe)
 
 class Alignment:
-    def __init__(self, model_dir="", alignment=""):        
-        self.alignment = compressed_file(os.path.join(model_dir, 'aligned.'+alignment))
+    def __init__(self, alignment_dir="", alignment=""):        
+        self.alignment = compressed_file(os.path.join(alignment_dir, 'aligned.'+alignment))
 
         if not os.path.exists(self.alignment):
             raise ValueError, "no alignment data %s" %(self.alignment)
@@ -353,8 +355,8 @@ class Lexicon:
         command += " --target \"%s\"" %(corpus.target)
         command += " --alignment \"%s\"" %(alignment.alignment)
         
-        command += " --output-source-target \"%s\"" %(self.source_target)
-        command += " --output-target-source \"%s\"" %(self.target_source)
+        command += " --output-source-target \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.f2n'))
+        command += " --output-target-source \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.n2f'))
         
         command += " --variational-bayes"
         command += " --prior %g" %(prior)
@@ -367,7 +369,6 @@ class Lexicon:
         self.command = command
 
     def run(self):
-        
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
         
@@ -376,6 +377,9 @@ class Lexicon:
         else:
             run_command(self.command)
 
+        self.source_target = compressed_file(self.source_target)
+        self.target_source = compressed_file(self.target_source)
+
 class Extract:
     def __init__(self, max_malloc=8, threads=4, mpi=None, pbs=None, makedirs=""):
         self.threads = threads
@@ -383,12 +387,11 @@ class Extract:
         self.mpi = mpi
         self.pbs = pbs
         self.makedirs = makedirs
-
+        
         if not hasattr(self, 'command'):
             self.command = ""
         
     def run(self):
-        
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
 
@@ -616,19 +619,19 @@ class ExtractScore(Extract):
         if phrase:
             self.counts = os.path.join(model_dir, "phrase-counts")
             self.scores = os.path.join(model_dir, "phrase-score")
-            option = " --phrase"
+            option = " --score-phrase"
         elif scfg:
             self.counts = os.path.join(model_dir, "scfg-counts")
             self.scores = os.path.join(model_dir, "scfg-score")
-            option = " --scfg"
+            option = " --score-scfg"
         elif ghkm:
             self.counts = os.path.join(model_dir, "ghkm-counts")
             self.scores = os.path.join(model_dir, "ghkm-score")
-            option = " --ghkm"
+            option = " --score-ghkm"
         elif tree:
             self.counts = os.path.join(model_dir, "tree-counts")
             self.scores = os.path.join(model_dir, "tree-score")
-            option = " --tree"
+            option = " --score-ghkm"
         else:
             raise ValueError, "no count type?"
 
@@ -644,7 +647,7 @@ class ExtractScore(Extract):
         command = prog_name
         
         command += " --list \"%s\"" %(self.counts)
-        command += " --output \"%s\"" %(self.counts)
+        command += " --output \"%s\"" %(self.scores)
         command += " --lexicon-source-target \"%s\"" %(lexicon.source_target)
         command += " --lexicon-target-source \"%s\"" %(lexicon.target_source)
         command += option
@@ -669,6 +672,8 @@ if not options.model_dir:
     options.model_dir = os.path.join(options.root_dir, "model")
 if not options.lexical_dir:
     options.lexical_dir = options.model_dir
+if not options.alignment_dir:
+    options.alignment_dir = options.model_dir
 
 toolkit = Toolkit(options.toolkit_dir)
 
@@ -691,7 +696,7 @@ corpus = Corpus(corpus=options.corpus,
                 ff=options.ff,
                 fe=options.fe)
 
-alignment = Alignment(options.model_dir, options.alignment)
+alignment = Alignment(options.alignment_dir, options.alignment)
 
 lexicon = Lexicon(toolkit=toolkit, corpus=corpus, alignment=alignment,
                   lexical_dir=options.lexical_dir,
