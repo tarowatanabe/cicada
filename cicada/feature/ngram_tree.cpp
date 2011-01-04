@@ -43,6 +43,9 @@ namespace cicada
 
       typedef feature_function_type::feature_set_type   feature_set_type;
       typedef feature_function_type::attribute_set_type attribute_set_type;
+
+      typedef feature_set_type::feature_type     feature_type;
+      typedef attribute_set_type::attribute_type attribute_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -82,7 +85,9 @@ namespace cicada
       tree_map_type  tree_map;
       
       phrase_span_set_type phrase_spans_impl;
-
+      
+      feature_type feature_name_prefix;
+      
       const sentence_type* sentence;
       
       bool forced_feature;
@@ -286,10 +291,10 @@ namespace cicada
       {
 	return node + '(' + prev + ")(" + next + ')';
       }
-
+      
       const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next) const
       {
-	return "ngram-tree:" +  compose_tree(node, prev, next);
+	return static_cast<const std::string&>(feature_name_prefix) + ":" +  compose_tree(node, prev, next);
       }
 
       
@@ -307,6 +312,7 @@ namespace cicada
 	throw std::runtime_error("is this really ngram tree feature function? " + parameter);
       
       impl_type::normalizer_set_type normalizers;
+      std::string name;
       bool alignment_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -317,6 +323,8 @@ namespace cicada
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
 	} else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
+	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
 	  alignment_mode = utils::lexical_cast<bool>(piter->second);
 	else
@@ -327,17 +335,18 @@ namespace cicada
 
       ngram_tree_impl->normalizers.swap(normalizers);
       ngram_tree_impl->alignment_mode = alignment_mode;
+      ngram_tree_impl->feature_name_prefix = (name.empty() ? std::string("ngram-tree") : name);
       
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type) * 2;
-      base_type::__feature_name = std::string("ngram-tree");
+      base_type::__feature_name = (name.empty() ? std::string("ngram-tree") : name);
       base_type::__sparse_feature = true;
       
       pimpl = ngram_tree_impl.release();
     }
     
     NGramTree::~NGramTree() { std::auto_ptr<impl_type> tmp(pimpl); }
-
+    
     
     NGramTree::NGramTree(const NGramTree& x)
       : base_type(static_cast<const base_type&>(x)),

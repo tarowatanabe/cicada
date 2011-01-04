@@ -21,6 +21,7 @@ namespace cicada
 {
   namespace feature
   {
+    static const cicada::Attribute __attr_target_position("target-position");
     
     class NeighboursImpl
     {
@@ -42,7 +43,11 @@ namespace cicada
       
       typedef feature_function_type::edge_type edge_type;
 
-      typedef feature_function_type::feature_set_type feature_set_type;
+      typedef feature_function_type::feature_set_type   feature_set_type;
+      typedef feature_function_type::attribute_set_type attribute_set_type;
+      
+      typedef feature_set_type::feature_type     feature_type;
+      typedef attribute_set_type::attribute_type attribute_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -90,7 +95,7 @@ namespace cicada
       
       typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
       
-      NeighboursImpl() :  forced_feature(false) {}
+      NeighboursImpl() :  sentence(0), forced_feature(false), alignment_mode(false) {}
       
       void clear()
       {
@@ -102,8 +107,22 @@ namespace cicada
       state_map_type state_map;
       
       phrase_span_set_type phrase_spans_impl;
-
+      
+      feature_type feature_name_prefix;
+      const sentence_type* sentence;
+      
       bool forced_feature;
+      bool alignment_mode;
+
+      struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
+      {
+	typedef cicada::AttributeVector attribute_set_type;
+	
+	attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -2; }
+	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -2; }
+      };
+      
       
       void neighbours_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
@@ -116,13 +135,36 @@ namespace cicada
 	
 	if (states.empty()) {
 	  // we do not add feature here, since we know nothing abount surrounding context...
-	  symbol_type prefix = vocab_type::EPSILON;
-	  symbol_type suffix = vocab_type::EPSILON;
-	  int size = count_span(phrase.begin(), phrase.end(), prefix, suffix);
 	  
-	  state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, prefix, suffix, size)).first;
-
-	  *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
+	  if (alignment_mode) {
+	    symbol_type prefix = vocab_type::EPSILON;
+	    symbol_type suffix = vocab_type::EPSILON;
+	    int size = 0;
+	    
+	    attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	    if (titer == edge.attributes.end())
+	      throw std::runtime_error("we do not support non alignment forest");
+	    
+	    const int target_pos = boost::apply_visitor(__attribute_integer(), titer->second);
+	    
+	    if (sentence && target_pos >= 0) {
+	      prefix = sentence->operator[](target_pos);
+	      suffix = sentence->operator[](target_pos);
+	      size = 1;
+	    }
+	    
+	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, prefix, suffix, size)).first;
+	    
+	    *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
+	  } else {
+	    symbol_type prefix = vocab_type::EPSILON;
+	    symbol_type suffix = vocab_type::EPSILON;
+	    int size = count_span(phrase.begin(), phrase.end(), prefix, suffix);
+	    
+	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, prefix, suffix, size)).first;
+	    
+	    *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
+	  }
 	} else {
 	  phrase_span_set_type& phrase_spans = const_cast<phrase_span_set_type&>(phrase_spans_impl);
 	  
@@ -296,7 +338,7 @@ namespace cicada
       
       const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next, const int span) const
       {
-	return "neighbours:" + node + '|' + prev + '|' + next + '|' + boost::lexical_cast<std::string>(span);
+	return (static_cast<const std::string&>(feature_name_prefix) + ":" + node + '|' + prev + '|' + next + '|' + boost::lexical_cast<std::string>(span));
       }
       
       void neighbours_final_score(const state_ptr_type& __state,
@@ -333,6 +375,8 @@ namespace cicada
 	throw std::runtime_error("is this really neighbours feature function? " + parameter);
 
       impl_type::normalizer_set_type normalizers;
+      std::string name;
+      bool alignment_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
@@ -342,6 +386,10 @@ namespace cicada
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
 	} else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
+	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	  name = piter->second;
+	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
+	  alignment_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for neighbours: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -349,10 +397,12 @@ namespace cicada
       std::auto_ptr<impl_type> neighbours_impl(new impl_type());
       
       neighbours_impl->normalizers.swap(normalizers);
+      neighbours_impl->alignment_mode = alignment_mode;
+      neighbours_impl->feature_name_prefix = (name.empty() ? std::string("neighbours") : name);
       
       // non-terminal + two neighbouring symbols + span-size
       base_type::__state_size = sizeof(impl_type::id_type);
-      base_type::__feature_name = std::string("neighbours");
+      base_type::__feature_name = (name.empty() ? std::string("neighbours") : name);
       base_type::__sparse_feature = true;
       
       pimpl = neighbours_impl.release();
@@ -429,5 +479,19 @@ namespace cicada
     {
       pimpl->clear();
     }
+
+    
+    void Neighbours::assign(const size_type& id,
+			    const hypergraph_type& hypergraph,
+			    const lattice_type& lattice,
+			    const span_set_type& spans,
+			    const sentence_set_type& targets,
+			    const ngram_count_set_type& ngram_counts)
+    {
+      pimpl->sentence = 0;
+      if (! targets.empty())
+	pimpl->sentence = &targets.front();
+    }
+
   };
 };

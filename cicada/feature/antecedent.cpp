@@ -44,6 +44,9 @@ namespace cicada
 
       typedef feature_function_type::feature_set_type   feature_set_type;
       typedef feature_function_type::attribute_set_type attribute_set_type;
+
+      typedef feature_set_type::feature_type     feature_type;
+      typedef attribute_set_type::attribute_type attribute_type;
       
       typedef feature_function_type::rule_type rule_type;
 
@@ -69,6 +72,8 @@ namespace cicada
       normalizer_set_type normalizers;
       
       tree_map_type  tree_map;
+
+      feature_type feature_name_prefix;
 
       const sentence_type* sentence;
 
@@ -245,7 +250,8 @@ namespace cicada
 				     const std::string& suffix,
 				     const int span_size) const
       {
-	return "antecedent:" + node + antecedent + '|' + prefix + '|' + suffix + '|' + boost::lexical_cast<std::string>(span_size);
+	return (static_cast<const std::string&>(feature_name_prefix) + ":"
+		+ node + antecedent + '|' + prefix + '|' + suffix + '|' + boost::lexical_cast<std::string>(span_size));
       }
     };
     
@@ -261,6 +267,7 @@ namespace cicada
 	throw std::runtime_error("is this really antecedent feature function? " + parameter);
 
       impl_type::normalizer_set_type normalizers;
+      std::string name;
       bool alignment_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -271,6 +278,8 @@ namespace cicada
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
 	} else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
+	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
 	  alignment_mode = utils::lexical_cast<bool>(piter->second);
 	else
@@ -280,11 +289,12 @@ namespace cicada
       std::auto_ptr<impl_type> antecedent_impl(new impl_type());
       
       antecedent_impl->normalizers.swap(normalizers);
-      antecedent_impl->alignment_mode= alignment_mode;
+      antecedent_impl->alignment_mode = alignment_mode;
+      antecedent_impl->feature_name_prefix = (name.empty() ? std::string("antecedent") : name);
       
       // antecedent conext + terminal-boundary + span-size
       base_type::__state_size = sizeof(impl_type::id_type) + sizeof(symbol_type) * 2 + sizeof(int);
-      base_type::__feature_name = std::string("antecedent");
+      base_type::__feature_name = (name.empty() ? std::string("antecedent") : name);
       base_type::__sparse_feature = true;
       
       pimpl = antecedent_impl.release();

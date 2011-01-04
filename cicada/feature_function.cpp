@@ -35,6 +35,7 @@ antecedent: antecedent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \talignment=[true|false] alignment forest mode\n\
+\tname=feature-name-prefix(default: antecedent)\n\
 bleu: BLEU\n\
 \torder=<order>\n\
 \texact=[true|false] clipped ngram computation\n\
@@ -66,6 +67,8 @@ lexicalized-reordering: lexicalized reordering for phrase-based\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
+\talignment=[true|false] alignment forest mode\n\
+\tname=feature-name-prefix(default: neighbours)\n\
 ngram: ngram language model\n\
 \tfile=<file>\n\
 \torder=<order>\n\
@@ -78,6 +81,7 @@ ngram-tree: ngram tree feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \talignment=[true|false] alignment forest mode\n\
+\tname=feature-name-prefix(default: ngram-tree)\n\
 parent: parent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
