@@ -152,7 +152,10 @@ bool variational_bayes_mode = false;
 // parameter...
 double p0    = 1e-4;
 double prior = 0.1;
-double smooth = 1e-20;
+double smooth = 1e-7;
+
+double threshold = 0.0;
+bool   logprob_mode = false;
 
 int threads = 2;
 
@@ -265,10 +268,33 @@ void dump(const path_type& path, const ttable_type& lexicon)
 	  sorted.push_back(&(*titer));
       
       std::sort(sorted.begin(), sorted.end(), greater_second());
-
-      sorted_type::const_iterator iter_end = sorted.end();
-      for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+      
+      if (threshold > 0.0) {
+	const double prob_max       = sorted.front()->second;
+	const double prob_threshold = prob_max * threshold;
+	
+	// TODO: extra checking to keep Viterbi alignemnt in the final output!
+	
+	if (logprob_mode) {
+	  sorted_type::const_iterator iter_end = sorted.end();
+	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end && (*iter)->second >= prob_threshold; ++ iter)
+	    os << (*iter)->first << ' ' << source << ' '  << std::log((*iter)->second) << '\n';
+	} else {
+	  sorted_type::const_iterator iter_end = sorted.end();
+	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end && (*iter)->second >= prob_threshold; ++ iter)
+	    os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+	}
+      } else {
+	if (logprob_mode) {
+	  sorted_type::const_iterator iter_end = sorted.end();
+	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	    os << (*iter)->first << ' ' << source << ' '  << std::log((*iter)->second) << '\n';
+	} else {
+	  sorted_type::const_iterator iter_end = sorted.end();
+	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	    os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+	}
+      }
     }
 }
 
@@ -648,9 +674,9 @@ struct LearnIndividualPosterior : public LearnBase
       // update phi.. but ignore NULL...
       
       bool updated = false;
-      for (int src = 1; src <= source_size; ++ src) {
+      for (size_type src = 1; src <= source_size; ++ src) {
 	double sum = 0.0;
-	for (int trg = 1; trg <= target_size; ++ trg)
+	for (size_type trg = 1; trg <= target_size; ++ trg)
 	  sum += posterior(trg, src);
 	
 	phi[src] += 1.0 - sum;
@@ -663,20 +689,20 @@ struct LearnIndividualPosterior : public LearnBase
       
       if (! updated) break;
       
-      for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type trg = 1; trg <= target_size; ++ trg) {
 	double sum = 0.0;
-	for (int src = 0; src <= source_size; ++ src)
+	for (size_type src = 0; src <= source_size; ++ src)
 	  sum += probs(trg, src) * exp_phi[src];
 	
 	const double factor = 1.0 / sum;
-	for (int src = 0; src <= source_size; ++ src)
+	for (size_type src = 0; src <= source_size; ++ src)
 	  posterior(trg, src) = probs(trg, src) * factor * exp_phi[src];
       }
     }
     
     // update...
-    for (int trg = 1; trg <= target_size; ++ trg)
-      for (int src = 0; src <= source_size; ++ src)
+    for (size_type trg = 1; trg <= target_size; ++ trg)
+      for (size_type src = 0; src <= source_size; ++ src)
 	counts[src == 0 ? vocab_type::NONE : source[src - 1]][target[trg - 1]] += posterior(trg, src);
   }
 
@@ -920,23 +946,23 @@ struct LearnSymmetricPosterior : public LearnBase
       if (! updated) break;
       
       // recompute...
-      for (int trg = 1; trg <= target_size; ++ trg) {
+      for (size_type trg = 1; trg <= target_size; ++ trg) {
 	double prob_sum = 0.0;
-	for (int src = 0; src <= source_size; ++ src)
+	for (size_type src = 0; src <= source_size; ++ src)
 	  prob_sum += prob_source_target(trg, src) * exp_phi(trg, src);
 	
 	const double factor = 1.0 / prob_sum;
-	for (int src = 0; src <= source_size; ++ src)
+	for (size_type src = 0; src <= source_size; ++ src)
 	  posterior_source_target(trg, src) = prob_source_target(trg, src) * factor *  exp_phi(trg, src);
       }
       
-      for (int src = 1; src <= source_size; ++ src) {
+      for (size_type src = 1; src <= source_size; ++ src) {
 	double prob_sum = 0.0;
-	for (int trg = 0; trg <= target_size; ++ trg)
+	for (size_type trg = 0; trg <= target_size; ++ trg)
 	  prob_sum += prob_target_source(src, trg) / exp_phi(trg, src);
 	
 	const double factor = 1.0 / prob_sum;
-	for (int trg = 0; trg <= target_size; ++ trg)
+	for (size_type trg = 0; trg <= target_size; ++ trg)
 	  posterior_target_source(src, trg) = prob_target_source(src, trg) * factor / exp_phi(trg, src);
       }
     }
@@ -986,7 +1012,10 @@ void options(int argc, char** argv)
     
     ("p0",     po::value<double>(&p0)->default_value(p0),         "parameter for NULL alignment")
     ("prior",  po::value<double>(&prior)->default_value(prior),   "Dirichlet prior for variational Bayes")
-    ("smooth", po::value<double>(&smooth)->default_value(smooth), "smoothing parameter for cutoff probability")
+    ("smooth", po::value<double>(&smooth)->default_value(smooth), "smoothing parameter for uniform distribution")
+
+    ("threshold", po::value<double>(&threshold)->default_value(threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
+    ("logprob",   po::bool_switch(&logprob_mode),                          "dump in log-domain")
 
     ("threads", po::value<int>(&threads), "# of threads")
     
