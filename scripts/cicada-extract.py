@@ -285,11 +285,9 @@ class Toolkit:
 	if not self.bindirs:
 	    raise ValueError, str(self.bindirs) + "  does not exist"
 	
-        for binprog in ('cicada-extract.py',
-                        ## step 3
-                        'cicada_alignment',
+        for binprog in ('cicada_alignment',
                         ## step 4
-                        'cicada_lexicon',
+                        'cicada_lexicon', 
                         ## step 5
                         'cicada_extract_phrase', 'cicada_extract_phrase_mpi',
                         'cicada_extract_scfg',   'cicada_extract_scfg_mpi',
