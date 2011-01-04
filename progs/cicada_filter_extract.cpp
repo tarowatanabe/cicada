@@ -81,7 +81,7 @@ int main(int argc, char** argv)
       }
       
       const double& count = phrase_pair.counts.front();
-      if (phrase_pairs.size() < nbest || count >= (-- phrase_pairs.end())->first)
+      if (static_cast<int>(phrase_pairs.size()) < nbest || count >= (-- phrase_pairs.end())->first)
 	phrase_pairs.insert(std::make_pair(count, line));
     }
     
