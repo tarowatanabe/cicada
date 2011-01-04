@@ -259,6 +259,8 @@ void dump(const path_type& path, const ttable_type& lexicon)
       const word_type source(word_type::id_type(siter - siter_begin));
       const ttable_type::count_map_type& dict = *(*siter);
       
+      if (dict.empty()) continue;
+      
       sorted.clear();
       sorted.reserve(dict.size());
       
