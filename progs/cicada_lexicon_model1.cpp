@@ -12,6 +12,7 @@
 #include <boost/fusion/adapted.hpp>
 
 #include <cicada/sentence.hpp>
+#include <cicada/alignment.hpp>
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
@@ -31,9 +32,14 @@
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
 
-typedef cicada::Symbol   word_type;
-typedef cicada::Sentence sentence_type;
-typedef cicada::Vocab    vocab_type;
+#include <set>
+
+#include "kuhn_munkres.hpp"
+
+typedef cicada::Symbol    word_type;
+typedef cicada::Sentence  sentence_type;
+typedef cicada::Alignment alignment_type;
+typedef cicada::Vocab     vocab_type;
 typedef boost::filesystem::path path_type;
 
 typedef double count_type;
@@ -230,14 +236,18 @@ path_type source_file = "-";
 path_type target_file = "-";
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
-path_type output_source_target_file = "-";
-path_type output_target_source_file = "-";
+path_type output_source_target_file;
+path_type output_target_source_file;
+path_type viterbi_source_target_file;
+path_type viterbi_target_source_file;
 
 int iteration = 5;
 
 bool symmetric_mode = false;
 bool posterior_mode = false;
 bool variational_bayes_mode = false;
+
+bool max_match_mode = false;
 
 // parameter...
 double p0    = 1e-4;
@@ -259,6 +269,9 @@ struct LearnSymmetricPosterior;
 struct Maximize;
 struct MaximizeBayes;
 
+struct Viterbi;
+struct MaxMatch;
+
 void read(const path_type& path, ttable_type& lexicon);
 void dump(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned);
 template <typename Learner, typename Maximizer>
@@ -266,6 +279,10 @@ void learn(ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source);
+
+template <typename Aligner>
+void viterbi(const ttable_type& ttable_source_target,
+	     const ttable_type& ttable_target_source);
 
 void options(int argc, char** argv);
 
@@ -327,6 +344,14 @@ int main(int argc, char ** argv)
 	}
       }
     }
+    
+    if (! viterbi_source_target_file.empty() || ! viterbi_target_source_file.empty()) {
+      if (max_match_mode)
+	viterbi<MaxMatch>(ttable_source_target, ttable_target_source);
+      else
+	viterbi<Viterbi>(ttable_source_target, ttable_target_source);
+    }
+
       
     // final dumping...
     boost::thread_group workers_dump;
@@ -676,6 +701,276 @@ void learn(ttable_type& ttable_source_target,
 		<< "user time: " << accumulate_end.user_time() - accumulate_start.user_time() << std::endl;
     
   }
+}
+
+struct ViterbiMapReduce
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  struct bitext_type
+  {
+    bitext_type() : id(size_type(-1)), source(), target(), alignment() {}
+    bitext_type(const size_type& __id, const sentence_type& __source, const sentence_type& __target)
+      : id(__id), source(__source), target(__target), alignment() {}
+    bitext_type(const size_type& __id, const sentence_type& __source, const sentence_type& __target, const alignment_type& __alignment)
+      : id(__id), source(__source), target(__target), alignment(__alignment) {}
+    
+    size_type     id;
+    sentence_type source;
+    sentence_type target;
+    alignment_type alignment;
+
+    void clear()
+    {
+      id = size_type(-1);
+      source.clear();
+      target.clear();
+      alignment.clear();
+    }
+    
+    void swap(bitext_type& x)
+    {
+      std::swap(id, x.id);
+      source.swap(x.source);
+      target.swap(x.target);
+      alignment.swap(x.alignment);
+    }
+  };
+  
+  typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_type;
+};
+
+namespace std
+{
+  inline
+  void swap(ViterbiMapReduce::bitext_type& x, ViterbiMapReduce::bitext_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+template <typename Aligner>
+struct ViterbiMapper : public ViterbiMapReduce, public Aligner
+{
+  queue_type& mapper;
+  queue_type& reducer_source_target;
+  queue_type& reducer_target_source;
+  
+  ViterbiMapper(const Aligner& __aligner, queue_type& __mapper, queue_type& __reducer_source_target, queue_type& __reducer_target_source)
+    : Aligner(__aligner),
+      mapper(__mapper),
+      reducer_source_target(__reducer_source_target),
+      reducer_target_source(__reducer_target_source)
+  {}
+
+  void operator()()
+  {
+    bitext_type bitext;
+    alignment_type alignment_source_target;
+    alignment_type alignment_target_source;
+    
+    for (;;) {
+      mapper.pop_swap(bitext);
+      if (bitext.id == size_type(-1)) break;
+      
+      alignment_source_target.clear();
+      alignment_target_source.clear();
+      
+      if (! bitext.source.empty() && ! bitext.target.empty())
+	Aligner::operator()(bitext.source, bitext.target, alignment_source_target, alignment_target_source);
+      
+      reducer_source_target.push(bitext_type(bitext.id, bitext.source, bitext.target, alignment_source_target));
+      reducer_target_source.push(bitext_type(bitext.id, bitext.target, bitext.source, alignment_target_source));
+    }
+  }
+};
+
+struct ViterbiReducer : public ViterbiMapReduce
+{
+  struct less_bitext
+  {
+    bool operator()(const bitext_type& x, const bitext_type& y) const
+    {
+      return x.id < y.id;
+    }
+  };
+  typedef std::set<bitext_type, less_bitext, std::allocator<bitext_type> > bitext_set_type;
+
+  path_type   path;
+  queue_type& queue;
+  
+  ViterbiReducer(const path_type& __path, queue_type& __queue) : path(__path), queue(__queue) {}
+
+  typedef int index_type;
+  typedef std::vector<index_type, std::allocator<index_type> > index_set_type;
+  typedef std::vector<index_set_type, std::allocator<index_set_type> > align_set_type;
+  typedef std::set<index_type, std::less<index_type>, std::allocator<index_type> > align_none_type;
+  
+  align_set_type  aligns;
+  align_none_type aligns_none;
+  
+  void dump(std::ostream& os, const bitext_type& bitext)
+  {
+    os << "# Sentence pair (" << (bitext.id + 1) << ')'
+       << " source length " << bitext.source.size()
+       << " target length " << bitext.target.size()
+       << " alignment score : " << 0 << '\n';
+    os << bitext.target << '\n';
+    
+    if (bitext.alignment.empty() || bitext.source.empty() || bitext.target.empty()) {
+      os << "NULL ({ })";
+      sentence_type::const_iterator siter_end = bitext.source.end();
+      for (sentence_type::const_iterator siter = bitext.source.begin(); siter != siter_end; ++ siter)
+	os << ' ' << *siter << " ({ })";
+      os << '\n';
+    } else {
+      aligns.clear();
+      aligns.resize(bitext.source.size());
+      
+      aligns_none.clear();
+      for (size_type trg = 0; trg != bitext.target.size(); ++ trg)
+	aligns_none.insert(trg + 1);
+      
+      alignment_type::const_iterator aiter_end = bitext.alignment.end();
+      for (alignment_type::const_iterator aiter = bitext.alignment.begin(); aiter != aiter_end; ++ aiter) {
+	aligns[aiter->source].push_back(aiter->target + 1);
+	aligns_none.erase(aiter->target + 1);
+      }
+      
+      os << "NULL";
+      os << " ({ ";
+      std::copy(aligns_none.begin(), aligns_none.end(), std::ostream_iterator<index_type>(os, " "));
+      os << "})";
+      
+      for (size_type src = 0; src != bitext.source.size(); ++ src) {
+	os << ' ' << bitext.source[src];
+	os << " ({ ";
+	std::copy(aligns[src].begin(), aligns[src].end(), std::ostream_iterator<index_type>(os, " "));
+	os << "})";
+      }
+      os << '\n';
+    }
+  }
+  
+  void operator()()
+  {
+    if (path.empty()) {
+      bitext_type bitext;
+      for (;;) {
+	queue.pop_swap(bitext);
+	if (bitext.id == size_type(-1)) break;
+      }
+    } else {
+      bitext_set_type bitexts;
+
+      const bool flush_output = (path == "-"
+			       || (boost::filesystem::exists(path)
+				   && ! boost::filesystem::is_regular_file(path)));
+      
+      utils::compress_ostream os(path, 1024 * 1024 * (! flush_output));
+      
+      size_type id = 0;
+      bitext_type bitext;
+      for (;;) {
+	queue.pop_swap(bitext);
+	if (bitext.id == size_type(-1)) break;
+	
+	if (bitext.id == id) {
+	  dump(os, bitext);
+	  ++ id;
+	} else
+	  bitexts.insert(bitext);
+	
+	while (! bitexts.empty() && bitexts.begin()->id == id) {
+	  dump(os, *bitexts.begin());
+	  bitexts.erase(bitexts.begin());
+	  ++ id;
+	}
+      }
+      
+      while (! bitexts.empty() && bitexts.begin()->id == id) {
+	dump(os, *bitexts.begin());
+	bitexts.erase(bitexts.begin());
+	++ id;
+      }
+      
+      if (! bitexts.empty())
+	throw std::runtime_error("error while dumping viterbi output?");
+    }
+  }
+};
+
+template <typename Aligner>
+void viterbi(const ttable_type& ttable_source_target,
+	     const ttable_type& ttable_target_source)
+{
+  typedef ViterbiReducer         reducer_type;
+  typedef ViterbiMapper<Aligner> mapper_type;
+  
+  typedef reducer_type::bitext_type bitext_type;
+  typedef reducer_type::queue_type  queue_type;
+  
+  typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
+  
+  queue_type queue;
+  queue_type queue_source_target;
+  queue_type queue_target_source;
+  
+  boost::thread_group mapper;
+  for (int i = 0; i != threads; ++ i)
+    mapper.add_thread(new boost::thread(mapper_type(Aligner(ttable_source_target, ttable_target_source),
+						    queue,
+						    queue_source_target,
+						    queue_target_source)));
+
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(viterbi_source_target_file, queue_source_target)));
+  reducer.add_thread(new boost::thread(reducer_type(viterbi_target_source_file, queue_target_source)));
+  
+  bitext_type bitext;
+  
+  utils::resource viterbi_start;
+  
+  utils::compress_istream is_src(source_file, 1024 * 1024);
+  utils::compress_istream is_trg(target_file, 1024 * 1024);
+  
+  for (;;) {
+    is_src >> bitext.source;
+    is_trg >> bitext.target;
+    
+    if (! is_src || ! is_trg) break;
+    
+    queue.push(bitext);
+    
+    ++ bitext.id;
+    
+    if (debug) {
+      if (bitext.id % 10000 == 0)
+	std::cerr << '.';
+      if (bitext.id % 1000000 == 0)
+	std::cerr << '\n';
+    }
+  }
+
+  if (debug && bitext.id >= 10000)
+    std::cerr << std::endl;
+  if (debug)
+    std::cerr << "# of bitexts: " << bitext.id << std::endl;
+  
+  for (int i = 0; i != threads; ++ i) {
+    bitext.clear();
+    queue.push_swap(bitext);
+  }
+
+  mapper.join_all();
+
+  bitext.clear();
+  queue_source_target.push_swap(bitext);
+  bitext.clear();
+  queue_target_source.push_swap(bitext);
+  
+  reducer.join_all();
 }
 
 struct Maximize
@@ -1258,6 +1553,214 @@ struct LearnSymmetricPosterior : public LearnBase
   posterior_set_type exp_phi;
 };
 
+struct ViterbiBase
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  ViterbiBase(const ttable_type& __ttable_source_target,
+	      const ttable_type& __ttable_target_source)
+    : ttable_source_target(__ttable_source_target),
+      ttable_target_source(__ttable_target_source)
+  {}
+  
+  const ttable_type& ttable_source_target;
+  const ttable_type& ttable_target_source;
+};
+
+
+struct Viterbi : public ViterbiBase
+{
+  Viterbi(const ttable_type& __ttable_source_target,
+	  const ttable_type& __ttable_target_source)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source) {}
+
+  void viterbi(const sentence_type& source,
+	       const sentence_type& target,
+	       const ttable_type& ttable,
+	       alignment_type& alignment)
+  {
+    alignment.clear();
+    
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    const double prob_null  = p0;
+    const double prob_align = 1.0 - p0;
+    
+    for (size_type trg = 0; trg != target_size; ++ trg) {
+      const double prob_align_norm = 1.0 / source_size;
+      
+      double prob_max = ttable(vocab_type::NONE, target[trg]) * prob_null;
+      int    align_max = -1;
+      
+      for (size_type src = 0; src != source_size; ++ src) {
+	const double prob = ttable(source[src], target[trg]) * prob_align * prob_align_norm;
+	
+	if (prob > prob_max) {
+	  prob_max = prob;
+	  align_max = src;
+	}
+      }
+      
+      if (align_max >= 0)
+	alignment.push_back(std::make_pair(align_max, static_cast<int>(trg)));
+    }
+  }
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    viterbi(source, target, ttable_source_target, alignment_source_target);
+    viterbi(target, source, ttable_target_source, alignment_target_source);
+  }
+};
+
+struct MaxMatch : public ViterbiBase
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+
+  MaxMatch(const ttable_type& __ttable_source_target,
+	   const ttable_type& __ttable_target_source)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source) {}
+  
+  class insert_align
+  {
+    int source_size;
+    int target_size;
+    
+    alignment_type& alignment_source_target;
+    alignment_type& alignment_target_source;
+    
+  public:
+    insert_align(const int& _source_size,
+		 const int& _target_size,
+		 alignment_type& __alignment_source_target,
+		 alignment_type& __alignment_target_source)
+      : source_size(_source_size), target_size(_target_size),
+	alignment_source_target(__alignment_source_target),
+	alignment_target_source(__alignment_target_source) {}
+    
+    template <typename Edge>
+    insert_align& operator=(const Edge& edge)
+    {	
+      if (edge.first < source_size && edge.second < target_size) {
+	alignment_source_target.push_back(edge);
+	alignment_target_source.push_back(std::make_pair(edge.second, edge.first));
+      }
+      
+      return *this;
+    }
+    
+    insert_align& operator*() { return *this; }
+    insert_align& operator++() { return *this; }
+    insert_align operator++(int) { return *this; }
+  };
+  
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    const double prob_null  = p0;
+    const double prob_align = 1.0 - p0;
+    
+    // we do not have to clearn!
+    posterior_source_target.reserve(target_size + 1, source_size + 1);
+    posterior_target_source.reserve(source_size + 1, target_size + 1);
+    
+    posterior_source_target.resize(target_size + 1, source_size + 1);
+    posterior_target_source.resize(source_size + 1, target_size + 1);
+    
+    prob_source_target.reserve(source_size + 1);
+    prob_target_source.reserve(target_size + 1);
+    
+    prob_source_target.resize(source_size + 1);
+    prob_target_source.resize(target_size + 1);
+    
+    for (size_type trg = 0; trg != target_size; ++ trg) {
+      const double prob_align_norm = 1.0 / source_size;
+      double prob_sum = 0.0;
+      
+      prob_set_type::iterator piter     = prob_source_target.begin();
+      prob_set_type::iterator piter_end = prob_source_target.end();
+      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+      prob_sum += *piter;
+      ++ piter;
+      
+      for (size_type src = 0; src != source_size; ++ src, ++ piter) {
+	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
+	prob_sum += *piter;
+      }
+      
+      const double factor = 1.0 / prob_sum;
+      
+      piter = prob_source_target.begin();
+      posterior_set_type::iterator siter = posterior_source_target.begin(trg + 1);
+      for (/**/; piter != piter_end; ++ piter, ++ siter)
+	(*siter) = (*piter) * factor;
+    }
+    
+    for (size_type src = 0; src != source_size; ++ src) {
+      const double prob_align_norm = 1.0 / target_size;
+      double prob_sum = 0.0;
+      
+      prob_set_type::iterator piter     = prob_target_source.begin();
+      prob_set_type::iterator piter_end = prob_target_source.end();
+      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+      prob_sum += *piter;
+      ++ piter;
+      
+      for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
+	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
+	prob_sum += *piter;
+      }
+      
+      const double factor = 1.0 / prob_sum;
+      
+      piter = prob_target_source.begin();
+      posterior_set_type::iterator titer = posterior_target_source.begin(src + 1);
+      for (/**/; piter != piter_end; ++ piter, ++ titer)
+	(*titer) = (*piter) * factor;
+    }
+    
+    costs.clear();
+    costs.resize(source_size + target_size, target_size + source_size, 0.0);
+    
+    for (size_type src = 0; src != source_size; ++ src)
+      for (size_type trg = 0; trg != target_size; ++ trg) {
+	costs(src, trg) = 0.5 * (utils::mathop::log(posterior_source_target(trg + 1, src + 1))
+				 + utils::mathop::log(posterior_target_source(src + 1, trg + 1)));
+	
+	costs(src, trg + source_size) = utils::mathop::log(posterior_target_source(src + 1, 0));
+	costs(src + target_size, trg) = utils::mathop::log(posterior_source_target(trg + 1, 0));
+      }
+    
+    alignment_source_target.clear();
+    alignment_target_source.clear();
+    
+    kuhn_munkres_assignment(costs, insert_align(source_size, target_size, alignment_source_target, alignment_target_source));
+    
+    std::sort(alignment_source_target.begin(), alignment_source_target.end());
+    std::sort(alignment_target_source.begin(), alignment_target_source.end());
+  }
+  
+  matrix_type costs;
+
+  prob_set_type      prob_source_target;
+  prob_set_type      prob_target_source;
+  posterior_set_type posterior_source_target;
+  posterior_set_type posterior_target_source;
+};
+
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
@@ -1272,14 +1775,19 @@ void options(int argc, char** argv)
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
     
-    ("output-source-target", po::value<path_type>(&output_source_target_file), "output for P(target | source)")
-    ("output-target-source", po::value<path_type>(&output_target_source_file), "output for P(source | target)")
+    ("output-source-target", po::value<path_type>(&output_source_target_file), "lexicon model output for P(target | source)")
+    ("output-target-source", po::value<path_type>(&output_target_source_file), "lexicon model output for P(source | target)")
+    
+    ("viterbi-source-target", po::value<path_type>(&viterbi_source_target_file), "viterbi for P(target | source)")
+    ("viterbi-target-source", po::value<path_type>(&viterbi_target_source_file), "viterbi for P(source | target)")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max iteration")
     
     ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric model1 training")
     ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained model1 training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
+    
+    ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
     
     ("p0",     po::value<double>(&p0)->default_value(p0),         "parameter for NULL alignment")
     ("prior",  po::value<double>(&prior)->default_value(prior),   "Dirichlet prior for variational Bayes")
