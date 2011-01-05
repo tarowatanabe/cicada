@@ -118,6 +118,7 @@ bool final_mode = false;
 bool diag_mode = false;
 bool final_and_mode = false;
 bool invert_mode = false;
+bool moses_mode = false;
 
 double prob_null         = 0.01;
 double prob_union        = 0.5;
@@ -251,8 +252,7 @@ struct Invert
 struct SourceTarget
 {
   template <typename Alignment>
-  void operator()(const bitext_giza_type& bitext,
-		  Alignment& align)
+  void operator()(const bitext_giza_type& bitext, Alignment& align)
   {
     for (int src = 1; src < static_cast<int>(bitext.source.size()); ++ src) {
       const bitext_giza_type::point_set_type& aligns = bitext.source[src].second;
@@ -267,8 +267,7 @@ struct SourceTarget
 struct TargetSource
 {
   template <typename Alignment>
-  void operator()(const bitext_giza_type& bitext,
-		  Alignment& align)
+  void operator()(const bitext_giza_type& bitext, Alignment& align)
   {
     for (int src = 1; src < static_cast<int>(bitext.source.size()); ++ src) {
       const bitext_giza_type::point_set_type& aligns = bitext.source[src].second;
@@ -852,6 +851,8 @@ void options(int argc, char** argv)
     ("final",        po::bool_switch(&final_mode),        "final")
     ("final-and",    po::bool_switch(&final_and_mode),    "final-and")
     ("invert",       po::bool_switch(&invert_mode),       "invert alignment")
+
+    ("moses", po::bool_switch(&moses_mode), "moses alignment (not GIZA++ alignment)")
 
     ("prob-null",         po::value<double>(&prob_null),         "NULL probability")
     ("prob-union",        po::value<double>(&prob_union),        "union probability")
