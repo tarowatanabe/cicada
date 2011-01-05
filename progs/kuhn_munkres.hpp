@@ -47,8 +47,8 @@ namespace detail
 	matched_size(0),
 	matched_u(__costs.size1(), index_type(-1)),
 	matched_v(__costs.size1(), index_type(-1)),
-	covered(__costs.size1()),
 	tree(__costs.size1()),
+	covered(__costs.size1()),
 	min_slack(__costs.size1()) {}
     
     void improve_labels(const value_type value)
