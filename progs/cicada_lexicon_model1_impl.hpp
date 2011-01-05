@@ -11,7 +11,7 @@
 #include "utils/mathop.hpp"
 
 #include "kuhn_munkres.hpp"
-#include "itg_prune.hpp"
+#include "itg_alignment.hpp"
 
 struct LearnModel1 : public LearnBase
 {
@@ -571,6 +571,144 @@ struct ViterbiModel1 : public ViterbiBase
     viterbi(source, target, ttable_source_target, alignment_source_target);
     viterbi(target, source, ttable_target_source, alignment_target_source);
   }
+};
+
+struct ITGModel1 : public ViterbiBase
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  
+  ITGModel1(const ttable_type& __ttable_source_target,
+	    const ttable_type& __ttable_target_source)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source) {}
+
+  class insert_align
+  {
+    alignment_type& alignment_source_target;
+    alignment_type& alignment_target_source;
+    
+  public:
+    insert_align(alignment_type& __alignment_source_target,
+		 alignment_type& __alignment_target_source)
+      : alignment_source_target(__alignment_source_target),
+	alignment_target_source(__alignment_target_source) {}
+    
+    template <typename Edge>
+    insert_align& operator=(const Edge& edge)
+    {	
+      alignment_source_target.push_back(edge);
+      alignment_target_source.push_back(std::make_pair(edge.second, edge.first));
+      
+      return *this;
+    }
+    
+    insert_align& operator*() { return *this; }
+    insert_align& operator++() { return *this; }
+    insert_align operator++(int) { return *this; }
+  };
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    const double prob_null  = p0;
+    const double prob_align = 1.0 - p0;
+    
+    // we do not have to clearn!
+    posterior_source_target.reserve(target_size + 1, source_size + 1);
+    posterior_target_source.reserve(source_size + 1, target_size + 1);
+    
+    posterior_source_target.resize(target_size + 1, source_size + 1);
+    posterior_target_source.resize(source_size + 1, target_size + 1);
+    
+    prob_source_target.reserve(source_size + 1);
+    prob_target_source.reserve(target_size + 1);
+    
+    prob_source_target.resize(source_size + 1);
+    prob_target_source.resize(target_size + 1);
+    
+    for (size_type trg = 0; trg != target_size; ++ trg) {
+      const double prob_align_norm = 1.0 / source_size;
+      double prob_sum = 0.0;
+      
+      prob_set_type::iterator piter     = prob_source_target.begin();
+      prob_set_type::iterator piter_end = prob_source_target.end();
+      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+      prob_sum += *piter;
+      ++ piter;
+      
+      for (size_type src = 0; src != source_size; ++ src, ++ piter) {
+	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
+	prob_sum += *piter;
+      }
+      
+      const double factor = 1.0 / prob_sum;
+      
+      piter = prob_source_target.begin();
+      posterior_set_type::iterator siter = posterior_source_target.begin(trg + 1);
+      for (/**/; piter != piter_end; ++ piter, ++ siter)
+	(*siter) = (*piter) * factor;
+    }
+    
+    for (size_type src = 0; src != source_size; ++ src) {
+      const double prob_align_norm = 1.0 / target_size;
+      double prob_sum = 0.0;
+      
+      prob_set_type::iterator piter     = prob_target_source.begin();
+      prob_set_type::iterator piter_end = prob_target_source.end();
+      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+      prob_sum += *piter;
+      ++ piter;
+      
+      for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
+	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
+	prob_sum += *piter;
+      }
+      
+      const double factor = 1.0 / prob_sum;
+      
+      piter = prob_target_source.begin();
+      posterior_set_type::iterator titer = posterior_target_source.begin(src + 1);
+      for (/**/; piter != piter_end; ++ piter, ++ titer)
+	(*titer) = (*piter) * factor;
+    }
+
+    costs.clear();
+    costs.resize(source_size + 1, target_size + 1, boost::numeric::bounds<double>::lowest());
+    
+    for (size_type src = 1; src <= source_size; ++ src)
+      for (size_type trg = 1; trg <= target_size; ++ trg)
+	costs(src, trg) = 0.5 * (utils::mathop::log(posterior_source_target(trg, src)) 
+				 + utils::mathop::log(posterior_target_source(src, trg)));
+    
+    for (size_type trg = 1; trg <= target_size; ++ trg)
+      costs(0, trg) = utils::mathop::log(posterior_source_target(trg, 0));
+    
+    for (size_type src = 1; src <= source_size; ++ src)
+      costs(src, 0) = utils::mathop::log(posterior_target_source(src, 0));
+    
+    alignment_source_target.clear();
+    alignment_target_source.clear();
+    
+    aligner(costs, insert_align(alignment_source_target, alignment_target_source));
+    
+    std::sort(alignment_source_target.begin(), alignment_source_target.end());
+    std::sort(alignment_target_source.begin(), alignment_target_source.end());
+  }
+  
+  matrix_type costs;
+  
+  prob_set_type      prob_source_target;
+  prob_set_type      prob_target_source;
+  posterior_set_type posterior_source_target;
+  posterior_set_type posterior_target_source;
+  
+  detail::ITGAlignment aligner;
 };
 
 struct MaxMatchModel1 : public ViterbiBase

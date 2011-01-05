@@ -39,6 +39,12 @@ namespace detail
       
       span_pair_type() : source(), target() {}
       span_pair_type(const span_type& __source, const span_type& __target) : source(__source), target(__target) {}
+
+      friend
+      bool operator==(const span_pair_type& x, const span_pair_type& y)
+      {
+	return x.source == y.source && x.target == y.target;
+      }
     };
     
     typedef std::pair<span_pair_type, span_pair_type> backptr_type;
@@ -88,8 +94,8 @@ namespace detail
 		      Spans& span_prune,
 		      const bool inverse)
       {
-	const int source_size = (! inverse ? costs.size1() : costs.size2());
-	const int target_size = (! inverse ? costs.size2() : costs.size1());
+	const int source_size = (! inverse ? costs.size1() : costs.size2()) - 1;
+	const int target_size = (! inverse ? costs.size2() : costs.size1()) - 1;
 	
 	span_prune.clear();
 	span_prune.resize(source_size + 1, typename Spans::value_type(target_size + 1, true));
@@ -215,8 +221,8 @@ namespace detail
       template <typename Costs>
       SpanPrune(const Costs& costs, const span_set_type& spans_source, const span_set_type& spans_target)
       {
-	const int source_size = costs.size1();
-	const int target_size = costs.size2();
+	const int source_size = costs.size1() - 1;
+	const int target_size = costs.size2() - 1;
 	
 	prune_source.clear();
 	prune_target.clear();
@@ -258,8 +264,8 @@ namespace detail
     template <typename Costs>
     void initialize(const Costs& costs)
     {
-      const int source_size = costs.size1();
-      const int target_size = costs.size2();
+      const int source_size = costs.size1() - 1;
+      const int target_size = costs.size2() - 1;
       
       const int sent_fert = utils::bithack::max(source_size, target_size) / utils::bithack::min(source_size, target_size);
       const int max_fert  = utils::bithack::max(max_fertility, sent_fert);
@@ -301,8 +307,8 @@ namespace detail
     template <typename Costs, typename Prune>
     void construct(const Costs& costs, const Prune& prune)
     {
-      const int source_size = costs.size1();
-      const int target_size = costs.size2();
+      const int source_size = costs.size1() - 1;
+      const int target_size = costs.size2() - 1;
 
       const double lowest = boost::numeric::bounds<double>::lowest();
       
@@ -366,8 +372,8 @@ namespace detail
     template <typename Costs, typename Iterator>
     void viterbi(const Costs& costs, Iterator result)
     {
-      const int source_size = costs.size1();
-      const int target_size = costs.size2();
+      const int source_size = costs.size1() - 1;
+      const int target_size = costs.size2() - 1;
       
       const backptr_type backptr_invalid(span_pair_type(span_type(-1, -1), span_type(-1, -1)),
 					 span_pair_type(span_type(-1, -1), span_type(-1, -1)));

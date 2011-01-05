@@ -561,6 +561,74 @@ struct FinalAnd
   __Final final;
 };
 
+struct ITG
+{
+  typedef utils::vector2<double, std::allocator<double> > matrix_type;
+  typedef utils::vector2<char, std::allocator<char> > assigned_type;
+  
+  template <typename Alignment>
+  class insert_align
+  {
+    typedef Alignment align_type;
+    
+    align_type&   align;
+    
+  public:
+    insert_align(align_type& __align)
+      : align(__align) {}
+    
+    template <typename Edge>
+    insert_align& operator=(const Edge& edge)
+    {	
+      align.insert(edge);
+	
+      return *this;
+    }
+      
+    insert_align& operator*() { return *this; }
+    insert_align& operator++() { return *this; }
+    insert_align operator++(int) { return *this; }
+  };
+  
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  Alignment& align)
+  {
+    const int source_size = utils::bithack::max(bitext_source_target.source.size() - 1, bitext_target_source.target.size());
+    const int target_size = utils::bithack::max(bitext_source_target.target.size(),     bitext_target_source.source.size() - 1);
+    
+    costs.clear();
+    costs.resize(source_size + 1, target_size + 1, score_null);
+    assigned.clear();
+    assigned.resize(source_size + 1, target_size + 1, false);
+    
+    for (int src = 1; src < static_cast<int>(bitext_source_target.source.size()); ++ src) {
+      const bitext_giza_type::point_set_type& aligns = bitext_source_target.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) {
+	costs(src, *titer) = score_union;
+	assigned(src, *titer) = true;
+      }
+    }
+    
+    for (int trg = 1; trg < static_cast<int>(bitext_target_source.source.size()); ++ trg) {
+      const bitext_giza_type::point_set_type& aligns = bitext_target_source.source[trg].second;
+      
+      bitext_giza_type::point_set_type::const_iterator siter_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator siter = aligns.begin(); siter != siter_end; ++ siter)
+	costs(*siter, trg) = (assigned(*siter, trg) ? score_intersection : score_union);
+    }
+    
+    aligner(costs, insert_align<Alignment>(align));
+  }
+  
+  matrix_type costs;
+  assigned_type assigned;
+  detail::ITGAlignment aligner;
+};
+
 
 struct MaxMatch
 {
@@ -808,6 +876,7 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
   AlignmentInserter inserter(alignment);
   AlignmentInserter inverted_inserter(inverted);
   
+  ITG       __itg;
   MaxMatch  __max_match;
   Intersect __intersect;
   Union     __union;
@@ -848,8 +917,12 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
     }
     
     aligns.clear();
-    
-    if (max_match_mode) {
+
+    if (itg_mode) {
+      __itg(bitext_source_target, bitext_target_source, aligns);
+      
+      alignment.insert(alignment.end(), aligns.begin(), aligns.end());
+    } else if (max_match_mode) {
       __max_match(bitext_source_target, bitext_target_source, aligns);
       
       alignment.insert(alignment.end(), aligns.begin(), aligns.end());

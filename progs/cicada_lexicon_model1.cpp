@@ -38,6 +38,7 @@ bool symmetric_mode = false;
 bool posterior_mode = false;
 bool variational_bayes_mode = false;
 
+bool itg_mode = false;
 bool max_match_mode = false;
 
 // parameter...
@@ -73,6 +74,9 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
+    
+    if (itg_mode && max_match_mode)
+      throw std::runtime_error("you cannot specify both of ITG and max-match for Viterbi alignment");
     
     threads = utils::bithack::max(threads, 1);
     
@@ -129,7 +133,9 @@ int main(int argc, char ** argv)
     }
     
     if (! viterbi_source_target_file.empty() || ! viterbi_target_source_file.empty()) {
-      if (max_match_mode)
+      if (itg_mode)
+	viterbi<ITGModel1>(ttable_source_target, ttable_target_source);
+      else if (max_match_mode)
 	viterbi<MaxMatchModel1>(ttable_source_target, ttable_target_source);
       else
 	viterbi<ViterbiModel1>(ttable_source_target, ttable_target_source);
@@ -783,6 +789,7 @@ void options(int argc, char** argv)
     ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained model1 training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
     
+    ("itg",       po::bool_switch(&itg_mode),       "ITG alignment")
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
     
     ("p0",     po::value<double>(&p0)->default_value(p0),         "parameter for NULL alignment")
