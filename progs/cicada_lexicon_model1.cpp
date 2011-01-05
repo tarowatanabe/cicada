@@ -932,6 +932,7 @@ void viterbi(const ttable_type& ttable_source_target,
   reducer.add_thread(new boost::thread(reducer_type(viterbi_target_source_file, queue_target_source)));
   
   bitext_type bitext;
+  bitext.id = 0;
   
   utils::resource viterbi_start;
   
