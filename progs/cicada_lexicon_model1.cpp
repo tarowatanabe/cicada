@@ -604,7 +604,7 @@ void learn(ttable_type& ttable_source_target,
   
   typedef TaskMaximize<learner_set_type, Maximizer> maximizer_type;
 
-  queue_type       queue;
+  queue_type       queue(threads * 64);
   learner_set_type learners(threads, learner_type(queue, ttable_source_target, ttable_target_source));
   
   for (int iter = 0; iter < iteration; ++ iter) {
@@ -913,9 +913,9 @@ void viterbi(const ttable_type& ttable_source_target,
   
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
   
-  queue_type queue;
-  queue_type queue_source_target;
-  queue_type queue_target_source;
+  queue_type queue(threads * 4096);
+  queue_type queue_source_target(threads * 4096);
+  queue_type queue_target_source(threads * 4096);
   
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
