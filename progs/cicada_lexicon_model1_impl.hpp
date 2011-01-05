@@ -11,6 +11,7 @@
 #include "utils/mathop.hpp"
 
 #include "kuhn_munkres.hpp"
+#include "itg_prune.hpp"
 
 struct LearnModel1 : public LearnBase
 {

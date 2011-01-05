@@ -12,6 +12,8 @@
 
 #include <utils/chart.hpp>
 #include <utils/vector2.hpp>
+#include <utils/mathop.hpp>
+#include <utils/bithack.hpp>
 
 namespace detail
 {
