@@ -2,6 +2,15 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
 #include <cicada/sentence.hpp>
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -219,6 +228,8 @@ struct aligned_type
 
 path_type source_file = "-";
 path_type target_file = "-";
+path_type lexicon_source_target_file;
+path_type lexicon_target_source_file;
 path_type output_source_target_file = "-";
 path_type output_target_source_file = "-";
 
@@ -248,6 +259,7 @@ struct LearnSymmetricPosterior;
 struct Maximize;
 struct MaximizeBayes;
 
+void read(const path_type& path, ttable_type& lexicon);
 void dump(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned);
 template <typename Learner, typename Maximizer>
 void learn(ttable_type& ttable_source_target,
@@ -269,7 +281,24 @@ int main(int argc, char ** argv)
     
     aligned_type aligned_source_target;
     aligned_type aligned_target_source;
+    
+    if (! lexicon_source_target_file.empty())
+      if (lexicon_source_target_file != "-" && ! boost::filesystem::exists(lexicon_source_target_file))
+	throw std::runtime_error("no file: " + lexicon_source_target_file.file_string());
 
+    if (! lexicon_target_source_file.empty())
+      if (lexicon_target_source_file != "-" && ! boost::filesystem::exists(lexicon_target_source_file))
+	throw std::runtime_error("no file: " + lexicon_target_source_file.file_string());
+
+    boost::thread_group workers_read;
+    
+    if (! lexicon_source_target_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read, boost::cref(lexicon_source_target_file), boost::ref(ttable_source_target))));
+    if (! lexicon_target_source_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read, boost::cref(lexicon_target_source_file), boost::ref(ttable_target_source))));
+    
+    workers_read.join_all();
+    
     if (iteration > 0) {
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
@@ -331,6 +360,46 @@ struct greater_second
     return x->second > y->second;
   }
 };
+
+void read(const path_type& path, ttable_type& lexicon)
+{
+  typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
+  typedef boost::spirit::istream_iterator iterator_type;
+
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  qi::rule<iterator_type, std::string(), standard::blank_type>         word;
+  qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
+  
+  word   %= qi::lexeme[+(standard::char_ - standard::space)];
+  parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
+  
+  lexicon.clear();
+  
+  utils::compress_istream is(path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iterator_type iter(is);
+  iterator_type iter_end;
+  
+  lexicon_parsed_type lexicon_parsed;
+  
+  while (iter != iter_end) {
+    boost::fusion::get<0>(lexicon_parsed).clear();
+    boost::fusion::get<1>(lexicon_parsed).clear();
+    
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
+      if (iter != iter_end)
+	throw std::runtime_error("global lexicon parsing failed");
+    
+    const word_type target(boost::fusion::get<0>(lexicon_parsed));
+    const word_type source(boost::fusion::get<1>(lexicon_parsed));
+    const double&   prob(boost::fusion::get<2>(lexicon_parsed));
+    
+    lexicon[source][target] = prob;
+  }
+}
 
 void dump(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned)
 {
@@ -1200,9 +1269,12 @@ void options(int argc, char** argv)
     ("source", po::value<path_type>(&source_file), "source file")
     ("target", po::value<path_type>(&target_file), "target file")
     
+    ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
+    ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
+    
     ("output-source-target", po::value<path_type>(&output_source_target_file), "output for P(target | source)")
     ("output-target-source", po::value<path_type>(&output_target_source_file), "output for P(source | target)")
-
+    
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max iteration")
     
     ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric model1 training")
