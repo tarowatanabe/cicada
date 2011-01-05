@@ -55,7 +55,7 @@ namespace detail
     {
       const size_type matrix_size = costs.size1();
       
-      for (index_type v = 0; v != matrix_size; ++ v) {
+      for (size_type v = 0; v != matrix_size; ++ v) {
 	const bool has_parent = (tree[v] >= 0);
 	
 	label_u[v]         -= value * covered[v];
@@ -87,7 +87,7 @@ namespace detail
     
     void augment()
     {
-      const size_type matrix_size = costs.size1();
+      const index_type matrix_size = costs.size1();
 
       for (;;) {
 	value_type value = boost::numeric::bounds<value_type>::highest();
@@ -155,7 +155,7 @@ namespace detail
 	covered[u0] = true;
 	
 	// compute min-slack...
-	for (index_type v = 0; v < matrix_size; ++ v)
+	for (size_type v = 0; v < matrix_size; ++ v)
 	  min_slack[v] = std::make_pair(slack(u0, v), u0);
 	
 	// augment!
