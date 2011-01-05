@@ -46,7 +46,6 @@ double prior = 0.1;
 double smooth = 1e-7;
 
 double threshold = 0.0;
-bool   logprob_mode = false;
 
 int threads = 2;
 
@@ -104,36 +103,36 @@ int main(int argc, char ** argv)
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<Model1LearnSymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<Model1LearnSymmetric, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Symmetric, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<Model1LearnPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Posterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<Model1Learn, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
 	
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<Model1LearnSymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<Model1LearnSymmetric, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Symmetric, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<Model1LearnPosterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Posterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	  else
-	    learn<Model1Learn, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
 	}
       }
     }
     
     if (! viterbi_source_target_file.empty() || ! viterbi_target_source_file.empty()) {
       if (max_match_mode)
-	viterbi<Model1MaxMatch>(ttable_source_target, ttable_target_source);
+	viterbi<MaxMatchModel1>(ttable_source_target, ttable_target_source);
       else
-	viterbi<Model1Viterbi>(ttable_source_target, ttable_target_source);
+	viterbi<ViterbiModel1>(ttable_source_target, ttable_target_source);
     }
 
       
@@ -185,6 +184,7 @@ void read(const path_type& path, ttable_type& lexicon)
   parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
   
   lexicon.clear();
+  lexicon.smooth = boost::numeric::bounds<double>::highest();
   
   utils::compress_istream is(path, 1024 * 1024);
   is.unsetf(std::ios::skipws);
@@ -207,6 +207,7 @@ void read(const path_type& path, ttable_type& lexicon)
     const double&   prob(boost::fusion::get<2>(lexicon_parsed));
     
     lexicon[source][target] = prob;
+    lexicon.smooth = std::min(lexicon.smooth, prob * 0.1);
   }
 }
 
@@ -248,27 +249,14 @@ void dump(const path_type& path, const ttable_type& lexicon, const aligned_type&
 	
 	// TODO: extra checking to keep Viterbi alignemnt in the final output!
 	
-	if (logprob_mode) {
-	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	    if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
-	    os << (*iter)->first << ' ' << source << ' '  << std::log((*iter)->second) << '\n';
-	} else {
-	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	    if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
-	      os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
-	}
-      } else {
-	if (logprob_mode) {
-	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	    os << (*iter)->first << ' ' << source << ' '  << std::log((*iter)->second) << '\n';
-	} else {
-	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	sorted_type::const_iterator iter_end = sorted.end();
+	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	  if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
 	    os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
-	}
+      } else {
+	sorted_type::const_iterator iter_end = sorted.end();
+	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	  os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
       }
     }
 }
@@ -802,7 +790,6 @@ void options(int argc, char** argv)
     ("smooth", po::value<double>(&smooth)->default_value(smooth), "smoothing parameter for uniform distribution")
 
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
-    ("logprob",   po::bool_switch(&logprob_mode),                          "dump in log-domain")
 
     ("threads", po::value<int>(&threads), "# of threads")
     

@@ -67,7 +67,6 @@ path_type source_file = "-";
 path_type target_file = "-";
 path_type output_file = "-";
 bool inverse = false;
-bool logprob = false;
 
 void options(int argc, char** argv);
 
@@ -141,15 +140,9 @@ int main(int argc, char ** argv)
 	  sorted.insert(std::make_pair(score, titer->first));
 	}
 	
-	if (logprob) {
-	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	    os << iter->second << ' ' << source << ' ' << std::log(iter->first) << '\n';
-	} else {
-	  sorted_type::const_iterator iter_end = sorted.end();
-	  for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	    os << iter->second << ' ' << source << ' ' << iter->first << '\n';
-	}
+	sorted_type::const_iterator iter_end = sorted.end();
+	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	  os << iter->second << ' ' << source << ' ' << iter->first << '\n';
       }
     
   }
@@ -172,7 +165,6 @@ void options(int argc, char** argv)
     ("target", po::value<path_type>(&target_file), "target file")
     ("output", po::value<path_type>(&output_file)->default_value("-"), "dice: for target source")
     ("inverse", po::bool_switch(&inverse), "inverse source/target")
-    ("logprob", po::bool_switch(&logprob), "dump in log-domain")
     
     ("help", "help message");
 

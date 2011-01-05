@@ -12,9 +12,9 @@
 
 #include "kuhn_munkres.hpp"
 
-struct Model1Learn : public LearnBase
+struct LearnModel1 : public LearnBase
 {
-  Model1Learn(const ttable_type& __ttable_source_target,
+  LearnModel1(const ttable_type& __ttable_source_target,
 	      const ttable_type& __ttable_target_source)
     : LearnBase(__ttable_source_target, __ttable_target_source) {}
   
@@ -86,9 +86,9 @@ struct Model1Learn : public LearnBase
   prob_set_type probs;
 };
 
-struct Model1LearnPosterior : public LearnBase
+struct LearnModel1Posterior : public LearnBase
 {
-  Model1LearnPosterior(const ttable_type& __ttable_source_target,
+  LearnModel1Posterior(const ttable_type& __ttable_source_target,
 		       const ttable_type& __ttable_target_source)
     : LearnBase(__ttable_source_target, __ttable_target_source) {}
 
@@ -208,9 +208,9 @@ struct Model1LearnPosterior : public LearnBase
   prob_set_type      exp_phi;
 };
 
-struct Model1LearnSymmetric : public LearnBase
+struct LearnModel1Symmetric : public LearnBase
 {
-  Model1LearnSymmetric(const ttable_type& __ttable_source_target,
+  LearnModel1Symmetric(const ttable_type& __ttable_source_target,
 		       const ttable_type& __ttable_target_source)
     : LearnBase(__ttable_source_target, __ttable_target_source) {}
       
@@ -343,9 +343,9 @@ struct Model1LearnSymmetric : public LearnBase
   posterior_set_type posterior_target_source;
 };
 
-struct Model1LearnSymmetricPosterior : public LearnBase
+struct LearnModel1SymmetricPosterior : public LearnBase
 {
-  Model1LearnSymmetricPosterior(const ttable_type& __ttable_source_target,
+  LearnModel1SymmetricPosterior(const ttable_type& __ttable_source_target,
 				const ttable_type& __ttable_target_source)
     : LearnBase(__ttable_source_target, __ttable_target_source) {}
 
@@ -523,9 +523,9 @@ struct Model1LearnSymmetricPosterior : public LearnBase
   posterior_set_type exp_phi;
 };
 
-struct Model1Viterbi : public ViterbiBase
+struct ViterbiModel1 : public ViterbiBase
 {
-  Model1Viterbi(const ttable_type& __ttable_source_target,
+  ViterbiModel1(const ttable_type& __ttable_source_target,
 		const ttable_type& __ttable_target_source)
     : ViterbiBase(__ttable_source_target, __ttable_target_source) {}
 
@@ -572,13 +572,13 @@ struct Model1Viterbi : public ViterbiBase
   }
 };
 
-struct Model1MaxMatch : public ViterbiBase
+struct MaxMatchModel1 : public ViterbiBase
 {
   typedef utils::vector2<double, std::allocator<double> > matrix_type;
   typedef utils::vector2<double, std::allocator<double> > posterior_set_type;
   typedef std::vector<double, std::allocator<double> > prob_set_type;
 
-  Model1MaxMatch(const ttable_type& __ttable_source_target,
+  MaxMatchModel1(const ttable_type& __ttable_source_target,
 		 const ttable_type& __ttable_target_source)
     : ViterbiBase(__ttable_source_target, __ttable_target_source) {}
   
