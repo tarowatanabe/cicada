@@ -42,6 +42,7 @@
 #include "utils/vector2.hpp"
 
 #include "kuhn_munkres.hpp"
+#include "itg_prune.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
