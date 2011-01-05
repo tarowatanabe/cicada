@@ -3,8 +3,8 @@
 //  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __ITG_PRUNE__HPP__
-#define __ITG_PRUNE__HPP__ 1
+#ifndef __ITG_ALIGNMENT__HPP__
+#define __ITG_ALIGNMENT__HPP__ 1
 
 #include <vector>
 
@@ -18,7 +18,7 @@
 namespace detail
 {
   
-  struct ITGPrune
+  struct ITGAlignment
   {
     static const int max_fertility = 8;
     static const double threshold_global = 1e-5;
@@ -47,7 +47,7 @@ namespace detail
 
     typedef std::vector<span_pair_type, std::allocator<span_pair_type> > stack_type;
     
-    ITGPrune() {}
+    ITGAlignment() {}
     
     struct SpanBeam
     {
