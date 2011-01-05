@@ -912,6 +912,9 @@ void viterbi(const ttable_type& ttable_source_target,
   typedef reducer_type::queue_type  queue_type;
   
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
+
+  if (debug)
+    std::cerr << "viterbi alignment" << std::endl;
   
   queue_type queue(threads * 4096);
   queue_type queue_source_target(threads * 4096);
@@ -971,6 +974,12 @@ void viterbi(const ttable_type& ttable_source_target,
   queue_target_source.push_swap(bitext);
   
   reducer.join_all();
+
+  utils::resource viterbi_end;
+  
+  if (debug)
+    std::cerr << "cpu time:  " << viterbi_end.cpu_time() - viterbi_start.cpu_time() << std::endl
+	      << "user time: " << viterbi_end.user_time() - viterbi_start.user_time() << std::endl;
 }
 
 struct Maximize
