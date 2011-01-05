@@ -914,7 +914,7 @@ void viterbi(const ttable_type& ttable_source_target,
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
 
   if (debug)
-    std::cerr << "viterbi alignment" << std::endl;
+    std::cerr << "Viterbi alignment" << std::endl;
   
   queue_type queue(threads * 4096);
   queue_type queue_source_target(threads * 4096);
