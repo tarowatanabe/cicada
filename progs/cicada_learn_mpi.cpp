@@ -14,7 +14,6 @@
 #include <deque>
 
 #include "cicada_impl.hpp"
-#include "cicada_learn_impl.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -55,6 +54,7 @@ double C = 1.0;
 
 int debug = 0;
 
+#include "cicada_learn_impl.hpp"
 
 void options(int argc, char** argv);
 
@@ -695,7 +695,11 @@ void read_forest(const path_set_type& forest_path,
 
   hypergraph_type graph;
   
-  for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter)
+  for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
+    
+    if (mpi_rank == 0 && debug)
+      std::cerr << "reading forest: " << piter->file_string() << std::endl;
+
     for (size_t i = mpi_rank; /**/; i += mpi_size) {
       const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
       
@@ -724,10 +728,15 @@ void read_forest(const path_set_type& forest_path,
       
       graphs_forest[id_forest].unite(graph);
     }
+  }
   
   graphs_intersected.resize(graphs_forest.size());
   
-  for (path_set_type::const_iterator piter = intersected_path.begin(); piter != intersected_path.end(); ++ piter)
+  for (path_set_type::const_iterator piter = intersected_path.begin(); piter != intersected_path.end(); ++ piter) {
+    
+    if (mpi_rank == 0 && debug)
+      std::cerr << "reading intersected forest: " << piter->file_string() << std::endl;
+
     for (size_t i = mpi_rank; i < graphs_intersected.size(); i += mpi_size) {
       const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
       
@@ -751,8 +760,9 @@ void read_forest(const path_set_type& forest_path,
       if (iter != end)
 	throw std::runtime_error("invalid id ||| graph format" + path_intersected.file_string());
       
-      graphs_intersected[id_forest].unite(graph);
+      graphs_intersected[id_intersected].unite(graph);
     }
+  }
   
   // collect features...
   for (int rank = 0; rank < mpi_size; ++ rank) {

@@ -14,7 +14,6 @@
 #include <stdexcept>
 
 #include "cicada_impl.hpp"
-#include "cicada_learn_impl.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -43,6 +42,8 @@ double C = 1.0;
 int threads = 1;
 
 int debug = 0;
+
+#include "cicada_learn_impl.hpp"
 
 void options(int argc, char** argv);
 
