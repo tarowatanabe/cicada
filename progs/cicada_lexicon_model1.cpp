@@ -40,6 +40,7 @@ bool symmetric_mode = false;
 bool posterior_mode = false;
 bool variational_bayes_mode = false;
 
+bool moses_mode = false;
 bool itg_mode = false;
 bool max_match_mode = false;
 
@@ -610,44 +611,48 @@ struct ViterbiReducer : public ViterbiMapReduce
   
   void dump(std::ostream& os, const bitext_type& bitext)
   {
-    os << "# Sentence pair (" << (bitext.id + 1) << ')'
-       << " source length " << bitext.source.size()
-       << " target length " << bitext.target.size()
-       << " alignment score : " << 0 << '\n';
-    os << bitext.target << '\n';
+    if (moses_mode)
+      os << bitext.alignment << '\n';
+    else {
+      os << "# Sentence pair (" << (bitext.id + 1) << ')'
+	 << " source length " << bitext.source.size()
+	 << " target length " << bitext.target.size()
+	 << " alignment score : " << 0 << '\n';
+      os << bitext.target << '\n';
     
-    if (bitext.alignment.empty() || bitext.source.empty() || bitext.target.empty()) {
-      os << "NULL ({ })";
-      sentence_type::const_iterator siter_end = bitext.source.end();
-      for (sentence_type::const_iterator siter = bitext.source.begin(); siter != siter_end; ++ siter)
-	os << ' ' << *siter << " ({ })";
-      os << '\n';
-    } else {
-      aligns.clear();
-      aligns.resize(bitext.source.size());
+      if (bitext.alignment.empty() || bitext.source.empty() || bitext.target.empty()) {
+	os << "NULL ({ })";
+	sentence_type::const_iterator siter_end = bitext.source.end();
+	for (sentence_type::const_iterator siter = bitext.source.begin(); siter != siter_end; ++ siter)
+	  os << ' ' << *siter << " ({ })";
+	os << '\n';
+      } else {
+	aligns.clear();
+	aligns.resize(bitext.source.size());
       
-      aligns_none.clear();
-      for (size_type trg = 0; trg != bitext.target.size(); ++ trg)
-	aligns_none.insert(trg + 1);
+	aligns_none.clear();
+	for (size_type trg = 0; trg != bitext.target.size(); ++ trg)
+	  aligns_none.insert(trg + 1);
       
-      alignment_type::const_iterator aiter_end = bitext.alignment.end();
-      for (alignment_type::const_iterator aiter = bitext.alignment.begin(); aiter != aiter_end; ++ aiter) {
-	aligns[aiter->source].push_back(aiter->target + 1);
-	aligns_none.erase(aiter->target + 1);
-      }
+	alignment_type::const_iterator aiter_end = bitext.alignment.end();
+	for (alignment_type::const_iterator aiter = bitext.alignment.begin(); aiter != aiter_end; ++ aiter) {
+	  aligns[aiter->source].push_back(aiter->target + 1);
+	  aligns_none.erase(aiter->target + 1);
+	}
       
-      os << "NULL";
-      os << " ({ ";
-      std::copy(aligns_none.begin(), aligns_none.end(), std::ostream_iterator<index_type>(os, " "));
-      os << "})";
-      
-      for (size_type src = 0; src != bitext.source.size(); ++ src) {
-	os << ' ' << bitext.source[src];
+	os << "NULL";
 	os << " ({ ";
-	std::copy(aligns[src].begin(), aligns[src].end(), std::ostream_iterator<index_type>(os, " "));
+	std::copy(aligns_none.begin(), aligns_none.end(), std::ostream_iterator<index_type>(os, " "));
 	os << "})";
+      
+	for (size_type src = 0; src != bitext.source.size(); ++ src) {
+	  os << ' ' << bitext.source[src];
+	  os << " ({ ";
+	  std::copy(aligns[src].begin(), aligns[src].end(), std::ostream_iterator<index_type>(os, " "));
+	  os << "})";
+	}
+	os << '\n';
       }
-      os << '\n';
     }
   }
   
@@ -827,6 +832,7 @@ void options(int argc, char** argv)
     
     ("itg",       po::bool_switch(&itg_mode),       "ITG alignment")
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
+    ("moses",     po::bool_switch(&moses_mode),     "Moses alignment foramt")
     
     ("p0",     po::value<double>(&p0)->default_value(p0),         "parameter for NULL alignment")
     ("prior",  po::value<double>(&prior)->default_value(prior),   "Dirichlet prior for variational Bayes")
