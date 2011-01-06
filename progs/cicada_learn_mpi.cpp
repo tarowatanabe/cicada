@@ -39,9 +39,11 @@
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
+typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-path_type forest_path;
-path_type intersected_path;
+
+path_set_type forest_path;
+path_set_type intersected_path;
 
 path_type output_path = "-";
 
@@ -67,8 +69,8 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 
 struct OptimizeLBFGS;
 
-void read_forest(const path_type& forest_path,
-		 const path_type& intersected_path,
+void read_forest(const path_set_type& forest_path,
+		 const path_set_type& intersected_path,
 		 hypergraph_set_type& graphs_forest,
 		 hypergraph_set_type& graphs_intersected);
 void bcast_weights(const int rank, weight_set_type& weights);
@@ -115,10 +117,9 @@ int main(int argc, char ** argv)
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
 
-    if (! boost::filesystem::exists(forest_path) || ! boost::filesystem::is_directory(forest_path))
+    if (forest_path.empty())
       throw std::runtime_error("no forest?");
-
-    if (! boost::filesystem::exists(intersected_path) || ! boost::filesystem::is_directory(intersected_path))
+    if (intersected_path.empty())
       throw std::runtime_error("no intersected forest?");
 
     hypergraph_set_type graphs_forest;
@@ -306,7 +307,7 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
       optimizer.initialize();
       
       for (size_t id = 0; id != ids.size(); ++ id)
-	if (graphs_intersected[ids[id]].is_valid())
+	if (graphs_intersected[ids[id]].is_valid() && graphs_forest[ids[id]].is_valid())
 	  opt(graphs_intersected[ids[id]], graphs_forest[ids[id]]);
       
       optimizer.finalize();
@@ -361,7 +362,7 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 	optimizer.initialize();
 	
 	for (size_t id = 0; id != ids.size(); ++ id)
-	  if (graphs_intersected[ids[id]].is_valid())
+	  if (graphs_intersected[ids[id]].is_valid() && graphs_forest[ids[id]].is_valid())
 	    opt(graphs_intersected[ids[id]], graphs_forest[ids[id]]);
 	
 	optimizer.finalize();
@@ -679,8 +680,8 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
 }
 
 
-void read_forest(const path_type& forest_path,
-		 const path_type& intersected_path,
+void read_forest(const path_set_type& forest_path,
+		 const path_set_type& intersected_path,
 		 hypergraph_set_type& graphs_forest,
 		 hypergraph_set_type& graphs_intersected)
 {
@@ -691,17 +692,17 @@ void read_forest(const path_type& forest_path,
   size_t id_intersected;
   
   std::string line;
+
+  hypergraph_type graph;
   
-  for (int i = mpi_rank; /**/; i += mpi_size) {
-    const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
-    
-    const path_type path_forest      = forest_path / file_name;
-    const path_type path_intersected = intersected_path / file_name;
-    
-    if (! boost::filesystem::exists(path_forest)) break;
-    if (! boost::filesystem::exists(path_intersected)) continue;
-    
-    {
+  for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter)
+    for (size_t i = mpi_rank; /**/; i += mpi_size) {
+      const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
+      
+      const path_type path_forest = (*piter) / file_name;
+      
+      if (! boost::filesystem::exists(path_forest)) break;
+      
       utils::compress_istream is(path_forest);
       std::getline(is, line);
       
@@ -710,17 +711,30 @@ void read_forest(const path_type& forest_path,
       
       if (! parse_id(id_forest, iter, end))
 	throw std::runtime_error("invalid id input: " + path_forest.file_string());
+      if (id_forest != i)
+	throw std::runtime_error("invalid id input: " + path_forest.file_string());
       
-      graphs_forest.push_back(hypergraph_type());
+      if (id_forest >= graphs_forest.size())
+	graphs_forest.resize(id_forest + 1);
       
-      if (! graphs_forest.back().assign(iter, end))
+      if (! graph.assign(iter, end))
 	throw std::runtime_error("invalid graph format" + path_forest.file_string());
-            
       if (iter != end)
 	throw std::runtime_error("invalid id ||| graph format" + path_forest.file_string());
+      
+      graphs_forest[id_forest].unite(graph);
     }
-
-    {
+  
+  graphs_intersected.resize(graphs_forest.size());
+  
+  for (path_set_type::const_iterator piter = intersected_path.begin(); piter != intersected_path.end(); ++ piter)
+    for (size_t i = mpi_rank; i < graphs_intersected.size(); i += mpi_size) {
+      const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
+      
+      const path_type path_intersected = (*piter) / file_name;
+      
+      if (! boost::filesystem::exists(path_intersected)) continue;
+      
       utils::compress_istream is(path_intersected);
       std::getline(is, line);
       
@@ -729,24 +743,16 @@ void read_forest(const path_type& forest_path,
       
       if (! parse_id(id_intersected, iter, end))
 	throw std::runtime_error("invalid id input" + path_intersected.file_string());
+      if (id_intersected != i)
+	throw std::runtime_error("invalid id input: " + path_intersected.file_string());
       
-      graphs_intersected.push_back(hypergraph_type());
-      
-      if (! graphs_intersected.back().assign(iter, end))
+      if (! graph.assign(iter, end))
 	throw std::runtime_error("invalid graph format" + path_intersected.file_string());
-      
-      
       if (iter != end)
 	throw std::runtime_error("invalid id ||| graph format" + path_intersected.file_string());
+      
+      graphs_intersected[id_forest].unite(graph);
     }
-    
-    if (id_forest != id_intersected)
-      throw std::runtime_error("id do not match");
-  }
-  
-  if (graphs_intersected.size() != graphs_forest.size())
-    throw std::runtime_error("# of hypergraphs do not match");
-
   
   // collect features...
   for (int rank = 0; rank < mpi_size; ++ rank) {
@@ -883,8 +889,8 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("forest",      po::value<path_type>(&forest_path),       "forest path")
-    ("intersected", po::value<path_type>(&intersected_path),  "intersected forest path")
+    ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),       "forest path(s)")
+    ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(),  "intersected forest path(s)")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
