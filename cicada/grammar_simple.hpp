@@ -23,8 +23,36 @@ namespace cicada
   class GrammarGlue : public GrammarMutable
   {
   public:
+    template <typename Iterator>
+    GrammarGlue(const symbol_type& goal, const symbol_type& non_terminal, Iterator first, Iterator last, const bool __straight, const bool __inverted)
+      : straight(__straight), inverted(__inverted)
+    {
+      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > non_terminal_set_type;
+      
+      non_terminal_set_type non_terminals;
+      non_terminals.set_empty_key(symbol_type());
+      non_terminals.insert(first, last);
+      non_terminals.insert(non_terminal);
+
+      non_terminal_set_type::const_iterator niter_end = non_terminals.end();
+      for (non_terminal_set_type::const_iterator niter = non_terminals.begin(); niter != niter_end; ++ niter)
+	construct(goal, *niter);
+    }
+    
     GrammarGlue(const symbol_type& goal, const symbol_type& non_terminal, const bool __straight, const bool __inverted)
       : straight(__straight), inverted(__inverted)
+    {
+      construct(goal, non_terminal);
+    }
+    
+    bool valid_span(int first, int last, int distance) const
+    {
+      return (straight && inverted ? true : first == 0);
+    }
+    
+  private:
+    
+    void construct(const symbol_type& goal, const symbol_type& non_terminal)
     {
       rule_ptr_type rule_unary(rule_type::create(rule_type(goal, rule_type::symbol_set_type(1, non_terminal.non_terminal(1)))));
       
@@ -61,11 +89,7 @@ namespace cicada
 	
 	insert(rule1, rule2, features);
       }
-    }
-    
-    bool valid_span(int first, int last, int distance) const
-    {
-      return (straight && inverted ? true : first == 0);
+      
     }
     
   private:

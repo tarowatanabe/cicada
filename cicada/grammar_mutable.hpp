@@ -45,7 +45,7 @@ namespace cicada
     // Here, we will have 4 features, feature-name-1, FeatuerName2, featurename2 etc.!
     //
 
-    GrammarMutable();
+    GrammarMutable(const int __max_span=0);
     GrammarMutable(const std::string& parameter);
     ~GrammarMutable();
 
@@ -56,7 +56,7 @@ namespace cicada
     // virtual members
     transducer_ptr_type clone() const;
 
-    bool valid_span(int first, int last, int distance) const { return true; }
+    bool valid_span(int first, int last, int distance) const;
     id_type root() const;
     id_type next(const id_type& node, const symbol_type& symbol) const;
     bool has_next(const id_type& node) const;

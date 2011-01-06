@@ -45,6 +45,8 @@ namespace cicada
   class GrammarMutableImpl
   {
   public:
+    friend class GrammarMutable;
+
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
@@ -66,7 +68,7 @@ namespace cicada
     typedef std::vector<feature_type, std::allocator<feature_type> >     feature_name_set_type;
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
 
-    GrammarMutableImpl() : trie(symbol_type()) {}
+    GrammarMutableImpl(const int __max_span=0) : trie(symbol_type()), max_span(__max_span) {}
     
     void read(const std::string& parameter);
     
@@ -94,16 +96,15 @@ namespace cicada
       trie[id].push_back(rule);
     }
     
-    
     void clear() { trie.clear(); }
-
-    void read();
 
   private:
     trie_type trie;
 
     feature_name_set_type   feature_names_default;
     attribute_name_set_type attribute_names_default;
+
+    int max_span;
   };
   
   typedef std::vector<std::string, std::allocator<std::string> > phrase_parsed_type;
@@ -282,6 +283,11 @@ namespace cicada
     parameter_type::iterator piter_end = param.end();
     for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
       
+      if (strcasecmp(piter->first.c_str(), "max-span") == 0) {
+	max_span = boost::lexical_cast<int>(piter->second);
+	continue;
+      }
+      
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
@@ -450,8 +456,9 @@ namespace cicada
     pimpl->insert(rule);
   }
   
-  GrammarMutable::GrammarMutable()
-    : pimpl(new impl_type()) {}
+  GrammarMutable::GrammarMutable(const int __max_span)
+    : pimpl(new impl_type(__max_span)) {}
+  
   GrammarMutable::GrammarMutable(const std::string& parameter)
     : pimpl(new impl_type())
   {
@@ -471,6 +478,11 @@ namespace cicada
   GrammarMutable::transducer_ptr_type GrammarMutable::clone() const
   {
     return transducer_ptr_type(new GrammarMutable(*this));
+  }
+  
+  bool GrammarMutable::valid_span(int first, int last, int distance) const
+  {
+    return pimpl->max_span <= 0 || distance <= pimpl->max_span || last - first == 1;
   }
   
   
