@@ -1006,6 +1006,17 @@ void compute_oracles(const hypergraph_set_type& graphs,
 	__bleu->assign(score_curr);
       else
 	__bleu_linear->assign(score_curr);
+
+      if (apply_exact) {
+	model_type model;
+	model.push_back(features[id]);
+	
+	hypergraph_type graph_reward;
+	
+	cicada::apply_exact(model, graphs[id], graph_reward);
+	
+	graphs[id].swap(graph_reward);
+      }
     }
 }
 
@@ -1091,7 +1102,7 @@ void read_tstset(const path_set_type& files,
       else
 	__bleu_linear->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
       
-      if (apply_exact) {
+      if (apply_exact && ! oracle_loss) {
 	model_type model;
 	model.push_back(features[id]);
 	
