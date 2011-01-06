@@ -25,12 +25,27 @@
 #include <jemalloc.h>
 #endif
 
+#if defined(HAVE_JEMALLOC_JEMALLOC_H) && defined(HAVE_JEMALLOC_MALLCTL)
+#include <jemalloc/jemalloc.h>
+#endif
+
 
 namespace utils
 {
   size_t malloc_stats::used()
   {
-#if defined(HAVE_JEMALLOC_STATS)
+#if defined(HAVE_JEMALLOC_MALLCTL)
+    // refresh data...
+    uint64_t epoch = 1;
+    size_t u64sz = sizeof(uint64_t);
+    int err = mallctl("epoch", &epoch, &u64sz, &epoch, sizeof(uint64_t));
+
+    // then, collect allcoated
+    size_t allocated = 0;
+    size_t len = sizeof(size_t);
+    mallctl("stats.allocated", &allocated, &len, 0, 0);
+    return allocated;
+#elif defined(HAVE_JEMALLOC_STATS)
     jemalloc_stats_t stats;
     jemalloc_stats(&stats);
     return stats.allocated;
@@ -57,7 +72,18 @@ namespace utils
 
   size_t malloc_stats::allocated()
   {
-#if defined(HAVE_JEMALLOC_STATS)
+#if defined(HAVE_JEMALLOC_MALLCTL)
+    // refresh data...
+    uint64_t epoch = 1;
+    size_t u64sz = sizeof(uint64_t);
+    int err = mallctl("epoch", &epoch, &u64sz, &epoch, sizeof(uint64_t));
+
+    // then, collect active data
+    size_t active = 0;
+    size_t len = sizeof(size_t);
+    mallctl("stats.active", &active, &len, 0, 0);
+    return active;
+#elif defined(HAVE_JEMALLOC_STATS)
     jemalloc_stats_t stats;
     jemalloc_stats(&stats);
     return stats.mapped;
