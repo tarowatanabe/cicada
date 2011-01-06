@@ -7,6 +7,7 @@
 
 #include <cicada/sentence.hpp>
 #include <cicada/alignment.hpp>
+#include <cicada/span_vector.hpp>
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
@@ -18,10 +19,11 @@
 #include <utils/alloc_vector.hpp>
 
 
-typedef cicada::Symbol    word_type;
-typedef cicada::Sentence  sentence_type;
-typedef cicada::Alignment alignment_type;
-typedef cicada::Vocab     vocab_type;
+typedef cicada::Symbol     word_type;
+typedef cicada::Sentence   sentence_type;
+typedef cicada::Alignment  alignment_type;
+typedef cicada::SpanVector span_set_type;
+typedef cicada::Vocab      vocab_type;
 typedef boost::filesystem::path path_type;
 
 typedef double count_type;

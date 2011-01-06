@@ -562,6 +562,16 @@ struct ViterbiModel1 : public ViterbiBase
 	alignment.push_back(std::make_pair(align_max, static_cast<int>(trg)));
     }
   }
+
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const span_set_type& span_source,
+		  const span_set_type& span_target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    operator()(source, target, alignment_source_target, alignment_target_source);
+  }
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
@@ -607,9 +617,23 @@ struct ITGModel1 : public ViterbiBase
     insert_align& operator++() { return *this; }
     insert_align operator++(int) { return *this; }
   };
+
+  const span_set_type __span_source;
+  const span_set_type __span_target;
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    operator()(source, target, __span_source, __span_target, alignment_source_target, alignment_target_source);
+  }
+  
+  
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const span_set_type& span_source,
+		  const span_set_type& span_target,
 		  alignment_type& alignment_source_target,
 		  alignment_type& alignment_target_source)
   {
@@ -695,7 +719,10 @@ struct ITGModel1 : public ViterbiBase
     alignment_source_target.clear();
     alignment_target_source.clear();
     
-    aligner(costs, insert_align(alignment_source_target, alignment_target_source));
+    if (span_source.empty() && span_target.empty())
+      aligner(costs, insert_align(alignment_source_target, alignment_target_source));
+    else
+      aligner(costs, span_source, span_target, insert_align(alignment_source_target, alignment_target_source));
     
     std::sort(alignment_source_target.begin(), alignment_source_target.end());
     std::sort(alignment_target_source.begin(), alignment_target_source.end());
@@ -754,6 +781,16 @@ struct MaxMatchModel1 : public ViterbiBase
     insert_align operator++(int) { return *this; }
   };
   
+  void operator()(const sentence_type& source,
+		  const sentence_type& target,
+		  const span_set_type& span_source,
+		  const span_set_type& span_target,
+		  alignment_type& alignment_source_target,
+		  alignment_type& alignment_target_source)
+  {
+    operator()(source, target, alignment_source_target, alignment_target_source);
+  }
+
   
   void operator()(const sentence_type& source,
 		  const sentence_type& target,

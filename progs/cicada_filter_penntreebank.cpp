@@ -331,6 +331,9 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
+    if (unary_top && unary_bottom)
+      throw std::runtime_error("which strategy? unary-[top|bottom]");
+
     typedef boost::spirit::istream_iterator iter_type;
 
     utils::compress_istream is(input_file, 1024 * 1024);

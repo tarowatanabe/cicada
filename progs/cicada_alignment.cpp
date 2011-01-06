@@ -34,6 +34,7 @@
 #include <set>
 
 #include <cicada/alignment.hpp>
+#include <cicada/span_vector.hpp>
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -51,6 +52,8 @@ typedef boost::filesystem::path path_type;
 
 typedef cicada::Alignment alignment_type;
 typedef alignment_type::point_type point_type;
+
+typedef cicada::SpanVector span_set_type;
 
 struct BitextGiza
 {
@@ -138,7 +141,7 @@ double score_intersection = 0.0;
 int threads = 1;
 int debug = 0;
 
-void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostream& os);
+void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os);
 void process_giza(std::istream& is, std::ostream& os);
 void process_alignment(std::istream& is, std::ostream& os);
 
@@ -192,8 +195,19 @@ int main(int argc, char ** argv)
       utils::compress_istream is_src_trg(source_target_file, 1024 * 1024);
       utils::compress_istream is_trg_src(target_source_file, 1024 * 1024);
       utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+
+      if (! span_source_file.empty())
+	if (span_source_file != "-" && ! boost::filesystem::exists(span_source_file))
+	  throw std::runtime_error("no spna source file: " + span_source_file.file_string());
       
-      process_giza(is_src_trg, is_trg_src, os);
+      if (! span_target_file.empty())
+	if (span_target_file != "-" && ! boost::filesystem::exists(span_target_file))
+	  throw std::runtime_error("no spna target file: " + span_target_file.file_string());
+      
+      std::auto_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
+      std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
+
+      process_giza(is_src_trg, is_trg_src, is_src.get(), is_trg.get(), os);
     }
   }
   catch (const std::exception& err) {
@@ -623,6 +637,42 @@ struct ITG
     
     aligner(costs, insert_align<Alignment>(align));
   }
+
+  template <typename Alignment>
+  void operator()(const bitext_giza_type& bitext_source_target,
+		  const bitext_giza_type& bitext_target_source,
+		  const span_set_type& span_source,
+		  const span_set_type& span_target,
+		  Alignment& align)
+  {
+    const int source_size = utils::bithack::max(bitext_source_target.source.size() - 1, bitext_target_source.target.size());
+    const int target_size = utils::bithack::max(bitext_source_target.target.size(),     bitext_target_source.source.size() - 1);
+    
+    costs.clear();
+    costs.resize(source_size + 1, target_size + 1, score_null);
+    assigned.clear();
+    assigned.resize(source_size + 1, target_size + 1, false);
+    
+    for (int src = 1; src < static_cast<int>(bitext_source_target.source.size()); ++ src) {
+      const bitext_giza_type::point_set_type& aligns = bitext_source_target.source[src].second;
+      
+      bitext_giza_type::point_set_type::const_iterator titer_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator titer = aligns.begin(); titer != titer_end; ++ titer) {
+	costs(src, *titer) = score_union;
+	assigned(src, *titer) = true;
+      }
+    }
+    
+    for (int trg = 1; trg < static_cast<int>(bitext_target_source.source.size()); ++ trg) {
+      const bitext_giza_type::point_set_type& aligns = bitext_target_source.source[trg].second;
+      
+      bitext_giza_type::point_set_type::const_iterator siter_end = aligns.end();
+      for (bitext_giza_type::point_set_type::const_iterator siter = aligns.begin(); siter != siter_end; ++ siter)
+	costs(*siter, trg) = (assigned(*siter, trg) ? score_intersection : score_union);
+    }
+    
+    aligner(costs, span_source, span_target, insert_align<Alignment>(align));
+  }
   
   matrix_type costs;
   assigned_type assigned;
@@ -849,7 +899,7 @@ struct Task
   
 };
 
-void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostream& os)
+void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os)
 {
   typedef std::set<point_type, std::less<point_type>, std::allocator<point_type> > align_set_type;
 
@@ -886,12 +936,21 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
   FinalAnd  __final_and;
   
   Invert    __invert;
+  
+  span_set_type span_source;
+  span_set_type span_target;
+  
 
   while (siter != siter_end && titer != titer_end) {
     bitext_source_target.clear();
     bitext_target_source.clear();
     alignment.clear();
-
+    
+    if (is_src)
+      *is_src >> span_source;
+    if (is_trg)
+      *is_trg >> span_target;
+    
     if (moses_mode) {
       if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser_alignment, boost::spirit::standard::blank, alignment))
 	if (siter != siter_end)
@@ -916,10 +975,16 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
 	  throw std::runtime_error("target-source parsing failed");
     }
     
+    if (is_src && ! *is_src) break;
+    if (is_trg && ! *is_trg) break;
+    
     aligns.clear();
-
+    
     if (itg_mode) {
-      __itg(bitext_source_target, bitext_target_source, aligns);
+      if (is_src || is_trg)
+	__itg(bitext_source_target, bitext_target_source, span_source, span_target, aligns);
+      else
+	__itg(bitext_source_target, bitext_target_source, aligns);
       
       alignment.insert(alignment.end(), aligns.begin(), aligns.end());
     } else if (max_match_mode) {
@@ -966,6 +1031,11 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::ostre
   
   if (siter != siter_end || titer != titer_end)
     throw std::runtime_error("# of samples do not match");
+  
+  if (is_src && (*is_src >> span_source))
+    throw std::runtime_error("# of samples do not match");
+  if (is_trg && (*is_trg >> span_target))
+    throw std::runtime_error("# of samples do not match");
 }
 
 
@@ -999,9 +1069,9 @@ void options(int argc, char** argv)
 
     ("moses", po::bool_switch(&moses_mode), "moses alignment (not GIZA++ alignment)")
 
-    ("prob-null",         po::value<double>(&prob_null),         "NULL probability")
-    ("prob-union",        po::value<double>(&prob_union),        "union probability")
-    ("prob-intersection", po::value<double>(&prob_intersection), "intersection probability")
+    ("prob-null",         po::value<double>(&prob_null)->default_value(prob_null),                 "NULL probability")
+    ("prob-union",        po::value<double>(&prob_union)->default_value(prob_union),               "union probability")
+    ("prob-intersection", po::value<double>(&prob_intersection)->default_value(prob_intersection), "intersection probability")
     
     ("threads", po::value<int>(&threads), "# of threads")
     

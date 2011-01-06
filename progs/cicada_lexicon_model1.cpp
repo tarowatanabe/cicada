@@ -25,6 +25,8 @@
 
 path_type source_file = "-";
 path_type target_file = "-";
+path_type span_source_file;
+path_type span_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 path_type output_source_target_file;
@@ -434,6 +436,9 @@ void learn(ttable_type& ttable_source_target,
       std::cerr << std::endl;
     if (debug)
       std::cerr << "# of bitexts: " << num_bitext << std::endl;
+
+    if (is_src || is_trg)
+      throw std::runtime_error("# of samples do not match");
         
     for (size_t i = 0; i != learners.size(); ++ i) {
       bitexts.clear();
@@ -494,9 +499,20 @@ struct ViterbiMapReduce
     bitext_type(const size_type& __id, const sentence_type& __source, const sentence_type& __target, const alignment_type& __alignment)
       : id(__id), source(__source), target(__target), alignment(__alignment) {}
     
+    bitext_type(const size_type& __id,
+		const sentence_type& __source, const sentence_type& __target,
+		const span_set_type& __span_source, const span_set_type& __span_target,
+		const alignment_type& __alignment)
+      : id(__id),
+	source(__source), target(__target),
+	span_source(__span_source), span_target(__span_target),
+	alignment(__alignment) {}
+    
     size_type     id;
     sentence_type source;
     sentence_type target;
+    span_set_type span_source;
+    span_set_type span_target;
     alignment_type alignment;
 
     void clear()
@@ -504,6 +520,8 @@ struct ViterbiMapReduce
       id = size_type(-1);
       source.clear();
       target.clear();
+      span_source.clear();
+      span_target.clear();
       alignment.clear();
     }
     
@@ -512,6 +530,8 @@ struct ViterbiMapReduce
       std::swap(id, x.id);
       source.swap(x.source);
       target.swap(x.target);
+      span_source.swap(x.span_source);
+      span_target.swap(x.span_target);
       alignment.swap(x.alignment);
     }
   };
@@ -556,7 +576,7 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
       alignment_target_source.clear();
       
       if (! bitext.source.empty() && ! bitext.target.empty())
-	Aligner::operator()(bitext.source, bitext.target, alignment_source_target, alignment_target_source);
+	Aligner::operator()(bitext.source, bitext.target, bitext.span_source, bitext.span_target, alignment_source_target, alignment_target_source);
       
       reducer_source_target.push(bitext_type(bitext.id, bitext.source, bitext.target, alignment_source_target));
       reducer_target_source.push(bitext_type(bitext.id, bitext.target, bitext.source, alignment_target_source));
@@ -716,12 +736,22 @@ void viterbi(const ttable_type& ttable_source_target,
   
   utils::compress_istream is_src(source_file, 1024 * 1024);
   utils::compress_istream is_trg(target_file, 1024 * 1024);
+
+  std::auto_ptr<std::istream> is_span_src(! span_source_file.empty()
+					  ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
+  std::auto_ptr<std::istream> is_span_trg(! span_target_file.empty()
+					  ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);
   
   for (;;) {
     is_src >> bitext.source;
     is_trg >> bitext.target;
     
-    if (! is_src || ! is_trg) break;
+    if (is_span_src.get())
+      *is_span_src >> bitext.span_source;
+    if (is_span_trg.get())
+      *is_span_trg >> bitext.span_target;
+    
+    if (! is_src || ! is_trg || (is_span_src.get() && ! *is_span_src) || (is_span_trg.get() && ! *is_span_trg)) break;
     
     queue.push(bitext);
     
@@ -739,6 +769,9 @@ void viterbi(const ttable_type& ttable_source_target,
     std::cerr << std::endl;
   if (debug)
     std::cerr << "# of bitexts: " << bitext.id << std::endl;
+  
+  if (is_src || is_trg || (is_span_src.get() && *is_span_src) || (is_span_trg.get() && *is_span_trg))
+    throw std::runtime_error("# of samples do not match");
   
   for (int i = 0; i != threads; ++ i) {
     bitext.clear();
@@ -773,6 +806,9 @@ void options(int argc, char** argv)
   desc.add_options()
     ("source", po::value<path_type>(&source_file), "source file")
     ("target", po::value<path_type>(&target_file), "target file")
+    
+    ("span-source", po::value<path_type>(&span_source_file), "source span file")
+    ("span-target", po::value<path_type>(&span_target_file), "target span file")
     
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
