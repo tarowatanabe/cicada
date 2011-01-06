@@ -197,7 +197,7 @@ int main(int argc, char** argv)
       root_count_set_type::const_iterator siter_end = root_sources.end();
       for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
 	os_src << *siter << '\n';
-	
+      
       root_count_set_type::const_iterator titer_end = root_targets.end();
       for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
 	os_trg << *titer << '\n';

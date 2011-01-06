@@ -54,7 +54,8 @@ while rule-target.gz looks like:
 root(rhs) ||| counts(root(rhs)) ||| observed(hs,rhs) observed(rhs)
 
 You can easily transform the counts into probabilities by maximum likelihood estimates, or use observed counts
-to perform Dirichlet prior smoothing (default). Following filers are implemented:
+to perform Dirichlet prior smoothing (default).
+Following filers are implemented:
 
    cicada_filter_extract:
 	extract only nbet of target variation for each source side,

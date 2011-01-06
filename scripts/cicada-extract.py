@@ -757,4 +757,5 @@ if options.first_step <= 6 and options.last_step >= 6:
     
     print "(6) score phrase table started @", time.ctime()
     score.run()
+    
     print "(6) score phrase table finished @", time.ctime()
