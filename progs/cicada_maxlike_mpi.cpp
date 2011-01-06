@@ -1145,7 +1145,7 @@ void read_tstset(const path_set_type& files,
 	  
 	  cicada::apply_exact(model, graphs[id], graph_reward);
 	  
-	  graphs[id].swap(graph_reward);
+	  const_cast<hypergraph_type&>(graphs[id]).swap(graph_reward);
 	}
       }
     }
