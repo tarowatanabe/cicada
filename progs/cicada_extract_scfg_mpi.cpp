@@ -307,6 +307,8 @@ void options(int argc, char** argv)
     ("alignment",    po::value<path_type>(&alignment_file),    "alignment file")
     ("spans-source", po::value<path_type>(&spans_source_file), "source span file")
     ("spans-target", po::value<path_type>(&spans_target_file), "target span file")
+
+    ("output",    po::value<path_type>(&output_file),    "output directory")
     
     ("max-length",    po::value<int>(&max_length)->default_value(max_length),       "maximum terminal length")
     ("max-fertility", po::value<int>(&max_fertility)->default_value(max_fertility), "maximum terminal fertility ratio")
