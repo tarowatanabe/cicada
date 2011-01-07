@@ -253,8 +253,8 @@ class MPI:
                 
     def run(self, command):
         mpirun = self.mpirun
-        if self.dir:
-            mpirun += ' --prefix %s' %(self.dir)
+        #if self.dir:
+        #    mpirun += ' --prefix %s' %(self.dir)
         if self.number > 0:
             mpirun += ' --np %d' %(self.number)
         if self.hosts:

@@ -276,7 +276,7 @@ int main(int argc, char** argv)
 }
 
 enum {
-  root_count_tag = 1000,
+  root_count_tag = 2000,
   modified_tag,
   phrase_pair_tag,
   notify_tag,
@@ -330,7 +330,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   path_set_type mapped_files;
-  for (int i = 0; i != static_cast<int>(counts_files.size()); ++ i)
+  for (size_t i = 0; i != counts_files.size(); ++ i)
     if (i % mpi_size == mpi_rank)
       mapped_files.push_back(counts_files[i]);
   
@@ -353,7 +353,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   phrase_pair_type phrase_pair;
   generator_type   generator;
   
-  boost::thread mapper(mapper_type(mapped_files, queues, debug));
+  boost::thread_group mapper;
+  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, debug)));
   
   int non_found_iter = 0;
   for (;;) {
@@ -380,7 +381,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  mapper.join();
+  mapper.join_all();
 }
 
 template <typename Extractor, typename Lexicon>
@@ -446,13 +447,14 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   
   utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
   
-  boost::thread reducer(reducer_type(modified,
-				     root_sources,
-				     Extractor(),
-				     lexicon,
-				     queues,
-				     os,
-				     debug));
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(modified,
+						    root_sources,
+						    Extractor(),
+						    lexicon,
+						    queues,
+						    os,
+						    debug)));
   
   phrase_pair_type phrase_pair;
   parser_type      parser;
@@ -485,7 +487,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  reducer.join();
+  reducer.join_all();
   
   // merge root-sources...
   if (mpi_rank == 0) {
@@ -517,6 +519,9 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
       generator(os, *siter) << '\n';
   }
+  
+  for (int rank = 0; rank != mpi_size; ++ rank)
+    mapper.comm.Send(0, 0, MPI::INT, rank, notify_tag);
 }
 
 template <typename Extractor>
@@ -632,7 +637,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   path_set_type mapped_files;
-  for (int i = 0; i != static_cast<int>(counts_files.size()); ++ i)
+  for (size_t i = 0; i != counts_files.size(); ++ i)
     if (i % mpi_size == mpi_rank)
       mapped_files.push_back(counts_files[i]);
   
@@ -651,13 +656,16 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     queues[rank].reset(new queue_type(128));
   }
 
-  boost::thread mapper(mapper_type(mapped_files, queues, debug));
+  if (debug >= 2)
+    std::cerr << "modify counts: rank: " << mpi_rank << " files: " << mapped_files.size() << std::endl;
+
+  boost::thread_group mapper;
+  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, debug)));
   
   modified_set_type       modified;
   modified_generator_type generator;
 
   int non_found_iter = 0;
-  int mapped = 0;
   for (;;) {
     bool found = false;
     
@@ -669,10 +677,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    boost::thread::yield();
 	  
 	  modified_set_type::const_iterator citer_end = modified.end();
-	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
+	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
 	    generator(*stream[rank], *citer) << '\n';
-	    ++ mapped;
-	  }
 	  
 	} else
 	  stream[rank].reset();
@@ -690,7 +696,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  mapper.join();
+  mapper.join_all();
 }
 
 void modify_counts_reducer(utils::mpi_intercomm& mapper,
@@ -734,7 +740,8 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   
   const size_t queue_size = mpi_size * 128;
   queue_type queue(queue_size);
-  boost::thread reducer(reducer_type(queue, modified_files, 1, max_malloc, debug));
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(queue, modified_files, 1, max_malloc, debug)));
   
   modified_set_type modified;
   modified_type     parsed;
@@ -777,7 +784,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   modified.clear();
   queue.push_swap(modified);
   
-  reducer.join();
+  reducer.join_all();
 }
 
 

@@ -390,8 +390,8 @@ void modify_counts(const path_set_type& counts_files,
 						     queues,
 						     debug)));
   
-  mappers.join_all();
   reducers.join_all();
+  mappers.join_all();
 }
 
 void options(int argc, char** argv)

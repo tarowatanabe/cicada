@@ -994,10 +994,9 @@ struct PhrasePairModifyMapper
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
-      else if (counts.back().target != phrase_pair.target) {
-	phrase_pair.source = counts.back().source;
+      else if (counts.back().target != phrase_pair.target)
 	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
-      } else
+      else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
@@ -1010,15 +1009,16 @@ struct PhrasePairModifyMapper
     
     typedef std::deque<modified_type, std::allocator<modified_type> > buffer_type;
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
+    typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
     
     typedef std::vector<modified_set_type, std::allocator<modified_set_type> > modified_map_type;
     
-    pqueue_type          pqueue;
-    istream_ptr_set_type istreams;
-
-    std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_streams(paths.size());
+    pqueue_type pqueue;
+    
+    istream_ptr_set_type   istreams(paths.size());
+    buffer_stream_set_type buffer_streams(paths.size());
     
     size_t pos = 0;
     path_set_type::const_iterator piter_end = paths.end();
@@ -1026,17 +1026,17 @@ struct PhrasePairModifyMapper
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->file_string());
       
-      istreams.push_back(istream_ptr_type(new istream_type(*piter, 1024 * 1024)));
+      istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
       
       buffer_stream_type* buffer_stream = &buffer_streams[pos];
-      buffer_stream->second = &(*istreams.back());
+      buffer_stream->second = &(*istreams[pos]);
       
-      read_phrase_pair(*istreams.back(), buffer_stream->first);
+      read_phrase_pair(*istreams[pos], buffer_stream->first);
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
     }
-    
+
     modified_map_type modified(queues.size());
     modified_type counts;
     
@@ -1047,7 +1047,7 @@ struct PhrasePairModifyMapper
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
-
+      
       modified_type& curr = buffer_stream->first.front();
       
       if (counts != curr) {
@@ -1069,7 +1069,9 @@ struct PhrasePairModifyMapper
 	  bool found = false;
 	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 256) {
-	      const bool no_wait = (modified[shard].size() < 1024 * 4);
+	      
+	      const size_t modified_size = modified[shard].size();
+	      const bool no_wait = (modified_size < 1024 * 4);
 	      if (queues[shard]->push_swap(modified[shard], no_wait)) {
 		modified[shard].clear();
 		found = true;
@@ -1088,8 +1090,12 @@ struct PhrasePairModifyMapper
       
       buffer_stream->first.pop_front();
       
-      if (buffer_stream->first.empty())
+      if (buffer_stream->first.empty()) {
+	if (! buffer_stream->second)
+	  throw std::runtime_error("no istream?");
+	
 	read_phrase_pair(*(buffer_stream->second), buffer_stream->first);
+      }
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
@@ -1117,6 +1123,7 @@ struct PhrasePairModifyMapper
 	if (! terminated[shard]) {
 	  modified[shard].clear();
 	  terminated[shard] = queues[shard]->push_swap(modified[shard], true);
+	  modified[shard].clear();
 	}
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
@@ -1230,7 +1237,7 @@ struct PhrasePairModifyReducer
   void merge_counts(path_set_type& paths)
   {
     if (paths.size() <= 128) return;
-    
+
     const path_type tmp_dir = utils::tempfile::tmp_dir();
 
     while (paths.size() > 128) {
@@ -1282,7 +1289,7 @@ struct PhrasePairModifyReducer
   {
     // sort...!
     typedef std::vector<const modified_type*, std::allocator<const modified_type*> > sorted_type;
-
+    
     // sorting...
     sorted_type sorted(counts.size());
     {
@@ -1301,7 +1308,7 @@ struct PhrasePairModifyReducer
     utils::tempfile::insert(counts_file);
     
     paths.push_back(counts_file);
-    
+
     // final dump!
     utils::compress_ostream os(counts_file, 1024 * 1024);
     os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
@@ -1330,7 +1337,7 @@ struct PhrasePairModifyReducer
 	else
 	  continue;
       }
-      
+
       modified_set_type::const_iterator citer_end = modified.end();
       for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
 	
@@ -1488,10 +1495,9 @@ public:
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(phrase_pair);
-      else if (counts.back().target != phrase_pair.target) {
-	phrase_pair.source = counts.back().source;
+      else if (counts.back().target != phrase_pair.target)
 	counts.push_back(phrase_pair);
-      } else
+      else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
@@ -1508,6 +1514,7 @@ public:
     
     typedef std::deque<modified_type, std::allocator<modified_type> > buffer_type;
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
+    typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
 
@@ -1528,20 +1535,20 @@ public:
     os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
     
     pqueue_type pqueue;
-    istream_ptr_set_type istreams;
-    std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_streams(paths.size());
+    istream_ptr_set_type   istreams(paths.size());
+    buffer_stream_set_type buffer_streams(paths.size());
     
     size_t pos = 0;
     for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->file_string());
       
-      istreams.push_back(istream_ptr_type(new istream_type(*piter, 1024 * 1024)));
+      istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
       
       buffer_stream_type* buffer_stream = &buffer_streams[pos];
-      buffer_stream->second = &(*istreams.back());
+      buffer_stream->second = &(*istreams[pos]);
       
-      read_phrase_pair(*istreams.back(), buffer_stream->first);
+      read_phrase_pair(*istreams[pos], buffer_stream->first);
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
@@ -1760,13 +1767,15 @@ struct PhrasePairScoreMapper
     typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
     
     typedef std::deque<phrase_pair_type, std::allocator<phrase_pair_type> > buffer_type;
+    
     typedef std::pair<buffer_type, istream_type*> buffer_stream_type;
+    typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
     
-    pqueue_type          pqueue;
-    istream_ptr_set_type istreams;
-    std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_streams(paths.size());
+    pqueue_type            pqueue;
+    istream_ptr_set_type   istreams(paths.size());
+    buffer_stream_set_type buffer_streams(paths.size());
     
     size_t pos = 0;
     path_set_type::const_iterator piter_end = paths.end();
@@ -1774,12 +1783,12 @@ struct PhrasePairScoreMapper
       if (! boost::filesystem::exists(*piter))
 	throw std::runtime_error("no file? " + piter->file_string());
       
-      istreams.push_back(istream_ptr_type(new istream_type(*piter, 1024 * 1024)));
+      istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
       
       buffer_stream_type* buffer_stream = &buffer_streams[pos];
-      buffer_stream->second = &(*istreams.back());
+      buffer_stream->second = &(*istreams[pos]);
       
-      read_phrase_pair(*istreams.back(), buffer_stream->first);
+      read_phrase_pair(*istreams[pos], buffer_stream->first);
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
