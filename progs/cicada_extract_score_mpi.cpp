@@ -470,6 +470,8 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
 	  
 	  if (parser(line, phrase_pair))
 	    queues[rank]->push_swap(phrase_pair);
+	  else
+	    std::cerr << "failed phrase-pair parsing: " << line << std::endl;
 	} else {
 	  phrase_pair.clear();
 	  queues[rank]->push_swap(phrase_pair);
@@ -766,6 +768,8 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  if (std::getline(*stream[rank], line)) {
 	    if (parser(line, parsed))
 	      modified.push_back(parsed);
+	    else
+	      std::cerr << "failed modified phrase parsing: " << line << std::endl;
 	  } else {
 	    stream[rank].reset();
 	    device[rank].reset();
