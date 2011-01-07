@@ -115,7 +115,7 @@ namespace cicada
     
     iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, (karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_]) % ' ', x))
+    if (! boost::spirit::karma::generate(iter, -((karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_]) % ' '), x))
       throw std::runtime_error("span vector generation failed...?");
     
     return os;
