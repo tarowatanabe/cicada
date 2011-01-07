@@ -269,6 +269,7 @@ void score_counts(const path_type& output_file,
   for (int shard = 0; shard != threads; ++ shard)
     mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
 						     queues_mapper[shard],
+						     max_malloc,
 						     debug)));
   for (int shard = 0; shard != threads; ++ shard) {
     const path_type path = output_file / (boost::lexical_cast<std::string>(shard) + ".gz");

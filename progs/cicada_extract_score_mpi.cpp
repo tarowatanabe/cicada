@@ -354,7 +354,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   generator_type   generator;
   
   boost::thread_group mapper;
-  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, debug)));
+  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
   
   int non_found_iter = 0;
   for (;;) {
@@ -503,7 +503,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
       
       while (std::getline(is, line)) {
 	if (! parser(line, root_count)) {
-	  std::cerr << "warning: root-count parsing failed" << std::endl;
+	  std::cerr << "warning: root-count parsing failed: " << line << std::endl;
 	  continue;
 	}
 	
@@ -586,7 +586,7 @@ void index_counts(const path_set_type& modified_files,
       
       while (std::getline(is, line)) {
 	if (! parser(line, root_count)) {
-	  std::cerr << "warning: root-count parsing failed" << std::endl;
+	  std::cerr << "warning: root-count parsing failed: " << line << std::endl;
 	  continue;
 	}
 	
@@ -819,10 +819,8 @@ void options(int argc, char** argv)
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")
     ("score-ghkm",   po::bool_switch(&score_ghkm),   "score ghkm fragment counts")
     
-    ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
-    ("prog",       po::value<path_type>(&prog_name),   "this binary")
-    
-    ;
+    ("max-malloc", po::value<double>(&max_malloc),   "maximum malloc in GB")
+    ("prog",       po::value<path_type>(&prog_name), "this binary");
   
   po::options_description opts_command("command line options");
   opts_command.add_options()

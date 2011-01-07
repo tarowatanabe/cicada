@@ -640,14 +640,16 @@ struct RootCountParser
       
       token %= lexeme[+(char_ - space)];
       count_base64 %= token;
+      count %= 'B' >> count_base64 | double_;
       
-      counts %= +('B' >> count_base64 | double_);
-      root_count %= label >> "|||" >> counts >> "|||" >> double_ >> double_;
+      counts %= +count;
+      root_count %= label >> "|||" >> counts >> "|||" >> count >> count;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
     boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
     boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count_base64;
+    boost::spirit::qi::rule<Iterator, double(), boost::spirit::standard::space_type> count;
     boost::spirit::qi::rule<Iterator, counts_type(), boost::spirit::standard::space_type> counts;
     boost::spirit::qi::rule<Iterator, root_count_type(), boost::spirit::standard::space_type> root_count;
   };
@@ -1044,8 +1046,7 @@ struct PhrasePairModifyMapper
     modified_type counts;
     
     int iter = 0;
-    const int mask_full    = (1 << 12) - 1;
-    const int mask_partial = (1 << 10) - 1;
+    const int iteration_mask = (1 << 10) - 1;
     
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -1062,17 +1063,12 @@ struct PhrasePairModifyMapper
 	  modified[shard].push_back(counts);
 	}
 	
-	if ((iter & mask_full) == mask_full) {
-	  for (size_t shard = 0; shard != queues.size(); ++ shard)
-	    if (modified[shard].size() >= 256) {
-	      queues[shard]->push_swap(modified[shard]);
-	      modified[shard].clear();
-	    }
-	} else if ((iter & mask_partial) == mask_partial) {
+	if ((iter & iteration_mask) == iteration_mask) {
+	  const bool no_full = utils::malloc_stats::used() < size_t(max_malloc * 1024 * 1024 * 1024);
+	  
 	  bool found = false;
 	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 256) {
-	      const bool no_full = utils::malloc_stats::used() < size_t(max_malloc * 1024 * 1024 * 1024);
 	      const bool no_wait = (modified[shard].size() < 1024 * 4) && no_full;
 	      if (queues[shard]->push_swap(modified[shard], no_wait)) {
 		modified[shard].clear();
@@ -1718,12 +1714,14 @@ struct PhrasePairScoreMapper
   
   path_set_type paths;
   queue_ptr_set_type& queues;
+  double max_malloc;
   int debug;
   
   PhrasePairScoreMapper(const path_set_type& __paths,
 			queue_ptr_set_type& __queues,
+			const double __max_malloc,
 			const int __debug)
-    : paths(__paths), queues(__queues), debug(__debug) {}
+    : paths(__paths), queues(__queues), max_malloc(__max_malloc), debug(__debug) {}
   
   template <typename Tp>
   struct greater_buffer
@@ -1798,6 +1796,9 @@ struct PhrasePairScoreMapper
     
     phrase_pair_type counts;
     
+    int iter = 0;
+    const int iteration_mask = (1 << 10) - 1;
+
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1809,6 +1810,12 @@ struct PhrasePairScoreMapper
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
+	
+	if ((iter & iteration_mask) == iteration_mask
+	    && utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))
+	  boost::thread::yield();
+	
+	++ iter;
 	
 	counts.swap(curr);
       } else
