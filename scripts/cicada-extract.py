@@ -395,6 +395,7 @@ class Extract:
         self.makedirs = makedirs
         self.data = []
         self.logfile = ""
+        self.name = ""
         
         if not hasattr(self, 'command'):
             self.command = ""
@@ -407,9 +408,12 @@ class Extract:
         if not os.path.exists(self.makedirs):
             os.makedirs(self.makedirs)
 
+        if not self.name:
+            self.name = "extract"
+
         if self.mpi:
             if self.pbs:
-                self.pbs.run(command=self.command, name="extract", mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
+                self.pbs.run(command=self.command, name=self.name, mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
             else:
                 self.mpi.run(self.command)
         else:
@@ -432,6 +436,7 @@ class ExtractPhrase(Extract):
         self.data.append(corpus.source)
         self.data.append(corpus.target)
         self.logfile = "extract-phrase.log"
+        self.name = "extract-phrase"
         
         prog_name = toolkit.cicada_extract_phrase
         if mpi:
@@ -474,6 +479,7 @@ class ExtractSCFG(Extract):
         self.data.append(corpus.source)
         self.data.append(corpus.target)
         self.logfile = "extract-scfg.log"
+        self.name = "extract-scfg"
         
         if os.path.exists(corpus.source_span) and os.path.exists(corpus.target_span):
             raise ValueError, "both of source/target span specified... which one?"
@@ -528,6 +534,7 @@ class ExtractGHKM(Extract):
         self.data.append(corpus.source_forest)
         self.data.append(corpus.target)
         self.logfile = "extract-ghkm.log"
+        self.name = "extract-ghkm"
         
         prog_name = toolkit.cicada_extract_ghkm
         if mpi:
@@ -576,6 +583,7 @@ class ExtractTree(Extract):
         self.data.append(corpus.source_forest)
         self.data.append(corpus.target_forest)
         self.logfile = "extract-tree.log"
+        self.name = "extract-tree"
         
         prog_name = toolkit.cicada_extract_tree
         if mpi:
