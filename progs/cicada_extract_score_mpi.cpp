@@ -496,10 +496,14 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     std::string line;
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
       is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
       
       while (std::getline(is, line)) {
-	if (! parser(line, root_count)) continue;
+	if (! parser(line, root_count)) {
+	  std::cerr << "warning: root-count parsing failed" << std::endl;
+	  continue;
+	}
 	
 	std::pair<root_count_set_type::iterator, bool> result = root_sources.insert(root_count);
 	if (! result.second) {
@@ -512,6 +516,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     
   } else {
     boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::gzip_compressor());
     os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
     
     RootCountGenerator generator;
@@ -574,10 +579,14 @@ void index_counts(const path_set_type& modified_files,
     std::string line;
     for (int rank = 1; rank != mpi_size; ++ rank) {
       boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
       is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
       
       while (std::getline(is, line)) {
-	if (! parser(line, root_count)) continue;
+	if (! parser(line, root_count)) {
+	  std::cerr << "warning: root-count parsing failed" << std::endl;
+	  continue;
+	}
 	
 	std::pair<root_count_set_type::iterator, bool> result = root_targets.insert(root_count);
 	if (! result.second) {
@@ -589,6 +598,7 @@ void index_counts(const path_set_type& modified_files,
     }
   } else {
     boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::gzip_compressor());
     os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
     
     RootCountGenerator generator;
