@@ -20,6 +20,7 @@
 #include <mpi.h>
 
 #include <utils/mpi_allocator.hpp>
+#include <utils/atomicop.hpp>
 
 namespace utils
 {
@@ -252,6 +253,8 @@ namespace utils
   
   void mpi_device_sink::impl::wait() const
   {
+    utils::atomicop::memory_barrier();
+    
     if (! is_open())
       return;
 
@@ -264,6 +267,8 @@ namespace utils
 
   void mpi_device_source::impl::wait() const
   {
+    utils::atomicop::memory_barrier();
+    
     if (! is_open())
       return;
 
@@ -276,6 +281,8 @@ namespace utils
   
   bool mpi_device_sink::impl::test() const
   {
+    utils::atomicop::memory_barrier();
+
     if (! is_open())
       return true;
 
@@ -284,6 +291,8 @@ namespace utils
   
   bool mpi_device_source::impl::test() const
   {
+    utils::atomicop::memory_barrier();
+
     if (! is_open()) 
       return true;
     
@@ -360,6 +369,8 @@ namespace utils
   
   bool mpi_device_sink::impl::test_terminate()
   {
+    utils::atomicop::memory_barrier();
+
     return send_size == 0;
   }
   
@@ -382,6 +393,8 @@ namespace utils
   
   void mpi_device_sink::impl::finalize()
   {
+    utils::atomicop::memory_barrier();
+
     if (buffer.empty()) return;
     
     if (send_size != 0)

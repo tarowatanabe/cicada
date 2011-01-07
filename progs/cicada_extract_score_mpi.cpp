@@ -352,7 +352,6 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   boost::thread mapper(mapper_type(mapped_files, queues, debug));
   
   int non_found_iter = 0;
-  int mapped = 0;
   for (;;) {
     bool found = false;
     
@@ -364,7 +363,6 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	    boost::thread::yield();
 
 	  generator(*stream[rank], phrase_pair) << '\n';
-	  ++ mapped;
 	} else
 	  stream[rank].reset();
 	
@@ -457,7 +455,6 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   std::string line;
    
   int non_found_iter = 0;
-  int reduced = 0;
   for (;;) {
     bool found = false;
     
@@ -465,10 +462,8 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
       while (stream[rank] && device[rank] && device[rank]->test() && queues[rank]->size() < queue_size) {
 	if (std::getline(*stream[rank], line)) {
 	  
-	  if (parser(line, phrase_pair))  {
+	  if (parser(line, phrase_pair))
 	    queues[rank]->push_swap(phrase_pair);
-	    ++ reduced;
-	  }
 	} else {
 	  phrase_pair.clear();
 	  queues[rank]->push_swap(phrase_pair);
@@ -658,7 +653,6 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   modified_generator_type generator;
 
   int non_found_iter = 0;
-  int mapped = 0;
   for (;;) {
     bool found = false;
     
@@ -670,13 +664,14 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    boost::thread::yield();
 	  
 	  modified_set_type::const_iterator citer_end = modified.end();
-	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer, ++ mapped)
+	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
 	    generator(*stream[rank], *citer) << '\n';
 	  
 	} else
 	  stream[rank].reset();
 	
 	modified.clear();
+	modified_set_type(modified).swap(modified);
 	
 	found = true;
       }
@@ -687,6 +682,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }
+
+  MPI::COMM_WORLD.Barrier();
   
   mapper.join();
 }
@@ -741,7 +738,6 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   std::string line;
   
   int non_found_iter = 0;
-  int reduced = 0;
   for (;;) {
     bool found = false;
     
@@ -749,11 +745,8 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       for (int rank = 0; rank != mpi_size; ++ rank)
 	for (int iter = 0; iter < 1024 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
 	  if (std::getline(*stream[rank], line)) {
-
-	    if (! parser(line, parsed)) continue;
-	    
-	    modified.push_back(parsed);
-	    ++ reduced;
+	    if (parser(line, parsed))
+	      modified.push_back(parsed);
 	  } else {
 	    stream[rank].reset();
 	    device[rank].reset();
@@ -775,10 +768,13 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
+  
   modified.clear();
   queue.push_swap(modified);
   
   reducer.join();
+
+  MPI::COMM_WORLD.Barrier();
 }
 
 
