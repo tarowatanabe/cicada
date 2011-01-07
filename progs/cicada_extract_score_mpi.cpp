@@ -519,9 +519,6 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
       generator(os, *siter) << '\n';
   }
-  
-  for (int rank = 0; rank != mpi_size; ++ rank)
-    mapper.comm.Send(0, 0, MPI::INT, rank, notify_tag);
 }
 
 template <typename Extractor>
