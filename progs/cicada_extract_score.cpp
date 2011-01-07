@@ -388,6 +388,7 @@ void modify_counts(const path_set_type& counts_files,
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     mappers.add_thread(new boost::thread(mapper_type(mapped_files[shard],
 						     queues,
+						     max_malloc,
 						     debug)));
   
   reducers.join_all();

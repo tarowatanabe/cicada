@@ -657,7 +657,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     std::cerr << "modify counts: rank: " << mpi_rank << " files: " << mapped_files.size() << std::endl;
 
   boost::thread_group mapper;
-  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, debug)));
+  mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
   
   modified_set_type       modified;
   modified_generator_type generator;

@@ -960,13 +960,16 @@ struct PhrasePairModifyMapper
   
   path_set_type paths;
   queue_ptr_set_type& queues;
-  int debug;
+  double max_malloc;
+  int    debug;
 
   PhrasePairModifyMapper(const path_set_type& __paths,
 			 queue_ptr_set_type& __queues,
+			 const double __max_malloc,
 			 const int __debug)
     : paths(__paths),
       queues(__queues),
+      max_malloc(__max_malloc),
       debug(__debug) {}
 
   template <typename Tp>
@@ -1069,9 +1072,8 @@ struct PhrasePairModifyMapper
 	  bool found = false;
 	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 256) {
-	      
-	      const size_t modified_size = modified[shard].size();
-	      const bool no_wait = (modified_size < 1024 * 4);
+	      const bool no_full = utils::malloc_stats::used() < size_t(max_malloc * 1024 * 1024 * 1024);
+	      const bool no_wait = (modified[shard].size() < 1024 * 4) && no_full;
 	      if (queues[shard]->push_swap(modified[shard], no_wait)) {
 		modified[shard].clear();
 		found = true;
