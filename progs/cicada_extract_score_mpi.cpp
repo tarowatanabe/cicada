@@ -275,6 +275,7 @@ enum {
   root_count_tag = 1000,
   modified_tag,
   phrase_pair_tag,
+  notify_tag,
 };
 
 inline
@@ -351,6 +352,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   boost::thread mapper(mapper_type(mapped_files, queues, debug));
   
   int non_found_iter = 0;
+  int mapped = 0;
   for (;;) {
     bool found = false;
     
@@ -362,7 +364,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	    boost::thread::yield();
 
 	  generator(*stream[rank], phrase_pair) << '\n';
-	  
+	  ++ mapped;
 	} else
 	  stream[rank].reset();
 	
@@ -455,6 +457,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   std::string line;
    
   int non_found_iter = 0;
+  int reduced = 0;
   for (;;) {
     bool found = false;
     
@@ -462,9 +465,10 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
       while (stream[rank] && device[rank] && device[rank]->test() && queues[rank]->size() < queue_size) {
 	if (std::getline(*stream[rank], line)) {
 	  
-	  if (parser(line, phrase_pair)) 
+	  if (parser(line, phrase_pair))  {
 	    queues[rank]->push_swap(phrase_pair);
-	  
+	    ++ reduced;
+	  }
 	} else {
 	  phrase_pair.clear();
 	  queues[rank]->push_swap(phrase_pair);
@@ -514,7 +518,6 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
       generator(os, *siter) << '\n';
   }
-  
 }
 
 template <typename Extractor>
@@ -638,24 +641,24 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   odevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
-  for (int rank = 0; rank < mpi_size; ++ rank) {
-    stream[rank].reset(new ostream_type());
+  for (int rank = 0; rank != mpi_size; ++ rank) {
     device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024, false, true));
     
+    stream[rank].reset(new ostream_type());
     stream[rank]->push(boost::iostreams::gzip_compressor());
     stream[rank]->push(*device[rank]);
+    stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(128));
-    
-    stream[rank]->precision(20);
   }
-  
+
   boost::thread mapper(mapper_type(mapped_files, queues, debug));
   
   modified_set_type       modified;
   modified_generator_type generator;
 
   int non_found_iter = 0;
+  int mapped = 0;
   for (;;) {
     bool found = false;
     
@@ -667,7 +670,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    boost::thread::yield();
 	  
 	  modified_set_type::const_iterator citer_end = modified.end();
-	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
+	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer, ++ mapped)
 	    generator(*stream[rank], *citer) << '\n';
 	  
 	} else
@@ -719,10 +722,10 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
   
-  for (int rank = 0; rank < mpi_size; ++ rank) {
-    stream[rank].reset(new istream_type());
+  for (int rank = 0; rank != mpi_size; ++ rank) {
     device[rank].reset(new idevice_type(mapper.comm, rank, modified_tag, 1024 * 1024));
     
+    stream[rank].reset(new istream_type());
     stream[rank]->push(boost::iostreams::gzip_decompressor());
     stream[rank]->push(*device[rank]);
   }
@@ -738,17 +741,19 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   std::string line;
   
   int non_found_iter = 0;
+  int reduced = 0;
   for (;;) {
     bool found = false;
     
     if (queue.size() < queue_size)
-      for (int rank = 0; rank < mpi_size; ++ rank)
+      for (int rank = 0; rank != mpi_size; ++ rank)
 	for (int iter = 0; iter < 1024 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
 	  if (std::getline(*stream[rank], line)) {
-	    
+
 	    if (! parser(line, parsed)) continue;
 	    
 	    modified.push_back(parsed);
+	    ++ reduced;
 	  } else {
 	    stream[rank].reset();
 	    device[rank].reset();
