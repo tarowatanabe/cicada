@@ -159,7 +159,6 @@ int main(int argc, char** argv)
 							       modified_counts,
 							       root_sources,
 							       LexiconPhrase(lexicon_source_target, lexicon_target_source));
-      
       else if (score_scfg)
 	score_counts_reducer<ExtractRootSCFG, LexiconSCFG>(comm_parent,
 							   output_file,
@@ -230,8 +229,9 @@ int main(int argc, char** argv)
 	std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
 	
 	boost::iostreams::filtering_ostream os;
+	os.push(boost::iostreams::gzip_compressor());
 	os.push(utils::mpi_device_bcast_sink(0, 4096));
-
+	
 	path_set_type::const_iterator citer_end = counts_files.end();
 	for (path_set_type::const_iterator citer = counts_files.begin(); citer != citer_end; ++ citer)
 	  os << citer->file_string() << '\n';
@@ -239,12 +239,16 @@ int main(int argc, char** argv)
 	counts_files.clear();
 	
 	boost::iostreams::filtering_istream is;
+	is.push(boost::iostreams::gzip_decompressor());
 	is.push(utils::mpi_device_bcast_source(0, 4096));
 	
 	std::string line;
 	while (std::getline(is, line))
 	  counts_files.push_back(line);
       }
+
+      if (debug && mpi_rank == 0)
+	std::cerr << "count files: " << counts_files.size() << std::endl;
       
       utils::resource start_modify;
       modify_counts_mapper(comm_child, counts_files);
@@ -653,6 +657,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   modified_generator_type generator;
 
   int non_found_iter = 0;
+  int mapped = 0;
   for (;;) {
     bool found = false;
     
@@ -664,8 +669,10 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    boost::thread::yield();
 	  
 	  modified_set_type::const_iterator citer_end = modified.end();
-	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
+	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
 	    generator(*stream[rank], *citer) << '\n';
+	    ++ mapped;
+	  }
 	  
 	} else
 	  stream[rank].reset();
@@ -682,8 +689,6 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     
     non_found_iter = loop_sleep(found, non_found_iter);
   }
-
-  MPI::COMM_WORLD.Barrier();
   
   mapper.join();
 }
@@ -773,8 +778,6 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   queue.push_swap(modified);
   
   reducer.join();
-
-  MPI::COMM_WORLD.Barrier();
 }
 
 

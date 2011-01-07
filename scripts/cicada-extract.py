@@ -262,7 +262,7 @@ class MPI:
         elif self.hosts_file:
             mpirun += ' --hostfile %s' %(self.hosts_file)
 	mpirun += ' ' + command
-	
+
 	run_command(mpirun)
 
 
