@@ -14,7 +14,9 @@ opt_parser = OptionParser(
         make_option("--root-count", action="store", type="string", default="-",
                     help="root count file", metavar='FILE'),
         make_option("--non-terminal", action="store", type="string", default="[x]",
-                    help="default non-terminal")
+                    help="default non-terminal"),
+        make_option("--binary", action="store_true", default=None,
+                    help="binary rule")
         ])
 
 (options, args) = opt_parser.parse_args()
@@ -39,12 +41,16 @@ for line in istream(options.root_count):
     
     if tokens[0][0] != '[': continue
     if tokens[0][-1] != ']': continue
-
+    
     non_terminals.add(tokens[0])
-
-for non_terminal in non_terminals:
-    # do we add index?
-    sys.stdout.write("%s ||| %s %s ||| %s %s ||| fallback-rule=1\n" %(non_terminal,
-                                                                      non_terminal, options.non_terminal,
-                                                                      non_terminal, options.non_terminal))
+    
+    for non_terminal in non_terminals:
+    sys.stdout.write("%s ||| %s ||| %s ||| fallback-rule=1\n" %(non_terminal,
+                                                                options.non_terminal,
+                                                                options.non_terminal))
+    
+    if options.binary:
+        sys.stdout.write("%s ||| %s %s ||| %s %s ||| fallback-rule=1\n" %(non_terminal,
+                                                                          non_terminal, options.non_terminal,
+                                                                          non_terminal, options.non_terminal))
     
