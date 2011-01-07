@@ -30,13 +30,15 @@ def istream(name):
     else:
         return open(name, 'r')
 
+def is_non_terminal(non_terminal):
+    return len(non_terminal) > 2 and non_terminal[0] == '[' and non_terminal[-1] == ']'
+
 non_terminals = set()
 for line in istream(options.root_count):
     tokens = line.split()
     if not tokens: continue
-    
-    if tokens[0][0] != '[': continue
-    if tokens[0][-1] != ']': continue
+
+    if not is_non_terminal(tokens[0]): continue
 
     non_terminals.add(tokens[0])
 
