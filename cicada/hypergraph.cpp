@@ -439,10 +439,7 @@ namespace cicada
 	      if (! initial_rule)
 		os << ", ";
 	      os << '\"';
-	      
-	      iterator_type iter(os);
-	      boost::spirit::karma::generate(iter, rule_grammar, rule);
-	      
+	      boost::spirit::karma::generate(iterator_type(os), rule_grammar, rule);
 	      os << '\"';
 	      
 	      initial_rule = false;
@@ -511,8 +508,7 @@ namespace cicada
 	  
 	  if (! edge.features.empty()) {
 	    os << "\"feature\":{";
-	    iterator_type iter(os);
-	    boost::spirit::karma::generate(iter, features_grammar, edge.features);
+	    boost::spirit::karma::generate(iterator_type(os), features_grammar, edge.features);
 	    os << "},";
 	  }
 	  

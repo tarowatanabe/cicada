@@ -71,19 +71,7 @@ struct penntreebank_escaped_grammar : boost::spirit::qi::grammar<Iterator, treeb
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
     
-    using qi::lit;
-    using qi::lexeme;
-    using qi::hold;
-    using qi::repeat;
-    using qi::attr;
-    using qi::on_error;
-    using qi::int_;
-    using qi::double_;
-    using standard::char_;
-    using standard::space;
-
     escaped_char.add
       ("\\/",   '/')
       ("\\*",   '*');
@@ -96,8 +84,8 @@ struct penntreebank_escaped_grammar : boost::spirit::qi::grammar<Iterator, treeb
       ("-LCB-", "{")
       ("-RCB-", "}");
     
-    cat %= lexeme[escaped_word | +(escaped_char | (char_ - space - '(' - ')'))];
-    treebank %= hold['(' >> cat >> +treebank >> ')'] | cat;
+    cat %= qi::lexeme[escaped_word | +(escaped_char | (standard::char_ - standard::space - '(' - ')'))];
+    treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
   }
   
   boost::spirit::qi::symbols<char, char>        escaped_char;
@@ -114,22 +102,10 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
     
-    using qi::lit;
-    using qi::lexeme;
-    using qi::hold;
-    using qi::repeat;
-    using qi::attr;
-    using qi::on_error;
-    using qi::int_;
-    using qi::double_;
-    using standard::char_;
-    using standard::space;
-    
-    cat %= lexeme[+(char_ - space - '(' - ')')];
-    treebank %= hold['(' >> cat >> +treebank >> ')'] | cat;
-    root %= hold['(' >> cat >> +treebank >> ')'] | cat;
+    cat %= qi::lexeme[+(standard::char_ - standard::space - '(' - ')')];
+    treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
+    root %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
   }
   
   boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   cat;

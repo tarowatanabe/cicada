@@ -180,18 +180,10 @@ struct RootCountParser
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using qi::phrase_parse;
-      using qi::lexeme;
-      using qi::hold;
-      using standard::char_;
-      using qi::double_;
-      using standard::space;
-      
-      label %= lexeme[+(char_ - (space >> "|||" >> space))];
-      counts %= +double_;
-      root_count %= label >> "|||" >> counts >> "|||" >> double_ >> double_;
+      label %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      counts %= +qi::double_;
+      root_count %= label >> "|||" >> counts >> "|||" >> qi::double_ >> qi::double_;
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
@@ -240,28 +232,17 @@ struct PhrasePairParser
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using qi::lexeme;
-      using qi::lit;
-      using qi::hold;
-      using qi::repeat;
-      using qi::double_;
-      using qi::int_;
-      
-      using standard::char_;
-      using standard::space;
-      
-      phrase %= lexeme[+(char_ - (space >> "|||" >> space))];
-      counts %= +double_;
+      phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      counts %= +qi::double_;
       
       phrase_pair %= (phrase
 		      >> "|||" >> phrase
 		      >> "|||" >> counts
 		      >> "|||" >> counts
 		      >> "|||" >> counts
-		      >> "|||" >> double_ >> double_
-		      >> "|||" >> double_ >> double_);
+		      >> "|||" >> qi::double_ >> qi::double_
+		      >> "|||" >> qi::double_ >> qi::double_);
     }
     
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
@@ -317,14 +298,8 @@ struct PhrasePairGenerator
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
       
-      using karma::repeat;
-      using standard::char_;
-      using karma::int_;
-      using standard::space;
-      
-      phrase %= +char_;
+      phrase %= +standard::char_;
       counts %= double20 % ' ';
       phrase_pair %= (phrase
 		      << " ||| " << phrase
@@ -382,18 +357,18 @@ struct ExtractRootSCFG
   // extract the first word...
   std::string operator()(const std::string& phrase) const
   {
-    using boost::spirit::standard::char_;
-    using boost::spirit::standard::space;
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
     std::string::const_iterator iter = phrase.begin();
     std::string::const_iterator end = phrase.end();
 
     std::string label;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, end,
-							boost::spirit::qi::lexeme[+(char_ - space)],
-							space,
-							label);
+    const bool result = qi::phrase_parse(iter, end,
+					 qi::lexeme[+(standard::char_ - standard::space)],
+					 standard::space,
+					 label);
     if (! result)
       throw std::runtime_error("no label?");
     
@@ -406,19 +381,18 @@ struct ExtractPhraseSCFG
   // extract the non-first word...
   std::pair<std::string, std::string> operator()(const std::string& phrase) const
   {
-    using boost::spirit::standard::char_;
-    using boost::spirit::standard::space;
-    using boost::spirit::qi::lexeme;
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
     std::string::const_iterator iter = phrase.begin();
     std::string::const_iterator end = phrase.end();
     
     std::pair<std::string, std::string> label_pair;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, end,
-							lexeme[+(char_ - space)] >> lexeme[+(char_ - space) >> *char_],
-							space,
-							label_pair);
+    const bool result = qi::phrase_parse(iter, end,
+					 qi::lexeme[+(standard::char_ - standard::space)] >> qi::lexeme[+(standard::char_ - standard::space) >> *standard::char_],
+					 standard::space,
+					 label_pair);
     if (! result || iter != end)
       throw std::runtime_error("no label?");
     
@@ -431,18 +405,18 @@ struct ExtractRootGHKM
   // extract the first word...
   std::string operator()(const std::string& phrase) const
   {
-    using boost::spirit::standard::char_;
-    using boost::spirit::standard::space;
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
     std::string::const_iterator iter = phrase.begin();
     std::string::const_iterator end = phrase.end();
     
     std::string label;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, end,
-							boost::spirit::qi::lexeme[+((char_ - space - '(') | "\\(")],
-							space,
-							label);
+    const bool result = qi::phrase_parse(iter, end,
+					 qi::lexeme[+((standard::char_ - standard::space - '(') | "\\(")],
+					 standard::space,
+					 label);
     if (! result)
       throw std::runtime_error("no label?");
     

@@ -82,14 +82,7 @@ bool parse_id(size_t& id, Iterator& iter, Iterator end)
   namespace standard = boost::spirit::standard;
   namespace phoenix = boost::phoenix;
   
-  using qi::phrase_parse;
-  using qi::_1;
-  using qi::ulong_;
-  using standard::space;
-  
-  using phoenix::ref;
-  
-  return phrase_parse(iter, end, ulong_ [ref(id) = _1] >> "|||", space);
+  return qi::phrase_parse(iter, end, qi::ulong_ [phoenix::ref(id) = qi::_1] >> "|||", standard::space);
 }
 
 template <typename Iterator>
@@ -98,11 +91,7 @@ bool parse_separator(Iterator& iter, Iterator end)
 {
   namespace qi = boost::spirit::qi;
   namespace standard = boost::spirit::standard;
-  namespace phoenix = boost::phoenix;
   
-  using qi::phrase_parse;
-  using standard::space;
-  
-  return phrase_parse(iter, end, "|||", space);
+  return qi::phrase_parse(iter, end, "|||", standard::space);
 }
 

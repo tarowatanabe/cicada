@@ -83,10 +83,6 @@ struct Bitext
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
     
-    using qi::phrase_parse;
-    using qi::lit;
-    using standard::space;
-
     bitext.clear();
     std::string line;
     if (std::getline(is, line)) {
@@ -94,9 +90,9 @@ struct Bitext
       std::string::const_iterator end  = line.end();
       
       if((!bitext.source.assign(iter, end))
-	 || (!phrase_parse(iter, end, lit("|||"), space))
+	 || (!qi::phrase_parse(iter, end, qi::lit("|||"), standard::space))
 	 || (!bitext.target.assign(iter, end))
-	 || (!phrase_parse(iter, end, lit("|||"), space))
+	 || (!qi::phrase_parse(iter, end, qi::lit("|||"), standard::space))
 	 || (!bitext.alignment.assign(iter, end))
 	 || iter != end)
 	bitext.clear();
@@ -209,14 +205,8 @@ struct RulePairGenerator
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      using karma::repeat;
-      using standard::char_;
-      using karma::double_;
-      using karma::int_;
-      using standard::space;
-      
-      phrase %= +char_;
-      alignment %= -((int_ << '-' << int_) % ' ');
+      phrase %= +standard::char_;
+      alignment %= -((karma::int_ << '-' << karma::int_) % ' ');
       phrase_pair %= phrase << " ||| " << phrase << " ||| " << alignment << " ||| " << double20;
     }
 

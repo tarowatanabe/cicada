@@ -41,6 +41,7 @@ bin_PROGRAMS = \
 	cicada_filter_extract_ghkm \
 	cicada_filter_extract_phrase \
 	cicada_filter_extract_scfg \
+	cicada_filter_kbest \
 	cicada_filter_penntreebank \
 	cicada_index_cluster \
 	cicada_index_grammar \
@@ -134,6 +135,9 @@ cicada_filter_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $
 
 cicada_filter_extract_scfg_SOURCES = cicada_filter_extract_scfg.cpp
 cicada_filter_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_kbest_SOURCES = cicada_filter_kbest.cpp
+cicada_filter_kbest_LDADD   = $(boost_LDADD) $(perftools_LDADD)
 
 cicada_index_cluster_SOURCES = cicada_index_cluster.cpp
 cicada_index_cluster_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

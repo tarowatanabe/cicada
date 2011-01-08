@@ -12,7 +12,6 @@
 #define PHOENIX_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/karma.hpp>
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
@@ -354,15 +353,18 @@ struct ExtractRootSCFG
   // extract the first word...
   std::string operator()(const std::string& phrase) const
   {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+
     std::string::const_iterator iter = phrase.begin();
     std::string::const_iterator end = phrase.end();
 
     std::string label;
 
-    const bool result = boost::spirit::qi::phrase_parse(iter, end,
-							boost::spirit::qi::lexeme[+(boost::spirit::standard::char_ - boost::spirit::standard::space)],
-							boost::spirit::standard::space,
-							label);
+    const bool result = qi::phrase_parse(iter, end,
+					 qi::lexeme[+(standard::char_ - standard::space)],
+					 standard::space,
+					 label);
     if (! result)
       throw std::runtime_error("no label?");
     
@@ -375,15 +377,18 @@ struct ExtractRootGHKM
   // extract the first word...
   std::string operator()(const std::string& phrase) const
   {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+
     std::string::const_iterator iter = phrase.begin();
     std::string::const_iterator end = phrase.end();
     
     std::string label;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, end,
-							boost::spirit::qi::lexeme[+((boost::spirit::standard::char_ - boost::spirit::standard::space - '(') | "\\(")],
-							boost::spirit::standard::space,
-							label);
+    const bool result = qi::phrase_parse(iter, end,
+					 qi::lexeme[+((standard::char_ - standard::space - '(') | "\\(")],
+					 standard::space,
+					 label);
     if (! result)
       throw std::runtime_error("no label?");
     
@@ -416,13 +421,16 @@ struct LexiconModel
   
   void open(const path_type& path)
   {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
     typedef boost::fusion::tuple<std::string, std::string, double> parsed_type;
 
-    boost::spirit::qi::rule<std::string::const_iterator, std::string(), boost::spirit::standard::space_type> word;
-    boost::spirit::qi::rule<std::string::const_iterator, parsed_type(), boost::spirit::standard::space_type> lexicon;
+    qi::rule<std::string::const_iterator, std::string(), standard::space_type> word;
+    qi::rule<std::string::const_iterator, parsed_type(), standard::space_type> lexicon;
     
-    word %= boost::spirit::qi::lexeme[+(boost::spirit::standard::char_ - boost::spirit::standard::space)];
-    lexicon %= word >> word >> boost::spirit::qi::double_;
+    word %= qi::lexeme[+(standard::char_ - standard::space)];
+    lexicon %= word >> word >> qi::double_;
     
     smooth = std::numeric_limits<double>::infinity();
     tables.clear();
@@ -438,7 +446,7 @@ struct LexiconModel
       boost::fusion::get<0>(parsed).clear();
       boost::fusion::get<1>(parsed).clear();
       
-      const bool result = boost::spirit::qi::phrase_parse(iter, end, lexicon, boost::spirit::standard::space, parsed);
+      const bool result = qi::phrase_parse(iter, end, lexicon, standard::space, parsed);
       if (! result || iter != end) continue;
 
       
@@ -629,18 +637,11 @@ struct RootCountParser
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      using qi::phrase_parse;
-      using qi::lexeme;
-      using qi::hold;
-      using standard::char_;
-      using qi::double_;
-      using standard::space;
+      label %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
       
-      label %= lexeme[+(char_ - (space >> "|||" >> space))];
-      
-      token %= lexeme[+(char_ - space)];
+      token %= qi::lexeme[+(standard::char_ - standard::space)];
       count_base64 %= token;
-      count %= 'B' >> count_base64 | double_;
+      count %= 'B' >> count_base64 | qi::double_;
       
       counts %= +count;
       root_count %= label >> "|||" >> counts >> "|||" >> count >> count;
@@ -730,23 +731,13 @@ struct PhrasePairParser
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      using qi::lexeme;
-      using qi::lit;
-      using qi::hold;
-      using qi::repeat;
-      using qi::double_;
-      using qi::int_;
+      phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
+      alignment %= *(qi::int_ >> '-' >> qi::int_);
       
-      using standard::char_;
-      using standard::space;
-      
-      phrase %= lexeme[+(char_ - (space >> "|||" >> space))];
-      alignment %= *(int_ >> '-' >> int_);
-      
-      token %= lexeme[+(char_ - space)];
+      token %= qi::lexeme[+(standard::char_ - standard::space)];
       count_base64 %= token;
       
-      counts %= +('B' >> count_base64 | double_);
+      counts %= +('B' >> count_base64 | qi::double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> alignment >> "|||" >> counts;
     }
     
@@ -840,18 +831,12 @@ struct PhrasePairModifiedParser
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      using qi::lexeme;
-      using qi::hold;
-      using standard::char_;
-      using qi::double_;
-      using standard::space;
+      phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
       
-      phrase %= lexeme[+(char_ - (space >> "|||" >> space))];
-
-      token %= lexeme[+(char_ - space)];
+      token %= qi::lexeme[+(standard::char_ - standard::space)];
       count_base64 %= token;
       
-      counts %= +('B' >> count_base64 | double_);
+      counts %= +('B' >> count_base64 | qi::double_);
       phrase_pair %= phrase >> "|||" >> phrase >> "|||" >> counts;
     }
     

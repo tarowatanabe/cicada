@@ -189,22 +189,17 @@ namespace cicada
 	if (edge.rule) {
 	  os << "  edge_" << edge.id << " [label=\"{";
 	  
-	  iterator_type iter_rule(os);
-	  boost::spirit::karma::generate(iter_rule, rule_grammar, *edge.rule);
-	  
+	  boost::spirit::karma::generate(iterator_type(os), rule_grammar, *edge.rule);
 	  if (! edge.tails.empty()) {
 	    os << " | ";
-	    
-	    iterator_type iter_tail(os);
-	    boost::spirit::karma::generate(iter_tail, tail_grammar, edge.tails);
+	    boost::spirit::karma::generate(iterator_type(os), tail_grammar, edge.tails);
 	  }
 	  
 	  os << "}";
 	  
 	  if (! edge.features.empty()) {
 	    os << " | ";
-	    iterator_type iter_feature(os);
-	    boost::spirit::karma::generate(iter_feature, feature_grammar, edge.features);
+	    boost::spirit::karma::generate(iterator_type(os), feature_grammar, edge.features);
 	  }
 	  
 	  os << "\", shape=record];" << '\n';
@@ -248,15 +243,11 @@ namespace cicada
 	const lattice_type::arc_type& arc = *aiter;
 	
 	os << "   edge_" << id_edge << " [label=\"";
-
-	iterator_type iter_label(os);
-	boost::spirit::karma::generate(iter_label, label_grammar, arc.label);
 	
+	boost::spirit::karma::generate(iterator_type(os), label_grammar, arc.label);
 	if (! arc.features.empty()) {
 	  os << " | ";
-	  
-	  iterator_type iter_feature(os);
-	  boost::spirit::karma::generate(iter_feature, feature_grammar, arc.features);
+	  boost::spirit::karma::generate(iterator_type(os), feature_grammar, arc.features);
 	}
 	
 	os << "\", shape=record];" << '\n';

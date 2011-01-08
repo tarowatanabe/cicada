@@ -471,24 +471,16 @@ void decode_support_vectors(const std::string& data,
   namespace standard = boost::spirit::standard;
   namespace phoenix = boost::phoenix;
   
-  using qi::phrase_parse;
-  using qi::_1;
-  using qi::ulong_;
-  using qi::int_;
-  using standard::space;
-  
-  using phoenix::ref;
-  
   std::string::const_iterator iter = data.begin();
   std::string::const_iterator end = data.end();
   
-  if (! phrase_parse(iter, end, ulong_ [ref(id) = _1] >> "|||", space))
+  if (! qi::phrase_parse(iter, end, qi::ulong_ [phoenix::ref(id) = qi::_1] >> "|||", standard::space))
     throw std::runtime_error("invalid id and source-length");
   
   if (! viterbi.assign(iter, end))
     throw std::runtime_error("invalid sentence");
   
-  if (! phrase_parse(iter, end, "|||", space))
+  if (! qi::phrase_parse(iter, end, "|||", standard::space))
     throw std::runtime_error("expected separator");
   
   if (! violated.assign(iter, end))
@@ -509,30 +501,22 @@ void decode_support_vectors(const std::string& data,
   namespace standard = boost::spirit::standard;
   namespace phoenix = boost::phoenix;
   
-  using qi::phrase_parse;
-  using qi::_1;
-  using qi::ulong_;
-  using qi::int_;
-  using standard::space;
-  
-  using phoenix::ref;
-  
   std::string::const_iterator iter = data.begin();
   std::string::const_iterator end = data.end();
   
-  if (! phrase_parse(iter, end, ulong_ [ref(id) = _1] >> "|||", space))
+  if (! qi::phrase_parse(iter, end, qi::ulong_ [phoenix::ref(id) = qi::_1] >> "|||", standard::space))
     throw std::runtime_error("invalid id and source-length");
   
   if (! viterbi.assign(iter, end))
     throw std::runtime_error("invalid sentence");
   
-  if (! phrase_parse(iter, end, "|||", space))
+  if (! qi::phrase_parse(iter, end, "|||", standard::space))
     throw std::runtime_error("expected separator");
   
   if (! oracle.assign(iter, end))
     throw std::runtime_error("invalid oracle hypergraph");
   
-  if (! phrase_parse(iter, end, "|||", space))
+  if (! qi::phrase_parse(iter, end, "|||", standard::space))
     throw std::runtime_error("expected separator");
   
   if (! violated.assign(iter, end))
