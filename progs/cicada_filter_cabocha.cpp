@@ -62,7 +62,10 @@ struct equal_pos
 path_type input_file = "-";
 path_type output_file = "-";
 
-bool leaf = false;
+std::string goal = "[s]";
+std::string non_terminal = "[x]";
+bool pos_mode = false;
+bool leaf_mode = false;
 
 void options(int argc, char** argv);
 
@@ -80,6 +83,9 @@ int main(int argc, char** argv)
     
     std::string line;
     tokens_type tokens;
+
+    symbol_type __goal(goal);
+    symbol_type __x(non_terminal);
     
     while (std::getline(is, line)) {
       tokenizer_type tokenizer(line);
@@ -94,7 +100,7 @@ int main(int argc, char** argv)
 	  throw std::runtime_error("invalid cabocha F1 format: no EOS");
 	
 	
-	if (leaf) {
+	if (leaf_mode) {
 	  bool initial = true;
 	  node_set_type::const_iterator niter_end = nodes.end();
 	  for (node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
@@ -171,19 +177,19 @@ int main(int argc, char** argv)
 	    for (int id = 0; id < static_cast<int>(nodes.size()); ++ id) {
 	      if (nodes[id].pos == node_id) {
 		tails.push_back(graph.add_node().id);
-		symbols.push_back(nodes[id].cat);
+		symbols.push_back(pos_mode ? nodes[id].cat : __x);
 		
 		queue.push_back(std::make_pair(tails.back(), id));
 	      } else if (id == node_id) {
 		tails.push_back(nodes[id].id);
-		symbols.push_back(nodes[id].cat);
+		symbols.push_back(pos_mode ? nodes[id].cat : __x);
 	      }
 	    }
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 	    edge.rule = rule_type::create(rule_type(static_cast<hypergraph_type::id_type>(parent_id) == graph.goal
-						    ? symbol_type("[root]")
-						    : nodes[node_id].cat,
+						    ? __goal
+						    : (pos_mode ? nodes[node_id].cat : __x),
 						    symbols.begin(), symbols.end()));
 	    graph.connect_edge(edge.id, parent_id);
 	  }
@@ -237,7 +243,12 @@ void options(int argc, char** argv)
   desc.add_options()
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
-    ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
+    
+    ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
+    ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
+    
+    ("pos",     po::bool_switch(&pos_mode),  "use pos as non-temrinal")
+    ("leaf",    po::bool_switch(&leaf_mode), "collect leaf nodes only")
     
     ("help", "help message");
   
