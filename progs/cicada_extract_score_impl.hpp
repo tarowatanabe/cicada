@@ -1076,13 +1076,19 @@ struct PhrasePairModifyMapper
 	  
 	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  
+	  int committed = 0;
+	  int failed = 0;
 	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 64) {
+	      ++ committed;
 	      if (queues[shard]->push_swap(modified[shard], modified[shard].size() < 1024))
 		modified[shard].clear();
 	      else
-		boost::thread::yield();
+		++ failed;
 	    }
+	  
+	  if (committed && committed == failed)
+	    boost::thread::yield();
 	}
 	
 	++ iter;

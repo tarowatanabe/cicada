@@ -45,11 +45,11 @@ Which will output:
 lhs ||| rhs ||| counts(lhs, rhs) ||| counts(lhs) ||| counts(rhs) ||| observed(lhs) observed(rhs) \
     	||| lex(lhs | rhs) lex(rhs | lhs)
 
-In addtion, we will dump rule-source.gz and rule-target.gz. rule-source.gz contains:
+In addtion, we will dump root-source.gz and root-target.gz. root-source.gz contains:
 
 root(lhs) ||| counts(root(lhs)) ||| observed(lhs,rhs) observed(lhs)
 
-while rule-target.gz looks like:
+while root-target.gz looks like:
 
 root(rhs) ||| counts(root(rhs)) ||| observed(hs,rhs) observed(rhs)
 

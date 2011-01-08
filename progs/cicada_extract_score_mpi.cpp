@@ -84,6 +84,9 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 			  const path_set_type& counts_files);
 void modify_counts_reducer(utils::mpi_intercomm& mapper,
 			   path_set_type& modified_files);
+void synchronize_mapper(utils::mpi_intercomm& reducer);
+void synchronize_reducer(utils::mpi_intercomm& mapper);
+
 void options(int argc, char** argv);
 
 int main(int argc, char** argv)
@@ -196,6 +199,9 @@ int main(int argc, char** argv)
 	for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
 	  os_trg << *titer << '\n';
       }
+      
+      // synchronize here...
+      synchronize_reducer(comm_parent);
     } else {
       const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.file_string() : std::string(argv[0]));
       utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, MPI::INFO_NULL, 0));
@@ -265,6 +271,9 @@ int main(int argc, char** argv)
       if (debug && mpi_rank == 0)
 	std::cerr << "mapper score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		  << "mapper score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
+
+      // synchronize here...
+      synchronize_mapper(comm_child);
     }
   }
   catch (const std::exception& err) {
@@ -301,6 +310,29 @@ int loop_sleep(bool found, int non_found_iter)
   }
   return non_found_iter;
 }
+
+void synchronize_mapper(utils::mpi_intercomm& reducer)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  int non_found_iter = 0;
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    MPI::Request request = reducer.comm.Irecv(0, 0, MPI::INT, rank, notify_tag);
+    while (! request.Test())
+      non_found_iter = loop_sleep(false, non_found_iter);
+  }
+}
+
+void synchronize_reducer(utils::mpi_intercomm& mapper)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  for (int rank = 0; rank != mpi_size; ++ rank)
+    mapper.comm.Send(0, 0, MPI::INT, rank, notify_tag);
+}
+
 
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			  const path_set_type& counts_files)
