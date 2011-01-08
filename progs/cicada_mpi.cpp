@@ -34,6 +34,7 @@ bool input_directory_mode = false;
 
 std::string symbol_goal         = vocab_type::S;
 std::string symbol_non_terminal = vocab_type::X;
+path_type   symbol_fallback_file;
 
 grammar_file_set_type grammar_mutable_files;
 grammar_file_set_type grammar_static_files;
@@ -122,11 +123,25 @@ int main(int argc, char ** argv)
 		<< "loaded mutable grammar: " << grammar_mutable_size << std::endl;
 
     
-    if (grammar_glue_straight || grammar_glue_inverted)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
-										  symbol_non_terminal,
-										  grammar_glue_straight,
-										  grammar_glue_inverted)));
+    if (grammar_glue_straight || grammar_glue_inverted) {
+      if (! symbol_fallback_file.empty()) {
+	if (symbol_fallback_file != "-" && ! boost::filesystem::exists(symbol_fallback_file))
+	  throw std::runtime_error("invalid fallback non-terminal file: " + symbol_fallback_file.file_string());
+	
+	utils::compress_istream is(symbol_fallback_file, 1024 * 1024);
+	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
+										    symbol_non_terminal,
+										    std::istream_iterator<std::string>(is),
+										    std::istream_iterator<std::string>(),
+										    grammar_glue_straight,
+										    grammar_glue_inverted)));
+	
+      } else
+	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
+										    symbol_non_terminal,
+										    grammar_glue_straight,
+										    grammar_glue_inverted)));
+    }
 
     if (debug && mpi_rank == 0)
       std::cerr << "grammar: " << grammar.size() << std::endl;
@@ -691,6 +706,7 @@ void options(int argc, char** argv)
     // grammar
     ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")
     ("non-terminal",   po::value<std::string>(&symbol_non_terminal)->default_value(symbol_non_terminal), "default non-terminal symbol")
+    ("fallback",       po::value<path_type>(&symbol_fallback_file),                                      "fallback non-terminal list")
     ("grammar",        po::value<grammar_file_set_type >(&grammar_mutable_files)->composing(),           "grammar file(s)")
     ("grammar-static", po::value<grammar_file_set_type >(&grammar_static_files)->composing(),            "static binary grammar file(s)")
     

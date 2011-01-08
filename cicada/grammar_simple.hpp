@@ -105,6 +105,7 @@ namespace cicada
     
   public:
     GrammarPair(const hypergraph_type& source, const lattice_type& target, const symbol_type& non_terminal)
+      : GrammarMutable(1)
     {
       typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
       typedef google::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> > symbol_pair_set_type;
@@ -156,6 +157,7 @@ namespace cicada
     }
 
     GrammarPair(const lattice_type& source, const lattice_type& target, const symbol_type& non_terminal)
+      : GrammarMutable(1)
     {
       typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
       typedef google::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> > symbol_pair_set_type;
@@ -204,13 +206,6 @@ namespace cicada
 	  }
       }
     }
-    
-    bool valid_span(int first, int last, int distance) const
-    {
-      // we need this last - first == 1 when intersecting with lattice...
-      return distance <= 1 || last - first == 1;
-    }
-    
   };
 
   class GrammarInsertion : public GrammarMutable
@@ -221,6 +216,7 @@ namespace cicada
 
   public:
     GrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
+      : GrammarMutable(1)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -251,6 +247,7 @@ namespace cicada
     }
 
     GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
+      : GrammarMutable(1)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -277,12 +274,6 @@ namespace cicada
 	  }
       }
     }
-    
-    bool valid_span(int first, int last, int distance) const
-    {
-      // we need this last - first == 1 when intersecting with lattice...
-      return distance <= 1 || last - first == 1;
-    }
   };
   
   
@@ -294,6 +285,7 @@ namespace cicada
     
   public:
     GrammarDeletion(const hypergraph_type& graph, const symbol_type& non_terminal)
+      : GrammarMutable(1)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -326,6 +318,7 @@ namespace cicada
     }
 
     GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
+      : GrammarMutable(1)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
       
@@ -353,12 +346,6 @@ namespace cicada
 	    symbols.insert(aiter->label);
 	  }
       }
-    }
-    
-    bool valid_span(int first, int last, int distance) const
-    {
-      // we need this last - first == 1 when intersecting with lattice...
-      return distance <= 1 || last - first == 1;
     }
   };
 };
