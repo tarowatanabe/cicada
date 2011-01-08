@@ -29,6 +29,18 @@ namespace utils
     return encoded;
   }
 
+  template <typename Tp, typename Iterator>
+  inline
+  Iterator encode_base64(const Tp& x, Iterator iter)
+  {
+    using namespace boost::archive::iterators;
+    
+    typedef base64_from_binary<transform_width<const char*, 6, 8> > encoder_type;
+    
+    std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(x)), iter);
+    return iter;
+  }
+
   template <typename Tp>
   inline
   Tp decode_base64(const std::string& x)

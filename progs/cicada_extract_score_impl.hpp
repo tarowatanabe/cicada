@@ -686,18 +686,20 @@ struct RootCountGenerator
   typedef root_count_type::label_type  label_type;
   typedef root_count_type::counts_type counts_type;
   
-  
   std::ostream& operator()(std::ostream& os, const root_count_type& root_count)
   {
     os << root_count.label << " |||";
-    
     counts_type::const_iterator citer_end = root_count.counts.end();
-    for (counts_type::const_iterator citer = root_count.counts.begin(); citer != citer_end; ++ citer)
-      os << " B" << utils::encode_base64(*citer);
+    for (counts_type::const_iterator citer = root_count.counts.begin(); citer != citer_end; ++ citer) {
+      os << " B";
+      utils::encode_base64(*citer, std::ostream_iterator<char>(os));
+    }
     
-    os << " |||"
-       << " B" << utils::encode_base64(root_count.observed_joint)
-       << " B" << utils::encode_base64(root_count.observed);
+    os << " |||";
+    os << " B";
+    utils::encode_base64(root_count.observed_joint, std::ostream_iterator<char>(os));
+    os << " B";
+    utils::encode_base64(root_count.observed, std::ostream_iterator<char>(os));
     
     return os;
   }
@@ -804,8 +806,10 @@ struct PhrasePairGenerator
        << " |||";
     
     counts_type::const_iterator citer_end = phrase_pair.counts.end();
-    for (counts_type::const_iterator citer = phrase_pair.counts.begin(); citer != citer_end; ++ citer)
-      os << " B" << utils::encode_base64(*citer);
+    for (counts_type::const_iterator citer = phrase_pair.counts.begin(); citer != citer_end; ++ citer) {
+      os << " B";
+      utils::encode_base64(*citer, std::ostream_iterator<char>(os));
+    }
     
     return os;
   }
@@ -899,8 +903,10 @@ struct PhrasePairModifiedGenerator
     os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
     
     counts_type::const_iterator citer_end = phrase_pair.counts.end();
-    for (counts_type::const_iterator citer = phrase_pair.counts.begin(); citer != citer_end; ++ citer)
-      os << " B" << utils::encode_base64(*citer);
+    for (counts_type::const_iterator citer = phrase_pair.counts.begin(); citer != citer_end; ++ citer) {
+      os << " B";
+      utils::encode_base64(*citer, std::ostream_iterator<char>(os));
+    }
     
     return os;
   }

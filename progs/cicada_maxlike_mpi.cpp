@@ -1312,8 +1312,11 @@ void send_weights(const weight_set_type& weights)
   os.push(utils::mpi_device_sink(0, weights_tag, 1024 * 1024));
   
   for (feature_type::id_type id = 0; id < weights.size(); ++ id)
-    if (! feature_type(id).empty() && weights[id] != 0.0)
-      os << feature_type(id) << ' ' << utils::encode_base64(weights[id]) << '\n';
+    if (! feature_type(id).empty() && weights[id] != 0.0) {
+      os << feature_type(id) << ' ';
+      utils::encode_base64(weights[id], std::ostream_iterator<char>(os));
+      os << '\n';
+    }
 }
 
 void bcast_weights(const int rank, weight_set_type& weights)
@@ -1335,8 +1338,11 @@ void bcast_weights(const int rank, weight_set_type& weights)
     for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
       if (*witer != 0.0) {
 	const weight_set_type::feature_type feature(witer - witer_begin);
-	if (feature != __empty)
-	  os << feature << ' ' << utils::encode_base64(*witer) << '\n';
+	if (feature != __empty) {
+	  os << feature << ' ';
+	  utils::encode_base64(*witer, std::ostream_iterator<char>(os));
+	  os << '\n';
+	}
       }
   } else {
     weights.clear();

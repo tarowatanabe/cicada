@@ -757,7 +757,9 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	
 	line->yield(yield);
 	
-	os << id << " ||| " << utils::encode_base64(line->x) << " ||| " << yield << '\n';
+	os << id << " ||| ";
+	utils::encode_base64(line->x, std::ostream_itertor<char>(os));
+	os << " ||| " << yield << '\n';
       }
     }
   }
@@ -1052,8 +1054,11 @@ void bcast_weights(const int rank, weight_set_type& weights)
     for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
       if (*witer != 0.0) {
 	const weight_set_type::feature_type feature(witer - witer_begin);
-	if (feature != __empty)
-	  os << feature << ' ' << utils::encode_base64(*witer) << '\n';
+	if (feature != __empty) {
+	  os << feature << ' ';
+	  utils::encode_base64(*witer, std::ostream_iterator<char>(os));
+	  os << '\n';
+	}
       }
   } else {
     weights.clear();
