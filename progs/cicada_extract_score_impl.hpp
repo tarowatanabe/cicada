@@ -1005,9 +1005,10 @@ struct PhrasePairModifyMapper
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
-      else if (counts.back().target != phrase_pair.target)
+      else if (counts.back().target != phrase_pair.target) {
+	phrase_pair.source = counts.back().source;
 	counts.push_back(modified_type(phrase_pair.source, phrase_pair.target, phrase_pair.counts));
-      else
+      } else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
@@ -1053,6 +1054,7 @@ struct PhrasePairModifyMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 10) - 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -1070,20 +1072,18 @@ struct PhrasePairModifyMapper
 	}
 	
 	if ((iter & iteration_mask) == iteration_mask) {
-	  const bool no_full = utils::malloc_stats::used() < size_t(max_malloc * 1024 * 1024 * 1024);
-	  
-	  bool found = false;
-	  for (size_t shard = 0; shard != queues.size(); ++ shard)
-	    if (modified[shard].size() >= 256) {
-	      const bool no_wait = (modified[shard].size() < 1024 * 4) && no_full;
-	      if (queues[shard]->push_swap(modified[shard], no_wait)) {
-		modified[shard].clear();
-		found = true;
-	      }
-	    }
-	  
-	  if (! found)
+
+	  // if memory is full, yield
+	  if (utils::malloc_stats::used() > malloc_threshold)
 	    boost::thread::yield();
+	  
+	  for (size_t shard = 0; shard != queues.size(); ++ shard)
+	    if (modified[shard].size() >= 64) {
+	      if (queues[shard]->push_swap(modified[shard], modified[shard].size() < 1024))
+		modified[shard].clear();
+	      else
+		boost::thread::yield();
+	    }
 	}
 	
 	++ iter;
@@ -1094,12 +1094,8 @@ struct PhrasePairModifyMapper
       
       buffer_stream->first.pop_front();
       
-      if (buffer_stream->first.empty()) {
-	if (! buffer_stream->second)
-	  throw std::runtime_error("no istream?");
-	
+      if (buffer_stream->first.empty())
 	read_phrase_pair(*(buffer_stream->second), buffer_stream->first);
-      }
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
@@ -1330,6 +1326,8 @@ struct PhrasePairModifyReducer
     int num_termination = 0;
     
     const size_type iteration_mask = (1 << 5) - 1;
+    const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
+    
     for (size_type iteration = 0; /**/; ++ iteration) {
       queue.pop_swap(modified);
       
@@ -1353,7 +1351,7 @@ struct PhrasePairModifyReducer
       modified.clear();
       modified_set_type(modified).swap(modified);
       
-      if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))) {
+      if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
 	dump_counts(paths, counts);
 	counts.clear();
       }
@@ -1499,9 +1497,10 @@ public:
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(phrase_pair);
-      else if (counts.back().target != phrase_pair.target)
+      else if (counts.back().target != phrase_pair.target) {
+	phrase_pair.source = counts.back().source;
 	counts.push_back(phrase_pair);
-      else
+      } else
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
@@ -1804,6 +1803,7 @@ struct PhrasePairScoreMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 10) - 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
 
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -1817,8 +1817,7 @@ struct PhrasePairScoreMapper
 	  queues[shard]->push_swap(counts);
 	}
 	
-	if ((iter & iteration_mask) == iteration_mask
-	    && utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))
+	if ((iter & iteration_mask) == iteration_mask && utils::malloc_stats::used() > malloc_threshold)
 	  boost::thread::yield();
 	
 	++ iter;
