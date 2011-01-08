@@ -1055,6 +1055,7 @@ struct PhrasePairModifyMapper
     int iter = 0;
     const int iteration_mask = (1 << 10) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
     
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -1072,10 +1073,8 @@ struct PhrasePairModifyMapper
 	}
 	
 	if ((iter & iteration_mask) == iteration_mask) {
-
-	  // if memory is full, yield
-	  if (utils::malloc_stats::used() > malloc_threshold)
-	    boost::thread::yield();
+	  
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  
 	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 64) {
@@ -1087,6 +1086,9 @@ struct PhrasePairModifyMapper
 	}
 	
 	++ iter;
+	
+	if (malloc_full)
+	  boost::thread::yield();
 	
 	counts.swap(curr);
       } else
@@ -1804,6 +1806,7 @@ struct PhrasePairScoreMapper
     int iter = 0;
     const int iteration_mask = (1 << 10) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
 
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
@@ -1817,10 +1820,13 @@ struct PhrasePairScoreMapper
 	  queues[shard]->push_swap(counts);
 	}
 	
-	if ((iter & iteration_mask) == iteration_mask && utils::malloc_stats::used() > malloc_threshold)
-	  boost::thread::yield();
+	if ((iter & iteration_mask) == iteration_mask)
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	
 	++ iter;
+	
+	if (malloc_full)
+	  boost::thread::yield();
 	
 	counts.swap(curr);
       } else
