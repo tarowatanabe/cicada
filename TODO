@@ -54,3 +54,5 @@ Added cicada_lexicon_{model1,dice} series for alignment training
 
 Support syntactic features for alignment composed forest:
   Basic idea is to use "target-pos" to grab target-word position + assigned sentence
+
+Add CONLL filter to conver into hypergraph
