@@ -15,6 +15,7 @@
 #include <string>
 #include <stdexcept>
 #include <numeric>
+#include <iterator>
 
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
@@ -758,7 +759,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	line->yield(yield);
 	
 	os << id << " ||| ";
-	utils::encode_base64(line->x, std::ostream_itertor<char>(os));
+	utils::encode_base64(line->x, std::ostream_iterator<char>(os));
 	os << " ||| " << yield << '\n';
       }
     }
