@@ -1,0 +1,56 @@
+Word alignment in cicada
+
+Currently, we implemented:
+
+cicada_lexicon_dice
+	Dice
+
+cicada_lexicon_model1
+	IBM Model1: + symmetric learning[1] + posterior constrained learning [2]
+
+cicada_lexicon_global{,_mpi}
+	Global lexicon: trigger based lexiocn model[3]
+
+cicada_lexicon
+	Heuristic word alignment combiner (as in Moses grow-diagl-final-and etc.)
+	+ ITG constrained combiner
+	+ MaxMatch combiner (using Hungarian algorithm)
+
+[1]
+@InProceedings{liang-taskar-klein:2006:HLT-NAACL06-Main,
+  author    = {Liang, Percy  and  Taskar, Ben  and  Klein, Dan},
+  title     = {Alignment by Agreement},
+  booktitle = {Proceedings of the Human Language Technology Conference of the NAACL, Main Conference},
+  month     = {June},
+  year      = {2006},
+  address   = {New York City, USA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {104--111},
+  url       = {http://www.aclweb.org/anthology/N/N06/N06-1014}
+}
+
+[2]
+@InProceedings{ganchev-gracca-taskar:2008:ACLMain,
+  author    = {Ganchev, Kuzman  and  Gra\c{c}a, Jo\~{a}o V.  and  Taskar, Ben},
+  title     = {Better Alignments = Better Translations?},
+  booktitle = {Proceedings of ACL-08: HLT},
+  month     = {June},
+  year      = {2008},
+  address   = {Columbus, Ohio},
+  publisher = {Association for Computational Linguistics},
+  pages     = {986--993},
+  url       = {http://www.aclweb.org/anthology/P/P08/P08-1112}
+}
+
+[3]
+@InProceedings{mauser-hasan-ney:2009:EMNLP,
+  author    = {Mauser, Arne  and  Hasan, Sa{\v{s}}a  and  Ney, Hermann},
+  title     = {Extending Statistical Machine Translation with Discriminative and Trigger-Based Lexicon Models},
+  booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
+  month     = {August},
+  year      = {2009},
+  address   = {Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {210--218},
+  url       = {http://www.aclweb.org/anthology/D/D09/D09-1022}
+}
