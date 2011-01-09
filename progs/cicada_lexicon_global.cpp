@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 // global lexicon learning...
 //
 // First, compile vocabulary
@@ -15,7 +18,7 @@
 #include <string>
 #include <vector>
 
-#include "learn_global_lexicon_impl.hpp"
+#include "cicada_lexicon_global_impl.hpp"
 
 path_type source_file = "-";
 path_type target_file = "-";

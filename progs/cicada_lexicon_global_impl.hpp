@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include <algorithm>
 #include <vector>
@@ -15,20 +18,29 @@
 #include <utils/mathop.hpp>
 #include <utils/sgi_hash_set.hpp>
 
-#include "nicttm/Word.hpp"
-#include "nicttm/Vocab.hpp"
-#include "nicttm/Sentence.hpp"
-#include "nicttm/Bitext.hpp"
+#include "cicada/symbol.hpp"
+#include "cicada/vocab.hpp"
+#include "cicada/sentence.hpp"
 
 #include "lbfgs.h"
 
 
 typedef boost::filesystem::path path_type;
 
-typedef nicttm::Word            word_type;
-typedef nicttm::Vocab           vocab_type;
-typedef nicttm::Sentence        sent_type;
-typedef nicttm::Bitext          bitext_type;
+typedef cicada::Symbol   word_type;
+typedef cicada::Vocab    vocab_type;
+typedef cicada::Sentence sentence_type;
+
+struct bitext_type
+{
+  sentence_type source;
+  sentence_type target;
+
+  bitext_type()
+    : source(), target() {}
+  bitext_type(const sentence_type& __source, const sentence_type& __target)
+    : source(__source), target(__target) {}
+};
 
 typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
 typedef std::vector<word_type, std::allocator<word_type> > word_set_type;
@@ -62,8 +74,8 @@ void read_bitexts(const path_type& path_source,
   utils::compress_istream is_src(path_source, 1024 * 1024);
   utils::compress_istream is_trg(path_target, 1024 * 1024);
   
-  sent_type      source;
-  sent_type      target;
+  sentence_type      source;
+  sentence_type      target;
   
   while (is_src && is_trg) {
     is_src >> source;
@@ -76,7 +88,7 @@ void read_bitexts(const path_type& path_source,
     uniques_source.clear();
     uniques_source.insert(source.begin(), source.end());
     
-    bitexts.push_back(bitext_type(sent_type(uniques_source.begin(), uniques_source.end()), target));
+    bitexts.push_back(bitext_type(sentence_type(uniques_source.begin(), uniques_source.end()), target));
     uniques.insert(target.begin(), target.end());
   }
   if (is_src || is_trg)
@@ -141,16 +153,16 @@ struct OptimizeAROW : public Optimizer
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
 	const bitext_type& bitext = bitexts[*piter];
 	
-	sent_type::const_iterator siter_begin = bitext.source.begin();
-	sent_type::const_iterator siter_end   = bitext.source.end();
+	sentence_type::const_iterator siter_begin = bitext.source.begin();
+	sentence_type::const_iterator siter_end   = bitext.source.end();
 	
-	sent_type::const_iterator titer_end = bitext.target.end();
-	for (sent_type::const_iterator titer = bitext.target.begin(); titer != titer_end; ++ titer) {
+	sentence_type::const_iterator titer_end = bitext.target.end();
+	for (sentence_type::const_iterator titer = bitext.target.begin(); titer != titer_end; ++ titer) {
 	  const double y = (int(*titer == word) * 2 - 1);
 	  
 	  double var    = v[id_bias];
 	  double margin = x[id_bias];
-	  for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
+	  for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 	    margin += x[siter->id()];
 	    var    += v[siter->id()];
 	  }
@@ -167,7 +179,7 @@ struct OptimizeAROW : public Optimizer
 	    x[id_bias] += alpha * y * v[id_bias];
 	    v[id_bias] -= beta * v[id_bias] * v[id_bias];
 	    
-	    for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
+	    for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 	      x[siter->id()] += alpha * y * v[siter->id()];
 	      v[siter->id()] -= beta * v[siter->id()] * v[siter->id()];
 	    }
@@ -224,16 +236,16 @@ struct OptimizeCW : public Optimizer
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
 	const bitext_type& bitext = bitexts[*piter];
 	
-	sent_type::const_iterator siter_begin = bitext.source.begin();
-	sent_type::const_iterator siter_end   = bitext.source.end();
+	sentence_type::const_iterator siter_begin = bitext.source.begin();
+	sentence_type::const_iterator siter_end   = bitext.source.end();
 	
-	sent_type::const_iterator titer_end = bitext.target.end();
-	for (sent_type::const_iterator titer = bitext.target.begin(); titer != titer_end; ++ titer) {
+	sentence_type::const_iterator titer_end = bitext.target.end();
+	for (sentence_type::const_iterator titer = bitext.target.begin(); titer != titer_end; ++ titer) {
 	  const double y = (int(*titer == word) * 2 - 1);
 	  
 	  double var    = v[id_bias];
 	  double margin = x[id_bias];
-	  for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
+	  for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 	    margin += x[siter->id()];
 	    var    += v[siter->id()];
 	  }
@@ -250,7 +262,7 @@ struct OptimizeCW : public Optimizer
 	    x[id_bias] += alpha * y * v[id_bias];
 	    v[id_bias] -= beta * v[id_bias] * v[id_bias];
 	    
-	    for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
+	    for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 	      x[siter->id()] += alpha * y * v[siter->id()];
 	      v[siter->id()] -= beta * v[siter->id()] * v[siter->id()];
 	    }
@@ -305,15 +317,15 @@ struct OptimizeMIRA : public Optimizer
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
 	const bitext_type& bitext = bitexts[*piter];
 	
-	sent_type::const_iterator siter_begin = bitext.source.begin();
-	sent_type::const_iterator siter_end   = bitext.source.end();
+	sentence_type::const_iterator siter_begin = bitext.source.begin();
+	sentence_type::const_iterator siter_end   = bitext.source.end();
 	
-	sent_type::const_iterator titer_end = bitext.target.end();
-	for (sent_type::const_iterator titer = bitext.target.begin(); titer != titer_end; ++ titer) {
+	sentence_type::const_iterator titer_end = bitext.target.end();
+	for (sentence_type::const_iterator titer = bitext.target.begin(); titer != titer_end; ++ titer) {
 	  const double y = (int(*titer == word) * 2 - 1);
 	  
 	  double margin = x[id_bias];
-	  for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	  for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	    margin += x[siter->id()];
 	  
 	  const double score = margin * y;
@@ -326,7 +338,7 @@ struct OptimizeMIRA : public Optimizer
 	    const double alpha = std::min(1.0 / C, y * (1.0 - score) / norm);
 	    
 	    x[id_bias] += alpha;
-	    for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	    for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	      x[siter->id()] += alpha;
 	  }
 	}
@@ -404,15 +416,15 @@ struct OptimizeSGD : public Optimizer
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
 	const bitext_type& bitext = bitexts[*piter];
 	
-	sent_type::const_iterator siter_begin = bitext.source.begin();
-	sent_type::const_iterator siter_end   = bitext.source.end();
+	sentence_type::const_iterator siter_begin = bitext.source.begin();
+	sentence_type::const_iterator siter_end   = bitext.source.end();
 	
 	const double eta = 1.0 / (1.0 + epoch / sample_size);
 	++ epoch;
 	penalty += eta * lambda * bitext.target.size();
 	
 	double margin = x[id_bias];
-	for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	  margin += x[siter->id()];
 
 	const double objective_correct   = boost::math::log1p(utils::mathop::exp(- 1.0 * margin));
@@ -432,7 +444,7 @@ struct OptimizeSGD : public Optimizer
 	
 	x[id_bias] += eta * gradient;
 	apply(x[id_bias], penalties[id_bias], penalty);
-	for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
+	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) {
 	  x[siter->id()] += eta * gradient;
 	  apply(x[siter->id()], penalties[siter->id()], penalty);
 	}
@@ -502,14 +514,14 @@ struct OptimizeSGD : public Optimizer
       for (position_set_type::const_iterator piter = positions.begin(); piter != piter_end; ++ piter) {
 	const bitext_type& bitext = bitexts[*piter];
 	
-	sent_type::const_iterator siter_begin = bitext.source.begin();
-	sent_type::const_iterator siter_end   = bitext.source.end();
+	sentence_type::const_iterator siter_begin = bitext.source.begin();
+	sentence_type::const_iterator siter_end   = bitext.source.end();
 
 	const double eta = 1.0 / (lambda * (epoch + 2));
 	++ epoch;
 	
 	double margin = x[id_bias];
-	for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	  margin += x[siter->id()];
 	margin *= weight_scale;
 
@@ -534,7 +546,7 @@ struct OptimizeSGD : public Optimizer
 	const double alpha = (eta / bitext.target.size()) * gradient;
 	
 	update(x[id_bias], weight_scale, weight_norm, alpha);
-	for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	  update(x[siter->id()], weight_scale, weight_norm, alpha);
 	
 	if (weight_norm > 1.0 / lambda)
@@ -616,11 +628,11 @@ struct OptimizeLBFGS : public Optimizer
     bitext_set_type::const_iterator biter_end = bitexts.end();
     for (bitext_set_type::const_iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
 
-      sent_type::const_iterator siter_begin = biter->source.begin();
-      sent_type::const_iterator siter_end   = biter->source.end();
+      sentence_type::const_iterator siter_begin = biter->source.begin();
+      sentence_type::const_iterator siter_end   = biter->source.end();
       
       double margin = x[id_bias];
-      for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+      for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	margin += x[siter->id()];
       
       const double objective_correct   = boost::math::log1p(utils::mathop::exp(- 1.0 * margin));
@@ -640,7 +652,7 @@ struct OptimizeLBFGS : public Optimizer
       
       const double gradient = gradient_correct * num_correct + gradient_incorrect * num_incorrect;
       g[id_bias] += gradient;
-      for (sent_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
+      for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	g[siter->id()] += gradient;
     }
     
