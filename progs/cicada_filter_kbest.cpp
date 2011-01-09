@@ -7,6 +7,8 @@
 //
 // id ||| sentence ||| features etc.
 //
+// TODO: add subprocess filter so that we can uncover the kbest-format again...
+//
 
 #include <iostream>
 #include <vector>
@@ -14,6 +16,9 @@
 #include <string>
 #include <algorithm>
 #include <iterator>
+
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -24,11 +29,13 @@
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/tokenizer.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/subprocess.hpp"
+#include "utils/lockfree_list_queue.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -58,8 +65,67 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
   boost::spirit::qi::rule<Iterator, kbest_type(), blank_type>  kbest;
 };
 
+struct Task
+{
+  typedef utils::lockfree_list_queue<kbest_type, std::allocator<kbest_type> > queue_type;
+  typedef utils::subprocess subprocess_type;
+
+  Task(queue_type&      __queue,
+       subprocess_type& __subprocess,
+       std::ostream&    __os,
+       const bool __id_mode,
+       const bool __features_mode)
+    : queue(__queue),
+      subprocess(__subprocess),
+      os(__os),
+      id_mode(__id_mode),
+      features_mode(__features_mode) {}
+  
+  queue_type& queue;
+  subprocess_type& subprocess;
+  std::ostream& os;
+  
+  bool id_mode;
+  bool features_mode;
+
+  void operator()()
+  {
+    boost::iostreams::filtering_istream is;
+#if BOOST_VERSION >= 104400
+    is.push(boost::iostreams::file_descriptor_source(subprocess.desc_read(), boost::iostreams::close_handle));
+#else
+    is.push(boost::iostreams::file_descriptor_source(subprocess.desc_read(), true));
+#endif
+    
+    kbest_type kbest;
+    std::string line;
+    while (queue.pop(kbest)) {
+      if (boost::fusion::get<0>(kbest) == size_type(-1)) break;
+      
+      if (id_mode)
+	os << boost::fusion::get<0>(kbest) << " ||| ";
+      
+      // read from is...
+      std::getline(is, line);
+      os << line;
+      
+      if (features_mode) {
+	const tokens_type& features = boost::fusion::get<2>(kbest);
+	
+	os << " ||| ";
+	if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), features))
+	  throw std::runtime_error("tokens generation failed...?");
+      }
+      
+      os << '\n';
+    }
+  }
+};
+
 path_type input_file = "-";
 path_type output_file = "-";
+
+std::string filter;
 
 bool id_mode = false;
 bool features_mode = false;
@@ -88,31 +154,72 @@ int main(int argc, char** argv)
     iter_type iter_end;
     
     kbest_type kbest;
-    while (iter != iter_end) {
-      boost::fusion::get<1>(kbest).clear();
-      boost::fusion::get<2>(kbest).clear();
+    
+    if (! filter.empty()) {
+      typedef Task task_type;
       
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	if (iter != iter_end)
-	  throw std::runtime_error("kbest parsing failed");
+      task_type::subprocess_type subprocess(filter);
+      task_type::queue_type      queue;
       
-      if (id_mode)
-	os << boost::fusion::get<0>(kbest) << " ||| ";
-      
-      const tokens_type& tokens = boost::fusion::get<1>(kbest);
-      
-      if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), tokens))
-	throw std::runtime_error("tokens generation failed...?");
-      
-      if (features_mode) {
-	const tokens_type& features = boost::fusion::get<2>(kbest);
-	
-	os << " ||| ";
-	if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), features))
-	  throw std::runtime_error("tokens generation failed...?");
-      }
+      boost::thread thread(task_type(queue, subprocess, os, id_mode, features_mode));
 
-      os << '\n';
+      {
+	boost::iostreams::filtering_ostream os_filter;
+#if BOOST_VERSION >= 104400
+	os_filter.push(boost::iostreams::file_descriptor_sink(subprocess.desc_write(), boost::iostreams::close_handle));
+#else
+	os_filter.push(boost::iostreams::file_descriptor_sink(subprocess.desc_write(), true));
+#endif
+	
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  const tokens_type& tokens = boost::fusion::get<1>(kbest);
+	  
+	  if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os_filter), -((+boost::spirit::standard::char_) % ' '), tokens))
+	    throw std::runtime_error("tokens generation failed...?");
+	  os_filter << '\n';
+	  
+	  queue.push(kbest);
+	}
+      }
+      
+      boost::fusion::get<0>(kbest) = size_type(-1);
+      queue.push(kbest);
+      
+      thread.join();
+    } else {
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
+      
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
+      
+	if (id_mode)
+	  os << boost::fusion::get<0>(kbest) << " ||| ";
+      
+	const tokens_type& tokens = boost::fusion::get<1>(kbest);
+      
+	if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), tokens))
+	  throw std::runtime_error("tokens generation failed...?");
+      
+	if (features_mode) {
+	  const tokens_type& features = boost::fusion::get<2>(kbest);
+	
+	  os << " ||| ";
+	  if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), features))
+	    throw std::runtime_error("tokens generation failed...?");
+	}
+
+	os << '\n';
+      }
     }
   }
   catch (const std::exception& err) {
@@ -130,8 +237,10 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
-    ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
+    ("input",  po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("output", po::value<path_type>(&output_file)->default_value(output_file), "output")
+    
+    ("filter", po::value<std::string>(&filter), "filter for sentences")
 
     ("id",       po::bool_switch(&id_mode),       "output id")
     ("features", po::bool_switch(&features_mode), "output features")
