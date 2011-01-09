@@ -419,7 +419,8 @@ struct OptimizeSGD : public Optimizer
 	sentence_type::const_iterator siter_begin = bitext.source.begin();
 	sentence_type::const_iterator siter_end   = bitext.source.end();
 	
-	const double eta = 1.0 / (1.0 + epoch / sample_size);
+	//const double eta = 1.0 / (1.0 + epoch / sample_size);
+	const double eta = 0.2 * std::pow(0.85, double(epoch) / sample_size);
 	++ epoch;
 	penalty += eta * lambda * bitext.target.size();
 	
@@ -517,7 +518,8 @@ struct OptimizeSGD : public Optimizer
 	sentence_type::const_iterator siter_begin = bitext.source.begin();
 	sentence_type::const_iterator siter_end   = bitext.source.end();
 
-	const double eta = 1.0 / (lambda * (epoch + 2));
+	//const double eta = 1.0 / (lambda * (epoch + 2));
+	const double eta = 0.2 * std::pow(0.85, double(epoch) / sample_size);
 	++ epoch;
 	
 	double margin = x[id_bias];
