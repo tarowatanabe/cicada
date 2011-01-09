@@ -102,11 +102,13 @@ struct Task
     while (queue.pop(kbest)) {
       if (boost::fusion::get<0>(kbest) == size_type(-1)) break;
       
+      // read from is...
+      if (! std::getline(is, line))
+	throw std::runtime_error("# of lines do not match");
+      
       if (id_mode)
 	os << boost::fusion::get<0>(kbest) << " ||| ";
       
-      // read from is...
-      std::getline(is, line);
       os << line;
       
       if (features_mode) {
