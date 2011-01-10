@@ -6,7 +6,7 @@ cicada_lexicon_dice
 	Dice
 
 cicada_lexicon_model1
-	IBM Model1: + symmetric learning[1] + posterior constrained learning [2]
+	IBM Model1 + symmetric learning[1] + posterior constrained learning [2]
 
 cicada_lexicon_global{,_mpi}
 	Global lexicon: trigger based lexiocn model[3]
