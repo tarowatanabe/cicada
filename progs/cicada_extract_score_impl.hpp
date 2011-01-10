@@ -92,6 +92,7 @@ struct RootCount
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(last - first));
     
+    counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -176,6 +177,7 @@ struct PhrasePair
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(last - first));
 
+    counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }
@@ -252,6 +254,7 @@ struct PhrasePairModified
   {
     const size_t size_max = utils::bithack::max(counts.size(), size_t(last - first));
     
+    counts.reserve(size_max);
     counts.resize(size_max, 0.0);
     std::transform(first, last, counts.begin(), counts.begin(), std::plus<double>());
   }

@@ -9,7 +9,7 @@ cicada_lexicon_model1
 	IBM Model1 + symmetric learning[1] + posterior constrained learning [2]
 
 cicada_lexicon_global{,_mpi}
-	Global lexicon: trigger based lexiocn model[3]
+	Trigger based global lexicon[3]
 
 cicada_lexicon
 	Heuristic word alignment combiner (as in Moses grow-diagl-final-and etc.)
