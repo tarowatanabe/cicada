@@ -146,7 +146,8 @@ struct ScorerCICADA
     const std::pair<std::string, std::string> phrase_target = phrase_extractor(phrase_pair.target);
 
     if (phrase_source.first != phrase_target.first)
-      throw std::runtime_error("synchronous-CFG, but different lh?");
+      throw std::runtime_error("synchronous-CFG, but different lhs?" + phrase_source.first + ' ' + phrase_target.first
+			       + " original: " + phrase_pair.source + ' ' + phrase_pair.target);
 
     if (feature_root) {
       root_count_set_type::const_iterator siter = root_count_source.find(phrase_source.first);

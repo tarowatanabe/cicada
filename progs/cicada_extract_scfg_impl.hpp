@@ -352,9 +352,6 @@ struct ExtractSCFG
   span_pair_set_type        spans;
   span_pair_set_type        spans_unique;
 
-  phrase_chart_type phrases_source;
-  phrase_chart_type phrases_target;
-
   struct ExtractCategory
   {
     symbol_type operator()(const span_pair_type& spans) const
@@ -516,12 +513,6 @@ struct ExtractSCFG
 
     const size_type source_size = source.size();
     const size_type target_size = target.size();
-
-    phrases_source.clear();
-    phrases_target.clear();
-    
-    phrases_source.resize(source_size + 1);
-    phrases_target.resize(target_size + 1);
     
     rule_pair_list_type rule_pair_list;
     rule_pair_type rule_pair;
@@ -656,24 +647,14 @@ struct ExtractSCFG
 		    rule_pair_type& rule_pair)
   {
     const symbol_type& lhs = category(spans);
+
+    rule_pair.source = static_cast<const std::string&>(lhs);
+    for (int src = spans.source.first; src != spans.source.second; ++ src)
+      rule_pair.source += ' ' + static_cast<const std::string&>(source[src]);
     
-    if (phrases_source(spans.source.first, spans.source.second).empty()) {
-      phrase_type& phrase = phrases_source(spans.source.first, spans.source.second);
-      
-      phrase = static_cast<const std::string&>(lhs);
-      for (int src = spans.source.first; src != spans.source.second; ++ src)
-	phrase += ' ' + static_cast<const std::string&>(source[src]);
-    }
-    rule_pair.source = phrases_source(spans.source.first, spans.source.second);
-    
-    if (phrases_target(spans.target.first, spans.target.second).empty()) {
-      phrase_type& phrase = phrases_target(spans.target.first, spans.target.second);
-      
-      phrase = static_cast<const std::string&>(lhs);
-      for (int trg = spans.target.first; trg != spans.target.second; ++ trg)
-	phrase += ' ' + static_cast<const std::string&>(target[trg]);
-    }
-    rule_pair.target = phrases_target(spans.target.first, spans.target.second);
+    rule_pair.target = static_cast<const std::string&>(lhs);
+    for (int trg = spans.target.first; trg != spans.target.second; ++ trg)
+      rule_pair.target += ' ' + static_cast<const std::string&>(target[trg]);
     
     rule_pair.alignment.clear();
     for (int src = spans.source.first; src != spans.source.second; ++ src) {
