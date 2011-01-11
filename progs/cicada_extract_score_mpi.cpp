@@ -315,12 +315,26 @@ void synchronize_mapper(utils::mpi_intercomm& reducer)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  std::vector<MPI::Request, std::allocator<MPI::Request> > request(mpi_size);
+  std::vector<bool, std::allocator<bool> > terminated(mpi_size, false);
+  
+  for (int rank = 0; rank != mpi_size; ++ rank)
+    request[rank] = reducer.comm.Irecv(0, 0, MPI::INT, rank, notify_tag);
   
   int non_found_iter = 0;
-  for (int rank = 0; rank != mpi_size; ++ rank) {
-    MPI::Request request = reducer.comm.Irecv(0, 0, MPI::INT, rank, notify_tag);
-    while (! request.Test())
-      non_found_iter = loop_sleep(false, non_found_iter);
+  for (;;) {
+    bool found = false;
+    
+    for (int rank = 0; rank != mpi_size; ++ rank)
+      if (! terminated[rank] && request[rank].Test()) {
+	terminated[rank] = true;
+	found = true;
+      }
+    
+    if (std::count(terminated.begin(), terminated.end(), true) == mpi_size) break;
+    
+    non_found_iter = loop_sleep(false, non_found_iter);
   }
 }
 
@@ -328,9 +342,27 @@ void synchronize_reducer(utils::mpi_intercomm& mapper)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-
+  
+  std::vector<MPI::Request, std::allocator<MPI::Request> > request(mpi_size);
+  std::vector<bool, std::allocator<bool> > terminated(mpi_size, false);
+  
   for (int rank = 0; rank != mpi_size; ++ rank)
-    mapper.comm.Send(0, 0, MPI::INT, rank, notify_tag);
+    request[rank] = mapper.comm.Isend(0, 0, MPI::INT, rank, notify_tag);
+  
+  int non_found_iter = 0;
+  for (;;) {
+    bool found = false;
+    
+    for (int rank = 0; rank != mpi_size; ++ rank)
+      if (! terminated[rank] && request[rank].Test()) {
+	terminated[rank] = true;
+	found = true;
+      }
+    
+    if (std::count(terminated.begin(), terminated.end(), true) == mpi_size) break;
+    
+    non_found_iter = loop_sleep(false, non_found_iter);
+  }
 }
 
 
