@@ -1069,9 +1069,15 @@ struct PhrasePairModifyMapper
 	  for (size_t shard = 0; shard != queues.size(); ++ shard)
 	    if (modified[shard].size() >= 64) {
 	      ++ committed;
-	      if (queues[shard]->push_swap(modified[shard], modified[shard].size() < 1024))
+	      
+	      const size_t modified_size = modified[shard].size();
+		
+	      if (queues[shard]->push_swap(modified[shard], modified_size < 1024)) {
+		if (debug >= 4)
+		  std::cerr << "modified mapper send: " << modified_size << std::endl;
+
 		modified[shard].clear();
-	      else
+	      } else
 		++ failed;
 	    }
 	  
@@ -1325,6 +1331,7 @@ struct PhrasePairModifyReducer
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     for (size_type iteration = 0; /**/; ++ iteration) {
+      modified.clear();
       queue.pop_swap(modified);
       
       if (modified.empty()) {
@@ -1335,6 +1342,9 @@ struct PhrasePairModifyReducer
 	else
 	  continue;
       }
+      
+      if (debug >= 4)
+	std::cerr << "modified reducer received: " << modified.size() << std::endl;
 
       modified_set_type::const_iterator citer_end = modified.end();
       for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
@@ -1810,6 +1820,9 @@ struct PhrasePairScoreMapper
       
       if (counts != curr) {
 	if (! counts.counts.empty()) {
+	  if (debug >= 5)
+	    std::cerr << "score count mapper send" << std::endl;
+	      
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
@@ -1836,6 +1849,9 @@ struct PhrasePairScoreMapper
     }
     
     if (! counts.counts.empty()) {
+      if (debug >= 5)
+	std::cerr << "score count mapper send" << std::endl;
+
       const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
       queues[shard]->push_swap(counts);
     }
@@ -2047,6 +2063,9 @@ struct PhrasePairScoreReducer
       
       if (counts.empty() || counts.back().source != curr.source) {
 	if (! counts.empty()) {
+	  if (debug >= 4)
+	    std::cerr << "score count reducer: " << counts.size() << std::endl;
+
 	  dump_phrase_pair(counts);
 	  counts.clear();
 	}
@@ -2077,8 +2096,12 @@ struct PhrasePairScoreReducer
 	pqueue.push(buffer_queue);
     }
     
-    if (! counts.empty()) 
+    if (! counts.empty()) {
+      if (debug >= 4)
+	std::cerr << "score count reducer: " << counts.size() << std::endl;
+      
       dump_phrase_pair(counts);
+    }
   }
   
 };
