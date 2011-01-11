@@ -103,7 +103,10 @@ bool oracle_loss = false;
 bool apply_exact = false;
 int cube_size = 200;
 bool softmax_margin = false;
-bool sgd = false;
+
+bool learn_maxent = false;
+bool learn_sgd = false;
+
 bool mix_optimized = false;
 
 int threads = 4;
@@ -146,6 +149,11 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
+
+    if (int(learn_maxent) + learn_sgd > 1)
+      throw std::runtime_error("eitehr learn-{maxent,sgd}");
+    if (int(learn_maxent) + learn_sgd == 0)
+      learn_maxent = true;
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
@@ -185,7 +193,7 @@ int main(int argc, char ** argv)
     
     double objective = 0.0;
 
-    if (sgd) {
+    if (learn_sgd) {
       if (regularize_l1)
 	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs, features, scorers, weights);
       else
@@ -1177,6 +1185,9 @@ void options(int argc, char** argv)
     
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
     
+    ("learn-maxent",  po::bool_switch(&learn_maxent),  "batch LBFGS algorithm")
+    ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
+
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
@@ -1187,7 +1198,6 @@ void options(int argc, char** argv)
     ("cube-size",   po::value<int>(&cube_size),     "cube-pruning size")
 
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
-    ("sgd",            po::bool_switch(&sgd),            "online SGD algorithm")
     ("mix-optimized",  po::bool_switch(& mix_optimized), "optimized weights mixing")
     
     ("threads", po::value<int>(&threads), "# of threads")

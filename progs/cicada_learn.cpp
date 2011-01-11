@@ -34,7 +34,9 @@ path_type intersected_path;
 path_type output_path = "-";
 
 int iteration = 100;
-bool sgd = false;
+bool learn_sgd = false;
+bool learn_maxent = false;
+bool learn_mira = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
@@ -71,6 +73,11 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
+    if (int(learn_maxent) + learn_sgd > 1)
+      throw std::runtime_error("eitehr learn-{maxent,sgd}");
+    if (int(learn_maxent) + learn_sgd == 0)
+      learn_maxent = true;
+    
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
 
@@ -91,7 +98,7 @@ int main(int argc, char ** argv)
     double objective = 0.0;
     
 
-    if (sgd) {
+    if (learn_sgd) {
       if (regularize_l1)
 	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(instances, forest_path, intersected_path, weights);
       else
@@ -781,7 +788,9 @@ void options(int argc, char** argv)
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
-    ("sgd",           po::bool_switch(&sgd),           "online SGD algorithm")
+    ("learn-maxent",  po::bool_switch(&learn_maxent),  "batch LBFGS algorithm")
+    ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
+    
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C"            , po::value<double>(&C),           "regularization constant")

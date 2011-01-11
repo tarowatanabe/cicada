@@ -47,7 +47,9 @@ path_set_type intersected_path;
 path_type output_path = "-";
 
 int iteration = 100;
-bool sgd = false;
+bool learn_maxent = false;
+bool learn_sgd = false;
+bool learn_mira = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
@@ -67,6 +69,10 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
 		       weight_set_type& weights);
 
+template <typename Optimizer>
+struct OptimizeOnline;
+template <typename Optimizer>
+struct OptimizeOnlineMargin;
 struct OptimizeLBFGS;
 
 void read_forest(const path_set_type& forest_path,
@@ -76,6 +82,67 @@ void read_forest(const path_set_type& forest_path,
 void bcast_weights(const int rank, weight_set_type& weights);
 void send_weights(const weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
+
+
+int main(int argc, char ** argv)
+{
+  utils::mpi_world mpi_world(argc, argv);
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  try {
+    options(argc, argv);
+    
+    if (int(learn_maxent) + learn_sgd > 1)
+      throw std::runtime_error("eitehr learn-{maxent,sgd}");
+    if (int(learn_maxent) + learn_sgd == 0)
+      learn_maxent = true;
+
+    if (regularize_l1 && regularize_l2)
+      throw std::runtime_error("either L1 or L2 regularization");
+
+    if (forest_path.empty())
+      throw std::runtime_error("no forest?");
+    if (intersected_path.empty())
+      throw std::runtime_error("no intersected forest?");
+
+    hypergraph_set_type graphs_forest;
+    hypergraph_set_type graphs_intersected;
+        
+    read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
+
+    if (debug && mpi_rank == 0)
+      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
+
+    weight_set_type weights;
+    
+    double objective = 0.0;
+    
+    if (learn_sgd) {
+      if (regularize_l1)
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs_forest, graphs_intersected, weights);
+      else
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs_forest, graphs_intersected, weights);
+    } else
+      objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
+
+    if (debug && mpi_rank == 0)
+      std::cerr << "objective: " << objective << std::endl;
+    
+    if (mpi_rank == 0) {
+      utils::compress_ostream os(output_path, 1024 * 1024);
+      os.precision(20);
+      os << weights;
+    }
+  }
+  catch (const std::exception& err) {
+    std::cerr << "error: " << err.what() << std::endl;
+    MPI::COMM_WORLD.Abort(1);
+    return 1;
+  }
+  return 0;
+}
 
 enum {
   weights_tag = 1000,
@@ -102,61 +169,6 @@ int loop_sleep(bool found, int non_found_iter)
     non_found_iter = 0;
   }
   return non_found_iter;
-}
-
-int main(int argc, char ** argv)
-{
-  utils::mpi_world mpi_world(argc, argv);
-  
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  try {
-    options(argc, argv);
-    
-    if (regularize_l1 && regularize_l2)
-      throw std::runtime_error("either L1 or L2 regularization");
-
-    if (forest_path.empty())
-      throw std::runtime_error("no forest?");
-    if (intersected_path.empty())
-      throw std::runtime_error("no intersected forest?");
-
-    hypergraph_set_type graphs_forest;
-    hypergraph_set_type graphs_intersected;
-        
-    read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
-
-    if (debug && mpi_rank == 0)
-      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
-
-    weight_set_type weights;
-    
-    double objective = 0.0;
-    
-    if (sgd) {
-      if (regularize_l1)
-	objective = optimize_online<OptimizerSGDL1>(graphs_forest, graphs_intersected, weights);
-      else
-	objective = optimize_online<OptimizerSGDL2>(graphs_forest, graphs_intersected, weights);
-    } else
-      objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
-
-    if (debug && mpi_rank == 0)
-      std::cerr << "objective: " << objective << std::endl;
-    
-    if (mpi_rank == 0) {
-      utils::compress_ostream os(output_path, 1024 * 1024);
-      os.precision(20);
-      os << weights;
-    }
-  }
-  catch (const std::exception& err) {
-    std::cerr << "error: " << err.what() << std::endl;
-    MPI::COMM_WORLD.Abort(1);
-    return 1;
-  }
-  return 0;
 }
 
 template <typename Optimizer>
@@ -276,12 +288,131 @@ struct OptimizeOnline
   weights_type   inside_intersected;
 };
 
+
+template <typename Optimizer>
+struct OptimizeOnlineMargin
+{
+  
+  OptimizeOnlineMargin(Optimizer& __optimizer)
+    : optimizer(__optimizer) {}
+  
+  typedef Optimizer optimizer_type;
+  
+  typedef typename optimizer_type::weight_type   weight_type;
+  typedef typename optimizer_type::gradient_type gradient_type;    
+  
+  typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
+    
+  struct gradients_type
+  {
+    typedef gradient_type value_type;
+
+    template <typename Index>
+    gradient_type& operator[](Index)
+    {
+      return gradient;
+    }
+
+    void clear() { gradient.clear(); }
+      
+    gradient_type gradient;
+  };
+    
+  struct weight_function
+  {
+    typedef weight_type value_type;
+      
+    weight_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+      
+    template <typename Edge>
+    value_type operator()(const Edge& edge) const
+    {
+      // p_e
+      return cicada::semiring::traits<value_type>::log(edge.features.dot(weights) * scale);
+    }
+      
+    const weight_set_type& weights;
+    const double scale;
+  };
+
+  struct feature_function
+  {
+    typedef gradient_type value_type;
+
+    feature_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
+
+    template <typename Edge>
+    value_type operator()(const Edge& edge) const
+    {
+      // p_e r_e
+      gradient_type grad;
+	
+      const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights) * scale);
+	
+      feature_set_type::const_iterator fiter_end = edge.features.end();
+      for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
+	if (fiter->second != 0.0)
+	  grad[fiter->first] = weight_type(fiter->second) * weight;
+      
+      return grad;
+    }
+    
+    const weight_set_type& weights;
+    const double scale;
+  };
+  
+  
+  void operator()(const hypergraph_type& hypergraph_intersected,
+		  const hypergraph_type& hypergraph_forest)
+  {
+    gradients.clear();
+    gradients_intersected.clear();
+    
+    inside.clear();
+    inside_intersected.clear();
+    
+    inside.reserve(hypergraph_forest.nodes.size());
+    inside.resize(hypergraph_forest.nodes.size(), weight_type());
+    cicada::inside_outside(hypergraph_forest, inside, gradients,
+			   weight_function(optimizer.weights, optimizer.weight_scale),
+			   feature_function(optimizer.weights, optimizer.weight_scale));
+    
+    inside_intersected.reserve(hypergraph_intersected.nodes.size());
+    inside_intersected.resize(hypergraph_intersected.nodes.size(), weight_type());
+    cicada::inside_outside(hypergraph_intersected, inside_intersected, gradients_intersected,
+			   weight_function(optimizer.weights, optimizer.weight_scale),
+			   feature_function(optimizer.weights, optimizer.weight_scale));
+    
+    gradient_type& gradient = gradients.gradient;
+    weight_type& Z = inside.back();
+    
+    gradient_type& gradient_intersected = gradients_intersected.gradient;
+    weight_type& Z_intersected = inside_intersected.back();
+    
+    gradient /= Z;
+    gradient_intersected /= Z_intersected;
+    
+    optimizer(gradients_intersected.gradient,
+	      gradients.gradient,
+	      Z_intersected,
+	      Z);
+  }
+  
+  Optimizer& optimizer;
+
+  gradients_type gradients;
+  gradients_type gradients_intersected;
+  weights_type   inside;
+  weights_type   inside_intersected;
+};
+
 template <typename Optimize>
 double optimize_online(const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
 		       weight_set_type& weights)
 {
   typedef std::vector<int, std::allocator<int> > id_set_type;
+  typedef typename Optimize::optimizer_type optimizer_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -289,10 +420,9 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   id_set_type ids(graphs_forest.size());
   for (size_t id = 0; id != ids.size(); ++ id)
     ids[id] = id;
-
-  Optimize optimizer(graphs_forest.size(), C);
-
-  OptimizeOnline<Optimize> opt(optimizer);
+  
+  optimizer_type optimizer(graphs_forest.size(), C);
+  Optimize opt(optimizer);
   
   if (mpi_rank == 0) {
     double objective = 0.0;
@@ -910,7 +1040,10 @@ void options(int argc, char** argv)
     ("output",      po::value<path_type>(&output_path),       "output parameter")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
-    ("sgd",           po::bool_switch(&sgd),           "online SGD algorithm")
+    
+    ("learn-maxent",  po::bool_switch(&learn_maxent),  "batch LBFGS algorithm")
+    ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
+    
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C"            , po::value<double>(&C),           "regularization constant")
