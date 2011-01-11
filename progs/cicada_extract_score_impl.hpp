@@ -55,8 +55,9 @@
 
 #include <google/dense_hash_map>
 
-struct RootCount
+class RootCount
 {
+public:
   typedef std::string label_type;
   typedef std::vector<double, std::allocator<double> > counts_type;
   
@@ -90,7 +91,7 @@ struct RootCount
   template <typename Iterator>
   void increment(Iterator first, Iterator last)
   {
-    const size_t size_max = utils::bithack::max(counts.size(), size_t(last - first));
+    const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
     
     counts.reserve(size_max);
     counts.resize(size_max, 0.0);
@@ -142,8 +143,9 @@ struct RootCount
 };
 
 
-struct PhrasePair
+class PhrasePair
 {
+public:
   typedef std::string phrase_type;
   typedef std::vector<double, std::allocator<double> > counts_type;
   typedef cicada::Alignment alignment_type;
@@ -175,7 +177,7 @@ struct PhrasePair
   template <typename Iterator>
   void increment(Iterator first, Iterator last)
   {
-    const size_t size_max = utils::bithack::max(counts.size(), size_t(last - first));
+    const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
 
     counts.reserve(size_max);
     counts.resize(size_max, 0.0);
@@ -221,8 +223,9 @@ struct PhrasePair
   }
 };
 
-struct PhrasePairModified
+class PhrasePairModified
 {
+public:
   typedef PhrasePair phrase_pair_type;
   typedef phrase_pair_type::phrase_type phrase_type;
   typedef phrase_pair_type::counts_type counts_type;
@@ -252,7 +255,7 @@ struct PhrasePairModified
   template <typename Iterator>
   void increment(Iterator first, Iterator last)
   {
-    const size_t size_max = utils::bithack::max(counts.size(), size_t(last - first));
+    const size_t size_max = utils::bithack::max(counts.size(), size_t(std::distance(first, last)));
     
     counts.reserve(size_max);
     counts.resize(size_max, 0.0);

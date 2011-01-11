@@ -134,7 +134,7 @@ int main(int argc, char** argv)
       if (debug && mpi_rank == 0)
 	std::cerr << "modify counts reducer cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
 		  << "modify counts reducer  user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
-      
+            
       modified_counts_set_type modified_counts(mpi_size);
       
       utils::resource start_index;
@@ -150,6 +150,9 @@ int main(int argc, char** argv)
       if (debug && mpi_rank == 0)
 	std::cerr << "index counts cpu time:  " << end_index.cpu_time() - start_index.cpu_time() << std::endl
 		  << "index counts user time: " << end_index.user_time() - start_index.user_time() << std::endl;
+      
+      // synchronize here...
+      synchronize_reducer(comm_parent);
       
       // scoring...
       const LexiconModel lexicon_source_target(lexicon_source_target_file);
@@ -263,6 +266,9 @@ int main(int argc, char** argv)
       if (debug && mpi_rank == 0)
 	std::cerr << "modify counts mapper cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
 		  << "modify counts mapper user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
+      
+      // synchronize here...
+      synchronize_mapper(comm_child);
       
       utils::resource start_score;
       score_counts_mapper(comm_child, counts_files);
@@ -749,15 +755,17 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  if (! device[rank]->test())
 	    boost::thread::yield();
 	  
+	  if (debug >= 5)
+	    std::cerr << "modify counts mapper: " << modified.size() << std::endl;
+	  
 	  modified_set_type::const_iterator citer_end = modified.end();
 	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
 	    generator(*stream[rank], *citer) << '\n';
 	  
+	  modified.clear();
+	  modified_set_type(modified).swap(modified);
 	} else
 	  stream[rank].reset();
-	
-	modified.clear();
-	modified_set_type(modified).swap(modified);
 	
 	found = true;
       }
@@ -828,7 +836,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     
     if (queue.size() < queue_size)
       for (int rank = 0; rank != mpi_size; ++ rank)
-	for (int iter = 0; iter < 1024 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
+	for (int iter = 0; iter != 256 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
 	  if (std::getline(*stream[rank], line)) {
 	    if (parser(line, parsed))
 	      modified.push_back(parsed);
@@ -842,7 +850,13 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  found = true;
 	}
     
+    const size_t modified_size = modified.size();
+    
     if (! modified.empty() && queue.push_swap(modified, true)) {
+      
+      if (debug >= 5)
+	std::cerr << "modify counts reducer: " << modified_size << std::endl;
+      
       modified.clear();
       modified_set_type(modified).swap(modified);
       
