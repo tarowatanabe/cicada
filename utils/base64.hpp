@@ -24,7 +24,7 @@ namespace utils
     typedef base64_from_binary<transform_width<const char*, 6, 8> > encoder_type;
 
     std::string encoded;
-    std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(x)), std::back_inserter(encoded));
+    std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(Tp)), std::back_inserter(encoded));
   
     return encoded;
   }
@@ -37,7 +37,7 @@ namespace utils
     
     typedef base64_from_binary<transform_width<const char*, 6, 8> > encoder_type;
     
-    std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(x)), iter);
+    std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(Tp)), iter);
     return iter;
   }
 

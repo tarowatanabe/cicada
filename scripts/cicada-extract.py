@@ -668,7 +668,7 @@ class ExtractScore(Extract):
             command += " --debug=%d" %(debug)
         else:
             command += " --debug"
-        
+
         self.command = command
 
 
