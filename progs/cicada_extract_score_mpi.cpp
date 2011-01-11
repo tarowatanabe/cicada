@@ -132,8 +132,8 @@ int main(int argc, char** argv)
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "reducer modify counts cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
-		  << "reducer modify counts user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
+	std::cerr << "modify counts reducer cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
+		  << "modify counts reducer  user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
       
       modified_counts_set_type modified_counts(mpi_size);
       
@@ -176,8 +176,8 @@ int main(int argc, char** argv)
 							   LexiconGHKM(lexicon_source_target, lexicon_target_source));
       utils::resource end_score;
       if (debug && mpi_rank == 0)
-	std::cerr << "reducer score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
-		  << "reducer score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
+	std::cerr << "score counts reducer cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
+		  << "score counts reducer user time: " << end_score.user_time() - start_score.user_time() << std::endl;
       
       // finally, dump root-sources and root-targets...
       if (mpi_rank == 0) {
@@ -261,16 +261,16 @@ int main(int argc, char** argv)
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "mapper modify counts cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
-		  << "mapper modify counts user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
+	std::cerr << "modify counts mapper cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
+		  << "modify counts mapper user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
       
       utils::resource start_score;
       score_counts_mapper(comm_child, counts_files);
       utils::resource end_score;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "mapper score counts cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
-		  << "mapper score counts user time: " << end_score.user_time() - start_score.user_time() << std::endl;
+	std::cerr << "score counts mapper cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
+		  << "score counts mapper user time: " << end_score.user_time() - start_score.user_time() << std::endl;
 
       // synchronize here...
       synchronize_mapper(comm_child);
