@@ -739,14 +739,14 @@ if options.first_step <= 5 and options.last_step >= 5:
                               model_dir=options.model_dir,
                               non_terminal=options.non_terminal,
                               max_nodes=options.max_nodes,
-                              min_height=options.min_height,
+                              max_height=options.max_height,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     elif options.tree:
         extract = ExtractTree(toolkit=toolkit, corpus=corpus, alignment=alignment,
                               model_dir=options.model_dir,
                               max_nodes=options.max_nodes,
-                              min_height=options.min_height,
+                              max_height=options.max_height,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     else:

@@ -6,13 +6,16 @@
 import sys
 import os.path
 import subprocess
+import re
 
 from optparse import OptionParser, make_option
 
 opt_parser = OptionParser(
     option_list=[
         make_option("--root-count", action="store", type="string", default="-",
-                    help="root count file", metavar='FILE')
+                    help="root count file", metavar='FILE'),
+        make_option("--composed", action="store_true", default=None,
+                    help="use compsoed non-terminal")
         ])
 
 (options, args) = opt_parser.parse_args()
@@ -33,12 +36,22 @@ def istream(name):
 def is_non_terminal(non_terminal):
     return len(non_terminal) > 2 and non_terminal[0] == '[' and non_terminal[-1] == ']'
 
+def is_composed(non_terminal):
+    if '+' in non_terminal: return True
+    if '/' in non_terminal: return True
+    if '\\' in non_terminal: return True
+    if '..' in non_terminal: return True
+    return False
+    
+
 non_terminals = set()
 for line in istream(options.root_count):
     tokens = line.split()
     if not tokens: continue
 
     if not is_non_terminal(tokens[0]): continue
+    if not options.composed and is_composed(tokens[0]): continue
+    
 
     non_terminals.add(tokens[0])
 

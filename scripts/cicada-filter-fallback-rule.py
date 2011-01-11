@@ -16,7 +16,9 @@ opt_parser = OptionParser(
         make_option("--non-terminal", action="store", type="string", default="[x]",
                     help="default non-terminal"),
         make_option("--binary", action="store_true", default=None,
-                    help="binary rule")
+                    help="binary rule"),
+        make_option("--composed", action="store_true", default=None,
+                    help="use compsoed non-terminal")
         ])
 
 (options, args) = opt_parser.parse_args()
@@ -38,6 +40,13 @@ def istream(name):
 def is_non_terminal(non_terminal):
     return len(non_terminal) > 2 and non_terminal[0] == '[' and non_terminal[-1] == ']'
 
+def is_composed(non_terminal):
+    if '+' in non_terminal: return True
+    if '/' in non_terminal: return True
+    if '\\' in non_terminal: return True
+    if '..' in non_terminal: return True
+    return False
+
 if not is_non_terminal(options.non_terminal):
     raise ValueError, "invalid non-terminal %s" %(options.non_terminal)
 
@@ -47,16 +56,18 @@ for line in istream(options.root_count):
     if not tokens: continue
     
     if not is_non_terminal(tokens[0]): continue
+    if not options.composed and is_composed(tokens[0]): continue
     
     non_terminals.add(tokens[0])
     
-    for non_terminal in non_terminals:
-        sys.stdout.write("%s ||| %s ||| %s ||| fallback-rule=1\n" %(non_terminal,
-                                                                    options.non_terminal,
-                                                                    options.non_terminal))
+
+for non_terminal in non_terminals:
+    sys.stdout.write("%s ||| %s ||| %s ||| fallback-rule=1\n" %(non_terminal,
+                                                                options.non_terminal,
+                                                                options.non_terminal))
     
-        if options.binary:
-            sys.stdout.write("%s ||| %s %s ||| %s %s ||| fallback-rule=1\n" %(non_terminal,
-                                                                              non_terminal, options.non_terminal,
-                                                                              non_terminal, options.non_terminal))
+    if options.binary:
+        sys.stdout.write("%s ||| %s %s ||| %s %s ||| fallback-rule=1\n" %(non_terminal,
+                                                                          non_terminal, options.non_terminal,
+                                                                          non_terminal, options.non_terminal))
     
