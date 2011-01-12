@@ -460,11 +460,13 @@ struct ExtractGHKM
   ExtractGHKM(const symbol_type& __non_terminal,
 	      const int __max_nodes,
 	      const int __max_height,
+	      const bool __exhaustive,
 	      const bool __inverse,
 	      const bool __swap_source_target)
     : non_terminal(__non_terminal),
       max_nodes(__max_nodes),
       max_height(__max_height),
+      exhaustive(__exhaustive),
       inverse(__inverse),
       swap_source_target(__swap_source_target),
       attr_span_first("span-first"),
@@ -473,6 +475,8 @@ struct ExtractGHKM
   symbol_type non_terminal;
   int max_nodes;
   int max_height;
+  
+  bool exhaustive;
   bool inverse;
   bool swap_source_target;
   
@@ -1273,26 +1277,47 @@ struct ExtractGHKM
 		  derivations[goal_node].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
 		} else {
 		  // we will compute all possible ranges...
-		  for (int first = range_max.first; first <= range.first; ++ first)
-		    for (int last = range.second; last <= range_max.second; ++ last) {
-		      const range_type range_next(first, last);
-
-		      //std::cerr << "constructing for range: " << first << ".." << last << std::endl;
-		      
-		      range_node_map_type::iterator biter = buf.find(range_next);
-		      if (biter == buf.end()) {
-			derivations.resize(derivations.size() + 1);
+		  
+		  if (exhaustive) {
+		    for (int first = range_max.first; first <= range.first; ++ first)
+		      for (int last = range.second; last <= range_max.second; ++ last) {
+			const range_type range_next(first, last);
 			
-			derivations.back().node = id;
-			derivations.back().range = range_next;
+			//std::cerr << "constructing for range: " << first << ".." << last << std::endl;
 			
-			node_map[id].push_back(derivations.size() - 1);
+			range_node_map_type::iterator biter = buf.find(range_next);
+			if (biter == buf.end()) {
+			  derivations.resize(derivations.size() + 1);
+			  
+			  derivations.back().node = id;
+			  derivations.back().range = range_next;
+			  
+			  node_map[id].push_back(derivations.size() - 1);
+			  
+			  biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
+			}
 			
-			biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
+			derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
 		      }
+		  } else {
+		    const range_type& range_next = range;
+		    
+		    //std::cerr << "constructing for range: " << range_next.first << ".." << range_next.second << std::endl;
+		    
+		    range_node_map_type::iterator biter = buf.find(range_next);
+		    if (biter == buf.end()) {
+		      derivations.resize(derivations.size() + 1);
 		      
-		      derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
+		      derivations.back().node = id;
+		      derivations.back().range = range_next;
+		      
+		      node_map[id].push_back(derivations.size() - 1);
+		      
+		      biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
 		    }
+		    
+		    derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
+		  }
 		}
 	      }
 	      
@@ -1496,12 +1521,13 @@ struct Task
        const std::string& non_terminal,
        const int max_nodes,
        const int max_height,
+       const bool exhaustive,
        const bool inverse,
        const bool swap,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_nodes, max_height, inverse, swap),
+      extractor(non_terminal, max_nodes, max_height, exhaustive, inverse, swap),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

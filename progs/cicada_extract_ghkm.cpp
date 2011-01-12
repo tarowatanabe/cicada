@@ -33,6 +33,7 @@ path_type output_file;
 std::string non_terminal = "[x]";
 int max_nodes = 15;
 int max_height = 3;
+bool exhaustive = false;
 bool inverse = false;
 bool swap_source_target = false;
 
@@ -73,7 +74,7 @@ int main(int argc, char** argv)
     utils::resource start_extract;
     
     queue_type queue(1024 * threads);
-    task_set_type tasks(threads, task_type(queue, output_file, non_terminal, max_nodes, max_height, inverse, swap_source_target, max_malloc));
+    task_set_type tasks(threads, task_type(queue, output_file, non_terminal, max_nodes, max_height, exhaustive, inverse, swap_source_target, max_malloc));
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -157,6 +158,8 @@ void options(int argc, char** argv)
     
     ("max-nodes",  po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in a rule")
     ("max-height", po::value<int>(&max_height)->default_value(max_height), "maximum height of a rule")
+    
+    ("exhaustive", po::bool_swtich(&exhaustive),                           "exhausive extraction")
     ("inverse",    po::bool_switch(&inverse),                              "inversed word alignment")
     ("swap",       po::bool_switch(&swap_source_target),                   "swap source/target")
     
