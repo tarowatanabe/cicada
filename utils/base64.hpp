@@ -29,7 +29,7 @@ namespace utils
     
     size_t curr = 0;
     while (curr < size) {
-      const size_t len = utils::bithack::min(size, size_t(3));
+      const size_t len = utils::bithack::min(size - curr, size_t(3));
       
       *iter = enc64[buf[curr + 0] >> 2]; ++ iter;
       
