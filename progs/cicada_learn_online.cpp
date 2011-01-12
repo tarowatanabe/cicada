@@ -79,6 +79,11 @@ bool grammar_glue_inverted = false;
 bool grammar_insertion = false;
 bool grammar_deletion = false;
 
+grammar_file_set_type tree_grammar_mutable_files;
+grammar_file_set_type tree_grammar_static_files;
+
+bool tree_grammar_fallback = false;
+
 feature_parameter_set_type feature_parameters;
 bool feature_list = false;
 
@@ -226,7 +231,8 @@ struct Task
 
   hypergraph_set_type hypergraph_oracles;
   
-  grammar_type grammar;
+  grammar_type      grammar;
+  tree_grammar_type tree_grammar;
   model_type model;
   
   typedef cicada::semiring::Logprob<double> weight_type;
@@ -533,10 +539,12 @@ struct Task
     operation_set_type operations(ops.begin(), ops.end(),
 				  model,
 				  grammar,
+				  tree_grammar,
 				  symbol_goal,
 				  symbol_non_terminal,
 				  grammar_insertion,
 				  grammar_deletion,
+				  tree_grammar_fallback,
 				  true,
 				  input_lattice_mode,
 				  input_forest_mode,
@@ -884,15 +892,8 @@ struct Task
   void initialize()
   {
     // read grammars...
-    
-    size_t grammar_static_size = 0;
-    size_t grammar_mutable_size = 0;
-    
-    for (grammar_file_set_type::const_iterator fiter = grammar_static_files.begin(); fiter != grammar_static_files.end(); ++ fiter, ++ grammar_static_size)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarStatic(*fiter)));
-    
-    for (grammar_file_set_type::const_iterator fiter = grammar_mutable_files.begin(); fiter != grammar_mutable_files.end(); ++ fiter, ++ grammar_mutable_size)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarMutable(*fiter)));
+    const size_t grammar_static_size  = load_grammar<cicada::GrammarStatic>(grammar, grammar_static_files);
+    const size_t grammar_mutable_size = load_grammar<cicada::GrammarMutable>(grammar, grammar_mutable_files);
     
     if (debug)
       std::cerr << "loaded static grammar: " << grammar_static_size << std::endl
@@ -920,6 +921,17 @@ struct Task
     
     if (debug)
       std::cerr << "grammar: " << grammar.size() << std::endl;
+
+    const size_t tree_grammar_static_size  = load_grammar<cicada::TreeGrammarStatic>(tree_grammar, tree_grammar_static_files);
+    const size_t tree_grammar_mutable_size = load_grammar<cicada::TreeGrammarMutable>(tree_grammar, tree_grammar_mutable_files);
+    
+    if (debug)
+      std::cerr << "loaded static tree grammar: " << tree_grammar_static_size << std::endl
+		<< "loaded mutable tree grammar: " << tree_grammar_mutable_size << std::endl;
+    
+    if (debug)
+      std::cerr << "tree grammar: " << tree_grammar.size() << std::endl;
+
     
     // read features...
     for (feature_parameter_set_type::const_iterator piter = feature_parameters.begin(); piter != feature_parameters.end(); ++ piter)
@@ -1176,6 +1188,14 @@ void options(int argc, char** argv)
     ("grammar-glue-inverted", po::bool_switch(&grammar_glue_inverted), "add inverted hiero glue rule")
     ("grammar-insertion",     po::bool_switch(&grammar_insertion),     "source-to-target transfer grammar")
     ("grammar-deletion",      po::bool_switch(&grammar_deletion),      "source-to-<epsilon> transfer grammar")
+
+    // tree-grammar
+    ("tree-grammar",          po::value<grammar_file_set_type >(&tree_grammar_mutable_files)->composing(), "tree grammar file(s)")
+    ("tree-grammar-static",   po::value<grammar_file_set_type >(&tree_grammar_static_files)->composing(),  "static binary tree grammar file(s)")
+    
+    // special handling
+    ("tree-grammar-fallback", po::bool_switch(&tree_grammar_fallback),                                     "source-to-target transfer tree grammar")
+
     
     // models...
     ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")

@@ -44,14 +44,14 @@ namespace cicada
     //
     // if not supplied we will use rule-table-0, rule-table-1 etc.
     
+    TreeGrammarMutable();
     TreeGrammarMutable(const std::string& parameter);
     ~TreeGrammarMutable();
     
     TreeGrammarMutable(const TreeGrammarMutable& x);
     TreeGrammarMutable& operator=(const TreeGrammarMutable& x);
 
-  private:
-    TreeGrammarMutable() {}
+    
     
   public:
     // virtual members

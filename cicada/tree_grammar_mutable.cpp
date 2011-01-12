@@ -86,6 +86,9 @@ namespace cicada
     
     TreeGrammarMutableImpl(const std::string& parameter)
       : trie(edge_id_type(-1)), edges(symbol_type()) { read(parameter); }
+
+    TreeGrammarMutableImpl()
+      : trie(edge_id_type(-1)), edges(symbol_type()) {  }
     
     edge_id_type edge(const symbol_type* first, const symbol_type* last) const
     {
@@ -469,6 +472,9 @@ namespace cicada
     
   }
 
+  TreeGrammarMutable::TreeGrammarMutable()
+    : pimpl(new impl_type()) {}
+  
   TreeGrammarMutable::TreeGrammarMutable(const std::string& parameter)
     : pimpl(new impl_type(parameter)) {}
   

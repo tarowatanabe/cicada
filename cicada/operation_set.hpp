@@ -49,10 +49,12 @@ namespace cicada
     OperationSet(Iterator first, Iterator last,
 		 const model_type& model,
 		 const grammar_type& grammar,
+		 const tree_grammar_type& tree_grammar,
 		 const std::string& goal,
 		 const std::string& non_terminal,
 		 const bool insertion,
 		 const bool deletion,
+		 const bool fallback,
 		 const bool __input_id,
 		 const bool __input_lattice,
 		 const bool __input_forest,
@@ -61,9 +63,7 @@ namespace cicada
 		 const bool __input_mpi,
 		 const int debug)
     {
-      parameter_set_type parameters(first, last);
-      
-      initialize(parameters, model, grammar, goal, non_terminal, insertion, deletion,
+      initialize(parameter_set_type(first, last), model, grammar, tree_grammar, goal, non_terminal, insertion, deletion, fallback,
 		 __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
 		 debug);
     }
@@ -71,10 +71,12 @@ namespace cicada
     OperationSet(const parameter_set_type& parameters,
 		 const model_type& model,
 		 const grammar_type& grammar,
+		 const tree_grammar_type& tree_grammar,
 		 const std::string& goal,
 		 const std::string& non_terminal,
 		 const bool insertion,
 		 const bool deletion,
+		 const bool fallback,
 		 const bool __input_id,
 		 const bool __input_lattice,
 		 const bool __input_forest,
@@ -83,7 +85,7 @@ namespace cicada
 		 const bool __input_mpi,
 		 const int debug)
     {
-      initialize(parameters, model, grammar, goal, non_terminal, insertion, deletion,
+      initialize(parameters, model, grammar, tree_grammar, goal, non_terminal, insertion, deletion, fallback,
 		 __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
 		 debug);
     }
@@ -99,10 +101,12 @@ namespace cicada
     void initialize(const parameter_set_type& parameters,
 		    const model_type& model,
 		    const grammar_type& grammar,
+		    const tree_grammar_type& tree_grammar,
 		    const std::string& goal,
 		    const std::string& non_terminal,
 		    const bool insertion,
 		    const bool deletion,
+		    const bool fallback,
 		    const bool __input_id,
 		    const bool __input_lattice,
 		    const bool __input_forest,
@@ -110,6 +114,7 @@ namespace cicada
 		    const bool __input_bitext,
 		    const bool __input_mpi,
 		    const int debug);
+    
     
   private:
     bool input_id;

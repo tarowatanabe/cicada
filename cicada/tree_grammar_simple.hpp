@@ -15,7 +15,7 @@
 
 namespace cicada
 {
-  class TreeGrammarInsertion : public TreeGrammarMutable
+  class TreeGrammarFallback : public TreeGrammarMutable
   {
   public:
     typedef HyperGraph hypergraph_type;
@@ -40,12 +40,12 @@ namespace cicada
       }
     };
 
-    typedef google::dense_hash_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal> graph_rule_ptr_set_type;
+    typedef google::dense_hash_set<graph_rule_ptr_type, rule_ptr_hash, rule_ptr_equal> graph_rule_ptr_set_type;
 
   public:
 
     // copy, but use default non-terminal category
-    TreeGrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
+    TreeGrammarFallback(const hypergraph_type& graph, const symbol_type& non_terminal)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
 
@@ -57,8 +57,8 @@ namespace cicada
 
       non_terminal_set_type non_terminals;
       
-      hypegraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-      for (hypegraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
+      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = *eiter;
 	
 	if (rules.find(edge.rule) != rules.end()) continue;
@@ -67,7 +67,7 @@ namespace cicada
 	non_terminals.clear();
 	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
-	  non_terminals.push_back(riter->is_non_terminal() ? non_terminal.non_terminal(ritr->non_terminal_index()) : *riter);
+	  non_terminals.push_back(riter->is_non_terminal() ? non_terminal.non_terminal(riter->non_terminal_index()) : *riter);
 	
 	rule_ptr_type rule_source(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
 	rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, non_terminals.begin(), non_terminals.end())));
@@ -77,7 +77,7 @@ namespace cicada
     }
     
     // simply copy and preserve the same non-terminal category...
-    TreeGrammarInsertion(const hypergraph_type& graph)
+    TreeGrammarFallback(const hypergraph_type& graph)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
 
@@ -89,8 +89,8 @@ namespace cicada
 
       non_terminal_set_type non_terminals;
       
-      hypegraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
-      for (hypegraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
+      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = *eiter;
 	
 	if (rules.find(edge.rule) != rules.end()) continue;

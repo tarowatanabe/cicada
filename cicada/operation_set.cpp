@@ -57,6 +57,8 @@ compose-phrase: composition from lattice (or sentence) with phrase-based grammar
 compose-alignment: composition from lattice (or forest) with target\n\
 \tlattice=[true|false] lattice composition\n\
 \tforest=[true|false] forest composition\n\
+compose-tree: composition from tree with tree grammar\n\
+\tyield=[source|target] use source or target yield for rule\n\
 generate-earley: re-generation from tree\n\
 \tdepth: depth of rule pattern \n\
 \twidth: width of rule pattern \n\
@@ -108,10 +110,12 @@ output: kbest or hypergraph output\n\
   void OperationSet::initialize(const parameter_set_type& parameters,
 				const model_type& model,
 				const grammar_type& grammar,
+				const tree_grammar_type& tree_grammar,
 				const std::string& goal,
 				const std::string& non_terminal,
 				const bool insertion,
 				const bool deletion,
+				const bool fallback,
 				const bool __input_id,
 				const bool __input_lattice,
 				const bool __input_forest,
@@ -152,6 +156,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::Permute(*piter, debug)));
       else if (param.name() == "clear")
 	operations.push_back(operation_ptr_type(new operation::Clear(*piter, debug)));
+      else if (param.name() == "compose-tree")
+	operations.push_back(operation_ptr_type(new operation::ComposeTree(*piter, tree_grammar, grammar, goal, non_terminal, insertion, deletion, fallback, debug)));
       else if (param.name() == "compose-earley")
 	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param.name() == "compose-cky")

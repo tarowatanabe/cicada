@@ -11,6 +11,7 @@
 #include <algorithm>
 
 #include <cicada/symbol.hpp>
+#include <cicada/sentence.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/tree_grammar.hpp>
 #include <cicada/tree_transducer.hpp>
@@ -21,6 +22,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/sgi_hash_set.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -61,6 +63,9 @@ namespace cicada
   {
     typedef Symbol symbol_type;
     typedef Vocab  vocab_type;
+    
+    typedef Sentence sentence_type;
+    typedef Sentence phrase_type;
 
     typedef TreeGrammar    tree_grammar_type;
     typedef TreeTransducer tree_transducer_type;
@@ -91,9 +96,18 @@ namespace cicada
     typedef std::deque<feature_set_type, std::allocator<feature_set_type> >    feature_queue_type;
     typedef std::deque<attribute_set_type, std::allocator<attribute_set_type> > attribute_queue_type;
     
+    // for phrasal matching...
+    // this is used to keep extended transducer...
     typedef std::vector<transducer_type::id_type, std::allocator<transducer_type::id_type> > phrase_node_set_type;
     typedef std::vector<phrase_node_set_type, std::allocator<phrase_node_set_type> > phrase_node_map_type;
     typedef std::vector<phrase_node_map_type, std::allocator<phrase_node_map_type> > phrase_node_map_set_type;
+    
+#ifdef HAVE_TR1_UNORDERED_SET
+    typedef std::tr1::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> > phrase_set_type;
+#else
+    typedef sgi::hash_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> > phrase_set_type;
+#endif
+    typedef std::vector<phrase_set_type, std::allocator<phrase_set_type> > phrase_map_type;
     
     struct State
     {
@@ -146,7 +160,9 @@ namespace cicada
     
     ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
       : goal(__goal), tree_grammar(__tree_grammar), grammar(__grammar), yield_source(__yield_source) 
-    {  }
+    {  
+      goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal(1))));
+    }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
@@ -154,7 +170,7 @@ namespace cicada
       node_map.clear();
       
       if (! graph_in.is_valid()) return;
-
+      
       node_map.reserve(graph_in.nodes.size());
       node_map.resize(graph_in.nodes.size());
       
@@ -162,18 +178,122 @@ namespace cicada
       phrase_node_map.reserve(grammar.size());
       phrase_node_map.resize(grammar.size(), phrase_node_map_type(graph_in.nodes.size()));
       
-      // bottom-up topological order
-      for (size_t id = 0; id != graph_in.nodes.size(); ++ id)
-	match_tree(id, graph_in, graph_out);
+      phrase_map.clear();
+      phrase_map.reserve(graph_in.nodes.size());
+      phrase_map.resize(graph_in.nodes.size());
       
+      // bottom-up topological order
+      for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
+	match_tree(id, graph_in, graph_out);
+	match_phrase(id, graph_in, graph_out);
+      }
+      
+      // goal node... the goal must be mapped goal...
       node_map_type::const_iterator niter = node_map[graph_in.goal].find(goal.non_terminal());
-      if (niter != node_map[graph_in.goal].end())
-	graph_out.goal = niter->second;
-
+      if (niter != node_map[graph_in.goal].end()) {
+	// goal node...
+	graph_out.goal = graph_out.add_node().id;
+	
+	// hyperedge to goal...
+	hypergraph_type::edge_type& edge = graph_out.add_edge(&(niter->second), (&(niter->second)) + 1);
+	edge.rule = goal_rule;
+	
+	// connect!
+	graph_out.connect_edge(edge.id, graph_out.goal);
+      }
+      
       node_map.clear();
     }
+
+    void match_phrase(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
+    {
+      typedef std::deque<phrase_type, std::allocator<phrase_type> >  buffer_type;
+
+      if (graph_in.nodes[id].edges.empty()) return;
+      
+      // first, construct prases
+
+      buffer_type buffer;
+      buffer_type buffer_next;
+      
+      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = graph_in.nodes[id].edges.end();
+      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = graph_in.nodes[id].edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = graph_in.edges[*eiter];
+	
+	buffer.clear();
+	buffer.push_back(phrase_type());
+
+	int non_terminal_pos = 0;
+	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	  if (titer->is_non_terminal()) {
+	    int pos = titer->non_terminal_index() - 1;
+	    if (pos < 0)
+	      pos = non_terminal_pos;
+	    ++ non_terminal_pos;
+	    
+	    // combine buffer and tails...
+	    buffer_next.clear();
+	    
+	    phrase_set_type::const_iterator piter_end = phrase_map[edge.tails[pos]].end();
+	    for (phrase_set_type::const_iterator piter = phrase_map[edge.tails[pos]].begin(); piter != piter_end; ++ piter) {
+	      buffer_type::const_iterator biter_end = buffer.end();
+	      for (buffer_type::const_iterator biter = buffer.begin(); biter != biter_end; ++ biter) {
+		buffer_next.push_back(*biter);
+		buffer_next.back().insert(buffer_next.back().end(), piter->begin(), piter->end());
+	      }
+	    }
+	    
+	    buffer.swap(buffer_next);
+	  } else if (*titer != vocab_type::EPSILON) {
+	    buffer_type::iterator biter_end = buffer.end();
+	    for (buffer_type::iterator biter = buffer.begin(); biter != biter_end; ++ biter)
+	      biter->push_back(*titer);
+	  }
+	
+	phrase_map[id].insert(buffer.begin(), buffer.end());
+      }
+      
+      // then, try matching within this span...
+      
+      for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
+	const transducer_type& transducer = grammar[grammar_id];
+	
+	phrase_set_type::const_iterator piter_end = phrase_map[id].end();
+	for (phrase_set_type::const_iterator piter = phrase_map[id].begin(); piter != piter_end; ++ piter) {
+	  const phrase_type& phrase = *piter;
+	  
+	  transducer_type::id_type node = transducer.root();
+	  
+	  phrase_type::const_iterator iter_end = phrase.end();
+	  for (phrase_type::const_iterator iter = phrase.begin(); iter != iter_end; ++ iter) {
+	    node = transducer.next(node, *iter);
+	    if (node == transducer.root()) break;
+	  }
+	  
+	  if (node == transducer.root()) continue;
+	  
+	  const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+	  
+	  if (rules.empty()) continue;
+	  
+	  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	    hypergraph_type::edge_type& edge = graph_out.add_edge();
+	    edge.rule = (yield_source ? riter->source : riter->target);
+	    edge.features = riter->features;
+	    edge.attributes = riter->attributes;
+	    
+	    std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
+	    if (result.second)
+	      result.first->second = graph_out.add_node().id;
+	    
+	    graph_out.connect_edge(edge.id, result.first->second);
+	  }
+	}
+      }
+    }
     
-    // TODO: collect features on graph_in.... HOW?
     void match_tree(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       if (graph_in.nodes[id].edges.empty()) return;
@@ -309,9 +429,6 @@ namespace cicada
 	  queue.pop_front();
 	}
       }
-      
-      // then, try phrasal grammar...
-      
     }
     
     
@@ -406,7 +523,9 @@ namespace cicada
     node_map_set_type node_map;
     
     phrase_node_map_set_type phrase_node_map;
-    
+    phrase_map_type          phrase_map;
+
+    rule_ptr_type goal_rule;
     
     symbol_type goal;
     const tree_grammar_type& tree_grammar;

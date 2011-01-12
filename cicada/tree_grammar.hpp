@@ -8,6 +8,10 @@
 
 #include <cicada/tree_transducer.hpp>
 
+#include <cicada/tree_grammar_mutable.hpp>
+#include <cicada/tree_grammar_static.hpp>
+#include <cicada/tree_grammar_simple.hpp>
+
 #include <boost/shared_ptr.hpp>
 
 namespace cicada

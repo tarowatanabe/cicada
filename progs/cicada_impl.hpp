@@ -31,6 +31,7 @@
 
 #include "cicada/model.hpp"
 #include "cicada/grammar.hpp"
+#include "cicada/tree_grammar.hpp"
 
 #include "cicada/operation_set.hpp"
 
@@ -57,6 +58,7 @@ typedef cicada::Lattice         lattice_type;
 typedef cicada::Rule            rule_type;
 typedef cicada::HyperGraph      hypergraph_type;
 typedef cicada::Grammar         grammar_type;
+typedef cicada::TreeGrammar     tree_grammar_type;
 typedef cicada::Model           model_type;
 typedef cicada::FeatureFunction feature_function_type;
 
@@ -95,3 +97,15 @@ bool parse_separator(Iterator& iter, Iterator end)
   return qi::phrase_parse(iter, end, "|||", standard::space);
 }
 
+template <typename GrammarClass, typename Grammar, typename Files>
+inline
+size_t load_grammar(Grammar& grammar, const Files& files)
+{
+  size_t num = 0;
+  
+  typename Files::const_iterator iter_end = files.end();
+  for (typename Files::const_iterator iter = files.begin(); iter != iter_end; ++ iter, ++ num)
+    grammar.push_back(typename Grammar::transducer_ptr_type(new GrammarClass(*iter)));
+  
+  return num;
+}

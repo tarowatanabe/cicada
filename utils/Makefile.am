@@ -100,6 +100,7 @@ vertical_coded_vector.hpp
 noinst_PROGRAMS = \
 sample_arc_list \
 sample_b_heap \
+sample_base64 \
 sample_bithack \
 sample_bitpack \
 sample_bit_vector \
@@ -160,6 +161,9 @@ sample_arc_list_LDADD = $(BOOST_THREAD_LIBS)
 
 sample_b_heap_SOURCES = sample_b_heap.cpp
 sample_b_heap_LDADD = $(LIBUTILS)
+
+sample_base64_SOURCES = sample_base64.cpp
+#sample_base64_LDADD = $(LIBUTILS)
 
 sample_bithack_SOURCES = sample_bithack.cpp
 
