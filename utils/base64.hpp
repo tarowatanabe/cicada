@@ -76,7 +76,7 @@ namespace utils
       *iter = enc64[buf[curr + 0] >> 2];
       ++ iter;
       
-      *iter = enc64[((buf[curr + 0] & 0x03) << 4) | ((buf[curr + 1] & 0xf0) >> 4)];
+      *iter = enc64[((buf[curr + 0] & 0x03) << 4) | (len > 1 ? ((buf[curr + 1] & 0xf0) >> 4) : 0)];
       ++ iter;
       
       *iter = (len > 1 ? enc64[((buf[curr + 1] & 0x0f) << 2) | ((buf[curr + 2] & 0xc0) >> 6) ] : '=');
