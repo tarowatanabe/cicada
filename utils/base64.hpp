@@ -41,7 +41,7 @@ namespace utils
 	break;
       case 2:
 	*iter = enc64[((buf[curr + 0] & 0x03) << 4) | ((buf[curr + 1] & 0xf0) >> 4)]; ++ iter;
-	*iter = enc64[((buf[curr + 1] & 0x0f) << 2)];                                 ++ iter;
+	*iter = enc64[(buf[curr + 1] & 0x0f) << 2];                                   ++ iter;
 	break;
       case 1:
 	*iter = enc64[(buf[curr + 0] & 0x03) << 4]; ++ iter;
@@ -70,39 +70,6 @@ namespace utils
     std::string encoded;
     encode_base64(x, std::back_inserter(encoded));
     return encoded;
-    
-#if 0
-    static const char* enc64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    
-    const unsigned char* buf = reinterpret_cast<const unsigned char*>(&x);
-    const size_t size = sizeof(Tp);
-
-    std::string encoded;
-    
-    size_t curr = 0;
-    while (curr < size) {
-      const size_t len = utils::bithack::min(size, size_t(3));
-      
-      encoded += enc64[buf[curr + 0] >> 2];
-      encoded += enc64[((buf[curr + 0] & 0x03) << 4) | (len > 1 ? ((buf[curr + 1] & 0xf0) >> 4) : 0)];
-      encoded += (len > 1 ? enc64[((buf[curr + 1] & 0x0f) << 2) | ((buf[curr + 2] & 0xc0) >> 6) ] : '=');
-      encoded += (len > 2 ? enc64[ buf[curr + 2] & 0x3f ] : '=');
-      curr += len;
-    }
-
-    return encoded;
-#endif
-    
-#if 0
-    using namespace boost::archive::iterators;
-
-    typedef base64_from_binary<transform_width<const char*, 6, 8> > encoder_type;
-
-    std::string encoded;
-    std::copy(encoder_type((const char*) &x), encoder_type(((const char*) &x) + sizeof(Tp)), std::back_inserter(encoded));
-  
-    return encoded;
-#endif
   }
 
 
