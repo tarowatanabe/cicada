@@ -979,7 +979,7 @@ namespace cicada
       
       // default name...!
       if (feature_names[feature] == feature_type())
-	feature_names[feature] = std::string("rule-table-") + boost::lexical_cast<std::string>(feature);
+	feature_names[feature] = std::string("tree-rule-table-") + boost::lexical_cast<std::string>(feature);
     }
     
     if (attribute_size < 0)
@@ -1006,7 +1006,7 @@ namespace cicada
       
       // default name...!
       if (attribute_names[attribute] == attribute_type())
-	attribute_names[attribute] = std::string("rule-table-") + boost::lexical_cast<std::string>(attribute);
+	attribute_names[attribute] = std::string("tree-rule-table-") + boost::lexical_cast<std::string>(attribute);
     }
   }
   
