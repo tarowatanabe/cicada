@@ -146,7 +146,7 @@ namespace utils
       MPI::Prequest request_size;
       MPI::Prequest request_buffer;
       volatile unsigned int recv_size;
-      size_t buffer_offset;
+      volatile size_t buffer_offset;
       std::vector<char_type, std::allocator<char_type> > buffer;
       
       impl() {}
@@ -225,7 +225,7 @@ namespace utils
       MPI::Prequest request_size;
       MPI::Prequest request_buffer;
       volatile unsigned int send_size;
-      size_t buffer_offset;
+      volatile size_t buffer_offset;
       std::vector<char_type, std::allocator<char_type> > buffer;
       std::vector<char_type> buffer_overcommit;
       bool terminate_on_close;

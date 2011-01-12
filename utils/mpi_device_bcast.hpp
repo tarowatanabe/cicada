@@ -59,7 +59,7 @@ namespace utils
     {
       int root;
       volatile unsigned int recv_size;
-      size_t buffer_offset;
+      volatile size_t buffer_offset;
       std::vector<char_type, std::allocator<char_type> > buffer;
       
       impl() : root(-1), buffer_offset(0) {}
@@ -108,7 +108,7 @@ namespace utils
     {
       int root;
       volatile unsigned int send_size;
-      size_t buffer_offset;
+      volatile size_t buffer_offset;
       std::vector<char_type, std::allocator<char_type> > buffer;
       
       impl() : root(-1), buffer_offset(0) {}

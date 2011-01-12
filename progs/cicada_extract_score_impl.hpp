@@ -693,7 +693,7 @@ struct RootCountGenerator
   typedef root_count_type::label_type  label_type;
   typedef root_count_type::counts_type counts_type;
   
-  std::ostream& operator()(std::ostream& os, const root_count_type& root_count)
+  std::ostream& operator()(std::ostream& os, const root_count_type& root_count) const
   {
     os << root_count.label << " |||";
     counts_type::const_iterator citer_end = root_count.counts.end();
@@ -795,7 +795,7 @@ struct PhrasePairGenerator
   typedef phrase_pair_type::alignment_type alignment_type;
   typedef phrase_pair_type::counts_type    counts_type;
   
-  std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair)
+  std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair) const
   {
     os << phrase_pair.source
        << " ||| " << phrase_pair.target
@@ -889,7 +889,7 @@ struct PhrasePairModifiedGenerator
   typedef phrase_pair_type::phrase_type    phrase_type;
   typedef phrase_pair_type::counts_type    counts_type;
 
-  std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair)
+  std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair) const
   {
     os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
     
