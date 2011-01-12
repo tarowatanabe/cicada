@@ -40,7 +40,7 @@ namespace utils
       const size_t len = utils::bithack::min(size, size_t(3));
       
       encoded += enc64[buf[curr + 0] >> 2];
-      encoded += enc64[((buf[curr + 0] & 0x03) << 4) | ((buf[curr + 1] & 0xf0) >> 4)];
+      encoded += enc64[((buf[curr + 0] & 0x03) << 4) | (len > 1 ? ((buf[curr + 1] & 0xf0) >> 4) : 0)];
       encoded += (len > 1 ? enc64[((buf[curr + 1] & 0x0f) << 2) | ((buf[curr + 2] & 0xc0) >> 6) ] : '=');
       encoded += (len > 2 ? enc64[ buf[curr + 2] & 0x3f ] : '=');
       curr += len;
