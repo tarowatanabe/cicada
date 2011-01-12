@@ -31,17 +31,22 @@ namespace utils
     while (curr < size) {
       const size_t len = utils::bithack::min(size, size_t(3));
       
-      *iter = enc64[buf[curr + 0] >> 2];
-      ++ iter;
+      *iter = enc64[buf[curr + 0] >> 2]; ++ iter;
       
-      *iter = enc64[((buf[curr + 0] & 0x03) << 4) | (len > 1 ? ((buf[curr + 1] & 0xf0) >> 4) : 0)];
-      ++ iter;
-      
-      *iter = (len > 1 ? enc64[((buf[curr + 1] & 0x0f) << 2) | ((buf[curr + 2] & 0xc0) >> 6) ] : '=');
-      ++ iter;
-      
-      *iter = (len > 2 ? enc64[ buf[curr + 2] & 0x3f ] : '=');
-      ++ iter;
+      switch (len) {
+      case 3:
+	*iter = enc64[((buf[curr + 0] & 0x03) << 4) | ((buf[curr + 1] & 0xf0) >> 4)]; ++ iter;
+	*iter = enc64[((buf[curr + 1] & 0x0f) << 2) | ((buf[curr + 2] & 0xc0) >> 6)]; ++ iter;
+	*iter = enc64[buf[curr + 2] & 0x3f];                                          ++ iter;
+	break;
+      case 2:
+	*iter = enc64[((buf[curr + 0] & 0x03) << 4) | ((buf[curr + 1] & 0xf0) >> 4)]; ++ iter;
+	*iter = enc64[((buf[curr + 1] & 0x0f) << 2)];                                 ++ iter;
+	break;
+      case 1:
+	*iter = enc64[(buf[curr + 0] & 0x03) << 4]; ++ iter;
+	break;
+      }
       
       curr += len;
     }
