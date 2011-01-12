@@ -40,7 +40,7 @@ std::string non_terminal = "[x]";
 int max_nodes = 15;
 int max_height = 3;
 
-bool exhasutive = false;
+bool exhaustive = false;
 bool inverse = false;
 bool swap_source_target = false;
 
