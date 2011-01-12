@@ -296,7 +296,7 @@ void options(int argc, char** argv)
     ("max-nodes",  po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in a rule")
     ("max-height", po::value<int>(&max_height)->default_value(max_height), "maximum height of a rule")
     
-    ("exhaustive", po::bool_swtich(&exhaustive),                           "exhausive extraction")
+    ("exhaustive", po::bool_switch(&exhaustive),                           "exhausive extraction")
     ("inverse",    po::bool_switch(&inverse),                              "inversed word alignment")
     ("swap",       po::bool_switch(&swap_source_target),                   "swap source/target")
     
