@@ -38,6 +38,7 @@ namespace cicada
 #ifdef HAVE_TLS
   __thread FeatureImpl::feature_map_type* FeatureImpl::feature_maps_tls = 0;
 #endif
+  boost::thread_specific_ptr<FeatureImpl::feature_map_type> FeatureImpl::feature_maps;
   
   Feature::feature_set_type& Feature::__features()
   {

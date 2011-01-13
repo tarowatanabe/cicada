@@ -55,6 +55,11 @@ namespace cicada
   __thread SymbolImpl::non_terminal_symbol_map_type* SymbolImpl::non_terminal_symbol_maps_tls = 0;
 #endif
   
+  boost::thread_specific_ptr<SymbolImpl::symbol_map_type>              SymbolImpl::symbol_maps;
+  boost::thread_specific_ptr<SymbolImpl::index_map_type>               SymbolImpl::index_maps;
+  boost::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        SymbolImpl::non_terminal_maps;
+  boost::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> SymbolImpl::non_terminal_symbol_maps;
+  
   
   
   Symbol::symbol_set_type& Symbol::__symbols()
