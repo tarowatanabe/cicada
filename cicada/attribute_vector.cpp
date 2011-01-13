@@ -118,15 +118,25 @@ namespace cicada
     boost::spirit::karma::rule<Iterator, AttributeVector::value_type()> attribute;
     boost::spirit::karma::rule<Iterator, AttributeVector::attribute_vector_type()> attributes;
   };
-
-  bool AttributeVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  
+  namespace attribute_vector_parser_impl
   {
     typedef attribute_vector_parser<std::string::const_iterator > grammar_type;
-    
+
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+  };
+
+
+  bool AttributeVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    using namespace attribute_vector_parser_impl;
     
+#ifdef HAVE_TLS
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -134,7 +144,6 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
@@ -165,16 +174,25 @@ namespace cicada
       throw std::runtime_error("attribute-vector format parsing failed...");
   }
 
-  
-  std::ostream& operator<<(std::ostream& os, const AttributeVector& x)
+  namespace attribute_vector_generator_impl
   {
     typedef std::ostream_iterator<char> iterator_type;
     typedef attribute_vector_generator<iterator_type> grammar_type;    
- 
+
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
- 
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+  };
+
+  
+  std::ostream& operator<<(std::ostream& os, const AttributeVector& x)
+  {
+    using namespace attribute_vector_generator_impl;
+    
+#ifdef HAVE_TLS
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -182,7 +200,6 @@ namespace cicada
       
     grammar_type& grammar = *__grammar_tls;
 #else
-    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
@@ -283,7 +300,7 @@ namespace cicada
     boost::spirit::karma::rule<Iterator, AttributeVector::data_type()> data;
   };
 
-  std::ostream& operator<<(std::ostream& os, const AttributeVector::data_type& x)
+  namespace attribute_data_generator_impl
   {
     typedef std::ostream_iterator<char> iterator_type;
     typedef attribute_data_generator<iterator_type> grammar_type;    
@@ -291,7 +308,16 @@ namespace cicada
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
- 
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+  };
+
+  std::ostream& operator<<(std::ostream& os, const AttributeVector::data_type& x)
+  {
+    using namespace attribute_data_generator_impl;
+    
+#ifdef HAVE_TLS
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -299,7 +325,6 @@ namespace cicada
       
     grammar_type& grammar = *__grammar_tls;
 #else
-    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
@@ -314,14 +339,23 @@ namespace cicada
     return os;
   }
 
-  std::istream& operator>>(std::istream& is, AttributeVector::data_type& x)
+  namespace attribute_data_parser_impl
   {
     typedef attribute_data_parser<std::string::const_iterator > grammar_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+  };
+
+  std::istream& operator>>(std::istream& is, AttributeVector::data_type& x)
+  {
+    using namespace attribute_data_parser_impl;
     
+#ifdef HAVE_TLS
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -329,7 +363,6 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
