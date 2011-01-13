@@ -84,11 +84,13 @@ opt_parser = OptionParser(
     make_option("--max-length", default=7, action="store", type="int",
                 metavar="LENGTH", help="maximum terminal length (default: 7)"),
     make_option("--max-fertility", default=4, action="store", type="int",
-                metavar="FERTILITY",help="maximum terminal fertility (default: 4)"),
+                metavar="FERTILITY", help="maximum terminal fertility (default: 4)"),
     make_option("--max-nodes", default=15, action="store", type="int",
-                metavar="NODES",help="maximum rule nodes (default: 15)"),
+                metavar="NODES", help="maximum rule nodes (default: 15)"),
     make_option("--max-height", default=4, action="store", type="int",
-                metavar="HEIGHT",help="maximum rule height (default: 4)"),
+                metavar="HEIGHT", help="maximum rule height (default: 4)"),
+    make_option("--exhaustive", default=None, action="store_true",
+                help="exhaustive extraction in GHKMx")
     
     make_option("--ternary", default=None, action="store_true",
                 help="extract ternary rule"),
@@ -524,6 +526,7 @@ class ExtractGHKM(Extract):
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
                  non_terminal="", max_nodes=15, max_height=4,
+                 exhaustive=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -555,6 +558,9 @@ class ExtractGHKM(Extract):
         
         command += " --max-nodes %d"  %(max_nodes)
         command += " --max-height %d" %(max_height)
+
+        if exhaustive:
+            comamnd += " --exhaustive"
         
         command += " --max-malloc %g" %(max_malloc)
 
@@ -739,6 +745,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               non_terminal=options.non_terminal,
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
+                              exhaustive=options.exhaustive,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     elif options.tree:
