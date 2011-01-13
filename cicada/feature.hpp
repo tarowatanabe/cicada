@@ -117,8 +117,11 @@ namespace cicada
 	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
       }
     };
+
+  public:
     typedef utils::indexed_set<feature_type, hasher, std::equal_to<feature_type>, std::allocator<feature_type> > feature_set_type;
 
+  private:
     typedef std::vector<const feature_type*, std::allocator<const feature_type*> > feature_map_type;
     
   public:
@@ -138,11 +141,7 @@ namespace cicada
     
     static feature_map_type& __feature_maps();
     
-    static feature_set_type& __features()
-    {
-      static feature_set_type features;
-      return features;
-    }
+    static feature_set_type& __features();
     
     static const id_type& __allocate_empty()
     {

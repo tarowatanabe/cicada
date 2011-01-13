@@ -117,8 +117,11 @@ namespace cicada
 	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
       }
     };
+
+  public:
     typedef utils::indexed_set<attribute_type, hasher, std::equal_to<attribute_type>, std::allocator<attribute_type> > attribute_set_type;
 
+  private:
     typedef std::vector<const attribute_type*, std::allocator<const attribute_type*> > attribute_map_type;
     
   public:
@@ -138,11 +141,7 @@ namespace cicada
     
     static attribute_map_type& __attribute_maps();
     
-    static attribute_set_type& __attributes()
-    {
-      static attribute_set_type attributes;
-      return attributes;
-    }
+    static attribute_set_type& __attributes();
     
     static const id_type& __allocate_empty()
     {

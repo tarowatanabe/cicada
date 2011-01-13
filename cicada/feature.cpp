@@ -8,6 +8,32 @@
 
 namespace cicada
 {
+  Feature::mutex_type    Feature::__mutex;
+  
+  class __feature_set_instance
+  {
+  public:
+    __feature_set_instance() : instance(0) {}
+    ~__feature_set_instance() { if (instance) delete instance; }
+    
+    Feature::feature_set_type* instance;
+  };
+  
+  static boost::once_flag      __features_once = BOOST_ONCE_INIT;
+  static __feature_set_instance __features_instance;
+  
+  static void __features_init()
+  {
+    __features_instance.instance = new Feature::feature_set_type();
+  }
+  
+  Feature::feature_set_type& Feature::__features()
+  {
+    boost::call_once(__features_once, __features_init);
+
+    return *__features_instance.instance;
+  }
+  
   Feature::feature_map_type& Feature::__feature_maps()
   {
 #ifdef HAVE_TLS
@@ -33,7 +59,5 @@ namespace cicada
     return *__maps;
 #endif
   }
-  
-  Feature::mutex_type    Feature::__mutex;
-  
+    
 };
