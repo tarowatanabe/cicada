@@ -13,28 +13,20 @@ namespace cicada
 {
     
   Symbol::mutex_type    Symbol::__mutex;
-
-  struct __symbol_set_instance
-  {
-    __symbol_set_instance() : instance(0) {}
-    ~__symbol_set_instance() { if (instance) delete instance; }
-    
-    Symbol::symbol_set_type* instance;
-  };
   
-  static boost::once_flag      __symbols_once = BOOST_ONCE_INIT;
-  static __symbol_set_instance __symbols_instance;
+  static boost::once_flag         __symbols_once = BOOST_ONCE_INIT;
+  static Symbol::symbol_set_type* __symbols_instance = 0;
   
   static void __symbols_init()
   {
-    __symbols_instance.instance = new Symbol::symbol_set_type();
+    __symbols_instance = new Symbol::symbol_set_type();
   }
   
   Symbol::symbol_set_type& Symbol::__symbols()
   {
     boost::call_once(__symbols_once, __symbols_init);
-
-    return *__symbols_instance.instance;
+    
+    return *__symbols_instance;
   }
   
   Symbol::symbol_map_type& Symbol::__symbol_maps()
