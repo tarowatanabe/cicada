@@ -9,20 +9,6 @@
 #include <iostream>
 
 #include <cicada/operation.hpp>
-#include <cicada/parameter.hpp>
-#include <cicada/semiring.hpp>
-#include <cicada/kbest.hpp>
-#include <cicada/graphviz.hpp>
-#include <cicada/inside_outside.hpp>
-
-#include <cicada/operation/functional.hpp>
-#include <cicada/operation/traversal.hpp>
-
-#include <utils/lexical_cast.hpp>
-#include <utils/resource.hpp>
-#include <utils/sgi_hash_map.hpp>
-
-#include <google/dense_hash_map>
 
 namespace cicada
 {
