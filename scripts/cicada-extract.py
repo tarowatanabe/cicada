@@ -90,7 +90,7 @@ opt_parser = OptionParser(
     make_option("--max-height", default=4, action="store", type="int",
                 metavar="HEIGHT", help="maximum rule height (default: 4)"),
     make_option("--exhaustive", default=None, action="store_true",
-                help="exhaustive extraction in GHKMx")
+                help="exhaustive extraction in GHKM"),
     
     make_option("--ternary", default=None, action="store_true",
                 help="extract ternary rule"),
