@@ -31,9 +31,15 @@ namespace cicada
   
   Feature::feature_set_type& Feature::__features()
   {
+    static feature_set_type features;
+    
+    return features;
+
+#if 0
     boost::call_once(FeatureImpl::once, FeatureImpl::initialize);
     
     return *FeatureImpl::features;
+#endif
   }
 
   Feature::feature_map_type& Feature::__feature_maps()

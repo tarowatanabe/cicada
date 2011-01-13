@@ -30,9 +30,15 @@ namespace cicada
   
   Attribute::attribute_set_type& Attribute::__attributes()
   {
+    static attribute_set_type attributes;
+
+    return attributes;
+
+#if 0
     boost::call_once(AttributeImpl::once, AttributeImpl::initialize);
     
     return *AttributeImpl::attributes;
+#endif
   }
 
   Attribute::attribute_map_type& Attribute::__attribute_maps()

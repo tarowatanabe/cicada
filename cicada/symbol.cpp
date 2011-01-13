@@ -35,9 +35,15 @@ namespace cicada
   
   Symbol::symbol_set_type& Symbol::__symbols()
   {
+    static symbol_set_type symbols;
+    
+    return symbols;
+
+#if 0
     boost::call_once(SymbolImpl::once, SymbolImpl::initialize);
     
     return *SymbolImpl::symbols;
+#endif
   }
   
 
