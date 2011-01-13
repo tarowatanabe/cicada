@@ -132,17 +132,17 @@ namespace cicada
   typedef sgi::hash_map<std::string, Cluster, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
 #endif
-
-#ifdef HAVE_TLS
-  static __thread cluster_map_type* __clusters_tls = 0;
-  static boost::thread_specific_ptr<cluster_map_type> __clusters;
-#else
-  static boost::thread_specific_ptr<cluster_map_type> __clusters;
-#endif
   
 
   Cluster& Cluster::create(const path_type& path)
   {
+#ifdef HAVE_TLS
+    static __thread cluster_map_type* __clusters_tls = 0;
+    static boost::thread_specific_ptr<cluster_map_type> __clusters;
+#else
+    static boost::thread_specific_ptr<cluster_map_type> __clusters;
+#endif
+
 #ifdef HAVE_TLS
     if (! __clusters_tls) {
       __clusters.reset(new cluster_map_type());

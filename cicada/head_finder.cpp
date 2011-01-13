@@ -47,16 +47,16 @@ chinese: Chinese head finder\n\
 			std::allocator<std::pair<const std::string, finder_ptr_type> > > finder_map_type;
 #endif
 
-#ifdef HAVE_TLS
-  static __thread finder_map_type* __finders_tls = 0;
-  static boost::thread_specific_ptr<finder_map_type> __finders;
-#else
-  static boost::thread_specific_ptr<finder_map_type> __finders;
-#endif
-
   
   HeadFinder& HeadFinder::create(const std::string& parameter)
   {
+#ifdef HAVE_TLS
+    static __thread finder_map_type* __finders_tls = 0;
+    static boost::thread_specific_ptr<finder_map_type> __finders;
+#else
+    static boost::thread_specific_ptr<finder_map_type> __finders;
+#endif
+
     typedef cicada::Parameter parameter_type;
 
 #ifdef HAVE_TLS
