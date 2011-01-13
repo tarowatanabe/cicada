@@ -123,7 +123,7 @@ namespace cicada
       }
     };
 
-  public:
+  private:
     typedef utils::indexed_set<feature_type, hasher, std::equal_to<feature_type>, std::allocator<feature_type> > feature_set_type;
 
     typedef std::vector<const feature_type*, std::allocator<const feature_type*> > feature_map_type;
