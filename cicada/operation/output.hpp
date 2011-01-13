@@ -13,6 +13,7 @@
 #include <cicada/semiring.hpp>
 #include <cicada/kbest.hpp>
 #include <cicada/graphviz.hpp>
+#include <cicada/inside_outside.hpp>
 
 #include <cicada/operation/functional.hpp>
 #include <cicada/operation/traversal.hpp>

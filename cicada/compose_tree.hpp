@@ -185,7 +185,9 @@ namespace cicada
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
 	match_tree(id, graph_in, graph_out);
-	match_phrase(id, graph_in, graph_out);
+
+	if (! grammar.empty())
+	  match_phrase(id, graph_in, graph_out);
       }
       
       // goal node... the goal must be mapped goal...
@@ -298,12 +300,18 @@ namespace cicada
     {
       if (graph_in.nodes[id].edges.empty()) return;
       
+      //std::cerr << "node: " << id << std::endl;
+
+      
       queue_type queue;
       
       for (size_t grammar_id = 0; grammar_id != tree_grammar.size(); ++ grammar_id) {
 	const tree_transducer_type& transducer = tree_grammar[grammar_id];
+
+	//std::cerr << "transducer: " << grammar_id << std::endl;
 	
-	const tree_transducer_type::edge_id_type edge_id = transducer.edge(graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs);
+	const symbol_type cat = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
+	const tree_transducer_type::edge_id_type edge_id = transducer.edge(cat);
 	
 	if (edge_id == tree_transducer_type::edge_id_type(-1)) continue;
 	
@@ -315,6 +323,8 @@ namespace cicada
 	
 	node = transducer.next(node, edge_none);
 	if (node == transducer.root()) continue;
+	
+	//std::cerr << "grammar cat: " << cat << " id: " << edge_id << std::endl;
 	
 	queue.clear();
 	queue.push_back(state_type(frontier_type(1, id), node));
@@ -358,7 +368,7 @@ namespace cicada
 
 	    node_queue_type::const_iterator titer_end = nodes.end();
 	    for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	      const tree_transducer_type::size_type node_epsilon = transducer.next(edge_epsilon, *titer);
+	      const tree_transducer_type::size_type node_epsilon = transducer.next(*titer, edge_epsilon);
 	      if (node_epsilon != transducer.root()) {
 		frontier_type frontier(*fiter);
 		frontier.push_back(*niter);
@@ -375,7 +385,7 @@ namespace cicada
 		if (*eiter != tree_transducer_type::edge_id_type(-1)) {
 		  const tree_transducer_type::edge_id_type& edge_id = *eiter;
 		  
-		  const tree_transducer_type::size_type node_edge = transducer.next(edge_id, *titer);
+		  const tree_transducer_type::size_type node_edge = transducer.next(*titer, edge_id);
 		  if (node_edge != transducer.root()) {
 		    const hypergraph_type::edge_type& edge = graph_in.edges[graph_in.nodes[*niter].edges[eiter - eiter_begin]];
 		    
@@ -400,6 +410,8 @@ namespace cicada
 	    features_next.clear();
 	    attributes_next.clear();
 	  }
+
+	  //std::cerr << "finished loop: " << frontiers.size() << std::endl;
 	  
 	  // frontiers and nodes contain new frontier!
 	  // in addition, we need to traverse transducer.next() with edge_none!
@@ -410,7 +422,7 @@ namespace cicada
 	  
 	  node_queue_type::const_iterator titer_end = nodes.end();
 	  for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	    const tree_transducer_type::size_type node_none = transducer.next(edge_none, *titer);
+	    const tree_transducer_type::size_type node_none = transducer.next(*titer, edge_none);
 	    if (node_none == transducer.root()) continue;
 	    
 	    const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node_none);
@@ -448,14 +460,18 @@ namespace cicada
       //
       // construct graph_out in pre-order...
       //
-
+      
+      //std::cerr << "apply rule pair: " << *rule_pair.source << " ||| " << *rule_pair.target << std::endl;
+      
       const tree_rule_type& rule = (yield_source ? *rule_pair.source : *rule_pair.target);
       
       std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
       if (result.second)
 	result.first->second = graph_out.add_node().id;
+
+      int non_terminal_pos = 0;
       
-      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_in, graph_out);
+      const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_in, graph_out, non_terminal_pos);
       
       graph_out.edges[edge_id].features   += features;
       graph_out.edges[edge_id].attributes += attributes;
@@ -468,7 +484,8 @@ namespace cicada
 					     const hypergraph_type::id_type root,
 					     const frontier_type& frontiers,
 					     const hypergraph_type& graph_in,
-					     hypergraph_type& graph_out)
+					     hypergraph_type& graph_out,
+					     int& non_terminal_pos)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
@@ -481,14 +498,15 @@ namespace cicada
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
 	if (aiter->label.is_non_terminal()) {
 	  if (aiter->antecedents.empty()) {
-	    const int non_terminal_index = aiter->label.non_terminal_index();
+	    int non_terminal_index = aiter->label.non_terminal_index() - 1;
+	    if (non_terminal_index < 0)
+	      non_terminal_index = non_terminal_pos;
+	    ++ non_terminal_pos;
 	    
-	    if (non_terminal_index == 0)
-	      throw std::runtime_error("invalid non-terminal index");
-	    if (non_terminal_index - 1 >= static_cast<int>(frontiers.size()))
+	    if (non_terminal_index >= static_cast<int>(frontiers.size()))
 	      throw std::runtime_error("non-terminal index exceeds frontier size");
-	    
-	    const hypergraph_type::id_type node = frontiers[non_terminal_index - 1];
+	     
+	    const hypergraph_type::id_type node = frontiers[non_terminal_index];
 
 	    std::pair<node_map_type::iterator, bool> result = node_map[node].insert(std::make_pair(aiter->label.non_terminal(), 0));
 	    if (result.second)
@@ -506,13 +524,15 @@ namespace cicada
       
       const hypergraph_type::id_type edge_id = graph_out.add_edge(tails.begin(), tails.end()).id;
       graph_out.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
-
+      
+      //std::cerr << "output forest rule: " << *(graph_out.edges[edge_id].rule) << std::endl;
+      
       graph_out.connect_edge(edge_id, root);
       
       tails_type::const_iterator titer = tails.begin();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter) {
 	if (aiter->label.is_non_terminal() && ! aiter->antecedents.empty()) {
-	  construct_graph(*aiter, *titer, frontiers, graph_in, graph_out);
+	  construct_graph(*aiter, *titer, frontiers, graph_in, graph_out, non_terminal_pos);
 	  ++ titer;
 	}
       }

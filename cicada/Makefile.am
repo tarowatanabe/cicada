@@ -11,6 +11,7 @@ libcicada-semiring.la \
 libcicada-eval.la \
 libcicada-head.la \
 libcicada-optimize.la \
+libcicada-operation.la \
 libcicada-stemmer.la 
 
 libcicadaincludedir= $(pkgincludedir)/cicada
@@ -179,6 +180,22 @@ operation/remove_epsilon.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp
 
+libcicada_operation_la_SOURCES = \
+operation/apply.cpp \
+operation/binarize.cpp \
+operation/clear.cpp \
+operation/compose.cpp \
+operation/expected_ngram.cpp \
+operation/intersect.cpp \
+operation/generate.cpp \
+operation/normalize.cpp \
+operation/permute.cpp \
+operation/prune.cpp \
+operation/remove_epsilon.cpp \
+operation/span_forest.cpp 
+libcicada_operation_la_CPPFLAGS = $(AM_CPPFLAGS)
+
+
 libcicadainclude_HEADERS = \
 alignment.hpp \
 apply.hpp \
@@ -306,6 +323,7 @@ libcicada_la_LIBADD = \
 	libcicada-feature.la \
 	libcicada-matcher.la \
 	libcicada-optimize.la \
+	libcicada-operation.la \
 	libcicada-semiring.la \
 	libcicada-stemmer.la \
 	\

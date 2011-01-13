@@ -130,7 +130,6 @@ stdout = sys.stdout
 sys.stdout = sys.stderr
 
 def run_command(command):
-    
     fp = os.popen(command)
     while 1:
         data = fp.read(1)
