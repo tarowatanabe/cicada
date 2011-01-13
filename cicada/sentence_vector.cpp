@@ -54,27 +54,32 @@ namespace cicada
     if (! result || iter != end)
       throw std::runtime_error("sentence vector format parsing failed...");
   }
-
-  bool SentenceVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
-  {
+  
+  namespace sentence_vector_impl {
     typedef sentence_vector_parser<std::string::const_iterator> grammar_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
-    
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
+#endif
+  };
+  
+  bool SentenceVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+#ifdef HAVE_TLS
+    if (! sentence_vector_impl::__grammar_tls) {
+      sentence_vector_impl::__grammar.reset(new sentence_vector_impl::grammar_type());
+      sentence_vector_impl::__grammar_tls = sentence_vector_impl::__grammar.get();
+    }
     
-    grammar_type& grammar = *__grammar;
+    sentence_vector_impl::grammar_type& grammar = *sentence_vector_impl::__grammar_tls;
+#else
+    if (! sentence_vector_impl::__grammar.get())
+      sentence_vector_impl::__grammar.reset(new sentence_vector_impl::grammar_type());
+    
+    sentence_vector_impl::grammar_type& grammar = *sentence_vector_impl::__grammar;
 #endif
     
     clear();
