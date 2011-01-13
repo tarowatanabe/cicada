@@ -190,6 +190,7 @@ operation/expected_ngram.cpp \
 operation/intersect.cpp \
 operation/generate.cpp \
 operation/normalize.cpp \
+operation/output.cpp \
 operation/permute.cpp \
 operation/prune.cpp \
 operation/remove_epsilon.cpp \
