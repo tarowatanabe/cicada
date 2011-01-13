@@ -13,23 +13,8 @@ namespace cicada
 {
   struct SymbolImpl
   {
-    typedef Symbol::symbol_set_type              symbol_set_type;
     
-    static boost::once_flag once;
-    
-    static Symbol::symbol_set_type* symbols; 
-   
-
-    static void initialize()
-    {
-      symbols = new symbol_set_type();
-    }
   };
-  
-  
-  boost::once_flag SymbolImpl::once = BOOST_ONCE_INIT;
-  
-  SymbolImpl::symbol_set_type* SymbolImpl::symbols = 0;  
   
   Symbol::mutex_type    Symbol::__mutex;
   
@@ -38,12 +23,6 @@ namespace cicada
     static symbol_set_type symbols;
     
     return symbols;
-
-#if 0
-    boost::call_once(SymbolImpl::once, SymbolImpl::initialize);
-    
-    return *SymbolImpl::symbols;
-#endif
   }
   
 

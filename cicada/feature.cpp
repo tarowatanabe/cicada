@@ -11,21 +11,8 @@ namespace cicada
 
   struct FeatureImpl
   {
-    typedef Feature::feature_set_type feature_set_type;
-
-    static boost::once_flag once;
-
-    static feature_set_type* features;
     
-    static void initialize()
-    {
-      features = new feature_set_type();
-    }
   };
-
-  boost::once_flag FeatureImpl::once = BOOST_ONCE_INIT;
-  
-  FeatureImpl::feature_set_type* FeatureImpl::features = 0;
   
   Feature::mutex_type    Feature::__mutex;
   
@@ -34,12 +21,6 @@ namespace cicada
     static feature_set_type features;
     
     return features;
-
-#if 0
-    boost::call_once(FeatureImpl::once, FeatureImpl::initialize);
-    
-    return *FeatureImpl::features;
-#endif
   }
 
   Feature::feature_map_type& Feature::__feature_maps()

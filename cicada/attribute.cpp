@@ -10,16 +10,7 @@ namespace cicada
 {
   struct AttributeImpl
   {
-    typedef Attribute::attribute_set_type attribute_set_type;
     
-    static boost::once_flag once;
-
-    static attribute_set_type* attributes;
-    
-    static void initialize()
-    {
-      attributes = new attribute_set_type();
-    }
   };
 
   boost::once_flag AttributeImpl::once = BOOST_ONCE_INIT;
@@ -31,14 +22,8 @@ namespace cicada
   Attribute::attribute_set_type& Attribute::__attributes()
   {
     static attribute_set_type attributes;
-
-    return attributes;
-
-#if 0
-    boost::call_once(AttributeImpl::once, AttributeImpl::initialize);
     
-    return *AttributeImpl::attributes;
-#endif
+    return attributes;
   }
 
   Attribute::attribute_map_type& Attribute::__attribute_maps()
