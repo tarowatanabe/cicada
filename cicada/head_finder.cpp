@@ -11,6 +11,7 @@
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -49,8 +50,9 @@ chinese: Chinese head finder\n\
   
 #ifdef HAVE_TLS
   static __thread finder_map_type* __finders_tls = 0;
-#endif
   static boost::thread_specific_ptr<finder_map_type> __finders;
+#endif
+  static utils::thread_specific_ptr<finder_map_type> __finders;
 
   HeadFinder& HeadFinder::create(const std::string& parameter)
   {    

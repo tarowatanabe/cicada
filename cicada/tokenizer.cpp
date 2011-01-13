@@ -16,6 +16,7 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -63,8 +64,9 @@ tokenize: use the chain of tokenization\n\
 
 #ifdef HAVE_TLS
   static __thread tokenizer_map_type* __tokenizers_tls = 0;
-#endif
   static boost::thread_specific_ptr<tokenizer_map_type> __tokenizers;
+#endif
+  static utils::thread_specific_ptr<tokenizer_map_type> __tokenizers;
   
   Tokenizer& Tokenizer::create(const std::string& parameter)
   {

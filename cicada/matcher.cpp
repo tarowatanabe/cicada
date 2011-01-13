@@ -13,6 +13,7 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -52,8 +53,9 @@ wordnet: matching by wordnet synsets\n\
 
 #ifdef HAVE_TLS
   static __thread matcher_map_type* __matchers_tls = 0;
-#endif
   static boost::thread_specific_ptr<matcher_map_type> __matchers;
+#endif
+  static utils::thread_specific_ptr<matcher_map_type> __matchers;
   
   Matcher& Matcher::create(const std::string& parameter)
   {

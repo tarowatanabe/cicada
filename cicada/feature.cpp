@@ -3,6 +3,7 @@
 //
 
 #include <utils/config.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 #include "feature.hpp"
 
@@ -25,8 +26,10 @@ namespace cicada
 
 #ifdef HAVE_TLS
   static __thread FeatureImpl::feature_map_type* feature_maps_tls = 0;
-#endif
   static boost::thread_specific_ptr<FeatureImpl::feature_map_type> feature_maps;
+#else
+  static utils::thread_specific_ptr<FeatureImpl::feature_map_type> feature_maps;
+#endif
 
   Feature::feature_map_type& Feature::__feature_maps()
   {

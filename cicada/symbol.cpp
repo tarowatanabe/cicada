@@ -3,6 +3,7 @@
 //
 
 #include <utils/config.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 #include "symbol.hpp"
 
@@ -34,11 +35,18 @@ namespace cicada
   static __thread SymbolImpl::index_map_type*               index_maps_tls = 0;
   static __thread SymbolImpl::non_terminal_map_type*        non_terminal_maps_tls = 0;
   static __thread SymbolImpl::non_terminal_symbol_map_type* non_terminal_symbol_maps_tls = 0;
-#endif
+
   static boost::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
   static boost::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
   static boost::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
   static boost::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
+#else
+  static utils::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
+  static utils::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
+  static utils::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
+#endif
+
 
   Symbol::symbol_map_type& Symbol::__symbol_maps()
   {

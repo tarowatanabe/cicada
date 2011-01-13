@@ -16,6 +16,7 @@
 #include <utils/tempfile.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/sgi_hash_map.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 #include <boost/thread.hpp>
 
@@ -136,8 +137,9 @@ namespace cicada
 
 #ifdef HAVE_TLS
   static __thread cluster_map_type* __clusters_tls = 0;
-#endif
   static boost::thread_specific_ptr<cluster_map_type> __clusters;
+#endif
+  static utils::thread_specific_ptr<cluster_map_type> __clusters;
 
   Cluster& Cluster::create(const path_type& path)
   {

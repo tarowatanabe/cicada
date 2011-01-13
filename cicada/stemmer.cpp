@@ -14,6 +14,7 @@
 #include "parameter.hpp"
 
 #include <utils/sgi_hash_map.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -61,8 +62,9 @@ lower: lower casing\n\
 
 #ifdef HAVE_TLS
   static __thread stemmer_map_type* __stemmers_tls = 0;
-#endif
   static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
+#endif
+  static utils::thread_specific_ptr<stemmer_map_type> __stemmers;
   
   Stemmer& Stemmer::create(const std::string& parameter)
   {
