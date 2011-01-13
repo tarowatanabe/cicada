@@ -10,9 +10,8 @@ namespace cicada
 {
   Attribute::mutex_type    Attribute::__mutex;
   
-  class __attribute_set_instance
+  struct __attribute_set_instance
   {
-  public:
     __attribute_set_instance() : instance(0) {}
     ~__attribute_set_instance() { if (instance) delete instance; }
     

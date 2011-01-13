@@ -14,9 +14,8 @@ namespace cicada
     
   Symbol::mutex_type    Symbol::__mutex;
 
-  class __symbol_set_instance
+  struct __symbol_set_instance
   {
-  public:
     __symbol_set_instance() : instance(0) {}
     ~__symbol_set_instance() { if (instance) delete instance; }
     

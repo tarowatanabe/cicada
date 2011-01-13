@@ -10,9 +10,8 @@ namespace cicada
 {
   Feature::mutex_type    Feature::__mutex;
   
-  class __feature_set_instance
+  struct __feature_set_instance
   {
-  public:
     __feature_set_instance() : instance(0) {}
     ~__feature_set_instance() { if (instance) delete instance; }
     
