@@ -67,24 +67,24 @@ namespace cicada
   typedef utils::array_power2<TreeRule::rule_ptr_type, 1024 * 64, std::allocator<TreeRule::rule_ptr_type> > cache_type;
 
 #ifdef HAVE_TLS
-  static __thread cache_type* __cache_tls = 0;
-  static boost::thread_specific_ptr<cache_type> __cache;
+  static __thread cache_type* __tree_rule_cache_tls = 0;
+  static boost::thread_specific_ptr<cache_type> __tree_rule_cache;
 #else
-  static boost::thread_specific_ptr<cache_type> __cache;
+  static boost::thread_specific_ptr<cache_type> __tree_rule_cache;
 #endif
 
   TreeRule::rule_ptr_type TreeRule::create(const TreeRule& x)
   {
 #ifdef HAVE_TLS
-    if (! __cache_tls) {
-      __cache.reset(new cache_type());
-      __cache_tls = __cache.get();
+    if (! __tree_rule_cache_tls) {
+      __tree_rule_cache.reset(new cache_type());
+      __tree_rule_cache_tls = __tree_rule_cache.get();
     }
-    cache_type& cache = *__cache_tls;
+    cache_type& cache = *__tree_rule_cache_tls;
 #else
-    if (! __cache.get())
-      __cache.reset(new cache_type());
-    cache_type& cache = *__cache;
+    if (! __tree_rule_cache.get())
+      __tree_rule_cache.reset(new cache_type());
+    cache_type& cache = *__tree_rule_cache;
 #endif
     
     const size_t cache_pos = hash_value(x) & (cache.size() - 1);

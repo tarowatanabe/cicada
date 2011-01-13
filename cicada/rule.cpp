@@ -25,24 +25,24 @@ namespace cicada
   typedef utils::array_power2<Rule::rule_ptr_type, 1024 * 256, std::allocator<Rule::rule_ptr_type> > cache_type;
   
 #ifdef HAVE_TLS
-  static __thread cache_type* __cache_tls = 0;
-  static boost::thread_specific_ptr<cache_type> __cache;
+  static __thread cache_type* __rule_cache_tls = 0;
+  static boost::thread_specific_ptr<cache_type> __rule_cache;
 #else
-  static boost::thread_specific_ptr<cache_type> __cache;
+  static boost::thread_specific_ptr<cache_type> __rule_cache;
 #endif
   
   Rule::rule_ptr_type Rule::create(const Rule& x)
   {
 #ifdef HAVE_TLS
-    if (! __cache_tls) {
-      __cache.reset(new cache_type());
-      __cache_tls = __cache.get();
+    if (! __rule_cache_tls) {
+      __rule_cache.reset(new cache_type());
+      __rule_cache_tls = __rule_cache.get();
     }
-    cache_type& cache = *__cache_tls;
+    cache_type& cache = *__rule_cache_tls;
 #else
-    if (! __cache.get())
-      __cache.reset(new cache_type());
-    cache_type& cache = *__cache;
+    if (! __rule_cache.get())
+      __rule_cache.reset(new cache_type());
+    cache_type& cache = *__rule_cache;
 #endif
     
     const size_t cache_pos = hash_value(x) & (cache.size() - 1);
