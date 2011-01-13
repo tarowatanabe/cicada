@@ -25,6 +25,7 @@
 #include "operation/expected_ngram.hpp"
 #include "operation/prune.hpp"
 #include "operation/remove_epsilon.hpp"
+#include "operation/sort_tail.hpp"
 #include "operation/span_forest.hpp"
 #include "operation/intersect.hpp"
 #include "operation/normalize.hpp"
@@ -91,6 +92,7 @@ normalize: feature value normalizer\n\
 \tprefix=feature name prefix\n\
 remove-epsilon: remove epsilon for lattice\n\
 span-forest: annotate terminal span\n\
+sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
 \tinsertion-prefix=<prefix attatched to inserted word>\n\
@@ -174,6 +176,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
       else if (param.name() == "span-forest")
 	operations.push_back(operation_ptr_type(new operation::SpanForest(*piter, debug)));
+      else if (param.name() == "sort-tail")
+	operations.push_back(operation_ptr_type(new operation::SortTail(*piter, debug)));
       else if (param.name() == "intersect")
 	operations.push_back(operation_ptr_type(new operation::Intersect(*piter, debug)));
       else if (param.name() == "normalize")

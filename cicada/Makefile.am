@@ -177,6 +177,7 @@ operation/output.hpp \
 operation/permute.hpp \
 operation/prune.hpp \
 operation/remove_epsilon.hpp \
+operation/sort_tail.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp
 
@@ -192,6 +193,7 @@ operation/normalize.cpp \
 operation/permute.cpp \
 operation/prune.cpp \
 operation/remove_epsilon.cpp \
+operation/sort_tail.cpp \
 operation/span_forest.cpp 
 libcicada_operation_la_CPPFLAGS = $(AM_CPPFLAGS)
 
@@ -255,6 +257,8 @@ semiring.hpp \
 sentence.hpp \
 sentence_vector.hpp \
 sort.hpp \
+sort_tail.hpp \
+sort_topologically.hpp \
 span_node.hpp \
 span_edge.hpp \
 span_forest.hpp \
