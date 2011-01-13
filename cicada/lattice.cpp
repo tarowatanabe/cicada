@@ -19,6 +19,7 @@
 #include <boost/thread.hpp>
 
 #include "utils/config.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Lattice::arc_type,
@@ -177,7 +178,7 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static boost::thread_specific_ptr<grammar_type > __grammar;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
@@ -280,7 +281,7 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static boost::thread_specific_ptr<grammar_type > __grammar;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     

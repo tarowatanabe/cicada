@@ -51,8 +51,9 @@ chinese: Chinese head finder\n\
 #ifdef HAVE_TLS
   static __thread finder_map_type* __finders_tls = 0;
   static boost::thread_specific_ptr<finder_map_type> __finders;
-#endif
+#else
   static utils::thread_specific_ptr<finder_map_type> __finders;
+#endif
 
   HeadFinder& HeadFinder::create(const std::string& parameter)
   {    

@@ -7,6 +7,7 @@
 #include "utils/hashmurmur.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 #include <boost/filesystem.hpp>
 
@@ -35,8 +36,11 @@ namespace cicada
 
 #ifdef HAVE_TLS
     static __thread weight_map_type* __weights_tls = 0;
-#endif
     static boost::thread_specific_ptr<weight_map_type> __weights;
+#else
+    static utils::thread_specific_ptr<weight_map_type> __weights;
+#endif
+
   };
 
   const Operation::weight_set_type& Operation::weights(const path_type& path)

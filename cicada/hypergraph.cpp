@@ -21,6 +21,7 @@
 
 #include "utils/config.hpp"
 #include "utils/hashmurmur.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 #include <google/dense_hash_map>
 
@@ -266,7 +267,7 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static boost::thread_specific_ptr<grammar_type > __grammar;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
@@ -406,7 +407,7 @@ namespace cicada
       
       grammar_type& rule_grammar = *__grammar_tls;
 #else
-      static boost::thread_specific_ptr<grammar_type > __grammar;
+      static utils::thread_specific_ptr<grammar_type > __grammar;
       if (! __grammar.get())
 	__grammar.reset(new grammar_type());
       
@@ -471,7 +472,7 @@ namespace cicada
       
       grammar_type& features_grammar = *__grammar_tls;
 #else
-      static boost::thread_specific_ptr<grammar_type > __grammar;
+      static utils::thread_specific_ptr<grammar_type > __grammar;
       if (! __grammar.get())
 	__grammar.reset(new grammar_type());
       

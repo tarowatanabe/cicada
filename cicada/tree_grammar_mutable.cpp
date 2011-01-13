@@ -26,6 +26,7 @@
 #include "utils/arc_list.hpp"
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -247,7 +248,7 @@ namespace cicada
     
     scores_parser_type& scores_parser = *__scores_parser_tls;
 #else
-    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
+    static utils::thread_specific_ptr<scores_parser_type > __scores_parser;
     if (! __scores_parser.get())
       __scores_parser.reset(new scores_parser_type());
     
@@ -351,7 +352,7 @@ namespace cicada
     
     scores_parser_type& scores_parser = *__scores_parser_tls;
 #else
-    static boost::thread_specific_ptr<scores_parser_type > __scores_parser;
+    static utils::thread_specific_ptr<scores_parser_type > __scores_parser;
     if (! __scores_parser.get())
       __scores_parser.reset(new scores_parser_type());
     

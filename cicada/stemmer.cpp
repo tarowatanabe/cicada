@@ -63,8 +63,9 @@ lower: lower casing\n\
 #ifdef HAVE_TLS
   static __thread stemmer_map_type* __stemmers_tls = 0;
   static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
-#endif
+#else
   static utils::thread_specific_ptr<stemmer_map_type> __stemmers;
+#endif
   
   Stemmer& Stemmer::create(const std::string& parameter)
   {

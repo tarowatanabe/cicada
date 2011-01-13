@@ -19,6 +19,7 @@
 
 #include "utils/config.hpp"
 #include "utils/array_power2.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 namespace cicada
 {  
@@ -26,8 +27,10 @@ namespace cicada
 
 #ifdef HAVE_TLS
   static __thread cache_type* __rule_cache_tls = 0;
-#endif
   static boost::thread_specific_ptr<cache_type> __rule_cache;
+#else
+  static utils::thread_specific_ptr<cache_type> __rule_cache;
+#endif
 
   Rule::rule_ptr_type Rule::create(const Rule& x)
   {
@@ -89,7 +92,7 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static boost::thread_specific_ptr<grammar_type > __grammar;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     

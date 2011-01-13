@@ -29,6 +29,7 @@
 #include <boost/thread.hpp>
 
 #include "utils/config.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 namespace std
 {
@@ -189,7 +190,7 @@ namespace cicada
     
     rule_parser_type& rule_parser = *__rule_parser_tls;
 #else
-    static boost::thread_specific_ptr<rule_parser_type > __rule_parser;
+    static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
     if (! __rule_parser.get())
       __rule_parser.reset(new rule_parser_type());
     
@@ -338,7 +339,7 @@ namespace cicada
     
     rule_parser_type& rule_parser = *__rule_parser_tls;
 #else
-    static boost::thread_specific_ptr<rule_parser_type > __rule_parser;
+    static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
     if (! __rule_parser.get())
       __rule_parser.reset(new rule_parser_type());
     

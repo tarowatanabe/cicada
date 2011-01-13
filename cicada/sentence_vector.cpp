@@ -19,6 +19,7 @@
 #include <boost/thread.hpp>
 
 #include "utils/config.hpp"
+#include "utils/thread_specific_ptr.hpp"
 
 namespace cicada
 {
@@ -69,7 +70,7 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static boost::thread_specific_ptr<grammar_type > __grammar;
+    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
