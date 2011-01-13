@@ -12,17 +12,11 @@ namespace cicada
   struct FeatureImpl
   {
     typedef Feature::feature_set_type feature_set_type;
-    typedef Feature::feature_map_type feature_map_type;
 
     static boost::once_flag once;
 
     static feature_set_type* features;
     
-#ifdef HAVE_TLS
-    static __thread feature_map_type* feature_maps_tls;
-#endif
-    static boost::thread_specific_ptr<feature_map_type> feature_maps;
-
     static void initialize()
     {
       features = new feature_set_type();
@@ -33,11 +27,6 @@ namespace cicada
   
   FeatureImpl::feature_set_type* FeatureImpl::features = 0;
   
-#ifdef HAVE_TLS
-  __thread FeatureImpl::feature_map_type* FeatureImpl::feature_maps_tls __attribute__ ((tls_model ("initial-exec")));
-#endif
-  boost::thread_specific_ptr<FeatureImpl::feature_map_type> FeatureImpl::feature_maps;
-
   Feature::mutex_type    Feature::__mutex;
   
   Feature::feature_set_type& Feature::__features()
@@ -50,21 +39,26 @@ namespace cicada
   Feature::feature_map_type& Feature::__feature_maps()
   {
 #ifdef HAVE_TLS
-    if (! FeatureImpl::feature_maps_tls) {
-      FeatureImpl::feature_maps.reset(new feature_map_type());
-      FeatureImpl::feature_maps->reserve(allocated());
+    static __thread feature_map_type* feature_maps_tls = 0;
+#endif
+    static boost::thread_specific_ptr<feature_map_type> feature_maps;
+
+#ifdef HAVE_TLS
+    if (! feature_maps_tls) {
+      feature_maps.reset(new feature_map_type());
+      feature_maps->reserve(allocated());
       
-      FeatureImpl::feature_maps_tls = FeatureImpl::feature_maps.get();
+      feature_maps_tls = feature_maps.get();
     }
     
-    return *FeatureImpl::feature_maps_tls;
+    return *feature_maps_tls;
 #else
-    if (! FeatureImpl::feature_maps.get()) {
-      FeatureImpl::feature_maps.reset(new feature_map_type());
-      FeatureImpl::feature_maps->reserve(allocated());
+    if (! feature_maps.get()) {
+      feature_maps.reset(new feature_map_type());
+      feature_maps->reserve(allocated());
     }
     
-    return *FeatureImpl::feature_maps;
+    return *feature_maps;
 #endif
   }
 };
