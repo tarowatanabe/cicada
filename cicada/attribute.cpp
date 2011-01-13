@@ -8,47 +8,62 @@
 
 namespace cicada
 {
+
   Attribute::mutex_type    Attribute::__mutex;
-  
-  static boost::once_flag               __attributes_once = BOOST_ONCE_INIT;
-  static Attribute::attribute_set_type* __attributes_instance = 0;
-  
-  static void __attributes_init()
+
+  struct AttributeImpl
   {
-    __attributes_instance = new Attribute::attribute_set_type();
-  }
+    typedef Attribute::attribute_set_type attribute_set_type;
+    typedef Attribute::attribute_map_type attribute_map_type;
+
+    static boost::once_flag once;
+
+    static attribute_set_type* attributes;
+    
+#ifdef HAVE_TLS
+    static __thread attribute_map_type* attribute_maps_tls;
+#endif
+    static boost::thread_specific_ptr<attribute_map_type> attribute_maps;
+
+    static void initialize()
+    {
+      attributes = new attribute_set_type();
+    }
+  };
+
+  boost::once_flag AttributeImpl::once = BOOST_ONCE_INIT;
+  
+  AttributeImpl::attribute_set_type* AttributeImpl::attributes = 0;
+  
+#ifdef HAVE_TLS
+  __thread AttributeImpl::attribute_map_type* AttributeImpl::attribute_maps_tls = 0;
+#endif
   
   Attribute::attribute_set_type& Attribute::__attributes()
   {
-    boost::call_once(__attributes_once, __attributes_init);
-
-    return *__attributes_instance;
+    boost::call_once(AttributeImpl::once, AttributeImpl::initialize);
+    
+    return *AttributeImpl::attributes;
   }
 
   Attribute::attribute_map_type& Attribute::__attribute_maps()
   {
 #ifdef HAVE_TLS
-    static __thread attribute_map_type* __maps_tls = 0;
-    static boost::thread_specific_ptr<attribute_map_type> __maps;
-    
-    if (! __maps_tls) {
-      __maps.reset(new attribute_map_type());
-      __maps->reserve(allocated());
+    if (! AttributeImpl::attribute_maps_tls) {
+      AttributeImpl::attribute_maps.reset(new attribute_map_type());
+      AttributeImpl::attribute_maps->reserve(allocated());
       
-      __maps_tls = __maps.get();
+      AttributeImpl::attribute_maps_tls = AttributeImpl::attribute_maps.get();
     }
-      
-    return *__maps_tls;
+    
+    return *AttributeImpl::attribute_maps_tls;
 #else
-    static boost::thread_specific_ptr<attribute_map_type> __maps;
-      
-    if (! __maps.get()) {
-      __maps.reset(new attribute_map_type());
-      __maps->reserve(allocated());
+    if (! AttributeImpl::attribute_maps.get()) {
+      AttributeImpl::attribute_maps.reset(new attribute_map_type());
+      AttributeImpl::attribute_maps->reserve(allocated());
     }
     
-    return *__maps;
+    return *AttributeImpl::attribute_maps;
 #endif
   }
-    
 };

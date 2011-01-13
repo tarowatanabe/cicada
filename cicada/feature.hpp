@@ -22,8 +22,13 @@
 
 namespace cicada
 {
+  struct FeatureImpl;
+
   class Feature
   {
+  private:
+    friend struct FeatureImpl;
+    
   public:
     typedef std::string feature_type;
     typedef uint32_t    id_type;
@@ -121,7 +126,6 @@ namespace cicada
   public:
     typedef utils::indexed_set<feature_type, hasher, std::equal_to<feature_type>, std::allocator<feature_type> > feature_set_type;
 
-  private:
     typedef std::vector<const feature_type*, std::allocator<const feature_type*> > feature_map_type;
     
   public:

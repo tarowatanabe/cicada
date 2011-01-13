@@ -11,125 +11,142 @@
 
 namespace cicada
 {
-    
   Symbol::mutex_type    Symbol::__mutex;
   
-  static boost::once_flag         __symbols_once = BOOST_ONCE_INIT;
-  static Symbol::symbol_set_type* __symbols_instance = 0;
-  
-  static void __symbols_init()
+  struct SymbolImpl
   {
-    __symbols_instance = new Symbol::symbol_set_type();
-  }
+    typedef Symbol::symbol_set_type              symbol_set_type;
+    typedef Symbol::symbol_map_type              symbol_map_type;
+    typedef Symbol::index_map_type               index_map_type;
+    typedef Symbol::non_terminal_map_type        non_terminal_map_type;
+    typedef Symbol::non_terminal_symbol_map_type non_terminal_symbol_map_type;
+    
+    static boost::once_flag once;
+
+    static Symbol::symbol_set_type* symbols; 
+   
+#ifdef HAVE_TLS
+    static __thread symbol_map_type*              symbol_maps_tls;
+    static __thread index_map_type*               index_maps_tls;
+    static __thread non_terminal_map_type*        non_terminal_maps_tls;
+    static __thread non_terminal_symbol_map_type* non_terminal_symbol_maps_tls;
+#endif
+    
+    static boost::thread_specific_ptr<symbol_map_type>              symbol_maps;
+    static boost::thread_specific_ptr<index_map_type>               index_maps;
+    static boost::thread_specific_ptr<non_terminal_map_type>        non_terminal_maps;
+    static boost::thread_specific_ptr<non_terminal_symbol_map_type> non_terminal_symbol_maps;
+
+    static void initialize()
+    {
+      symbols = new symbol_set_type();
+    }
+  };
+  
+  
+  boost::once_flag SymbolImpl::once = BOOST_ONCE_INIT;
+  
+  SymbolImpl::symbol_set_type* SymbolImpl::symbols = 0;
+  
+#ifdef HAVE_TLS
+  __thread SymbolImpl::symbol_map_type*              SymbolImpl::symbol_maps_tls = 0;
+  __thread SymbolImpl::index_map_type*               SymbolImpl::index_maps_tls = 0;
+  __thread SymbolImpl::non_terminal_map_type*        SymbolImpl::non_terminal_maps_tls = 0;
+  __thread SymbolImpl::non_terminal_symbol_map_type* SymbolImpl::non_terminal_symbol_maps_tls = 0;
+#endif
+  
+  
   
   Symbol::symbol_set_type& Symbol::__symbols()
   {
-    boost::call_once(__symbols_once, __symbols_init);
+    boost::call_once(SymbolImpl::once, SymbolImpl::initialize);
     
-    return *__symbols_instance;
+    return *SymbolImpl::symbols;
   }
   
+
   Symbol::symbol_map_type& Symbol::__symbol_maps()
   {
 #ifdef HAVE_TLS
-    static __thread symbol_map_type* __maps_tls = 0;
-    static boost::thread_specific_ptr<symbol_map_type> __maps;
+    if (! SymbolImpl::symbol_maps_tls) {
+      SymbolImpl::symbol_maps.reset(new symbol_map_type());
+      SymbolImpl::symbol_maps->reserve(allocated());
       
-    if (! __maps_tls) {
-      __maps.reset(new symbol_map_type());
-      __maps->reserve(allocated());
-	
-      __maps_tls = __maps.get();
+      SymbolImpl::symbol_maps_tls = SymbolImpl::symbol_maps.get();
     }
-      
-    return *__maps_tls;
+    
+    return *SymbolImpl::symbol_maps_tls;
 #else
-    static boost::thread_specific_ptr<symbol_map_type> __maps;
-      
-    if (! __maps.get()) {
-      __maps.reset(new symbol_map_type());
-      __maps->reserve(allocated());
+    if (! SymbolImpl::symbol_maps.get()) {
+      SymbolImpl::symbol_maps.reset(new symbol_map_type());
+      SymbolImpl::symbol_maps->reserve(allocated());
     }
-      
-    return *__maps;
+    
+    return *SymbolImpl::symbol_maps;
 #endif
   }
 
+  
   Symbol::index_map_type& Symbol::__index_maps()
   {
 #ifdef HAVE_TLS
-    static __thread index_map_type* __maps_tls = 0;
-    static boost::thread_specific_ptr<index_map_type> __maps;
+    if (! SymbolImpl::index_maps_tls) {
+      SymbolImpl::index_maps.reset(new index_map_type());
+      SymbolImpl::index_maps->reserve(allocated());
       
-    if (! __maps_tls) {
-      __maps.reset(new index_map_type());
-      __maps->reserve(allocated());
-      
-      __maps_tls = __maps.get();
+      SymbolImpl::index_maps_tls = SymbolImpl::index_maps.get();
     }
-      
-    return *__maps_tls;
+    
+    return *SymbolImpl::index_maps_tls;
 #else
-    static boost::thread_specific_ptr<index_map_type> __maps;
-      
-    if (! __maps.get()) {
-      __maps.reset(new index_map_type());
-      __maps->reserve(allocated());
+    if (! SymbolImpl::index_maps.get()) {
+      SymbolImpl::index_maps.reset(new index_map_type());
+      SymbolImpl::index_maps->reserve(allocated());
     }
-      
-    return *__maps;
+    
+    return *SymbolImpl::index_maps;
 #endif
   }
-
+  
   Symbol::non_terminal_map_type& Symbol::__non_terminal_maps()
   {
 #ifdef HAVE_TLS
-    static __thread non_terminal_map_type* __maps_tls = 0;
-    static boost::thread_specific_ptr<non_terminal_map_type> __maps;
+    if (! SymbolImpl::non_terminal_maps_tls) {
+      SymbolImpl::non_terminal_maps.reset(new non_terminal_map_type());
+      SymbolImpl::non_terminal_maps->reserve(allocated());
       
-    if (! __maps_tls) {
-      __maps.reset(new non_terminal_map_type());
-      __maps->reserve(allocated());
-	
-      __maps_tls = __maps.get();
+      SymbolImpl::non_terminal_maps_tls = SymbolImpl::non_terminal_maps.get();
     }
-      
-    return *__maps_tls;
+    
+    return *SymbolImpl::non_terminal_maps_tls;
 #else
-    static boost::thread_specific_ptr<non_terminal_map_type> __maps;
-      
-    if (! __maps.get()) {
-      __maps.reset(new non_terminal_map_type());
-      __maps->reserve(allocated());
+    if (! SymbolImpl::non_terminal_maps.get()) {
+      SymbolImpl::non_terminal_maps.reset(new non_terminal_map_type());
+      SymbolImpl::non_terminal_maps->reserve(allocated());
     }
-      
-    return *__maps;
+    
+    return *SymbolImpl::non_terminal_maps;
 #endif
   }
-
+  
   Symbol::non_terminal_symbol_map_type& Symbol::__non_terminal_symbol_maps()
   {
 #ifdef HAVE_TLS
-    static __thread non_terminal_symbol_map_type* __maps_tls = 0;
-    static boost::thread_specific_ptr<non_terminal_symbol_map_type> __maps;
+    if (! SymbolImpl::non_terminal_symbol_maps_tls) {
+      SymbolImpl::non_terminal_symbol_maps.reset(new non_terminal_symbol_map_type());
+      SymbolImpl::non_terminal_symbol_maps->reserve(allocated());
       
-    if (! __maps_tls) {
-      __maps.reset(new non_terminal_symbol_map_type());
-      __maps->reserve(allocated());
-	
-      __maps_tls = __maps.get();
+      SymbolImpl::non_terminal_symbol_maps_tls = SymbolImpl::non_terminal_symbol_maps.get();
     }
-      
-    return *__maps_tls;
+    
+    return *SymbolImpl::non_terminal_symbol_maps_tls;
 #else
-    static boost::thread_specific_ptr<non_terminal_symbol_map_type> __maps;
-      
-    if (! __maps.get()) {
-      __maps.reset(new non_terminal_symbol_map_type());
-      __maps->reserve(allocated());
+    if (! SymbolImpl::non_terminal_symbol_maps.get()) {
+      SymbolImpl::non_terminal_symbol_maps.reset(new non_terminal_symbol_map_type());
+      SymbolImpl::non_terminal_symbol_maps->reserve(allocated());
     }
-      
-    return *__maps;
+    
+    return *SymbolImpl::non_terminal_symbol_maps;
 #endif
   }
 

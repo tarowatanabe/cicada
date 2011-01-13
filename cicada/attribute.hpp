@@ -22,8 +22,13 @@
 
 namespace cicada
 {
+  struct AttributeImpl;
+
   class Attribute
   {
+  private:
+    friend struct AttributeImpl;
+    
   public:
     typedef std::string attribute_type;
     typedef uint32_t    id_type;
@@ -118,10 +123,9 @@ namespace cicada
       }
     };
 
-  public:
+  private:
     typedef utils::indexed_set<attribute_type, hasher, std::equal_to<attribute_type>, std::allocator<attribute_type> > attribute_set_type;
 
-  private:
     typedef std::vector<const attribute_type*, std::allocator<const attribute_type*> > attribute_map_type;
     
   public:

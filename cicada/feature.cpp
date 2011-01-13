@@ -8,47 +8,62 @@
 
 namespace cicada
 {
+
   Feature::mutex_type    Feature::__mutex;
-  
-  static boost::once_flag           __features_once = BOOST_ONCE_INIT;
-  static Feature::feature_set_type* __features_instance = 0;
-  
-  static void __features_init()
+
+  struct FeatureImpl
   {
-    __features_instance = new Feature::feature_set_type();
-  }
+    typedef Feature::feature_set_type feature_set_type;
+    typedef Feature::feature_map_type feature_map_type;
+
+    static boost::once_flag once;
+
+    static feature_set_type* features;
+    
+#ifdef HAVE_TLS
+    static __thread feature_map_type* feature_maps_tls;
+#endif
+    static boost::thread_specific_ptr<feature_map_type> feature_maps;
+
+    static void initialize()
+    {
+      features = new feature_set_type();
+    }
+  };
+
+  boost::once_flag FeatureImpl::once = BOOST_ONCE_INIT;
+  
+  FeatureImpl::feature_set_type* FeatureImpl::features = 0;
+  
+#ifdef HAVE_TLS
+  __thread FeatureImpl::feature_map_type* FeatureImpl::feature_maps_tls = 0;
+#endif
   
   Feature::feature_set_type& Feature::__features()
   {
-    boost::call_once(__features_once, __features_init);
-
-    return *__features_instance;
+    boost::call_once(FeatureImpl::once, FeatureImpl::initialize);
+    
+    return *FeatureImpl::features;
   }
-  
+
   Feature::feature_map_type& Feature::__feature_maps()
   {
 #ifdef HAVE_TLS
-    static __thread feature_map_type* __maps_tls = 0;
-    static boost::thread_specific_ptr<feature_map_type> __maps;
-    
-    if (! __maps_tls) {
-      __maps.reset(new feature_map_type());
-      __maps->reserve(allocated());
+    if (! FeatureImpl::feature_maps_tls) {
+      FeatureImpl::feature_maps.reset(new feature_map_type());
+      FeatureImpl::feature_maps->reserve(allocated());
       
-      __maps_tls = __maps.get();
+      FeatureImpl::feature_maps_tls = FeatureImpl::feature_maps.get();
     }
-      
-    return *__maps_tls;
+    
+    return *FeatureImpl::feature_maps_tls;
 #else
-    static boost::thread_specific_ptr<feature_map_type> __maps;
-      
-    if (! __maps.get()) {
-      __maps.reset(new feature_map_type());
-      __maps->reserve(allocated());
+    if (! FeatureImpl::feature_maps.get()) {
+      FeatureImpl::feature_maps.reset(new feature_map_type());
+      FeatureImpl::feature_maps->reserve(allocated());
     }
     
-    return *__maps;
+    return *FeatureImpl::feature_maps;
 #endif
   }
-    
 };

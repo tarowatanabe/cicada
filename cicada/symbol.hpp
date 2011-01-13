@@ -23,8 +23,14 @@
 
 namespace cicada
 {
+  
+  struct SymbolImpl;
+
   class Symbol
   {
+  private:
+    friend struct SymbolImpl;
+
   public:
     typedef std::string symbol_type;
     typedef uint32_t    id_type;
@@ -218,15 +224,14 @@ namespace cicada
 	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
       }
     };
-  public:
+    
+  private:
     typedef utils::indexed_set<symbol_type, hasher, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
 
-  private:
     typedef std::vector<const symbol_type*, std::allocator<const symbol_type*> > symbol_map_type;
     typedef std::vector<int, std::allocator<int> >   index_map_type;
     typedef std::vector<bool, std::allocator<bool> > non_terminal_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > non_terminal_symbol_map_type;
-
     
   public:
     static bool exists(const symbol_type& x)
