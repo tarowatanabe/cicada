@@ -11,6 +11,33 @@
 
 namespace cicada
 {
+    
+  Symbol::mutex_type    Symbol::__mutex;
+
+  class __symbol_set_instance
+  {
+  public:
+    __symbol_set_instance() : instance(0) {}
+    ~__symbol_set_instance() { if (instance) delete instance; }
+    
+    Symbol::symbol_set_type* instance;
+  };
+  
+  static boost::once_flag      __symbols_once = BOOST_ONCE_INIT;
+  static __symbol_set_instance __symbols_instance;
+  
+  static void __symbols_init()
+  {
+    __symbols_instance.instance = new Symbol::symbol_set_type();
+  }
+  
+  Symbol::symbol_set_type& Symbol::__symbols()
+  {
+    boost::call_once(__symbols_once, __symbols_init);
+
+    return *__symbols_instance.instance;
+  }
+  
   Symbol::symbol_map_type& Symbol::__symbol_maps()
   {
 #ifdef HAVE_TLS
@@ -125,7 +152,5 @@ namespace cicada
     for (symbol_set_type::const_iterator siter = __symbols().begin(); siter != siter_end; ++ siter)
       vocab.insert(*siter);
   }
-  
-  Symbol::mutex_type    Symbol::__mutex;
   
 };

@@ -218,8 +218,10 @@ namespace cicada
 	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
       }
     };
+  public:
     typedef utils::indexed_set<symbol_type, hasher, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
 
+  private:
     typedef std::vector<const symbol_type*, std::allocator<const symbol_type*> > symbol_map_type;
     typedef std::vector<int, std::allocator<int> >   index_map_type;
     typedef std::vector<bool, std::allocator<bool> > non_terminal_map_type;
@@ -247,11 +249,7 @@ namespace cicada
     static non_terminal_map_type& __non_terminal_maps();
     static non_terminal_symbol_map_type& __non_terminal_symbol_maps();
     
-    static symbol_set_type& __symbols()
-    {
-      static symbol_set_type symbols;
-      return symbols;
-    }
+    static symbol_set_type& __symbols();
     
     static const id_type& __allocate_empty()
     {
