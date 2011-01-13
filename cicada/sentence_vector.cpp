@@ -68,18 +68,20 @@ namespace cicada
   
   bool SentenceVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
+    using namespace sentence_vector_impl;
+
 #ifdef HAVE_TLS
-    if (! sentence_vector_impl::__grammar_tls) {
-      sentence_vector_impl::__grammar.reset(new sentence_vector_impl::grammar_type());
-      sentence_vector_impl::__grammar_tls = sentence_vector_impl::__grammar.get();
+    if (! __grammar_tls) {
+      __grammar.reset(new grammar_type());
+      __grammar_tls = __grammar.get();
     }
     
-    sentence_vector_impl::grammar_type& grammar = *sentence_vector_impl::__grammar_tls;
+    grammar_type& grammar = *__grammar_tls;
 #else
-    if (! sentence_vector_impl::__grammar.get())
-      sentence_vector_impl::__grammar.reset(new sentence_vector_impl::grammar_type());
+    if (! __grammar.get())
+      __grammar.reset(new grammar_type());
     
-    sentence_vector_impl::grammar_type& grammar = *sentence_vector_impl::__grammar;
+    grammar_type& grammar = *__grammar;
 #endif
     
     clear();
