@@ -12,10 +12,6 @@ namespace cicada
   {
     
   };
-
-  boost::once_flag AttributeImpl::once = BOOST_ONCE_INIT;
-  
-  AttributeImpl::attribute_set_type* AttributeImpl::attributes = 0;
   
   Attribute::mutex_type    Attribute::__mutex;
   
