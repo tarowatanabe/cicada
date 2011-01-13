@@ -36,7 +36,7 @@ namespace cicada
     {
       bool operator()(const graph_rule_ptr_type& x, const graph_rule_ptr_type& y) const
       {
-	return (x == y || x && y && *x == *y);
+	return (x == y || (x && y && *x == *y));
       }
     };
 
