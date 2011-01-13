@@ -162,15 +162,24 @@ namespace cicada
     if (! result || iter != end)
       throw std::runtime_error("LATTICE format parsing failed...");
   }
-  
-  bool Lattice::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+
+  namespace lattice_grammar_parser_impl
   {
     typedef lattice_grammar_parser<std::string::const_iterator > grammar_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+  };
+  
+  bool Lattice::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    using namespace lattice_grammar_parser_impl;
     
+#ifdef HAVE_TLS
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -178,7 +187,6 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     
@@ -264,16 +272,25 @@ namespace cicada
     boost::spirit::karma::rule<Iterator, Lattice::lattice_type()> lattice_grammar;
   };
 
-
-  std::ostream& operator<<(std::ostream& os, const Lattice& x)
+  namespace lattice_grammar_generator_impl
   {
     typedef std::ostream_iterator<char> iterator_type;
-
     typedef lattice_grammar_generator<iterator_type> grammar_type;
+    
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+  };
+
+
+  std::ostream& operator<<(std::ostream& os, const Lattice& x)
+  {
+    using namespace lattice_grammar_generator_impl;
     
+#ifdef HAVE_TLS
     if (! __grammar_tls) {
       __grammar.reset(new grammar_type());
       __grammar_tls = __grammar.get();
@@ -281,7 +298,6 @@ namespace cicada
     
     grammar_type& grammar = *__grammar_tls;
 #else
-    static utils::thread_specific_ptr<grammar_type > __grammar;
     if (! __grammar.get())
       __grammar.reset(new grammar_type());
     

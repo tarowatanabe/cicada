@@ -173,29 +173,41 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type> rule_grammar;
   };
 
+  namespace grammar_mutable_impl
+  {
+    typedef rule_grammar_parser_mutable<std::string::const_iterator> rule_parser_type;
+    
+#ifdef HAVE_TLS
+    static __thread rule_parser_type* __rule_parser_tls = 0;
+    static boost::thread_specific_ptr<rule_parser_type > __rule_parser;
+#else
+    static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
+#endif
+
+    static rule_parser_type& rule_parser_instance()
+    {
+#ifdef HAVE_TLS
+      if (! __rule_parser_tls) {
+	__rule_parser.reset(new rule_parser_type());
+	__rule_parser_tls = __rule_parser.get();
+      }
+      
+      return *__rule_parser_tls;
+#else
+      if (! __rule_parser.get())
+	__rule_parser.reset(new rule_parser_type());
+      
+      return *__rule_parser;
+#endif
+    }
+  };
+
   
   void GrammarMutableImpl::insert(const std::string& pattern)
   {
     typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
     
-    typedef rule_grammar_parser_mutable<std::string::const_iterator> rule_parser_type;
-#ifdef HAVE_TLS
-    static __thread rule_parser_type* __rule_parser_tls = 0;
-    static boost::thread_specific_ptr<rule_parser_type > __rule_parser;
-    
-    if (! __rule_parser_tls) {
-      __rule_parser.reset(new rule_parser_type());
-      __rule_parser_tls = __rule_parser.get();
-    }
-    
-    rule_parser_type& rule_parser = *__rule_parser_tls;
-#else
-    static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
-    if (! __rule_parser.get())
-      __rule_parser.reset(new rule_parser_type());
-    
-    rule_parser_type& rule_parser = *__rule_parser;
-#endif
+    grammar_mutable_impl::rule_parser_type& rule_parser = grammar_mutable_impl::rule_parser_instance();
     
     rule_parsed_type rule_parsed;
 
@@ -326,26 +338,7 @@ namespace cicada
       throw std::runtime_error("unsupported key: " + piter->first);
     }
 
-    typedef rule_grammar_parser_mutable<std::string::const_iterator> rule_parser_type;
-    
-#ifdef HAVE_TLS
-    static __thread rule_parser_type* __rule_parser_tls = 0;
-    static boost::thread_specific_ptr<rule_parser_type > __rule_parser;
-    
-    if (! __rule_parser_tls) {
-      __rule_parser.reset(new rule_parser_type());
-      __rule_parser_tls = __rule_parser.get();
-    }
-    
-    rule_parser_type& rule_parser = *__rule_parser_tls;
-#else
-    static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
-    if (! __rule_parser.get())
-      __rule_parser.reset(new rule_parser_type());
-    
-    rule_parser_type& rule_parser = *__rule_parser;
-#endif
-
+    grammar_mutable_impl::rule_parser_type& rule_parser = grammar_mutable_impl::rule_parser_instance();
     
     utils::compress_istream is(param.name(), 1024 * 1024);
     std::string line;
