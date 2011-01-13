@@ -33,7 +33,7 @@ namespace cicada
   AttributeImpl::attribute_set_type* AttributeImpl::attributes = 0;
   
 #ifdef HAVE_TLS
-  __thread AttributeImpl::attribute_map_type* AttributeImpl::attribute_maps_tls = 0;
+  __thread AttributeImpl::attribute_map_type* AttributeImpl::attribute_maps_tls __attribute__ ((tls_model ("initial-exec")));
 #endif
   boost::thread_specific_ptr<AttributeImpl::attribute_map_type> AttributeImpl::attribute_maps;
 

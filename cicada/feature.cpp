@@ -34,7 +34,7 @@ namespace cicada
   FeatureImpl::feature_set_type* FeatureImpl::features = 0;
   
 #ifdef HAVE_TLS
-  __thread FeatureImpl::feature_map_type* FeatureImpl::feature_maps_tls = 0;
+  __thread FeatureImpl::feature_map_type* FeatureImpl::feature_maps_tls __attribute__ ((tls_model ("initial-exec")));
 #endif
   boost::thread_specific_ptr<FeatureImpl::feature_map_type> FeatureImpl::feature_maps;
 

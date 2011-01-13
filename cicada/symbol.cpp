@@ -47,10 +47,10 @@ namespace cicada
   SymbolImpl::symbol_set_type* SymbolImpl::symbols = 0;
   
 #ifdef HAVE_TLS
-  __thread SymbolImpl::symbol_map_type*              SymbolImpl::symbol_maps_tls = 0;
-  __thread SymbolImpl::index_map_type*               SymbolImpl::index_maps_tls = 0;
-  __thread SymbolImpl::non_terminal_map_type*        SymbolImpl::non_terminal_maps_tls = 0;
-  __thread SymbolImpl::non_terminal_symbol_map_type* SymbolImpl::non_terminal_symbol_maps_tls = 0;
+  __thread SymbolImpl::symbol_map_type*              SymbolImpl::symbol_maps_tls __attribute__ ((tls_model ("initial-exec")));
+  __thread SymbolImpl::index_map_type*               SymbolImpl::index_maps_tls  __attribute__ ((tls_model ("initial-exec")));
+  __thread SymbolImpl::non_terminal_map_type*        SymbolImpl::non_terminal_maps_tls  __attribute__ ((tls_model ("initial-exec")));
+  __thread SymbolImpl::non_terminal_symbol_map_type* SymbolImpl::non_terminal_symbol_maps_tls __attribute__ ((tls_model ("initial-exec")));
 #endif
   
   boost::thread_specific_ptr<SymbolImpl::symbol_map_type>              SymbolImpl::symbol_maps;
