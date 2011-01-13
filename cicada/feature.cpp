@@ -9,8 +9,6 @@
 namespace cicada
 {
 
-  Feature::mutex_type    Feature::__mutex;
-
   struct FeatureImpl
   {
     typedef Feature::feature_set_type feature_set_type;
@@ -39,6 +37,8 @@ namespace cicada
   __thread FeatureImpl::feature_map_type* FeatureImpl::feature_maps_tls = 0;
 #endif
   boost::thread_specific_ptr<FeatureImpl::feature_map_type> FeatureImpl::feature_maps;
+
+  Feature::mutex_type    Feature::__mutex;
   
   Feature::feature_set_type& Feature::__features()
   {

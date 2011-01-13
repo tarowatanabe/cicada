@@ -11,8 +11,6 @@
 
 namespace cicada
 {
-  Symbol::mutex_type    Symbol::__mutex;
-  
   struct SymbolImpl
   {
     typedef Symbol::symbol_set_type              symbol_set_type;
@@ -61,6 +59,7 @@ namespace cicada
   boost::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> SymbolImpl::non_terminal_symbol_maps;
   
   
+  Symbol::mutex_type    Symbol::__mutex;
   
   Symbol::symbol_set_type& Symbol::__symbols()
   {

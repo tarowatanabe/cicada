@@ -8,9 +8,6 @@
 
 namespace cicada
 {
-
-  Attribute::mutex_type    Attribute::__mutex;
-
   struct AttributeImpl
   {
     typedef Attribute::attribute_set_type attribute_set_type;
@@ -39,6 +36,8 @@ namespace cicada
   __thread AttributeImpl::attribute_map_type* AttributeImpl::attribute_maps_tls = 0;
 #endif
   boost::thread_specific_ptr<AttributeImpl::attribute_map_type> AttributeImpl::attribute_maps;
+
+  Attribute::mutex_type    Attribute::__mutex;
   
   Attribute::attribute_set_type& Attribute::__attributes()
   {
