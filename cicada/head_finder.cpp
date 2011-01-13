@@ -46,23 +46,26 @@ chinese: Chinese head finder\n\
   typedef sgi::hash_map<std::string, finder_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, finder_ptr_type> > > finder_map_type;
 #endif
+
+#ifdef HAVE_TLS
+  static __thread finder_map_type* __finders_tls = 0;
+  static boost::thread_specific_ptr<finder_map_type> __finders;
+#else
+  static boost::thread_specific_ptr<finder_map_type> __finders;
+#endif
+
   
   HeadFinder& HeadFinder::create(const std::string& parameter)
   {
     typedef cicada::Parameter parameter_type;
 
 #ifdef HAVE_TLS
-    static __thread finder_map_type* __finders_tls = 0;
-    static boost::thread_specific_ptr<finder_map_type> __finders;
-    
     if (! __finders_tls) {
       __finders.reset(new finder_map_type());
       __finders_tls = __finders.get();
     }
     finder_map_type& finders_map = *__finders_tls;    
 #else
-    static boost::thread_specific_ptr<finder_map_type> __finders;
-    
     if (! __finders.get())
       __finders.reset(new finder_map_type());
     

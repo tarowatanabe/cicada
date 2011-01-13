@@ -57,25 +57,26 @@ lower: lower casing\n\
   typedef sgi::hash_map<std::string, stemmer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, stemmer_ptr_type> > > stemmer_map_type;
 #endif
+
   
-
-
+#ifdef HAVE_TLS
+  static __thread stemmer_map_type* __stemmers_tls = 0;
+  static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
+#else
+  static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
+#endif  
+  
   Stemmer& Stemmer::create(const std::string& parameter)
   {
     typedef cicada::Parameter parameter_type;
 
 #ifdef HAVE_TLS
-    static __thread stemmer_map_type* __stemmers_tls = 0;
-    static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
-    
     if (! __stemmers_tls) {
       __stemmers.reset(new stemmer_map_type());
       __stemmers_tls = __stemmers.get();
     }
     stemmer_map_type& stemmers_map = *__stemmers_tls;    
 #else
-    static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
-    
     if (! __stemmers.get())
       __stemmers.reset(new stemmer_map_type());
     

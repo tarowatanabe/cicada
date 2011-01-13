@@ -60,6 +60,13 @@ tokenize: use the chain of tokenization\n\
   typedef sgi::hash_map<std::string, tokenizer_ptr_type, hash_string<std::string>, std::equal_to<std::string>,
 			std::allocator<std::pair<const std::string, tokenizer_ptr_type> > > tokenizer_map_type;
 #endif
+
+#ifdef HAVE_TLS
+  static __thread tokenizer_map_type* __tokenizers_tls = 0;
+  static boost::thread_specific_ptr<tokenizer_map_type> __tokenizers;
+#else
+  static boost::thread_specific_ptr<tokenizer_map_type> __tokenizers;
+#endif
   
   
   Tokenizer& Tokenizer::create(const std::string& parameter)
@@ -67,17 +74,12 @@ tokenize: use the chain of tokenization\n\
     typedef cicada::Parameter parameter_type;
 
 #ifdef HAVE_TLS
-    static __thread tokenizer_map_type* __tokenizers_tls = 0;
-    static boost::thread_specific_ptr<tokenizer_map_type> __tokenizers;
-    
     if (! __tokenizers_tls) {
       __tokenizers.reset(new tokenizer_map_type());
       __tokenizers_tls = __tokenizers.get();
     }
     tokenizer_map_type& tokenizers_map = *__tokenizers_tls;    
 #else
-    static boost::thread_specific_ptr<tokenizer_map_type> __tokenizers;
-    
     if (! __tokenizers.get())
       __tokenizers.reset(new tokenizer_map_type());
     

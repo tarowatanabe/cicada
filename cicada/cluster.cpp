@@ -133,22 +133,23 @@ namespace cicada
 			std::allocator<std::pair<const std::string, Cluster> > > cluster_map_type;
 #endif
 
+#ifdef HAVE_TLS
+  static __thread cluster_map_type* __clusters_tls = 0;
+  static boost::thread_specific_ptr<cluster_map_type> __clusters;
+#else
+  static boost::thread_specific_ptr<cluster_map_type> __clusters;
+#endif
   
 
   Cluster& Cluster::create(const path_type& path)
   {
 #ifdef HAVE_TLS
-    static __thread cluster_map_type* __clusters_tls = 0;
-    static boost::thread_specific_ptr<cluster_map_type> __clusters;
-    
     if (! __clusters_tls) {
       __clusters.reset(new cluster_map_type());
       __clusters_tls = __clusters.get();
     }
     cluster_map_type& clusters_map = *__clusters_tls;    
 #else
-    static boost::thread_specific_ptr<cluster_map_type> __clusters;
-    
     if (! __clusters.get())
       __clusters.reset(new cluster_map_type());
     
