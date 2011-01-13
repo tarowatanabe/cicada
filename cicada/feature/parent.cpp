@@ -45,8 +45,6 @@ namespace cicada
       }
     };
 
-    static const cicada::Attribute __attr_target_position("target-position");
-    
     class ParentImpl
     {
     public:
@@ -94,7 +92,12 @@ namespace cicada
       typedef utils::simple_vector<std::string, std::allocator<std::string> > normalized_set_type;
       typedef utils::chunk_vector<normalized_set_type, 4096 /sizeof(normalized_set_type), std::allocator<normalized_set_type> > normalized_map_type;
       
-      ParentImpl() :  exclude_terminal(false), sentence(0), forced_feature(false), alignment_mode(false) {}
+      ParentImpl()
+	: exclude_terminal(false),
+	  sentence(0),
+	  forced_feature(false),
+	  alignment_mode(false),
+	  attr_target_position("target-position") {}
       
       void clear()
       {
@@ -172,7 +175,8 @@ namespace cicada
       
       bool forced_feature;
       bool alignment_mode;
-
+      
+      attribute_type attr_target_position;
 
       struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
       {
@@ -197,7 +201,7 @@ namespace cicada
 	  if (alignment_mode) {
 	    symbol_type symbol = vocab_type::EPSILON;
 	    
-	    attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	    attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	    if (titer == edge.attributes.end())
 	      throw std::runtime_error("we do not support non alignment forest");
 	    

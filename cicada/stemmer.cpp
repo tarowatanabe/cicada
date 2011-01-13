@@ -58,16 +58,14 @@ lower: lower casing\n\
 			std::allocator<std::pair<const std::string, stemmer_ptr_type> > > stemmer_map_type;
 #endif
 
-    
+
+#ifdef HAVE_TLS
+  static __thread stemmer_map_type* __stemmers_tls = 0;
+#endif
+  static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
+  
   Stemmer& Stemmer::create(const std::string& parameter)
   {
-#ifdef HAVE_TLS
-    static __thread stemmer_map_type* __stemmers_tls = 0;
-    static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
-#else
-    static boost::thread_specific_ptr<stemmer_map_type> __stemmers;
-#endif  
-
     typedef cicada::Parameter parameter_type;
 
 #ifdef HAVE_TLS

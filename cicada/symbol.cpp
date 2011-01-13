@@ -13,7 +13,10 @@ namespace cicada
 {
   struct SymbolImpl
   {
-    
+    typedef Symbol::symbol_map_type               symbol_map_type;
+    typedef Symbol::index_map_type                index_map_type;
+    typedef Symbol::non_terminal_map_type         non_terminal_map_type;
+    typedef Symbol::non_terminal_symbol_map_type  non_terminal_symbol_map_type;
   };
   
   Symbol::mutex_type    Symbol::__mutex;
@@ -26,18 +29,23 @@ namespace cicada
   }
   
 
+#ifdef HAVE_TLS
+  static __thread SymbolImpl::symbol_map_type*              symbol_maps_tls = 0;
+  static __thread SymbolImpl::index_map_type*               index_maps_tls = 0;
+  static __thread SymbolImpl::non_terminal_map_type*        non_terminal_maps_tls = 0;
+  static __thread SymbolImpl::non_terminal_symbol_map_type* non_terminal_symbol_maps_tls = 0;
+#endif
+  static boost::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
+  static boost::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
+  static boost::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
+  static boost::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
+
   Symbol::symbol_map_type& Symbol::__symbol_maps()
   {
-#ifdef HAVE_TLS
-    static __thread symbol_map_type*                   symbol_maps_tls = 0;
-#endif
-    static boost::thread_specific_ptr<symbol_map_type> symbol_maps;
-
 #ifdef HAVE_TLS
     if (! symbol_maps_tls) {
       symbol_maps.reset(new symbol_map_type());
       symbol_maps->reserve(allocated());
-      
       symbol_maps_tls = symbol_maps.get();
     }
     
@@ -56,24 +64,15 @@ namespace cicada
   Symbol::index_map_type& Symbol::__index_maps()
   {
 #ifdef HAVE_TLS
-    static __thread index_map_type*                   index_maps_tls = 0;
-#endif
-    static boost::thread_specific_ptr<index_map_type> index_maps;
-
-#ifdef HAVE_TLS
     if (! index_maps_tls) {
       index_maps.reset(new index_map_type());
-      index_maps->reserve(allocated());
-      
       index_maps_tls = index_maps.get();
     }
     
     return *index_maps_tls;
 #else
-    if (! index_maps.get()) {
+    if (! index_maps.get())
       index_maps.reset(new index_map_type());
-      index_maps->reserve(allocated());
-    }
     
     return *index_maps;
 #endif
@@ -82,24 +81,15 @@ namespace cicada
   Symbol::non_terminal_map_type& Symbol::__non_terminal_maps()
   {
 #ifdef HAVE_TLS
-    static __thread non_terminal_map_type*                   non_terminal_maps_tls = 0;
-#endif
-    static boost::thread_specific_ptr<non_terminal_map_type> non_terminal_maps;
-    
-#ifdef HAVE_TLS
     if (! non_terminal_maps_tls) {
       non_terminal_maps.reset(new non_terminal_map_type());
-      non_terminal_maps->reserve(allocated());
-      
       non_terminal_maps_tls = non_terminal_maps.get();
     }
     
     return *non_terminal_maps_tls;
 #else
-    if (! non_terminal_maps.get()) {
+    if (! non_terminal_maps.get())
       non_terminal_maps.reset(new non_terminal_map_type());
-      non_terminal_maps->reserve(allocated());
-    }
     
     return *non_terminal_maps;
 #endif
@@ -108,24 +98,15 @@ namespace cicada
   Symbol::non_terminal_symbol_map_type& Symbol::__non_terminal_symbol_maps()
   {
 #ifdef HAVE_TLS
-    static __thread non_terminal_symbol_map_type*                   non_terminal_symbol_maps_tls = 0;
-#endif
-    static boost::thread_specific_ptr<non_terminal_symbol_map_type> non_terminal_symbol_maps;
-
-#ifdef HAVE_TLS
     if (! non_terminal_symbol_maps_tls) {
       non_terminal_symbol_maps.reset(new non_terminal_symbol_map_type());
-      non_terminal_symbol_maps->reserve(allocated());
-      
       non_terminal_symbol_maps_tls = non_terminal_symbol_maps.get();
     }
     
     return *non_terminal_symbol_maps_tls;
 #else
-    if (! non_terminal_symbol_maps.get()) {
+    if (! non_terminal_symbol_maps.get())
       non_terminal_symbol_maps.reset(new non_terminal_symbol_map_type());
-      non_terminal_symbol_maps->reserve(allocated());
-    }
     
     return *non_terminal_symbol_maps;
 #endif

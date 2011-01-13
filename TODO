@@ -56,3 +56,8 @@ Support syntactic features for alignment composed forest:
   Basic idea is to use "target-pos" to grab target-word position + assigned sentence
 
 Add CONLL filter to conver into hypergraph
+
+
+remove static const Symbol from vocab:
+  Although cicada::Symbol behaves like POD, it relies on underlying storage...
+  I'm still not sure how to make it valgrind safe...

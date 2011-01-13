@@ -21,8 +21,6 @@ namespace cicada
 {
   namespace feature
   {
-    static const cicada::Attribute __attr_target_position("target-position");
-    
     class NeighboursImpl
     {
     public:
@@ -95,7 +93,11 @@ namespace cicada
       
       typedef utils::indexed_set<state_type, state_hash_type, std::equal_to<state_type>, std::allocator<state_type> > state_map_type;
       
-      NeighboursImpl() :  sentence(0), forced_feature(false), alignment_mode(false) {}
+      NeighboursImpl()
+	: sentence(0),
+	  forced_feature(false),
+	  alignment_mode(false),
+	  attr_target_position("target-position") {}
       
       void clear()
       {
@@ -113,6 +115,8 @@ namespace cicada
       
       bool forced_feature;
       bool alignment_mode;
+
+      attribute_type attr_target_position;
 
       struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
       {
@@ -141,7 +145,7 @@ namespace cicada
 	    symbol_type suffix = vocab_type::EPSILON;
 	    int size = 0;
 	    
-	    attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	    attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	    if (titer == edge.attributes.end())
 	      throw std::runtime_error("we do not support non alignment forest");
 	    

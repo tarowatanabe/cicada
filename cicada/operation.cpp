@@ -32,6 +32,11 @@ namespace cicada
     typedef sgi::hash_map<std::string, weight_set_type, hash_string, std::equal_to<std::string>,
 			  std::allocator<std::pair<const std::string, weight_set_type> > > weight_map_type;
 #endif
+
+#ifdef HAVE_TLS
+    static __thread weight_map_type* __weights_tls = 0;
+#endif
+    static boost::thread_specific_ptr<weight_map_type> __weights;
   };
 
   const Operation::weight_set_type& Operation::weights(const path_type& path)
@@ -39,21 +44,16 @@ namespace cicada
     typedef operation_detail::weight_map_type weight_map_type;
     
 #ifdef HAVE_TLS
-    static __thread weight_map_type* __weights_tls = 0;
-    static boost::thread_specific_ptr<weight_map_type> __weights;
-    
-    if (! __weights_tls) {
-      __weights.reset(new weight_map_type());
-      __weights_tls = __weights.get();
+    if (! operation_detail::__weights_tls) {
+      operation_detail::__weights.reset(new weight_map_type());
+      operation_detail::__weights_tls = operation_detail::__weights.get();
     }
-    weight_map_type& weights_map = *__weights_tls;
+    weight_map_type& weights_map = *operation_detail::__weights_tls;
 #else
-    static boost::thread_specific_ptr<weight_map_type> __weights;
+    if (! operation_detail::__weights.get())
+      operation_detail::__weights.reset(new weight_map_type());
     
-    if (! __weights.get())
-      __weights.reset(new weight_map_type());
-    
-    weight_map_type& weights_map = *__weights;
+    weight_map_type& weights_map = *operation_detail::__weights;
 #endif
     
     weight_map_type::iterator iter = weights_map.find(path.file_string());

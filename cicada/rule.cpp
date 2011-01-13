@@ -22,17 +22,15 @@
 
 namespace cicada
 {  
+  typedef utils::array_power2<Rule::rule_ptr_type, 1024 * 256, std::allocator<Rule::rule_ptr_type> > cache_type;
+
+#ifdef HAVE_TLS
+  static __thread cache_type* __rule_cache_tls = 0;
+#endif
+  static boost::thread_specific_ptr<cache_type> __rule_cache;
+
   Rule::rule_ptr_type Rule::create(const Rule& x)
   {
-    typedef utils::array_power2<Rule::rule_ptr_type, 1024 * 256, std::allocator<Rule::rule_ptr_type> > cache_type;
-    
-#ifdef HAVE_TLS
-    static __thread cache_type* __rule_cache_tls = 0;
-    static boost::thread_specific_ptr<cache_type> __rule_cache;
-#else
-    static boost::thread_specific_ptr<cache_type> __rule_cache;
-#endif
-    
 #ifdef HAVE_TLS
     if (! __rule_cache_tls) {
       __rule_cache.reset(new cache_type());

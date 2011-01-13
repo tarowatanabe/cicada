@@ -134,15 +134,13 @@ namespace cicada
 #endif
   
 
+#ifdef HAVE_TLS
+  static __thread cluster_map_type* __clusters_tls = 0;
+#endif
+  static boost::thread_specific_ptr<cluster_map_type> __clusters;
+
   Cluster& Cluster::create(const path_type& path)
   {
-#ifdef HAVE_TLS
-    static __thread cluster_map_type* __clusters_tls = 0;
-    static boost::thread_specific_ptr<cluster_map_type> __clusters;
-#else
-    static boost::thread_specific_ptr<cluster_map_type> __clusters;
-#endif
-
 #ifdef HAVE_TLS
     if (! __clusters_tls) {
       __clusters.reset(new cluster_map_type());

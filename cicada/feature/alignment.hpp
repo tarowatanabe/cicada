@@ -153,8 +153,9 @@ namespace cicada
     // we will put into align namespace...
     namespace align
     {
-      struct Base
+      class Base
       {
+      public:
 	typedef size_t    size_type;
 	typedef ptrdiff_t difference_type;
 	
@@ -181,6 +182,15 @@ namespace cicada
 	typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
 	
 	typedef feature_function_type::edge_type edge_type;
+
+      public:
+	Base();
+
+      public:
+	attribute_type attr_source_size;
+	attribute_type attr_target_size;
+	attribute_type attr_source_position;
+	attribute_type attr_target_position;
       };
 
       class RelativePosition : public Base
@@ -236,8 +246,9 @@ namespace cicada
 	
       };
       
-      struct NullPath : public Base
+      class NullPath : public Base
       {
+      public:
 	NullPath(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
 	
 	void operator()(const feature_function_type& feature_function,

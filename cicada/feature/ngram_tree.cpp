@@ -20,8 +20,6 @@ namespace cicada
 {
   namespace feature
   {
-    static const cicada::Attribute __attr_target_position("target-position");
-    
     class NGramTreeImpl
     {
     public:
@@ -73,7 +71,8 @@ namespace cicada
 	: tree_map(symbol_type()),
 	  sentence(0),
 	  forced_feature(false),
-	  alignment_mode(false) {}
+	  alignment_mode(false),
+	  attr_target_position("target-position") {}
       
       void clear()
       {
@@ -92,6 +91,8 @@ namespace cicada
       
       bool forced_feature;
       bool alignment_mode;
+
+      attribute_type attr_target_position;
       
       struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
       {
@@ -117,7 +118,7 @@ namespace cicada
 	  symbol_type suffix = vocab_type::EPSILON;
 
 	  if (alignment_mode) {
-	    attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	    attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	    if (titer == edge.attributes.end())
 	      throw std::runtime_error("we do not support non alignment forest");
 	    

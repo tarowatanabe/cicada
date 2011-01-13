@@ -21,10 +21,11 @@ namespace cicada
 	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -2; }
       };
     
-      static const cicada::Attribute __attr_source_size("source-size");
-      static const cicada::Attribute __attr_target_size("target-size");
-      static const cicada::Attribute __attr_source_position("source-position");
-      static const cicada::Attribute __attr_target_position("target-position");
+      Base::Base()
+	: attr_source_size("source-size"),
+	  attr_target_size("target-size"),
+	  attr_source_position("source-position"),
+	  attr_target_position("target-position") {}
 
       // relative position...
       
@@ -62,8 +63,8 @@ namespace cicada
 					feature_set_type& estimates,
 					const bool final) const
       {
-	attribute_set_type::const_iterator siter = edge.attributes.find(__attr_source_position);
-	attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	attribute_set_type::const_iterator siter = edge.attributes.find(attr_source_position);
+	attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	
 	if (siter == edge.attributes.end() || titer == edge.attributes.end()) return;
 	
@@ -118,8 +119,8 @@ namespace cicada
 	const hypergraph_type::node_type& node = hypergraph.nodes[hypergraph.goal];
 	const hypergraph_type::edge_type& edge = hypergraph.edges[node.edges.front()];
       
-	attribute_set_type::const_iterator siter = edge.attributes.find(__attr_source_size);
-	attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_size);
+	attribute_set_type::const_iterator siter = edge.attributes.find(attr_source_size);
+	attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_size);
       
 	if (siter != edge.attributes.end())
 	  source_size = boost::apply_visitor(__attribute_integer(), siter->second);
@@ -187,7 +188,7 @@ namespace cicada
 	// how do we define distortion covered by forest...
 	
 	if (states.empty()) {
-	  attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	  attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	  if (titer == edge.attributes.end())
 	    throw std::runtime_error("we do not support non alignment forest");
 	  
@@ -257,7 +258,7 @@ namespace cicada
 	}
 	
 	if (states.empty()) {
-	  attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	  attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	  if (titer == edge.attributes.end())
 	    throw std::runtime_error("we do not support non alignment forest");
 	  
@@ -431,7 +432,7 @@ namespace cicada
       {
 	if (! states.empty()) return;
 	
-	attribute_set_type::const_iterator titer = edge.attributes.find(__attr_target_position);
+	attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	
 	if (titer == edge.attributes.end())
 	  throw std::runtime_error("we do not support non alignment forest");

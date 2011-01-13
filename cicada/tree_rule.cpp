@@ -63,19 +63,16 @@ BOOST_FUSION_ADAPT_STRUCT(
 
 namespace cicada
 {
+
+  typedef utils::array_power2<TreeRule::rule_ptr_type, 1024 * 64, std::allocator<TreeRule::rule_ptr_type> > cache_type;
+  
+#ifdef HAVE_TLS
+  static __thread cache_type* __tree_rule_cache_tls = 0;
+#endif
+  static boost::thread_specific_ptr<cache_type> __tree_rule_cache;
   
   TreeRule::rule_ptr_type TreeRule::create(const TreeRule& x)
   {
-    typedef utils::array_power2<TreeRule::rule_ptr_type, 1024 * 64, std::allocator<TreeRule::rule_ptr_type> > cache_type;
-    
-#ifdef HAVE_TLS
-    static __thread cache_type* __tree_rule_cache_tls = 0;
-    static boost::thread_specific_ptr<cache_type> __tree_rule_cache;
-#else
-    static boost::thread_specific_ptr<cache_type> __tree_rule_cache;
-#endif
-  
-
 #ifdef HAVE_TLS
     if (! __tree_rule_cache_tls) {
       __tree_rule_cache.reset(new cache_type());

@@ -50,16 +50,13 @@ wordnet: matching by wordnet synsets\n\
 			std::allocator<std::pair<const std::string, matcher_ptr_type> > > matcher_map_type;
 #endif
 
-
+#ifdef HAVE_TLS
+  static __thread matcher_map_type* __matchers_tls = 0;
+#endif
+  static boost::thread_specific_ptr<matcher_map_type> __matchers;
+  
   Matcher& Matcher::create(const std::string& parameter)
   {
-#ifdef HAVE_TLS
-    static __thread matcher_map_type* __matchers_tls = 0;
-    static boost::thread_specific_ptr<matcher_map_type> __matchers;
-#else
-    static boost::thread_specific_ptr<matcher_map_type> __matchers;
-#endif
-
     typedef cicada::Parameter parameter_type;
     
 #ifdef HAVE_TLS

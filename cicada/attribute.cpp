@@ -10,7 +10,7 @@ namespace cicada
 {
   struct AttributeImpl
   {
-    
+    typedef Attribute::attribute_map_type attribute_map_type;
   };
   
   Attribute::mutex_type    Attribute::__mutex;
@@ -21,13 +21,14 @@ namespace cicada
     
     return attributes;
   }
-
+  
+#ifdef HAVE_TLS
+  static __thread AttributeImpl::attribute_map_type* attribute_maps_tls = 0;
+#endif
+  static boost::thread_specific_ptr<AttributeImpl::attribute_map_type> attribute_maps;
+  
   Attribute::attribute_map_type& Attribute::__attribute_maps()
   {
-#ifdef HAVE_TLS
-    static __thread attribute_map_type* attribute_maps_tls = 0;
-#endif
-    static boost::thread_specific_ptr<attribute_map_type> attribute_maps;
 
 #ifdef HAVE_TLS
     if (! attribute_maps_tls) {
