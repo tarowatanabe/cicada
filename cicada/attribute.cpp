@@ -16,13 +16,6 @@ namespace cicada
   
   Attribute::mutex_type    Attribute::__mutex;
   
-  Attribute::attribute_set_type& Attribute::__attributes()
-  {
-    static attribute_set_type attrs;
-    
-    return attrs;
-  }
-  
 #ifdef HAVE_TLS
   static __thread AttributeImpl::attribute_map_type* attribute_maps_tls = 0;
   static boost::thread_specific_ptr<AttributeImpl::attribute_map_type> attribute_maps;

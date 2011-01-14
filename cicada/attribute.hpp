@@ -145,7 +145,11 @@ namespace cicada
     
     static attribute_map_type& __attribute_maps();
     
-    static attribute_set_type& __attributes();
+    static attribute_set_type& __attributes()
+    {
+      static attribute_set_type attrs;
+      return attrs;
+    }
     
     static const id_type& __allocate_empty()
     {

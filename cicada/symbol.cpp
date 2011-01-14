@@ -22,13 +22,6 @@ namespace cicada
   
   Symbol::mutex_type    Symbol::__mutex;
   
-  Symbol::symbol_set_type& Symbol::__symbols()
-  {
-    static symbol_set_type syms;
-    
-    return syms;
-  }
-  
 
 #ifdef HAVE_TLS
   static __thread SymbolImpl::symbol_map_type*              symbol_maps_tls = 0;

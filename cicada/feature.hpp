@@ -145,7 +145,11 @@ namespace cicada
     
     static feature_map_type& __feature_maps();
     
-    static feature_set_type& __features();
+    static feature_set_type& __features()
+    {
+      static feature_set_type feats;
+      return feats;
+    }
     
     static const id_type& __allocate_empty()
     {

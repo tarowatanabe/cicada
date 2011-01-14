@@ -254,7 +254,11 @@ namespace cicada
     static non_terminal_map_type& __non_terminal_maps();
     static non_terminal_symbol_map_type& __non_terminal_symbol_maps();
     
-    static symbol_set_type& __symbols();
+    static symbol_set_type& __symbols()
+    {
+      static symbol_set_type syms;
+      return syms;
+    }
     
     static const id_type& __allocate_empty()
     {

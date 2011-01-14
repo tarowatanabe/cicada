@@ -16,13 +16,6 @@ namespace cicada
   };
   
   Feature::mutex_type    Feature::__mutex;
-  
-  Feature::feature_set_type& Feature::__features()
-  {
-    static feature_set_type feats;
-    
-    return feats;
-  }
 
 #ifdef HAVE_TLS
   static __thread FeatureImpl::feature_map_type* feature_maps_tls = 0;
