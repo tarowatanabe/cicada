@@ -127,7 +127,7 @@ struct forest_parser : boost::spirit::qi::grammar<Iterator, forest_type(), boost
     category %= qi::hold[cat >> '[' >> qi::int_ >> ',' >> qi::int_ >> ']'] | cat;
     
     item %= category >> "=>" >> (+category) >> "|||" >> qi::double_ >> -qi::lit("EXTRAVAL") >> qi::eol;
-    sentence %= *cat >> qi::eol;
+    sentence %= +cat >> qi::eol;
     
     forest %= (-sentence) >> (*item) >> qi::eol;
   }
