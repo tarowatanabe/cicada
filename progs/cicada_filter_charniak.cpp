@@ -3,7 +3,7 @@
 //
 
 //
-// filter for kbest-output of parseIt
+// filter for forest-output of parseIt
 //
 
 #include <iostream>
