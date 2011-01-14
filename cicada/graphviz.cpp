@@ -21,6 +21,7 @@
 
 #include "graphviz.hpp"
 
+#include "utils/thread_specific_ptr.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Rule,
@@ -313,8 +314,8 @@ namespace cicada
     
     typedef graphviz_impl::iterator_type iterator_type;
     
-    graphviz_impl::grammar_label_type&   grammar_label   = graphviz_impl::instance_lable();
-    graphviz_impl::grammar_feature_type& grammar_feature = grphviz_impl::instance_feature();
+    graphviz_impl::grammar_label_type&   grammar_label   = graphviz_impl::instance_label();
+    graphviz_impl::grammar_feature_type& grammar_feature = graphviz_impl::instance_feature();
 
     os << "digraph { ordering=out;" << '\n';
 
