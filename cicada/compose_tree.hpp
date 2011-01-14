@@ -97,10 +97,6 @@ namespace cicada
     typedef std::deque<attribute_set_type, std::allocator<attribute_set_type> > attribute_queue_type;
     
     // for phrasal matching...
-    // this is used to keep extended transducer...
-    typedef std::vector<transducer_type::id_type, std::allocator<transducer_type::id_type> > phrase_node_set_type;
-    typedef std::vector<phrase_node_set_type, std::allocator<phrase_node_set_type> > phrase_node_map_type;
-    typedef std::vector<phrase_node_map_type, std::allocator<phrase_node_map_type> > phrase_node_map_set_type;
     
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_set<phrase_type, boost::hash<phrase_type>,  std::equal_to<phrase_type>, std::allocator<phrase_type> > phrase_set_type;
@@ -173,10 +169,6 @@ namespace cicada
       
       node_map.reserve(graph_in.nodes.size());
       node_map.resize(graph_in.nodes.size());
-      
-      phrase_node_map.clear();
-      phrase_node_map.reserve(grammar.size());
-      phrase_node_map.resize(grammar.size(), phrase_node_map_type(graph_in.nodes.size()));
       
       phrase_map.clear();
       phrase_map.reserve(graph_in.nodes.size());
@@ -542,8 +534,7 @@ namespace cicada
 
     node_map_set_type node_map;
     
-    phrase_node_map_set_type phrase_node_map;
-    phrase_map_type          phrase_map;
+    phrase_map_type phrase_map;
 
     rule_ptr_type goal_rule;
     
