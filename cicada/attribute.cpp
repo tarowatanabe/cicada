@@ -18,9 +18,9 @@ namespace cicada
   
   Attribute::attribute_set_type& Attribute::__attributes()
   {
-    static attribute_set_type attributes;
+    static attribute_set_type attrs;
     
-    return attributes;
+    return attrs;
   }
   
 #ifdef HAVE_TLS

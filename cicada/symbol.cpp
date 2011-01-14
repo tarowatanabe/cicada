@@ -24,9 +24,9 @@ namespace cicada
   
   Symbol::symbol_set_type& Symbol::__symbols()
   {
-    static symbol_set_type symbols;
+    static symbol_set_type syms;
     
-    return symbols;
+    return syms;
   }
   
 

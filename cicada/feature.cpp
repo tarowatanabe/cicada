@@ -19,9 +19,9 @@ namespace cicada
   
   Feature::feature_set_type& Feature::__features()
   {
-    static feature_set_type features;
+    static feature_set_type feats;
     
-    return features;
+    return feats;
   }
 
 #ifdef HAVE_TLS
