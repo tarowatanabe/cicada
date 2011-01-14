@@ -3,18 +3,9 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#include <sstream>
-#include <pthread.h>
-
-#include "symbol.hpp"
 #include "vocab.hpp"
 
-#include "utils/filesystem.hpp"
-#include "utils/atomicop.hpp"
-#include "utils/spinlock.hpp"
 #include "utils/config.hpp"
-
-#include <boost/thread.hpp>
 
 namespace cicada
 {
@@ -28,17 +19,15 @@ namespace cicada
   const Vocab::symbol_type Vocab::BOS     = Vocab::symbol_type("<s>");
   const Vocab::symbol_type Vocab::EOS     = Vocab::symbol_type("</s>");
 
-  // X_{n} indicated subscript...
   const Vocab::symbol_type Vocab::GOAL  = Vocab::symbol_type("[goal]");
 
   const Vocab::symbol_type Vocab::S  = Vocab::symbol_type("[s]");
   const Vocab::symbol_type Vocab::S1 = Vocab::symbol_type("[s,1]");
   const Vocab::symbol_type Vocab::S2 = Vocab::symbol_type("[s,2]");
-
+  
   const Vocab::symbol_type Vocab::X  = Vocab::symbol_type("[x]");
   const Vocab::symbol_type Vocab::X1 = Vocab::symbol_type("[x,1]");
   const Vocab::symbol_type Vocab::X2 = Vocab::symbol_type("[x,2]");
-  
 
   // normal vocab services...
   
