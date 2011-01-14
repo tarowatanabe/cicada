@@ -857,7 +857,7 @@ struct ExtractTree
       derivations_new.clear();
     }
     
-    void construct_derivations(const hypergraph_type& graph, const DerivationGraph& counterpart)
+    void construct_derivations(const hypergraph_type& graph, const DerivationGraph& counterpart, const bool exhaustive)
     {
       typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
       typedef google::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_node_map_type;
@@ -992,13 +992,35 @@ struct ExtractTree
 		    derivations[goal_node].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
 		  } else {
 		    // we will compute all possible ranges...
-		    for (int first = range_max.first; first <= range.first; ++ first)
-		      for (int last = range.second; last <= range_max.second; ++ last) {
-			const range_type range_next(first, last);
-			
-			// if we do not have any range in our counterpart, continue!
-			if (counterpart.range_map.find(range_next) == counterpart.range_map.end()) continue;
-			
+
+		    if (exhaustive) {
+		      for (int first = range_max.first; first <= range.first; ++ first)
+			for (int last = range.second; last <= range_max.second; ++ last) {
+			  const range_type range_next(first, last);
+			  
+			  // if we do not have any range in our counterpart, continue!
+			  if (counterpart.range_map.find(range_next) == counterpart.range_map.end()) continue;
+			  
+			  range_node_map_type::iterator biter = buf.find(range_next);
+			  if (biter == buf.end()) {
+			    derivations.resize(derivations.size() + 1);
+			    
+			    derivations.back().node = id;
+			    derivations.back().range = range_next;
+			    
+			    node_map[id].push_back(derivations.size() - 1);
+			    
+			    biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
+			  }
+			  
+			  derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
+			}
+		    } else {
+		      const range_type& range_next = range;
+		      
+		      // if we do not have any range in our counterpart, continue!
+		      if (counterpart.range_map.find(range_next) != counterpart.range_map.end()) {
+		      
 			range_node_map_type::iterator biter = buf.find(range_next);
 			if (biter == buf.end()) {
 			  derivations.resize(derivations.size() + 1);
@@ -1013,6 +1035,7 @@ struct ExtractTree
 			
 			derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
 		      }
+		    }
 		  }
 		}
 	      
@@ -1219,15 +1242,18 @@ struct ExtractTree
   
   ExtractTree(const int __max_nodes,
 	      const int __max_height,
+	      const bool __exhaustive, 
 	      const bool __inverse)
     : max_nodes(__max_nodes),
       max_height(__max_height),
+      exhaustive(__exhaustive),
       inverse(__inverse),
       attr_span_first("span-first"),
       attr_span_last("span-last") {}
 
   int max_nodes;
   int max_height;
+  bool exhaustive;
   bool inverse;
 
   attribute_type attr_span_first;
@@ -1264,8 +1290,8 @@ struct ExtractTree
     graph_target.admissible_nodes(target, graph_source);
     
     // construct derivations... here, we will create minimal rules wrt single side
-    graph_source.construct_derivations(source, graph_target);
-    graph_target.construct_derivations(target, graph_source);
+    graph_source.construct_derivations(source, graph_target, exhaustive);
+    graph_target.construct_derivations(target, graph_source, exhaustive);
     
     // prune...
     graph_source.prune_derivations();
@@ -1541,11 +1567,12 @@ struct Task
        const path_type& __output,
        const int max_nodes,
        const int max_height,
+       const bool exhaustive,
        const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_nodes, max_height, inverse),
+      extractor(max_nodes, max_height, exhaustive, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

@@ -579,6 +579,7 @@ class ExtractTree(Extract):
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
                  max_nodes=15, max_height=4,
+                 exhaustive=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -604,6 +605,9 @@ class ExtractTree(Extract):
         
         command += " --max-nodes %d"  %(max_nodes)
         command += " --max-height %d" %(max_height)
+        
+        if exhaustive:
+            comamnd += " --exhaustive"
         
         command += " --max-malloc %g" %(max_malloc)
         
@@ -753,6 +757,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               model_dir=options.model_dir,
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
+                              exhaustive=options.exhaustive,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     else:
