@@ -138,7 +138,7 @@ namespace cicada
 	__values.resize(x.size());
       }
       
-      std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::plus<Tp>());
+      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::plus<Tp>());
       return *this;
     }
     
@@ -150,7 +150,7 @@ namespace cicada
 	__values.resize(x.size());
       }
       
-      std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::minus<Tp>());
+      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::minus<Tp>());
       return *this;
     }
     
@@ -162,7 +162,7 @@ namespace cicada
 	__values.resize(x.size());
       }
       
-      std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::multiplies<Tp>());
+      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::multiplies<Tp>());
       return *this;
     }
     
@@ -174,7 +174,7 @@ namespace cicada
 	__values.resize(x.size());
       }
       
-      std::transform(begin(), begin() + utils::bithack::min(size(), x.size()), x.begin(), begin(), std::divides<Tp>());
+      std::transform(begin(), begin() + x.size(), x.begin(), begin(), std::divides<Tp>());
       return *this;
     }
 
