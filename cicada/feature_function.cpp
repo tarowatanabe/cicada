@@ -39,7 +39,7 @@ antecedent: antecedent feature\n\
 bleu: BLEU\n\
 \torder=<order>\n\
 \texact=[true|false] clipped ngram computation\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu)\n\
 \trefset=reference set file\n\
 bleu-expected: expected-BLEU\n\
@@ -48,13 +48,13 @@ bleu-linear: linear corpus-BLEU\n\
 \torder=<order>\n\
 \tprecision=<default 0.8>\n\
 \tratio=<default 0.6>\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu-linear)\n\
 \trefset=reference set file\n\
 bleu-multi: multiple BLEU\n\
 \torder=<order>\n\
 \texact=[true|false] clipped ngram computation\n\
-\tokenizer=[tokenizer spec]\n\
+\ttokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu-multi:integer)\n\
 \tsize=# of BLEU features\n\
 distortion: phrase-based distortion\n\
