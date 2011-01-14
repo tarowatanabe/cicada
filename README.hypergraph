@@ -8,21 +8,48 @@ filter_penntreebank and filter_cabocha to convert from penn-treebank or cabocha 
 PennTreebank filter was tested on output from stanford parser, thus, may not work on raw treebank file.
 If you need support contact me.
 
-filter_penntreebank [options]
+cicada_filter_penntreebank [options]
 options:
-  --input arg (=-)      input file (parse trees)
+  --input arg (=-)      input file
   --output arg (=-)     output
+  --map arg             map terminal symbols
   --escape              escape English penntreebank
+  --normalize           normalize category, such as [,] [.] etc.
   --leaf                collect leaf nodes only
-  --map                 re-label tree by sentences (a set of "parsed" original sentences)
+  --rule                collect rules only
+  --span                collect span only
+  --binarize            perform binarization
+  --category            added category to span
+  --unary-top           use top-most category for unary rules
+  --unary-bottom        use bottom-most category for unary rules
+  --unary-root          use single category for root
+  --exclude-terminal    no terminal in span
+  --debug [=arg(=1)]    debug level
   --help                help message
 
 For English treebanks, you may want to transform [,] or [.] into [COMMA] [PERIOD] respectively, otherwise
 you may encounter serious errors. (',' is a separator for index and category!)
+If your parser automatically modify tokens (like '(' => -LRB- etc.), you can use --map <file name>
+which will map the modified terminals into the original form, where "file name" is your original data
+used as an input to your parser.
+
+"--span" option will print spans each category covers. together with --category, you can dump span in
+first-last:category.
+
+Egret (another parser variant supporting English/Chinese) filter assume "parse forest" as its input.
+
+cicada_filter_charniak [options]
+options:
+  --input arg (=-)      input file
+  --output arg (=-)     output
+  --map arg             map terminal symbols
+  --normalize           normalize category, such as [,] [.] etc.
+  --debug [=arg(=1)]    debug level
+  --help                help message
 
 Cabocha supports only the latest version, 0.60pre4 (probably)
 
-filter_cabocha [options]
+cicada_filter_cabocha [options]
 options:
   --input arg (=-)      input file
   --output arg (=-)     output
