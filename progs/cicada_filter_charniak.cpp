@@ -31,6 +31,7 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/chart.hpp"
+#include "utils/space_separator.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/sgi_hash_set.hpp"
 
@@ -198,6 +199,17 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file, 1024 * 1024);
     utils::compress_ostream os(output_file);
     is.unsetf(std::ios::skipws);
+
+    boost::shared_ptr<utils::compress_istream> ms;
+    
+    if (! map_file.empty()) {
+      if (! boost::filesystem::exists(map_file))
+	throw std::runtime_error("no map file: " + map_file.file_string());
+      
+      ms.reset(new utils::compress_istream(map_file, 1024 * 1024));
+    }
+
+    const bool mapping = ms;
     
     forest_parser<iter_type> parser;
 
@@ -209,9 +221,11 @@ int main(int argc, char** argv)
     word_type       ROOT("[S1]");
     word_type       TOP("[ROOT]");
     root_set_type   roots;
+    sentence_type   sentence;
 
     hypergraph_type::feature_set_type::feature_type feature("parse-cost");
     
+    std::string line;
     iter_type iter(is);
     iter_type iter_end;
 
@@ -233,6 +247,20 @@ int main(int argc, char** argv)
       }
 
       hypergraph.clear();
+
+      if (mapping) {	
+	if (! std::getline(*ms, line))
+	  throw std::runtime_error("# of lines do not match with map-file");
+	
+	boost::tokenizer<utils::space_separator> tokenizer(line);
+	sentence.clear();
+	sentence.insert(sentence.end(), tokenizer.begin(), tokenizer.end());
+
+	if (sentence.size() != forest.sentence.size())
+	  throw std::runtime_error("# of words in map file and parse output differ");
+	
+	forest.sentence.swap(sentence);
+      }
       
       if (forest.sentence.empty() || forest.items.empty()) {
 	os << hypergraph << '\n';
@@ -261,9 +289,12 @@ int main(int argc, char** argv)
 	for (category_set_type::const_iterator riter = rhs.begin(); riter != riter_end; ++ riter) {
 	  const category_type& cat = *riter;
 	  
-	  if (cat.is_terminal())
-	    phrase.push_back(cat.cat);
-	  else {
+	  if (cat.is_terminal()) {
+	    if (mapping)
+	      phrase.push_back(forest.sentence[lhs.first]);
+	    else
+	      phrase.push_back(cat.cat);
+	  } else {
 	    // perform normalization if specified...!
 	    if (normalize)
 	      phrase.push_back('[' + normalize_cat(cat.strip()) + ']');
