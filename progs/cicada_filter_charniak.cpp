@@ -57,8 +57,13 @@ struct category_type
     std::string ::size_type pos = cat.find('_');
     if (pos != std::string::npos)
       return cat.substr(0, pos);
-    else
-      return cat;
+    else {
+      std::string ::size_type pos = cat.find('^');
+      if (pos != std::string::npos)
+	return cat.substr(0, pos);
+      else
+	return cat;
+    }
   }
 };
 
