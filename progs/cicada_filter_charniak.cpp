@@ -33,7 +33,6 @@
 #include "utils/chart.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/sgi_hash_map.hpp"
-#include "utils/sgi_hash_set.hpp"
 
 typedef boost::filesystem::path path_type;
 
@@ -176,14 +175,6 @@ typedef cicada::Vocab  vocab_type;
 typedef cicada::Symbol word_type;
 typedef std::vector<word_type, std::allocator<word_type> > phrase_type;
 
-#ifdef HAVE_TR1_UNORDERED_SET
-typedef std::tr1::unordered_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
-				std::allocator<hypergraph_type::id_type> > root_set_type;
-#else
-typedef sgi::hash_set<hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<hypergraph_type::id_type>,
-		      std::allocator<hypergraph_type::id_type> > root_set_type;
-#endif
-
 path_type input_file = "-";
 path_type output_file = "-";
 path_type map_file;
@@ -223,9 +214,6 @@ int main(int argc, char** argv)
     node_chart_type chart;
     tail_set_type   tails;
     phrase_type     phrase;
-    word_type       ROOT("[S1]");
-    word_type       TOP("[ROOT]");
-    root_set_type   roots;
     sentence_type   sentence;
 
     hypergraph_type::feature_set_type::feature_type feature("parse-cost");
@@ -275,9 +263,9 @@ int main(int argc, char** argv)
       chart.clear();
       chart.reserve(forest.sentence.size() + 1);
       chart.resize(forest.sentence.size() + 1);
-
-      roots.clear();
       
+      hypergraph_type::id_type node_last = hypergraph_type::invalid;
+
       // transform into hypergraph...
       item_set_type::const_iterator iiter_end = forest.items.end();
       for (item_set_type::const_iterator iiter = forest.items.begin(); iiter != iiter_end; ++ iiter) {
@@ -335,24 +323,13 @@ int main(int argc, char** argv)
 	  edge.features[feature] = score;
 	
 	hypergraph.connect_edge(edge.id, node_id);
-
-	if (cat == ROOT && lhs.last + 1 == forest.sentence.size())
-	  roots.insert(node_id);
+	
+	node_last = node_id;
       }
-
-      if (! roots.empty()) {
-	hypergraph_type::rule_ptr_type root_rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(TOP, &ROOT, (&ROOT) + 1));
-
-	hypergraph.goal = hypergraph.add_node().id;
-	
-	root_set_type::const_iterator riter_end = roots.end();
-	for (root_set_type::const_iterator riter = roots.begin(); riter != riter_end; ++ riter) {
-	  hypergraph_type::edge_type& edge = hypergraph.add_edge(&(*riter), (&(*riter)) + 1);
-	  edge.rule = root_rule;
-	  
-	  hypergraph.connect_edge(edge.id, hypergraph.goal);
-	}
-	
+      
+      // we assume that the last item is always the last rule leading to goal...
+      if (node_last != hypergraph_type::invalid) {
+	hypergraph.goal = node_last;
 	hypergraph.topologically_sort();
       }
       
