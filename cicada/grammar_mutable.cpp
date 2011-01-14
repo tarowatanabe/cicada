@@ -184,7 +184,7 @@ namespace cicada
     static utils::thread_specific_ptr<rule_parser_type > __rule_parser;
 #endif
 
-    static rule_parser_type& rule_parser_instance()
+    static rule_parser_type& instance()
     {
 #ifdef HAVE_TLS
       if (! __rule_parser_tls) {
@@ -205,9 +205,10 @@ namespace cicada
   
   void GrammarMutableImpl::insert(const std::string& pattern)
   {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+
     typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
-    
-    grammar_mutable_impl::rule_parser_type& rule_parser = grammar_mutable_impl::rule_parser_instance();
     
     rule_parsed_type rule_parsed;
 
@@ -215,7 +216,7 @@ namespace cicada
     std::string::const_iterator iter_end = pattern.end();
     std::string::const_iterator iter = iter_begin;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule_parsed);
+    const bool result = qi::phrase_parse(iter, iter_end, grammar_mutable_impl::instance(), standard::space, rule_parsed);
     
     if (! result || iter != iter_end)
       throw std::runtime_error(std::string("rule parsing failed: ") + pattern);    
@@ -280,11 +281,13 @@ namespace cicada
   
   void GrammarMutableImpl::read(const std::string& parameter)
   {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    namespace phoenix = boost::phoenix;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
-
-    typedef cicada::Parameter parameter_type;
     
+    typedef cicada::Parameter parameter_type;
     
     const parameter_type param(parameter);
     
@@ -301,10 +304,6 @@ namespace cicada
 	continue;
       }
       
-      namespace qi = boost::spirit::qi;
-      namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
-
       {
 	std::string::const_iterator iter = piter->first.begin();
 	std::string::const_iterator iter_end = piter->first.end();
@@ -337,8 +336,6 @@ namespace cicada
       
       throw std::runtime_error("unsupported key: " + piter->first);
     }
-
-    grammar_mutable_impl::rule_parser_type& rule_parser = grammar_mutable_impl::rule_parser_instance();
     
     utils::compress_istream is(param.name(), 1024 * 1024);
     std::string line;
@@ -358,7 +355,7 @@ namespace cicada
       std::string::const_iterator iter = line.begin();
       std::string::const_iterator iter_end = line.end();
       
-      const bool result = boost::spirit::qi::phrase_parse(iter, iter_end, rule_parser, boost::spirit::standard::space, rule_parsed);
+      const bool result = qi::phrase_parse(iter, iter_end, grammar_mutable_impl::instance(), standard::space, rule_parsed);
       
       if (! result || iter != iter_end)
 	throw std::runtime_error("rule parsing failed: " + line);

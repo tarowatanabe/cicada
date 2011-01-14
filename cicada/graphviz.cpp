@@ -154,7 +154,98 @@ namespace cicada
     boost::spirit::karma::symbols<char, const char*> escape_char;
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };
+  
+  
+  namespace graphviz_impl
+  {
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    typedef graphviz_label_generator<iterator_type>   grammar_label_type;
+    typedef graphviz_rule_generator<iterator_type>    grammar_rule_type;
+    typedef graphviz_tail_generator<iterator_type>    grammar_tail_type;
+    typedef graphviz_feature_generator<iterator_type> grammar_feature_type;
+    
+#ifdef HAVE_TLS
+    static __thread grammar_label_type*   __grammar_label_tls = 0;
+    static __thread grammar_rule_type*    __grammar_rule_tls = 0;
+    static __thread grammar_tail_type*    __grammar_tail_tls = 0;
+    static __thread grammar_feature_type* __grammar_feature_tls = 0;
+    
+    static boost::thread_specific_ptr<grammar_label_type >   __grammar_label;
+    static boost::thread_specific_ptr<grammar_rule_type >    __grammar_rule;
+    static boost::thread_specific_ptr<grammar_tail_type >    __grammar_tail;
+    static boost::thread_specific_ptr<grammar_feature_type > __grammar_feature;
+#else
+    static utils::thread_specific_ptr<grammar_label_type >   __grammar_label;
+    static utils::thread_specific_ptr<grammar_rule_type >    __grammar_rule;
+    static utils::thread_specific_ptr<grammar_tail_type >    __grammar_tail;
+    static utils::thread_specific_ptr<grammar_feature_type > __grammar_feature;
+#endif
+    
+    static grammar_label_type& instance_label()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_label_tls) {
+	__grammar_label.reset(new grammar_label_type());
+	__grammar_label_tls = __grammar_label.get();
+      }
+      return * __grammar_label_tls;
+#else
+      if (! __grammar_label.get())
+	__grammar_label.reset(new grammar_label_type());
+      
+      return *__grammar_label;
+#endif
+    }
 
+    static grammar_rule_type& instance_rule()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_rule_tls) {
+	__grammar_rule.reset(new grammar_rule_type());
+	__grammar_rule_tls = __grammar_rule.get();
+      }
+      return * __grammar_rule_tls;
+#else
+      if (! __grammar_rule.get())
+	__grammar_rule.reset(new grammar_rule_type());
+      
+      return *__grammar_rule;
+#endif
+    }
+    
+    static grammar_tail_type& instance_tail()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tail_tls) {
+	__grammar_tail.reset(new grammar_tail_type());
+	__grammar_tail_tls = __grammar_tail.get();
+      }
+      return * __grammar_tail_tls;
+#else
+      if (! __grammar_tail.get())
+	__grammar_tail.reset(new grammar_tail_type());
+      
+      return *__grammar_tail;
+#endif
+    }
+
+    static grammar_feature_type& instance_feature()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_feature_tls) {
+	__grammar_feature.reset(new grammar_feature_type());
+	__grammar_feature_tls = __grammar_feature.get();
+      }
+      return * __grammar_feature_tls;
+#else
+      if (! __grammar_feature.get())
+	__grammar_feature.reset(new grammar_feature_type());
+      
+      return *__grammar_feature;
+#endif
+    }
+  };
 
   
   std::ostream& graphviz(std::ostream& os, const HyperGraph& hypergraph)
@@ -164,15 +255,11 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
 
-    typedef std::ostream_iterator<char> iterator_type;
+    typedef graphviz_impl::iterator_type iterator_type;
     
-    typedef graphviz_rule_generator<iterator_type>    rule_grammar_type;
-    typedef graphviz_tail_generator<iterator_type>    tail_grammar_type;
-    typedef graphviz_feature_generator<iterator_type> feature_grammar_type;
-    
-    rule_grammar_type    rule_grammar;
-    tail_grammar_type    tail_grammar;
-    feature_grammar_type feature_grammar;
+    graphviz_impl::grammar_rule_type&    grammar_rule    = graphviz_impl::instance_rule();
+    graphviz_impl::grammar_tail_type&    grammar_tail    = graphviz_impl::instance_tail();
+    graphviz_impl::grammar_feature_type& grammar_feature = graphviz_impl::instance_feature();
     
     os << "digraph { rankdir=BT; ordering=in;" << '\n';
     
@@ -189,17 +276,17 @@ namespace cicada
 	if (edge.rule) {
 	  os << "  edge_" << edge.id << " [label=\"{";
 	  
-	  boost::spirit::karma::generate(iterator_type(os), rule_grammar, *edge.rule);
+	  boost::spirit::karma::generate(iterator_type(os), grammar_rule, *edge.rule);
 	  if (! edge.tails.empty()) {
 	    os << " | ";
-	    boost::spirit::karma::generate(iterator_type(os), tail_grammar, edge.tails);
+	    boost::spirit::karma::generate(iterator_type(os), grammar_tail, edge.tails);
 	  }
 	  
 	  os << "}";
 	  
 	  if (! edge.features.empty()) {
 	    os << " | ";
-	    boost::spirit::karma::generate(iterator_type(os), feature_grammar, edge.features);
+	    boost::spirit::karma::generate(iterator_type(os), grammar_feature, edge.features);
 	  }
 	  
 	  os << "\", shape=record];" << '\n';
@@ -224,13 +311,10 @@ namespace cicada
   {
     typedef Lattice lattice_type;
     
-    typedef std::ostream_iterator<char> iterator_type;
-
-    typedef graphviz_label_generator<iterator_type>   label_grammar_type;
-    typedef graphviz_feature_generator<iterator_type> feature_grammar_type;
-
-    label_grammar_type   label_grammar;
-    feature_grammar_type feature_grammar;
+    typedef graphviz_impl::iterator_type iterator_type;
+    
+    graphviz_impl::grammar_label_type&   grammar_label   = graphviz_impl::instance_lable();
+    graphviz_impl::grammar_feature_type& grammar_feature = grphviz_impl::instance_feature();
 
     os << "digraph { ordering=out;" << '\n';
 
@@ -244,10 +328,10 @@ namespace cicada
 	
 	os << "   edge_" << id_edge << " [label=\"";
 	
-	boost::spirit::karma::generate(iterator_type(os), label_grammar, arc.label);
+	boost::spirit::karma::generate(iterator_type(os), grammar_label, arc.label);
 	if (! arc.features.empty()) {
 	  os << " | ";
-	  boost::spirit::karma::generate(iterator_type(os), feature_grammar, arc.features);
+	  boost::spirit::karma::generate(iterator_type(os), grammar_feature, arc.features);
 	}
 	
 	os << "\", shape=record];" << '\n';

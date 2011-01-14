@@ -60,32 +60,33 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
   
   bool SpanVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
-    using namespace span_vector_impl;
-    
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
     clear();
-
-    return phrase_parse(iter, end,
-			grammar,
-			boost::spirit::standard::space,
-			__spans);
+    
+    return qi::phrase_parse(iter, end, span_vector_impl::instance(), standard::space, __spans);
   }
   
   void SpanVector::assign(const std::string& line)
@@ -124,7 +125,7 @@ namespace cicada
     
     iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, -((karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_]) % ' '), x))
+    if (! karma::generate(iter, -((karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_]) % ' '), x))
       throw std::runtime_error("span vector generation failed...?");
     
     return os;

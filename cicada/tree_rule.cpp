@@ -144,34 +144,46 @@ namespace cicada
     boost::spirit::karma::rule<Iterator, TreeRule()>                       tree_rule;
   };
   
-
-  bool TreeRule::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  namespace tree_rule_parser_impl
   {
     typedef tree_rule_parser_grammar<std::string::const_iterator> grammar_type;
     
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
-    
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
 #endif
     
-    clear();
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
+  };
 
+
+  bool TreeRule::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    clear();
+    
     cicada_treebank_type treebank;
     
-    if (boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, treebank)) {
+    if (qi::phrase_parse(iter, end, tree_rule_parser_impl::instance(), standard::space, treebank)) {
       treebank.transform(*this);
       return true;
     } else
@@ -203,7 +215,7 @@ namespace cicada
     return is;
   }
 
-  std::ostream& operator<<(std::ostream& os, const TreeRule& x)
+  namespace tree_rule_generator_impl
   {
     typedef std::ostream_iterator<char> iterator_type;
     typedef tree_rule_generator_grammar<iterator_type> grammar_type;
@@ -211,24 +223,35 @@ namespace cicada
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
-    
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
+  };
+
+  std::ostream& operator<<(std::ostream& os, const TreeRule& x)
+  {
+    namespace karma = boost::spirit::karma;
     
-    iterator_type iter(os);
+    tree_rule_generator_impl::iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, grammar, x))
+    if (! karma::generate(iter, tree_rule_generator_impl::instance(), x))
       throw std::runtime_error("failed tree-rule generation!");
     
     return os;

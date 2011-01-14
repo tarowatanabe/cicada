@@ -129,35 +129,39 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
 
 
   bool AttributeVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
-    using namespace attribute_vector_parser_impl;
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
-
     clear();
-
+    
     // empty attribute vector...
     if (iter == end) return true;
-
+    
     attribute_set_parsed_type parsed;
     
-    if (boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, parsed)) {
+    if (qi::phrase_parse(iter, end, attribute_vector_parser_impl::instance(), standard::space, parsed)) {
       __values.insert(parsed.begin(), parsed.end());
       return true;
     } else
@@ -185,30 +189,33 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+    
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+       return *__grammar;
+#endif
+    }
   };
 
   
   std::ostream& operator<<(std::ostream& os, const AttributeVector& x)
   {
-    using namespace attribute_vector_generator_impl;
+    namespace karma = boost::spirit::karma;
     
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-      
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
+    attribute_vector_generator_impl::iterator_type iter(os);
     
-    grammar_type& grammar = *__grammar;
-#endif
-    
-    iterator_type iter(os);
-    
-    if (! boost::spirit::karma::generate(iter, grammar, x.__values))
+    if (! karma::generate(iter, attribute_vector_generator_impl::instance(), x.__values))
       throw std::runtime_error("failed attribute vector generation!");
 
     return os;
@@ -311,29 +318,32 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
 
   std::ostream& operator<<(std::ostream& os, const AttributeVector::data_type& x)
   {
-    using namespace attribute_data_generator_impl;
+    namespace karma = boost::spirit::karma;
     
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-      
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
+    attribute_data_generator_impl::iterator_type iter(os);
     
-    grammar_type& grammar = *__grammar;
-#endif
-
-    iterator_type iter(os);
-    
-    if (! boost::spirit::karma::generate(iter, grammar, x))
+    if (! karma::generate(iter, attribute_data_generator_impl::instance(), x))
       throw std::runtime_error("failed attribute vector data generation!");
     
     return os;
@@ -349,26 +359,30 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
 
   std::istream& operator>>(std::istream& is, AttributeVector::data_type& x)
   {
-    using namespace attribute_data_parser_impl;
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
-
     x = attribute_data_type();
     
     std::string token;
@@ -376,7 +390,7 @@ namespace cicada
       std::string::const_iterator iter = token.begin();
       std::string::const_iterator end  = token.end();
       
-      if (boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, x))
+      if (qi::phrase_parse(iter, end, attribute_data_parser_impl::instance(), standard::space, x))
 	if (iter != end)
 	  throw std::runtime_error("failed parsing attribute vector data");
     }

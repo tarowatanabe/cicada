@@ -252,35 +252,50 @@ namespace cicada
       throw std::runtime_error("hypergraph format error");
   }
 
-
-  bool HyperGraph::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  namespace hypergraph_parser_impl
   {
     typedef hypergraph_parser<std::string::const_iterator> grammar_type;
 
 #ifdef HAVE_TLS
     static __thread grammar_type* __grammar_tls = 0;
     static boost::thread_specific_ptr<grammar_type > __grammar;
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
 #endif
     
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
+  };
+
+
+  bool HyperGraph::assign(std::string::const_iterator& iter, std::string::const_iterator end)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
     clear();
+
+    hypergraph_parser_impl::grammar_type& grammar = hypergraph_parser_impl::instance();
     
     grammar.rules.clear();
     grammar.rules.push_back(HyperGraph::rule_ptr_type());
     grammar.graph.clear();
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space);
+    const bool result = qi::phrase_parse(iter, end, grammar, standard::space);
     
     if (result)
       grammar.graph.swap(*this);
@@ -375,9 +390,73 @@ namespace cicada
     boost::spirit::karma::symbols<char, const char*> escape_char;
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };
+
+  namespace hypergraph_rule_generator_impl
+  {
+    typedef std::ostream_iterator<char> iterator_type;
+    typedef rule_generator<iterator_type> grammar_type;
+    
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+      
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLD
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
+  };
+
+  namespace hypergraph_feature_generator_impl
+  {
+    typedef std::ostream_iterator<char> iterator_type;
+    
+    typedef features_generator<iterator_type> grammar_type;
+
+#ifdef HAVE_TLS
+    static __thread grammar_type* __grammar_tls = 0;
+    static boost::thread_specific_ptr<grammar_type > __grammar;
+#else
+    static utils::thread_specific_ptr<grammar_type > __grammar;
+#endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
+  };
   
   std::ostream& operator<<(std::ostream& os, const HyperGraph& graph)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+      
     typedef HyperGraph hypergraph_type;
     typedef hypergraph_type::rule_type rule_type;
 
@@ -392,27 +471,8 @@ namespace cicada
       os << "\"rules\"" << ": " << '[';
 
       // dump rule part...
-      
-      typedef std::ostream_iterator<char> iterator_type;
-      typedef rule_generator<iterator_type> grammar_type;
 
-#ifdef HAVE_TLS
-      static __thread grammar_type* __grammar_tls = 0;
-      static boost::thread_specific_ptr<grammar_type > __grammar;
-      
-      if (! __grammar_tls) {
-	__grammar.reset(new grammar_type());
-	__grammar_tls = __grammar.get();
-      }
-      
-      grammar_type& rule_grammar = *__grammar_tls;
-#else
-      static utils::thread_specific_ptr<grammar_type > __grammar;
-      if (! __grammar.get())
-	__grammar.reset(new grammar_type());
-      
-      grammar_type& rule_grammar = *__grammar;
-#endif
+      hypergraph_rule_generator_impl::grammar_type& grammar = hypergraph_rule_generator_impl::instance();
       
       bool initial_rule = true;
       
@@ -440,7 +500,7 @@ namespace cicada
 	      if (! initial_rule)
 		os << ", ";
 	      os << '\"';
-	      boost::spirit::karma::generate(iterator_type(os), rule_grammar, rule);
+	      karma::generate(hypergraph_rule_generator_impl::iterator_type(os), grammar, rule);
 	      os << '\"';
 	      
 	      initial_rule = false;
@@ -456,28 +516,8 @@ namespace cicada
     
     {
       os << "\"nodes\"" << ": " << '[';
-
-      typedef std::ostream_iterator<char> iterator_type;
-
-      typedef features_generator<iterator_type> grammar_type;
-
-#ifdef HAVE_TLS
-      static __thread grammar_type* __grammar_tls = 0;
-      static boost::thread_specific_ptr<grammar_type > __grammar;
       
-      if (! __grammar_tls) {
-	__grammar.reset(new grammar_type());
-	__grammar_tls = __grammar.get();
-      }
-      
-      grammar_type& features_grammar = *__grammar_tls;
-#else
-      static utils::thread_specific_ptr<grammar_type > __grammar;
-      if (! __grammar.get())
-	__grammar.reset(new grammar_type());
-      
-      grammar_type& features_grammar = *__grammar;
-#endif
+      hypergraph_feature_generator_impl::grammar_type& grammar = hypergraph_feature_generator_impl::instance();
       
       // dump nodes...
       bool initial_node = true;
@@ -509,7 +549,7 @@ namespace cicada
 	  
 	  if (! edge.features.empty()) {
 	    os << "\"feature\":{";
-	    boost::spirit::karma::generate(iterator_type(os), features_grammar, edge.features);
+	    karma::generate(hypergraph_feature_generator_impl::iterator_type(os), grammar, edge.features);
 	    os << "},";
 	  }
 	  

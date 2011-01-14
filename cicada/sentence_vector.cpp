@@ -64,30 +64,34 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
   
   bool SentenceVector::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
-    using namespace sentence_vector_impl;
-
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
     clear();
     if (iter == end) return true;
     
-    return boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, __sents);
+    return qi::phrase_parse(iter, end, sentence_vector_impl::instance(), standard::space, __sents);
   }
   
   std::ostream& operator<<(std::ostream& os, const SentenceVector& x)

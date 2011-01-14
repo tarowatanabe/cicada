@@ -173,25 +173,29 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
   
   bool Lattice::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
-    using namespace lattice_grammar_parser_impl;
-    
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
     clear();
     
@@ -200,7 +204,7 @@ namespace cicada
     
     std::string::const_iterator iter_back = iter;
     
-    if (boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, lattice)) {
+    if (qi::phrase_parse(iter, end, lattice_grammar_parser_impl::instance(), standard::space, lattice)) {
       initialize_distance();
       return true;
     } else {
@@ -283,30 +287,34 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+    
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
 
 
   std::ostream& operator<<(std::ostream& os, const Lattice& x)
   {
-    using namespace lattice_grammar_generator_impl;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
     
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
+    lattice_grammar_generator_impl::iterator_type iter(os);
     
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
-    
-    iterator_type iter(os);
-    
-    if (! boost::spirit::karma::generate(iter, grammar, x.lattice))
+    if (! karma::generate(iter, lattice_grammar_generator_impl::instance(), x.lattice))
       throw std::runtime_error("failed lattice generation!");
 
     return os;

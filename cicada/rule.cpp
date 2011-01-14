@@ -87,31 +87,35 @@ namespace cicada
 #else
     static utils::thread_specific_ptr<grammar_type > __grammar;
 #endif
+
+    static grammar_type& instance()
+    {
+#ifdef HAVE_TLS
+      if (! __grammar_tls) {
+	__grammar.reset(new grammar_type());
+	__grammar_tls = __grammar.get();
+      }
+      
+      return *__grammar_tls;
+#else
+      if (! __grammar.get())
+	__grammar.reset(new grammar_type());
+      
+      return *__grammar;
+#endif
+    }
   };
 
   bool Rule::assign(std::string::const_iterator& iter, std::string::const_iterator end)
   {
-    using namespace rule_impl;
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
     
-#ifdef HAVE_TLS
-    if (! __grammar_tls) {
-      __grammar.reset(new grammar_type());
-      __grammar_tls = __grammar.get();
-    }
-    
-    grammar_type& grammar = *__grammar_tls;
-#else
-    if (! __grammar.get())
-      __grammar.reset(new grammar_type());
-    
-    grammar_type& grammar = *__grammar;
-#endif
-
     clear();
-      
+    
     rule_parsed_type rule_parsed;
     
-    const bool result = boost::spirit::qi::phrase_parse(iter, end, grammar, boost::spirit::standard::space, rule_parsed);
+    const bool result = qi::phrase_parse(iter, end, rule_impl::instance(), standard::space, rule_parsed);
     if (result) {
       lhs = boost::fusion::get<0>(rule_parsed);
       if (lhs.empty())
