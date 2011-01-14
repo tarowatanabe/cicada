@@ -58,7 +58,7 @@ namespace cicada
     
     iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, karma::int_ << '-' << karma::int_, x))
+    if (! karma::generate(iter, karma::int_ << '-' << karma::int_, x))
       throw std::runtime_error("point generation failed...?");
     
     return os;
@@ -95,7 +95,7 @@ namespace cicada
     
     iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, -((karma::int_ << '-' << karma::int_) % ' '), x.__align))
+    if (! karma::generate(iter, -((karma::int_ << '-' << karma::int_) % ' '), x.__align))
       throw std::runtime_error("alignment generation failed...?");
     
     return os;

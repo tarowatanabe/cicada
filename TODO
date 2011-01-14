@@ -8,12 +8,6 @@ Do we allow state-less features applied during composition???
 	State-less features are sometimes related to composition algorithm,
 	such as shift-reduce etc.
 
-Support tree-to-tree transduction:
-	Support non-tree transducer matching:
-	match with phrases or hierarchical phrases whose spans match with
-	syntactic spans.
-	experimental code exits, but which do not support features/attributes in original hypergraph....
-
 Better MIRA training
     Optimized online training by combining MERT procedure to select better update ratio.... (does it work?)
 
@@ -21,6 +15,10 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     Simply convert source side into a flat structure and parse via CKY
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
+    
+Re-engineer tree-grammar/tree-transducer code:
+   Use special edge_tye to encapsulate edge-id so that we can differentiate
+   from a conventional "flat" tree-fragment, used in string-to-tree decoding.
 
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
@@ -47,7 +45,6 @@ Support word alignment training!
       We can potentially share by modifying "intersection"
   How to encode lexical feature...?
     use grammar! (source target word mapping with features!)
-  
 
 Added cicada_lexicon_{model1,dice} series for alignment training
   Do we add HMM models? Probably no, since we are primarily working with syntactic alignment
@@ -57,7 +54,3 @@ Support syntactic features for alignment composed forest:
 
 Add CONLL filter to conver into hypergraph
 
-
-remove static const Symbol from vocab:
-  Although cicada::Symbol behaves like POD, it relies on underlying storage...
-  I'm still not sure how to make it valgrind safe...

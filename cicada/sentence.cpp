@@ -51,7 +51,7 @@ namespace cicada
 
     iterator_type iter(os);
     
-    if (! boost::spirit::karma::generate(iter, -((+standard::char_) % ' '), x.__sent))
+    if (! karma::generate(iter, -((+standard::char_) % ' '), x.__sent))
       throw std::runtime_error("sentence generation failed...?");
     
     return os;
