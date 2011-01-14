@@ -32,11 +32,11 @@ you may encounter serious errors. (',' is a separator for index and category!)
 If your parser automatically modify tokens (like '(' => -LRB- etc.), you can use --map <file name>
 which will map the modified terminals into the original form, where "file name" is your original data
 used as an input to your parser.
-
 "--span" option will print spans each category covers. together with --category, you can dump span in
 first-last:category.
 
-Egret (another parser variant supporting English/Chinese) filter assume "parse forest" as its input.
+For forest output, we can use Charniak parser exteded with forest output or 
+Egret parser, another parser variant supporting English/Chinese.
 
 cicada_filter_charniak [options]
 options:
