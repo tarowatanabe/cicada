@@ -134,19 +134,6 @@ struct RulePair
 
   RulePair() : source(), target(), alignment(), count(0) {}
 
-  void inverse()
-  {
-    // inverse sourece and target side,
-    source.swap(target);
-    
-    // inverse alignment
-    alignment.inverse();
-    std::sort(alignment.begin(), alignment.end());
-    
-    // re-assign non-terminal index...
-    // TODO...
-    
-  }
 
   friend
   size_t hash_value(RulePair const& x)
@@ -751,9 +738,6 @@ struct ExtractGHKM
       for (rule_pair_list_type::iterator liter = rule_list.begin(); liter != liter_end; ++ liter) {
 	liter->count *= factor;
 	
-	if (swap_source_target)
-	  liter->inverse();
-	
 	std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
 	if (! result.second)
 	  const_cast<rule_pair_type&>(*(result.first)).count += liter->count;
@@ -939,14 +923,24 @@ struct ExtractGHKM
 	++ pos_src;
       }
 
+    if (swap_source_target) {
+      rule_pair.alignment.inverse();
+      std::sort(rule_pair.alignment.begin(), rule_pair.alignment.end());
+    }
+
     rule_pair.source.clear();
     rule_pair.target.clear();
     
     boost::iostreams::filtering_ostream os_source;
     boost::iostreams::filtering_ostream os_target;
-    
-    os_source.push(boost::iostreams::back_inserter(rule_pair.source));
-    os_target.push(boost::iostreams::back_inserter(rule_pair.target));
+
+    if (swap_source_target) {
+      os_source.push(boost::iostreams::back_inserter(rule_pair.target));
+      os_target.push(boost::iostreams::back_inserter(rule_pair.source));
+    } else {
+      os_source.push(boost::iostreams::back_inserter(rule_pair.source));
+      os_target.push(boost::iostreams::back_inserter(rule_pair.target));
+    }
     
     os_source << rule_source;
     os_target << rule_target;
