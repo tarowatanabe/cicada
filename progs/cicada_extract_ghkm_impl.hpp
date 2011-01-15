@@ -134,6 +134,20 @@ struct RulePair
 
   RulePair() : source(), target(), alignment(), count(0) {}
 
+  void inverse()
+  {
+    // inverse sourece and target side,
+    source.swap(target);
+    
+    // inverse alignment
+    alignment.inverse();
+    std::sort(alignment.begin(), alignment.end());
+    
+    // re-assign non-terminal index...
+    // TODO...
+    
+  }
+
   friend
   size_t hash_value(RulePair const& x)
   {
@@ -738,7 +752,7 @@ struct ExtractGHKM
 	liter->count *= factor;
 	
 	if (swap_source_target)
-	  liter->source.swap(liter->target);
+	  liter->inverse();
 	
 	std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(*liter);
 	if (! result.second)
