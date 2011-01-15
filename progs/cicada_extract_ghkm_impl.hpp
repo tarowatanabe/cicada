@@ -924,8 +924,12 @@ struct ExtractGHKM
       }
 
     if (swap_source_target) {
+      // inverse alignment
       rule_pair.alignment.inverse();
       std::sort(rule_pair.alignment.begin(), rule_pair.alignment.end());
+      
+      // re-assign index...
+      cicada::sort(rule_target, rule_source);
     }
 
     rule_pair.source.clear();
