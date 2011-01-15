@@ -533,8 +533,20 @@ class ExtractGHKM(Extract):
         
         self.counts = os.path.join(model_dir, "ghkm-counts")
 
-        self.data.append(corpus.source_forest)
-        self.data.append(corpus.target)
+        if os.path.exists(corpus.source_forest) and os.path.exists(corpus.target_forest):
+            raise ValueError, "both source and target forest.. we can extract string-to-tree or tree-to-string"
+        
+        tree_to_string = 1
+        if os.path.exists(corpus.target_forest):
+            tree_to_string = None
+            
+        if tree_to_string:
+            self.data.append(corpus.source_forest)
+            self.data.append(corpus.target)
+        else:
+            self.data.append(corpus.target_forest)
+            self.data.append(corpus.source)
+            
         self.logfile = "extract-ghkm.log"
         self.name = "extract-ghkm"
         
@@ -544,8 +556,16 @@ class ExtractGHKM(Extract):
         
         command = prog_name
         
-        command += " --source \"%s\"" %(corpus.source_forest)
-        command += " --target \"%s\"" %(corpus.target)
+        if tree_to_string:
+            command += " --source \"%s\"" %(corpus.source_forest)
+            command += " --target \"%s\"" %(corpus.target)
+        else:
+            ## strig-to-tree extraction...!
+            command += " --source \"%s\"" %(corpus.target_forest)
+            command += " --target \"%s\"" %(corpus.source)
+            command += " --inverse"
+            command += " --swap"
+            
         command += " --alignment \"%s\"" %(alignment.alignment)
         
         command += " --output \"%s\"" %(self.counts)
