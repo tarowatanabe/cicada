@@ -31,6 +31,8 @@
 #include <boost/shared_ptr.hpp>
 
 #include <cicada/hypergraph.hpp>
+#include <cicada/sentence.hpp>
+#include <cicada/vocab.hpp>
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -50,7 +52,44 @@ struct conll_type
   std::string deprel;
   phead_type  phead;
   std::string pdeprel;
+
+  conll_type() {}
+  conll_type(const size_type&   __id,
+	     const std::string& __form,
+	     const std::string& __lemma,
+	     const std::string& __cpostag,
+	     const std::string& __postag,
+	     const std::string& __feats,
+	     const size_type&   __head,
+	     const std::string& __deprel,
+	     const phead_type&  __phead,
+	     const std::string& __pdeprel)
+    : id(__id),
+      form(__form),
+      lemma(__lemma),
+      cpostag(__cpostag),
+      feats(__feats),
+      head(__head),
+      deprel(__deprel),
+      phead(__phead),
+      pdeprel(__pdeprel) {}
 };
+
+BOOST_FUSION_ADAPT_STRUCT(
+			  conll_type,
+			  (conll_type::size_type,   id)
+			  (std::string, form)
+			  (std::string, lemma)
+			  (std::string, cpostag)
+			  (std::string, postag)
+			  (std::string, feats)
+			  (conll_type::size_type, head)
+			  (std::string, deprel)
+			  (conll_type::phead_type, phead)
+			  (std::string, pdeprel)
+			  )
+
+typedef std::vector<conll_type, std::allocator<conll_type> > conll_set_type;
 
 template <typename Iterator>
 struct conll_parser : boost::spirit::qi::grammar<Iterator, conll_set_type(), boost::spirit::standard::blank_type>
@@ -63,14 +102,223 @@ struct conll_parser : boost::spirit::qi::grammar<Iterator, conll_set_type(), boo
     token %= qi::lexeme[+(standard::char_ - standard::space)];
     
     conll  %= size >> token >> token >> token >> token >> token >> size >> token >> (size | token) >> token >> qi::eol;
-    conlls %= *conll >> (qi::eol | qi::eoi);
+    conlls %= *conll >> qi::eol;
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
   
-  boost::spirit::qi::uint_parser<size_type, 10, 1, -1>            size;
+  boost::spirit::qi::uint_parser<conll_type::size_type, 10, 1, -1>            size;
   boost::spirit::qi::rule<Iterator, std::string(), blank_type>    token;
   boost::spirit::qi::rule<Iterator, conll_type(), blank_type>     conll;
   boost::spirit::qi::rule<Iterator, conll_set_type(), blank_type> conlls;
   
 };
+
+typedef boost::filesystem::path path_type;
+typedef cicada::HyperGraph hypergraph_type;
+typedef cicada::Sentence   sentence_type;
+typedef cicada::Vocab      vocab_type;
+typedef cicada::Symbol     word_type;
+
+typedef std::vector<conll_type::size_type, std::allocator<conll_type::size_type> > index_set_type;
+typedef std::vector<index_set_type, std::allocator<index_set_type> > dependency_type;
+
+typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
+typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
+typedef sentence_type phrase_type;
+
+path_type input_file = "-";
+path_type output_file = "-";
+
+std::string goal = "[s]";
+std::string non_terminal = "[x]";
+bool pos_mode = false;
+bool leaf_mode = false;
+
+int debug = 0;
+
+void options(int argc, char** argv);
+
+int main(int argc, char** argv)
+{
+  try {
+    options(argc, argv);
+    
+    typedef boost::spirit::istream_iterator iter_type;
+    
+    utils::compress_istream is(input_file, 1024 * 1024);
+    utils::compress_ostream os(output_file);
+    is.unsetf(std::ios::skipws);
+    
+    conll_parser<iter_type> parser;
+    
+    conll_set_type conlls;
+    hypergraph_type hypergraph;
+    dependency_type dependency;
+    node_map_type   node_map;
+
+    word_type __goal(goal);
+    word_type __non_terminal(non_terminal);
+    
+    tail_set_type   tails;
+    phrase_type     phrase;
+    
+    std::string line;
+    iter_type iter(is);
+    iter_type iter_end;
+
+    int num = 0;
+    while (iter != iter_end) {
+      conlls.clear();
+      
+      if (debug)
+	std::cerr << "parsing: " << num << std::endl;
+      
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conlls))
+	throw std::runtime_error("parsing failed");
+      
+      if (debug >= 2) {
+	std::cerr << "size: " << conlls.size();
+	
+	conll_set_type::const_iterator citer_end = conlls.end();
+	for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end; ++ citer)
+	  std::cerr << ' ' << citer->form;
+	std::cerr << std::endl;
+      }
+
+      ++ num;
+      
+      hypergraph.clear();
+      
+      if (conlls.empty()) {
+	os << hypergraph << '\n';
+	continue;
+      }
+      
+      dependency.clear();
+      dependency.resize(conlls.size() + 1);
+
+      node_map.clear();
+      node_map.resize(conlls.size() + 1, hypergraph_type::invalid);
+      
+      conll_set_type::const_iterator citer_end = conlls.end();
+      for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end; ++ citer)
+	dependency[citer->head].push_back(citer->id);
+      
+      if (! dependency[0].empty()) {
+	tails.clear();
+	phrase.clear();
+	
+	for (size_t i = 0; i != dependency[0].size(); ++ i) {
+	  const size_t antecedent = dependency[0][i];
+	  
+	  if (node_map[antecedent] == hypergraph_type::invalid)
+	    node_map[antecedent] = hypergraph.add_node().id;
+	  
+	  tails.push_back(node_map[antecedent]);
+	  phrase.push_back(pos_mode
+			   ? word_type('[' + conlls[antecedent - 1].cpostag + ']')
+			   : __non_terminal);
+	}
+	
+	if (node_map[0] == hypergraph_type::invalid)
+	  node_map[0] = hypergraph.add_node().id;
+	
+	hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
+	edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(__goal, phrase.begin(), phrase.end()));
+	
+	hypergraph.connect_edge(edge.id, node_map[0]);
+	hypergraph.goal = node_map[0];
+      }
+      
+      for (size_t id = 1; id != dependency.size(); ++ id) {
+	// list of edges in dependency[citer->head]
+
+	tails.clear();
+	phrase.clear();
+	
+	index_set_type::const_iterator iiter_begin = dependency[id].begin();
+	index_set_type::const_iterator iiter_end   = dependency[id].end();
+	index_set_type::const_iterator iiter_lex   = std::lower_bound(iiter_begin, iiter_end, id);
+	
+	for (index_set_type::const_iterator iiter = iiter_begin; iiter != iiter_lex; ++ iiter) {
+	  const size_t antecedent = *iiter;
+	  
+	  if (node_map[antecedent] == hypergraph_type::invalid)
+	    node_map[antecedent] = hypergraph.add_node().id;
+	  
+	  tails.push_back(node_map[antecedent]);
+	  phrase.push_back(pos_mode
+			   ? word_type('[' + conlls[antecedent - 1].cpostag + ']')
+			   : __non_terminal);
+	}
+	
+	phrase.push_back(conlls[id - 1].form);
+	
+	for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
+	  const size_t antecedent = *iiter;
+	  
+	  if (node_map[antecedent] == hypergraph_type::invalid)
+	    node_map[antecedent] = hypergraph.add_node().id;
+	  
+	  tails.push_back(node_map[antecedent]);
+	  phrase.push_back(pos_mode
+			   ? word_type('[' + conlls[antecedent - 1].cpostag + ']')
+			   : __non_terminal);
+	}
+	
+	if (node_map[id] == hypergraph_type::invalid)
+	  node_map[id] = hypergraph.add_node().id;
+
+	const word_type lhs = (pos_mode 
+			       ? word_type('[' + conlls[id - 1].cpostag + ']')
+			       : __non_terminal);
+			       
+	hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
+	edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, phrase.begin(), phrase.end()));
+	
+	hypergraph.connect_edge(edge.id, node_map[id]);
+      }
+      
+      if (! hypergraph.nodes.empty() && hypergraph.is_valid())
+	hypergraph.topologically_sort();
+      
+      os << hypergraph << '\n';
+    }
+  }
+  catch (const std::exception& err) {
+    std::cerr << "error: " << err.what() << std::endl;
+    return 1;
+  }
+  return 0;
+}
+  
+
+void options(int argc, char** argv)
+{
+  namespace po = boost::program_options;
+  
+  po::options_description desc("options");
+  desc.add_options()
+    ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+    ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
+
+    ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
+    ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
+
+    ("pos",     po::bool_switch(&pos_mode),  "use pos as non-temrinal")
+    ("leaf",    po::bool_switch(&leaf_mode), "collect leaf nodes only")
+    
+    ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
+        
+    ("help", "help message");
+  
+  po::variables_map vm;
+  po::store(po::parse_command_line(argc, argv, desc, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), vm);
+  po::notify(vm);
+  
+  if (vm.count("help")) {
+    std::cout << argv[0] << " [options]" << '\n' << desc << '\n';
+    exit(0);
+  }
+}

@@ -43,6 +43,7 @@ bin_PROGRAMS = \
 	cicada_filter_extract_scfg \
 	cicada_filter_kbest \
 	cicada_filter_charniak \
+	cicada_filter_conll \
 	cicada_filter_penntreebank \
 	cicada_index_cluster \
 	cicada_index_grammar \
@@ -123,6 +124,9 @@ cicada_extract_tree_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boo
 
 cicada_filter_charniak_SOURCES = cicada_filter_charniak.cpp
 cicada_filter_charniak_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_conll_SOURCES = cicada_filter_conll.cpp
+cicada_filter_conll_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_penntreebank_SOURCES = cicada_filter_penntreebank.cpp
 cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

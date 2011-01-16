@@ -255,6 +255,8 @@ int main(int argc, char** argv)
 	forest.sentence.swap(sentence);
       }
       
+      ++ num;
+      
       if (forest.sentence.empty() || forest.items.empty()) {
 	os << hypergraph << '\n';
 	continue;
@@ -334,8 +336,6 @@ int main(int argc, char** argv)
       }
       
       os << hypergraph << '\n';
-      
-      ++ num;
     }
   }
   catch (const std::exception& err) {
