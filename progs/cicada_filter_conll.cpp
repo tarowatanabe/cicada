@@ -164,6 +164,12 @@ int main(int argc, char** argv)
 
     symbol_type __goal(goal);
     symbol_type __non_terminal(non_terminal);
+
+    if (! __goal.is_non_terminal())
+      throw std::runtime_error(goal + " is not a non-terminal");
+    
+    if (! __non_terminal.is_non_terminal())
+      throw std::runtime_error(non_terminal + " is not a non-terminal");
     
     tail_set_type   tails;
     phrase_type     phrase;

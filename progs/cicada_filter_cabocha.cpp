@@ -85,7 +85,13 @@ int main(int argc, char** argv)
     tokens_type tokens;
 
     symbol_type __goal(goal);
-    symbol_type __x(non_terminal);
+    symbol_type __non_terminal(non_terminal);
+    
+    if (! __goal.is_non_terminal())
+      throw std::runtime_error(goal + " is not a non-terminal");
+    
+    if (! __non_terminal.is_non_terminal())
+      throw std::runtime_error(non_terminal + " is not a non-terminal");
     
     while (std::getline(is, line)) {
       tokenizer_type tokenizer(line);
@@ -177,19 +183,19 @@ int main(int argc, char** argv)
 	    for (int id = 0; id < static_cast<int>(nodes.size()); ++ id) {
 	      if (nodes[id].pos == node_id) {
 		tails.push_back(graph.add_node().id);
-		symbols.push_back(pos_mode ? nodes[id].cat : __x);
+		symbols.push_back(pos_mode ? nodes[id].cat : __non_terminal);
 		
 		queue.push_back(std::make_pair(tails.back(), id));
 	      } else if (id == node_id) {
 		tails.push_back(nodes[id].id);
-		symbols.push_back(pos_mode ? nodes[id].cat : __x);
+		symbols.push_back(pos_mode ? nodes[id].cat : __non_terminal);
 	      }
 	    }
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 	    edge.rule = rule_type::create(rule_type(static_cast<hypergraph_type::id_type>(parent_id) == graph.goal
 						    ? __goal
-						    : (pos_mode ? nodes[node_id].cat : __x),
+						    : (pos_mode ? nodes[node_id].cat : __non_terminal),
 						    symbols.begin(), symbols.end()));
 	    graph.connect_edge(edge.id, parent_id);
 	  }
