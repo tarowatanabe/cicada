@@ -119,6 +119,7 @@ typedef cicada::HyperGraph hypergraph_type;
 typedef cicada::Sentence   sentence_type;
 typedef cicada::Vocab      vocab_type;
 typedef cicada::Symbol     word_type;
+typedef cicada::Symbol     symbol_type;
 
 typedef std::vector<conll_type::size_type, std::allocator<conll_type::size_type> > index_set_type;
 typedef std::vector<index_set_type, std::allocator<index_set_type> > dependency_type;
@@ -133,6 +134,7 @@ path_type output_file = "-";
 std::string goal = "[s]";
 std::string non_terminal = "[x]";
 bool pos_mode = false;
+bool relation_mode = false;
 bool leaf_mode = false;
 
 int debug = 0;
@@ -143,6 +145,9 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+    
+    if (pos_mode && relation_mode)
+      throw std::runtime_error("either pos or relation or none");
     
     typedef boost::spirit::istream_iterator iter_type;
     
@@ -157,11 +162,12 @@ int main(int argc, char** argv)
     dependency_type dependency;
     node_map_type   node_map;
 
-    word_type __goal(goal);
-    word_type __non_terminal(non_terminal);
+    symbol_type __goal(goal);
+    symbol_type __non_terminal(non_terminal);
     
     tail_set_type   tails;
     phrase_type     phrase;
+    phrase_type     non_terminals;
     
     std::string line;
     iter_type iter(is);
@@ -177,16 +183,23 @@ int main(int argc, char** argv)
       if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, conlls))
 	throw std::runtime_error("parsing failed");
       
-      if (debug >= 2) {
-	std::cerr << "size: " << conlls.size();
-	
-	conll_set_type::const_iterator citer_end = conlls.end();
-	for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end; ++ citer)
-	  std::cerr << ' ' << citer->form;
-	std::cerr << std::endl;
-      }
+      if (debug >= 2)
+	std::cerr << "size: " << conlls.size() << std::endl;
 
       ++ num;
+      
+      if (leaf_mode) {
+	if (! conlls.empty()) {
+	  conll_set_type::const_iterator citer_end = conlls.end();
+	  for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end - 1; ++ citer)
+	    os << citer->form << ' ';
+	  os << conlls.back().form;
+	}
+	os << '\n';
+	
+	continue;
+      }
+
       
       hypergraph.clear();
       
@@ -200,10 +213,22 @@ int main(int argc, char** argv)
 
       node_map.clear();
       node_map.resize(conlls.size() + 1, hypergraph_type::invalid);
+
+      non_terminals.clear();
+      non_terminals.push_back(__goal);
+	
       
       conll_set_type::const_iterator citer_end = conlls.end();
-      for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end; ++ citer)
+      for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end; ++ citer) {
 	dependency[citer->head].push_back(citer->id);
+	
+	if (pos_mode)
+	  non_terminals.push_back('[' + citer->cpostag + ']');
+	else if (relation_mode)
+	  non_terminals.push_back('[' + citer->deprel + ']');
+	else
+	  non_terminals.push_back(__non_terminal);
+      }
       
       if (! dependency[0].empty()) {
 	tails.clear();
@@ -216,16 +241,14 @@ int main(int argc, char** argv)
 	    node_map[antecedent] = hypergraph.add_node().id;
 	  
 	  tails.push_back(node_map[antecedent]);
-	  phrase.push_back(pos_mode
-			   ? word_type('[' + conlls[antecedent - 1].cpostag + ']')
-			   : __non_terminal);
+	  phrase.push_back(non_terminals[antecedent]);
 	}
 	
 	if (node_map[0] == hypergraph_type::invalid)
 	  node_map[0] = hypergraph.add_node().id;
 	
 	hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
-	edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(__goal, phrase.begin(), phrase.end()));
+	edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(non_terminals[0], phrase.begin(), phrase.end()));
 	
 	hypergraph.connect_edge(edge.id, node_map[0]);
 	hypergraph.goal = node_map[0];
@@ -248,9 +271,7 @@ int main(int argc, char** argv)
 	    node_map[antecedent] = hypergraph.add_node().id;
 	  
 	  tails.push_back(node_map[antecedent]);
-	  phrase.push_back(pos_mode
-			   ? word_type('[' + conlls[antecedent - 1].cpostag + ']')
-			   : __non_terminal);
+	  phrase.push_back(non_terminals[antecedent]);
 	}
 	
 	phrase.push_back(conlls[id - 1].form);
@@ -262,17 +283,13 @@ int main(int argc, char** argv)
 	    node_map[antecedent] = hypergraph.add_node().id;
 	  
 	  tails.push_back(node_map[antecedent]);
-	  phrase.push_back(pos_mode
-			   ? word_type('[' + conlls[antecedent - 1].cpostag + ']')
-			   : __non_terminal);
+	  phrase.push_back(non_terminals[antecedent]);
 	}
 	
 	if (node_map[id] == hypergraph_type::invalid)
 	  node_map[id] = hypergraph.add_node().id;
 
-	const word_type lhs = (pos_mode 
-			       ? word_type('[' + conlls[id - 1].cpostag + ']')
-			       : __non_terminal);
+	const symbol_type& lhs = non_terminals[id];
 			       
 	hypergraph_type::edge_type& edge = hypergraph.add_edge(tails.begin(), tails.end());
 	edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, phrase.begin(), phrase.end()));
@@ -306,8 +323,9 @@ void options(int argc, char** argv)
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
 
-    ("pos",     po::bool_switch(&pos_mode),  "use pos as non-temrinal")
-    ("leaf",    po::bool_switch(&leaf_mode), "collect leaf nodes only")
+    ("pos",      po::bool_switch(&pos_mode),      "use pos as non-terminal")
+    ("relation", po::bool_switch(&relation_mode), "use relation as non-terminal")
+    ("leaf",     po::bool_switch(&leaf_mode),     "collect leaf nodes only")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         

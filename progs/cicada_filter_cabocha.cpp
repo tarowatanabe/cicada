@@ -247,7 +247,7 @@ void options(int argc, char** argv)
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
     
-    ("pos",     po::bool_switch(&pos_mode),  "use pos as non-temrinal")
+    ("pos",     po::bool_switch(&pos_mode),  "use pos as non-terminal")
     ("leaf",    po::bool_switch(&leaf_mode), "collect leaf nodes only")
     
     ("help", "help message");
