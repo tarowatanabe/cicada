@@ -10,7 +10,7 @@ int main(int argc, char** argv)
   typedef std::vector<cicada::Symbol> node_set_type;
   typedef std::vector<node_set_type> hyperpath_type;
 
-  typedef cicada::TreeGrammarMutable::edge_id_type edge_id_type;
+  typedef cicada::TreeGrammarMutable::edge_type edge_type;
   typedef cicada::TreeGrammarMutable::id_type id_type;
   
   if (argc < 2) {
@@ -37,7 +37,7 @@ int main(int argc, char** argv)
     rule.hyperpath(hyperpath);
 
     id_type id = grammar.root();
-    const edge_id_type edge_none = grammar.edge(cicada::Vocab::NONE);
+    const edge_type edge_none = grammar.edge(cicada::Vocab::NONE);
     
     hyperpath_type::const_iterator piter_end = hyperpath.end();
     for (hyperpath_type::const_iterator piter = hyperpath.begin(); piter != piter_end; ++ piter) {
@@ -47,9 +47,9 @@ int main(int argc, char** argv)
       node_set_type::const_iterator niter_end = piter->end();
       for (node_set_type::const_iterator niter = piter->begin(); niter != niter_end; ++ niter) 
 	if (*niter == cicada::Vocab::NONE) {
-	  const edge_id_type edge_id = grammar.edge(&(*nodes.begin()), &(*nodes.end()));
+	  const edge_type edge_id = grammar.edge(&(*nodes.begin()), &(*nodes.end()));
 	  
-	  if (edge_id == edge_id_type(-1))
+	  if (edge_id == edge_type())
 	    id = grammar.root();
 	  else
 	    id = grammar.next(id, edge_id);

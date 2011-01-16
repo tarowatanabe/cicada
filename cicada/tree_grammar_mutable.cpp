@@ -495,29 +495,29 @@ namespace cicada
     return transducer_ptr_type(new TreeGrammarMutable(*this));
   }
   
-  TreeGrammarMutable::edge_id_type TreeGrammarMutable::edge(const symbol_type& symbol) const
+  TreeGrammarMutable::edge_type TreeGrammarMutable::edge(const symbol_type& symbol) const
   {
     impl_type::edge_id_type node = pimpl->edges.find(pimpl->edges.root(), symbol.non_terminal());
 
-    return (node != pimpl->edges.npos() ? node : edge_id_type(-1));
+    return (node != pimpl->edges.npos() ? node : edge_type::id_type(-1));
   }
   
-  TreeGrammarMutable::edge_id_type TreeGrammarMutable::edge(const symbol_set_type& symbols) const
+  TreeGrammarMutable::edge_type TreeGrammarMutable::edge(const symbol_set_type& symbols) const
   {
     return edge(&(*symbols.begin()), &(*symbols.end()));
   }
   
-  TreeGrammarMutable::edge_id_type TreeGrammarMutable::edge(const symbol_type* first, const symbol_type* last) const
+  TreeGrammarMutable::edge_type TreeGrammarMutable::edge(const symbol_type* first, const symbol_type* last) const
   {
     impl_type::edge_id_type node = pimpl->edges.root();
     for (/**/; first != last; ++ first) {
       node = pimpl->edges.find(node, first->non_terminal());
       
       if (node == pimpl->edges.npos())
-	return edge_id_type(-1);
+	return edge_type();
     }
     
-    return (node != pimpl->edges.npos() ? node : edge_id_type(-1));
+    return (node != pimpl->edges.npos() ? node : edge_type::id_type(-1));
   }
 
 
@@ -526,9 +526,9 @@ namespace cicada
     return pimpl->root();
   }
   
-  TreeGrammarMutable::id_type TreeGrammarMutable::next(const id_type& node, const edge_id_type& edge) const
+  TreeGrammarMutable::id_type TreeGrammarMutable::next(const id_type& node, const edge_type& edge) const
   {
-    return pimpl->next(node, edge);
+    return pimpl->next(node, edge.id);
   }
   
   bool TreeGrammarMutable::has_next(const id_type& node) const

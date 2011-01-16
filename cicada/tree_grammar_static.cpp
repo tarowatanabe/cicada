@@ -1030,31 +1030,31 @@ namespace cicada
     return transducer_ptr_type(new TreeGrammarStatic(*this));
   }
   
-  TreeGrammarStatic::edge_id_type TreeGrammarStatic::edge(const symbol_type& symbol) const
+  TreeGrammarStatic::edge_type TreeGrammarStatic::edge(const symbol_type& symbol) const
   {
     const id_type node = pimpl->find_edge(symbol.non_terminal(), 0);
     
-    return (pimpl->is_valid_edge(node) && pimpl->exists_edge(node) ? pimpl->edge_db[node] : edge_id_type(-1));
+    return (pimpl->is_valid_edge(node) && pimpl->exists_edge(node) ? pimpl->edge_db[node] : edge_type::id_type(-1));
   }
 
   
   
-  TreeGrammarStatic::edge_id_type TreeGrammarStatic::edge(const symbol_set_type& symbols) const
+  TreeGrammarStatic::edge_type TreeGrammarStatic::edge(const symbol_set_type& symbols) const
   {
     return edge(&(*symbols.begin()), &(*symbols.end()));
   }
   
-  TreeGrammarStatic::edge_id_type TreeGrammarStatic::edge(const symbol_type* first, const symbol_type* last) const
+  TreeGrammarStatic::edge_type TreeGrammarStatic::edge(const symbol_type* first, const symbol_type* last) const
   {
     id_type node = 0;
     for (/**/; first != last; ++ first) {
       node = pimpl->find_edge(first->non_terminal(), node);
       
       if (! pimpl->is_valid_edge(node))
-	return edge_id_type(-1);
+	return edge_type::id_type(-1);
     }
     
-    return (pimpl->is_valid_edge(node) && pimpl->exists_edge(node) ? pimpl->edge_db[node] : edge_id_type(-1));
+    return (pimpl->is_valid_edge(node) && pimpl->exists_edge(node) ? pimpl->edge_db[node] : edge_type::id_type(-1));
   }
 
 
@@ -1063,9 +1063,9 @@ namespace cicada
     return 0;
   }
   
-  TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const edge_id_type& edge) const
+  TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const edge_type& edge) const
   {
-    const impl_type::size_type pos = pimpl->find(edge, node);
+    const impl_type::size_type pos = pimpl->find(edge.id, node);
     
     return (pimpl->is_valid(pos) ? id_type(pos) : id_type(0));
   }

@@ -86,7 +86,7 @@ namespace cicada
     typedef tree_transducer_type::rule_type          tree_rule_type;
     typedef tree_transducer_type::rule_ptr_type      tree_rule_ptr_type;
     
-    typedef std::vector<tree_transducer_type::edge_id_type, std::allocator<tree_transducer_type::edge_id_type> > edge_set_type;
+    typedef std::vector<tree_transducer_type::edge_type, std::allocator<tree_transducer_type::edge_type> > edge_set_type;
     
     typedef std::vector<tree_transducer_type::id_type, std::allocator<tree_transducer_type::id_type> > node_queue_type;
     
@@ -303,12 +303,12 @@ namespace cicada
 	//std::cerr << "transducer: " << grammar_id << std::endl;
 	
 	const symbol_type cat = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
-	const tree_transducer_type::edge_id_type edge_id = transducer.edge(cat);
+	const tree_transducer_type::edge_type edge_id = transducer.edge(cat);
 	
-	if (edge_id == tree_transducer_type::edge_id_type(-1)) continue;
+	if (edge_id == tree_transducer_type::edge_type()) continue;
 	
-	const tree_transducer_type::edge_id_type edge_epsilon = transducer.edge(vocab_type::EPSILON);
-	const tree_transducer_type::edge_id_type edge_none    = transducer.edge(vocab_type::NONE);
+	const tree_transducer_type::edge_type edge_epsilon = transducer.edge(vocab_type::EPSILON);
+	const tree_transducer_type::edge_type edge_none    = transducer.edge(vocab_type::NONE);
 	
 	tree_transducer_type::id_type node = transducer.next(transducer.root(), edge_id);
 	if (node == transducer.root()) continue;
@@ -374,8 +374,8 @@ namespace cicada
 	      edge_set_type::const_iterator eiter_begin = edges.begin();
 	      edge_set_type::const_iterator eiter_end = edges.end();
 	      for (edge_set_type::const_iterator eiter = eiter_begin; eiter != eiter_end; ++ eiter)
-		if (*eiter != tree_transducer_type::edge_id_type(-1)) {
-		  const tree_transducer_type::edge_id_type& edge_id = *eiter;
+		if (*eiter != tree_transducer_type::edge_type()) {
+		  const tree_transducer_type::edge_type& edge_id = *eiter;
 		  
 		  const tree_transducer_type::size_type node_edge = transducer.next(*titer, edge_id);
 		  if (node_edge != transducer.root()) {

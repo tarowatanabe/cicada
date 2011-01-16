@@ -22,6 +22,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <utils/hashmurmur.hpp>
+
 namespace cicada
 {
   
@@ -69,8 +71,17 @@ namespace cicada
     
     // 64-bit id type!
     typedef uint64_t id_type;
-    typedef uint32_t edge_id_type;
-
+    
+    struct edge_type
+    {
+      typedef uint32_t id_type;
+      
+      edge_type() : id(id_type(-1)) {}
+      edge_type(const id_type& __id) : id(__id) {}
+      
+      id_type id;
+    };
+    
     typedef TreeTransducer transducer_type;
     typedef boost::shared_ptr<transducer_type> transducer_ptr_type;
     
@@ -79,17 +90,60 @@ namespace cicada
     virtual transducer_ptr_type clone() const = 0;
 
     // operation over edges...
-    virtual edge_id_type edge(const symbol_type& symbol) const = 0;
-    virtual edge_id_type edge(const symbol_set_type& symbols) const = 0;
-    virtual edge_id_type edge(const symbol_type* first, const symbol_type* last) const = 0;
+    virtual edge_type edge(const symbol_type& symbol) const = 0;
+    virtual edge_type edge(const symbol_set_type& symbols) const = 0;
+    virtual edge_type edge(const symbol_type* first, const symbol_type* last) const = 0;
     
     // operation over nodes...
     virtual id_type root() const = 0;
-    virtual id_type next(const id_type& node, const edge_id_type& edge) const = 0;
+    virtual id_type next(const id_type& node, const edge_type& edge) const = 0;
     virtual bool has_next(const id_type& node) const = 0;
     virtual const rule_pair_set_type& rules(const id_type& node) const = 0;
   };
   
+  
+  inline
+  size_t hash_value(TreeTransducer::edge_type const& x)
+  {
+    return utils::hashmurmur<size_t>()(x.id);
+  }
+
+  
+  inline
+  bool operator==(const TreeTransducer::edge_type& x, const TreeTransducer::edge_type& y)
+  {
+    return x.id == y.id;
+  }
+
+  inline
+  bool operator!=(const TreeTransducer::edge_type& x, const TreeTransducer::edge_type& y)
+  {
+    return x.id != y.id;
+  }
+
+  inline
+  bool operator<(const TreeTransducer::edge_type& x, const TreeTransducer::edge_type& y)
+  {
+    return x.id < y.id;
+  }
+  
+  inline
+  bool operator>(const TreeTransducer::edge_type& x, const TreeTransducer::edge_type& y)
+  {
+    return x.id > y.id;
+  }
+
+  inline
+  bool operator<=(const TreeTransducer::edge_type& x, const TreeTransducer::edge_type& y)
+  {
+    return x.id <= y.id;
+  }
+  
+  inline
+  bool operator>=(const TreeTransducer::edge_type& x, const TreeTransducer::edge_type& y)
+  {
+    return x.id >= y.id;
+  }
   
 };
 
