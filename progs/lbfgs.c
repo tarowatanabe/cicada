@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-/* $Id: lbfgs.c 65 2010-01-29 12:19:16Z naoaki $ */
+/* $Id$ */
 
 /*
 This library is a C port of the FORTRAN implementation of Limited-memory
@@ -65,6 +65,7 @@ licence.
 #include <config.h>
 #endif/*HAVE_CONFIG_H*/
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -73,7 +74,6 @@ licence.
 
 #ifdef  _MSC_VER
 #define inline  __inline
-typedef unsigned int uint32_t;
 #endif/*_MSC_VER*/
 
 #if     defined(USE_SSE) && defined(__SSE2__) && LBFGS_FLOAT == 64
@@ -290,7 +290,7 @@ int lbfgs(
     if (n % 8 != 0) {
         return LBFGSERR_INVALID_N_SSE;
     }
-    if (((unsigned short)x & 0x000F) != 0) {
+    if ((uintptr_t)(const void*)x % 16 != 0) {
         return LBFGSERR_INVALID_X_SSE;
     }
 #endif/*defined(USE_SSE)*/
@@ -490,7 +490,7 @@ int lbfgs(
 
         /* Report the progress. */
         if (cd.proc_progress) {
-            if (ret = cd.proc_progress(cd.instance, x, g, fx, xnorm, gnorm, step, cd.n, k, ls)) {
+            if ((ret = cd.proc_progress(cd.instance, x, g, fx, xnorm, gnorm, step, cd.n, k, ls))) {
                 goto lbfgs_exit;
             }
         }
@@ -656,8 +656,8 @@ static int line_search_backtracking(
     const lbfgs_parameter_t *param
     )
 {
-    int ret = 0, count = 0;
-    lbfgsfloatval_t width, dg, norm = 0.;
+    int count = 0;
+    lbfgsfloatval_t width, dg;
     lbfgsfloatval_t finit, dginit = 0., dgtest;
     const lbfgsfloatval_t dec = 0.5, inc = 2.1;
 
@@ -749,7 +749,7 @@ static int line_search_backtracking_owlqn(
     const lbfgs_parameter_t *param
     )
 {
-    int i, ret = 0, count = 0;
+    int i, count = 0;
     lbfgsfloatval_t width = 0.5, norm = 0.;
     lbfgsfloatval_t finit = *f, dgtest;
 

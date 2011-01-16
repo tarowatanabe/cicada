@@ -23,7 +23,7 @@
  * THE SOFTWARE.
  */
 
-/* $Id: arithmetic_ansi.h 65 2010-01-29 12:19:16Z naoaki $ */
+/* $Id$ */
 
 #include <stdlib.h>
 #include <memory.h>
