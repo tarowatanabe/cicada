@@ -1,9 +1,11 @@
 2011-1-17
 Support tree-to-string translation (probably, the code will work for tree-to-tree)
+Added sort-tail operation which sort tails by its order in rule's non-terminal index.
 Added lexicon learning (dice and model1 via cicada_lexicon_{dice,model1}) and lexicon model learning from word alignment (cicada_lexicon)
 Added word-cluster learning (cicada_cluster_word)
 Added filter for forest-charniak and egret (cicada_filter_charniak) and CONLL-X (cicada_filter_conll)
 Added moses compatible extraction script (cicada-extract.py)
+Added string-to-tree GHKM extraction by flipping source/target side in tree-to-string extraction
 
 2010-12-22
 Added new API for mt-evaluation score allowing ascii-dumping by desciption/encode and recovery by decode.

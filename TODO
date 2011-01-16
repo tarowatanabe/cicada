@@ -27,8 +27,6 @@ Systematic symbols:
 Add head-finder?
     Head finder requires child/parent node, therefore, requires the whole hypergraph...
 
-Add alignment tool, which can read GIZA++ output and dump heuristic alignment?
-
 Re-engineer kbest/viterbi framework...
   I don't like current interface, separating weight and derivation
   Is there a workaround, like use iterator-based enumeration?
@@ -45,12 +43,4 @@ Support word alignment training!
       We can potentially share by modifying "intersection"
   How to encode lexical feature...?
     use grammar! (source target word mapping with features!)
-
-Added cicada_lexicon_{model1,dice} series for alignment training
-  Do we add HMM models? Probably no, since we are primarily working with syntactic alignment
-
-Support syntactic features for alignment composed forest:
-  Basic idea is to use "target-pos" to grab target-word position + assigned sentence
-
-Add CONLL filter to conver into hypergraph
 
