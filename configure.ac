@@ -342,6 +342,9 @@ AC_CHECK_HEADERS([fcntl.h malloc.h stdint.h stdlib.h sys/time.h unistd.h])
 # hasn_{map,set}
 AC_CHECK_HEADERS([tr1/unordered_map tr1/unordered_set ext/hash_map ext/hash_set hash_map hash_set])
 
+## SSE related...
+AC_CHECK_HEADERS([mm_malloc.h xmmintrin.h nmmintrin.h emmintrin.h tmmintrin.h ammintrin.h bmmintrin.h])
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL
 AC_C_INLINE
