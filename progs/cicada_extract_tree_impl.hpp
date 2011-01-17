@@ -1625,7 +1625,8 @@ struct Task
     bitext_type bitext;
     rule_pair_set_type rule_pairs;
     
-    const int iteration_mask = (1 << 10) - 1;
+    const int iteration_mask = (1 << 6) - 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     
     for (int iter = 0;/**/; ++ iter) {
       queue.pop_swap(bitext);
@@ -1634,7 +1635,7 @@ struct Task
       
       extractor(bitext.source, bitext.target, bitext.alignment, rule_pairs);
       
-      if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > size_t(max_malloc * 1024 * 1024 * 1024))) {
+      if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
 	dump(rule_pairs);
 	rule_pairs.clear();
       }
