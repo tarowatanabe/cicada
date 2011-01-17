@@ -103,6 +103,7 @@ int main(int argc, char** argv)
 	    
 	    // compute span_pos from antecedent node...
 	    
+	    rhs.push_back(*riter);
 	    span_pos = spans[hypergraph.nodes[edge.tails[non_terminal_pos]].edges.front()].second;
 	  } else if (*riter != vocab_type::EPSILON) {
 	    rhs.push_back(sentence[span_pos]);
