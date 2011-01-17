@@ -44,3 +44,10 @@ Support word alignment training!
   How to encode lexical feature...?
     use grammar! (source target word mapping with features!)
 
+Reimplement cicada-learn-online:
+  Distribute sentences and oracle translations first, then, run online learning
+  instead of distributing sentences on the fly... This will potentially speed up
+  learning at the cost of slow decoding at some sentences... We can potentially avoid this by 
+  sorting training data wrt its length.
+  
+  or, implement as cicada_learn_online_static{,_mpi} ?? since we will pre-demine spliting...
