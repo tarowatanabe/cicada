@@ -30,7 +30,7 @@
 #include "cicada/operation/functional.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/inside_outside.hpp"
-#include "cicada/span_forest.hpp"
+#include "cicada/span_edge.hpp"
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/sgi_hash_set.hpp"
@@ -489,6 +489,8 @@ struct ExtractTree
     span_set_type  spans;
     span_set_type  complements;
 
+    range_set_type span_edges;
+
     admissible_set_type admissibles;
     
     weight_set_type weights_inside;
@@ -496,6 +498,7 @@ struct ExtractTree
     
     alignment_map_type alignment_map;
 
+#if 0
     struct __rule_span : public boost::static_visitor<int>
     {
       int operator()(const attribute_set_type::int_type& x) const { return x; }
@@ -511,6 +514,7 @@ struct ExtractTree
     
       return boost::apply_visitor(__rule_span(), iter->second);
     }
+#endif
     
 
     struct Candidate
@@ -1142,6 +1146,13 @@ struct ExtractTree
 			 const alignment_type& alignment,
 			 const bool inverse)
     {
+      // span-edge
+      span_edges.clear();
+      span_edges.reserve(graph.edges.size());
+      span_edges.resize(graph.edges.size());
+      
+      cicada::span_edge(graph, span_edges);
+      
       weights_inside.clear();
       weights_outside.clear();
       
@@ -1195,8 +1206,11 @@ struct ExtractTree
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
 
+#if 0
 	  const range_type edge_range(rule_span(edge.attributes, attr_span_first),
 				      rule_span(edge.attributes, attr_span_last));
+#endif
+	  const range_type& edge_range = span_edges[*eiter];
 	  
 	  // copy range...
 	  ranges[id] = edge_range;
@@ -1269,19 +1283,14 @@ struct ExtractTree
   derivation_graph_type graph_source;
   derivation_graph_type graph_target;
   
-  void operator()(const hypergraph_type& __source,
-		  const hypergraph_type& __target,
+  void operator()(const hypergraph_type& source,
+		  const hypergraph_type& target,
 		  const alignment_type&  alignment,
 		  rule_pair_set_type& rules)
 
     
   {
-    hypergraph_type source;
-    hypergraph_type target;
     
-    cicada::span_forest(__source, source);
-    cicada::span_forest(__target, target);
-
 #if 0
     std::cerr << "source: " << source << std::endl
 	      << "target: " << target << std::endl
@@ -1437,6 +1446,7 @@ struct ExtractTree
   covered_type   covered;
   point_set_type positions_relative;
 
+#if 0
   struct __rule_span : public boost::static_visitor<int>
   {
     int operator()(const attribute_set_type::int_type& x) const { return x; }
@@ -1452,6 +1462,7 @@ struct ExtractTree
     
     return boost::apply_visitor(__rule_span(), iter->second);
   }
+#endif
   
   void construct_rule(const hypergraph_type& graph,
 		      const derivation_node_type& node,
@@ -1518,8 +1529,13 @@ struct ExtractTree
     
     const hypergraph_type::edge_type& edge = graph.edges[*iter];
     
-    const int edge_first = rule_span(edge.attributes, attr_span_first);
-    const int edge_last  = rule_span(edge.attributes, attr_span_last);
+    //const int edge_first = rule_span(edge.attributes, attr_span_first);
+    //const int edge_last  = rule_span(edge.attributes, attr_span_last);
+    
+    const int edge_first = derivations.span_edges[*iter].first;
+    const int edge_last  = derivations.span_edges[*iter].second;
+    
+    
     for (int pos = edge_first; pos != edge_last; ++ pos)
       covered[pos] = true;
     

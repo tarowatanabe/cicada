@@ -554,6 +554,7 @@ struct ExtractGHKM
     extract_composed(graph, sentence, alignment, rules);
   }
 
+#if 0
   struct __rule_span : public boost::static_visitor<int>
   {
     int operator()(const attribute_set_type::int_type& x) const { return x; }
@@ -569,8 +570,7 @@ struct ExtractGHKM
     
     return boost::apply_visitor(__rule_span(), iter->second);
   }
-
-  
+#endif
   
   struct Candidate
   {
