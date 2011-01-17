@@ -506,14 +506,7 @@ struct ExtractGHKM
 		  const alignment_type& alignment,
 		  rule_pair_set_type& rules)
   {
-    
-    // span-edge
-    span_edges.clear();
-    span_edges.reserve(graph.edges.size());
-    span_edges.resize(graph.edges.size());
-    
-    cicada::span_edge(graph, span_edges);
-    
+        
 #if 0
     std::cerr << "hypergraph: " << graph << std::endl
 	      << "sentence: " << sentence << std::endl
@@ -1415,6 +1408,13 @@ struct ExtractGHKM
 			const sentence_type& sentence,
 			const alignment_type& alignment)
   {
+    // span-edge
+    span_edges.clear();
+    span_edges.reserve(graph.edges.size());
+    span_edges.resize(graph.edges.size());
+    
+    cicada::span_edge(graph, span_edges);
+    
     // compute inside/outside score
 
     //std::cerr << "compute inside outside score" << std::endl;
