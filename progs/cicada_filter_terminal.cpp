@@ -87,7 +87,7 @@ int main(int argc, char** argv)
       for (size_t edge_id = 0; edge_id != hypergraph.edges.size(); ++ edge_id) {
 	hypergraph_type::edge_type& edge = hypergraph.edges[edge_id];
 	const span_type& span = spans[edge_id];
-	const hypergraph_type::symbol_type& lhs = edge.rule->lhs;
+	const hypergraph_type::symbol_type lhs = edge.rule->lhs;
 	
 	rhs.clear();
 	
