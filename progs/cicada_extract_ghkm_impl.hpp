@@ -30,7 +30,7 @@
 #include "cicada/operation/functional.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/inside_outside.hpp"
-#include "cicada/span_forest.hpp"
+#include "cicada/span_edge.hpp"
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/sgi_hash_set.hpp"
@@ -483,6 +483,8 @@ struct ExtractGHKM
   
   attribute_type attr_span_first;
   attribute_type attr_span_last;
+
+  range_set_type span_edges;
   
   range_set_type ranges;
   span_set_type spans;
@@ -499,13 +501,18 @@ struct ExtractGHKM
   weight_set_type weights_inside;
   weight_set_type weights_outside;
   
-  void operator()(const hypergraph_type& __graph,
+  void operator()(const hypergraph_type& graph,
 		  const sentence_type& sentence,
 		  const alignment_type& alignment,
 		  rule_pair_set_type& rules)
   {
-    hypergraph_type graph;
-    cicada::span_forest(__graph, graph);
+    
+    // span-edge
+    span_edges.clear();
+    span_edges.reserve(graph.edges.size());
+    span_edges.resize(graph.edges.size());
+    
+    cicada::span_edge(graph, span_edges);
     
 #if 0
     std::cerr << "hypergraph: " << graph << std::endl
@@ -971,8 +978,11 @@ struct ExtractGHKM
     
     const hypergraph_type::edge_type& edge = graph.edges[*iter];
 
-    const int edge_first = rule_span(edge.attributes, attr_span_first);
-    const int edge_last  = rule_span(edge.attributes, attr_span_last);
+    //const int edge_first = rule_span(edge.attributes, attr_span_first);
+    //const int edge_last  = rule_span(edge.attributes, attr_span_last);
+    
+    const int edge_first = span_edges[*iter].first;
+    const int edge_last  = span_edges[*iter].second;
     
     for (int pos = edge_first; pos != edge_last; ++ pos)
       covered[pos] = true;
@@ -1465,8 +1475,12 @@ struct ExtractGHKM
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = graph.edges[*eiter];
 
+#if 0
 	const range_type edge_range(rule_span(edge.attributes, attr_span_first),
 				    rule_span(edge.attributes, attr_span_last));
+#endif
+
+	const range_type& edge_range = span_edges[*eiter];
 	
 	// copy range...
 	ranges[id] = edge_range;
