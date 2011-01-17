@@ -1218,7 +1218,7 @@ struct ExtractTree
       }
       
       complements.clear();
-      complemente.reserve(graph.nodes.size());
+      complements.reserve(graph.nodes.size());
       complements.resize(graph.nodes.size());
       
       // second, top-down traversal to compute complement
