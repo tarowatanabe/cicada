@@ -24,6 +24,8 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/include/adapt_struct.hpp>
 #include <boost/fusion/include/std_pair.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -134,6 +136,8 @@ typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id
 typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
 typedef sentence_type phrase_type;
 
+typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
+
 path_type input_file = "-";
 path_type output_file = "-";
 
@@ -182,6 +186,7 @@ int main(int argc, char** argv)
     tail_set_type   tails;
     phrase_type     phrase;
     phrase_type     non_terminals;
+    tokens_type     tokens;
     
     std::string line;
     iter_type iter(is);
@@ -302,9 +307,26 @@ int main(int argc, char** argv)
 	}
 	
 	if (split_mode && conlls[id - 1].form.size() > 1) {
-	  // split multi word expression...!
+	  // split multi word expression by '_'
 	  
-	  phrase.push_back(conlls[id - 1].form);
+	  tokens.clear();
+	  boost::algorithm::split(tokens, conlls[id - 1].form, boost::is_any_of("_"));
+
+	  if (tokens.size() == 1)
+	    phrase.push_back(conlls[id - 1].form);
+	  else {
+	    bool has_empty = false;
+	    tokens_type::const_iterator titer_end = tokens.end();
+	    for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end && ! has_empty; ++ titer)
+	      if (titer->empty())
+		has_empty = true;
+
+	    if (has_empty)
+	      phrase.push_back(conlls[id - 1].form);
+	    else
+	      phrase.insert(phrase.end(), tokens.begin(), tokens.end());
+	    
+	  }
 	} else
 	  phrase.push_back(conlls[id - 1].form);
 	
