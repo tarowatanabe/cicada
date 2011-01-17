@@ -42,6 +42,12 @@ struct conll_type
   typedef size_t size_type;
   typedef boost::variant<size_type, std::string> phead_type;
 
+  struct visitor_phead : public boost::static_visitor<size_type>
+  {
+    size_type operator()(const size_type& x) const { return x; }
+    size_type operator()(const std::string& x) const { return size_type(-1); }
+  };
+
   size_type   id;
   std::string form;
   std::string lemma;
@@ -136,6 +142,8 @@ std::string non_terminal = "[x]";
 bool pos_mode = false;
 bool relation_mode = false;
 bool leaf_mode = false;
+bool projective_mode = false;
+bool split_mode = false;
 
 int debug = 0;
 
@@ -162,8 +170,8 @@ int main(int argc, char** argv)
     dependency_type dependency;
     node_map_type   node_map;
 
-    symbol_type __goal(goal);
-    symbol_type __non_terminal(non_terminal);
+    symbol_type __goal(symbol_type(goal).non_terminal());
+    symbol_type __non_terminal(symbol_type(non_terminal).non_terminal());
 
     if (! __goal.is_non_terminal())
       throw std::runtime_error(goal + " is not a non-terminal");
@@ -222,18 +230,33 @@ int main(int argc, char** argv)
 
       non_terminals.clear();
       non_terminals.push_back(__goal);
-	
       
       conll_set_type::const_iterator citer_end = conlls.end();
       for (conll_set_type::const_iterator citer = conlls.begin(); citer != citer_end; ++ citer) {
-	dependency[citer->head].push_back(citer->id);
-	
-	if (pos_mode)
-	  non_terminals.push_back('[' + citer->cpostag + ']');
-	else if (relation_mode)
-	  non_terminals.push_back('[' + citer->deprel + ']');
-	else
-	  non_terminals.push_back(__non_terminal);
+	if (projective_mode) {
+	  const conll_type::size_type head = boost::apply_visitor(conll_type::visitor_phead(), citer->phead);
+	  if (head == conll_type::size_type(-1))
+	    throw std::runtime_error("invalid projective head");
+	  
+	  dependency[head].push_back(citer->id);
+	  
+	  if (pos_mode)
+	    non_terminals.push_back('[' + citer->cpostag + ']');
+	  else if (relation_mode)
+	    non_terminals.push_back('[' + citer->pdeprel + ']');
+	  else
+	    non_terminals.push_back(__non_terminal);
+	  
+	} else {
+	  dependency[citer->head].push_back(citer->id);
+	  
+	  if (pos_mode)
+	    non_terminals.push_back('[' + citer->cpostag + ']');
+	  else if (relation_mode)
+	    non_terminals.push_back('[' + citer->deprel + ']');
+	  else
+	    non_terminals.push_back(__non_terminal);
+	}
       }
       
       if (! dependency[0].empty()) {
@@ -261,8 +284,6 @@ int main(int argc, char** argv)
       }
       
       for (size_t id = 1; id != dependency.size(); ++ id) {
-	// list of edges in dependency[citer->head]
-
 	tails.clear();
 	phrase.clear();
 	
@@ -280,7 +301,12 @@ int main(int argc, char** argv)
 	  phrase.push_back(non_terminals[antecedent]);
 	}
 	
-	phrase.push_back(conlls[id - 1].form);
+	if (split_mode && conlls[id - 1].form.size() > 1) {
+	  // split multi word expression...!
+	  
+	  phrase.push_back(conlls[id - 1].form);
+	} else
+	  phrase.push_back(conlls[id - 1].form);
 	
 	for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
 	  const size_t antecedent = *iiter;
@@ -329,9 +355,11 @@ void options(int argc, char** argv)
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
 
-    ("pos",      po::bool_switch(&pos_mode),      "use pos as non-terminal")
-    ("relation", po::bool_switch(&relation_mode), "use relation as non-terminal")
-    ("leaf",     po::bool_switch(&leaf_mode),     "collect leaf nodes only")
+    ("pos",        po::bool_switch(&pos_mode),        "use pos as non-terminal")
+    ("relation",   po::bool_switch(&relation_mode),   "use relation as non-terminal")
+    ("leaf",       po::bool_switch(&leaf_mode),       "collect leaf nodes only")
+    ("projective", po::bool_switch(&projective_mode), "use projective filed for dependency")
+    ("split",      po::bool_switch(&split_mode),      "split multi word expression")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         

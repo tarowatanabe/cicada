@@ -84,8 +84,8 @@ int main(int argc, char** argv)
     std::string line;
     tokens_type tokens;
 
-    symbol_type __goal(goal);
-    symbol_type __non_terminal(non_terminal);
+    symbol_type __goal(symbol_type(goal).non_terminal());
+    symbol_type __non_terminal(symbol_type(non_terminal).non_terminal());
     
     if (! __goal.is_non_terminal())
       throw std::runtime_error(goal + " is not a non-terminal");
