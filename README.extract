@@ -129,6 +129,7 @@ Parameters for extraction:
                         maximum terminal fertility (default: 4)
   --max-nodes=NODES     maximum rule nodes (default: 15)
   --max-height=HEIGHT   maximum rule height (default: 4)
+  --exhaustive          exhaustive extraction in GHKM and Tree
   --ternary             extract ternary rule
 
 Max memory allocation:
