@@ -45,6 +45,7 @@ namespace cicada
 
       bool graphviz;
       bool statistics;
+      bool no_id;
   
       int debug;
     };

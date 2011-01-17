@@ -33,7 +33,8 @@ namespace cicada
 			   const Hypergraph& graph,
 			   const int kbest_size,
 			   const Function& function,
-			   const Filter& filter)
+			   const Filter& filter,
+			   const bool no_id)
     {
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
@@ -102,8 +103,10 @@ namespace cicada
 	graph_kbest.goal = niter->second;
 
 	graph_kbest.topologically_sort();
-    
-	os << id << " ||| " << graph_kbest << " |||";
+	
+	if (! no_id)
+	  os << id << " ||| ";
+	os << graph_kbest << " |||";
 	typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
 	for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
 	  os << ' ' << fiter->first << '=' << fiter->second;
@@ -122,7 +125,8 @@ namespace cicada
 			   const int kbest_size,
 			   const Traversal& traversal, 
 			   const Function& function,
-			   const Filter& filter)
+			   const Filter& filter,
+			   const bool no_id)
     {
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
@@ -137,7 +141,9 @@ namespace cicada
 	if (! derivations(k, derivation, weight))
 	  break;
     
-	os << id << " ||| " << boost::get<0>(derivation) << " |||";
+	if (! no_id)
+	  os << id << " ||| ";
+	os << boost::get<0>(derivation) << " |||";
 	typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
 	for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
 	  os << ' ' << fiter->first << '=' << fiter->second;
@@ -156,6 +162,7 @@ namespace cicada
 	yield_alignment(false),
 	graphviz(false),
 	statistics(false),
+	no_id(false),
 	debug(__debug)
     {
       typedef cicada::Parameter param_type;
@@ -178,6 +185,8 @@ namespace cicada
 	  graphviz = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "statistics") == 0)
 	  statistics = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "no-id") == 0)
+	  no_id = utils::lexical_cast<bool>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "file") == 0)
 	  file = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "directory") == 0)
@@ -267,17 +276,24 @@ namespace cicada
 	  lattice_type::const_iterator liter_end = data.lattice.end();
 	  for (lattice_type::const_iterator liter = data.lattice.begin(); liter != liter_end; ++ liter) {
 	    num_edges += liter->size();
-	      
+	    
 	    lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
 	    for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
 	      num_epsilon += aiter->label == vocab_type::EPSILON;
 	  }
-	    
-	  os << id << " ||| lattice-num-node: "    << num_nodes << '\n'
-	     << id << " ||| lattice-num-edge: "    << num_edges << '\n'
-	     << id << " ||| lattice-num-epsilon: " << num_epsilon << '\n'
-	     << id << " ||| lattice-shortest-distance: " << data.lattice.shortest_distance() << '\n'
-	     << id << " ||| lattice-longest-distance: "  << data.lattice.longest_distance() << '\n';
+	  
+	  if (no_id)
+	    os << "lattice-num-node: "    << num_nodes << '\n'
+	       << "lattice-num-edge: "    << num_edges << '\n'
+	       << "lattice-num-epsilon: " << num_epsilon << '\n'
+	       << "lattice-shortest-distance: " << data.lattice.shortest_distance() << '\n'
+	       << "lattice-longest-distance: "  << data.lattice.longest_distance() << '\n';
+	  else
+	    os << id << " ||| lattice-num-node: "    << num_nodes << '\n'
+	       << id << " ||| lattice-num-edge: "    << num_edges << '\n'
+	       << id << " ||| lattice-num-epsilon: " << num_epsilon << '\n'
+	       << id << " ||| lattice-shortest-distance: " << data.lattice.shortest_distance() << '\n'
+	       << id << " ||| lattice-longest-distance: "  << data.lattice.longest_distance() << '\n';
 	}
 	  
 	if (data.hypergraph.is_valid()) {
@@ -289,11 +305,17 @@ namespace cicada
 	    
 	  const int length_shortest = - log(lengths_shortest.back());
 	  const int length_longest  =   log(lengths_longest.back());
-	    
-	  os << id << " ||| hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
-	     << id << " ||| hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
-	     << id << " ||| hypergraph-shortest-leaf: " << length_shortest << '\n'
-	     << id << " ||| hypergraph-longest-leaf: "  << length_longest << '\n';
+	  
+	  if (no_id)
+	    os << "hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
+	       << "hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
+	       << "hypergraph-shortest-leaf: " << length_shortest << '\n'
+	       << "hypergraph-longest-leaf: "  << length_longest << '\n';
+	  else
+	    os << id << " ||| hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
+	       << id << " ||| hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
+	       << id << " ||| hypergraph-shortest-leaf: " << length_shortest << '\n'
+	       << id << " ||| hypergraph-longest-leaf: "  << length_longest << '\n';
 	}
       } else if (graphviz)
 	cicada::graphviz(os, hypergraph);
@@ -301,7 +323,10 @@ namespace cicada
 	if (debug)
 	  std::cerr << "output graph: " << data.id << std::endl;
 	  
-	os << id << " ||| " << hypergraph << '\n';
+	if (no_id)
+	  os << hypergraph << '\n';
+	else
+	  os << id << " ||| " << hypergraph << '\n';
       } else if (hypergraph.is_valid()) {
 	if (debug)
 	  std::cerr << "output " << kbest_size << "-best for graph: "<< data.id << std::endl;
@@ -315,31 +340,37 @@ namespace cicada
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_alignment_traversal(),
 				weight_function_one<weight_type>(),
-				kbest_alignment_filter_unique(hypergraph));
+				kbest_alignment_filter_unique(hypergraph),
+				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_traversal(insertion_prefix),
 				weight_function_one<weight_type>(),
-				kbest_filter_unique(hypergraph));
+				kbest_filter_unique(hypergraph),
+				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function_one<weight_type>(),
-				kbest_filter());
+				kbest_filter(),
+				no_id);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_alignment_traversal(),
 				weight_function_one<weight_type>(),
-				kbest_alignment_filter());
+				kbest_alignment_filter(),
+				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_traversal(insertion_prefix),
 				weight_function_one<weight_type>(),
-				kbest_filter());
+				kbest_filter(),
+				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function_one<weight_type>(),
-				kbest_filter());
+				kbest_filter(),
+				no_id);
 	  }
 	} else {
 	  if (kbest_unique) {
@@ -347,31 +378,37 @@ namespace cicada
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_alignment_traversal(),
 				weight_function<weight_type>(*weights_kbest),
-				kbest_alignment_filter_unique(hypergraph));
+				kbest_alignment_filter_unique(hypergraph),
+				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_traversal(insertion_prefix),
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter_unique(hypergraph));
+				kbest_filter_unique(hypergraph),
+				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter());
+				kbest_filter(),
+				no_id);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_alignment_traversal(),
 				weight_function<weight_type>(*weights_kbest),
-				kbest_alignment_filter());
+				kbest_alignment_filter(),
+				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_traversal(insertion_prefix),
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter());
+				kbest_filter(),
+				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter());
+				kbest_filter(),
+				no_id);
 	  }
 	}
       }
