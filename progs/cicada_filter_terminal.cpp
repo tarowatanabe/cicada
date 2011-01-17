@@ -103,7 +103,7 @@ int main(int argc, char** argv)
 	    
 	    // compute span_pos from antecedent node...
 	    
-	    span_pos = spans[hypergraph.nodes[edge.tails[pos]].edges.front()].second;
+	    span_pos = spans[hypergraph.nodes[edge.tails[non_terminal_pos]].edges.front()].second;
 	  } else if (*riter != vocab_type::EPSILON) {
 	    rhs.push_back(sentence[span_pos]);
 	    ++ span_pos;
@@ -113,6 +113,7 @@ int main(int argc, char** argv)
 	edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, rhs.begin(), rhs.end()));
       }
       
+      os << hypergraph << '\n';
     }
     
     if (is || ms)
