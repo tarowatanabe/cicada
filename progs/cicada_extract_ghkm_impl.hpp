@@ -512,14 +512,19 @@ struct ExtractGHKM
 	      << "sentence: " << sentence << std::endl
 	      << "alignment: " << alignment << std::endl;
 #endif
+    derivations.clear();
     
     ranges.clear();
     spans.clear();
     complements.clear();
     admissibles.clear();
     node_map.clear();
-
-    derivations.clear();
+    
+    ranges.reserve(graph.nodes.size());
+    spans.reserve(graph.nodes.size());
+    complements.reserve(graph.nodes.size());
+    admissibles.reserve(graph.nodes.size());
+    node_map.reserve(graph.nodes.size());
     
     ranges.resize(graph.nodes.size());
     spans.resize(graph.nodes.size());
@@ -527,7 +532,6 @@ struct ExtractGHKM
     admissibles.resize(graph.nodes.size());
     node_map.resize(graph.nodes.size());
     
-
     //std::cerr << "admissible nodes" << std::endl;
     admissible_nodes(graph, sentence, alignment);
     

@@ -765,9 +765,11 @@ struct ExtractTree
       // the extracted Tree rules are reachable from root of the parse forest
       
       reloc_node.clear();
+      reloc_node.reserve(derivations.size());
       reloc_node.resize(derivations.size(), -1);
       
       color.clear();
+      color.reserve(derivations.size());
       color.resize(derivations.size(), white);
       
       stack.clear();
@@ -1111,6 +1113,7 @@ struct ExtractTree
       const int cspan_max = counterpart.alignment_map.size();
       
       admissibles.clear();
+      admissibles.reserve(graph.nodes.size());
       admissibles.resize(graph.nodes.size());
       for (size_t id = 0; id != graph.nodes.size(); ++ id) {
 	
@@ -1177,6 +1180,9 @@ struct ExtractTree
       range_map.clear();
       ranges.clear();
       spans.clear();
+
+      ranges.reserve(graph.nodes.size());
+      spans.reserve(graph.nodes.size());
       
       ranges.resize(graph.nodes.size());
       spans.resize(graph.nodes.size());
@@ -1212,6 +1218,7 @@ struct ExtractTree
       }
       
       complements.clear();
+      complemente.reserve(graph.nodes.size());
       complements.resize(graph.nodes.size());
       
       // second, top-down traversal to compute complement
