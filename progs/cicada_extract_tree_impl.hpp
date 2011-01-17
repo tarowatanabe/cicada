@@ -1463,7 +1463,7 @@ struct ExtractTree
     covered.resize(derivations.alignment_map.size(), false);
     
     tree_rule_type tree_rule;
-    weight_type weight = derivations.weights_outside[node.node];
+    weight_type weight = derivations.weights_outside[node.node] / derivations.weights_inside.back();
     
     int frontier_pos = 0;
     int index = 0;

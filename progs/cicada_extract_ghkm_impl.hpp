@@ -847,7 +847,7 @@ struct ExtractGHKM
     covered.resize(alignment_source_target.size(), false);
     
     tree_rule_type rule_source;
-    weight_type weight = weights_outside[node.node];
+    weight_type weight = weights_outside[node.node] / weights_inside.back();
     
 
     //std::cerr << "construct source" << std::endl;
