@@ -340,7 +340,7 @@ void synchronize_mapper(utils::mpi_intercomm& reducer)
     
     if (std::count(terminated.begin(), terminated.end(), true) == mpi_size) break;
     
-    non_found_iter = loop_sleep(false, non_found_iter);
+    non_found_iter = loop_sleep(found, non_found_iter);
   }
 }
 
@@ -367,7 +367,7 @@ void synchronize_reducer(utils::mpi_intercomm& mapper)
     
     if (std::count(terminated.begin(), terminated.end(), true) == mpi_size) break;
     
-    non_found_iter = loop_sleep(false, non_found_iter);
+    non_found_iter = loop_sleep(found, non_found_iter);
   }
 }
 
