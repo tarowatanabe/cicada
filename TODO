@@ -51,3 +51,5 @@ Reimplement cicada-learn-online:
   sorting training data wrt its length.
   
   or, implement as cicada_learn_online_static{,_mpi} ?? since we will pre-demine spliting...
+
+Added binarization to cicada-extract, or use cicada tool for binarization?

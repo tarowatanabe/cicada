@@ -91,7 +91,7 @@ namespace cicada
 	  
 	  for (int i = 0; i < arity - 2; ++ i) {
 	    std::string non_terminal_new = (i == 0
-					    ? '@' + edge_source.rule->lhs.non_terminal_strip() + "->"
+					    ? edge_source.rule->lhs.non_terminal_strip() + "^"
 					    : non_terminal_head);
 	    non_terminal_new += '_' + edge_source.rule->rhs[i].non_terminal_strip();
 	      
@@ -182,7 +182,7 @@ namespace cicada
 	  
 	  for (int i = 0; i < arity - 2; ++ i) {
 	    std::string non_terminal_new = (i == 0
-					    ? '@' + edge_source.rule->lhs.non_terminal_strip() + "->"
+					    ? edge_source.rule->lhs.non_terminal_strip() + "^"
 					    : non_terminal_head);
 	    non_terminal_new += '_' + edge_source.rule->rhs[arity - i - 1].non_terminal_strip();
 	      
