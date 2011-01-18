@@ -8,7 +8,12 @@ We support various phrase/rule/tree extraction. Basically, we will run in two st
    They can operate similarly with underlying extraction specific map/reduce framework.
 
 You can try "cicada-extract.py" which runs like phrase-extract in Moses, but starting from step 4 (and 6).
-For details, see the last part of this document.
+For details, see the last part of this document. It is recommended to specify TMPDIR or TMPDIR_SPEC pointing to 
+a large "local" storage for efficient extraction. In NICT, you can exploit local disc on running machines
+(and cluster machines):
+
+export TMPDIR_SPEC=/export/tmp
+
 Internally, cicada-extract.py calls following binaries:
 
 cicada_extract_phrase{,_mpi}

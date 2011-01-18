@@ -957,11 +957,15 @@ struct ExtractSCFG
     
     alignment_source_target.clear();
     alignment_target_source.clear();
+    alignment_source_target.reserve(source_size);
+    alignment_target_source.reserve(target_size);
     alignment_source_target.resize(source_size);
     alignment_target_source.resize(target_size);
     
     alignment_count_source.clear();
     alignment_count_target.clear();
+    alignment_count_source.reserve(source_size + 1);
+    alignment_count_target.reserve(target_size + 1);
     alignment_count_source.resize(source_size + 1, 0);
     alignment_count_target.resize(target_size + 1, 0);
     
@@ -993,6 +997,7 @@ struct ExtractSCFG
     }
     
     span_target_chart.clear();
+    span_target_chart.reserve(target_size + 1);
     span_target_chart.resize(target_size + 1, span_type(source_size, 0));
     
     // first, collect alignment count only for the target side

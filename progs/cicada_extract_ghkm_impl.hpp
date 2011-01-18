@@ -546,24 +546,6 @@ struct ExtractGHKM
     // perform compounds extraction
     extract_composed(graph, sentence, alignment, rules);
   }
-
-#if 0
-  struct __rule_span : public boost::static_visitor<int>
-  {
-    int operator()(const attribute_set_type::int_type& x) const { return x; }
-    template <typename Tp>
-    int operator()(const Tp& x) const { throw std::runtime_error("no rule span with integer?"); }
-  };
-  
-  int rule_span(const attribute_set_type& attrs, const attribute_type& attr) const
-  {
-    attribute_set_type::const_iterator iter = attrs.find(attr);
-    if (iter == attrs.end())
-      throw std::runtime_error("no phrasal span attribute?");
-    
-    return boost::apply_visitor(__rule_span(), iter->second);
-  }
-#endif
   
   struct Candidate
   {
@@ -866,6 +848,7 @@ struct ExtractGHKM
     range_pos.clear();
     trees.clear();
     positions_target.clear();
+    positions_target.reserve(sentence.size());
     positions_target.resize(sentence.size());
     
     if (tails.empty()) {
@@ -971,9 +954,6 @@ struct ExtractGHKM
     
     const hypergraph_type::edge_type& edge = graph.edges[*iter];
 
-    //const int edge_first = rule_span(edge.attributes, attr_span_first);
-    //const int edge_last  = rule_span(edge.attributes, attr_span_last);
-    
     const int edge_first = span_edges[*iter].first;
     const int edge_last  = span_edges[*iter].second;
     
@@ -1420,6 +1400,9 @@ struct ExtractGHKM
     //std::cerr << "compute inside outside score" << std::endl;
     weights_inside.clear();
     weights_outside.clear();
+    
+    weights_inside.reserve(graph.nodes.size());
+    weights_outside.reserve(graph.nodes.size());
 
     weights_inside.resize(graph.nodes.size());
     weights_outside.resize(graph.nodes.size());
@@ -1474,12 +1457,6 @@ struct ExtractGHKM
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-
-#if 0
-	const range_type edge_range(rule_span(edge.attributes, attr_span_first),
-				    rule_span(edge.attributes, attr_span_last));
-#endif
-
 	const range_type& edge_range = span_edges[*eiter];
 	
 	// copy range...
