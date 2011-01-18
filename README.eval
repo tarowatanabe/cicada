@@ -51,8 +51,6 @@ Evaluator score JSON format:
 {"eval":"wlcs", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
 {"eval":"combined", "score":[{"eval":"bleu", ...}, {"eval":"ter", ...}], "weight":["base64", "base64",.... list of weights]}
 and doubles are encoded as base64 (string!). We can insert spaces, but encoder will generate a string w/o spaces.
-Remark, that double's 64bits will be encoded by 66-bit string (11 * 6bits), thus base64 encoding of double may be
-slightly different by the last two digits.
 
 [1]
 @inproceedings{koehn:2004:EMNLP,
