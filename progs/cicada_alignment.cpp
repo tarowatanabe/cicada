@@ -64,7 +64,6 @@ struct BitextGiza
   typedef std::vector<word_align_type, std::allocator<word_align_type> > word_align_set_type;
   typedef std::vector<std::string, std::allocator<std::string> > sent_type;
   
-  size_t              id;
   std::string         comment;
   sent_type           target;
   word_align_set_type source;
@@ -80,7 +79,6 @@ struct BitextGiza
 
   void swap(BitextGiza& x)
   {
-    std::swap(id, x.id);
     comment.swap(x.comment);
     target.swap(x.target);
     source.swap(x.source);
@@ -155,6 +153,8 @@ int main(int argc, char ** argv)
 {
   try {
     options(argc, argv);
+
+    threads = utils::bithack::max(threads, 1);
 
     score_null         = utils::mathop::log(prob_null);
     score_union        = utils::mathop::log(prob_union);
@@ -898,8 +898,39 @@ struct MapReduce
   typedef utils::lockfree_list_queue<id_alignment_type, std::allocator<id_alignment_type> > queue_alignment_type;
   typedef boost::shared_ptr<queue_alignment_type> queue_alignment_ptr_type;
   typedef std::vector<queue_alignment_ptr_type, std::allocator<queue_alignment_ptr_type> > queue_alignment_ptr_set_type;
-  
-  typedef std::pair<bitext_giza_type, bitext_giza_type> bitext_giza_pair_type;
+
+  struct bitext_giza_pair_type
+  {
+    size_t id;
+
+    bitext_giza_type source_target;
+    bitext_giza_type target_source;
+    
+    span_set_type span_source;
+    span_set_type span_target;
+    
+    bitext_giza_pair_type() {}
+    
+    void clear()
+    {
+      id = size_t(-1);
+      source_target.clear();
+      target_source.clear();
+      span_source.clear();
+      span_target.clear();
+    }
+
+    void swap(bitext_giza_pair_type& x)
+    {
+      std::swap(id, x.id);
+
+      source_target.swap(x.source_target);
+      target_source.swap(x.target_source);
+      
+      span_source.swap(x.span_source);
+      span_target.swap(x.span_target);
+    }
+  };
   typedef utils::lockfree_list_queue<bitext_giza_pair_type, std::allocator<bitext_giza_pair_type> > queue_bitext_type;
   
 };
@@ -916,8 +947,7 @@ namespace std
   inline
   void swap(MapReduce::bitext_giza_pair_type& x, MapReduce::bitext_giza_pair_type& y)
   {
-    x.first.swap(y.first);
-    x.second.swap(y.second);
+    x.swap(y);
   }
 };
 
@@ -1028,23 +1058,23 @@ struct Mapper
     
     while (1) {
       queue_bitext.pop_swap(bitext_pair);
-      if (bitext_pair.first.id == size_t(-1)) break;
+      if (bitext_pair.id == size_t(-1)) break;
       
-      bitext_giza_type& bitext_source_target = bitext_pair.first;
-      bitext_giza_type& bitext_target_source = bitext_pair.second;
+      const bitext_giza_type& bitext_source_target = bitext_pair.source_target;
+      const bitext_giza_type& bitext_target_source = bitext_pair.target_source;
+      
+      const span_set_type& span_source = bitext_pair.span_source;
+      const span_set_type& span_target = bitext_pair.span_target;
       
       aligns.clear();
       alignment.clear();
       
       if (itg_mode) {
-#if 0
 	// do we handle span-constrained ITG?
-	if (is_src || is_trg)
+	if (! span_source.empty() || ! span_target.empty())
 	  __itg(bitext_source_target, bitext_target_source, span_source, span_target, aligns);
 	else
 	  __itg(bitext_source_target, bitext_target_source, aligns);
-#endif
-	__itg(bitext_source_target, bitext_target_source, aligns);
       
 	alignment.insert(alignment.end(), aligns.begin(), aligns.end());
       } else if (max_match_mode) {
@@ -1086,7 +1116,7 @@ struct Mapper
 	alignment.swap(inverted);
       }
       
-      id_alignment.first = bitext_source_target.id;
+      id_alignment.first = bitext_pair.id;
       id_alignment.second.swap(alignment);
       
       queue_alignment.push_swap(id_alignment);
@@ -1101,15 +1131,39 @@ struct Mapper
 
 void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os)
 {
-  typedef std::set<point_type, std::less<point_type>, std::allocator<point_type> > align_set_type;
+  typedef MapReduce map_reduce_type;
+  
+  typedef map_reduce_type::id_alignment_type            id_alignment_type;
+  typedef map_reduce_type::queue_alignment_type         queue_alignment_type;
+  typedef map_reduce_type::queue_alignment_ptr_set_type queue_alignment_ptr_set_type;
+  
+  typedef map_reduce_type::bitext_giza_pair_type bitext_giza_pair_type;
+  typedef map_reduce_type::queue_bitext_type     queue_bitext_type;
 
+  typedef Mapper  mapper_type;
+  typedef Reducer reducer_type;
+  
   typedef boost::spirit::istream_iterator iter_type;
+  
+  queue_alignment_ptr_set_type queues(threads);
+  queue_bitext_type            queue_bitext;
+
+  boost::thread_group mappers;
+  for (int i = 0; i != threads; ++ i) {
+    queues[i].reset(new queue_alignment_type(1024));
+    mappers.add_thread(new boost::thread(mapper_type(queue_bitext, *queues[i])));
+  }
+  
+  boost::thread_group reducer;
+  reducer.add_thread(new boost::thread(reducer_type(os, queues)));
   
   alignment_parser<iter_type> parser_alignment;
   bitext_giza_parser<iter_type> parser_giza;
   
   bitext_giza_type bitext_source_target;
   bitext_giza_type bitext_target_source;
+
+  alignment_type alignment;
   
   is_src_trg.unsetf(std::ios::skipws);
   is_trg_src.unsetf(std::ios::skipws);
@@ -1120,30 +1174,19 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
   iter_type titer(is_trg_src);
   iter_type titer_end;
   
-  align_set_type aligns;
-  alignment_type alignment;
-  alignment_type inverted;
-  AlignmentInserter inserter(alignment);
-  AlignmentInserter inverted_inserter(inverted);
-  
-  ITG       __itg;
-  MaxMatch  __max_match;
-  Intersect __intersect;
-  Union     __union;
-  Grow      __grow;
-  GrowDiag  __grow_diag;
-  Final     __final;
-  FinalAnd  __final_and;
-  
-  Invert    __invert;
-  
   span_set_type span_source;
   span_set_type span_target;
+
+  bitext_giza_pair_type bitext_pair;
   
+  size_t id = 0;
 
   while (siter != siter_end && titer != titer_end) {
     bitext_source_target.clear();
     bitext_target_source.clear();
+    span_source.clear();
+    span_target.clear();
+    
     alignment.clear();
     
     if (is_src)
@@ -1177,56 +1220,23 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
     
     if (is_src && ! *is_src) break;
     if (is_trg && ! *is_trg) break;
+
+    bitext_pair.id = id;
     
-    aligns.clear();
+    bitext_pair.source_target.swap(bitext_source_target);
+    bitext_pair.target_source.swap(bitext_target_source);
     
-    if (itg_mode) {
-      if (is_src || is_trg)
-	__itg(bitext_source_target, bitext_target_source, span_source, span_target, aligns);
-      else
-	__itg(bitext_source_target, bitext_target_source, aligns);
-      
-      alignment.insert(alignment.end(), aligns.begin(), aligns.end());
-    } else if (max_match_mode) {
-      __max_match(bitext_source_target, bitext_target_source, aligns);
-      
-      alignment.insert(alignment.end(), aligns.begin(), aligns.end());
-    } else if (intersection_mode) 
-      __intersect(bitext_source_target, bitext_target_source, inserter);
-    else if (union_mode) {
-      __union(bitext_source_target, bitext_target_source, aligns);
-      
-      alignment.insert(alignment.end(), aligns.begin(), aligns.end());
-    } else {
-      // first, compute intersection
-      __intersect(bitext_source_target, bitext_target_source, aligns);
-      
-      // grow...
-      if (grow_mode) {
-	if (diag_mode)
-	  __grow_diag(bitext_source_target, bitext_target_source, aligns);
-	else
-	  __grow(bitext_source_target, bitext_target_source, aligns);
-      }
-      
-      // final...
-      if (final_mode)
-	__final(bitext_source_target, bitext_target_source, aligns);
-      else if (final_and_mode)
-	__final_and(bitext_source_target, bitext_target_source, aligns);
-      
-      alignment.insert(alignment.end(), aligns.begin(), aligns.end());
-    }
+    bitext_pair.span_source.swap(span_source);
+    bitext_pair.span_target.swap(span_target);
     
-    // invert this alignment...
-    if (invert_mode) {
-      inverted.clear();
-      __invert(alignment, inverted_inserter);
-      std::sort(inverted.begin(), inverted.end());
-      alignment.swap(inverted);
-    }
+    queue_bitext.push_swap(bitext_pair);
     
-    os << alignment << '\n';
+    ++ id;
+  }
+  
+  for (int i = 0; i != threads; ++ i) {
+    bitext_pair.clear();
+    queue_bitext.push_swap(bitext_pair);
   }
   
   if (siter != siter_end || titer != titer_end)
@@ -1236,6 +1246,9 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
     throw std::runtime_error("# of samples do not match");
   if (is_trg && (*is_trg >> span_target))
     throw std::runtime_error("# of samples do not match");
+
+  mappers.join_all();
+  reducer.join_all();
 }
 
 
