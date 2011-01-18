@@ -41,10 +41,12 @@
 #include "utils/bithack.hpp"
 #include "utils/mathop.hpp"
 #include "utils/vector2.hpp"
+#include "utils/lockfree_list_queue.hpp"
 
 #include "kuhn_munkres.hpp"
 #include "itg_alignment.hpp"
 
+#include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 
@@ -62,6 +64,7 @@ struct BitextGiza
   typedef std::vector<word_align_type, std::allocator<word_align_type> > word_align_set_type;
   typedef std::vector<std::string, std::allocator<std::string> > sent_type;
   
+  size_t              id;
   std::string         comment;
   sent_type           target;
   word_align_set_type source;
@@ -77,6 +80,7 @@ struct BitextGiza
 
   void swap(BitextGiza& x)
   {
+    std::swap(id, x.id);
     comment.swap(x.comment);
     target.swap(x.target);
     source.swap(x.source);
@@ -888,15 +892,211 @@ void process_giza(std::istream& is, std::ostream& os)
   }
 }
 
-struct Task
+struct MapReduce
 {
+  typedef std::pair<size_t, alignment_type> id_alignment_type;
+  typedef utils::lockfree_list_queue<id_alignment_type, std::allocator<id_alignment_type> > queue_alignment_type;
+  typedef boost::shared_ptr<queue_alignment_type> queue_alignment_ptr_type;
+  typedef std::vector<queue_alignment_ptr_type, std::allocator<queue_alignment_ptr_type> > queue_alignment_ptr_set_type;
+  
+  typedef std::pair<bitext_giza_type, bitext_giza_type> bitext_giza_pair_type;
+  typedef utils::lockfree_list_queue<bitext_giza_pair_type, std::allocator<bitext_giza_pair_type> > queue_bitext_type;
+  
+};
+
+namespace std
+{
+  inline
+  void swap(MapReduce::id_alignment_type& x, MapReduce::id_alignment_type& y)
+  {
+    std::swap(x.first, y.first);
+    x.second.swap(y.second);
+  }
+
+  inline
+  void swap(MapReduce::bitext_giza_pair_type& x, MapReduce::bitext_giza_pair_type& y)
+  {
+    x.first.swap(y.first);
+    x.second.swap(y.second);
+  }
+};
+
+struct Reducer
+{
+  typedef MapReduce map_reduce_type;
+  
+  typedef map_reduce_type::id_alignment_type            id_alignment_type;
+  typedef map_reduce_type::queue_alignment_type         queue_alignment_type;
+  typedef map_reduce_type::queue_alignment_ptr_set_type queue_alignment_ptr_set_type;
+
+  Reducer(std::ostream& __os,
+	  queue_alignment_ptr_set_type& __queues)
+    : os(__os), queues(__queues) {}
+  
+  std::ostream&                 os;
+  queue_alignment_ptr_set_type& queues;
+  
+  template <typename Tp>
+  struct greater_buffer
+  {
+    bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
+    {
+      return x->first.first > y->first.first;
+    }
+    
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return x->first.first > y->first.first;
+    }
+  };
   
   void operator()()
   {
+    typedef std::pair<id_alignment_type, queue_alignment_type*> alignment_buffer_type;
     
+    typedef std::vector<alignment_buffer_type*, std::allocator<alignment_buffer_type*> > pqueue_base_type;
+    typedef std::priority_queue<alignment_buffer_type*, pqueue_base_type, greater_buffer<alignment_buffer_type> > pqueue_type;
     
+    pqueue_type pqueue;
+    std::vector<alignment_buffer_type, std::allocator<alignment_buffer_type> > buffer_queues(queues.size());
+    
+    for (size_t i = 0; i != queues.size(); ++ i) {
+      queue_alignment_type&  queue = *queues[i];
+      alignment_buffer_type* buffer = &buffer_queues[i];
+      
+      queue.pop_swap(buffer->first);
+      buffer->second = &queue;
+      
+      if (buffer->first.first != size_t(-1))
+	pqueue.push(buffer);
+    }
+    
+    while (! pqueue.empty()) {
+      alignment_buffer_type* buffer = pqueue.top();
+      pqueue.pop();
+      
+      os << buffer->first.second << '\n';
+      
+      buffer->second->pop_swap(buffer->first);
+      if (buffer->first.first != size_t(-1))
+	pqueue.push(buffer);
+    }
   }
+};
+
+struct Mapper
+{
+  typedef MapReduce map_reduce_type;
+
+  typedef map_reduce_type::id_alignment_type    id_alignment_type;
+  typedef map_reduce_type::queue_alignment_type queue_alignment_type;
   
+  typedef map_reduce_type::bitext_giza_pair_type bitext_giza_pair_type;
+  typedef map_reduce_type::queue_bitext_type     queue_bitext_type;
+  
+  Mapper(queue_bitext_type& __queue_bitext,
+	 queue_alignment_type& __queue_alignment)
+    : queue_bitext(__queue_bitext),
+      queue_alignment(__queue_alignment) {}
+  
+  queue_bitext_type&    queue_bitext;
+  queue_alignment_type& queue_alignment;
+  
+  void operator()()
+  {
+    typedef std::set<point_type, std::less<point_type>, std::allocator<point_type> > align_set_type;
+    
+    id_alignment_type     id_alignment;
+    bitext_giza_pair_type bitext_pair;
+    
+    align_set_type aligns;
+    alignment_type alignment;
+    alignment_type inverted;
+    AlignmentInserter inserter(alignment);
+    AlignmentInserter inverted_inserter(inverted);
+
+    ITG       __itg;
+    MaxMatch  __max_match;
+    Intersect __intersect;
+    Union     __union;
+    Grow      __grow;
+    GrowDiag  __grow_diag;
+    Final     __final;
+    FinalAnd  __final_and;
+    
+    Invert    __invert;
+    
+    while (1) {
+      queue_bitext.pop_swap(bitext_pair);
+      if (bitext_pair.first.id == size_t(-1)) break;
+      
+      bitext_giza_type& bitext_source_target = bitext_pair.first;
+      bitext_giza_type& bitext_target_source = bitext_pair.second;
+      
+      aligns.clear();
+      alignment.clear();
+      
+      if (itg_mode) {
+#if 0
+	// do we handle span-constrained ITG?
+	if (is_src || is_trg)
+	  __itg(bitext_source_target, bitext_target_source, span_source, span_target, aligns);
+	else
+	  __itg(bitext_source_target, bitext_target_source, aligns);
+#endif
+	__itg(bitext_source_target, bitext_target_source, aligns);
+      
+	alignment.insert(alignment.end(), aligns.begin(), aligns.end());
+      } else if (max_match_mode) {
+	__max_match(bitext_source_target, bitext_target_source, aligns);
+      
+	alignment.insert(alignment.end(), aligns.begin(), aligns.end());
+      } else if (intersection_mode) 
+	__intersect(bitext_source_target, bitext_target_source, inserter);
+      else if (union_mode) {
+	__union(bitext_source_target, bitext_target_source, aligns);
+      
+	alignment.insert(alignment.end(), aligns.begin(), aligns.end());
+      } else {
+	// first, compute intersection
+	__intersect(bitext_source_target, bitext_target_source, aligns);
+      
+	// grow...
+	if (grow_mode) {
+	  if (diag_mode)
+	    __grow_diag(bitext_source_target, bitext_target_source, aligns);
+	  else
+	    __grow(bitext_source_target, bitext_target_source, aligns);
+	}
+      
+	// final...
+	if (final_mode)
+	  __final(bitext_source_target, bitext_target_source, aligns);
+	else if (final_and_mode)
+	  __final_and(bitext_source_target, bitext_target_source, aligns);
+      
+	alignment.insert(alignment.end(), aligns.begin(), aligns.end());
+      }
+    
+      // invert this alignment...
+      if (invert_mode) {
+	inverted.clear();
+	__invert(alignment, inverted_inserter);
+	std::sort(inverted.begin(), inverted.end());
+	alignment.swap(inverted);
+      }
+      
+      id_alignment.first = bitext_source_target.id;
+      id_alignment.second.swap(alignment);
+      
+      queue_alignment.push_swap(id_alignment);
+    }
+    
+    id_alignment.first = size_t(-1);
+    id_alignment.second.clear();
+    
+    queue_alignment.push_swap(id_alignment);
+  }  
 };
 
 void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istream* is_src, std::istream* is_trg, std::ostream& os)
