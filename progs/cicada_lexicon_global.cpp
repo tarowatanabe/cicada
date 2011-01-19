@@ -70,8 +70,6 @@ int main(int argc, char** argv)
     
     if (output_file.empty())
       throw std::runtime_error("no output path");
-
-    srandom(getpid() * time(0));
     
     threads = (threads <= 0 ? 1 : threads);
     

@@ -10,6 +10,7 @@
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/random.hpp>
 
 #include <utils/compress_stream.hpp>
 #include <utils/lockfree_list_queue.hpp>
@@ -142,9 +143,13 @@ struct OptimizeAROW : public Optimizer
       positions[pos] = pos;
       sample_size += bitexts[pos].target.size();
     }
+
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
     
     for (int iter = 0; iter < max_iteration; ++ iter) {
-      std::random_shuffle(positions.begin(), positions.end());
+      std::random_shuffle(positions.begin(), positions.end(), generator);
 
       double margin_sum = 0.0;
       size_t num_correct = 0;
@@ -226,8 +231,12 @@ struct OptimizeCW : public Optimizer
       sample_size += bitexts[pos].target.size();
     }
     
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
+
     for (int iter = 0; iter < max_iteration; ++ iter) {
-      std::random_shuffle(positions.begin(), positions.end());
+      std::random_shuffle(positions.begin(), positions.end(), generator);
       
       double margin_sum = 0.0;
       size_t num_correct = 0;
@@ -307,8 +316,12 @@ struct OptimizeMIRA : public Optimizer
       sample_size += bitexts[pos].target.size();
     }
     
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
+
     for (int iter = 0; iter < max_iteration; ++ iter) {
-      std::random_shuffle(positions.begin(), positions.end());
+      std::random_shuffle(positions.begin(), positions.end(), generator);
       
       double margin_sum = 0.0;
       size_t num_correct = 0;
@@ -405,8 +418,12 @@ struct OptimizeSGD : public Optimizer
     double penalty = 0.0;
     parameter_set_type penalties(x.size(), 0.0);
     
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
+
     for (int iter = 0; iter < max_iteration; ++ iter) {
-      std::random_shuffle(positions.begin(), positions.end());
+      std::random_shuffle(positions.begin(), positions.end(), generator);
       
       double objective = 0.0;
       double margin_sum = 0.0;
@@ -504,8 +521,12 @@ struct OptimizeSGD : public Optimizer
     size_t epoch = 0;
     const double lambda = C / sample_size;
 
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
+
     for (int iter = 0; iter < max_iteration; ++ iter) {
-      std::random_shuffle(positions.begin(), positions.end());
+      std::random_shuffle(positions.begin(), positions.end(), generator);
       
       double objective = 0.0;
       double margin_sum = 0.0;
