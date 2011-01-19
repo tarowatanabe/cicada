@@ -38,7 +38,7 @@ namespace cicada
     typedef std::vector<bool, std::allocator<bool> > removed_type;
 
     template <typename Iterator>
-    std::string binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
+    symbol_type binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
     {
       std::string label = lhs.non_terminal().non_terminal_strip() + '^';
       if (first != last) {
@@ -49,7 +49,7 @@ namespace cicada
 	  label += first->non_terminal().non_terminal_strip();
 	}
       }
-      return label;
+      return '[' + label + ']';
     }
 
     
@@ -107,14 +107,14 @@ namespace cicada
 	  context.clear();
 	  
 	  hypergraph_type::id_type head = edge_source.head;
-	  std::string non_terminal_head = edge_source.rule->lhs.non_terminal_strip();
+	  symbol_type non_terminal_head = edge_source.rule->lhs;
 	  
 	  const int arity = edge_source.tails.size();
 	  
 	  for (int i = 0; i < arity - 2; ++ i) {
 	    context.push_back(edge_source.rule->rhs[i]);
 	    
-	    const std::string non_terminal_new = (order < 0
+	    const symbol_type non_terminal_new = (order < 0
 						  ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
 						  : binarized_label(edge_source.rule->lhs,
 								    std::max(context.begin(), context.end() - order),
@@ -125,11 +125,11 @@ namespace cicada
 	    tails.back() = node_new.id;
 	    
 	    binarized.front() = edge_source.rule->rhs[i];
-	    binarized.back() = '[' + non_terminal_new + ']';
+	    binarized.back() = non_terminal_new;
 	    
 	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	    
-	    edge_new.rule = rule_type::create(rule_type('[' + non_terminal_head + ']', binarized.begin(), binarized.end()));
+	    edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
 	    
 	    target.connect_edge(edge_new.id, head);
 	    
@@ -142,7 +142,7 @@ namespace cicada
 	  binarized.front() = *(edge_source.rule->rhs.end() - 2);
 	  binarized.back()  = *(edge_source.rule->rhs.end() - 1);
 	  
-	  edge_new.rule = rule_type::create(rule_type('[' + non_terminal_head + ']', binarized.begin(), binarized.end()));
+	  edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
 	  
 	  // assign features here...
 	  edge_new.features   = edge_source.features;
@@ -205,14 +205,14 @@ namespace cicada
 	  context.clear();
 	  
 	  hypergraph_type::id_type head = edge_source.head;
-	  std::string non_terminal_head = edge_source.rule->lhs.non_terminal_strip();
+	  symbol_type non_terminal_head = edge_source.rule->lhs;
 	  
 	  const int arity = edge_source.tails.size();
 	  
 	  for (int i = 0; i < arity - 2; ++ i) {
 	    context.push_back(edge_source.rule->rhs[arity - i - 1]);
 	    
-	    const std::string non_terminal_new = (order < 0
+	    const symbol_type non_terminal_new = (order < 0
 						  ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
 						  : binarized_label(edge_source.rule->lhs,
 								    std::max(context.begin(), context.end() - order),
@@ -222,12 +222,12 @@ namespace cicada
 	    tails.front() =  node_new.id;
 	    tails.back() = edge_source.tails[arity - i - 1];
 	    
-	    binarized.front() =  '[' + non_terminal_new + ']';
+	    binarized.front() =  non_terminal_new;
 	    binarized.back() = edge_source.rule->rhs[arity - i - 1];
 	    
 	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	    
-	    edge_new.rule = rule_type::create(rule_type('[' + non_terminal_head + ']', binarized.begin(), binarized.end()));
+	    edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
 	    
 	    target.connect_edge(edge_new.id, head);
 	    
@@ -240,7 +240,7 @@ namespace cicada
 	  binarized.front() = *(edge_source.rule->rhs.begin() + 0);
 	  binarized.back()  = *(edge_source.rule->rhs.begin() + 1);
 	  
-	  edge_new.rule = rule_type::create(rule_type('[' + non_terminal_head + ']', binarized.begin(), binarized.end()));
+	  edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
 	  
 	  // assign features here...
 	  edge_new.features   = edge_source.features;

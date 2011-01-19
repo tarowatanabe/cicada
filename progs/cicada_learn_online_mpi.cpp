@@ -280,13 +280,12 @@ int main(int argc, char ** argv)
     
     if (! oracle_files.empty()) {
       graphs_oracle.resize(scorers.size());
-
+      
       read_oracle(oracle_files, graphs_oracle, mpi_rank, mpi_size);
       
       //read_oracle(oracle_files, scorers, graphs_oracle, score_oracle, scores_oracle, bleus);
       
       // compute oracles, taken from cicada-orace-mpi, but w/o iteration.
-      
       
     }
 
