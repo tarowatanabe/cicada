@@ -312,23 +312,6 @@ struct Task
     value_set_type accumulated;
   };
   
-  struct bleu_function
-  {
-    typedef cicada::semiring::Tropical<double> value_type;
-    
-    bleu_function(const feature_type& __feature_name, const double __scale)
-      : feature_name(__feature_name), scale(__scale) {}
-    
-    const feature_type feature_name;
-    const double scale;
-    
-    template <typename Edge>
-    value_type operator()(const Edge& x) const
-    {
-      return cicada::semiring::traits<value_type>::exp(x.features[feature_name] * scale);
-    }
-  };
-
   typedef std::vector<size_t, std::allocator<size_t> > id_collection_type;
   typedef std::vector<double, std::allocator<double> > label_collection_type;
   typedef std::vector<double, std::allocator<double> > margin_collection_type;
@@ -418,7 +401,8 @@ struct Task
 				    margin_collection_type& margins,
 				    feature_collection_type& features)
   {
-    typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+    typedef cicada::semiring::Tropical<double> bleu_weight_type;
+    typedef std::vector<bleu_weight_type, std::allocator<bleu_weight_type> > bleu_set_type;
 
     count_set_type counts_reward(hypergraph_reward.nodes.size());
     count_set_type counts_penalty(hypergraph_penalty.nodes.size());
@@ -435,8 +419,8 @@ struct Task
     bleu_set_type bleu_edge_reward(hypergraph_reward.edges.size());
     bleu_set_type bleu_edge_penalty(hypergraph_penalty.edges.size());
     
-    cicada::inside_outside(hypergraph_reward,  bleu_reward,  bleu_edge_reward,  bleu_function(feature_name,   1.0), bleu_function(feature_name,   1.0));
-    cicada::inside_outside(hypergraph_penalty, bleu_penalty, bleu_edge_penalty, bleu_function(feature_name, - 1.0), bleu_function(feature_name, - 1.0));
+    cicada::inside_outside(hypergraph_reward,  bleu_reward,  bleu_edge_reward,  cicada::operation::single_scaled_function<bleu_weight_type>(feature_name,   1.0), cicada::operation::single_scaled_function<bleu_weight_type>(feature_name,   1.0));
+    cicada::inside_outside(hypergraph_penalty, bleu_penalty, bleu_edge_penalty, cicada::operation::single_scaled_function<bleu_weight_type>(feature_name, - 1.0), cicada::operation::single_scaled_function<bleu_weight_type>(feature_name, - 1.0));
 
     const double factor_reward  = 1.0 / double(counts_reward.back());
     const double factor_penalty = 1.0 / double(counts_penalty.back());
@@ -751,7 +735,8 @@ struct Task
 	  hypergraph_oracles.resize(id + 1);
 	
 	if (hypergraph_oracles[id].is_valid()) {
-	  typedef std::vector<typename bleu_function::value_type, std::allocator<typename bleu_function::value_type> > bleu_set_type;
+	  typedef cicada::semiring::Tropical<double> bleu_weight_type;
+	  typedef std::vector<bleu_weight_type, std::allocator<bleu_weight_type> > bleu_set_type;
 	  
 	  hypergraph_type hypergraph_oracle;
 	  
@@ -760,8 +745,8 @@ struct Task
 	  bleu_set_type bleu_curr(hypergraph_reward.nodes.size());
 	  bleu_set_type bleu_prev(hypergraph_oracle.nodes.size());
 	  
-	  cicada::inside(hypergraph_reward, bleu_curr, bleu_function(__bleu->feature_name(), 1.0));
-	  cicada::inside(hypergraph_oracle, bleu_prev, bleu_function(__bleu->feature_name(), 1.0));
+	  cicada::inside(hypergraph_reward, bleu_curr, cicada::operation::single_scaled_function<bleu_weight_type>(__bleu->feature_name(), 1.0));
+	  cicada::inside(hypergraph_oracle, bleu_prev, cicada::operation::single_scaled_function<bleu_weight_type>(__bleu->feature_name(), 1.0));
 
 	  if (bleu_curr.back() >= bleu_prev.back())
 	    hypergraph_oracles[id] = hypergraph_reward;

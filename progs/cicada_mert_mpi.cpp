@@ -902,7 +902,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       weight_type weight;
       
-      cicada::viterbi(graphs[mpi_id], yield, weight, cicaa::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weigh_type>(weights));
+      cicada::viterbi(graphs[mpi_id], yield, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
       
       os << id << " ||| " << yield << '\n';
     }

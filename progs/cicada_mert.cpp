@@ -31,6 +31,9 @@
 #include "cicada/optimize/line_search.hpp"
 #include "cicada/optimize/powell.hpp"
 
+#include "cicada/operation/functional.hpp"
+#include "cicada/operation/traversal.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
