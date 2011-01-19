@@ -33,6 +33,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/random.hpp>
 
 #include "lbfgs.h"
 
@@ -64,10 +65,11 @@ template <typename Optimize>
 double optimize_batch(const hypergraph_set_type& graphs_forest,
 		      const hypergraph_set_type& graphs_intersected,
 		      weight_set_type& weights);
-template <typename Optimize>
+template <typename Optimize, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
-		       weight_set_type& weights);
+		       weight_set_type& weights,
+		       Generator& generator);
 
 template <typename Optimizer>
 struct OptimizeOnline;
@@ -116,14 +118,17 @@ int main(int argc, char ** argv)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
     weight_set_type weights;
-    
     double objective = 0.0;
+
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
     
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs_forest, graphs_intersected, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs_forest, graphs_intersected, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs_forest, graphs_intersected, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs_forest, graphs_intersected, weights, generator);
     } else
       objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
 
@@ -406,10 +411,11 @@ struct OptimizeOnlineMargin
   weights_type   inside_intersected;
 };
 
-template <typename Optimize>
+template <typename Optimize, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs_forest,
 		       const hypergraph_set_type& graphs_intersected,
-		       weight_set_type& weights)
+		       weight_set_type& weights,
+		       Generator& generator)
 {
   typedef std::vector<int, std::allocator<int> > id_set_type;
   typedef typename Optimize::optimizer_type optimizer_type;
@@ -442,7 +448,7 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
       
       optimizer.finalize();
       
-      std::random_shuffle(ids.begin(), ids.end());
+      std::random_shuffle(ids.begin(), ids.end(), generator);
       
       optimizer.weights *= optimizer.samples;
       reduce_weights(optimizer.weights);
@@ -497,7 +503,7 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
 	
 	optimizer.finalize();
 	
-	std::random_shuffle(ids.begin(), ids.end());
+	std::random_shuffle(ids.begin(), ids.end(), generator);
 	
 	optimizer.weights *= optimizer.samples;
 	send_weights(optimizer.weights);

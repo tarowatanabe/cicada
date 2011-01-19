@@ -738,7 +738,7 @@ double optimize_online(const hypergraph_set_type& graphs,
 	
 	optimizer.finalize();
 	
-	std::random_shuffle(ids.begin(), ids.end());
+	std::random_shuffle(ids.begin(), ids.end(), generator);
 	
 	optimizer.weights *= optimizer.samples;
 	send_weights(optimizer.weights);
