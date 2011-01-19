@@ -50,8 +50,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
-
 #include <boost/thread.hpp>
+#include <boost/random.hpp>
 
 #include "utils/base64.hpp"
 #include "utils/mpi.hpp"
@@ -134,7 +134,7 @@ int cube_size = 200;
 
 int debug = 0;
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 void optimize(const sample_set_type& samples,
 	      operation_set_type& operations,
 	      scorer_document_type& scorers,
@@ -142,7 +142,8 @@ void optimize(const sample_set_type& samples,
 	      feature_function_ptr_set_type& bleus,
 	      model_type& model,
 	      weight_set_type& weights,
-	      weight_set_type& weights_average);
+	      weight_set_type& weights_average,
+	      Generator& generator);
 
 void compute_oracles(const scorer_document_type& scorers,
 		     hypergraph_set_type& graphs,
@@ -186,8 +187,6 @@ int main(int argc, char ** argv)
       return 0;
     }
 
-    srandom(time(0) * getpid());
-    
     // read grammars...
     grammar_type grammar;
     const size_t grammar_static_size  = load_grammar<cicada::GrammarStatic>(grammar, grammar_static_files);
@@ -289,11 +288,15 @@ int main(int argc, char ** argv)
       utils::compress_istream is(weights_file);
       is >> weights;
     }
+
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
     
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
-      ::optimize<OptimizeMIRA>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
+      ::optimize<OptimizeMIRA>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average, generator);
     else if (strcasecmp(algorithm.c_str(), "cp") == 0)
-      ::optimize<OptimizeCP>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
+      ::optimize<OptimizeCP>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average, generator);
     else
       throw std::runtime_error("unsupported learning algorithm: " + algorithm);
     
@@ -469,14 +472,16 @@ void compute_oracles(const scorer_document_type& scorers,
   }
 }
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 struct Task
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
   typedef utils::lockfree_list_queue<std::string, std::allocator<std::string> > queue_type;
+  
   typedef Optimizer optimizer_type;
+  typedef Generator generator_type;
 
   typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
@@ -490,7 +495,8 @@ struct Task
        hypergraph_set_type& __hypergraph_oracles,
        feature_function_ptr_set_type& __bleus,
        model_type& __model,
-       optimizer_type& __optimizer)
+       optimizer_type& __optimizer,
+       generator_type& __generator)
     : samples(__samples), queue_send(__queue_send), queue_recv(__queue_recv),
       operations(__operations),
       scorers(__scorers),
@@ -498,6 +504,7 @@ struct Task
       bleus(__bleus),
       model(__model),
       optimizer(__optimizer),
+      generator(__generator),
       batch_current(0),
       score_1best(), score(), scores(), norm(0.0)
   {
@@ -509,8 +516,6 @@ struct Task
       if (! samples[i].empty())
 	sample_map.push_back(i);
   }
-
-  
 
   const sample_set_type& samples;
   queue_type&        queue_send;
@@ -524,6 +529,7 @@ struct Task
   model_type&        model;
   
   optimizer_type&    optimizer;
+  generator_type&    generator;
   
   int batch_current;
   
@@ -1139,7 +1145,7 @@ struct Task
       features.clear();
     }
 
-    std::random_shuffle(sample_map.begin(), sample_map.end());
+    std::random_shuffle(sample_map.begin(), sample_map.end(), generator);
     
     // final function call...
     optimizer.finalize();
@@ -1211,7 +1217,7 @@ bool bcast_vectors(Iterator first, Iterator last, BufferIterator bfirst, Queue& 
   return found;
 }
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 void optimize(const sample_set_type& samples,
 	      operation_set_type& operations,
 	      scorer_document_type& scorers,
@@ -1219,10 +1225,12 @@ void optimize(const sample_set_type& samples,
 	      feature_function_ptr_set_type& bleus,
 	      model_type& model,
 	      weight_set_type& weights,
-	      weight_set_type& weights_average)
+	      weight_set_type& weights_average,
+	      Generator& generator)
 {
   typedef Optimizer optimizer_type;
-  typedef Task<optimizer_type>  task_type;
+  typedef Generator generator_type;
+  typedef Task<optimizer_type, generator_type>  task_type;
   typedef typename task_type::queue_type queue_type;
   
   typedef boost::shared_ptr<utils::mpi_ostream_simple> ostream_ptr_type;
@@ -1245,7 +1253,7 @@ void optimize(const sample_set_type& samples,
 
   optimizer_type optimizer(weights, C, tolerance_solver, debug);
   
-  task_type task(samples, queue_reduce, queue_bcast, operations, scorers, hypergraph_oracles, bleus, model, optimizer);
+  task_type task(samples, queue_reduce, queue_bcast, operations, scorers, hypergraph_oracles, bleus, model, optimizer, generator);
 
   dumper_type::queue_type queue_dumper;
   std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
