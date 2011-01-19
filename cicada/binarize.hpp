@@ -97,13 +97,11 @@ namespace cicada
 	  	  
 	  if (edge_source.tails.size() <= 2) continue;
 	  
-	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->rhs.size()))
-	    throw std::runtime_error("we do not support terminal-mixed rules (aka Hiero rules)");
-	  
 	  removed[edge_source.id] = true;
 	  
 	  // right most antecedents binarization...
 	  
+	  binarized.clear();
 	  context.clear();
 	  
 	  hypergraph_type::id_type head = edge_source.head;
@@ -111,36 +109,61 @@ namespace cicada
 	  
 	  const int arity = edge_source.tails.size();
 	  
-	  for (int i = 0; i < arity - 2; ++ i) {
-	    context.push_back(edge_source.rule->rhs[i]);
-	    
-	    const symbol_type non_terminal_new = (order < 0
-						  ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
-						  : binarized_label(edge_source.rule->lhs,
-								    std::max(context.begin(), context.end() - order),
-								    context.end()));
+	  int pos = 0;
+	  rule_type::symbol_set_type::const_iterator riter = edge_source.rule->rhs.begin();
+	  rule_type::symbol_set_type::const_iterator riter_end = edge_source.rule->rhs.end();
+	  for (/**/; riter != riter_end && pos < arity - 2; ++ riter) {
+	    if (riter->is_non_terminal()) {
+	      // we will check non-terminal-index here...
+	      const int non_terminal_index = riter->non_terminal_index();
+	      if (non_terminal_index > 0 && non_terminal_index - 1 != pos)
+		throw std::runtime_error("hypergraph is not tail-sorted!");
 	      
-	    hypergraph_type::node_type& node_new = target.add_node();
-	    tails.front() = edge_source.tails[i];
-	    tails.back() = node_new.id;
-	    
-	    binarized.front() = edge_source.rule->rhs[i];
-	    binarized.back() = non_terminal_new;
-	    
-	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
-	    
-	    edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
-	    
-	    target.connect_edge(edge_new.id, head);
-	    
-	    head = node_new.id;
-	    non_terminal_head = non_terminal_new;
+	      // then...
+	      context.push_back(*riter);
+	      
+	      const symbol_type non_terminal_new = (order < 0
+						    ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
+						    : binarized_label(edge_source.rule->lhs,
+								      std::max(context.begin(), context.end() - order),
+								      context.end()));
+	      
+	      binarized.push_back(riter->non_terminal());
+	      binarized.push_back(non_terminal_new);
+	      
+	      hypergraph_type::node_type& node_new = target.add_node();
+	      tails.front() = edge_source.tails[pos];
+	      tails.back() = node_new.id;
+	      
+	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
+	      
+	      edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
+	      
+	      target.connect_edge(edge_new.id, head);
+	      
+	      head = node_new.id;
+	      non_terminal_head = non_terminal_new;
+	      
+	      binarized.clear();
+	      ++ pos;
+	    } else 
+	      binarized.push_back(*riter);
 	  }
 	  
 	  hypergraph_type::edge_type& edge_new = target.add_edge(edge_source.tails.end() - 2, edge_source.tails.end());
 	  
-	  binarized.front() = *(edge_source.rule->rhs.end() - 2);
-	  binarized.back()  = *(edge_source.rule->rhs.end() - 1);
+	  for (/**/; riter != riter_end; ++ riter) {
+	    if (riter->is_non_terminal()) {
+	      // we will check non-terminal-index here...
+	      const int non_terminal_index = riter->non_terminal_index();
+	      if (non_terminal_index > 0 && non_terminal_index - 1 != pos)
+		throw std::runtime_error("hypergraph is not tail-sorted!");
+	      
+	      ++ pos;
+	      binarized.push_back(riter->non_terminal());
+	    } else
+	      binarized.push_back(*riter);
+	  }
 	  
 	  edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
 	  
@@ -195,50 +218,75 @@ namespace cicada
 	  
 	  if (edge_source.tails.size() <= 2) continue;
 	  
-	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->rhs.size()))
-	    throw std::runtime_error("we do not support terminal-mixed rules (aka Hiero rules)");
-	  
 	  removed[edge_source.id] = true;
 	  
 	  // left most antecedents binarization...
-
+	  
+	  binarized.clear();
 	  context.clear();
 	  
 	  hypergraph_type::id_type head = edge_source.head;
 	  symbol_type non_terminal_head = edge_source.rule->lhs;
 	  
 	  const int arity = edge_source.tails.size();
-	  
-	  for (int i = 0; i < arity - 2; ++ i) {
-	    context.push_back(edge_source.rule->rhs[arity - i - 1]);
-	    
-	    const symbol_type non_terminal_new = (order < 0
-						  ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
-						  : binarized_label(edge_source.rule->lhs,
-								    std::max(context.begin(), context.end() - order),
-								    context.end()));
-	    
-	    hypergraph_type::node_type& node_new = target.add_node();
-	    tails.front() =  node_new.id;
-	    tails.back() = edge_source.tails[arity - i - 1];
-	    
-	    binarized.front() =  non_terminal_new;
-	    binarized.back() = edge_source.rule->rhs[arity - i - 1];
-	    
-	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
-	    
-	    edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
-	    
-	    target.connect_edge(edge_new.id, head);
-	    
-	    head = node_new.id;
-	    non_terminal_head = non_terminal_new;
+
+	  int pos = arity - 1;
+	  rule_type::symbol_set_type::const_reverse_iterator riter = edge_source.rule->rhs.rbegin();
+	  rule_type::symbol_set_type::const_reverse_iterator riter_end = edge_source.rule->rhs.rend();
+	  for (/**/; riter != riter_end && pos >= 2; ++ riter) {
+	    if (riter->is_non_terminal()) {
+	      // we will check non-terminal-index here...
+	      const int non_terminal_index = riter->non_terminal_index();
+	      if (non_terminal_index > 0 && non_terminal_index - 1 != pos)
+		throw std::runtime_error("hypergraph is not tail-sorted!");
+	      
+	      context.push_back(*riter);
+	      
+	      const symbol_type non_terminal_new = (order < 0
+						    ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
+						    : binarized_label(edge_source.rule->lhs,
+								      std::max(context.begin(), context.end() - order),
+								      context.end()));
+	      
+	      binarized.push_back(*riter);
+	      binarized.push_back(non_terminal_new);
+	      
+	      hypergraph_type::node_type& node_new = target.add_node();
+	      tails.front() =  node_new.id;
+	      tails.back() = edge_source.tails[pos];
+	      
+	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
+
+	      std::reverse(binarized.begin(), binarized.end());
+	      edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
+	      
+	      target.connect_edge(edge_new.id, head);
+	      
+	      head = node_new.id;
+	      non_terminal_head = non_terminal_new;
+	      
+	      binarized.clear();
+	      -- pos;
+	    } else
+	      binarized.push_back(*riter);
 	  }
 	  
-	  hypergraph_type::edge_type& edge_new = target.add_edge(edge_source.tails.begin(), edge_source.tails.begin() + 1);
+	  hypergraph_type::edge_type& edge_new = target.add_edge(edge_source.tails.begin(), edge_source.tails.begin() + 2);
+
+	  for (/**/; riter != riter_end; ++ riter) {
+	    if (riter->is_non_terminal()) {
+	      // we will check non-terminal-index here...
+	      const int non_terminal_index = riter->non_terminal_index();
+	      if (non_terminal_index > 0 && non_terminal_index - 1 != pos)
+		throw std::runtime_error("hypergraph is not tail-sorted!");
+	      
+	      -- pos;
+	      binarized.push_back(riter->non_terminal());
+	    } else
+	      binarized.push_back(*riter);
+	  }
 	  
-	  binarized.front() = *(edge_source.rule->rhs.begin() + 0);
-	  binarized.back()  = *(edge_source.rule->rhs.begin() + 1);
+	  std::reverse(binarized.begin(), binarized.end());
 	  
 	  edge_new.rule = rule_type::create(rule_type(non_terminal_head, binarized.begin(), binarized.end()));
 	  
