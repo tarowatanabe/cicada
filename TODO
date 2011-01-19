@@ -10,6 +10,8 @@ Do we allow state-less features applied during composition???
 
 Better MIRA training
     Optimized online training by combining MERT procedure to select better update ratio.... (does it work?)
+    Sharding to reduce memory for each rank
+    Separate averaging and non-averaging code during optimization...
 
 Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree, as in ISI system!)
     Simply convert source side into a flat structure and parse via CKY

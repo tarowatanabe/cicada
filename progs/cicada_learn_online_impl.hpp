@@ -46,6 +46,7 @@ typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_s
 typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+typedef std::vector<std::string, std::allocator<std::string> > sample_set_type;
 
 typedef cicada::SentenceVector sentence_set_type;
 
@@ -196,6 +197,133 @@ struct TaskOracle
 };
 
 inline
+void read_sample(const path_type& input_path,
+		 sample_set_type& samples,
+		 const bool directory_mode,
+		 const bool id_mode,
+		 const int shard_rank,
+		 const int shard_size)
+{
+  if (directory_mode) {
+    for (int i = 0; /**/; ++ i) 
+      if (shard_size <= 0 || i % shard_size == shard_rank) {
+	const path_type path = input_path / (boost::lexical_cast<std::string>(i) + ".gz");
+	
+	if (! boost::filesystem::exists(path)) break;
+
+	if (i >= samples.size())
+	  throw std::runtime_error("id exceeds sample size");
+	
+	utils::compress_istream is(path, 1024 * 1024);
+	
+	samples[i].clear();
+	std::getline(is, samples[i]);
+	
+	// check id...
+	boost::iostreams::filtering_istream stream;
+	stream.push(boost::iostreams::array_source(samples[i].c_str(), samples[i].size()));
+	
+	size_t id = 0;
+	stream >> id;
+	
+	if (id != i)
+	  throw std::runtime_error("invalid directory mode with mismatched id");
+      }
+  } else if (id_mode) {
+    utils::compress_istream is(input_path, 1024 * 1024);
+    
+    size_t id = 0;
+    std::string line;
+    while (std::getline(is, line)) {
+      boost::iostreams::filtering_istream stream;
+      stream.push(boost::iostreams::array_source(line.c_str(), line.size()));
+      
+      stream >> id;
+      
+      if (shard_size <= 0 || id % shard_size == shard_rank) {
+	if (id >= samples.size())
+	  throw std::runtime_error("id exceeds sample size");
+	
+	samples[id].swap(line);
+      }
+    }
+    
+  } else {
+    utils::compress_istream is(input_path, 1024 * 1024);
+    
+    std::string line;
+    for (size_t id = 0; std::getline(is, line); ++ id)
+      if (shard_size <= 0 || id % shard_size == shard_rank) {
+	if (id >= samples.size())
+	  throw std::runtime_error("id exceeds sample size");
+	
+	samples[id] = boost::lexical_cast<std::string>(id) + " ||| " + line;
+      }
+  }
+}
+
+inline
+void read_oracle(const path_set_type& files,
+		 hypergraph_set_type& graphs,
+		 const int shard_rank,
+		 const int shard_size)
+{
+  if (files.empty())
+    throw std::runtime_error("no oracle files?");
+  
+  path_set_type::const_iterator fiter_end = files.end();
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
+    
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (int i = 0; /**/; ++ i) 
+	if (shard_size <= 0 || i % shard_size == shard_rank) {
+	  const path_type path = (*fiter) / (boost::lexical_cast<std::string>(i) + ".gz");
+	  
+	  if (! boost::filesystem::exists(path)) break;
+	  
+	  utils::compress_istream is(path, 1024 * 1024);
+	  
+	  size_t id;
+	  std::string sep;
+	  hypergraph_type hypergraph;
+	  
+	  if (is >> id >> sep >> hypergraph) {
+	    if (sep != "|||")
+	      throw std::runtime_error("format error?: " + fiter->file_string());
+	    
+	    if (id != i)
+	      throw std::runtime_error("invalid directory output format?");
+	    
+	    if (id >= graphs.size())
+	      throw std::runtime_error("id exceeds graphs size");
+	    
+	    graphs[id].unite(hypergraph);
+	  }
+	}
+    } else {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      
+      size_t id;
+      std::string sep;
+      hypergraph_type hypergraph;
+      
+      while (is >> id >> sep >> hypergraph) 
+	if (shard_size <= 0 || id % shard_size == shard_rank) {
+	  
+	  if (sep != "|||")
+	    throw std::runtime_error("format error?: " + fiter->file_string());
+
+	  if (id >= graphs.size())
+	    throw std::runtime_error("id exceeds graphs size");
+	  
+	  graphs[id].unite(hypergraph);
+	}
+    }
+  }
+  
+}
+
+inline
 void read_oracle(const path_set_type& files,
 		 const scorer_document_type& scorers,
 		 hypergraph_set_type& graphs,
@@ -264,6 +392,8 @@ void read_oracle(const path_set_type& files,
   // apply-exact...
   
   // no threading for simplicity...
+  
+  // we will borrow code from cicada_oracle.... w/o iterations
   
   TaskOracle(scorers, graphs, score, scores, bleus)();
 }

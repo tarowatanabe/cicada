@@ -33,8 +33,25 @@ namespace cicada
     typedef hypergraph_type::feature_set_type feature_set_type;
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > context_type;
     
     typedef std::vector<bool, std::allocator<bool> > removed_type;
+
+    template <typename Iterator>
+    std::string binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
+    {
+      std::string label = lhs.non_terminal().non_terminal_strip() + '^';
+      if (first != last) {
+	label += first->non_terminal().non_terminal_strip();
+	++ first;
+	for (/**/; first != last; ++ first) {
+	  label += '_';
+	  label += first->non_terminal().non_terminal_strip();
+	}
+      }
+      return label;
+    }
+
     
     struct filter
     {
@@ -52,8 +69,9 @@ namespace cicada
 
   struct BinarizeRight : public __BinarizeBase
   {
-    BinarizeRight(const int __binarize_size)
-      : binarize_size(__binarize_size) {}
+    BinarizeRight(const int __order=-1)
+      : order(__order) {}
+
 
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -66,6 +84,8 @@ namespace cicada
       // we will traverse source-side in order to avoid confusion with newly created nodes...
       
       removed_type removed(source.edges.size(), false);
+
+      context_type context;
       
       hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
@@ -75,7 +95,7 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	  	  
-	  if (edge_source.tails.size() <= 2 || static_cast<int>(edge_source.tails.size()) < binarize_size) continue;
+	  if (edge_source.tails.size() <= 2) continue;
 	  
 	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->rhs.size()))
 	    throw std::runtime_error("we do not support terminal-mixed rules (aka Hiero rules)");
@@ -84,16 +104,21 @@ namespace cicada
 	  
 	  // right most antecedents binarization...
 	  
+	  context.clear();
+	  
 	  hypergraph_type::id_type head = edge_source.head;
 	  std::string non_terminal_head = edge_source.rule->lhs.non_terminal_strip();
 	  
 	  const int arity = edge_source.tails.size();
 	  
 	  for (int i = 0; i < arity - 2; ++ i) {
-	    std::string non_terminal_new = (i == 0
-					    ? edge_source.rule->lhs.non_terminal_strip() + '^'
-					    : non_terminal_head);
-	    non_terminal_new += '_' + edge_source.rule->rhs[i].non_terminal_strip();
+	    context.push_back(edge_source.rule->rhs[i]);
+	    
+	    const std::string non_terminal_new = (order < 0
+						  ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
+						  : binarized_label(edge_source.rule->lhs,
+								    std::max(context.begin(), context.end() - order),
+								    context.end()));
 	      
 	    hypergraph_type::node_type& node_new = target.add_node();
 	    tails.front() = edge_source.tails[i];
@@ -137,14 +162,14 @@ namespace cicada
       target.swap(graph_removed);
     }
     
-    int binarize_size;
+    int order;
   };
 
 
   struct BinarizeLeft : public __BinarizeBase
   {
-    BinarizeLeft(const int __binarize_size)
-      : binarize_size(__binarize_size) {}
+    BinarizeLeft(const int __order=-1)
+      : order(__order) {}
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -153,6 +178,8 @@ namespace cicada
       
       phrase_type binarized(2);
       hypergraph_type::edge_type::node_set_type tails(2);
+
+      context_type context;
       
       // we will traverse source-side in order to avoid confusion with newly created nodes...
       
@@ -166,7 +193,7 @@ namespace cicada
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
 	  
-	  if (edge_source.tails.size() <= 2 || static_cast<int>(edge_source.tails.size()) < binarize_size) continue;
+	  if (edge_source.tails.size() <= 2) continue;
 	  
 	  if (edge_source.tails.size() != static_cast<size_t>(edge_source.rule->rhs.size()))
 	    throw std::runtime_error("we do not support terminal-mixed rules (aka Hiero rules)");
@@ -174,6 +201,8 @@ namespace cicada
 	  removed[edge_source.id] = true;
 	  
 	  // left most antecedents binarization...
+
+	  context.clear();
 	  
 	  hypergraph_type::id_type head = edge_source.head;
 	  std::string non_terminal_head = edge_source.rule->lhs.non_terminal_strip();
@@ -181,11 +210,14 @@ namespace cicada
 	  const int arity = edge_source.tails.size();
 	  
 	  for (int i = 0; i < arity - 2; ++ i) {
-	    std::string non_terminal_new = (i == 0
-					    ? edge_source.rule->lhs.non_terminal_strip() + '^'
-					    : non_terminal_head);
-	    non_terminal_new += '_' + edge_source.rule->rhs[arity - i - 1].non_terminal_strip();
-	      
+	    context.push_back(edge_source.rule->rhs[arity - i - 1]);
+	    
+	    const std::string non_terminal_new = (order < 0
+						  ? binarized_label(edge_source.rule->lhs, context.begin(), context.end())
+						  : binarized_label(edge_source.rule->lhs,
+								    std::max(context.begin(), context.end() - order),
+								    context.end()));
+	    
 	    hypergraph_type::node_type& node_new = target.add_node();
 	    tails.front() =  node_new.id;
 	    tails.back() = edge_source.tails[arity - i - 1];
@@ -228,24 +260,24 @@ namespace cicada
       target.swap(graph_removed);
     }
     
-    int binarize_size;
+    int order;
   };
   
   
   inline
-  void binarize_right(const HyperGraph& source, HyperGraph& target, const int binarize_size=0)
+  void binarize_right(const HyperGraph& source, HyperGraph& target, const int order=-1)
   {
-    BinarizeRight binarizer(binarize_size);
+    BinarizeRight binarizer(order);
     
     binarizer(source, target);
   }
 
   inline
-  void binarize_right(HyperGraph& source, const int binarize_size=0)
+  void binarize_right(HyperGraph& source, const int order=-1)
   {
     HyperGraph target;
 
-    BinarizeRight binarizer(binarize_size);
+    BinarizeRight binarizer(order);
     
     binarizer(source, target);
     
@@ -253,19 +285,19 @@ namespace cicada
   }
 
   inline
-  void binarize_left(const HyperGraph& source, HyperGraph& target, const int binarize_size=0)
+  void binarize_left(const HyperGraph& source, HyperGraph& target, const int order=-1)
   {
-    BinarizeLeft binarizer(binarize_size);
+    BinarizeLeft binarizer(order);
     
     binarizer(source, target);
   }
 
   inline
-  void binarize_left(HyperGraph& source, const int binarize_size=0)
+  void binarize_left(HyperGraph& source, const int order=-1)
   {
     HyperGraph target;
 
-    BinarizeLeft binarizer(binarize_size);
+    BinarizeLeft binarizer(order);
     
     binarizer(source, target);
     

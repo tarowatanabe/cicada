@@ -135,7 +135,8 @@ int cube_size = 200;
 int debug = 0;
 
 template <typename Optimizer>
-void optimize(operation_set_type& operations,
+void optimize(const sample_set_type& samples,
+	      operation_set_type& operations,
 	      scorer_document_type& scorers,
 	      hypergraph_set_type& hypergraph_oracles,
 	      feature_function_ptr_set_type& bleus,
@@ -150,7 +151,6 @@ void reduce_weights_optimized(weight_set_type& weights, Optimizer& optimizer);
 void options(int argc, char** argv);
 
 enum {
-  
   weights_tag = 1000,
   sample_tag,
   vector_tag,
@@ -262,17 +262,33 @@ int main(int argc, char ** argv)
     
     if (debug && mpi_rank == 0)
       std::cerr << "feature functions: " << model.size() << std::endl;
-    
+
+    // read refset... we do not shard data...
     scorer_document_type          scorers(scorer_name);
     feature_function_ptr_set_type bleus;
     
     read_refset(refset_files, scorer_name, scorers, bleus);
     
+    // read samples.... we will shard data...
+    sample_set_type samples(scorers.size());
+    read_sample(input_file, samples, input_directory_mode, input_id_mode, mpi_rank, mpi_size);
+    
+    // read oracle hypergraphs, when used...
     hypergraph_set_type graphs_oracle;
     score_ptr_type      score_oracle;
     score_ptr_set_type  scores_oracle;
-    if (! oracle_files.empty())
-      read_oracle(oracle_files, scorers, graphs_oracle, score_oracle, scores_oracle, bleus);
+    
+    if (! oracle_files.empty()) {
+      graphs_oracle.resize(scorers.size());
+
+      read_oracle(oracle_files, graphs_oracle, mpi_rank, mpi_size);
+      
+      //read_oracle(oracle_files, scorers, graphs_oracle, score_oracle, scores_oracle, bleus);
+      
+      // compute oracles, taken from cicada-orace-mpi, but w/o iteration.
+      
+      
+    }
 
     operation_set_type operations(ops.begin(), ops.end(),
 				  model,
@@ -300,9 +316,9 @@ int main(int argc, char ** argv)
     }
     
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
-      ::optimize<OptimizeMIRA>(operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
+      ::optimize<OptimizeMIRA>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
     else if (strcasecmp(algorithm.c_str(), "cp") == 0)
-      ::optimize<OptimizeCP>(operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
+      ::optimize<OptimizeCP>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average);
     else
       throw std::runtime_error("unsupported learning algorithm: " + algorithm);
     
@@ -366,7 +382,7 @@ struct Task
   queue_type&        queue_send;
   queue_type&        queue_recv;
   
-  operation_set_type&      operations;
+  operation_set_type&   operations;
   scorer_document_type& scorers;
   
   hypergraph_set_type&  hypergraph_oracles;
@@ -693,7 +709,6 @@ struct Task
     label_collection_type   labels;
     margin_collection_type  margins;
     feature_collection_type features;
-
 
     bool terminated_merge = false;
     bool terminated_sample = false;
@@ -1084,7 +1099,8 @@ bool bcast_vectors(Iterator first, Iterator last, BufferIterator bfirst, Queue& 
 }
 
 template <typename Optimizer>
-void optimize(operation_set_type& operations,
+void optimize(const sample_set_type& samples,
+	      operation_set_type& operations,
 	      scorer_document_type& scorers,
 	      hypergraph_set_type& hypergraph_oracles,
 	      feature_function_ptr_set_type& bleus,
@@ -1095,8 +1111,6 @@ void optimize(operation_set_type& operations,
   typedef Optimizer optimizer_type;
   typedef Task<optimizer_type>  task_type;
   typedef typename task_type::queue_type queue_type;
-
-  typedef std::vector<std::string, std::allocator<std::string> > sample_set_type;
   
   typedef boost::shared_ptr<utils::mpi_ostream_simple> ostream_ptr_type;
   typedef boost::shared_ptr<utils::mpi_istream_simple> istream_ptr_type;
@@ -1112,40 +1126,6 @@ void optimize(operation_set_type& operations,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  sample_set_type samples;
-    
-  // read all the training data...
-  if (mpi_rank == 0) {
-    if (input_directory_mode) {
-      std::string line;
-      
-      boost::filesystem::directory_iterator iter_end;
-      for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
-	utils::compress_istream is(*iter, 1024 * 1024);
-      
-	if (std::getline(is, line) && ! line.empty())
-	  samples.push_back(line);
-      }
-    } else {
-      utils::compress_istream is(input_file, 1024 * 1024);
-    
-      size_t id = 0;
-
-      std::string line;
-      while (std::getline(is, line))
-	if (! line.empty()) {
-	  if (! input_id_mode)
-	    samples.push_back(boost::lexical_cast<std::string>(id) + " ||| " + line);
-	  else
-	    samples.push_back(line);
-	  ++ id;
-	}
-    }
-    
-    if (debug)
-      std::cerr << "# of samples: " << samples.size() << std::endl;
-  }
   
   queue_type queue(1);
   queue_type queue_reduce;
@@ -1249,7 +1229,8 @@ void optimize(operation_set_type& operations,
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
       
-      std::random_shuffle(samples.begin(), samples.end());
+      // randomize!
+      //std::random_shuffle(samples.begin(), samples.end());
       
     } else {
       buffer_map_type buffers(mpi_size);

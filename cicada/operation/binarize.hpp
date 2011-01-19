@@ -22,7 +22,7 @@ namespace cicada
   
       void operator()(data_type& data) const;
   
-      int size;
+      int order;
   
       bool left;
       bool right;

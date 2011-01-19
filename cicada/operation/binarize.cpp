@@ -18,7 +18,7 @@ namespace cicada
   {
 
     Binarize::Binarize(const std::string& parameter, const int __debug)
-      : size(0), left(false), right(false), debug(__debug)
+      : order(-1), left(false), right(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -27,8 +27,8 @@ namespace cicada
 	throw std::runtime_error("this is not a binarizer");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "size") == 0)
-	  size = boost::lexical_cast<int>(piter->second);
+	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	  order = boost::lexical_cast<int>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "direction") == 0) {
 	  const std::string& dir = piter->second;
 	
@@ -58,9 +58,9 @@ namespace cicada
       utils::resource start;
     
       if (left)
-	cicada::binarize_left(data.hypergraph, binarized, size);
+	cicada::binarize_left(data.hypergraph, binarized, order);
       else if (right)
-	cicada::binarize_right(data.hypergraph, binarized, size);
+	cicada::binarize_right(data.hypergraph, binarized, order);
     
       utils::resource end;
     

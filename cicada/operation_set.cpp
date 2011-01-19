@@ -44,7 +44,7 @@ namespace cicada
     static const char* desc = "\
 binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right] binarization direction\n\
-\tsize=binarization size\n\
+\torder=binarization order (default: -1 == all context)\n\
 permute: permute tree (monolingual tree only)\n\
 \tsize=permute size\n\
 \texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
