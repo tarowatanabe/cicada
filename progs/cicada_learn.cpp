@@ -99,16 +99,14 @@ int main(int argc, char ** argv)
     weight_set_type weights;
     double objective = 0.0;
     
-    typedef boost::random_number_generator<boost::mt19937> generator_type;
-    boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
-    generator_type generator(gen);
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
 
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, generator_type> >(instances, forest_path, intersected_path, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(instances, forest_path, intersected_path, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, generator_type> >(instances, forest_path, intersected_path, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(instances, forest_path, intersected_path, weights, generator);
     } else
       objective = optimize_batch<OptimizeLBFGS>(instances, forest_path, intersected_path, weights);
     
@@ -357,7 +355,8 @@ struct OptimizeOnline
       for (int i = 0; i < threads; ++ i)
 	queue.push(path_pair_type());
       
-      std::random_shuffle(paths.begin(), paths.end(), generator);
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(paths.begin(), paths.end(), gen);
       
       workers.join_all();
       

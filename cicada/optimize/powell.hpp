@@ -11,6 +11,8 @@
 #include <cicada/optimize/line_search.hpp>
 #include <cicada/semiring/envelope.hpp>
 
+#include <boost/random.hpp>
+
 namespace cicada
 {
   namespace optimize
@@ -187,8 +189,10 @@ namespace cicada
       template <typename Iterator>
       void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper)
       {
+	boost::uniform_01<double> uniform;
+
 	for (/**/; first != last; ++ first, ++ lower, ++ upper)
-	  *first = *lower + (double(generator(RAND_MAX)) / RAND_MAX) * std::min(double(*upper - *lower), 1.0);
+	  *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
       }
 
       template <typename Iterator>

@@ -288,9 +288,8 @@ int main(int argc, char ** argv)
       is >> weights;
     }
 
-    boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
-    boost::random_number_generator<boost::mt19937> generator(gen);
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
     
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
       ::optimize<OptimizeMIRA>(samples, operations, scorers, graphs_oracle, bleus, model, weights, weights_average, generator);
@@ -1146,7 +1145,8 @@ struct Task
       features.clear();
     }
 
-    std::random_shuffle(sample_map.begin(), sample_map.end(), generator);
+    boost::random_number_generator<generator_type> gen(generator);
+    std::random_shuffle(sample_map.begin(), sample_map.end(), gen);
     
     // final function call...
     optimizer.finalize();

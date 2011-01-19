@@ -115,8 +115,10 @@ template <typename Iterator, typename Generator>
 inline
 void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper, Generator& generator)
 {
+  boost::uniform_01<double> uniform;
+  
   for (/**/; first != last; ++ first, ++ lower, ++ upper)
-    *first = *lower + (double(generator(RAND_MAX)) / RAND_MAX) * std::min(double(*upper - *lower), 1.0);
+    *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
 }
 
 template <typename Iterator>
@@ -399,9 +401,8 @@ int main(int argc, char ** argv)
       cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     }
     
-    boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
-    boost::random_number_generator<boost::mt19937> generator(gen);
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
     
     if (mpi_rank == 0) {
 

@@ -168,9 +168,8 @@ int main(int argc, char ** argv)
       is >> weights;
     }
     
-    boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
-    boost::random_number_generator<boost::mt19937> generator(gen);
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
     
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
       ::optimize<OptimizeMIRA>(weights, weights_average, generator);
@@ -1059,7 +1058,8 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average, Genera
     
     workers.join_all();
     
-    std::random_shuffle(samples.begin(), samples.end(), generator);
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(samples.begin(), samples.end(), gen);
     
     // merge vector...
     weights_mixed.clear();

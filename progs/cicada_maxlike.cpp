@@ -188,10 +188,8 @@ int main(int argc, char ** argv)
     if (oracle_loss)
       compute_oracles(graphs, features, scorers);
 
-    typedef boost::random_number_generator<boost::mt19937> generator_type;
-    boost::mt19937 gen;
-    gen.seed(time(0) * getpid());
-    generator_type generator(gen);
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
     
     weight_set_type weights;
     
@@ -199,9 +197,9 @@ int main(int argc, char ** argv)
 
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, generator_type> >(graphs, features, scorers, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(graphs, features, scorers, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, generator_type> >(graphs, features, scorers, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs, features, scorers, weights, generator);
     } else 
       objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
@@ -700,7 +698,8 @@ struct OptimizeOnline
       for (int i = 0; i < threads; ++ i)
 	queue.push(-1);
       
-      std::random_shuffle(ids.begin(), ids.end(), generator);
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(ids.begin(), ids.end(), gen);
       
       workers.join_all();
       
