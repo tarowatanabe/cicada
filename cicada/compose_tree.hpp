@@ -203,6 +203,8 @@ namespace cicada
     {
       typedef std::deque<phrase_type, std::allocator<phrase_type> >  buffer_type;
 
+      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > lhs_set_type;
+
       if (graph_in.nodes[id].edges.empty()) return;
       
       // first, construct prases
@@ -249,6 +251,13 @@ namespace cicada
       }
       
       // then, try matching within this span...
+
+      lhs_set_type lhss;
+      lhss.set_empty_key(symbol_type());
+      
+      node_map_type::const_iterator niter_end = node_map[id].end();
+      for (node_map_type::const_iterator niter = node_map[id].begin(); niter != niter_end; ++ niter)
+	lhss.insert(niter->first);
       
       for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
 	const transducer_type& transducer = grammar[grammar_id];
@@ -273,8 +282,29 @@ namespace cicada
 	  
 	  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	    
+	    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
+	    
+	    if (lhss.find(rule->lhs) == lhss.end()) {
+	      // we will try all the combination of lhs in lhss...
+	      
+	      lhs_set_type::const_iterator liter_end = lhss.end();
+	      for (lhs_set_type::const_iterator liter = lhss.begin(); liter != liter_end; ++ liter) {
+		hypergraph_type::edge_type& edge = graph_out.add_edge();
+		edge.rule = rule_type::create(rule_type(*liter, rule->rhs.begin(), rule->rhs.end()));
+		edge.features = riter->features;
+		edge.attributes = riter->attributes;
+		
+		std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
+		if (result.second)
+		  result.first->second = graph_out.add_node().id;
+		
+		graph_out.connect_edge(edge.id, result.first->second);
+	      }
+	    }
+	    
 	    hypergraph_type::edge_type& edge = graph_out.add_edge();
-	    edge.rule = (yield_source ? riter->source : riter->target);
+	    edge.rule = rule;
 	    edge.features = riter->features;
 	    edge.attributes = riter->attributes;
 	    
