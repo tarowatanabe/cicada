@@ -480,7 +480,9 @@ struct Task
 
   typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
-  Task(queue_type& __queue,
+  typedef std::vector<size_type, std::allocator<size_type> > sample_map_type;
+
+  Task(const sample_set_type& __samples,
        queue_type& __queue_send,
        queue_type& __queue_recv,
        operation_set_type& __operations,
@@ -489,7 +491,7 @@ struct Task
        feature_function_ptr_set_type& __bleus,
        model_type& __model,
        optimizer_type& __optimizer)
-    : queue(__queue), queue_send(__queue_send), queue_recv(__queue_recv),
+    : samples(__samples), queue_send(__queue_send), queue_recv(__queue_recv),
       operations(__operations),
       scorers(__scorers),
       hypergraph_oracles(__hypergraph_oracles),
@@ -500,9 +502,17 @@ struct Task
       score_1best(), score(), scores(), norm(0.0)
   {
     optimize_fixed_oracle = ! hypergraph_oracles.empty();
+
+    sample_map.clear();
+    
+    for (size_type i = 0; i != samples.size(); ++ i)
+      if (! samples[i].empty())
+	sample_map.push_back(i);
   }
 
-  queue_type&        queue;
+  
+
+  const sample_set_type& samples;
   queue_type&        queue_send;
   queue_type&        queue_recv;
   
@@ -524,6 +534,8 @@ struct Task
   std::vector<int, std::allocator<int> > norms;
 
   bool optimize_fixed_oracle;
+
+  sample_map_type sample_map;
   
   typedef cicada::semiring::Logprob<double> weight_type;
   
@@ -836,6 +848,9 @@ struct Task
 
     bool terminated_merge = false;
     bool terminated_sample = false;
+    
+    sample_map_type::const_iterator siter     = sample_map.begin();
+    sample_map_type::const_iterator siter_end = sample_map.end();
 
     int non_found_iter = 0;
     
@@ -957,14 +972,7 @@ struct Task
 	continue;
       }
       
-      if (! queue.pop_swap(buffer, true)) {
-	non_found_iter = loop_sleep(found, non_found_iter);
-	continue;
-      }
-      
-      found = true;
-      
-      if (buffer.empty()) {
+      if (siter == siter_end) {
 	terminated_sample = true;
 	queue_send.push(std::string());
 	continue;
@@ -972,7 +980,8 @@ struct Task
       
       model.apply_feature(false);
       
-      operations(buffer);
+      operations(samples[*siter]);
+      ++ siter;
       
       // operations.hypergraph contains result...
       const size_t& id = operations.get_data().id;
@@ -1151,6 +1160,8 @@ struct Task
       margins.clear();
       features.clear();
     }
+
+    std::random_shuffle(sample_map.begin(), sample_map.end());
     
     // final function call...
     optimizer.finalize();
@@ -1251,13 +1262,12 @@ void optimize(const sample_set_type& samples,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  queue_type queue(1);
   queue_type queue_reduce;
   queue_type queue_bcast;
 
   optimizer_type optimizer(weights, C, tolerance_solver, debug);
   
-  task_type task(queue, queue_reduce, queue_bcast, operations, scorers, hypergraph_oracles, bleus, model, optimizer);
+  task_type task(samples, queue_reduce, queue_bcast, operations, scorers, hypergraph_oracles, bleus, model, optimizer);
 
   dumper_type::queue_type queue_dumper;
   std::auto_ptr<boost::thread> thread_dumper(new boost::thread(dumper_type(queue_dumper)));
@@ -1273,141 +1283,32 @@ void optimize(const sample_set_type& samples,
 
     boost::thread thread(boost::ref(task));
     
-    if (mpi_rank == 0) {
-      typedef utils::mpi_ostream stream_type;
-      typedef boost::shared_ptr<stream_type> stream_ptr_type;
-
-      buffer_map_type buffers(mpi_size);
-      
-      ostream_ptr_set_type ostreams(mpi_size);
-      istream_ptr_set_type istreams(mpi_size);
-
-      for (int rank = 0; rank < mpi_size; ++ rank)
-	if (rank != mpi_rank) {
-	  ostreams[rank].reset(new utils::mpi_ostream_simple(rank, vector_tag, 4096));
-	  istreams[rank].reset(new utils::mpi_istream_simple(rank, vector_tag, 4096));
-	}
-      
-      std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream(mpi_size);
-      
-      for (int rank = 1; rank < mpi_size; ++ rank)
-	stream[rank].reset(new stream_type(rank, sample_tag, 4096));
-            
-      sample_set_type::const_iterator siter = samples.begin();
-      sample_set_type::const_iterator siter_end = samples.end();
-      
-      int non_found_iter = 0;
-      while (siter != siter_end) {
-	bool found = false;
-
-	found |= reduce_vectors(istreams.begin(), istreams.end(), queue_bcast);
-	
-	found |= bcast_vectors(ostreams.begin(), ostreams.end(), buffers.begin(), queue_reduce);
-	
-	for (int rank = 1; rank < mpi_size && siter != siter_end; ++ rank)
-	  if (stream[rank]->test()) {
-	    stream[rank]->write(*siter);
-	    ++ siter;
-	    
-	    found = true;
-	  }
-	
-	if (queue.empty() && siter != siter_end) {
-	  queue.push(*siter);
-	  ++ siter;
-	  
-	  found = true;
-	}
-	
-	non_found_iter = loop_sleep(found, non_found_iter);
+    buffer_map_type buffers(mpi_size);
+    
+    ostream_ptr_set_type ostreams(mpi_size);
+    istream_ptr_set_type istreams(mpi_size);
+    
+    for (int rank = 0; rank < mpi_size; ++ rank)
+      if (rank != mpi_rank) {
+	ostreams[rank].reset(new utils::mpi_ostream_simple(rank, vector_tag, 4096));
+	istreams[rank].reset(new utils::mpi_istream_simple(rank, vector_tag, 4096));
       }
-
-      bool terminated = false;
-
-      while (1) {
-	bool found = false;
-	
-	if (! terminated)
-	  terminated = queue.push(std::string(), true);
-
-	found |= reduce_vectors(istreams.begin(), istreams.end(), queue_bcast);
-	
-	found |= bcast_vectors(ostreams.begin(), ostreams.end(), buffers.begin(), queue_reduce);
-	
-	for (int rank = 1; rank < mpi_size; ++ rank) 
-	  if (stream[rank] && stream[rank]->test()) {
-	    if (! stream[rank]->terminated())
-	      stream[rank]->terminate();
-	    else
-	      stream[rank].reset();
-	    
-	    found = true;
-	  }
-	
-	if (std::count(stream.begin(), stream.end(), stream_ptr_type()) == mpi_size
-	    && std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size
-	    && std::count(ostreams.begin(), ostreams.end(), ostream_ptr_type()) == mpi_size
-	    && terminated)
-	  break;
-	
-	non_found_iter = loop_sleep(found, non_found_iter);
-      }
+    
+    int non_found_iter = 0;
+    while (1) {
+      bool found = false;
       
-      // randomize!
-      //std::random_shuffle(samples.begin(), samples.end());
+      found |= reduce_vectors(istreams.begin(), istreams.end(), queue_bcast);
       
-    } else {
-      buffer_map_type buffers(mpi_size);
-
-      ostream_ptr_set_type ostreams(mpi_size);
-      istream_ptr_set_type istreams(mpi_size);
-      for (int rank = 0; rank < mpi_size; ++ rank)
-	if (rank != mpi_rank) {
-	  ostreams[rank].reset(new utils::mpi_ostream_simple(rank, vector_tag, 4096));
-	  istreams[rank].reset(new utils::mpi_istream_simple(rank, vector_tag, 4096));
-	}
-
-      boost::shared_ptr<utils::mpi_istream> is(new utils::mpi_istream(0, sample_tag, 4096));
+      found |= bcast_vectors(ostreams.begin(), ostreams.end(), buffers.begin(), queue_reduce);
       
-      std::string buffer;
-      int non_found_iter = 0;
-      while (1) {
-	bool found = false;
-	
-	found |= reduce_vectors(istreams.begin(), istreams.end(), queue_bcast);
-	
-	found |= bcast_vectors(ostreams.begin(), ostreams.end(), buffers.begin(), queue_reduce);
-	
-	if (is && queue.empty() && is->test()) {
-	  if (is->read(buffer))
-	    queue.push_swap(buffer);
-	  else {
-	    queue.push(std::string());
-	    is.reset();
-	  }
-	  
-	  found = true;
-	}
-	
-	if (! is) break;
-	
-	non_found_iter = loop_sleep(found, non_found_iter);
-      }
+      if (std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size
+	  && std::count(ostreams.begin(), ostreams.end(), ostream_ptr_type()) == mpi_size)
+	break;
       
-      while (1) {
-	bool found = false;
-	
-	found |= reduce_vectors(istreams.begin(), istreams.end(), queue_bcast);
-	
-	found |= bcast_vectors(ostreams.begin(), ostreams.end(), buffers.begin(), queue_reduce);
-	
-	if (std::count(istreams.begin(), istreams.end(), istream_ptr_type()) == mpi_size
-	    && std::count(ostreams.begin(), ostreams.end(), ostream_ptr_type()) == mpi_size) break;
-	
-	non_found_iter = loop_sleep(found, non_found_iter);
-      }
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
-
+    
     queue_bcast.push(std::string());
     
     thread.join();

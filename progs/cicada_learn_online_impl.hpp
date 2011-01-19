@@ -205,34 +205,37 @@ void read_sample(const path_type& input_path,
 	samples[i].clear();
 	std::getline(is, samples[i]);
 	
-	// check id...
-	boost::iostreams::filtering_istream stream;
-	stream.push(boost::iostreams::array_source(samples[i].c_str(), samples[i].size()));
-	
-	size_t id = 0;
-	stream >> id;
-	
-	if (id != i)
-	  throw std::runtime_error("invalid directory mode with mismatched id");
+	if (! samples[i].empty()) {
+	  // check id...
+	  boost::iostreams::filtering_istream stream;
+	  stream.push(boost::iostreams::array_source(samples[i].c_str(), samples[i].size()));
+	  
+	  size_t id = 0;
+	  stream >> id;
+	  
+	  if (id != i)
+	    throw std::runtime_error("invalid directory mode with mismatched id");
+	}
       }
   } else if (id_mode) {
     utils::compress_istream is(input_path, 1024 * 1024);
     
     size_t id = 0;
     std::string line;
-    while (std::getline(is, line)) {
-      boost::iostreams::filtering_istream stream;
-      stream.push(boost::iostreams::array_source(line.c_str(), line.size()));
-      
-      stream >> id;
-      
-      if (shard_size <= 0 || id % shard_size == shard_rank) {
-	if (id >= samples.size())
-	  throw std::runtime_error("id exceeds sample size");
+    while (std::getline(is, line)) 
+      if (! line.empty()) {
+	boost::iostreams::filtering_istream stream;
+	stream.push(boost::iostreams::array_source(line.c_str(), line.size()));
 	
-	samples[id].swap(line);
+	stream >> id;
+	
+	if (shard_size <= 0 || id % shard_size == shard_rank) {
+	  if (id >= samples.size())
+	    throw std::runtime_error("id exceeds sample size");
+	  
+	  samples[id].swap(line);
+	}
       }
-    }
     
   } else {
     utils::compress_istream is(input_path, 1024 * 1024);
@@ -243,7 +246,8 @@ void read_sample(const path_type& input_path,
 	if (id >= samples.size())
 	  throw std::runtime_error("id exceeds sample size");
 	
-	samples[id] = boost::lexical_cast<std::string>(id) + " ||| " + line;
+	if (! line.empty())
+	  samples[id] = boost::lexical_cast<std::string>(id) + " ||| " + line;
       }
   }
 }
