@@ -548,12 +548,12 @@ struct Task
 
   struct count_function
   {
-    typedef int value_type;
+    typedef cicada::semiring::Log<double> value_type;
     
     template <typename Edge>
     value_type operator()(const Edge& x) const
     {
-      return 1;
+      return cicada::semiring::traits<value_type>::log(0.0);
     }
   };
 
@@ -640,7 +640,7 @@ struct Task
   typedef std::vector<double, std::allocator<double> > margin_collection_type;
   typedef std::vector<feature_set_type, std::allocator<feature_set_type> > feature_collection_type;
   
-  typedef std::vector<int, std::allocator<int> > count_set_type;
+  typedef std::vector<typename count_function::value_type, std::allocator<typename count_function::value_type> > count_set_type;
   typedef boost::tuple<sentence_type, feature_set_type> yield_type;
   
   
@@ -700,8 +700,8 @@ struct Task
     feature_set_type features_reward(accumulated_reward_unique.accumulated.begin(), accumulated_reward_unique.accumulated.end());
     feature_set_type features_penalty(accumulated_penalty_unique.accumulated.begin(), accumulated_penalty_unique.accumulated.end());
     
-    features_reward  *= (1.0 / counts_reward.back());
-    features_penalty *= (1.0 / counts_penalty.back());
+    features_reward  *= (1.0 / double(counts_reward.back()));
+    features_penalty *= (1.0 / double(counts_penalty.back()));
     
     features.push_back(features_reward - features_penalty);
     
@@ -744,11 +744,14 @@ struct Task
     cicada::inside_outside(hypergraph_reward,  bleu_reward,  bleu_edge_reward,  bleu_function(feature_name,   1.0), bleu_function(feature_name,   1.0));
     cicada::inside_outside(hypergraph_penalty, bleu_penalty, bleu_edge_penalty, bleu_function(feature_name, - 1.0), bleu_function(feature_name, - 1.0));
     
+    const double factor_reward  = 1.0 / double(counts_reward.back());
+    const double factor_penalty = 1.0 / double(counts_penalty.back());
+
     for (size_t i = 0; i != accumulated_reward.size(); ++ i) {
       features.push_back(feature_set_type());
       features.back().assign(accumulated_reward[i].begin(), accumulated_reward[i].end());
       
-      features.back() *= (1.0 / counts_reward.back());
+      features.back() *= factor_reward;
       features.back()["bias"] = 1.0;
       
       features.back().erase(feature_name);
@@ -768,7 +771,7 @@ struct Task
       features.push_back(feature_set_type());
       features.back().assign(accumulated_penalty[i].begin(), accumulated_penalty[i].end());
       
-      features.back() *= (1.0 / counts_penalty.back());
+      features.back() *= factor_penalty;
       features.back()["bias"] = 1.0;
       
       features.back().erase(feature_name);
