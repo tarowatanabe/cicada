@@ -134,34 +134,6 @@ void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests)
 void bcast_weights(const int rank, weight_set_type& weights);
 void options(int argc, char** argv);
 
-enum {
-  weights_tag = 1000,
-  sentence_tag,
-  gradients_tag,
-  notify_tag,
-  termination_tag,
-};
-
-inline
-int loop_sleep(bool found, int non_found_iter)
-{
-  if (! found) {
-    boost::thread::yield();
-    ++ non_found_iter;
-  } else
-    non_found_iter = 0;
-    
-  if (non_found_iter >= 64) {
-    struct timespec tm;
-    tm.tv_sec = 0;
-    tm.tv_nsec = 2000001; // above 2ms
-    nanosleep(&tm, NULL);
-    
-    non_found_iter = 0;
-  }
-  return non_found_iter;
-}
-
 int main(int argc, char ** argv)
 {
   utils::mpi_world mpi_world(argc, argv);
@@ -248,6 +220,34 @@ int main(int argc, char ** argv)
     return 1;
   }
   return 0;
+}
+
+enum {
+  weights_tag = 1000,
+  sentence_tag,
+  gradients_tag,
+  notify_tag,
+  termination_tag,
+};
+
+inline
+int loop_sleep(bool found, int non_found_iter)
+{
+  if (! found) {
+    boost::thread::yield();
+    ++ non_found_iter;
+  } else
+    non_found_iter = 0;
+    
+  if (non_found_iter >= 64) {
+    struct timespec tm;
+    tm.tv_sec = 0;
+    tm.tv_nsec = 2000001; // above 2ms
+    nanosleep(&tm, NULL);
+    
+    non_found_iter = 0;
+  }
+  return non_found_iter;
 }
 
 struct TaskOracle

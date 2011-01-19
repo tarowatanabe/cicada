@@ -14,6 +14,55 @@ namespace cicada
   namespace operation
   {
     template <typename Weight>
+    struct single_scaled_function
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+  
+      single_scaled_function(const weight_set_type::feature_type& __feature, const double& __scale)
+	: feature(__feature), scale(__scale) {}
+
+      const weight_set_type::feature_type feature;
+      const double scale;
+  
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(x.features[feature] * scale);
+      }
+      
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(x[feature] * scale);
+      }
+    };
+
+    template <typename Weight>
+    struct single_function
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+  
+      single_function(const weight_set_type::feature_type& __feature)
+	: feature(__feature) {}
+
+      const weight_set_type::feature_type feature;
+      
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(x.features[feature]);
+      }
+      
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(x[feature]);
+      }
+    };
+
+    template <typename Weight>
     struct weight_scaled_function
     {
       typedef cicada::Operation::hypergraph_type hypergraph_type;

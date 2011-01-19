@@ -32,6 +32,8 @@
 #include "cicada/prune.hpp"
 #include "cicada/feature_function.hpp"
 
+#include "cicada/operation/functional.hpp"
+
 #include "cicada_text_impl.hpp"
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -53,10 +55,10 @@ typedef cicada::SentenceVector sentence_set_type;
 struct TaskOracle
 {
   TaskOracle(const scorer_document_type&    __scorers,
-	     hypergraph_set_type&           __graphs,
-	     score_ptr_type&                __score,
-	     score_ptr_set_type&            __scores,
-	     feature_function_ptr_set_type& __features)
+	       hypergraph_set_type&           __graphs,
+	       score_ptr_type&                __score,
+	       score_ptr_set_type&            __scores,
+	       feature_function_ptr_set_type& __features)
     : scorers(__scorers),
       graphs(__graphs),
       score(__score),
@@ -64,24 +66,6 @@ struct TaskOracle
       features(__features)
   { }
 
-  struct bleu_function
-  {
-    typedef hypergraph_type::feature_set_type feature_set_type;
-    
-    typedef cicada::semiring::Logprob<double> value_type;
-
-    bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
-      : name(__name), factor(__factor) {}
-    
-    weight_set_type::feature_type name;
-    double factor;
-    
-    template <typename Edge>
-    value_type operator()(const Edge& edge) const
-    {
-      return cicada::semiring::traits<value_type>::log(edge.features[name] * factor);
-    }
-  };
   
   struct kbest_traversal
   {
@@ -147,9 +131,11 @@ struct TaskOracle
       
       cicada::apply_exact(model, graphs[id], graph_oracle);
       
-      cicada::semiring::Logprob<double> weight;
+      typedef cicada::semiring::Logprob<double> bleu_weight_type;
+      
+      bleu_weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), bleu_function(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), cicada::operation::single_scaled_function<bleu_weight_type>(feature_bleu, score_factor));
       
       score_ptr_type score_sample = scorers[id]->score(sentence);
       if (score_curr)
@@ -201,8 +187,8 @@ void read_sample(const path_type& input_path,
 		 sample_set_type& samples,
 		 const bool directory_mode,
 		 const bool id_mode,
-		 const int shard_rank,
-		 const int shard_size)
+		 const int shard_rank = 0,
+		 const int shard_size = 0)
 {
   if (directory_mode) {
     for (int i = 0; /**/; ++ i) 
@@ -265,8 +251,8 @@ void read_sample(const path_type& input_path,
 inline
 void read_oracle(const path_set_type& files,
 		 hypergraph_set_type& graphs,
-		 const int shard_rank,
-		 const int shard_size)
+		 const int shard_rank = 0,
+		 const int shard_size = 0)
 {
   if (files.empty())
     throw std::runtime_error("no oracle files?");

@@ -144,39 +144,18 @@ void optimize(const sample_set_type& samples,
 	      weight_set_type& weights,
 	      weight_set_type& weights_average);
 
+void compute_oracles(const scorer_document_type& scorers,
+		     hypergraph_set_type& graphs,
+		     score_ptr_type& score,
+		     score_ptr_set_type& scores,
+		     feature_function_ptr_set_type& bleus);
+
 void bcast_weights(const int rank, weight_set_type& weights);
 void reduce_weights(weight_set_type& weights);
 template <typename Optimizer>
 void reduce_weights_optimized(weight_set_type& weights, Optimizer& optimizer);
 void options(int argc, char** argv);
 
-enum {
-  weights_tag = 1000,
-  sample_tag,
-  vector_tag,
-  notify_tag,
-  termination_tag,
-};
-
-inline
-int loop_sleep(bool found, int non_found_iter)
-{
-  if (! found) {
-    boost::thread::yield();
-    ++ non_found_iter;
-  } else
-    non_found_iter = 0;
-    
-  if (non_found_iter >= 64) {
-    struct timespec tm;
-    tm.tv_sec = 0;
-    tm.tv_nsec = 2000001; // above 2ms
-    nanosleep(&tm, NULL);
-    
-    non_found_iter = 0;
-  }
-  return non_found_iter;
-}
 
 int main(int argc, char ** argv)
 {
@@ -283,10 +262,7 @@ int main(int argc, char ** argv)
       
       read_oracle(oracle_files, graphs_oracle, mpi_rank, mpi_size);
       
-      //read_oracle(oracle_files, scorers, graphs_oracle, score_oracle, scores_oracle, bleus);
-      
-      // compute oracles, taken from cicada-orace-mpi, but w/o iteration.
-      
+      compute_oracles(scorers, graphs_oracle, score_oracle, scores_oracle, bleus);
     }
 
     operation_set_type operations(ops.begin(), ops.end(),
@@ -343,6 +319,155 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+
+enum {
+  weights_tag = 1000,
+  sample_tag,
+  vector_tag,
+  notify_tag,
+  termination_tag,
+};
+
+inline
+int loop_sleep(bool found, int non_found_iter)
+{
+  if (! found) {
+    boost::thread::yield();
+    ++ non_found_iter;
+  } else
+    non_found_iter = 0;
+    
+  if (non_found_iter >= 64) {
+    struct timespec tm;
+    tm.tv_sec = 0;
+    tm.tv_nsec = 2000001; // above 2ms
+    nanosleep(&tm, NULL);
+    
+    non_found_iter = 0;
+  }
+  return non_found_iter;
+}
+
+
+void compute_oracles(const scorer_document_type& scorers,
+		     hypergraph_set_type& graphs,
+		     score_ptr_type& score,
+		     score_ptr_set_type& scores,
+		     feature_function_ptr_set_type& bleus)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  score.reset();
+  scores.clear();
+  scores.resize(scorers.size());
+  
+  const bool error_metric = scorers.error_metric();
+  const double score_factor = (error_metric ? - 1.0 : 1.0);
+  
+  weight_set_type::feature_type feature_bleu;
+  for (size_t i = 0; i != bleus.size(); ++ i)
+    if (bleus[i]) {
+      feature_bleu = bleus[i]->feature_name();
+      break;
+    }
+  
+  double objective_optimum = - std::numeric_limits<double>::infinity();
+  
+  hypergraph_type graph_oracle;
+  
+  for (size_t id = 0; id != graphs.size(); ++ id) {
+    if (! graphs[id].is_valid()) continue;
+    
+    score_ptr_type score_curr;
+    if (score)
+      score_curr = score->clone();
+    
+    if (scores[id])
+      *score_curr -= *scores[id];
+    
+    dynamic_cast<cicada::feature::Bleu*>(bleus[id].get())->assign(score_curr);
+    
+    model_type model;
+    model.push_back(bleus[id]);
+    
+    graph_oracle.clear();
+      
+    cicada::apply_exact(model, graphs[id], graph_oracle);
+    
+    typedef cicada::semiring::Logprob<double> bleu_weight_type;
+    
+    bleu_weight_type weight;
+    sentence_type sentence;
+    cicada::viterbi(graph_oracle, sentence, weight, TaskOracle::kbest_traversal(), cicada::operation::single_scaled_function<bleu_weight_type>(feature_bleu, score_factor));
+    
+    score_ptr_type score_sample = scorers[id]->score(sentence);
+    if (score_curr)
+      *score_curr += *score_sample;
+    else
+      score_curr = score_sample;
+    
+    const double objective = score_curr->score() * score_factor;
+    if (objective > objective_optimum || ! scores[id]) {
+      score = score_curr;
+      objective_optimum = objective;
+      scores[id] = score_sample;
+    }
+  }
+  
+  // exchange score...
+  score_ptr_type score_bcast;
+  if (score)
+    score_bcast = score->clone();
+
+  for (int rank = 0; rank != mpi_rank; ++ rank) {
+    if (rank == mpi_rank) {
+      // bcast current bleu-score...
+      
+      boost::iostreams::filtering_ostream os;
+      os.push(utils::mpi_device_bcast_sink(rank, 1024));
+      
+      if (score_bcast)
+	os << score_bcast->encode();
+      
+    } else {
+      boost::iostreams::filtering_istream is;
+      is.push(utils::mpi_device_bcast_source(rank, 1024));
+      
+      std::string encoded;
+      is >> encoded;
+      
+      if (! encoded.empty()) {
+	score_ptr_type score_recv = scorer_type::score_type::decode(encoded);
+	if (score)
+	  *score += *score_recv;
+	else
+	  score = score_recv;
+      }
+    }
+  }
+  
+  // re-assign adjusted bleu score...
+  for (size_t id = 0; id != graphs.size(); ++ id) {
+    if (! graphs[id].is_valid()) continue;
+    
+    // we will keep adjust scores...
+    score_ptr_type score_curr = score->clone();
+    *score_curr -= *scores[id];
+    scores[id] = score_curr;
+    
+    dynamic_cast<cicada::feature::Bleu*>(bleus[id].get())->assign(scores[id]);
+    
+    model_type model;
+    model.push_back(bleus[id]);
+    
+    graph_oracle.clear();
+    
+    cicada::apply_exact(model, graphs[id], graph_oracle);
+    
+    graphs[id].swap(graph_oracle);
+  }
+}
 
 template <typename Optimizer>
 struct Task
