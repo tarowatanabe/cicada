@@ -50,7 +50,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
-
+#include <boost/random.hpp>
 #include <boost/thread.hpp>
 
 #include "cicada_text_impl.hpp"
@@ -111,12 +111,12 @@ int debug = 0;
 
 
 
-template <typename Iterator>
+template <typename Iterator, typename Generator>
 inline
-void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper)
+void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper, Generator& generator)
 {
   for (/**/; first != last; ++ first, ++ lower, ++ upper)
-    *first = *lower + (double(random()) / RAND_MAX) * std::min(double(*upper - *lower), 1.0);
+    *first = *lower + (double(generator(RAND_MAX)) / RAND_MAX) * std::min(double(*upper - *lower), 1.0);
 }
 
 template <typename Iterator>
@@ -222,26 +222,28 @@ struct ViterbiComputer
   const hypergraph_set_type&  graphs;
 };
 
-template <typename Regularizer>
+template <typename Regularizer, typename Generator>
 bool powell(const scorer_document_type& scorers,
 	    const hypergraph_set_type& graphs,
 	    const weight_set_type& bound_lower,
 	    const weight_set_type& bound_upper,
 	    Regularizer regularizer,
+	    Generator& generator,
 	    const double tolerance,
 	    const int samples,
 	    double& score,
 	    weight_set_type& weights)
 {
-  cicada::optimize::Powell<EnvelopeComputer, ViterbiComputer, Regularizer> optimizer(EnvelopeComputer(scorers, graphs),
-										     ViterbiComputer(scorers, graphs),
-										     regularizer,
-										     bound_lower,
-										     bound_upper,
-										     tolerance,
-										     samples,
-										     scorers.error_metric(),
-										     debug);
+  cicada::optimize::Powell<EnvelopeComputer, ViterbiComputer, Regularizer, Generator> optimizer(EnvelopeComputer(scorers, graphs),
+												ViterbiComputer(scorers, graphs),
+												regularizer,
+												generator,
+												bound_lower,
+												bound_upper,
+												tolerance,
+												samples,
+												scorers.error_metric(),
+												debug);
   
   return optimizer(score, weights);
 }
@@ -281,8 +283,6 @@ int main(int argc, char ** argv)
     if (weight_normalize_l1 && weight_normalize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2 for weight normalization...");
 
-    // random seed...
-    srandom(time(0) * getpid());
 
     // read reference set
     scorer_document_type scorers(scorer_name);
@@ -399,7 +399,9 @@ int main(int argc, char ** argv)
       cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
     }
     
-    
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
     
     if (mpi_rank == 0) {
 
@@ -425,6 +427,7 @@ int main(int argc, char ** argv)
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL1(C),
+			 generator,
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -435,6 +438,7 @@ int main(int argc, char ** argv)
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL2(C),
+			 generator,
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -445,6 +449,7 @@ int main(int argc, char ** argv)
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeNone(C),
+			 generator,
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -477,7 +482,7 @@ int main(int argc, char ** argv)
 	  sample_weights = optimum_weights;
 	
 	  while (1) {
-	    randomize(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin());
+	    randomize(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin(), generator);
 	  
 	    if (weight_normalize_l1 || regularize_l1)
 	      normalize_l1(sample_weights.begin(), sample_weights.end(), 1.0);
@@ -498,6 +503,7 @@ int main(int argc, char ** argv)
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL1(C),
+			 generator,
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -508,6 +514,7 @@ int main(int argc, char ** argv)
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL2(C),
+			 generator,
 			 tolerance,
 			 samples_directions,
 			 sample_objective,
@@ -518,6 +525,7 @@ int main(int argc, char ** argv)
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeNone(C),
+			 generator,
 			 tolerance,
 			 samples_directions,
 			 sample_objective,

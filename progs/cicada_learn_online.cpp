@@ -50,6 +50,7 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
+#include <boost/random.hpp>
 
 typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
@@ -128,8 +129,8 @@ int threads = 4;
 
 int debug = 0;
 
-template <typename Optimizer>
-void optimize(weight_set_type& weights, weight_set_type& weights_average);
+template <typename Optimizer, typename Generator>
+void optimize(weight_set_type& weights, weight_set_type& weights_average, Generator& generator);
 
 void options(int argc, char** argv);
 
@@ -156,7 +157,6 @@ int main(int argc, char ** argv)
       return 0;
     }
 
-    srandom(time(0) * getpid());
     
     threads = utils::bithack::max(threads, 1);
     
@@ -168,10 +168,14 @@ int main(int argc, char ** argv)
       is >> weights;
     }
     
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    boost::random_number_generator<boost::mt19937> generator(gen);
+    
     if (strcasecmp(algorithm.c_str(), "mira") == 0)
-      ::optimize<OptimizeMIRA>(weights, weights_average);
+      ::optimize<OptimizeMIRA>(weights, weights_average, generator);
     else if (strcasecmp(algorithm.c_str(), "cp") == 0)
-      ::optimize<OptimizeCP>(weights, weights_average);
+      ::optimize<OptimizeCP>(weights, weights_average, generator);
     else
       throw std::runtime_error("unsupported learning algorithm: " + algorithm);
     
@@ -937,8 +941,8 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
-template <typename Optimizer>
-void optimize(weight_set_type& weights, weight_set_type& weights_average)
+template <typename Optimizer, typename Generator>
+void optimize(weight_set_type& weights, weight_set_type& weights_average, Generator& generator)
 {
   typedef Optimizer optimizer_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
@@ -1055,7 +1059,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average)
     
     workers.join_all();
     
-    std::random_shuffle(samples.begin(), samples.end());
+    std::random_shuffle(samples.begin(), samples.end(), generator);
     
     // merge vector...
     weights_mixed.clear();

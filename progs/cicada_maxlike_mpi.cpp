@@ -48,7 +48,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
-
+#include <boost/random.hpp>
 #include <boost/thread.hpp>
 
 #include "lbfgs.h"
@@ -136,11 +136,12 @@ double optimize_batch(const hypergraph_set_type& graphs,
 		      const feature_function_ptr_set_type& features,
 		      const scorer_document_type& scorers,
 		      weight_set_type& weights);
-template <typename Optimize>
+template <typename Optimize, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
-		       weight_set_type& weights);
+		       weight_set_type& weights,
+		       Generator& generator);
 
 #include "cicada_maxlike_impl.hpp"
 
@@ -197,7 +198,11 @@ int main(int argc, char ** argv)
     
     if (oracle_loss)
       compute_oracles(graphs, features, scorers);
-
+    
+    typedef boost::random_number_generator<boost::mt19937> generator_type;
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    generator_type generator(gen);
     
     weight_set_type weights;
     
@@ -205,9 +210,9 @@ int main(int argc, char ** argv)
 
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizerSGDL1 >(graphs, features, scorers, weights);
+	objective = optimize_online<OptimizerSGDL1 >(graphs, features, scorers, weights, generator);
       else
-	objective = optimize_online<OptimizerSGDL2 >(graphs, features, scorers, weights);
+	objective = optimize_online<OptimizerSGDL2 >(graphs, features, scorers, weights, generator);
     } else 
       objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
@@ -638,11 +643,12 @@ struct OptimizeLBFGS
 };
 
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
-		       weight_set_type& weights)
+		       weight_set_type& weights,
+		       Generator& generator)
 {
   typedef std::vector<int, std::allocator<int> > id_set_type;
 
@@ -674,7 +680,7 @@ double optimize_online(const hypergraph_set_type& graphs,
       
       optimizer.finalize();
       
-      std::random_shuffle(ids.begin(), ids.end());
+      std::random_shuffle(ids.begin(), ids.end(), generator);
       
       optimizer.weights *= optimizer.samples;
       reduce_weights(optimizer.weights);

@@ -18,13 +18,15 @@ namespace cicada
     
     template <typename EnvelopeFunction,
 	      typename ViterbiFunction,
-	      typename Regularizer>
+	      typename Regularizer,
+	      typename Generator>
     struct Powell
     {
     public:
       typedef EnvelopeFunction envelope_function_type;
       typedef ViterbiFunction  viterbi_function_type;
       typedef Regularizer      regularizer_type;
+      typedef Generator        generator_type;
 
       typedef LineSearch line_search_type;
 
@@ -49,6 +51,7 @@ namespace cicada
       Powell(const envelope_function_type& __envelopes,
 	     const viterbi_function_type&  __viterbi,
 	     const regularizer_type&       __regularizer,
+	     generator_type&               __generator,
 	     const weight_set_type&        __bound_lower,
 	     const weight_set_type&        __bound_upper,
 	     const double __tolerance,
@@ -58,6 +61,7 @@ namespace cicada
 	: envelopes(__envelopes),
 	  viterbi(__viterbi),
 	  regularizer(__regularizer),
+	  generator(__generator),
 	  bound_lower(__bound_lower),
 	  bound_upper(__bound_upper),
 	  tolerance(__tolerance),
@@ -184,7 +188,7 @@ namespace cicada
       void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper)
       {
 	for (/**/; first != last; ++ first, ++ lower, ++ upper)
-	  *first = *lower + (double(random()) / RAND_MAX) * std::min(double(*upper - *lower), 1.0);
+	  *first = *lower + (double(generator(RAND_MAX)) / RAND_MAX) * std::min(double(*upper - *lower), 1.0);
       }
 
       template <typename Iterator>
@@ -246,6 +250,8 @@ namespace cicada
       const envelope_function_type& envelopes;
       const viterbi_function_type&  viterbi;
       const regularizer_type&       regularizer;
+      
+      generator_type& generator;
 
       weight_set_type bound_lower;
       weight_set_type bound_upper;

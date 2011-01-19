@@ -47,7 +47,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
-
+#include <boost/random.hpp>
 #include <boost/thread.hpp>
 
 #include "lbfgs.h"
@@ -124,11 +124,12 @@ void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers);
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
-		       weight_set_type& weights);
+		       weight_set_type& weights,
+		       Generator& generator);
 template <typename Optimizer>
 double optimize_batch(const hypergraph_set_type& graphs,
 		      const feature_function_ptr_set_type& features,
@@ -138,7 +139,7 @@ double optimize_batch(const hypergraph_set_type& graphs,
 
 struct OptimizeLBFGS;
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 struct OptimizeOnline;
 
 #include "cicada_maxlike_impl.hpp"
@@ -157,8 +158,6 @@ int main(int argc, char ** argv)
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
-    
-    srandom(time(0) * getpid());
     
     threads = utils::bithack::max(threads, 1);
     
@@ -182,12 +181,17 @@ int main(int argc, char ** argv)
     feature_function_ptr_set_type features(sentences.size());
     
     read_tstset(tstset_files, graphs, sentences, features);
-
+    
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
     if (oracle_loss)
       compute_oracles(graphs, features, scorers);
+
+    typedef boost::random_number_generator<boost::mt19937> generator_type;
+    boost::mt19937 gen;
+    gen.seed(time(0) * getpid());
+    generator_type generator(gen);
     
     weight_set_type weights;
     
@@ -195,9 +199,9 @@ int main(int argc, char ** argv)
 
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs, features, scorers, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, generator_type> >(graphs, features, scorers, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs, features, scorers, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, generator_type> >(graphs, features, scorers, weights, generator);
     } else 
       objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
@@ -618,20 +622,23 @@ struct OptimizeLBFGS
 };
 
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 struct OptimizeOnline
 {
   typedef Optimizer optimizer_type;
+  typedef Generator generator_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
   
   OptimizeOnline(const hypergraph_set_type&           __graphs,
 		 const feature_function_ptr_set_type& __features,
 		 const scorer_document_type&          __scorers,
-		 weight_set_type&                     __weights)
+		 weight_set_type&                     __weights,
+		 generator_type&                      __generator)
     : graphs(__graphs),
       features(__features),
       scorers(__scorers),
-      weights(__weights) {}
+      weights(__weights),
+      generator(__generator) {}
   
   struct Task
   {
@@ -693,7 +700,7 @@ struct OptimizeOnline
       for (int i = 0; i < threads; ++ i)
 	queue.push(-1);
       
-      std::random_shuffle(ids.begin(), ids.end());
+      std::random_shuffle(ids.begin(), ids.end(), generator);
       
       workers.join_all();
       
@@ -756,15 +763,17 @@ struct OptimizeOnline
   const feature_function_ptr_set_type& features;
   const scorer_document_type&          scorers;
   weight_set_type&                     weights;
+  generator_type&                      generator;
 };
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
-		       weight_set_type& weights)
+		       weight_set_type& weights,
+		       Generator& generator)
 {
-  return Optimizer(graphs, features, scorers,  weights)();
+  return Optimizer(graphs, features, scorers,  weights, generator)();
 }
 
 template <typename Optimizer>
