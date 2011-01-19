@@ -457,65 +457,6 @@ void read_refset(const path_set_type& files,
   }
 }
 
-template <typename Weight>
-struct weight_set_scaled_function
-{
-  typedef Weight value_type;
-  
-  weight_set_scaled_function(const weight_set_type& __weights, const double& __scale)
-    : weights(__weights), scale(__scale) {}
-  
-  const weight_set_type& weights;
-  const double scale;
-  
-  template <typename Edge>
-  value_type operator()(const Edge& edge) const
-  {
-    return cicada::semiring::traits<value_type>::log(edge.features.dot(weights) * scale);
-  }
-  
-};
-
-struct weight_set_function
-{
-  typedef cicada::semiring::Logprob<double> value_type;
-
-  weight_set_function(const weight_set_type& __weights)
-    : weights(__weights) {}
-
-  const weight_set_type& weights;
-
-  value_type operator()(const hypergraph_type::edge_type& x) const
-  {
-    return cicada::semiring::traits<value_type>::log(x.features.dot(weights));
-  }
-  
-  template <typename FeatureSet>
-  value_type operator()(const FeatureSet& x) const
-  {
-    return cicada::semiring::traits<value_type>::log(x.dot(weights));
-  }
-};
-
-
-struct weight_set_function_one
-{
-  typedef cicada::semiring::Logprob<double> value_type;
-
-  weight_set_function_one(const weight_set_type& __weights) {}
-
-  value_type operator()(const hypergraph_type::edge_type& x) const
-  {
-    return cicada::semiring::traits<value_type>::log(x.features.sum());
-  }
-  
-  template <typename FeatureSet>
-  value_type operator()(const FeatureSet& x) const
-  {
-    return cicada::semiring::traits<value_type>::log(x.sum());
-  }
-};
-
 
 inline
 path_type add_suffix(const path_type& path, const std::string& suffix)

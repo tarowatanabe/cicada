@@ -237,29 +237,6 @@ struct Task
   
   typedef cicada::semiring::Logprob<double> weight_type;
   
-  struct weight_set_function
-  {
-    typedef cicada::semiring::Logprob<double> value_type;
-    
-    weight_set_function(const weight_set_type& __weights, const double& __scale)
-      : weights(__weights), scale(__scale) {}
-    
-    const weight_set_type& weights;
-    const double scale;
-    
-    template <typename Edge>
-    value_type operator()(const Edge& x) const
-    {
-      return cicada::semiring::traits<value_type>::log(x.features.dot(weights) * scale);
-    }
-    
-    value_type operator()(const feature_set_type& x) const
-    {
-      return cicada::semiring::traits<value_type>::log(x.dot(weights) * scale);
-    }
-
-  };
-  
   struct count_function
   {
     typedef int value_type;
@@ -371,9 +348,9 @@ struct Task
 			const double margin,
 			const bool invert=false)
   {
-    cicada::apply_cube_prune(model_bleu, hypergraph, modified, weight_set_function(weights, invert ? - 1.0 : 1.0), cube_size);
+    cicada::apply_cube_prune(model_bleu, hypergraph, modified, cicada::operation::weight_scaled_function<weight_type>(weights, invert ? - 1.0 : 1.0), cube_size);
     
-    cicada::prune_beam(modified, weight_set_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
+    cicada::prune_beam(modified, cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
     if (! model_sparse.empty()) {
       static const size_type __id = 0;
@@ -391,7 +368,7 @@ struct Task
     
     weight_type weight;
     
-    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, invert ? - 1.0 : 1.0));
+    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, invert ? - 1.0 : 1.0));
   }
 
   void add_support_vectors_regression(const size_t& id,
@@ -717,7 +694,7 @@ struct Task
 	std::cerr << "id: " << id << std::endl;
       
       // collect max-feature from hypergraph
-      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
+      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::kbest_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, 1.0));
       
       if (id >= scorers.size())
 	throw std::runtime_error("id exceed scorer size");
@@ -789,7 +766,7 @@ struct Task
 	    hypergraph_reward.swap(hypergraph_oracle);
 	    
 	    weight_type weight;
-	    cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), weight_set_function(weights, 1.0));
+	    cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, 1.0));
 	  }
 	}
       }
