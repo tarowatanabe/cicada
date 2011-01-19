@@ -47,7 +47,7 @@ namespace cicada
       };
       
     public:
-      static inline self_type log(const Tp& x) { return proxy_type(x); }
+      static inline self_type exp(const Tp& x) { return proxy_type(x); }
       
       static inline self_type zero() { return proxy_type(impl::traits_infinity<value_type>::minus()); }
       static inline self_type one()  { return proxy_type(0); }
@@ -155,7 +155,7 @@ namespace cicada
     template <typename Tp>
     struct traits<Tropical<Tp> >
     {
-      static inline Tropical<Tp> log(const Tp& x) { return Tropical<Tp>::log(x); }
+      static inline Tropical<Tp> exp(const Tp& x) { return Tropical<Tp>::exp(x); }
       static inline Tropical<Tp> zero() { return Tropical<Tp>::zero();  }
       static inline Tropical<Tp> one()  { return Tropical<Tp>::one(); }
     };

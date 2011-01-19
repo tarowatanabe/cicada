@@ -69,7 +69,7 @@ namespace cicada
       for (id_type id = 0; id != source.edges.size(); ++ id)
 	posterior_max = std::max(posterior_max, posterior[id]);
       
-      const weight_type cutoff(posterior_max * cicada::semiring::traits<weight_type>::log(- threshold));
+      const weight_type cutoff(posterior_max * cicada::semiring::traits<weight_type>::exp(- threshold));
       
       removed_type removed(source.edges.size(), false);
       for (id_type id = 0; id != source.edges.size(); ++ id)

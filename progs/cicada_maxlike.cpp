@@ -297,7 +297,7 @@ struct OptimizeLBFGS
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
       }
       
       const weight_set_type& weights;
@@ -314,7 +314,7 @@ struct OptimizeLBFGS
       
       value_type operator()(const feature_set_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(x.dot(weights));
       }
     };
 
@@ -331,7 +331,7 @@ struct OptimizeLBFGS
       value_type operator()(const Edge& edge) const
       {
 	// p_e
-	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
       }
     };
 
@@ -353,7 +353,7 @@ struct OptimizeLBFGS
 	if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
 	  return value_type();
 	else
-	  return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+	  return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
       }
     };
 
@@ -369,7 +369,7 @@ struct OptimizeLBFGS
 	// p_e r_e
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -398,7 +398,7 @@ struct OptimizeLBFGS
 
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -828,7 +828,7 @@ struct TaskOracle
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
-      return cicada::semiring::traits<value_type>::log(edge.features[name] * factor);
+      return cicada::semiring::traits<value_type>::exp(edge.features[name] * factor);
     }
     
   };
@@ -871,7 +871,7 @@ struct TaskOracle
     
     value_type operator()(const feature_set_type& x) const
     {
-      return cicada::semiring::traits<value_type>::log(x[name] * factor);
+      return cicada::semiring::traits<value_type>::exp(x[name] * factor);
     }
   };
   

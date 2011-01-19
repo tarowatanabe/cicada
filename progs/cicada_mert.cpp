@@ -599,49 +599,6 @@ struct ViterbiTask
 {
   typedef cicada::semiring::Logprob<double> weight_type;
   
-  struct viterbi_function
-  {
-    typedef hypergraph_type::feature_set_type feature_set_type;
-
-    typedef weight_type value_type;
-
-    viterbi_function(const weight_set_type& __weights)
-      : weights(__weights) {}
-
-    const weight_set_type& weights;
-  
-    template <typename Edge>
-    value_type operator()(const Edge& edge) const
-    {
-      return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
-    }
-  };
-
-  struct viterbi_traversal
-  {
-    typedef sentence_type value_type;
-  
-    template <typename Edge, typename Iterator>
-    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-    {
-      yield.clear();
-    
-      int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  int pos = titer->non_terminal_index() - 1;
-	  if (pos < 0)
-	    pos = non_terminal_pos;
-	  ++ non_terminal_pos;
-	  
-	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
-	} else if (*titer != vocab_type::EPSILON)
-	  yield.push_back(*titer);
-    }
-  };
-
-
   
   typedef std::pair<int, const hypergraph_type*> mapper_type;
   typedef std::pair<int, sentence_type>     reducer_type;
@@ -672,7 +629,7 @@ struct ViterbiTask
       
       reduced.first = mapped.first;
       
-      viterbi(*mapped.second, reduced.second, weight, viterbi_traversal(), viterbi_function(weights));
+      viterbi(*mapped.second, reduced.second, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
       
       queue_reducer.push(reduced);
     }

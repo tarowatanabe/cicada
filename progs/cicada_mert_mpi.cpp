@@ -32,6 +32,9 @@
 #include "cicada/optimize/line_search.hpp"
 #include "cicada/optimize/powell.hpp"
 
+#include "cicada/operation/functional.hpp"
+#include "cicada/operation/traversal.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -778,23 +781,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 
 typedef cicada::semiring::Logprob<double> weight_type;
 
-struct viterbi_function
-{
-  typedef hypergraph_type::feature_set_type feature_set_type;
-
-  typedef weight_type value_type;
-
-  viterbi_function(const weight_set_type& __weights)
-    : weights(__weights) {}
-
-  const weight_set_type& weights;
-  
-  template <typename Edge>
-  value_type operator()(const Edge& edge) const
-  {
-    return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
-  }
-};
 
 struct viterbi_traversal
 {
@@ -916,7 +902,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       weight_type weight;
       
-      cicada::viterbi(graphs[mpi_id], yield, weight, viterbi_traversal(), viterbi_function(weights));
+      cicada::viterbi(graphs[mpi_id], yield, weight, cicaa::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weigh_type>(weights));
       
       os << id << " ||| " << yield << '\n';
     }

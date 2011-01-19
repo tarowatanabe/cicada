@@ -45,7 +45,7 @@ namespace cicada
     struct traits
     {
       template <typename T>
-      static inline Tp log(const T& x)  { return std::exp(x); }
+      static inline Tp exp(const T& x)  { return std::exp(x); }
       static inline Tp zero() { return Tp();  }
       static inline Tp one()  { return Tp(1); }
     };

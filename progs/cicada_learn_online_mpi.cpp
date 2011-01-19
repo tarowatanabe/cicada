@@ -553,7 +553,7 @@ struct Task
     template <typename Edge>
     value_type operator()(const Edge& x) const
     {
-      return cicada::semiring::traits<value_type>::log(0.0);
+      return cicada::semiring::traits<value_type>::exp(0.0);
     }
   };
 
@@ -631,7 +631,7 @@ struct Task
     template <typename Edge>
     value_type operator()(const Edge& x) const
     {
-      return cicada::semiring::traits<value_type>::log(x.features[feature_name] * scale);
+      return cicada::semiring::traits<value_type>::exp(x.features[feature_name] * scale);
     }
   };
 
