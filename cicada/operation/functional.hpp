@@ -13,6 +13,26 @@ namespace cicada
 {
   namespace operation
   {
+    
+    template <typename Weight>
+    struct constatnt_function
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+      
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(0.0);
+      }
+      
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::log(0.0);
+      }
+    };
+
     template <typename Weight>
     struct single_scaled_function
     {
