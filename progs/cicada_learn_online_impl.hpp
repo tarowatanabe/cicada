@@ -33,6 +33,7 @@
 #include "cicada/feature_function.hpp"
 
 #include "cicada/operation/functional.hpp"
+#include "cicada/operation/traversal.hpp"
 
 #include "cicada_text_impl.hpp"
 
@@ -65,33 +66,6 @@ struct TaskOracle
       scores(__scores),
       features(__features)
   { }
-
-  
-  struct kbest_traversal
-  {
-    typedef sentence_type value_type;
-    
-    template <typename Edge, typename Iterator>
-    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-    {
-      // extract target-yield, features
-      
-      yield.clear();
-      
-      int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  int pos = titer->non_terminal_index() - 1;
-	  if (pos < 0)
-	    pos = non_terminal_pos;
-	  ++ non_terminal_pos;
-	  
-	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
-	} else if (*titer != vocab_type::EPSILON)
-	  yield.push_back(*titer);
-    }
-  };
   
   void operator()()
   {
@@ -135,7 +109,7 @@ struct TaskOracle
       
       bleu_weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), cicada::operation::single_scaled_function<bleu_weight_type>(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::single_scaled_function<bleu_weight_type>(feature_bleu, score_factor));
       
       score_ptr_type score_sample = scorers[id]->score(sentence);
       if (score_curr)

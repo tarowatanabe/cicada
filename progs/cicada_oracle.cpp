@@ -29,6 +29,9 @@
 #include "cicada/sentence_vector.hpp"
 #include "cicada/prune.hpp"
 
+#include "cicada/operation/functional.hpp"
+#include "cicada/operation/traversal.hpp"
+
 #include "cicada/apply.hpp"
 #include "cicada/model.hpp"
 
@@ -233,69 +236,6 @@ struct TaskOracle
       } 
   }
   
-  template <typename Weight>
-  struct bleu_function
-  {
-    typedef hypergraph_type::feature_set_type feature_set_type;
-    
-    typedef Weight value_type;
-    
-    bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
-      : name(__name), factor(__factor) {}
-
-    weight_set_type::feature_type name;
-    double factor;
-    
-    template <typename Edge>
-    value_type operator()(const Edge& edge) const
-    {
-      return cicada::semiring::traits<value_type>::log(edge.features[name] * factor);
-    }
-    
-  };
-
-  struct weight_bleu_function
-  {
-    typedef cicada::semiring::Logprob<double> value_type;
-    
-    weight_bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
-      : name(__name), factor(__factor) {}
-    
-    weight_set_type::feature_type name;
-    double factor;
-    
-    value_type operator()(const feature_set_type& x) const
-    {
-      return cicada::semiring::traits<value_type>::log(x[name] * factor);
-    }
-  };
-  
-  struct kbest_traversal
-  {
-    typedef sentence_type value_type;
-    
-    template <typename Edge, typename Iterator>
-    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-    {
-      // extract target-yield, features
-      
-      yield.clear();
-      
-      int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  int pos = titer->non_terminal_index() - 1;
-	  if (pos < 0)
-	    pos = non_terminal_pos;
-	  ++ non_terminal_pos;
-	  
-	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
-	} else if (*titer != vocab_type::EPSILON)
-	  yield.push_back(*titer);
-    }
-  };
-
   
   void operator()()
   {
@@ -337,6 +277,8 @@ struct TaskOracle
 	__bleu->assign(score_curr);
       else
 	__bleu_linear->assign(score_curr);
+
+      typedef cicada::semiring::Logprob<double> weight_type;
       
       model_type model;
       model.push_back(features[id]);
@@ -344,16 +286,16 @@ struct TaskOracle
       if (apply_exact)
 	cicada::apply_exact(model, graphs[id], graph_oracle);
       else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, weight_bleu_function(feature_bleu, score_factor), cube_size);
+	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type >(feature_bleu, score_factor), cube_size);
       
       // compute viterbi...
-      cicada::semiring::Logprob<double> weight;
+      weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), bleu_function<cicada::semiring::Logprob<double> >(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_bleu, score_factor));
       
       // compute pruned forest
       hypergraph_type forest;
-      cicada::prune_beam(graph_oracle, forest, bleu_function<cicada::semiring::Tropical<double> >(feature_bleu, score_factor), 1e-5);
+      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_bleu, score_factor), 1e-5);
       
       // compute scores...
       score_ptr_type score_sample = scorers[id]->score(sentence);
