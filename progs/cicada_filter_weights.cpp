@@ -173,7 +173,7 @@ void options(int argc, char** argv)
     ("normalize-l2", po::bool_switch(&normalize_l2),  "weight normalization by L2")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
-        
+    
     ("help", "help message");
   
   po::variables_map vm;
