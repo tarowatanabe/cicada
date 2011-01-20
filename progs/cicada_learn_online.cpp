@@ -514,7 +514,7 @@ struct Task
 				  input_lattice_mode,
 				  input_forest_mode,
 				  input_span_mode,
-				  true,
+				  false,
 				  false,
 				  debug);
 
