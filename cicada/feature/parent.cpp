@@ -74,7 +74,6 @@ namespace cicada
 
       typedef rule_type::symbol_set_type phrase_type;
       
-      
       struct string_hash : public utils::hashmurmur<size_t>
       {
 	typedef utils::hashmurmur<size_t> hasher_type;
@@ -182,6 +181,8 @@ namespace cicada
       attribute_type attr_target_position;
       attribute_type attr_source_root;
 
+      sentence_type __buffer;
+
       struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
       {
 	typedef cicada::AttributeVector attribute_set_type;
@@ -199,6 +200,22 @@ namespace cicada
 	attribute_set_type::string_type operator()(const attribute_set_type::float_type& x) const { return ""; }
 	attribute_set_type::string_type operator()(const attribute_set_type::string_type& x) const { return x; }
       };
+
+      symbol_type root_label(const std::string& rule) const
+      {
+	std::string::size_type pos = rule.find('(');
+	if (pos != std::string::npos) {
+	  const std::string label = rule.substr(0, pos);
+	  if (label.empty() || label[0] != '[' || label[label.size() -1] != ']')
+	    throw std::runtime_error("invlaid label:" + label);
+	  return label;
+	} else {
+	  if (rule.empty() || rule[0] != '[' || rule[rule.size() -1] != ']')
+	    throw std::runtime_error("invlaid label: " + rule);
+	  
+	  return rule;
+	}
+      }
       
       symbol_type root_label(const edge_type& edge) const
       {
@@ -227,6 +244,7 @@ namespace cicada
 	const rule_type::symbol_set_type& phrase = edge.rule->rhs;
 	
 	if (states.empty()) {
+	  const symbol_type cat = root_label(edge);
 	  
 	  if (alignment_mode) {
 	    symbol_type symbol = vocab_type::EPSILON;
@@ -239,7 +257,7 @@ namespace cicada
 	    if (sentence && target_pos >= 0)
 	      symbol = sentence->operator[](target_pos);
 	    
-	    const std::string rule_string  = extract_phrase_rule(edge.rule->lhs, &symbol, (&symbol) + 1, __extractor_none());
+	    const std::string rule_string  = extract_phrase_rule(cat, &symbol, (&symbol) + 1, __extractor_none());
 	    const id_type     id_string    = rule_id(rule_string);
 	    
 	    apply_feature(features, rule_string);
@@ -248,7 +266,7 @@ namespace cicada
 	      std::string& rule_norm = const_cast<std::string&>(normalized[id_string][i]);
 	      
 	      if (rule_norm.empty())
-		rule_norm = extract_phrase_rule(edge.rule->lhs, &symbol, (&symbol) + 1, __extractor<normalizer_type>(normalizers[i]));
+		rule_norm = extract_phrase_rule(cat, &symbol, (&symbol) + 1, __extractor<normalizer_type>(normalizers[i]));
 	      
 	      if (rule_string != rule_norm)
 		apply_feature(features, rule_norm);
@@ -256,7 +274,7 @@ namespace cicada
 	    
 	    *reinterpret_cast<id_type*>(state) = id_string;
 	  } else {
-	    const std::string rule_string  = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());
+	    const std::string rule_string  = extract_phrase_rule(cat, phrase.begin(), phrase.end(), __extractor_none());
 	    const id_type     id_string    = rule_id(rule_string);
 	    
 	    apply_feature(features, rule_string);
@@ -265,7 +283,7 @@ namespace cicada
 	      std::string& rule_norm = const_cast<std::string&>(normalized[id_string][i]);
 	      
 	      if (rule_norm.empty())
-		rule_norm = extract_phrase_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<normalizer_type>(normalizers[i]));
+		rule_norm = extract_phrase_rule(cat, phrase.begin(), phrase.end(), __extractor<normalizer_type>(normalizers[i]));
 	      
 	      if (rule_string != rule_norm)
 		apply_feature(features, rule_norm);
@@ -274,6 +292,11 @@ namespace cicada
 	    *reinterpret_cast<id_type*>(state) = id_string;
 	  }
 	} else {
+	  const symbol_type cat = root_label(edge);
+	  
+	  sentence_type& buffer = const_cast<sentence_type&>(__buffer);
+	  buffer.clear();
+	  
 	  int pos_non_terminal = 0;
 	  phrase_type::const_iterator piter_end = phrase.end();
 	  for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
@@ -285,23 +308,26 @@ namespace cicada
 	      
 	      const id_type* antecedent_context = reinterpret_cast<const id_type*>(states[antecedent_index]);
 	      
-	      apply_feature(features, edge.rule->lhs, string_map[*antecedent_context]);
+	      buffer.push_back(root_label(string_map[*antecedent_context]));
+	      
+	      apply_feature(features, cat, string_map[*antecedent_context]);
 	      
 	      for (size_t i = 0; i != normalizers.size(); ++ i)
 		if (string_map[*antecedent_context] != normalized[*antecedent_context][i])
-		  apply_feature(features, edge.rule->lhs, normalized[*antecedent_context][i]);
-	    }
+		  apply_feature(features, cat, normalized[*antecedent_context][i]);
+	    } else
+	      buffer.push_back(*piter);
 	  
-	  const std::string rule_string  = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor_none());
+	  const std::string rule_string  = extract_rule(cat, buffer.begin(), buffer.end(), __extractor_none());
 	  const id_type id_string        = rule_id(rule_string);
 	  
 	  apply_feature(features, rule_string);
-
+	  
 	  for (size_t i = 0; i != normalizers.size(); ++ i) {
 	    std::string& rule_norm = const_cast<std::string&>(normalized[id_string][i]);
 	    
 	    if (rule_norm.empty())
-	      rule_norm = extract_rule(edge.rule->lhs, phrase.begin(), phrase.end(), __extractor<normalizer_type>(normalizers[i]));
+	      rule_norm = extract_rule(cat, buffer.begin(), buffer.end(), __extractor<normalizer_type>(normalizers[i]));
 	    
 	    if (rule_string != rule_norm)
 	      apply_feature(features, rule_norm);
