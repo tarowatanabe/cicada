@@ -858,7 +858,7 @@ struct Task
 	      *score -= *scores[id];
 
 	    norm = 1;
-	  } else {
+	  } else if (! loss_segment) {
 	    if (score)
 	      *score *= 0.9;
 	    
@@ -983,7 +983,7 @@ struct Task
 	  *score -= *scores[id];
 	
 	norm = 1;
-      } else {
+      } else if (! loss_segment) {
 	if (score)
 	  *score *= 0.9;
 	
