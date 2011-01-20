@@ -625,7 +625,8 @@ struct Task
 	    *score_1best += *scores[id];
 	  
 	  if (debug >= 2)
-	    std::cerr << "1best: " << (*score_1best) << " viterbi: " << (*score) << std::endl;
+	    std::cerr << "1best: " << (*score_1best) << std::endl
+		      << "viterbi: " << (*score) << std::endl;
 	  
 	  if (! optimize_fixed_oracle) {
 	    if (id >= hypergraph_oracles.size())
@@ -807,8 +808,10 @@ struct Task
 		  << " violated: " << (double(hypergraph_penalty.edges.size()) / hypergraph_penalty.nodes.size())
 		  << std::endl;
 
-	std::cerr << "1best: " << (*score_1best) << " viterbi: " << (*score) << std::endl
-		  << "oracle: " << (*score_reward) << " violated: " << (*score_penalty) << std::endl;
+	std::cerr << "1best: " << (*score_1best) << std::endl
+		  << "viterbi: " << (*score) << std::endl
+		  << "oracle: " << (*score_reward) << std::endl
+		  << " violated: " << (*score_penalty) << std::endl;
       }
 
       if (learn_factored)
