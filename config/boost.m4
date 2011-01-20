@@ -1,5 +1,5 @@
 # boost.m4: Locate Boost headers and libraries for autoconf-based projects.
-# Copyright (C) 2007, 2008, 2009, 2010  Benoit Sigoure <tsuna@lrde.epita.fr>
+# Copyright (C) 2007, 2008, 2009, 2010, 2011  Benoit Sigoure <tsuna@lrde.epita.fr>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 m4_define([_BOOST_SERIAL], [m4_translit([
-# serial 13
+# serial 14
 ], [#
 ], [])])
 
@@ -52,8 +52,12 @@ m4_pattern_forbid([^_?BOOST_])
 #                [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
 # --------------------------------------------------------
 # Same as AC_EGREP_CPP, but leave the result in conftest.i.
-# PATTERN is *not* overquoted, as in AC_EGREP_CPP.  It could be useful
-# to turn this into a macro which extracts the value of any macro.
+#
+# SED-PROGRAM is *not* overquoted, as in AC_EGREP_CPP.  It is expanded
+# in double-quotes, so escape your double quotes.
+#
+# It could be useful to turn this into a macro which extracts the
+# value of any macro.
 m4_define([_BOOST_SED_CPP],
 [AC_LANG_PREPROC_REQUIRE()dnl
 AC_REQUIRE([AC_PROG_SED])dnl
@@ -202,7 +206,7 @@ AC_LANG_POP([C++])dnl
   AC_CACHE_CHECK([for Boost's header version],
     [boost_cv_lib_version],
     [m4_pattern_allow([^BOOST_LIB_VERSION$])dnl
-     _BOOST_SED_CPP([/^boost-lib-version = /{s///;s/\"//g;p;g;}],
+     _BOOST_SED_CPP([/^boost-lib-version = /{s///;s/\"//g;p;q;}],
                     [#include <boost/version.hpp>
 boost-lib-version = BOOST_LIB_VERSION],
     [boost_cv_lib_version=`cat conftest.i`])])
@@ -415,7 +419,7 @@ rm -f conftest.$ac_objext
 ])
 case $Boost_lib in #(
   no) _AC_MSG_LOG_CONFTEST
-    AC_MSG_ERROR([cannot not find the flags to link with Boost $1])
+    AC_MSG_ERROR([cannot find the flags to link with Boost $1])
     ;;
 esac
 AC_SUBST(AS_TR_CPP([BOOST_$1_LDFLAGS]), [$Boost_lib_LDFLAGS])
@@ -543,7 +547,7 @@ AC_DEFUN([BOOST_GRAPH],
 
 
 # BOOST_IOSTREAMS([PREFERRED-RT-OPT])
-# -------------------------------
+# -----------------------------------
 # Look for Boost.IOStreams.  For the documentation of PREFERRED-RT-OPT, see the
 # documentation of BOOST_FIND_LIB above.
 AC_DEFUN([BOOST_IOSTREAMS],
@@ -610,13 +614,43 @@ AC_DEFUN([BOOST_PREPROCESSOR],
 
 # BOOST_PROGRAM_OPTIONS([PREFERRED-RT-OPT])
 # -----------------------------------------
-# Look for Boost.Program_options.  For the documentation of PREFERRED-RT-OPT, see
-# the documentation of BOOST_FIND_LIB above.
+# Look for Boost.Program_options.  For the documentation of PREFERRED-RT-OPT,
+# see the documentation of BOOST_FIND_LIB above.
 AC_DEFUN([BOOST_PROGRAM_OPTIONS],
 [BOOST_FIND_LIB([program_options], [$1],
                 [boost/program_options.hpp],
                 [boost::program_options::options_description d("test");])
 ])# BOOST_PROGRAM_OPTIONS
+
+
+
+# _BOOST_PYTHON_CONFIG(VARIABLE, FLAG)
+# ------------------------------------
+# Save VARIABLE, and define it via `python-config --FLAG`.
+# Substitute BOOST_PYTHON_VARIABLE.
+m4_define([_BOOST_PYTHON_CONFIG],
+[AC_SUBST([BOOST_PYTHON_$1],
+          [`python-config --$2 2>/dev/null`])dnl
+boost_python_save_$1=$$1
+$1="$$1 $BOOST_PYTHON_$1"])
+
+
+# BOOST_PYTHON([PREFERRED-RT-OPT])
+# --------------------------------
+# Look for Boost.Python.  For the documentation of PREFERRED-RT-OPT,
+# see the documentation of BOOST_FIND_LIB above.
+AC_DEFUN([BOOST_PYTHON],
+[_BOOST_PYTHON_CONFIG([CPPFLAGS], [includes])
+_BOOST_PYTHON_CONFIG([LDFLAGS],   [ldflags])
+_BOOST_PYTHON_CONFIG([LIBS],      [libs])
+m4_pattern_allow([^BOOST_PYTHON_MODULE$])dnl
+BOOST_FIND_LIB([python], [$1],
+               [boost/python.hpp],
+               [], [BOOST_PYTHON_MODULE(empty) {}])
+CPPFLAGS=$boost_python_save_CPPFLAGS
+LDFLAGS=$boost_python_save_LDFLAGS
+LIBS=$boost_python_save_LIBS
+])# BOOST_PYTHON
 
 
 # BOOST_REF()
@@ -730,7 +764,7 @@ LIBS="$LIBS $boost_cv_pthread_flag"
 #   threading: -pthread (Linux), -pthreads (Solaris) or -mthreads (Mingw32)"
 CPPFLAGS="$CPPFLAGS $boost_cv_pthread_flag"
 BOOST_FIND_LIB([thread], [$1],
-                [boost/thread.hpp], [boost::thread t; boost::mutex m;])
+               [boost/thread.hpp], [boost::thread t; boost::mutex m;])
 BOOST_THREAD_LIBS="$BOOST_THREAD_LIBS $boost_cv_pthread_flag"
 BOOST_CPPFLAGS="$BOOST_CPPFLAGS $boost_cv_pthread_flag"
 LIBS=$boost_threads_save_LIBS
