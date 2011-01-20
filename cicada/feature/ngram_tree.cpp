@@ -66,13 +66,14 @@ namespace cicada
 
       typedef tree_map_type::id_type id_type;
 
-      
       NGramTreeImpl()
 	: tree_map(symbol_type()),
 	  sentence(0),
 	  forced_feature(false),
 	  alignment_mode(false),
-	  attr_target_position("target-position") {}
+	  source_root_mode(false),
+	  attr_target_position("target-position"),
+	  attr_source_root("source-root") {}
       
       void clear()
       {
@@ -91,8 +92,10 @@ namespace cicada
       
       bool forced_feature;
       bool alignment_mode;
-
+      bool source_root_mode;
+      
       attribute_type attr_target_position;
+      attribute_type attr_source_root;
       
       struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
       {
@@ -102,6 +105,32 @@ namespace cicada
 	attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -2; }
 	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -2; }
       };
+      
+      struct __attribute_string : public boost::static_visitor<cicada::AttributeVector::string_type>
+      {
+	typedef cicada::AttributeVector attribute_set_type;
+	
+	attribute_set_type::string_type operator()(const attribute_set_type::int_type& x) const { return ""; }
+	attribute_set_type::string_type operator()(const attribute_set_type::float_type& x) const { return ""; }
+	attribute_set_type::string_type operator()(const attribute_set_type::string_type& x) const { return x; }
+      };
+      
+      symbol_type root_label(const edge_type& edge) const
+      {
+	if (source_root_mode) {
+	  std::string label;
+	  
+	  attribute_set_type::const_iterator riter = edge.attributes.find(attr_source_root);
+	  if (riter != edge.attributes.end())
+	    label = boost::apply_visitor(__attribute_string(), riter->second);
+	  
+	  if (label.empty())
+	    return edge.rule->lhs;
+	  else
+	    return label;
+	} else
+	  return edge.rule->lhs;
+      }
       
       void ngram_tree_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
@@ -134,9 +163,6 @@ namespace cicada
 	    compute_bound(phrase.begin(), phrase.end(), prefix, suffix);
 	  
 	  id_type* context = reinterpret_cast<id_type*>(state);
-	  //context[0] = tree_id(edge.rule->lhs, tree_id(prefix, tree_map.root()));
-	  //context[1] = tree_id(edge.rule->lhs, tree_id(suffix, tree_map.root()));
-	  
 	  context[0] = tree_id(prefix, tree_map.root());
 	  context[1] = tree_id(suffix, tree_map.root());
 	} else {
@@ -155,6 +181,8 @@ namespace cicada
 	  
 	  id_type prefix_id = (prefix.empty() ? tree_map.root() : tree_id(prefix, tree_map.root()));
 	  id_type suffix_id = (suffix.empty() ? tree_map.root() : tree_id(suffix, tree_map.root()));
+
+	  const symbol_type cat = root_label(edge);
 	  
 	  phrase_span_set_type::const_iterator siter_begin = phrase_spans.begin();
 	  phrase_span_set_type::const_iterator siter_end = phrase_spans.end();
@@ -180,14 +208,15 @@ namespace cicada
 	    const id_type prefix_next_id = (prefix_next.empty() ? tree_map.root() : tree_id(prefix_next, tree_map.root()));
 	    const id_type suffix_next_id = (suffix_next.empty() ? tree_map.root() : tree_id(suffix_next, tree_map.root()));
 	    
+	    
 	    if (! tree_map.is_root(suffix_id))
-	      apply_feature(features, edge.rule->lhs, suffix_id, prefix_antecedent_id);
+	      apply_feature(features, cat, suffix_id, prefix_antecedent_id);
 	    
 	    if (tree_map.is_root(prefix_id))
 	      prefix_id = prefix_antecedent_id;
 	    
 	    if (! tree_map.is_root(prefix_next_id)) {
-	      apply_feature(features, edge.rule->lhs, suffix_antecedent_id, prefix_next_id);
+	      apply_feature(features, cat, suffix_antecedent_id, prefix_next_id);
 	      suffix_id = suffix_next_id;
 	    } else
 	      suffix_id = suffix_antecedent_id;
@@ -201,8 +230,6 @@ namespace cicada
 	  if (tree_map.is_root(suffix_id))
 	    suffix_id = tree_id(vocab_type::EPSILON, tree_map.root());
 	  
-	  //context[0] = tree_id(edge.rule->lhs, prefix_id);
-	  //context[1] = tree_id(edge.rule->lhs, suffix_id);
 	  context[0] = prefix_id;
 	  context[1] = suffix_id;
 	}
@@ -217,8 +244,10 @@ namespace cicada
 	const id_type prefix_antecedent_id = antecedent_context[0];
 	const id_type suffix_antecedent_id = antecedent_context[1];
 	
-	apply_feature(features, edge.rule->lhs, tree_id(vocab_type::BOS, tree_map.root()), prefix_antecedent_id);
-	apply_feature(features, edge.rule->lhs, suffix_antecedent_id, tree_id(vocab_type::EOS, tree_map.root()));
+	const symbol_type cat = root_label(edge);
+	
+	apply_feature(features, cat, tree_id(vocab_type::BOS, tree_map.root()), prefix_antecedent_id);
+	apply_feature(features, cat, suffix_antecedent_id, tree_id(vocab_type::EOS, tree_map.root()));
       }
 
       
@@ -315,6 +344,7 @@ namespace cicada
       impl_type::normalizer_set_type normalizers;
       std::string name;
       bool alignment_mode = false;
+      bool source_root_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
@@ -328,6 +358,8 @@ namespace cicada
 	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
 	  alignment_mode = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "source-root") == 0)
+	  source_root_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -336,6 +368,7 @@ namespace cicada
 
       ngram_tree_impl->normalizers.swap(normalizers);
       ngram_tree_impl->alignment_mode = alignment_mode;
+      ngram_tree_impl->source_root_mode = source_root_mode;
       ngram_tree_impl->feature_name_prefix = (name.empty() ? std::string("ngram-tree") : name);
       
       // non-terminal + two neighbouring symbols + span-size

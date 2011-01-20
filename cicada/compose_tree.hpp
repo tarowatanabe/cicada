@@ -77,7 +77,7 @@ namespace cicada
     
     typedef hypergraph_type::feature_set_type   feature_set_type;
     typedef hypergraph_type::attribute_set_type attribute_set_type;
-    
+
     typedef hypergraph_type::rule_type        rule_type;
     typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
     
@@ -95,6 +95,9 @@ namespace cicada
     
     typedef std::deque<feature_set_type, std::allocator<feature_set_type> >    feature_queue_type;
     typedef std::deque<attribute_set_type, std::allocator<attribute_set_type> > attribute_queue_type;
+
+    typedef feature_set_type::feature_type     feature_type;
+    typedef attribute_set_type::attribute_type attribute_type;
     
     // for phrasal matching...
     
@@ -155,9 +158,14 @@ namespace cicada
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
     
     ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
-      : goal(__goal), tree_grammar(__tree_grammar), grammar(__grammar), yield_source(__yield_source) 
+      : goal(__goal),
+	tree_grammar(__tree_grammar), 
+	grammar(__grammar),
+	yield_source(__yield_source),
+	attr_source_root("source-root")
     {  
-      goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal(1))));
+      goal_rule = rule_type::create(rule_type(vocab_type::GOAL,
+					      rule_type::symbol_set_type(1, goal.non_terminal(1))));
     }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)
@@ -251,6 +259,8 @@ namespace cicada
       }
       
       // then, try matching within this span...
+      
+      const symbol_type& root_label = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
 
       lhs_set_type lhss;
       lhss.set_empty_key(symbol_type());
@@ -294,6 +304,8 @@ namespace cicada
 		edge.rule = rule_type::create(rule_type(*liter, rule->rhs.begin(), rule->rhs.end()));
 		edge.features = riter->features;
 		edge.attributes = riter->attributes;
+
+		edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
 		
 		std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
 		if (result.second)
@@ -307,6 +319,8 @@ namespace cicada
 	    edge.rule = rule;
 	    edge.features = riter->features;
 	    edge.attributes = riter->attributes;
+	    
+	    edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
 	    
 	    std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
 	    if (result.second)
@@ -323,7 +337,6 @@ namespace cicada
       if (graph_in.nodes[id].edges.empty()) return;
       
       //std::cerr << "node: " << id << std::endl;
-
       
       queue_type queue;
       
@@ -485,21 +498,26 @@ namespace cicada
       
       //std::cerr << "apply rule pair: " << *rule_pair.source << " ||| " << *rule_pair.target << std::endl;
       
+      const symbol_type& root_label = rule_pair.source->label;
+      
       const tree_rule_type& rule = (yield_source ? *rule_pair.source : *rule_pair.target);
       
       std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
       if (result.second)
 	result.first->second = graph_out.add_node().id;
-
+      
       int non_terminal_pos = 0;
       
       const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_in, graph_out, non_terminal_pos);
       
       graph_out.edges[edge_id].features   += features;
       graph_out.edges[edge_id].attributes += attributes;
-
+      
       graph_out.edges[edge_id].features   += rule_pair.features;
       graph_out.edges[edge_id].attributes += rule_pair.attributes;
+      
+      // root-label is assigned to source-root attribute
+      graph_out.edges[edge_id].attributes[attr_source_root] = static_cast<const std::string&>(root_label);
     }
     
     hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
@@ -572,6 +590,8 @@ namespace cicada
     const tree_grammar_type& tree_grammar;
     const grammar_type& grammar;
     const bool yield_source;
+    
+    attribute_type attr_source_root;
   };
   
   

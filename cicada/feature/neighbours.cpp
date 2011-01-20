@@ -97,7 +97,9 @@ namespace cicada
 	: sentence(0),
 	  forced_feature(false),
 	  alignment_mode(false),
-	  attr_target_position("target-position") {}
+	  source_root_mode(false),
+	  attr_target_position("target-position"),
+	  attr_source_root("source-root") {}
       
       void clear()
       {
@@ -115,8 +117,10 @@ namespace cicada
       
       bool forced_feature;
       bool alignment_mode;
+      bool source_root_mode;
 
       attribute_type attr_target_position;
+      attribute_type attr_source_root;
 
       struct __attribute_integer : public boost::static_visitor<cicada::AttributeVector::int_type>
       {
@@ -127,6 +131,32 @@ namespace cicada
 	attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -2; }
       };
       
+      
+      struct __attribute_string : public boost::static_visitor<cicada::AttributeVector::string_type>
+      {
+	typedef cicada::AttributeVector attribute_set_type;
+	
+	attribute_set_type::string_type operator()(const attribute_set_type::int_type& x) const { return ""; }
+	attribute_set_type::string_type operator()(const attribute_set_type::float_type& x) const { return ""; }
+	attribute_set_type::string_type operator()(const attribute_set_type::string_type& x) const { return x; }
+      };
+      
+      symbol_type root_label(const edge_type& edge) const
+      {
+	if (source_root_mode) {
+	  std::string label;
+	  
+	  attribute_set_type::const_iterator riter = edge.attributes.find(attr_source_root);
+	  if (riter != edge.attributes.end())
+	    label = boost::apply_visitor(__attribute_string(), riter->second);
+	  
+	  if (label.empty())
+	    return edge.rule->lhs;
+	  else
+	    return label;
+	} else
+	  return edge.rule->lhs;
+      }
       
       void neighbours_score(state_ptr_type& state,
 			    const state_ptr_set_type& states,
@@ -157,7 +187,7 @@ namespace cicada
 	      size = 1;
 	    }
 	    
-	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, prefix, suffix, size)).first;
+	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), root_label(edge), prefix, suffix, size)).first;
 	    
 	    *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
 	  } else {
@@ -165,7 +195,7 @@ namespace cicada
 	    symbol_type suffix = vocab_type::EPSILON;
 	    int size = count_span(phrase.begin(), phrase.end(), prefix, suffix);
 	    
-	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), edge.rule->lhs, prefix, suffix, size)).first;
+	    state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(id_type(-1), root_label(edge), prefix, suffix, size)).first;
 	    
 	    *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
 	  }
@@ -234,7 +264,7 @@ namespace cicada
 	  }
 	  
 	  // construct state is used as supplier for the next state...
-	  state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(state_id, edge.rule->lhs, prefix, suffix, size)).first;
+	  state_map_type::iterator iter = const_cast<state_map_type&>(state_map).insert(state_type(state_id, root_label(edge), prefix, suffix, size)).first;
 	  
 	  *reinterpret_cast<id_type*>(state) = iter - state_map.begin();
 	}
@@ -381,6 +411,7 @@ namespace cicada
       impl_type::normalizer_set_type normalizers;
       std::string name;
       bool alignment_mode = false;
+      bool source_root_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
@@ -394,6 +425,8 @@ namespace cicada
 	  name = piter->second;
 	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
 	  alignment_mode = utils::lexical_cast<bool>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "source-root") == 0)
+	  source_root_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for neighbours: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -402,6 +435,7 @@ namespace cicada
       
       neighbours_impl->normalizers.swap(normalizers);
       neighbours_impl->alignment_mode = alignment_mode;
+      neighbours_impl->source_root_mode = source_root_mode;
       neighbours_impl->feature_name_prefix = (name.empty() ? std::string("neighbours") : name);
       
       // non-terminal + two neighbouring symbols + span-size
