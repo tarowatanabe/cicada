@@ -422,7 +422,7 @@ void compute_oracles(const scorer_document_type& scorers,
   if (score)
     score_bcast = score->clone();
 
-  for (int rank = 0; rank != mpi_rank; ++ rank) {
+  for (int rank = 0; rank != mpi_size; ++ rank) {
     if (rank == mpi_rank) {
       // bcast current bleu-score...
       
