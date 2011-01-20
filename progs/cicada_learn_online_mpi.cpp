@@ -448,6 +448,9 @@ void compute_oracles(const scorer_document_type& scorers,
       }
     }
   }
+
+  if (debug && mpi_rank == 0 && score)
+    std::cerr << "oracle score: " << *score << std::endl;
   
   // re-assign adjusted bleu score...
   for (size_t id = 0; id != graphs.size(); ++ id) {
