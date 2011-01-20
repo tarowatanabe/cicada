@@ -13,6 +13,26 @@ namespace cicada
 {
   namespace operation
   {
+    
+    template <typename Weight>
+    struct constatnt_function
+    {
+      typedef cicada::Operation::hypergraph_type hypergraph_type;
+      typedef cicada::Operation::weight_set_type weight_set_type;
+      typedef Weight value_type;
+      
+      value_type operator()(const hypergraph_type::edge_type& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(0.0);
+      }
+      
+      template <typename FeatureSet>
+      value_type operator()(const FeatureSet& x) const
+      {
+	return cicada::semiring::traits<value_type>::exp(0.0);
+      }
+    };
+
     template <typename Weight>
     struct single_scaled_function
     {
@@ -28,13 +48,13 @@ namespace cicada
   
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features[feature] * scale);
+	return cicada::semiring::traits<value_type>::exp(x.features[feature] * scale);
       }
       
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x[feature] * scale);
+	return cicada::semiring::traits<value_type>::exp(x[feature] * scale);
       }
     };
 
@@ -52,13 +72,13 @@ namespace cicada
       
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features[feature]);
+	return cicada::semiring::traits<value_type>::exp(x.features[feature]);
       }
       
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x[feature]);
+	return cicada::semiring::traits<value_type>::exp(x[feature]);
       }
     };
 
@@ -77,13 +97,13 @@ namespace cicada
   
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features.dot(weights) * scale);
+	return cicada::semiring::traits<value_type>::exp(x.features.dot(weights) * scale);
       }
       
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.dot(weights) * scale);
+	return cicada::semiring::traits<value_type>::exp(x.dot(weights) * scale);
       }
     };
 
@@ -102,13 +122,13 @@ namespace cicada
       
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features.sum() * scale);
+	return cicada::semiring::traits<value_type>::exp(x.features.sum() * scale);
       }
       
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.sum() * scale);
+	return cicada::semiring::traits<value_type>::exp(x.sum() * scale);
       }
     };
 
@@ -126,13 +146,13 @@ namespace cicada
 
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(x.features.dot(weights));
       }
   
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(x.dot(weights));
       }
     };
 
@@ -145,13 +165,13 @@ namespace cicada
       
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.features.sum());
+	return cicada::semiring::traits<value_type>::exp(x.features.sum());
       }
   
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.sum());
+	return cicada::semiring::traits<value_type>::exp(x.sum());
       }
     };
     
@@ -170,7 +190,7 @@ namespace cicada
 	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
 	  
 	// since we will "max" at operator+, we will collect negative length
-	return cicada::semiring::traits<value_type>::log(- length);
+	return cicada::semiring::traits<value_type>::exp(- length);
       }
     };
 
@@ -189,7 +209,7 @@ namespace cicada
 	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
 	  
 	// since we will "max" at operator+, we will collect positive length
-	return cicada::semiring::traits<value_type>::log(length);
+	return cicada::semiring::traits<value_type>::exp(length);
       }
     };
 

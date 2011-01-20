@@ -28,6 +28,9 @@
 #include "cicada/viterbi.hpp"
 #include "cicada/sentence_vector.hpp"
 
+#include "cicada/operation/functional.hpp"
+#include "cicada/operation/traversal.hpp"
+
 #include "cicada/apply.hpp"
 #include "cicada/model.hpp"
 
@@ -47,7 +50,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
-
+#include <boost/random.hpp>
 #include <boost/thread.hpp>
 
 #include "lbfgs.h"
@@ -124,11 +127,12 @@ void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers);
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
-		       weight_set_type& weights);
+		       weight_set_type& weights,
+		       Generator& generator);
 template <typename Optimizer>
 double optimize_batch(const hypergraph_set_type& graphs,
 		      const feature_function_ptr_set_type& features,
@@ -138,7 +142,7 @@ double optimize_batch(const hypergraph_set_type& graphs,
 
 struct OptimizeLBFGS;
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 struct OptimizeOnline;
 
 #include "cicada_maxlike_impl.hpp"
@@ -157,8 +161,6 @@ int main(int argc, char ** argv)
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
-    
-    srandom(time(0) * getpid());
     
     threads = utils::bithack::max(threads, 1);
     
@@ -182,12 +184,15 @@ int main(int argc, char ** argv)
     feature_function_ptr_set_type features(sentences.size());
     
     read_tstset(tstset_files, graphs, sentences, features);
-
+    
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
     if (oracle_loss)
       compute_oracles(graphs, features, scorers);
+
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
     
     weight_set_type weights;
     
@@ -195,9 +200,9 @@ int main(int argc, char ** argv)
 
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs, features, scorers, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(graphs, features, scorers, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs, features, scorers, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs, features, scorers, weights, generator);
     } else 
       objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
@@ -295,7 +300,7 @@ struct OptimizeLBFGS
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
       }
       
       const weight_set_type& weights;
@@ -312,7 +317,7 @@ struct OptimizeLBFGS
       
       value_type operator()(const feature_set_type& x) const
       {
-	return cicada::semiring::traits<value_type>::log(x.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(x.dot(weights));
       }
     };
 
@@ -329,7 +334,7 @@ struct OptimizeLBFGS
       value_type operator()(const Edge& edge) const
       {
 	// p_e
-	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
       }
     };
 
@@ -351,7 +356,7 @@ struct OptimizeLBFGS
 	if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
 	  return value_type();
 	else
-	  return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+	  return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
       }
     };
 
@@ -367,7 +372,7 @@ struct OptimizeLBFGS
 	// p_e r_e
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -396,7 +401,7 @@ struct OptimizeLBFGS
 
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -618,20 +623,23 @@ struct OptimizeLBFGS
 };
 
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 struct OptimizeOnline
 {
   typedef Optimizer optimizer_type;
+  typedef Generator generator_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
   
   OptimizeOnline(const hypergraph_set_type&           __graphs,
 		 const feature_function_ptr_set_type& __features,
 		 const scorer_document_type&          __scorers,
-		 weight_set_type&                     __weights)
+		 weight_set_type&                     __weights,
+		 generator_type&                      __generator)
     : graphs(__graphs),
       features(__features),
       scorers(__scorers),
-      weights(__weights) {}
+      weights(__weights),
+      generator(__generator) {}
   
   struct Task
   {
@@ -693,7 +701,8 @@ struct OptimizeOnline
       for (int i = 0; i < threads; ++ i)
 	queue.push(-1);
       
-      std::random_shuffle(ids.begin(), ids.end());
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(ids.begin(), ids.end(), gen);
       
       workers.join_all();
       
@@ -756,15 +765,17 @@ struct OptimizeOnline
   const feature_function_ptr_set_type& features;
   const scorer_document_type&          scorers;
   weight_set_type&                     weights;
+  generator_type&                      generator;
 };
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
-		       weight_set_type& weights)
+		       weight_set_type& weights,
+		       Generator& generator)
 {
-  return Optimizer(graphs, features, scorers,  weights)();
+  return Optimizer(graphs, features, scorers,  weights, generator)();
 }
 
 template <typename Optimizer>
@@ -805,67 +816,6 @@ struct TaskOracle
   }
   
   
-  struct bleu_function
-  {
-    typedef hypergraph_type::feature_set_type feature_set_type;
-    
-    typedef cicada::semiring::Logprob<double> value_type;
-
-    bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
-      : name(__name), factor(__factor) {}
-
-    weight_set_type::feature_type name;
-    double factor;
-    
-    template <typename Edge>
-    value_type operator()(const Edge& edge) const
-    {
-      return cicada::semiring::traits<value_type>::log(edge.features[name] * factor);
-    }
-    
-  };
-  
-  struct kbest_traversal
-  {
-    typedef sentence_type value_type;
-    
-    template <typename Edge, typename Iterator>
-    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-    {
-      // extract target-yield, features
-      
-      yield.clear();
-      
-      int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  int pos = titer->non_terminal_index() - 1;
-	  if (pos < 0)
-	    pos = non_terminal_pos;
-	  ++ non_terminal_pos;
-	  
-	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
-	} else if (*titer != vocab_type::EPSILON)
-	  yield.push_back(*titer);
-    }
-  };
-
-  struct weight_bleu_function
-  {
-    typedef cicada::semiring::Logprob<double> value_type;
-    
-    weight_bleu_function(const weight_set_type::feature_type& __name, const double& __factor)
-      : name(__name), factor(__factor) {}
-    
-    weight_set_type::feature_type name;
-    double factor;
-    
-    value_type operator()(const feature_set_type& x) const
-    {
-      return cicada::semiring::traits<value_type>::log(x[name] * factor);
-    }
-  };
   
   void operator()()
   {
@@ -910,12 +860,14 @@ struct TaskOracle
       
       model_type model;
       model.push_back(features[id]);
+
+      typedef cicada::semiring::Logprob<double> weight_type;
       
-      cicada::apply_cube_prune(model, graphs[id], graph_oracle, weight_bleu_function(feature_bleu, score_factor), cube_size);
+      cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor), cube_size);
       
-      cicada::semiring::Logprob<double> weight;
+      weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, kbest_traversal(), bleu_function(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor));
       
       score_ptr_type score_sample = scorers[id]->score(sentence);
       if (score_curr)

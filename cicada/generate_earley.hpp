@@ -564,7 +564,7 @@ namespace cicada
 	  length += (*siter != vocab_type::EPSILON && siter->is_terminal());
 	
 	// since we will "max" at operator+, we will collect negative length
-	return cicada::semiring::traits<value_type>::log(length);
+	return cicada::semiring::traits<value_type>::exp(length);
       }
     };
 

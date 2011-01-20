@@ -31,6 +31,9 @@
 #include "cicada/optimize/line_search.hpp"
 #include "cicada/optimize/powell.hpp"
 
+#include "cicada/operation/functional.hpp"
+#include "cicada/operation/traversal.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -41,7 +44,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
-
+#include <boost/random.hpp>
 #include <boost/thread.hpp>
 
 #include "cicada_text_impl.hpp"
@@ -102,12 +105,14 @@ int threads = 4;
 
 int debug = 0;
 
-template <typename Iterator>
+template <typename Iterator, typename Generator>
 inline
-void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper)
+void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper, Generator& generator)
 {
+  boost::uniform_01<double> uniform;
+
   for (/**/; first != last; ++ first, ++ lower, ++ upper)
-    *first = *lower + (double(random()) / RAND_MAX) * std::min(double(*upper - *lower), 1.0);
+    *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
 }
 
 template <typename Iterator>
@@ -178,26 +183,28 @@ struct ViterbiComputer
   const hypergraph_set_type& graphs;
 };
 
-template <typename Regularizer>
+template <typename Regularizer, typename Generator>
 bool powell(const scorer_document_type& scorers,
 	    const hypergraph_set_type& graphs,
 	    const weight_set_type& bound_lower,
 	    const weight_set_type& bound_upper,
 	    Regularizer regularizer,
+	    Generator& generator,
 	    const double tolerance,
 	    const int samples,
 	    double& score,
 	    weight_set_type& weights)
 {
-  cicada::optimize::Powell<EnvelopeComputer, ViterbiComputer, Regularizer> optimizer(EnvelopeComputer(scorers, graphs),
-										     ViterbiComputer(scorers, graphs),
-										     regularizer,
-										     bound_lower,
-										     bound_upper,
-										     tolerance,
-										     samples,
-										     scorers.error_metric(),
-										     debug);
+  cicada::optimize::Powell<EnvelopeComputer, ViterbiComputer, Regularizer, Generator> optimizer(EnvelopeComputer(scorers, graphs),
+												ViterbiComputer(scorers, graphs),
+												regularizer,
+												generator,
+												bound_lower,
+												bound_upper,
+												tolerance,
+												samples,
+												scorers.error_metric(),
+												debug);
   
   return optimizer(score, weights);
 }
@@ -226,8 +233,6 @@ int main(int argc, char ** argv)
     if (weight_normalize_l1 && weight_normalize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2 for weight normalization...");
 
-    // random seed...
-    srandom(time(0) * getpid());
 
     threads = utils::bithack::max(threads, 1);
     
@@ -331,6 +336,9 @@ int main(int argc, char ** argv)
     double          optimum_objective = std::numeric_limits<double>::infinity();
     weight_set_type optimum_weights;
     
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
+    
     if (debug)
       std::cerr << "start optimization" << std::endl;
     
@@ -350,6 +358,7 @@ int main(int argc, char ** argv)
 		       bound_lower,
 		       bound_upper,
 		       line_search_type::RegularizeL1(C),
+		       generator,
 		       tolerance,
 		       samples_directions,
 		       sample_objective,
@@ -360,6 +369,7 @@ int main(int argc, char ** argv)
 		       bound_lower,
 		       bound_upper,
 		       line_search_type::RegularizeL2(C),
+		       generator,
 		       tolerance,
 		       samples_directions,
 		       sample_objective,
@@ -370,6 +380,7 @@ int main(int argc, char ** argv)
 		       bound_lower,
 		       bound_upper,
 		       line_search_type::RegularizeNone(C),
+		       generator,
 		       tolerance,
 		       samples_directions,
 		       sample_objective,
@@ -402,7 +413,7 @@ int main(int argc, char ** argv)
 	sample_weights = optimum_weights;
 	
 	while (1) {
-	  randomize(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin());
+	  randomize(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin(), generator);
 	  
 	  if (weight_normalize_l1 || regularize_l1)
 	    normalize_l1(sample_weights.begin(), sample_weights.end(), 1.0);
@@ -423,6 +434,7 @@ int main(int argc, char ** argv)
 		       bound_lower,
 		       bound_upper,
 		       line_search_type::RegularizeL1(C),
+		       generator,
 		       tolerance,
 		       samples_directions,
 		       sample_objective,
@@ -433,6 +445,7 @@ int main(int argc, char ** argv)
 		       bound_lower,
 		       bound_upper,
 		       line_search_type::RegularizeL2(C),
+		       generator,
 		       tolerance,
 		       samples_directions,
 		       sample_objective,
@@ -443,6 +456,7 @@ int main(int argc, char ** argv)
 		       bound_lower,
 		       bound_upper,
 		       line_search_type::RegularizeNone(C),
+		       generator,
 		       tolerance,
 		       samples_directions,
 		       sample_objective,
@@ -588,49 +602,6 @@ struct ViterbiTask
 {
   typedef cicada::semiring::Logprob<double> weight_type;
   
-  struct viterbi_function
-  {
-    typedef hypergraph_type::feature_set_type feature_set_type;
-
-    typedef weight_type value_type;
-
-    viterbi_function(const weight_set_type& __weights)
-      : weights(__weights) {}
-
-    const weight_set_type& weights;
-  
-    template <typename Edge>
-    value_type operator()(const Edge& edge) const
-    {
-      return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
-    }
-  };
-
-  struct viterbi_traversal
-  {
-    typedef sentence_type value_type;
-  
-    template <typename Edge, typename Iterator>
-    void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
-    {
-      yield.clear();
-    
-      int non_terminal_pos = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-      for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  int pos = titer->non_terminal_index() - 1;
-	  if (pos < 0)
-	    pos = non_terminal_pos;
-	  ++ non_terminal_pos;
-	  
-	  yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
-	} else if (*titer != vocab_type::EPSILON)
-	  yield.push_back(*titer);
-    }
-  };
-
-
   
   typedef std::pair<int, const hypergraph_type*> mapper_type;
   typedef std::pair<int, sentence_type>     reducer_type;
@@ -661,7 +632,7 @@ struct ViterbiTask
       
       reduced.first = mapped.first;
       
-      viterbi(*mapped.second, reduced.second, weight, viterbi_traversal(), viterbi_function(weights));
+      viterbi(*mapped.second, reduced.second, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
       
       queue_reducer.push(reduced);
     }

@@ -25,6 +25,7 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
+#include <boost/random.hpp>
 
 #include "lbfgs.h"
 
@@ -52,11 +53,12 @@ void options(int argc, char** argv);
 
 size_t enumerate_forest(const path_type& path);
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 double optimize_online(const size_t& instances,
 		       const path_type& forest_path,
 		       const path_type& intersected_path,
-		       weight_set_type& weights);
+		       weight_set_type& weights,
+		       Generator& generator);
 template <typename Optimizer>
 double optimize_batch(const size_t& instances,
 		      const path_type& forest_path,
@@ -65,7 +67,7 @@ double optimize_batch(const size_t& instances,
 
 struct OptimizeLBFGS;
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 struct OptimizeOnline;
 
 int main(int argc, char ** argv)
@@ -90,19 +92,21 @@ int main(int argc, char ** argv)
     threads = utils::bithack::max(1, threads);
 
     const size_t instances = enumerate_forest(forest_path);
-
+    
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
     weight_set_type weights;
     double objective = 0.0;
     
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
 
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(instances, forest_path, intersected_path, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(instances, forest_path, intersected_path, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(instances, forest_path, intersected_path, weights);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(instances, forest_path, intersected_path, weights, generator);
     } else
       objective = optimize_batch<OptimizeLBFGS>(instances, forest_path, intersected_path, weights);
     
@@ -120,20 +124,23 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 struct OptimizeOnline
 {
   typedef Optimizer optimizer_type;
+  typedef Generator generator_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
   
   OptimizeOnline(const size_t& __instances,
 		 const path_type& __forest_path,
 		 const path_type& __intersected_path,
-		 weight_set_type& __weights)
+		 weight_set_type& __weights,
+		 generator_type& __generator)
     : instances(__instances), 
       forest_path(__forest_path),
       intersected_path(__intersected_path),
-      weights(__weights) {}
+      weights(__weights),
+      generator(__generator) {}
   
   struct Task
   {
@@ -176,7 +183,7 @@ struct OptimizeOnline
       value_type operator()(const Edge& edge) const
       {
 	// p_e
-	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights) * scale);
+	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights) * scale);
       }
       
       const weight_set_type& weights;
@@ -195,7 +202,7 @@ struct OptimizeOnline
 	// p_e r_e
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights) * scale);
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights) * scale);
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -348,7 +355,8 @@ struct OptimizeOnline
       for (int i = 0; i < threads; ++ i)
 	queue.push(path_pair_type());
       
-      std::random_shuffle(paths.begin(), paths.end());
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(paths.begin(), paths.end(), gen);
       
       workers.join_all();
       
@@ -385,15 +393,17 @@ struct OptimizeOnline
   path_type forest_path;
   path_type intersected_path;
   weight_set_type& weights;
+  generator_type& generator;
 };
 
-template <typename Optimizer>
+template <typename Optimizer, typename Generator>
 double optimize_online(const size_t& instances,
 		       const path_type& forest_path,
 		       const path_type& intersected_path,
-		       weight_set_type& weights)
+		       weight_set_type& weights,
+		       Generator& generator)
 {
-  return Optimizer(instances, forest_path, intersected_path,  weights)();
+  return Optimizer(instances, forest_path, intersected_path,  weights, generator)();
 }
 
 
@@ -471,7 +481,7 @@ struct OptimizeLBFGS
       value_type operator()(const Edge& edge) const
       {
 	// p_e
-	return cicada::semiring::traits<value_type>::log(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
       }
       
       const weight_set_type& weights;
@@ -489,7 +499,7 @@ struct OptimizeLBFGS
 	// p_e r_e
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::log(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)

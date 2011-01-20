@@ -55,3 +55,6 @@ Reimplement cicada-learn-online:
   or, implement as cicada_learn_online_static{,_mpi} ?? since we will pre-demine spliting...
 
 Added binarization to cicada-extract, or use cicada tool for binarization?
+
+Revise parent feature:
+  we do not trust the label from rule, but use state propagated root label...

@@ -35,6 +35,7 @@ antecedent: antecedent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \talignment=[true|false] alignment forest mode\n\
+\tsource-root=[true|false] source root mode (for tree composition)\n\
 \tname=feature-name-prefix(default: antecedent)\n\
 bleu: BLEU\n\
 \torder=<order>\n\
@@ -68,6 +69,7 @@ neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \talignment=[true|false] alignment forest mode\n\
+\tsource-root=[true|false] source root mode (for tree composition)\n\
 \tname=feature-name-prefix(default: neighbours)\n\
 ngram: ngram language model\n\
 \tfile=<file>\n\
@@ -81,12 +83,14 @@ ngram-tree: ngram tree feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \talignment=[true|false] alignment forest mode\n\
+\tsource-root=[true|false] source root mode (for tree composition)\n\
 \tname=feature-name-prefix(default: ngram-tree)\n\
 parent: parent feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
 \texclude-terminal=[true|false] exclude terminal symbol\n\
 \talignment=[true|false] alignment forest mode\n\
+\tsource-root=[true|false] source root mode (for tree composition)\n\
 \tname=feature-name-prefix(default: parent)\n\
 permute: permutation feature\n\
 \tweights=weight file for collapsed feature\n\
