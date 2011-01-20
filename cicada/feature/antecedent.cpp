@@ -102,6 +102,22 @@ namespace cicada
 	attribute_set_type::string_type operator()(const attribute_set_type::string_type& x) const { return x; }
       };
       
+      symbol_type root_label(const std::string& rule) const
+      {
+	std::string::size_type pos = rule.find('(');
+	if (pos != std::string::npos) {
+	  const std::string label = rule.substr(0, pos);
+	  if (label.empty() || label[0] != '[' || label[label.size() -1] != ']')
+	    throw std::runtime_error("invlaid label:" + label);
+	  return label;
+	} else {
+	  if (rule.empty() || rule[0] != '[' || rule[rule.size() -1] != ']')
+	    throw std::runtime_error("invlaid label: " + rule);
+	  
+	  return rule;
+	}
+      }
+      
       std::string root_label(const edge_type& edge) const
       {
 	if (source_root_mode) {
@@ -164,7 +180,7 @@ namespace cicada
 	  symbol_type* context_symbol = reinterpret_cast<symbol_type*>(context_tree + 1);
 	  int*         context_size   = reinterpret_cast<int*>(context_symbol + 2);
 	  
-	  *context_tree = tree_map.root();
+	  *context_tree = tree_id(root_label(edge), tree_map.root());
 	  context_symbol[0] = prefix;
 	  context_symbol[1] = suffix;
 	  *context_size = span_size;
@@ -188,9 +204,9 @@ namespace cicada
 	      const symbol_type* antecedent_symbol = reinterpret_cast<const symbol_type*>(antecedent_tree + 1);
 	      const int*         antecedent_size   = reinterpret_cast<const int*>(antecedent_symbol + 2);
 	      
-	      node = tree_id(*piter, node);
+	      node = tree_id(root_label(tree_map[*antecedent_tree]), node);
 	      
-	      antecedent_string += compose_tree(*piter, *antecedent_tree);
+	      antecedent_string += '(' + tree_map[*antecedent_tree] + ')';
 	      span_size += *antecedent_size;
 	      
 	      if (prefix == vocab_type::EMPTY)
@@ -230,9 +246,9 @@ namespace cicada
       const std::string compose_tree(const std::string& node, const id_type& id) const
       {
 	if (tree_map.is_root(id))
-	  return '(' + node + ')';
+	  return node;
 	else
-	  return '(' + node + '(' + tree_map[id] + "))";
+	  return node + '(' + tree_map[id] + ')';
       }
 
       
