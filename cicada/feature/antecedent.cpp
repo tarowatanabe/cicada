@@ -102,23 +102,7 @@ namespace cicada
 	attribute_set_type::string_type operator()(const attribute_set_type::string_type& x) const { return x; }
       };
       
-      symbol_type root_label(const std::string& rule) const
-      {
-	std::string::size_type pos = rule.find('(');
-	if (pos != std::string::npos) {
-	  const std::string label = rule.substr(0, pos);
-	  if (label.empty() || label[0] != '[' || label[label.size() -1] != ']')
-	    throw std::runtime_error("invlaid label:" + label);
-	  return label;
-	} else {
-	  if (rule.empty() || rule[0] != '[' || rule[rule.size() -1] != ']')
-	    throw std::runtime_error("invlaid label: " + rule);
-	  
-	  return rule;
-	}
-      }
-      
-      std::string root_label(const edge_type& edge) const
+      symbol_type root_label(const edge_type& edge) const
       {
 	if (source_root_mode) {
 	  std::string label;
@@ -179,11 +163,13 @@ namespace cicada
 	  id_type*     context_tree   = reinterpret_cast<id_type*>(state);
 	  symbol_type* context_symbol = reinterpret_cast<symbol_type*>(context_tree + 1);
 	  int*         context_size   = reinterpret_cast<int*>(context_symbol + 2);
+	  symbol_type* context_root   = reinterpret_cast<symbol_type*>(context_size + 1);
 	  
-	  *context_tree = tree_id(root_label(edge), tree_map.root());
+	  *context_tree = tree_map.root();
 	  context_symbol[0] = prefix;
 	  context_symbol[1] = suffix;
 	  *context_size = span_size;
+	  *context_root = root_label(edge);
 	} else {
 	  symbol_type prefix = vocab_type::EMPTY;
 	  symbol_type suffix = vocab_type::EMPTY;
@@ -203,10 +189,10 @@ namespace cicada
 	      const id_type*     antecedent_tree   = reinterpret_cast<const id_type*>(states[antecedent_index]);
 	      const symbol_type* antecedent_symbol = reinterpret_cast<const symbol_type*>(antecedent_tree + 1);
 	      const int*         antecedent_size   = reinterpret_cast<const int*>(antecedent_symbol + 2);
+	      const symbol_type* antecedent_root   = reinterpret_cast<const symbol_type*>(antecedent_size + 1);
 	      
-	      node = tree_id(root_label(tree_map[*antecedent_tree]), node);
-	      
-	      antecedent_string += '(' + tree_map[*antecedent_tree] + ')';
+	      node = tree_id(*antecedent_root, node);
+	      antecedent_string += compose_tree(*antecedent_root, *antecedent_tree);
 	      span_size += *antecedent_size;
 	      
 	      if (prefix == vocab_type::EMPTY)
@@ -223,17 +209,21 @@ namespace cicada
 	    }
 	  
 	  // apply feature...
-	  apply_feature(features, root_label(edge), antecedent_string, prefix, suffix, span_size);
+	  const symbol_type cat = root_label(edge);
+
+	  apply_feature(features, cat, antecedent_string, prefix, suffix, span_size);
 	  
 	  // next context...
 	  id_type*     context_tree   = reinterpret_cast<id_type*>(state);
 	  symbol_type* context_symbol = reinterpret_cast<symbol_type*>(context_tree + 1);
 	  int*         context_size   = reinterpret_cast<int*>(context_symbol + 2);
+	  symbol_type* context_root   = reinterpret_cast<symbol_type*>(context_size + 1);
 	  
 	  *context_tree = node;
 	  context_symbol[0] = prefix;
 	  context_symbol[1] = suffix;
 	  *context_size = span_size;
+	  *context_root = cat;
 	}
       }
       
@@ -246,9 +236,9 @@ namespace cicada
       const std::string compose_tree(const std::string& node, const id_type& id) const
       {
 	if (tree_map.is_root(id))
-	  return node;
-	else
-	  return node + '(' + tree_map[id] + ')';
+          return '(' + node + ')';
+        else
+          return '(' + node + '(' + tree_map[id] + "))";
       }
 
       
@@ -267,6 +257,7 @@ namespace cicada
 	
 	return id;
       }
+      
 
       void apply_feature(feature_set_type& features,
 			 const std::string& node,
@@ -343,7 +334,7 @@ namespace cicada
       antecedent_impl->feature_name_prefix = (name.empty() ? std::string("antecedent") : name);
       
       // antecedent conext + terminal-boundary + span-size
-      base_type::__state_size = sizeof(impl_type::id_type) + sizeof(symbol_type) * 2 + sizeof(int);
+      base_type::__state_size = sizeof(impl_type::id_type) + sizeof(symbol_type) * 2 + sizeof(int) + sizeof(symbol_type);
       base_type::__feature_name = (name.empty() ? std::string("antecedent") : name);
       base_type::__sparse_feature = true;
       
