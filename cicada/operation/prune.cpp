@@ -18,7 +18,7 @@ namespace cicada
   namespace operation
   {
     Prune::Prune(const std::string& parameter, const int __debug)
-      : weights(0), kbest(0), beam(0.0), density(0.0), scale(1.0), weights_one(false), 
+      : weights(0), kbest(0), beam(-1), density(0.0), scale(1.0), weights_one(false), 
 	semiring_tropical(false), semiring_logprob(false), semiring_log(false),
 	debug(__debug)
     {
@@ -57,12 +57,12 @@ namespace cicada
 	  std::cerr << "WARNING: unsupported parameter for prune: " << piter->first << "=" << piter->second << std::endl;
       }
 
-      const bool beam_mode = beam > 0.0;
+      const bool beam_mode = beam >= 0.0;
       const bool density_mode = density >= 1.0;
       const bool kbest_mode = kbest > 0;
-    
+      
       if (int(beam_mode) + density_mode + kbest_mode > 1)
-	throw std::runtime_error("you cannot specify both kbest, beam and density pruning");
+	throw std::runtime_error("you can specify one of kbest, beam and density pruning");
       
       if (int(beam_mode) + density_mode + kbest_mode == 0)
 	throw std::runtime_error("you may want to specify either kbest, beam or density pruning");
@@ -105,7 +105,7 @@ namespace cicada
 	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), kbest);
 	  else
 	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), kbest);
-	} else if (beam > 0.0) {
+	} else if (beam >= 0.0) {
 	  if (semiring_tropical)
 	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
 	  else if (semiring_logprob)
