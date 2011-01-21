@@ -91,7 +91,7 @@ namespace cicada
       
       survived_type survived(source.edges.size(), false);
       
-      for (int k = 0; k < kbest_size; ++ k) {
+      for (size_type k = 0; k != kbest_size; ++ k) {
 	if (! derivations(k, derivation, weight))
 	  break;
 	
