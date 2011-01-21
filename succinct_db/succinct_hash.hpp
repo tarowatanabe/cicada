@@ -394,6 +394,8 @@ namespace succinctdb
       os_keys->push(boost::iostreams::file_sink(rep.path("keys").file_string()), 1024 * 1024);
       os_offs->push(utils::vertical_coded_sink<off_type, off_alloc_type>(rep.path("offs")));
       
+      os_keys->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+      
       // initial offset...
       os_offs->write((char*) &__offset, sizeof(__offset));
     }

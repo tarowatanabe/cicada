@@ -124,6 +124,7 @@ namespace utils
       
       if (! buffer_coded.empty() && (sizeof(Tp) > 1 || (size_coded & 0x01) == 0)) {
 	os_data->write((char*) &(*buffer_coded.begin()), buffer_coded.size());
+	
 	buffer_coded.clear();
 	size_coded = 0;
       }
@@ -156,6 +157,7 @@ namespace utils
       
       if (! buffer_coded.empty()) {
 	os_data->write((char*) &(*buffer_coded.begin()), buffer_coded.size());
+	
 	buffer_coded.clear();
 	size_coded = 0;
       }
@@ -200,6 +202,7 @@ namespace utils
     
     os_data.reset(new boost::iostreams::filtering_ostream());
     os_data->push(boost::iostreams::file_sink(rep.path("data").file_string()), 1024 * 1024);
+    os_data->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
     
     index.clear();
     

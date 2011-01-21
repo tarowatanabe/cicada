@@ -165,7 +165,8 @@ namespace utils
       repository_type rep(path, repository_type::read);
       os_off.reset(new boost::iostreams::filtering_ostream());
       os_off->push(boost::iostreams::file_sink(rep.path("offsets").file_string()));
-
+      os_off->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+      
       off_type off(0);
       os_off->write((char*) &off, sizeof(off_type));
       os_off->write((char*) &size, sizeof(off_type));
@@ -243,6 +244,7 @@ namespace utils
     
     os_data.reset(new boost::iostreams::filtering_ostream());
     os_data->push(boost::iostreams::file_sink(rep.path("data").file_string()), buffer_size);
+    os_data->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
     
     const size_type buffer_size_new = ((buffer_size + sizeof(value_type) - 1) / sizeof(value_type)) * sizeof(value_type);
     

@@ -836,6 +836,7 @@ namespace succinctdb
     {
       boost::iostreams::filtering_ostream os;
       os.push(boost::iostreams::file_sink(path.file_string()), 1024 * 1024);
+      os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       const int64_t file_size = sizeof(Key) * __mapped.size();
       for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)
@@ -916,6 +917,7 @@ namespace succinctdb
     {
       boost::iostreams::filtering_ostream os;
       os.push(boost::iostreams::file_sink(path.file_string()), 1024 * 1024);
+      os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       const int64_t file_size = sizeof(Data) * __mapped.size();
       for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)

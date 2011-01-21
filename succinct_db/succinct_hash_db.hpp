@@ -145,7 +145,7 @@ namespace succinctdb
 	__succinct_hash_stream.reset(new succinct_hash_stream_type(rep.path("index"), bin_size));
 	__data_stream.reset(new boost::iostreams::filtering_ostream());
 	__data_stream->push(boost::iostreams::file_sink(rep.path("data").file_string()), 1024 * 1024);
-	
+	__data_stream->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       } else {
 	// read-only open
 	repository_type rep(path, repository_type::read);

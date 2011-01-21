@@ -101,12 +101,13 @@ namespace succinctdb
       utils::tempfile::insert(path_size);
       
       __os_key_data.reset(new boost::iostreams::filtering_ostream());
-      __os_size.reset(new boost::iostreams::filtering_ostream());
-      
       __os_key_data->push(boost::iostreams::file_sink(path_key_data.file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+      __os_key_data->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
+      __os_size.reset(new boost::iostreams::filtering_ostream());
       __os_size->push(boost::iostreams::zlib_compressor());
       __os_size->push(boost::iostreams::file_sink(path_size.file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+      __os_size->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       __size = 0;
     }
