@@ -115,6 +115,8 @@ double tolerance_solver = 1e-4;
 
 double loss_margin = 0.001;
 double score_margin = 0.001;
+int    loss_kbest = 0;
+int    score_kbest = 0;
 
 int batch_size = 1;
 bool reranking = false;
@@ -330,12 +332,16 @@ struct Task
 			yield_type& yield, 
 			const weight_set_type& weights,
 			const weight_set_type& weights_prune,
+			const int kbest,
 			const double margin,
 			const bool invert=false)
   {
     cicada::apply_cube_prune(model_bleu, hypergraph, modified, cicada::operation::weight_scaled_function<weight_type>(weights, invert ? - 1.0 : 1.0), cube_size);
     
-    cicada::prune_beam(modified, cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
+    if (kbest > 0)
+      cicada::prune_kbest(modified, cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), kbest);
+    else
+      cicada::prune_beam(modified, cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> >(weights_prune, 1.0), margin);
     
     if (! model_sparse.empty()) {
       static const size_type __id = 0;
@@ -723,11 +729,11 @@ struct Task
 	// we will search for the smallest derivation(s) with the best BLEU
 	weights[__bleu->feature_name()] =  - loss_scale * norm;
 	
-	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin, true);
+	prune_hypergraph(model_bleu, model_sparse, hypergraph_oracles[id], lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin, loss_kbest, true);
       } else {
 	weights[__bleu->feature_name()] =  loss_scale * norm;
 	
-	prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin);
+	prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_reward, yield_reward, weights, weights_bleu, loss_margin, loss_kbest);
       }
 
       if (! optimize_fixed_oracle) {
@@ -765,7 +771,7 @@ struct Task
       // compute bleu-penalty hypergraph
       weights[__bleu->feature_name()] = - loss_scale * norm;
       
-      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_penalty, yield_penalty, weights, weights, score_margin);
+      prune_hypergraph(model_bleu, model_sparse, hypergraph, lattice, spans, hypergraph_penalty, yield_penalty, weights, weights, score_margin, score_kbest);
       
       // erase unused weights...
       weights.erase(__bleu->feature_name());
@@ -1201,6 +1207,9 @@ void options(int argc, char** argv)
     
     ("loss-margin",   po::value<double>(&loss_margin)->default_value(loss_margin),   "loss margin for oracle forest")
     ("score-margin",  po::value<double>(&score_margin)->default_value(score_margin), "score margin for hypothesis forest")
+
+    ("loss-kbest",    po::value<int>(&loss_kbest)->default_value(loss_kbest),   "loss kbest for oracle forest")
+    ("score-kbest",   po::value<int>(&score_kbest)->default_value(score_kbest), "score kbest for hypothesis forest")
     
     ("batch-size",            po::value<int>(&batch_size)->default_value(batch_size), "batch size")
     ("reranking",             po::bool_switch(&reranking),                            "learn by forest reranking")
