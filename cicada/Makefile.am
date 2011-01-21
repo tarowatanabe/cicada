@@ -251,6 +251,7 @@ permute.hpp \
 prune.hpp \
 prune_beam.hpp \
 prune_density.hpp \
+prune_kbest.hpp \
 quantizer.hpp \
 remove_epsilon.hpp \
 rule.hpp \

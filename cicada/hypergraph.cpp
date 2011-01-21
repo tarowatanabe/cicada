@@ -6,7 +6,7 @@
 #define PHOENIX_THREADSAFE
 
 #include "hypergraph.hpp"
-#include "sort.hpp"
+#include "sort_topologically.hpp"
 #include "unite.hpp"
 
 #include <boost/spirit/include/qi.hpp>

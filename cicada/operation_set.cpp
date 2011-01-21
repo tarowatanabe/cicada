@@ -81,6 +81,7 @@ expected-ngram: expected ngram computation\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
+\tkbest=kbest pruning thershold in kbest > 0\n\
 \tscale=scaling for score\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\

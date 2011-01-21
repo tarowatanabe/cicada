@@ -18,7 +18,7 @@ namespace cicada
   namespace operation
   {
     Prune::Prune(const std::string& parameter, const int __debug)
-      : weights(0), beam(0.0), density(0.0), scale(1.0), weights_one(false), 
+      : weights(0), kbest(0), beam(0.0), density(0.0), scale(1.0), weights_one(false), 
 	semiring_tropical(false), semiring_logprob(false), semiring_log(false),
 	debug(__debug)
     {
@@ -31,6 +31,8 @@ namespace cicada
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (strcasecmp(piter->first.c_str(), "beam") == 0)
 	  beam = boost::lexical_cast<double>(piter->second);
+	else if (strcasecmp(piter->first.c_str(), "kbest") == 0)
+	  kbest = boost::lexical_cast<size_t>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "density") == 0)
 	  density = boost::lexical_cast<double>(piter->second);
 	else if (strcasecmp(piter->first.c_str(), "scale") == 0)
@@ -54,12 +56,16 @@ namespace cicada
 	} else
 	  std::cerr << "WARNING: unsupported parameter for prune: " << piter->first << "=" << piter->second << std::endl;
       }
+
+      const bool beam_mode = beam > 0.0;
+      const bool density_mode = density >= 1.0;
+      const bool kbest_mode = kbest > 0;
     
-      if (beam > 0.0 && density > 1.0)
-	throw std::runtime_error("you cannot specify both beam and density pruning");
-    
-      if (beam <= 0.0 && density <= 1.0)
-	throw std::runtime_error("you may want to specify either beam or density pruning");
+      if (int(beam_mode) + density_mode + kbest_mode > 1)
+	throw std::runtime_error("you cannot specify both kbest, beam and density pruning");
+      
+      if (int(beam_mode) + density_mode + kbest_mode == 0)
+	throw std::runtime_error("you may want to specify either kbest, beam or density pruning");
 
       if (int(semiring_tropical) + semiring_logprob + semiring_log == 0)
 	semiring_tropical = true;
@@ -92,14 +98,21 @@ namespace cicada
     
 	utils::resource prune_start;
 
-	if (beam > 0.0) {
+	if (kbest > 0) {
+	  if (semiring_tropical)
+	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), kbest);
+	  else if (semiring_logprob)
+	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), kbest);
+	  else
+	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), kbest);
+	} else if (beam > 0.0) {
 	  if (semiring_tropical)
 	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
 	  else if (semiring_logprob)
 	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
 	  else
 	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
-	} else if (density > 1.0) {
+	} else if (density >= 1.0) {
 	  if (semiring_tropical)
 	    cicada::prune_density(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), density);
 	  else if (semiring_logprob)
