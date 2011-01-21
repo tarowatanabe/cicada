@@ -36,22 +36,6 @@ namespace cicada
     typedef std::vector<symbol_type, std::allocator<symbol_type> > context_type;
     
     typedef std::vector<bool, std::allocator<bool> > removed_type;
-
-    template <typename Iterator>
-    symbol_type binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
-    {
-      std::string label = lhs.non_terminal().non_terminal_strip() + '^';
-      if (first != last) {
-	label += first->non_terminal().non_terminal_strip();
-	++ first;
-	for (/**/; first != last; ++ first) {
-	  label += '_';
-	  label += first->non_terminal().non_terminal_strip();
-	}
-      }
-      return '[' + label + ']';
-    }
-
     
     struct filter
     {
@@ -72,6 +56,17 @@ namespace cicada
     BinarizeRight(const int __order=-1)
       : order(__order) {}
 
+
+    template <typename Iterator>
+    symbol_type binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
+    {
+      std::string label = lhs.non_terminal().non_terminal_strip() + '^';
+      for (/**/; first != last; ++ first) {
+	label += '/';
+	label += first->non_terminal().non_terminal_strip();
+      }
+      return '[' + label + ']';
+    }
 
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -193,6 +188,17 @@ namespace cicada
   {
     BinarizeLeft(const int __order=-1)
       : order(__order) {}
+
+    template <typename Iterator>
+    symbol_type binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
+    {
+      std::string label = lhs.non_terminal().non_terminal_strip() + '^';
+      for (/**/; first != last; ++ first) {
+	label += '\\';
+	label += first->non_terminal().non_terminal_strip();
+      }
+      return '[' + label + ']';
+    }
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
