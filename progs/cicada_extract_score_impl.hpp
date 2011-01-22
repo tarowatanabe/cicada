@@ -1645,18 +1645,16 @@ public:
     }
     
     index.clear();
-    
-    while (! index_db_type::exists(path_index))
-      boost::thread::yield();
-
-    index.open(path_index);
-    
     counts.clear();
     os_counts.pop();
     
+    ::sync();
+    while (! index_db_type::exists(path_index))
+      boost::thread::yield();
     while (! counts_db_type::exists(path_counts))
       boost::thread::yield();
 
+    index.open(path_index);
     counts.open(path_counts);
   }
   
