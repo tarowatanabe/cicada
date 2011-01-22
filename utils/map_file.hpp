@@ -1,7 +1,4 @@
 // -*- mode: c++ -*-
-//
-//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
-//
 
 #ifndef __UTILS__MAP_FILE__HPP__
 #define __UTILS__MAP_FILE__HPP__ 1
@@ -36,9 +33,9 @@ namespace utils
     
   public:
     __map_file_impl(const std::string& file, const bool writable=false)
-      : mmapped(), filesize(0), mmap_size(0), filename() { open(file, writable); }
+      : mmapped(), filesize(), mmap_size(), filename() { open(file, writable); }
     __map_file_impl(const boost::filesystem::path& file, const bool writable=false)
-      : mmapped(), filesize(0), mmap_size(0), filename() { open(file, writable); }
+      : mmapped(), filesize(), mmap_size(), filename() { open(file, writable); }
     ~__map_file_impl() { close(); }
     
   public:
@@ -65,51 +62,31 @@ namespace utils
 	fd = ::open(file.file_string().c_str(), (writable ? O_RDWR : O_RDONLY));
       if (fd < 0)
 	throw std::runtime_error("map_file::open() open()");
-
-      if (getenv("MAP_FILE_NO_MMAP")) {
-	mmapped = new char[filesize];
-	mmap_size = 0;
-	
-	off_type offset = 0;
-	while (offset < filesize) {
-	  const ssize_t read_size = ::read(fd, mmapped + offset, std::min(filesize - offset, off_type(1024 * 1024)));
-	  if (read_size == -1)
-	    throw std::runtime_error("error reading file");
-	  offset += read_size;
-	}
-	
-	::close(fd);
-      } else {
       
-	const size_t page_size = getpagesize();
-	mmap_size = static_cast<off_type>(((filesize + page_size - 1) / page_size) * page_size);
+      const size_t page_size = getpagesize();
+      mmap_size = static_cast<off_type>(std::max(off_type((filesize + page_size - 1) / page_size), off_type(1)) * page_size);
 	
-	// First, try map_shared
-	byte_type* x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, MAP_SHARED, fd, 0));
+      // First, try map_shared
+      byte_type* x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, MAP_SHARED, fd, 0));
+      
+      // Second, try map_private
+      if (! (x + 1))
+	x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, MAP_PRIVATE, fd, 0));
 	
-	// Second, try map_private
-	if (! (x + 1))
-	  x = static_cast<byte_type*>(::mmap(0, mmap_size, writable ? PROT_WRITE : PROT_READ, MAP_PRIVATE, fd, 0));
-	
-	// no need to keep file-descriptor
-	::close(fd);
-	
-	// If successful, use mmap. Otherwise pread|seek/read access...
-	if (x + 1)
-	  mmapped = x;
-	else
-	  throw std::runtime_error("map_file::open() mmap()");
-      }
+      // no need to keep file-descriptor
+      ::close(fd);
+      
+      // If successful, use mmap. Otherwise pread|seek/read access...
+      if (x + 1)
+	mmapped = x;
+      else
+	throw std::runtime_error(std::string("map_file::open() mmap()") + strerror(errno));
     }
 
     void close()
     {
-      if (mmapped && filesize > 0) {
-	if (mmap_size > 0)
-	  ::munmap(mmapped, mmap_size);
-	else
-	  delete [] mmapped;
-      }
+      if (mmapped && filesize > 0 && mmap_size > 0)
+	::munmap(mmapped, mmap_size);
       
       mmapped = 0;
       filesize = 0;
@@ -167,14 +144,19 @@ namespace utils
     
     bool is_open() const { return pimpl && pimpl->is_open(); }
     bool empty() const { return ! is_open() || size() == 0; }
-    size_type size() const { return (! is_open() ? size_type(0) : static_cast<size_type>(pimpl->size() / sizeof(value_type))); }
-    off_type file_size() const { return (! is_open() ? size_type(0) : pimpl->size()); }
+    size_type size() const { return static_cast<size_type>(pimpl->size() / sizeof(value_type)); }
+    off_type file_size() const { return pimpl->size(); }
 
     uint64_t size_bytes() const { return file_size(); }
     uint64_t size_compressed() const { return file_size(); }
     uint64_t size_cache() const { return 0; }
     
     path_type path() const { return pimpl->path(); }
+
+    static bool exists(const path_type& path)
+    {
+      return boost::filesystem::exists(path);
+    }
     
     void open(const std::string& file, const bool writable=false) { pimpl.reset(new impl_type(file, writable)); }
     void open(const path_type& file, const bool writable=false) { pimpl.reset(new impl_type(file, writable)); }

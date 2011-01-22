@@ -348,6 +348,15 @@ namespace succinctdb
 	return path_type();
     }
 
+    static bool exists(const path_type& path)
+    {
+      if (! utils::repository::exists(path)) return false;
+      if (! succinct_trie_type::exists(path / "index")) return false;
+      if (! data_set_type::exists(path / "mapped")) return false;
+      if (! off_set_type::exists(path / "offset")) return false;
+      return true;
+    }
+
     // methods supported by both read/write mode
     void open(const path_type& path, const mode_type mode=READ)
     {

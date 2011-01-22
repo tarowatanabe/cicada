@@ -311,6 +311,15 @@ namespace utils
     }
     
   public:
+    static bool exists(const path_type& path)
+    {
+      if (! utils::repository::exists(path)) return false;
+      if (! compressed_vector_type::exists(path / "data")) return false;
+      if (! off_vector_type::exists(path / "offsets")) return false;
+      
+      return true;
+    }
+
     void open(const path_type& path)
     {
       typedef utils::repository repository_type;

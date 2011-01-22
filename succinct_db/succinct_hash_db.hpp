@@ -130,6 +130,14 @@ namespace succinctdb
       __succinct_hash->reset(new succinct_hash_type(bin_size));
       __data->reset(new data_set_type());
     }
+
+    static bool exists(const path_type& path)
+    {
+      if (! utils::repository::exists(path)) return false;
+      if (! succinct_hash_mapped_type::exists(path / "index")) return false;
+      if (! data_set_mapped_type::exists(path / "data")) return false;
+      return true;
+    }
     
     void open(const path_type& path, size_type bin_size=0)
     {

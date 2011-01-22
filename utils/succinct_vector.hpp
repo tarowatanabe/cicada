@@ -439,6 +439,15 @@ namespace utils
     
     path_type path() const { return __blocks.path().parent_path(); }
 
+    static bool exists(const path_type& path) 
+    {
+      if (! utils::repository::exists(path)) return false;
+      if (! bit_block_type::exists(path / "bits")) return false;
+      if (! bit_rank_high_type::exists(path / "rank-high")) return false;
+      if (! bit_rank_low_type::exists(path / "rank-low")) return false;
+      return true;
+    }
+
     void read(const path_type& path) { open(path); }
     void open(const path_type& path)
     {

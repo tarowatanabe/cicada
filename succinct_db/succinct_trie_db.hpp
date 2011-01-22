@@ -252,6 +252,11 @@ namespace succinctdb
     ~succinct_trie_db() { close(); }
     
   public:
+    static bool exists(const path_type& path)
+    {
+      return succinct_trie_type::exists(path);
+    }
+
     // methods supported by both read/write mode
     void open(const path_type& path, const mode_type mode=READ)
     {

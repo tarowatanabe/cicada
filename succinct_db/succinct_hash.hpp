@@ -231,6 +231,16 @@ namespace succinctdb
       keys.clear();
       offs.clear();
     }
+
+    static bool exists(const path_type& path)
+    {
+      if (! utils::repository::exists(path)) return false;
+      if (! bin_set_type::exists(path / "bins")) return false;
+      if (! next_set_type::exists(path / "nexts")) return false;
+      if (! key_set_type::exists(path / "keys")) return false;
+      if (! off_set_type::exists(path / "offs")) return false;
+      return true;
+    }
     
     void open(const path_type& path)
     {

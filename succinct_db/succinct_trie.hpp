@@ -635,6 +635,16 @@ namespace succinctdb
     const_cursor cend() const { return cursor(); }
     
   public:
+    static bool exists(const path_type& path)
+    {
+      if (! utils::repository::exists(path)) return false;
+      if (! position_set_type::exists(path / "positions")) return false;
+      if (! index_map_type::exists(path / "index-map")) return false;
+      if (! index_set_type::impl_type::exists(path / "index")) return false;
+      if (! mapped_set_type::impl_type::exists(path / "mapped")) return false;
+      return true;
+    }
+
     void read(const path_type& path) { open(path); }
     void open(const path_type& path)
     {

@@ -132,6 +132,16 @@ namespace utils
     }
     
   public:
+    static bool exists(const path_type& path)
+    {
+      if (! boost::filesystem::exists(path) || ! boost::filesystem::is_directory(path))
+	return false;
+      
+      if (! boost::filesystem::exists(path / "prop.list"))
+	return false;
+      
+      return true;
+    }
     
     // repository operations
     void open(const path_type& dir, const mode_type mode=read)
@@ -179,6 +189,7 @@ namespace utils
 	
 	// here, dump contents of props at "prop.list"
 	std::ofstream os((repository_dir / "prop.list").string().c_str());
+	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
 	props_type::const_iterator piter_end = props.end();
 	for (props_type::const_iterator piter = props.begin(); piter != piter_end; ++ piter)
 	  os << piter->first << " = " << piter->second << "\n";
