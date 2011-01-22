@@ -117,6 +117,12 @@ namespace cicada
     
     // dump the vocabularies content, inserted so-forth...
     // we will perform vocabulary merging...
+    
+    static bool exists(const path_type& path)
+    {
+      return succinct_hash_mapped_type::exists(path);
+    }
+
     void open(const path_type& path, size_type bin_size = 0)
     {
       clear();

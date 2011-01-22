@@ -1445,6 +1445,14 @@ public:
     }
   }
 
+  bool exists(const path_type& path) const
+  {
+    if (! utils::repository::exists(path)) return false;
+    if (! index_db_type::exists(path / "index")) return false;
+    if (! counts_db_type::exists(path / "counts")) return false;
+    return true;
+  }
+
   void write(const path_type& path) const
   {
     typedef utils::repository repository_type;
@@ -1463,9 +1471,7 @@ public:
 
     clear();
 
-    while (! boost::filesystem::exists(path))
-      boost::thread::yield();
-    while (! boost::filesystem::exists(path / "prop.list"))
+    while (! repository_type::exists(path))
       boost::thread::yield();
 
     repository_type rep(path, repository_type::read);
@@ -1639,10 +1645,18 @@ public:
     }
     
     index.clear();
+    
+    while (! index_db_type::exists(path_index))
+      boost::thread::yield();
+
     index.open(path_index);
     
     counts.clear();
     os_counts.pop();
+    
+    while (! counts_db_type::exists(path_counts))
+      boost::thread::yield();
+
     counts.open(path_counts);
   }
   

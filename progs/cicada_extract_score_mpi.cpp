@@ -633,9 +633,7 @@ void index_counts(const path_set_type& modified_files,
   if (path_index.empty())
     throw std::runtime_error("no index path? " + path_index.file_string());
 
-  while (! boost::filesystem::exists(path_index))
-    boost::thread::yield();
-  while (! boost::filesystem::exists(path_index / "prop.list"))
+  while (! repository_type::exists(path_index))
     boost::thread::yield();
   
   repository_type rep(path_index, repository_type::read);
@@ -681,8 +679,13 @@ void index_counts(const path_set_type& modified_files,
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
     MPI::COMM_WORLD.Barrier();
+
+    const path_type path = rep.path(boost::lexical_cast<std::string>(rank));
+
+    while (! modified_counts[rank].exists(path))
+      boost::thread::yield();
     
-    modified_counts[rank].open(rep.path(boost::lexical_cast<std::string>(rank)));
+    modified_counts[rank].open(path);
   }
 }
 
