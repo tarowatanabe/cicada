@@ -56,6 +56,22 @@ options:
   --leaf                collect leaf nodes only
   --help                help message
 
+Similarly we can transform CONLL dependency format into hypergraph.
+
+cicada_filter_conll [options]
+options:
+  --input arg (=-)          input file
+  --output arg (=-)         output
+  --goal arg (=[s])         goal symbol
+  --non-terminal arg (=[x]) non-terminal symbol
+  --pos                     use pos as non-terminal
+  --relation                use relation as non-terminal
+  --leaf                    collect leaf nodes only
+  --projective              use projective filed for dependency
+  --split                   split multi word expression
+  --debug [=arg(=1)]        debug level
+  --help                    help message
+
 You can merge multiple hypergraphs in one by:
 cicada_unite_forest
 	This will simply merge by root...

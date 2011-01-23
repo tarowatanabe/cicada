@@ -640,6 +640,8 @@ void index_counts(const path_set_type& modified_files,
   
   modified_counts[mpi_rank].write(rep.path(boost::lexical_cast<std::string>(mpi_rank)));
   
+  ::sync();
+  
   // merge root-targets.
   if (mpi_rank == 0) {
     root_targets = modified_counts[0].root_counts;
@@ -679,9 +681,9 @@ void index_counts(const path_set_type& modified_files,
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
     MPI::COMM_WORLD.Barrier();
-
+    
     const path_type path = rep.path(boost::lexical_cast<std::string>(rank));
-
+    
     while (! modified_counts[rank].exists(path))
       boost::thread::yield();
     
