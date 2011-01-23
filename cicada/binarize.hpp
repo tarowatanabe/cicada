@@ -60,13 +60,9 @@ namespace cicada
     symbol_type binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
     {
       std::string label = lhs.non_terminal().non_terminal_strip() + '^';
-      if (first != last) {
+      for (/**/; first != last; ++ first) {
+	label += '_';
 	label += first->non_terminal().non_terminal_strip();
-	++ first;
-	for (/**/; first != last; ++ first) {
-	  label += '_';
-	  label += first->non_terminal().non_terminal_strip();
-	}
       }
       return '[' + label + ']';
     }
@@ -196,13 +192,9 @@ namespace cicada
     symbol_type binarized_label(const symbol_type& lhs, Iterator first, Iterator last)
     {
       std::string label = lhs.non_terminal().non_terminal_strip() + '^';
-      if (first != last) {
+      for (/**/; first != last; ++ first) {
+	label += '~';
 	label += first->non_terminal().non_terminal_strip();
-	++ first;
-	for (/**/; first != last; ++ first) {
-	  label += '_';
-	  label += first->non_terminal().non_terminal_strip();
-	}
       }
       return '[' + label + ']';
     }
