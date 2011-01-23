@@ -26,6 +26,7 @@ namespace cicada
   
       bool left;
       bool right;
+      bool all;
   
       int debug;
     };
