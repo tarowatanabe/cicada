@@ -248,14 +248,14 @@ namespace cicada
 		  tails.push_back(tails_local.front());
 		  binarized.push_back(rhs[i - 1].non_terminal());
 		} else {
-		  const std::pair<hypergraph_type::id_type, symbol_type> result = binarize(lhs_binarized, lhs_binarized, hypergraph_type::invalid,
-											   feature_set_type(), attribute_set_type(),
-											   tails_local.begin(), tails_local.end(),
-											   rhs.begin() + i - tails_local.size(), rhs.begin() + i,
-											   target);
+		  const hypergraph_type::id_type node_id = binarize(lhs_binarized, lhs_binarized, hypergraph_type::invalid,
+								    feature_set_type(), attribute_set_type(),
+								    tails_local.begin(), tails_local.end(),
+								    rhs.begin() + i - tails_local.size(), rhs.begin() + i,
+								    target);
 		  
-		  tails.push_back(result.first);
-		  binarized.push_back(result.second);
+		  tails.push_back(node_id);
+		  binarized.push_back(lhs_binarized);
 		}
 		tails_local.clear();
 	      }
@@ -276,14 +276,21 @@ namespace cicada
 	      removed[edge_source.id] = true;
 	    }
 	  } else {
-	    const std::pair<hypergraph_type::id_type, symbol_type> result = binarize(lhs_binarized, lhs_binarized, hypergraph_type::invalid,
-										     feature_set_type(), attribute_set_type(),
-										     tails_local.begin(), tails_local.end(),
-										     rhs.end() - tails_local.size(), rhs.end(),
-										     target);
-	    
-	    tails.push_back(result.first);
-	    binarized.push_back(result.second);
+	    if (! tails_local.empty()) {
+	      if (tails_local.size() == 1) {
+		tails.push_back(tails_local.back());
+		binarized.push_back(rhs.back());
+	      } else {
+		const hypergraph_type::id_type node_id = binarize(lhs_binarized, lhs_binarized, hypergraph_type::invalid,
+								  feature_set_type(), attribute_set_type(),
+								  tails_local.begin(), tails_local.end(),
+								  rhs.end() - tails_local.size(), rhs.end(),
+								  target);
+		
+		tails.push_back(node_id);
+		binarized.push_back(lhs_binarized);
+	      }
+	    }
 	    
 	    // create an edge leadning to node_soucrce.id...
 	    hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
@@ -315,14 +322,14 @@ namespace cicada
     label_chart_type  label_chart;
     
     template <typename IteratorTail, typename IteratorPhrase>
-    std::pair<hypergraph_type::id_type, symbol_type> binarize(const symbol_type& lhs,
-							      const symbol_type& lhs_binarized,
-							      const hypergraph_type::id_type& head,
-							      const feature_set_type& features,
-							      const attribute_set_type& attributes,
-							      IteratorTail tail_first, IteratorTail tail_last,
-							      IteratorPhrase phrase_first, IteratorPhrase phrase_last,
-							      hypergraph_type& graph)
+    hypergraph_type::id_type binarize(const symbol_type& lhs,
+				      const symbol_type& lhs_binarized,
+				      const hypergraph_type::id_type& head,
+				      const feature_set_type& features,
+				      const attribute_set_type& attributes,
+				      IteratorTail tail_first, IteratorTail tail_last,
+				      IteratorPhrase phrase_first, IteratorPhrase phrase_last,
+				      hypergraph_type& graph)
     {
       const size_t tail_size = tail_last - tail_first;
 
@@ -373,7 +380,7 @@ namespace cicada
 	  }
 	}
       
-      return std::make_pair(node_chart(0, tail_size), label_chart(0, tail_size));
+      return node_chart(0, tail_size);
     }
   };
 
@@ -694,6 +701,26 @@ namespace cicada
     HyperGraph target;
 
     BinarizeAll binarizer;
+    
+    binarizer(source, target);
+    
+    source.swap(target);
+  }
+
+  inline
+  void binarize_terminal(const HyperGraph& source, HyperGraph& target)
+  {
+    BinarizeTerminal binarizer;
+    
+    binarizer(source, target);
+  }
+
+  inline
+  void binarize_terminal(HyperGraph& source)
+  {
+    HyperGraph target;
+
+    BinarizeTerminal binarizer;
     
     binarizer(source, target);
     
