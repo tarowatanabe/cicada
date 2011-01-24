@@ -505,6 +505,10 @@ namespace cicada
 	
 	os.pop();
 	::sync();
+	
+	while (! score_set_type::quantized_set_type::exists(path))
+	  boost::thread::yield();
+
 	utils::tempfile::permission(path);
 	
 	score_db[feature].quantized.open(path);
@@ -543,6 +547,10 @@ namespace cicada
 	
 	os.pop();
 	::sync();
+	
+	while (! score_set_type::quantized_set_type::exists(path))
+	  boost::thread::yield();
+	
 	utils::tempfile::permission(path);
 	
 	attr_db[attr].quantized.open(path);
@@ -798,7 +806,7 @@ namespace cicada
     const parameter_type param(parameter);
     const path_type path = param.name();
 
-    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > phrase_db_type;
+    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > phrase_map_type;
     
     typedef ScoreSetStream score_stream_type;
     typedef std::vector<score_stream_type, std::allocator<score_stream_type> > score_stream_set_type;
@@ -829,8 +837,8 @@ namespace cicada
     utils::tempfile::insert(path_vocab);
     
     rule_db.open(path_rule, rule_db_type::WRITE);
-    phrase_db_type        source_map(1024 * 1024 * 4);
-    phrase_db_type        target_map(1024 * 1024 * 4);
+    phrase_map_type        source_map(1024 * 1024 * 4);
+    phrase_map_type        target_map(1024 * 1024 * 4);
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
@@ -1016,7 +1024,11 @@ namespace cicada
     word_type::write(path_vocab);
     
     ::sync();
-
+    
+    while (! phrase_db_type::exists(path_source))
+      boost::thread::yield();
+    while (! phrase_db_type::exists(path_target))
+      boost::thread::yield();
     while (! vocab_type::exists(path_vocab))
       boost::thread::yield();
     while (! rule_db_type::exists(path_rule))
@@ -1041,6 +1053,10 @@ namespace cicada
     for (int feature = 0; feature < feature_size; ++ feature) {
       score_streams[feature].ostream->reset();
       ::sync();
+      
+      while (! score_set_type::score_set_type::exists(score_streams[feature].path))
+	boost::thread::yield();
+      
       utils::tempfile::permission(score_streams[feature].path);
       score_db[feature].score.open(score_streams[feature].path);
 
@@ -1069,6 +1085,10 @@ namespace cicada
     for (int attribute = 0; attribute < attribute_size; ++ attribute) {
       attr_streams[attribute].ostream->reset();
       ::sync();
+      
+      while (! score_set_type::score_set_type::exists(attr_streams[attribute].path))
+	boost::thread::yield();
+      
       utils::tempfile::permission(attr_streams[attribute].path);
       attr_db[attribute].score.open(attr_streams[attribute].path);
 

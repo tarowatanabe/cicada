@@ -453,6 +453,10 @@ namespace cicada
 	
 	os.pop();
 	::sync();
+	
+	while (! score_set_type::quantized_set_type::exists(path))
+	  boost::thread::yield();
+
 	utils::tempfile::permission(path);
 	
 	score_db[feature].quantized.open(path);
@@ -491,6 +495,10 @@ namespace cicada
 	
 	os.pop();
 	::sync();
+	
+	while (! score_set_type::quantized_set_type::exists(path))
+	  boost::thread::yield();
+	
 	utils::tempfile::permission(path);
 	
 	attr_db[attr].quantized.open(path);
@@ -987,6 +995,10 @@ namespace cicada
     for (int feature = 0; feature < feature_size; ++ feature) {
       score_streams[feature].ostream->reset();
       ::sync();
+      
+      while (! score_set_type::score_set_type::exists(score_streams[feature].path))
+	boost::thread::yield();
+      
       utils::tempfile::permission(score_streams[feature].path);
       score_db[feature].score.open(score_streams[feature].path);
 
@@ -1015,6 +1027,10 @@ namespace cicada
     for (int attribute = 0; attribute < attribute_size; ++ attribute) {
       attr_streams[attribute].ostream->reset();
       ::sync();
+      
+      while (! score_set_type::score_set_type::exists(attr_streams[attribute].path))
+	boost::thread::yield();
+      
       utils::tempfile::permission(attr_streams[attribute].path);
       attr_db[attribute].score.open(attr_streams[attribute].path);
 
