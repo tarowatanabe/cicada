@@ -42,6 +42,8 @@
 #include <boost/fusion/adapted/std_pair.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
+#include <boost/thread.hpp>
+
 #include <google/dense_hash_set>
 
 namespace cicada
@@ -450,6 +452,7 @@ namespace cicada
 	  score_db[feature].maps[i] = codebook[i];
 	
 	os.pop();
+	::sync();
 	utils::tempfile::permission(path);
 	
 	score_db[feature].quantized.open(path);
@@ -487,6 +490,7 @@ namespace cicada
 	  attr_db[attr].maps[i] = codebook[i];
 	
 	os.pop();
+	::sync();
 	utils::tempfile::permission(path);
 	
 	attr_db[attr].quantized.open(path);
@@ -916,6 +920,13 @@ namespace cicada
     
     ::sync();
     
+    while (! rule_db_type::exists(path_source))
+      boost::thread::yield();
+    while (! rule_db_type::exists(path_target))
+      boost::thread::yield();
+    while (! rule_pair_db_type::exists(path_rule))
+      boost::thread::yield();
+    
     source_db.open(path_source);
     target_db.open(path_target);
     rule_db.open(path_rule);
@@ -950,13 +961,16 @@ namespace cicada
       edge_db.close();
       
       ::sync();
-
+      
       edge_db.open(path_edge);
     }
     
     // vocabulary...
     word_type::write(path_vocab);
     ::sync();
+    while (! vocab_type::exists(path_vocab))
+      boost::thread::yield();
+    
     vocab.open(path_vocab);
 
     if (feature_size < 0)

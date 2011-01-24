@@ -10,6 +10,7 @@
 
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
+#include <boost/thread.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -142,6 +143,11 @@ namespace cicada
       word_type::write(vocab_path);
       
       ::sync();
+      
+      while (! lexicon_type::exists(lexicon_path))
+	boost::thread::yield();
+      while (! vocab_type::exists(vocab_path))
+	boost::thread::yield();
       
       lexicon.open(lexicon_path);
       vocab.open(vocab_path);
