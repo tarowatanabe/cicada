@@ -612,6 +612,8 @@ struct OptimizeMarginBase
     
     weights[feature_bleu] = - loss_scale;
     cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
+
+    weights[feature_bleu] = 0.0;
     
     count_set_type counts_reward(graph_reward.nodes.size());
     count_set_type counts_penalty(graph_penalty.nodes.size());
