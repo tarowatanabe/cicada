@@ -37,6 +37,9 @@ namespace cicada
     
     typedef std::vector<symbol_type, std::allocator<symbol_type> > phrase_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > context_type;
+
+    typedef utils::chart<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_chart_type;
+    typedef utils::chart<symbol_type, std::allocator<symbol_type> > label_chart_type;
     
     typedef std::vector<bool, std::allocator<bool> > removed_type;
     
@@ -59,10 +62,7 @@ namespace cicada
   struct BinarizeAll : public __BinarizeBase
   {
     typedef std::vector<int, std::allocator<int> > position_set_type;
-
-    typedef utils::chart<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_chart_type;
-    typedef utils::chart<symbol_type, std::allocator<symbol_type> > label_chart_type;
-
+    
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       // first, copy...
@@ -193,9 +193,6 @@ namespace cicada
   {
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
     
-    typedef utils::chart<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_chart_type;
-    typedef utils::chart<symbol_type, std::allocator<symbol_type> > label_chart_type;
-
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       // first, copy...
