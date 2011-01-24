@@ -18,8 +18,6 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include <google/dense_hash_set>
-
 // we will add more permuted edges to the existing hypergraph
 // with features, rule=1 score...
 

@@ -13,13 +13,8 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort.hpp>
 
-#include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/chart.hpp>
-
-#include <boost/lexical_cast.hpp>
-
-#include <google/dense_hash_set>
 
 namespace cicada
 {
