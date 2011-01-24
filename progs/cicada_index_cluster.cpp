@@ -34,7 +34,7 @@ int main(int argc, char** argv)
     const std::string output_path = variables["output"].as<std::string>();
     
     cicada::Cluster cluster(input_path);
-    
+    ::sync();
     cluster.write(output_path);
   }
   catch (const std::exception& err) {

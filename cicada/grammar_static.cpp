@@ -1001,22 +1001,21 @@ namespace cicada
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
     }
 
-    // source phrases...
     source_map.write(path_source);
     source_map.clear();
-    source_db.open(path_source);
-
-    // target phrases...
+    
     target_map.write(path_target);
     target_map.clear();
-    target_db.open(path_target);
-
-    // rules....
+    
     rule_db.close();
-    rule_db.open(path_rule);
-
-    // vocabulary...
+    
     word_type::write(path_vocab);
+    
+    ::sync();
+    
+    source_db.open(path_source);
+    target_db.open(path_target);
+    rule_db.open(path_rule);
     vocab.open(path_vocab);
 
     if (feature_size < 0)
@@ -1032,6 +1031,7 @@ namespace cicada
     
     for (int feature = 0; feature < feature_size; ++ feature) {
       score_streams[feature].ostream->reset();
+      ::sync();
       utils::tempfile::permission(score_streams[feature].path);
       score_db[feature].score.open(score_streams[feature].path);
 
@@ -1059,6 +1059,7 @@ namespace cicada
     
     for (int attribute = 0; attribute < attribute_size; ++ attribute) {
       attr_streams[attribute].ostream->reset();
+      ::sync();
       utils::tempfile::permission(attr_streams[attribute].path);
       attr_db[attribute].score.open(attr_streams[attribute].path);
 

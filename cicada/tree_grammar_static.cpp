@@ -906,18 +906,18 @@ namespace cicada
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
     
-    // source trees...
     source_map.write(path_source);
     source_map.clear();
-    source_db.open(path_source);
-
-    // target trees...
+    
     target_map.write(path_target);
     target_map.clear();
-    target_db.open(path_target);
     
-    // rules....
     rule_db.close();
+    
+    ::sync();
+    
+    source_db.open(path_source);
+    target_db.open(path_target);
     rule_db.open(path_rule);
     
     // uncover edge_db from edge_map...
@@ -926,7 +926,7 @@ namespace cicada
       typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > buffer_type;
       
       edge_db.open(path_edge, edge_db_type::WRITE);
-
+      
       codes_type codes;
       buffer_type buffer;
       for (id_type id = 0; id != edge_map.size(); ++ id) {
@@ -948,11 +948,15 @@ namespace cicada
       }
       
       edge_db.close();
+      
+      ::sync();
+
       edge_db.open(path_edge);
     }
     
     // vocabulary...
     word_type::write(path_vocab);
+    ::sync();
     vocab.open(path_vocab);
 
     if (feature_size < 0)
@@ -968,6 +972,7 @@ namespace cicada
      
     for (int feature = 0; feature < feature_size; ++ feature) {
       score_streams[feature].ostream->reset();
+      ::sync();
       utils::tempfile::permission(score_streams[feature].path);
       score_db[feature].score.open(score_streams[feature].path);
 
@@ -995,6 +1000,7 @@ namespace cicada
      
     for (int attribute = 0; attribute < attribute_size; ++ attribute) {
       attr_streams[attribute].ostream->reset();
+      ::sync();
       utils::tempfile::permission(attr_streams[attribute].path);
       attr_db[attribute].score.open(attr_streams[attribute].path);
 

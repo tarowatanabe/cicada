@@ -141,6 +141,8 @@ namespace cicada
       lexicon.close();
       word_type::write(vocab_path);
       
+      ::sync();
+      
       lexicon.open(lexicon_path);
       vocab.open(vocab_path);
     }
