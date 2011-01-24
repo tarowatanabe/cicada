@@ -534,8 +534,6 @@ struct OptimizerSGDL1 : public OptimizerBase
 // we have two options: compute oracle by hill-climbing, or use dynamically computed oracle...
 struct OptimizeMarginBase
 {
-  typedef std::vector<int, std::allocator<int> > count_set_type;
-  
   struct Accumulated
   {
     typedef cicada::semiring::Log<double> weight_type;
@@ -556,12 +554,12 @@ struct OptimizeMarginBase
 
   struct count_function
   {
-    typedef int value_type;
+    typedef cicada::semiring::Log<double> value_type;
     
     template <typename Edge>
     value_type operator()(const Edge& x) const
     {
-      return 1;
+      return cicada::semiring::traits<value_type>::exp(0.0);
     }
   };
 
@@ -584,7 +582,8 @@ struct OptimizeMarginBase
       return accumulated;
     }
   };
-
+  
+  typedef std::vector<count_function::value_type, std::allocator<count_function::value_type> > count_set_type;
 
   OptimizeMarginBase(const hypergraph_set_type&           __graphs,
 		     const feature_function_ptr_set_type& __features)
@@ -626,8 +625,8 @@ struct OptimizeMarginBase
     features_reward.assign(accumulated_reward.accumulated.begin(),   accumulated_reward.accumulated.end());
     features_penalty.assign(accumulated_penalty.accumulated.begin(), accumulated_penalty.accumulated.end());
     
-    features_reward  *= (1.0 / counts_reward.back());
-    features_penalty *= (1.0 / counts_penalty.back());
+    features_reward  *= (1.0 / double(counts_reward.back()));
+    features_penalty *= (1.0 / double(counts_penalty.back()));
     
     features_reward.erase(feature_bleu);
     features_penalty.erase(feature_bleu);
