@@ -1,0 +1,27 @@
+Some note on MPI
+
+Open MPI is a recommended MPI engine, since it is well tested by the author.
+REMARK: it is recommended not to use memory managers in open-mpi, which may conflict with your
+    	favorite memory managers, such as jemalloc/tcmalloc. To disable this, for instance, you
+	can edit "openmpi-mca-params.conf" and add(or disable) mca by, "memory = ^ptmalloc2"
+	For details, consult open-mpi documentation.
+
+Some utilities:
+
+mpish [list of files or use stdin]
+      Run multiple commands (one-command-per-line) in the files on multiple nodes.
+      The commands are scheduled so that we will consume # of nodes
+      specified by mpirun.
+     
+mpipe --command [command]
+      Run command on multiple nodes, specified by mpirun, and distribute stdin (or file specified by --input) to each 
+      workers, collect their stdout into single stdout (or file specified by --output).
+      We assume workers consume exactly one line, then output one line.
+
+mpimap [list of command files]
+       Run commands on multiple nodes, specified by # of command in files. Then, distribute stdin
+       to each worker. We will not "reduce" stdout from each of worker, so it is your responsibility
+       to merge appropriately. Remark, distribution is NOT even, and rather random, due to optimum
+       scheduling
+	
+
