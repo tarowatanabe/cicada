@@ -171,30 +171,61 @@ int main(int argc, char** argv)
 	
 	std::string line;
 	int non_found_iter = 0;
-	for (;;) {
-	  bool found = false;
-	  
-	  for (int rank = 0; rank != mpi_child_size && std::cin; ++ rank)
-	    if (stream[rank] && device[rank] && device[rank]->test() && std::getline(std::cin, line)) {
-	      *stream[rank] << line << '\n';
+	
+	if (even) {
+	  for (;;) {
+	    bool found = false;
+
+	    if (std::cin)
+	      for (int rank = 0; rank != mpi_child_size && std::getline(std::cin, line); ++ rank)
+		if (stream[rank]) {
+		  *stream[rank] << line << '\n';
+		  
+		  found = true;
+		}
+	    
+	    if (! std::cin) {
+	      for (int rank = 0; rank != mpi_child_size; ++ rank)
+		if (stream[rank] && device[rank] && device[rank]->test()) {
+		  stream[rank].reset();
+		  
+		  found = true;
+		}
 	      
-	      found = true;
+	      found |= utils::mpi_terminate_devices(stream, device);
+	      
+	      if (std::count(device.begin(), device.end(), odevice_ptr_type()) == device.size()) break;
 	    }
 	  
-	  if (! std::cin) {
-	    for (int rank = 0; rank != mpi_child_size; ++ rank)
-	      if (stream[rank] && device[rank] && device[rank]->test()) {
-		stream[rank].reset();
-		
-		found = true;
-	      }
-	    
-	    found |= utils::mpi_terminate_devices(stream, device);
-	    
-	    if (std::count(device.begin(), device.end(), odevice_ptr_type()) == device.size()) break;
+	    non_found_iter = loop_sleep(found, non_found_iter);
 	  }
 	  
-	  non_found_iter = loop_sleep(found, non_found_iter);
+	} else {
+	  for (;;) {
+	    bool found = false;
+	  
+	    for (int rank = 0; rank != mpi_child_size && std::cin; ++ rank)
+	      if (stream[rank] && device[rank] && device[rank]->test() && std::getline(std::cin, line)) {
+		*stream[rank] << line << '\n';
+	      
+		found = true;
+	      }
+	  
+	    if (! std::cin) {
+	      for (int rank = 0; rank != mpi_child_size; ++ rank)
+		if (stream[rank] && device[rank] && device[rank]->test()) {
+		  stream[rank].reset();
+		
+		  found = true;
+		}
+	    
+	      found |= utils::mpi_terminate_devices(stream, device);
+	    
+	      if (std::count(device.begin(), device.end(), odevice_ptr_type()) == device.size()) break;
+	    }
+	  
+	    non_found_iter = loop_sleep(found, non_found_iter);
+	  }
 	}
 	
 	// termination...

@@ -17,11 +17,12 @@ mpipe --command [command]
       Run command on multiple nodes, specified by mpirun, and distribute stdin (or file specified by --input) to each 
       workers, collect their stdout into single stdout (or file specified by --output).
       We assume workers consume exactly one line, then output one line.
+      --even option will evenly split lines, otherwise, it is scheduled so that "faster" worker may consume more lines.
 
 mpimap [list of command files]
        Run commands on multiple nodes, specified by # of command in files. Then, distribute stdin
        to each worker. We will not "reduce" stdout from each of worker, so it is your responsibility
        to merge appropriately. Remark, distribution is NOT even, and rather random, due to optimum
-       scheduling
+       scheduling (like those used in mpipe). (--even option to evenly split lines.)
 	
 
