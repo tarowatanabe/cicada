@@ -221,6 +221,22 @@ public:
   {
     return y < x;
   }
+
+  friend
+  std::ostream& operator<<(std::ostream& os, const PhrasePair& x)
+  {
+    os << x.source
+       << " ||| " << x.target
+       << " ||| " << x.alignment
+       << " |||";
+    
+    PhrasePair::counts_type::const_iterator citer_end = x.counts.end();
+    for (PhrasePair::counts_type::const_iterator citer = x.counts.begin(); citer != citer_end; ++ citer)
+      os << ' ' << *citer;
+    
+    return os;
+  }
+
 };
 
 class PhrasePairModified
