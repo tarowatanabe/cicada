@@ -36,13 +36,13 @@ namespace utils
     {
       char buffer[8];
       
-      ::memset(buffer, 0, sizeof(char)*3);
       std::ifstream ifs(filename.c_str());
       ifs.read((char*) buffer, sizeof(char)*3);
+      const size_t gcount = ifs.gcount();
       
-      if (buffer[0] == '\037' && buffer[1] == '\213')
+      if (gcount >= 2 && buffer[0] == '\037' && buffer[1] == '\213')
 	return COMPRESS_STREAM_GZIP;
-      else if (buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h')
+      else if (gcount >= 3 && buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h')
 	return COMPRESS_STREAM_BZIP;
       else
 	return COMPRESS_STREAM_UNKNOWN;
