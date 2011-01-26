@@ -259,9 +259,14 @@ int getoptions(int argc, char** argv)
   
   po::positional_options_description pos;
   pos.add("input-file", -1); // all the files
+
+  po::command_line_parser parser(argc, argv);
+  parser.style(po::command_line_style::unix_style & (~po::command_line_style::allow_guessing));
+  parser.options(cmdline_options);
+  parser.positional(pos);
   
   po::variables_map vm;
-  po::store(po::command_line_parser(argc, argv).options(cmdline_options).positional(pos).run(), vm);
+  po::store(parser.run(), vm);
   po::notify(vm);
   
   if (vm.count("help")) {
