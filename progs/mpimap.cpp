@@ -57,7 +57,8 @@ typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef std::vector<std::string, std::allocator<std::string> > command_set_type;
 
-path_set_type input_files;
+path_type input_file = "-";
+path_set_type command_files;
 
 path_type prog_name;
 
@@ -87,8 +88,8 @@ int main(int argc, char** argv)
     if (! prog_name.empty() && ! boost::filesystem::exists(prog_name))
       throw std::runtime_error(std::string("no binary? ") + prog_name.file_string());
 
-    if (input_files.empty())
-      throw std::runtime_error(std::string("no shell commansd?"));
+    if (command_files.empty())
+      command_files.push_back("-");
     
     if (MPI::Comm::Get_parent() != MPI::COMM_NULL) {
       utils::mpi_intercomm comm_parent(MPI::Comm::Get_parent());
@@ -118,7 +119,7 @@ int main(int argc, char** argv)
       command_set_type commands;
       
       if (mpi_rank == 0)
-	for (path_set_type::const_iterator piter = input_files.begin(); piter != input_files.end(); ++ piter) {
+	for (path_set_type::const_iterator piter = command_files.begin(); piter != command_files.end(); ++ piter) {
 	  if (debug)
 	    std::cerr << "file: " << piter->file_string() << std::endl;
 	  
@@ -168,6 +169,8 @@ int main(int argc, char** argv)
 	  stream[rank]->push(boost::iostreams::gzip_compressor());
 	  stream[rank]->push(*device[rank]);
 	}
+
+	utils::compress_istream is(input_file, 1024 * 1024);
 	
 	std::string line;
 	int non_found_iter = 0;
@@ -176,15 +179,15 @@ int main(int argc, char** argv)
 	  for (;;) {
 	    bool found = false;
 
-	    if (std::cin)
-	      for (int rank = 0; rank != mpi_child_size && std::getline(std::cin, line); ++ rank)
+	    if (is)
+	      for (int rank = 0; rank != mpi_child_size && std::getline(is, line); ++ rank)
 		if (stream[rank]) {
 		  *stream[rank] << line << '\n';
 		  
 		  found = true;
 		}
 	    
-	    if (! std::cin) {
+	    if (! is) {
 	      for (int rank = 0; rank != mpi_child_size; ++ rank)
 		if (stream[rank] && device[rank] && device[rank]->test()) {
 		  stream[rank].reset();
@@ -204,14 +207,14 @@ int main(int argc, char** argv)
 	  for (;;) {
 	    bool found = false;
 	  
-	    for (int rank = 0; rank != mpi_child_size && std::cin; ++ rank)
-	      if (stream[rank] && device[rank] && device[rank]->test() && std::getline(std::cin, line)) {
+	    for (int rank = 0; rank != mpi_child_size && is; ++ rank)
+	      if (stream[rank] && device[rank] && device[rank]->test() && std::getline(is, line)) {
 		*stream[rank] << line << '\n';
 	      
 		found = true;
 	      }
 	  
-	    if (! std::cin) {
+	    if (! is) {
 	      for (int rank = 0; rank != mpi_child_size; ++ rank)
 		if (stream[rank] && device[rank] && device[rank]->test()) {
 		  stream[rank].reset();
@@ -268,20 +271,21 @@ int getoptions(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("prog",  po::value<path_type>(&prog_name), "this binary")
-    ("even",  po::bool_switch(&even),           "evenly split data")
+    ("input", po::value<path_type>(&input_file)->default_value(input_file), "input file")
+    ("prog",  po::value<path_type>(&prog_name),  "this binary")
+    ("even",  po::bool_switch(&even),            "evenly split data")
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
 
   po::options_description hidden;
   hidden.add_options()
-    ("input-file", po::value<path_set_type>(&input_files), "input file");
+    ("command-file", po::value<path_set_type>(&command_files), "command files");
 
   po::options_description cmdline_options;
   cmdline_options.add(desc).add(hidden);
   
   po::positional_options_description pos;
-  pos.add("input-file", -1); // all the files
+  pos.add("command-file", -1); // all the files
   
   po::variables_map vm;
   po::store(po::command_line_parser(argc, argv).options(cmdline_options).positional(pos).run(), vm);

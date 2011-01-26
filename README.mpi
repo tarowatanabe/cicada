@@ -9,7 +9,7 @@ REMARK: it is recommended not to use memory managers in open-mpi, which may conf
 Some utilities:
 
 mpish [list of files or use stdin]
-      Run multiple commands (one-command-per-line) in the files on multiple nodes.
+      Run multiple commands (one-command-per-line) in the files on multiple nodes. (if no args, use stdin)
       The commands are scheduled so that we will consume # of nodes
       specified by mpirun.
      
@@ -20,9 +20,10 @@ mpipe --command [command]
       --even option will evenly split lines, otherwise, it is scheduled so that "faster" worker may consume more lines.
 
 mpimap [list of command files]
-       Run commands on multiple nodes, specified by # of command in files. Then, distribute stdin
-       to each worker. We will not "reduce" stdout from each of worker, so it is your responsibility
-       to merge appropriately. Remark, distribution is NOT even, and rather random, due to optimum
-       scheduling (like those used in mpipe). (--even option to evenly split lines.)
+       Run commands on multiple nodes, specified by # of command in files (if no args, use stdin).
+       Then, distribute stdin (or file specified by --input) to each worker. We will not "reduce" stdout
+       from each of worker, so it is your responsibility to merge appropriately. Remark, distribution is
+       NOT even, and rather random, due to optimum scheduling (like those used in mpipe).
+       (--even option to evenly split lines.)
 	
 
