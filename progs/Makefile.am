@@ -71,6 +71,7 @@ bin_PROGRAMS = \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
 	\
+	mpimap \
 	mpish \
 	mpipe
 
@@ -232,6 +233,10 @@ cicada_oracle_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDAD
 cicada_oracle_mpi_SOURCES  = cicada_oracle_mpi.cpp
 cicada_oracle_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_oracle_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+mpimap_SOURCES = mpimap.cpp
+mpimap_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+mpimap_LDADD   = $(MPI_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
 
 mpish_SOURCES = mpish.cpp
 mpish_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
