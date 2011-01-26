@@ -112,6 +112,8 @@ int main(int argc, char** argv)
       }
       ::pclose(fp);
       
+      comm_parent.comm.Send(0, 0, MPI::INT, 0, notify_tag);
+      
     } else {
       command_set_type commands;
       
