@@ -143,6 +143,7 @@ path_type output_file = "-";
 
 std::string goal = "[s]";
 std::string non_terminal = "[x]";
+bool head_mode = false;
 bool pos_mode = false;
 bool relation_mode = false;
 bool leaf_mode = false;
@@ -305,30 +306,43 @@ int main(int argc, char** argv)
 	  tails.push_back(node_map[antecedent]);
 	  phrase.push_back(non_terminals[antecedent]);
 	}
-	
-	if (split_mode && conlls[id - 1].form.size() > 1) {
-	  // split multi word expression by '_'
+
+	if (head_mode) {
+	  // create a new node and edge to terminal(s)!
 	  
-	  tokens.clear();
-	  boost::algorithm::split(tokens, conlls[id - 1].form, boost::is_any_of("_"));
-
-	  if (tokens.size() == 1)
-	    phrase.push_back(conlls[id - 1].form);
-	  else {
-	    bool has_empty = false;
-	    tokens_type::const_iterator titer_end = tokens.end();
-	    for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end && ! has_empty; ++ titer)
-	      if (titer->empty())
-		has_empty = true;
-
-	    if (has_empty)
-	      phrase.push_back(conlls[id - 1].form);
-	    else
-	      phrase.insert(phrase.end(), tokens.begin(), tokens.end());
+	  const symbol_type lhs = '[' + non_terminals[id].non_terminal_strip() + "*]";
+	  tails.push_back(hypergraph.add_node().id);
+	  phrase.push_back(lhs);
+	  
+	  hypergraph_type::edge_type& edge = hypergraph.add_edge();
+	  edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(lhs, hypergraph_type::rule_type::symbol_set_type(1, conlls[id - 1].form)));
+	  
+	  hypergraph.connect_edge(edge.id, tails.back());
+	} else {
+	  if (split_mode && conlls[id - 1].form.size() > 1) {
+	    // split multi word expression by '_'
 	    
-	  }
-	} else
-	  phrase.push_back(conlls[id - 1].form);
+	    tokens.clear();
+	    boost::algorithm::split(tokens, conlls[id - 1].form, boost::is_any_of("_"));
+	    
+	    if (tokens.size() == 1)
+	      phrase.push_back(conlls[id - 1].form);
+	    else {
+	      bool has_empty = false;
+	      tokens_type::const_iterator titer_end = tokens.end();
+	      for (tokens_type::const_iterator titer = tokens.begin(); titer != titer_end && ! has_empty; ++ titer)
+		if (titer->empty())
+		  has_empty = true;
+	      
+	      if (has_empty)
+		phrase.push_back(conlls[id - 1].form);
+	      else
+		phrase.insert(phrase.end(), tokens.begin(), tokens.end());
+	      
+	    }
+	  } else
+	    phrase.push_back(conlls[id - 1].form);
+	}
 	
 	for (index_set_type::const_iterator iiter = iiter_lex; iiter != iiter_end; ++ iiter) {
 	  const size_t antecedent = *iiter;
@@ -377,6 +391,7 @@ void options(int argc, char** argv)
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
 
+    ("head",       po::bool_switch(&head_mode),       "use non-terminal for head word")
     ("pos",        po::bool_switch(&pos_mode),        "use pos as non-terminal")
     ("relation",   po::bool_switch(&relation_mode),   "use relation as non-terminal")
     ("leaf",       po::bool_switch(&leaf_mode),       "collect leaf nodes only")
