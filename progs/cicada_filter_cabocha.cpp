@@ -64,6 +64,8 @@ path_type output_file = "-";
 
 std::string goal = "[s]";
 std::string non_terminal = "[x]";
+
+bool head_mode = false;
 bool pos_mode = false;
 bool leaf_mode = false;
 
@@ -143,14 +145,14 @@ int main(int argc, char** argv)
 	      hypergraph_type::node_type& node = graph.add_node();
 	      
 	      tails.push_back(node.id);
-	      symbols.push_back('[' + titer->second + ']');
+	      symbols.push_back('[' + titer->second + "*]");
 	      
 	      hypergraph_type::edge_type& edge = graph.add_edge();
 	      edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
 	      graph.connect_edge(edge.id, node.id);
 	    }
-
-	    niter->cat = symbols[niter->head];
+	    
+	    niter->cat = '[' + niter->terminals[niter->head].second + ']';
 	    
 	    hypergraph_type::edge_type& edge = graph.add_edge(tails.begin(), tails.end());
 	    edge.rule = rule_type::create(rule_type(niter->cat, symbols.begin(), symbols.end()));
@@ -253,6 +255,7 @@ void options(int argc, char** argv)
     ("goal",         po::value<std::string>(&goal)->default_value(goal),                 "goal symbol")
     ("non-terminal", po::value<std::string>(&non_terminal)->default_value(non_terminal), "non-terminal symbol")
     
+    ("head",    po::bool_switch(&head_mode), "use non-terminal for head word")
     ("pos",     po::bool_switch(&pos_mode),  "use pos as non-terminal")
     ("leaf",    po::bool_switch(&leaf_mode), "collect leaf nodes only")
     
