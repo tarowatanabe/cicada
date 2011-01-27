@@ -145,7 +145,10 @@ int main(int argc, char** argv)
 	      hypergraph_type::node_type& node = graph.add_node();
 	      
 	      tails.push_back(node.id);
-	      symbols.push_back('[' + titer->second + "*]");
+	      if (head_mode)
+		symbols.push_back('[' + titer->second + "*]");
+	      else
+		symbols.push_back('[' + titer->second + ']']);
 	      
 	      hypergraph_type::edge_type& edge = graph.add_edge();
 	      edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
