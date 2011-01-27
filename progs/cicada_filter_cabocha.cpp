@@ -148,7 +148,7 @@ int main(int argc, char** argv)
 	      if (head_mode)
 		symbols.push_back('[' + titer->second + "*]");
 	      else
-		symbols.push_back('[' + titer->second + ']']);
+		symbols.push_back('[' + titer->second + ']');
 	      
 	      hypergraph_type::edge_type& edge = graph.add_edge();
 	      edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
