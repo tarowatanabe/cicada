@@ -1607,7 +1607,7 @@ public:
     os_counts.push(boost::iostreams::file_sink(path_counts.file_string()), 1024 * 1024);
     os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
 
-    segment_map_type segment_map;
+    segment_map_type segment_map(1024 * 1024 * 4);
     
     pqueue_type pqueue;
     istream_ptr_set_type   istreams(paths.size());
