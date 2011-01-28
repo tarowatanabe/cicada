@@ -1429,7 +1429,28 @@ public:
 
     cache_type() : node(index_db_type::size_type(-1)), counts() {}
   };
-  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+  
+  struct cache_prefix_type
+  {
+    index_db_type::size_type key;
+    index_db_type::size_type node;
+    
+    cache_prefix_type() : key(), node(0) {}
+  };
+  
+  struct cache_node_type
+  {
+    index_db_type::size_type key;
+    index_db_type::size_type node;
+    index_db_type::size_type next;
+    
+    cache_node_type()
+      : key(), node(0), next(0) {}
+  };
+  
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> >               cache_set_type;
+  typedef utils::array_power2<cache_prefix_type, 1024 * 8, std::allocator<cache_prefix_type> > cache_prefix_set_type;
+  typedef utils::array_power2<cache_node_type,   1024 * 32, std::allocator<cache_node_type> >  cache_node_set_type;
   
   PhraseCounts() : counts_size(size_type(-1)) {}
   
@@ -1439,7 +1460,7 @@ public:
   
   const count_set_type& operator[](const phrase_type& phrase) const
   {
-    const index_db_type::size_type node = index.find(phrase.c_str(), phrase.size());
+    const index_db_type::size_type node = find(phrase);
     
     if (index.is_valid(node) && index.exists(node)) {
       const size_type cache_pos = hasher_type::operator()(node) & (caches.size() - 1);
@@ -1460,7 +1481,55 @@ public:
       return counts_empty;
     }
   }
-
+  
+  index_db_type::size_type find(const phrase_type& phrase) const
+  {
+    if (phrase.size() < sizeof(index_db_type::size_type))
+      return index.find(phrase.c_str(), phrase.size());
+    
+    index_db_type::size_type key;
+    std::copy(phrase.begin(), phrase.begin() + sizeof(index_db_type::size_type), (char*) &key);
+    
+    const size_type cache_pos = hasher_type::operator()(key) & (caches_prefix.size() - 1);
+    
+    cache_prefix_type& cache = const_cast<cache_prefix_type&>(caches_prefix[cache_pos]);
+    if (cache.key != key || cache.node == 0) {
+      cache.key = key;
+      cache.node = index.find(phrase.c_str(), sizeof(index_db_type::size_type));
+    }
+    
+    if (phrase.size() == sizeof(index_db_type::size_type) || ! index.is_valid(cache.node))
+      return cache.node;
+    
+    index_db_type::size_type node = cache.node;
+    phrase_type::const_iterator piter = phrase.begin() + sizeof(index_db_type::size_type);
+    phrase_type::const_iterator piter_end = phrase.end();
+    // iterate...
+    
+    while (piter + sizeof(index_db_type::size_type) <= piter_end) {
+      std::copy(piter, piter + sizeof(index_db_type::size_type), (char*) &key);
+      const size_type cache_pos = hasher_type::operator()(key, node) & (caches_node.size() - 1);
+      
+      cache_node_type& cache = const_cast<cache_node_type&>(caches_node[cache_pos]);
+      if (cache.key != key || cache.node == 0) {
+	cache.key = key;
+	cache.node = node;
+	cache.next = index.find(&(*piter), sizeof(index_db_type::size_type), node);
+      }
+      node = cache.next;
+      if (! index.is_valid(node))
+	return node;
+      
+      piter += sizeof(index_db_type::size_type);
+    }
+    
+    if (piter != piter_end)
+      return index.find(&(*piter), piter_end - piter, node);
+    else
+      return node;
+  }
+  
+  
   bool exists(const path_type& path) const
   {
     if (! utils::repository::exists(path)) return false;
@@ -1682,6 +1751,8 @@ public:
     root_counts.clear();
     counts_empty.clear();
     caches.clear();
+    caches_prefix.clear();
+    caches_node.clear();
   }
   
   size_type counts_size;
@@ -1693,8 +1764,10 @@ public:
   root_count_set_type root_counts;
   
   count_set_type counts_empty;
-
-  cache_set_type caches;
+  
+  cache_set_type        caches;
+  cache_prefix_set_type caches_prefix;
+  cache_node_set_type   caches_node;
 };
 
 
