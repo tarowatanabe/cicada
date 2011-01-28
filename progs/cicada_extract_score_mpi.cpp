@@ -436,12 +436,14 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	  
 	  if (! device[rank]->test())
 	    boost::thread::yield();
-
+	  else
+	    found = true;
+	  
 	  generator(*stream[rank], phrase_pair) << '\n';
-	} else
+	} else {
 	  stream[rank].reset();
-	
-	found = true;
+	  found = true;
+	}
       }
     
     found |= utils::mpi_terminate_devices(stream, device);
