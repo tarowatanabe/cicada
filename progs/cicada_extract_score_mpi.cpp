@@ -415,7 +415,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->push(boost::iostreams::gzip_compressor());
     stream[rank]->push(*device[rank]);
     
-    queues[rank].reset(new queue_type(1024 * 1024));
+    queues[rank].reset(new queue_type(1024));
     
     stream[rank]->precision(20);
   }

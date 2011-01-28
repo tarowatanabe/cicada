@@ -262,7 +262,7 @@ void score_counts(const path_type& output_file,
   // construct queue matrix...
   for (int i = 0; i != threads; ++ i)
     for (int j = 0; j != threads; ++ j) {
-      queues_mapper[i][j].reset(new queue_type(1024 * 1024));
+      queues_mapper[i][j].reset(new queue_type(1024));
       queues_reducer[j][i] = queues_mapper[i][j];
     }
   
@@ -377,7 +377,7 @@ void modify_counts(const path_set_type& counts_files,
   queue_ptr_set_type  queues(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
-    queues[shard].reset(new queue_type(threads * 64));
+    queues[shard].reset(new queue_type(128));
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
