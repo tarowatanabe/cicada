@@ -51,8 +51,6 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/malloc_stats.hpp>
 #include <utils/lexical_cast.hpp>
-#include <utils/byte_aligned_code.hpp>
-#include <utils/group_aligned_code.hpp>
 #include <utils/base64.hpp>
 
 #include <succinct_db/succinct_trie_db.hpp>
@@ -1421,11 +1419,14 @@ public:
   typedef char     key_type;
   typedef uint64_t id_type;
   typedef double   count_type;
-
-  typedef std::vector<key_type, std::allocator<key_type> > code_set_type;
   
-  typedef succinctdb::succinct_trie_db<key_type, id_type, std::allocator<std::pair<key_type, id_type> > > index_db_type;
   typedef succinctdb::succinct_hash_mapped<key_type, std::allocator<key_type> > segment_db_type;
+  
+  typedef segment_db_type::pos_type segment_id_type;
+  typedef std::vector<segment_id_type, std::allocator<segment_id_type> > code_set_type;
+  
+  typedef succinctdb::succinct_trie_db<segment_id_type, id_type, std::allocator<std::pair<segment_id_type, id_type> > > index_db_type;
+  
   typedef utils::map_file<count_type, std::allocator<count_type> > counts_db_type;
   
   typedef phrase_pair_type::counts_type count_set_type;
@@ -1453,11 +1454,10 @@ public:
     typedef boost::tokenizer<utils::space_separator> tokenizer_type;
 
     code_set_type& codes = const_cast<code_set_type&>(codes_impl);
+    codes.clear();
     
-    codes.resize(phrase.size() * 8);
     tokenizer_type tokenizer(phrase);
     
-    code_set_type::iterator citer = codes.begin();
     tokenizer_type::iterator titer_end = tokenizer.end();
     for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
       const std::string& seg = *titer;
@@ -1466,10 +1466,10 @@ public:
       if (id == segment_db_type::npos())
 	throw std::runtime_error("no segment?: " + seg);
       
-      citer += utils::byte_aligned_encode(id, &(*citer));
+      codes.push_back(id);
     }
     
-    const index_db_type::size_type node = index.find(&(*codes.begin()), citer - codes.begin());
+    const index_db_type::size_type node = index.find(&(*codes.begin()), codes.size());
     
     if (index.is_valid(node) && index.exists(node)) {
       const size_type cache_pos = hasher_type::operator()(node) & (caches.size() - 1);
@@ -1648,20 +1648,17 @@ public:
 	if (! modified.source.empty() && ! modified.counts.empty()) {
 	  //index.insert(modified.source.c_str(), modified.source.size(), id);
 	  
-	  codes.resize(modified.source.size() * 8);
+	  codes.clear();
 	  tokenizer_type tokenizer(modified.source);
 	  
-	  code_set_type::iterator citer = codes.begin();
 	  tokenizer_type::iterator titer_end = tokenizer.end();
 	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
 	    const std::string& seg = *titer;
 	    
-	    const segment_db_type::pos_type id = segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0));
-	    
-	    citer += utils::byte_aligned_encode(id, &(*citer));
+	    codes.push_back(segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
 	  }
 	  
-	  index.insert(&(*codes.begin()), citer - codes.begin(), id);
+	  index.insert(&(*codes.begin()), codes.size(), id);
 	  ++ id;
 
 	  if (counts_size == size_type(-1))
@@ -1706,20 +1703,19 @@ public:
     
     if (! modified.source.empty() && ! modified.counts.empty()) {
       //index.insert(modified.source.c_str(), modified.source.size(), id);
-      codes.resize(modified.source.size() * 8);
+      
+      codes.clear();
       tokenizer_type tokenizer(modified.source);
 	  
-      code_set_type::iterator citer = codes.begin();
       tokenizer_type::iterator titer_end = tokenizer.end();
       for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
 	const std::string& seg = *titer;
 	    
-	const segment_db_type::pos_type id = segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0));
-	    
-	citer += utils::byte_aligned_encode(id, &(*citer));
+	codes.push_back(segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
       }
 	  
-      index.insert(&(*codes.begin()), citer - codes.begin(), id);
+      index.insert(&(*codes.begin()), codes.size(), id);
+      
       ++ id;
       
       if (counts_size == size_type(-1))
