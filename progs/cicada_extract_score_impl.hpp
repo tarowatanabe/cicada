@@ -1511,7 +1511,7 @@ public:
       const size_type cache_pos = hasher_type::operator()(key, node) & (caches_node.size() - 1);
       
       cache_node_type& cache = const_cast<cache_node_type&>(caches_node[cache_pos]);
-      if (cache.key != key || cache.node == 0) {
+      if (cache.key != key || cache.node != node || cache.node == 0) {
 	cache.key = key;
 	cache.node = node;
 	cache.next = index.find(&(*piter), sizeof(index_db_type::size_type), node);
