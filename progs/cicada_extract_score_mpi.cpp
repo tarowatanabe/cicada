@@ -761,6 +761,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  
 	  if (! device[rank]->test())
 	    boost::thread::yield();
+	  else
+	    found = true;
 	  
 	  if (debug >= 5)
 	    std::cerr << "modify counts mapper: " << modified.size() << std::endl;
@@ -771,10 +773,10 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  
 	  modified.clear();
 	  modified_set_type(modified).swap(modified);
-	} else
+	} else {
 	  stream[rank].reset();
-	
-	found = true;
+	  found = true;
+	}
       }
     
     found |= utils::mpi_terminate_devices(stream, device);
