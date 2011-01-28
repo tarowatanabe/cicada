@@ -1449,8 +1449,8 @@ public:
   };
   
   typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> >               cache_set_type;
-  typedef utils::array_power2<cache_prefix_type, 1024 * 8, std::allocator<cache_prefix_type> > cache_prefix_set_type;
-  typedef utils::array_power2<cache_node_type,   1024 * 32, std::allocator<cache_node_type> >  cache_node_set_type;
+  typedef utils::array_power2<cache_prefix_type, 1024 * 32, std::allocator<cache_prefix_type> > cache_prefix_set_type;
+  typedef utils::array_power2<cache_node_type,   1024 * 128, std::allocator<cache_node_type> >  cache_node_set_type;
   
   PhraseCounts() : counts_size(size_type(-1)) {}
   
