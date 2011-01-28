@@ -20,6 +20,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/array.hpp>
+#include <boost/tokenizer.hpp>
 
 #include <string>
 #include <vector>
@@ -37,6 +38,7 @@
 #include <cicada/alignment.hpp>
 #include <cicada/tree_rule.hpp>
 
+#include <utils/space_separator.hpp>
 #include <utils/tempfile.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/lockfree_list_queue.hpp>
@@ -49,9 +51,12 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/malloc_stats.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/byte_aligned_code.hpp>
+#include <utils/group_aligned_code.hpp>
 #include <utils/base64.hpp>
 
 #include <succinct_db/succinct_trie_db.hpp>
+#include <succinct_db/succinct_hash.hpp>
 
 #include <google/dense_hash_map>
 
@@ -1416,8 +1421,11 @@ public:
   typedef char     key_type;
   typedef uint64_t id_type;
   typedef double   count_type;
+
+  typedef std::vector<key_type, std::allocator<key_type> > code_set_type;
   
   typedef succinctdb::succinct_trie_db<key_type, id_type, std::allocator<std::pair<key_type, id_type> > > index_db_type;
+  typedef succinctdb::succinct_hash_mapped<key_type, std::allocator<key_type> > segment_db_type;
   typedef utils::map_file<count_type, std::allocator<count_type> > counts_db_type;
   
   typedef phrase_pair_type::counts_type count_set_type;
@@ -1426,41 +1434,42 @@ public:
   {
     index_db_type::size_type node;
     count_set_type           counts;
-
+    
     cache_type() : node(index_db_type::size_type(-1)), counts() {}
   };
   
-  struct cache_prefix_type
-  {
-    index_db_type::size_type key;
-    index_db_type::size_type node;
-    
-    cache_prefix_type() : key(), node(0) {}
-  };
-  
-  struct cache_node_type
-  {
-    index_db_type::size_type key;
-    index_db_type::size_type node;
-    index_db_type::size_type next;
-    
-    cache_node_type()
-      : key(), node(0), next(0) {}
-  };
-  
   typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> >               cache_set_type;
-  typedef utils::array_power2<cache_prefix_type, 1024 * 32, std::allocator<cache_prefix_type> > cache_prefix_set_type;
-  typedef utils::array_power2<cache_node_type,   1024 * 128, std::allocator<cache_node_type> >  cache_node_set_type;
   
   PhraseCounts() : counts_size(size_type(-1)) {}
   
   template <typename ExtractRoot>
   PhraseCounts(const path_set_type& paths, ExtractRoot extract_root) : counts_size(size_type(-1)) { open(paths, extract_root); }
   PhraseCounts(const path_type& path) : counts_size(size_type(-1)) { open(path); }
+
+  code_set_type codes_impl;
   
   const count_set_type& operator[](const phrase_type& phrase) const
   {
-    const index_db_type::size_type node = find(phrase);
+    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+
+    code_set_type& codes = const_cast<code_set_type&>(codes_impl);
+    
+    codes.resize(phrase.size() * 8);
+    tokenizer_type tokenizer(phrase);
+    
+    code_set_type::iterator citer = codes.begin();
+    tokenizer_type::iterator titer_end = tokenizer.end();
+    for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
+      const std::string& seg = *titer;
+      
+      const segment_db_type::pos_type id = segment.find(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0));
+      if (id == segment_db_type::npos())
+	throw std::runtime_error("no segment?: " + seg);
+      
+      citer += utils::byte_aligned_encode(id, &(*citer));
+    }
+    
+    const index_db_type::size_type node = index.find(&(*codes.begin()), citer - codes.begin());
     
     if (index.is_valid(node) && index.exists(node)) {
       const size_type cache_pos = hasher_type::operator()(node) & (caches.size() - 1);
@@ -1482,57 +1491,11 @@ public:
     }
   }
   
-  index_db_type::size_type find(const phrase_type& phrase) const
-  {
-    if (phrase.size() < sizeof(index_db_type::size_type))
-      return index.find(phrase.c_str(), phrase.size());
-    
-    index_db_type::size_type key;
-    std::copy(phrase.begin(), phrase.begin() + sizeof(index_db_type::size_type), (char*) &key);
-    
-    const size_type cache_pos = hasher_type::operator()(key) & (caches_prefix.size() - 1);
-    
-    cache_prefix_type& cache = const_cast<cache_prefix_type&>(caches_prefix[cache_pos]);
-    if (cache.key != key || cache.node == 0) {
-      cache.key = key;
-      cache.node = index.find(phrase.c_str(), sizeof(index_db_type::size_type));
-    }
-    
-    if (phrase.size() == sizeof(index_db_type::size_type) || ! index.is_valid(cache.node))
-      return cache.node;
-    
-    index_db_type::size_type node = cache.node;
-    phrase_type::const_iterator piter = phrase.begin() + sizeof(index_db_type::size_type);
-    phrase_type::const_iterator piter_end = phrase.end();
-    // iterate...
-    
-    while (piter + sizeof(index_db_type::size_type) <= piter_end) {
-      std::copy(piter, piter + sizeof(index_db_type::size_type), (char*) &key);
-      const size_type cache_pos = hasher_type::operator()(key, node) & (caches_node.size() - 1);
-      
-      cache_node_type& cache = const_cast<cache_node_type&>(caches_node[cache_pos]);
-      if (cache.key != key || cache.node != node || cache.node == 0) {
-	cache.key = key;
-	cache.node = node;
-	cache.next = index.find(&(*piter), sizeof(index_db_type::size_type), node);
-      }
-      node = cache.next;
-      if (! index.is_valid(node))
-	return node;
-      
-      piter += sizeof(index_db_type::size_type);
-    }
-    
-    if (piter != piter_end)
-      return index.find(&(*piter), piter_end - piter, node);
-    else
-      return node;
-  }
-  
   
   bool exists(const path_type& path) const
   {
     if (! utils::repository::exists(path)) return false;
+    if (! segment_db_type::exists(path / "segment")) return false;
     if (! index_db_type::exists(path / "index")) return false;
     if (! counts_db_type::exists(path / "counts")) return false;
     return true;
@@ -1544,6 +1507,7 @@ public:
 
     repository_type rep(path, repository_type::write);
     
+    segment.write(rep.path("segment"));
     index.write(rep.path("index"));
     counts.write(rep.path("counts"));
     
@@ -1566,6 +1530,7 @@ public:
       throw std::runtime_error("no counts size...");
     counts_size = boost::lexical_cast<size_type>(iter->second);
     
+    segment.open(rep.path("segment"));
     index.open(rep.path("index"));
     counts.open(rep.path("counts"));
   }
@@ -1621,13 +1586,18 @@ public:
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
 
+    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+    typedef succinctdb::succinct_hash<key_type, std::allocator<key_type> > segment_map_type;
+
     clear();
     
     const path_type tmp_dir = utils::tempfile::tmp_dir();
-    const path_type path_index = utils::tempfile::directory_name(tmp_dir / "cicada.extract.index.XXXXXX");
-    const path_type path_counts = utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX");
+    const path_type path_index   = utils::tempfile::directory_name(tmp_dir / "cicada.extract.index.XXXXXX");
+    const path_type path_segment = utils::tempfile::directory_name(tmp_dir / "cicada.extract.segment.XXXXXX");
+    const path_type path_counts  = utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX");
     
     utils::tempfile::insert(path_index);
+    utils::tempfile::insert(path_segment);
     utils::tempfile::insert(path_counts);
 
     index.open(path_index, index_db_type::WRITE);
@@ -1636,6 +1606,8 @@ public:
     boost::iostreams::filtering_ostream os_counts;
     os_counts.push(boost::iostreams::file_sink(path_counts.file_string()), 1024 * 1024);
     os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+
+    segment_map_type segment_map;
     
     pqueue_type pqueue;
     istream_ptr_set_type   istreams(paths.size());
@@ -1662,6 +1634,7 @@ public:
     
     root_count_set_type::iterator riter;
     
+    code_set_type codes;
     id_type id = 0;
     
     while (! pqueue.empty()) {
@@ -1673,7 +1646,22 @@ public:
       if (curr.source != modified.source) {
 	
 	if (! modified.source.empty() && ! modified.counts.empty()) {
-	  index.insert(modified.source.c_str(), modified.source.size(), id);
+	  //index.insert(modified.source.c_str(), modified.source.size(), id);
+	  
+	  codes.resize(modified.source.size() * 8);
+	  tokenizer_type tokenizer(modified.source);
+	  
+	  code_set_type::iterator citer = codes.begin();
+	  tokenizer_type::iterator titer_end = tokenizer.end();
+	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
+	    const std::string& seg = *titer;
+	    
+	    const segment_db_type::pos_type id = segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0));
+	    
+	    citer += utils::byte_aligned_encode(id, &(*citer));
+	  }
+	  
+	  index.insert(&(*codes.begin()), citer - codes.begin(), id);
 	  ++ id;
 
 	  if (counts_size == size_type(-1))
@@ -1717,7 +1705,21 @@ public:
     }
     
     if (! modified.source.empty() && ! modified.counts.empty()) {
-      index.insert(modified.source.c_str(), modified.source.size(), id);
+      //index.insert(modified.source.c_str(), modified.source.size(), id);
+      codes.resize(modified.source.size() * 8);
+      tokenizer_type tokenizer(modified.source);
+	  
+      code_set_type::iterator citer = codes.begin();
+      tokenizer_type::iterator titer_end = tokenizer.end();
+      for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
+	const std::string& seg = *titer;
+	    
+	const segment_db_type::pos_type id = segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0));
+	    
+	citer += utils::byte_aligned_encode(id, &(*citer));
+      }
+	  
+      index.insert(&(*codes.begin()), citer - codes.begin(), id);
       ++ id;
       
       if (counts_size == size_type(-1))
@@ -1729,45 +1731,48 @@ public:
       os_counts.write((char*) &observed, sizeof(count_type));
     }
     
+    segment_map.write(path_segment);
+
     index.clear();
     counts.clear();
     os_counts.pop();
     
     ::sync();
+    while (! segment_db_type::exists(path_segment))
+      boost::thread::yield();
     while (! index_db_type::exists(path_index))
       boost::thread::yield();
     while (! counts_db_type::exists(path_counts))
       boost::thread::yield();
 
     index.open(path_index);
+    segment.open(path_segment);
     counts.open(path_counts);
   }
   
   void clear()
   {
     counts_size = size_type(-1);
+    segment.clear();
     index.clear();
     counts.clear();
     root_counts.clear();
     counts_empty.clear();
     caches.clear();
-    caches_prefix.clear();
-    caches_node.clear();
   }
   
   size_type counts_size;
 
   modified_parser_type    parser;
   
-  index_db_type  index;
-  counts_db_type counts;
+  segment_db_type segment;
+  index_db_type   index;
+  counts_db_type  counts;
   root_count_set_type root_counts;
   
   count_set_type counts_empty;
   
   cache_set_type        caches;
-  cache_prefix_set_type caches_prefix;
-  cache_node_set_type   caches_node;
 };
 
 
@@ -2045,7 +2050,7 @@ struct PhrasePairScoreReducer
   {
     bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
     {
-      return x->first  > y->first;
+      return x->first > y->first;
     }
     
     bool operator()(const Tp* x, const Tp* y) const
