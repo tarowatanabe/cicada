@@ -79,6 +79,7 @@ namespace utils
     
     void clear() { first_ = 0; last_ = 0; }
     
+    // assign from piece
     void assign(const piece& str)
     {
       first_ = str.first_;
@@ -93,6 +94,7 @@ namespace utils
 	throw std::out_of_range("piece::assign");
     }
     
+    // assign from string
     void assign(const std::string& str)
     {
       first_ = str.c_str();
