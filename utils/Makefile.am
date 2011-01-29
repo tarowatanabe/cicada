@@ -15,7 +15,6 @@ libutils_la_SOURCES = \
 	icu_filter.cpp \
 	malloc_stats.cpp \
 	map_file_allocator.cpp \
-	piece.cpp \
 	tempfile.cpp
 
 libutils_la_LIBADD = \

@@ -36,7 +36,7 @@ namespace utils
     typedef const char& reference;
     typedef const char& const_reference;
 
-    static const size_type npos;
+    static const size_type npos = size_type(-1);
     
   public:
     piece() : first_(0), last_(0) {}
