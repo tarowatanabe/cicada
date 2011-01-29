@@ -40,13 +40,36 @@ namespace utils
     
   public:
     piece() : first_(0), last_(0) {}
+
+    // construct from piece
+    piece(const piece& str)
+      : first_(str.first_), last_(str.last_) {}
+    piece(const piece& str, size_type pos, size_type n = npos)
+      : first_(str.first_ + pos), last_(n == npos ? str.last_ : std::min(str.first_ + pos + n, str.last_))
+    {
+      if (first_ > str.last_)
+	throw std::out_of_range("piece::piece");
+    }
+    
+    // construc from string
+    piece(const std::string& str)
+      : first_(str.c_str()), last_(str.c_str() + str.size()) {}
+    piece(const std::string& str, size_type pos, size_type n = npos)
+      : first_(str.c_str() + pos), last_(n == npos ? str.c_str() + str.size() : std::min(str.c_str() + pos + n, str.c_str() + str.size()))
+    {
+      if (first_ > str.c_str() + str.size())
+	throw std::out_of_range("piece::piece");
+    }
+    
+    // consruct from bare string
     piece(const char* str) : first_(str), last_(str == 0 ? 0 : str + ::strlen(str)) {}
-    piece(const std::string& str) : first_(str.c_str()), last_(str.c_str() + str.size()) {}
     piece(const char* offset, const size_type len) : first_(offset), last_(offset + len) {}
+    
+    // construct by iterator
     piece(const char* __first, const char* __last) : first_(__first), last_(__last) {}
     piece(std::string::const_iterator __first, std::string::const_iterator __last)
       : first_(&(*__first)), last_(&(*__last)) {}
-
+    
     pointer data() const { return first_; }
     pointer c_str() const { return first_; }
     
@@ -55,24 +78,49 @@ namespace utils
     size_type length() const { return last_ - first_; }
     
     void clear() { first_ = 0; last_ = 0; }
-
-    void assign(const char* str)
+    
+    void assign(const piece& str)
     {
-      first_ = str;
-      last_  = (str == 0 ? 0 : str + ::strlen(str));
+      first_ = str.first_;
+      last_  = str.last_;
     }
+    void assign(const piece& str, size_type pos, size_type n = npos)
+    {
+      first_ = str.first_ + pos;
+      last_  = (n == npos ? str.last_ : std::min(str.first_ + pos + n, str.last_));
+
+      if (first_ > str.last_)
+	throw std::out_of_range("piece::assign");
+    }
+    
     void assign(const std::string& str)
     {
       first_ = str.c_str();
       last_  = str.c_str() + str.size();
     }
+    void assign(const std::string& str, size_type pos, size_type n = npos)
+    {
+      first_ = str.c_str() + pos;
+      last_  = (n == npos ? str.c_str() + str.size() : std::min(str.c_str() + pos + n, str.c_str() + str.size()));
+
+      if (first_ > str.c_str() + str.size())
+	throw std::out_of_range("piece::assign");
+    }
     
+    
+    // assignment by bare string
+    void assign(const char* str)
+    {
+      first_ = str;
+      last_  = (str == 0 ? 0 : str + ::strlen(str));
+    }
     void assign(const char* offset, const size_type len)
     {
       first_ = offset;
       last_  = offset + len;
     }
     
+    // assignment by iterators
     void assign(const char* __first, const char* __last)
     {
       first_ = __first;
