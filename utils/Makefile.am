@@ -15,6 +15,7 @@ libutils_la_SOURCES = \
 	icu_filter.cpp \
 	malloc_stats.cpp \
 	map_file_allocator.cpp \
+	piece.cpp \
 	tempfile.cpp
 
 libutils_la_LIBADD = \
@@ -73,6 +74,7 @@ mpi_stream.hpp \
 mpi_traits.hpp \
 packed_device.hpp \
 packed_vector.hpp \
+piece.hpp \
 program_options.hpp \
 regex_group.hpp \
 repository.hpp \
@@ -117,6 +119,7 @@ sample_lockfree_queue \
 sample_malloc_stats \
 sample_map_file_allocator \
 sample_packed_vector \
+sample_piece \
 sample_program_options \
 sample_simple_vector \
 sample_sparse_map \
@@ -213,6 +216,9 @@ sample_map_file_allocator_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIB
 sample_packed_vector_SOURCES = sample_packed_vector.cpp
 sample_packed_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)
 sample_packed_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(LIBUTILS)
+
+sample_piece_SOURCES = sample_piece.cpp
+sample_piece_LDADD = $(LIBUTILS)
 
 sample_program_options_SOURCES = sample_program_options.cpp
 sample_program_options_LDADD = $(BOOST_PROGRAM_OPTIONS_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LIBS)

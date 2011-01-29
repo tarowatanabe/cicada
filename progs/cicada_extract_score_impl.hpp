@@ -1446,17 +1446,14 @@ public:
   template <typename ExtractRoot>
   PhraseCounts(const path_set_type& paths, ExtractRoot extract_root) : counts_size(size_type(-1)) { open(paths, extract_root); }
   PhraseCounts(const path_type& path) : counts_size(size_type(-1)) { open(path); }
-
-  code_set_type codes_impl;
   
   const count_set_type& operator[](const phrase_type& phrase) const
   {
     typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
-    code_set_type& codes = const_cast<code_set_type&>(codes_impl);
-    codes.clear();
     
     tokenizer_type tokenizer(phrase);
+    
+    index_db_type::size_type node = 0;
     
     tokenizer_type::iterator titer_end = tokenizer.end();
     for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
@@ -1466,29 +1463,27 @@ public:
       if (id == segment_db_type::npos())
 	throw std::runtime_error("no segment?: " + seg);
       
-      codes.push_back(id);
+      node = index.find(&id, 1, node);
+      if (! index.is_valid(node))
+	throw std::runtime_error("no phrase?: " + phrase + " at segment: " + seg);
     }
+
+    if (! index.exists(node))
+      throw std::runtime_error("no phrase?: " + phrase);
     
-    const index_db_type::size_type node = index.find(&(*codes.begin()), codes.size());
-    
-    if (index.is_valid(node) && index.exists(node)) {
-      const size_type cache_pos = hasher_type::operator()(node) & (caches.size() - 1);
-      cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
-      if (cache.node != node || cache.counts.empty()) {
-	cache.node = node;
-	
-	const id_type id = index[node];
-	
-	cache.counts.clear();
-	cache.counts.reserve(counts_size + 1);
-	cache.counts.resize(counts_size + 1, 0.0);
-	std::copy(counts.begin() + id * (counts_size + 1), counts.begin() + (id + 1) * (counts_size + 1), cache.counts.begin());
-      }
-      return cache.counts;
-    } else {
-      const_cast<count_set_type&>(counts_empty).resize(counts.size(), 0.0);
-      return counts_empty;
+    const size_type cache_pos = hasher_type::operator()(node) & (caches.size() - 1);
+    cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
+    if (cache.node != node || cache.counts.empty()) {
+      cache.node = node;
+      
+      const id_type id = index[node];
+      
+      cache.counts.clear();
+      cache.counts.reserve(counts_size + 1);
+      cache.counts.resize(counts_size + 1, 0.0);
+      std::copy(counts.begin() + id * (counts_size + 1), counts.begin() + (id + 1) * (counts_size + 1), cache.counts.begin());
     }
+    return cache.counts;
   }
   
   
@@ -1715,7 +1710,6 @@ public:
       }
 	  
       index.insert(&(*codes.begin()), codes.size(), id);
-      
       ++ id;
       
       if (counts_size == size_type(-1))
