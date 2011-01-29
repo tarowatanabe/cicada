@@ -10,6 +10,8 @@
 #include <vector>
 #include <iostream>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
   struct Parameter
@@ -49,20 +51,20 @@ namespace cicada
     bool empty() const { return __values.empty(); }
     size_type size() const { return __values.size(); }
     
-    const_iterator find(const std::string& key) const
+    const_iterator find(const utils::piece& key) const
     {
       for (const_iterator iter = begin(); iter != end(); ++ iter)
-	if (iter->first == key)
+	if (utils::piece(iter->first) == key)
 	  return iter;
       return end();
     }
 
-    void erase(const std::string& key) 
+    void erase(const utils::piece& key) 
     {
       while (! __values.empty()) {
 	bool found = false;
 	for (value_set_type::iterator iter = __values.begin(); iter != __values.end(); ++ iter)
-	  if (iter->first == key) {
+	  if (utils::piece(iter->first) == key) {
 	    __values.erase(iter);
 	    found = true;
 	    break;

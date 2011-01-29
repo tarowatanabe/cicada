@@ -18,7 +18,7 @@
 #include <utils/indexed_set.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/spinlock.hpp>
-
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -61,6 +61,7 @@ namespace cicada
     
     const id_type   id() const { return __id; }
     operator const feature_type&() const { return feature(); }
+    operator utils::piece() const { return feature(); }
     
     const feature_type& feature() const
     {

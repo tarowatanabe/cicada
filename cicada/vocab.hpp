@@ -21,6 +21,7 @@
 #include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/array_power2.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {  
@@ -156,7 +157,7 @@ namespace cicada
       return find(id);
     }
     
-    bool exists(const std::string& word) const
+    bool exists(const utils::piece& word) const
     {
       const hash_value_type hash_value = __hasher(word.begin(), word.end(), 0);
       
