@@ -19,6 +19,7 @@
 #include <stdexcept>
 
 #include <utils/hashmurmur.hpp>
+#include <utils/bithack.hpp>
 
 namespace utils
 {
@@ -168,6 +169,24 @@ namespace utils
       
       return basic_piece(first, last);
     }
+
+    int compare(const basic_piece& x) const
+    {
+      const size_type __x = size();
+      const size_type __y = x.size();
+
+      int __result = traits_type::compare(data(), x.data(), utils::bithack::min(__x, __y));
+      if (__result)
+	return __result;
+      else {
+	if (__x > __y)
+	  return 1;
+	else if (__x < __y)
+	  return -1;
+	else
+	  return 0;
+      }
+    }
     
   private:
     const_iterator first_;
@@ -185,9 +204,9 @@ namespace utils
   inline
   bool operator==(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin(), _T::eq);
+    return x.compare(y) == 0;
   }
-  
+    
   template <typename _T>
   inline
   bool operator!=(const basic_piece<_T>& x, const basic_piece<_T>& y)
@@ -199,7 +218,7 @@ namespace utils
   inline
   bool operator<(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end(), _T::lt);
+    return x.compare(y) < 0;
   }
   
   template <typename _T>
@@ -208,6 +227,7 @@ namespace utils
   {
     return y < x;
   }
+  
   
   template <typename _T>
   inline
@@ -223,6 +243,91 @@ namespace utils
     return ! (x < y);
   }
   
+  
+  template <typename _T>
+  inline
+  bool operator==(const basic_piece<_T>& x, const char* y)
+  {
+    return x == basic_piece<_T>(y);
+  }
+  
+  template <typename _T>
+  inline
+  bool operator!=(const basic_piece<_T>& x, const char* y)
+  {
+    return x != basic_piece<_T>(y);
+  }
+
+  template <typename _T>
+  inline
+  bool operator<(const basic_piece<_T>& x, const char* y)
+  {
+    return x < basic_piece<_T>(y);
+  }
+  
+  template <typename _T>
+  inline
+  bool operator>(const basic_piece<_T>& x, const char* y)
+  {
+    return x > basic_piece<_T>(y);
+  }
+
+  template <typename _T>
+  inline
+  bool operator<=(const basic_piece<_T>& x, const char* y)
+  {
+    return x <= basic_piece<_T>(y);
+  }
+
+  template <typename _T>
+  inline
+  bool operator>=(const basic_piece<_T>& x, const char* y)
+  {
+    return x >= basic_piece<_T>(y);
+  }
+  
+  template <typename _T>
+  inline
+  bool operator==(const basic_piece<_T>& x, const std::string& y)
+  {
+    return x == basic_piece<_T>(y);
+  }
+  
+  template <typename _T>
+  inline
+  bool operator!=(const basic_piece<_T>& x, const std::string& y)
+  {
+    return x != basic_piece<_T>(y);
+  }
+
+  template <typename _T>
+  inline
+  bool operator<(const basic_piece<_T>& x, const std::string& y)
+  {
+    return x < basic_piece<_T>(y);
+  }
+  
+  template <typename _T>
+  inline
+  bool operator>(const basic_piece<_T>& x, const std::string& y)
+  {
+    return x > basic_piece<_T>(y);
+  }
+
+  template <typename _T>
+  inline
+  bool operator<=(const basic_piece<_T>& x, const std::string& y)
+  {
+    return x <= basic_piece<_T>(y);
+  }
+
+  template <typename _T>
+  inline
+  bool operator>=(const basic_piece<_T>& x, const std::string& y)
+  {
+    return x >= basic_piece<_T>(y);
+  }
+  
   template <typename _T>
   inline
   std::ostream& operator<<(std::ostream& os, const basic_piece<_T>& x)
@@ -233,16 +338,11 @@ namespace utils
   
   struct __piece_ichar_traits
   {
-    static bool eq(const char& x, const char& y)
+    static int compare(const char* x, const char* y, size_t n)
     {
-      return tolower(x) == tolower(y);
+      return ::strncasecmp(x, y, n);
     }
-    
-    static bool lt(const char& x, const char& y)
-    {
-      return tolower(x) < tolower(y);
-    }
-    
+
   };
 
   typedef basic_piece<std::char_traits<char> > piece;

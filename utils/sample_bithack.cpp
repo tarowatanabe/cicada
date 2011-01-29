@@ -12,6 +12,9 @@ int main(int argc, char** argv)
 {
   std::cout << utils::bithack::min(-56, 72) << std::endl;
   std::cout << utils::bithack::max(-56, 72) << std::endl;
+  
+  std::cout << utils::bithack::min(size_t(-56), size_t(72)) << std::endl;
+  std::cout << utils::bithack::max(size_t(-56), size_t(72)) << std::endl;
 
   std::cout << utils::bithack::min(56, 72) << std::endl;
   std::cout << utils::bithack::max(56, 72) << std::endl;

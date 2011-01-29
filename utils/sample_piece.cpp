@@ -28,5 +28,16 @@ int main(int argc, char** argv)
     std::cout << "token1: " << *iter << " base: " << (void*) (*iter).c_str() << " cast: " << static_cast<std::string>(*iter) << std::endl;
   for (tokenizer_type::iterator iter = tokens2.begin(); iter != tokens2.end(); ++ iter)
     std::cout << "token2: " << *iter << " base: " << (void*) (*iter).c_str() << " cast: " << static_cast<std::string>(*iter) << std::endl;
+
+  const char* str3 = "Good";
+  const char* str4 = "GOOD";
+
+  std::cout << "less: " << (utils::piece(str3) < str4) << std::endl
+	    << "greater: " << (utils::piece(str3) > str4) << std::endl
+	    << "equal: " << (utils::piece(str3) == str4) << std::endl;
+  
+  std::cout << "less: " << (utils::ipiece(str3) < str4) << std::endl
+	    << "greater: " << (utils::ipiece(str3) > str4) << std::endl
+	    << "equal: " << (utils::ipiece(str3) == str4) << std::endl;
   
 }
