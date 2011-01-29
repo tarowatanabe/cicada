@@ -12,6 +12,7 @@
 
 #include <string>
 #include <cstring>
+#include <cctype>
 #include <iterator>
 #include <algorithm>
 #include <iostream>
@@ -21,9 +22,12 @@
 
 namespace utils
 {
-  class piece
+  template <typename _Traits>
+  class basic_piece
   {
   public:
+    typedef _Traits   traits_type;
+    
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
 
@@ -36,38 +40,43 @@ namespace utils
     typedef const char& reference;
     typedef const char& const_reference;
 
-    static const size_type npos = size_type(-1);
+    static const size_type npos()
+    {
+      return size_type(-1);
+    }
     
   public:
-    piece() : first_(0), last_(0) {}
-
-    // construct from piece
-    piece(const piece& str)
+    basic_piece() : first_(0), last_(0) {}
+    
+    // construct from basic_piece
+    template <typename _T>
+    basic_piece(const basic_piece<_T>& str)
       : first_(str.first_), last_(str.last_) {}
-    piece(const piece& str, size_type pos, size_type n = npos)
-      : first_(str.first_ + pos), last_(n == npos ? str.last_ : std::min(str.first_ + pos + n, str.last_))
+    template <typename _T>
+    basic_piece(const basic_piece<_T>& str, size_type pos, size_type n = npos())
+      : first_(str.first_ + pos), last_(n == npos() ? str.last_ : std::min(str.first_ + pos + n, str.last_))
     {
       if (first_ > str.last_)
-	throw std::out_of_range("piece::piece");
+	throw std::out_of_range("basic_piece::basic_piece");
     }
     
     // construc from string
-    piece(const std::string& str)
+    basic_piece(const std::string& str)
       : first_(str.c_str()), last_(str.c_str() + str.size()) {}
-    piece(const std::string& str, size_type pos, size_type n = npos)
-      : first_(str.c_str() + pos), last_(n == npos ? str.c_str() + str.size() : std::min(str.c_str() + pos + n, str.c_str() + str.size()))
+    basic_piece(const std::string& str, size_type pos, size_type n = npos())
+      : first_(str.c_str() + pos), last_(n == npos() ? str.c_str() + str.size() : std::min(str.c_str() + pos + n, str.c_str() + str.size()))
     {
       if (first_ > str.c_str() + str.size())
-	throw std::out_of_range("piece::piece");
+	throw std::out_of_range("basic_piece::basic_piece");
     }
     
     // consruct from bare string
-    piece(const char* str) : first_(str), last_(str == 0 ? 0 : str + ::strlen(str)) {}
-    piece(const char* offset, const size_type len) : first_(offset), last_(offset + len) {}
+    basic_piece(const char* str) : first_(str), last_(str == 0 ? 0 : str + ::strlen(str)) {}
+    basic_piece(const char* offset, const size_type len) : first_(offset), last_(offset + len) {}
     
     // construct by iterator
-    piece(const char* __first, const char* __last) : first_(__first), last_(__last) {}
-    piece(std::string::const_iterator __first, std::string::const_iterator __last)
+    basic_piece(const char* __first, const char* __last) : first_(__first), last_(__last) {}
+    basic_piece(std::string::const_iterator __first, std::string::const_iterator __last)
       : first_(&(*__first)), last_(&(*__last)) {}
     
     pointer data() const { return first_; }
@@ -79,19 +88,21 @@ namespace utils
     
     void clear() { first_ = 0; last_ = 0; }
     
-    // assign from piece
-    void assign(const piece& str)
+    // assign from basic_piece
+    template <typename _T>
+    void assign(const basic_piece<_T>& str)
     {
       first_ = str.first_;
       last_  = str.last_;
     }
-    void assign(const piece& str, size_type pos, size_type n = npos)
+    template <typename _T>
+    void assign(const basic_piece<_T>& str, size_type pos, size_type n = npos())
     {
       first_ = str.first_ + pos;
-      last_  = (n == npos ? str.last_ : std::min(str.first_ + pos + n, str.last_));
+      last_  = (n == npos() ? str.last_ : std::min(str.first_ + pos + n, str.last_));
 
       if (first_ > str.last_)
-	throw std::out_of_range("piece::assign");
+	throw std::out_of_range("basic_piece::assign");
     }
     
     // assign from string
@@ -100,13 +111,13 @@ namespace utils
       first_ = str.c_str();
       last_  = str.c_str() + str.size();
     }
-    void assign(const std::string& str, size_type pos, size_type n = npos)
+    void assign(const std::string& str, size_type pos, size_type n = npos())
     {
       first_ = str.c_str() + pos;
-      last_  = (n == npos ? str.c_str() + str.size() : std::min(str.c_str() + pos + n, str.c_str() + str.size()));
+      last_  = (n == npos() ? str.c_str() + str.size() : std::min(str.c_str() + pos + n, str.c_str() + str.size()));
 
       if (first_ > str.c_str() + str.size())
-	throw std::out_of_range("piece::assign");
+	throw std::out_of_range("basic_piece::assign");
     }
     
     
@@ -147,15 +158,15 @@ namespace utils
     size_type max_size() const { return last_ - first_; }
     size_type capacity() const { return last_ - first_; }
     
-    piece substr(size_type pos = 0, size_type n = npos) const
+    basic_piece substr(size_type pos = 0, size_type n = npos()) const
     {
       const_iterator first = first_ + pos;
-      const_iterator last  = (n == npos ? last_ : std::min(first_ + pos + n, last_));
+      const_iterator last  = (n == npos() ? last_ : std::min(first_ + pos + n, last_));
       
       if (first > last_)
-	throw std::out_of_range("piece::substr");
+	throw std::out_of_range("basic_piece::substr");
       
-      return piece(first, last);
+      return basic_piece(first, last);
     }
     
   private:
@@ -163,54 +174,79 @@ namespace utils
     const_iterator last_;
   };
   
+  template <typename _T>
   inline
-  size_t hash_value(piece const& x)
+  size_t hash_value(basic_piece<_T> const& x)
   {
     return utils::hashmurmur<size_t>()(x.begin(), x.end(), 0);
   }
 
+  template <typename _T>
   inline
-  bool operator==(const piece& x, const piece& y)
+  bool operator==(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin());
+    return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin(), _T::eq);
   }
   
+  template <typename _T>
   inline
-  bool operator!=(const piece& x, const piece& y)
+  bool operator!=(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
     return ! (x == y);
   }
   
+  template <typename _T>
   inline
-  bool operator<(const piece& x, const piece& y)
+  bool operator<(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());
+    return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end(), _T::lt);
   }
   
+  template <typename _T>
   inline
-  bool operator>(const piece& x, const piece& y)
+  bool operator>(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
     return y < x;
   }
   
+  template <typename _T>
   inline
-  bool operator<=(const piece& x, const piece& y)
+  bool operator<=(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
     return ! (y < x);
   }
   
+  template <typename _T>
   inline
-  bool operator>=(const piece& x, const piece& y)
+  bool operator>=(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
     return ! (x < y);
   }
   
+  template <typename _T>
   inline
-  std::ostream& operator<<(std::ostream& os, const piece& x)
+  std::ostream& operator<<(std::ostream& os, const basic_piece<_T>& x)
   {
     return os.write(x.c_str(), x.size());
   }
   
+  
+  struct __piece_ichar_traits
+  {
+    static bool eq(const char& x, const char& y)
+    {
+      return tolower(x) == tolower(y);
+    }
+    
+    static bool lt(const char& x, const char& y)
+    {
+      return tolower(x) < tolower(y);
+    }
+    
+  };
+
+  typedef basic_piece<std::char_traits<char> > piece;
+  typedef basic_piece<__piece_ichar_traits > ipiece;
 };
 
 #endif
