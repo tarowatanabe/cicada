@@ -123,7 +123,7 @@ sb: skip bigram\n\
       return desc;
     }
     
-    Scorer::scorer_ptr_type Scorer::create(const std::string& parameter)
+    Scorer::scorer_ptr_type Scorer::create(const utils::piece& parameter)
     {
       typedef cicada::Parameter parameter_type;
       typedef boost::filesystem::path path_type;

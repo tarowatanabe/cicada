@@ -36,7 +36,7 @@ namespace cicada
     Matcher(const Matcher& x) {}
     
   public:
-    static Matcher&    create(const std::string& parameter);
+    static Matcher&    create(const utils::piece& parameter);
     static const char* lists();
     
   public:

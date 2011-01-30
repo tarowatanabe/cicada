@@ -34,7 +34,7 @@ namespace cicada
     typedef value_set_type::const_iterator const_iterator;
       
   public:
-    Parameter(const std::string& parameter)
+    Parameter(const utils::piece& parameter)
       : __attr(), __values()  { parse(parameter); }
     Parameter() : __attr(), __values() {}
     
@@ -79,7 +79,7 @@ namespace cicada
     std::ostream& operator<<(std::ostream& os, const Parameter& x);
       
   private:
-    void parse(const std::string& parameter);
+    void parse(const utils::piece& parameter);
       
   private:
     attribute_type __attr;

@@ -16,7 +16,7 @@
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
-
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -235,7 +235,7 @@ namespace cicada
     
     
   public:
-    static HeadFinder& create(const std::string& parameter);
+    static HeadFinder& create(const utils::piece& parameter);
     static const char* lists();
 
     const std::string& algorithm() const { return __algorithm; }

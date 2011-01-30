@@ -67,9 +67,9 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, parameter_parsed_type(), space_type> parameter;
   };
   
-  void Parameter::parse(const std::string& parameter)
+  void Parameter::parse(const utils::piece& parameter)
   {
-    typedef std::string::const_iterator iter_type;
+    typedef utils::piece::const_iterator iter_type;
     typedef parameter_parser<iter_type> parser_type;
     
     __attr.clear();

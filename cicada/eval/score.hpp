@@ -165,7 +165,7 @@ namespace cicada
       virtual scorer_ptr_type clone() const = 0;
       
       static const char*     lists();
-      static scorer_ptr_type create(const std::string& parameter);
+      static scorer_ptr_type create(const utils::piece& parameter);
 
       void tokenize(const sentence_type& source, sentence_type& tokenized) const
       {

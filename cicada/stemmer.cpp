@@ -68,7 +68,7 @@ lower: lower casing\n\
   static utils::thread_specific_ptr<stemmer_map_type> __stemmers;
 #endif
   
-  Stemmer& Stemmer::create(const std::string& parameter)
+  Stemmer& Stemmer::create(const utils::piece& parameter)
   {
     typedef cicada::Parameter parameter_type;
 

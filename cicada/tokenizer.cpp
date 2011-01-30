@@ -70,7 +70,7 @@ tokenize: use the chain of tokenization\n\
   static utils::thread_specific_ptr<tokenizer_map_type> __tokenizers;
 #endif
   
-  Tokenizer& Tokenizer::create(const std::string& parameter)
+  Tokenizer& Tokenizer::create(const utils::piece& parameter)
   {
     typedef cicada::Parameter parameter_type;
 

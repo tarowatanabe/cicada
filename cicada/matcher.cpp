@@ -60,7 +60,7 @@ wordnet: matching by wordnet synsets\n\
 #endif
 
   
-  Matcher& Matcher::create(const std::string& parameter)
+  Matcher& Matcher::create(const utils::piece& parameter)
   {
     typedef cicada::Parameter parameter_type;
     

@@ -12,6 +12,8 @@
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
   class Stemmer
@@ -36,7 +38,7 @@ namespace cicada
     Stemmer(const Stemmer& x) {}
     
   public:
-    static Stemmer&    create(const std::string& parameter);
+    static Stemmer&    create(const utils::piece& parameter);
     static const char* lists();
     
   public:

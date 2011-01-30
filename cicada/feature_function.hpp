@@ -23,6 +23,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
   class FeatureFunction
@@ -67,7 +69,7 @@ namespace cicada
 
   public:
     
-    static feature_function_ptr_type create(const std::string& parameter);
+    static feature_function_ptr_type create(const utils::piece& parameter);
     static const char*               lists();
     
   public:

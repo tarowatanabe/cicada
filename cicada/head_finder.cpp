@@ -55,7 +55,7 @@ chinese: Chinese head finder\n\
   static utils::thread_specific_ptr<finder_map_type> __finders;
 #endif
 
-  HeadFinder& HeadFinder::create(const std::string& parameter)
+  HeadFinder& HeadFinder::create(const utils::piece& parameter)
   {    
     typedef cicada::Parameter parameter_type;
 

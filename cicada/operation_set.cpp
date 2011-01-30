@@ -153,43 +153,44 @@ output: kbest or hypergraph output\n\
     
     parameter_set_type::const_iterator piter_end = parameters.end();
     for (parameter_set_type::const_iterator piter = parameters.begin(); piter != piter_end; ++ piter) {
-      param_type param(*piter);
+      const param_type param(*piter);
+      const utils::ipiece param_name(param.name());
       
-      if (utils::ipiece(param.name()) == "binarize")
+      if (param_name == "binarize")
 	operations.push_back(operation_ptr_type(new operation::Binarize(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "permute")
+      else if (param_name == "permute")
 	operations.push_back(operation_ptr_type(new operation::Permute(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "clear")
+      else if (param_name == "clear")
 	operations.push_back(operation_ptr_type(new operation::Clear(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "compose-tree")
+      else if (param_name == "compose-tree")
 	operations.push_back(operation_ptr_type(new operation::ComposeTree(*piter, tree_grammar, grammar, goal, non_terminal, insertion, deletion, fallback, debug)));
-      else if (utils::ipiece(param.name()) == "compose-earley")
+      else if (param_name == "compose-earley")
 	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
-      else if (utils::ipiece(param.name()) == "compose-cky")
+      else if (param_name == "compose-cky")
 	operations.push_back(operation_ptr_type(new operation::ComposeCKY(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
-      else if (utils::ipiece(param.name()) == "compose-phrase")
+      else if (param_name == "compose-phrase")
 	operations.push_back(operation_ptr_type(new operation::ComposePhrase(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
-      else if (utils::ipiece(param.name()) == "compose-alignment")
+      else if (param_name == "compose-alignment")
 	operations.push_back(operation_ptr_type(new operation::ComposeAlignment(*piter, grammar, goal, non_terminal, debug)));
-      else if (utils::ipiece(param.name()) == "generate-earley")
+      else if (param_name == "generate-earley")
 	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
-      else if (utils::ipiece(param.name()) == "apply")
+      else if (param_name == "apply")
 	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
-      else if (utils::ipiece(param.name()) == "prune")
+      else if (param_name == "prune")
 	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "span-forest")
+      else if (param_name == "span-forest")
 	operations.push_back(operation_ptr_type(new operation::SpanForest(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "sort-tail")
+      else if (param_name == "sort-tail")
 	operations.push_back(operation_ptr_type(new operation::SortTail(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "intersect")
+      else if (param_name == "intersect")
 	operations.push_back(operation_ptr_type(new operation::Intersect(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "normalize")
+      else if (param_name == "normalize")
 	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "remove-epsilon")
+      else if (param_name == "remove-epsilon")
 	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "expected-ngram")
+      else if (param_name == "expected-ngram")
 	operations.push_back(operation_ptr_type(new operation::ExpectedNGram(*piter, debug)));
-      else if (utils::ipiece(param.name()) == "output") {
+      else if (param_name == "output") {
 	// we do extra checking so that all the output directed to either the same directory or output-file
 	std::auto_ptr<operation::Output> output(new operation::Output(*piter, output_data, debug));
 	

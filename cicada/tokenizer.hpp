@@ -10,6 +10,8 @@
 
 #include <cicada/sentence.hpp>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
 
@@ -53,7 +55,7 @@ namespace cicada
     const std::string& algorithm() const { return __algorithm; }
     
   public:
-    static Tokenizer&  create(const std::string& parameter);
+    static Tokenizer&  create(const utils::piece& parameter);
     static const char* lists();
     
   protected:
