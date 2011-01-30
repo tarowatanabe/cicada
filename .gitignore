@@ -10,3 +10,7 @@
 
 ## ignore backup
 *~
+
+### makefiles
+Makefile
+Makefile.in
