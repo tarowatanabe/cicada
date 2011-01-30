@@ -13,6 +13,7 @@
 
 #include "utils/compact_trie_dense.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -299,7 +300,7 @@ namespace cicada
     parameter_type::iterator piter_end = param.end();
     for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
       
-      if (strcasecmp(piter->first.c_str(), "max-span") == 0) {
+      if (utils::ipiece(piter->first) == "max-span") {
 	max_span = boost::lexical_cast<int>(piter->second);
 	continue;
       }

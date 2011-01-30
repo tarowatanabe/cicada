@@ -23,6 +23,7 @@
 
 #include "utils/config.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/filesystem.hpp>
 
@@ -139,21 +140,21 @@ sb: skip bigram\n\
 	std::vector<double, std::allocator<double> > weights;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "error") == 0)
+	  if (utils::ipiece(piter->first) == "error")
 	    error = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "reward") == 0)
+	  else if (utils::ipiece(piter->first) == "reward")
 	    reward = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "metric") == 0)
+	  else if (utils::ipiece(piter->first) == "metric")
 	    metrics.push_back(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "weight") == 0)
+	  else if (utils::ipiece(piter->first) == "weight")
 	    weights.push_back(boost::lexical_cast<double>(piter->second));
 	  else
 	    std::cerr << "WARNING: unsupported parameter for combined: " << piter->first << "=" << piter->second << std::endl;
 	}
-
+	
 	if (int(error) + reward != 1)
 	  throw std::runtime_error("specify whether this is error or reward metric");
-
+	
 	if (metrics.empty())
 	  throw std::runtime_error("no metrics?");
 	if (weights.empty())
@@ -183,22 +184,22 @@ sb: skip bigram\n\
 	path_type   refset_file;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "order") == 0)
+	  if (utils::ipiece(piter->first) == "order")
 	    order = boost::lexical_cast<int>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "exact") == 0)
+	  else if (utils::ipiece(piter->first) == "exact")
 	    exact = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  else if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	  else if (utils::ipiece(piter->first) == "name")
 	    name = piter->second;
-	  else if (strcasecmp(piter->first.c_str(), "refset") == 0)
+	  else if (utils::ipiece(piter->first) == "refset")
 	    refset_file = piter->second;
-	  else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	    const std::string& yield = piter->second;
+	  else if (utils::ipiece(piter->first) == "yield") {
+	    const utils::ipiece yield = piter->second;
 	    
-	    if (strcasecmp(yield.c_str(), "source") == 0)
+	    if (yield == "source")
 	      yield_source = true;
-	    else if (strcasecmp(yield.c_str(), "target") == 0)
+	    else if (yield == "target")
 	      yield_target = true;
 	    else
 	      throw std::runtime_error("unknown parameter: " + parameter);
@@ -213,7 +214,7 @@ sb: skip bigram\n\
 	const tokenizer_type* tokenizer = 0;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for per: " << piter->first << "=" << piter->second << std::endl;
@@ -228,17 +229,17 @@ sb: skip bigram\n\
 	WERScorer::weights_type weights;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "matcher") == 0)
+	  else if (utils::ipiece(piter->first) == "matcher")
 	    matcher = &Matcher::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "match") == 0)
+	  else if (utils::ipiece(piter->first) == "match")
 	    weights.match = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "substitution") == 0)
+	  else if (utils::ipiece(piter->first) == "substitution")
 	    weights.substitution = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "insertion") == 0)
+	  else if (utils::ipiece(piter->first) == "insertion")
 	    weights.insertion = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "deletion") == 0)
+	  else if (utils::ipiece(piter->first) == "deletion")
 	    weights.deletion = boost::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for wer: " << piter->first << "=" << piter->second << std::endl;
@@ -253,19 +254,19 @@ sb: skip bigram\n\
 	TERScorer::weights_type weights;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "matcher") == 0)
+	  else if (utils::ipiece(piter->first) == "matcher")
 	    matcher = &Matcher::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "match") == 0)
+	  else if (utils::ipiece(piter->first) == "match")
 	    weights.match = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "substitution") == 0)
+	  else if (utils::ipiece(piter->first) == "substitution")
 	    weights.substitution = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "insertion") == 0)
+	  else if (utils::ipiece(piter->first) == "insertion")
 	    weights.insertion = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "deletion") == 0)
+	  else if (utils::ipiece(piter->first) == "deletion")
 	    weights.deletion = boost::lexical_cast<double>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "shift") == 0)
+	  else if (utils::ipiece(piter->first) == "shift")
 	    weights.shift = boost::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for ter: " << piter->first << "=" << piter->second << std::endl;
@@ -280,11 +281,11 @@ sb: skip bigram\n\
 	const tokenizer_type* tokenizer = 0;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "p") == 0)
+	  else if (utils::ipiece(piter->first) == "p")
 	    p = boost::lexical_cast<int>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "decay") == 0)
+	  else if (utils::ipiece(piter->first) == "decay")
 	    decay = boost::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for sk: " << piter->first << "=" << piter->second << std::endl;
@@ -298,9 +299,9 @@ sb: skip bigram\n\
 	const tokenizer_type* tokenizer = 0;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "alpha") == 0)
+	  else if (utils::ipiece(piter->first) == "alpha")
 	    alpha = boost::lexical_cast<double>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for wlcs: " << piter->first << "=" << piter->second << std::endl;
@@ -314,9 +315,9 @@ sb: skip bigram\n\
 	const tokenizer_type* tokenizer = 0;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "window") == 0)
+	  else if (utils::ipiece(piter->first) == "window")
 	    window = boost::lexical_cast<int>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for sb: " << piter->first << "=" << piter->second << std::endl;

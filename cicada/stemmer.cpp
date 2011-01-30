@@ -15,6 +15,7 @@
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
+#include <utils/piece.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -89,7 +90,7 @@ lower: lower casing\n\
     if (param.name() == "prefix") {
       int size = 0;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "size") == 0)
+	if (utils::ipiece(piter->first) == "size")
 	  size = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "unsupported parameter for prefix stemmer: " << piter->first << "=" << piter->second << std::endl;
@@ -110,7 +111,7 @@ lower: lower casing\n\
     } else if (param.name() == "suffix") {
       int size = 0;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "size") == 0)
+	if (utils::ipiece(piter->first) == "size")
 	  size = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "unsupported parameter for suffix stemmer: " << piter->first << "=" << piter->second << std::endl;
@@ -173,9 +174,9 @@ lower: lower casing\n\
       std::string language;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "lang") == 0
-	    || strcasecmp(piter->first.c_str(), "language") == 0
-	    || strcasecmp(piter->first.c_str(), "algorithm") == 0)
+	if (utils::ipiece(piter->first) == "lang"
+	    || utils::ipiece(piter->first) == "language"
+	    || utils::ipiece(piter->first) == "algorithm")
 	  language = piter->second;
 	else
 	  std::cerr << "unsupported parameter for snowball stemmer: " << piter->first << "=" << piter->second << std::endl;

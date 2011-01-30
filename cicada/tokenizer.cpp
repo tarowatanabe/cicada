@@ -17,6 +17,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/thread_specific_ptr.hpp>
+#include <utils/piece.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -132,7 +133,7 @@ tokenize: use the chain of tokenization\n\
       std::string algorithm;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "algorithm") == 0)
+	if (utils::ipiece(piter->first) == "algorithm")
 	  algorithm = piter->second;
 	else
 	  std::cerr << "unsupported parameter for stemming tokenizer: " << piter->first << "=" << piter->second << std::endl;
@@ -156,19 +157,19 @@ tokenize: use the chain of tokenization\n\
 	std::auto_ptr<tokenizer::Tokenize> tokenize(new tokenizer::Tokenize());
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "lower") == 0) {
+	  if (utils::ipiece(piter->first) == "lower") {
 	    if (utils::lexical_cast<bool>(piter->second))
 	      tokenize->insert(create("lower"));
-	  } else if (strcasecmp(piter->first.c_str(), "nist") == 0) {
+	  } else if (utils::ipiece(piter->first) == "nist") {
 	    if (utils::lexical_cast<bool>(piter->second))
 	      tokenize->insert(create("nist"));
-	  } else if (strcasecmp(piter->first.c_str(), "penn") == 0) {
+	  } else if (utils::ipiece(piter->first) == "penn") {
 	    if (utils::lexical_cast<bool>(piter->second))
 	      tokenize->insert(create("penn"));
-	  } else if (strcasecmp(piter->first.c_str(), "nonascii") == 0) {
+	  } else if (utils::ipiece(piter->first) == "nonascii") {
 	    if (utils::lexical_cast<bool>(piter->second))
 	      tokenize->insert(create("nonascii"));
-	  } else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
+	  } else if (utils::ipiece(piter->first) == "stemmer")
 	    tokenize->insert(create("stemmer:algorithm=" + piter->second));
 	  else
 	    std::cerr << "unsupported parameter for combined tokenizer: " << piter->first << "=" << piter->second << std::endl;
