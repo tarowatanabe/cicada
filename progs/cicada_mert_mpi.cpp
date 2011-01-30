@@ -47,6 +47,7 @@
 #include "utils/bithack.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/base64.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -658,7 +659,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
   typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
 
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -700,17 +701,18 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       for (int rank = 1; rank < mpi_size; ++ rank) 
 	while (is[rank] && dev[rank] && dev[rank]->test()) {
 	  if (std::getline(*is[rank], line)) {
-	    tokenizer_type tokenizer(line);
+	    const utils::piece line_piece(line);
+	    tokenizer_type tokenizer(line_piece);
 	    
 	    tokenizer_type::iterator iter = tokenizer.begin();
 	    if (iter == tokenizer.end()) continue;
-	    std::string id_str = *iter;
+	    const utils::piece id_str = *iter;
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    if (*iter != "|||") continue;
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
-	    std::string x_str = *iter;
+	    const utils::piece x_str = *iter;
 	    ++ iter;
 	    if (iter == tokenizer.end()) continue;
 	    if (*iter != "|||") continue;

@@ -17,13 +17,11 @@
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/tokenizer.hpp>
 
 #include <utils/mpi.hpp>
 #include <utils/mpi_stream.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/lockfree_list_queue.hpp>
-#include <utils/space_separator.hpp>
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type> path_set_type;
@@ -66,8 +64,6 @@ struct Task
 
   void operator()()
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-    
     std::string command;
     
     while (1) {

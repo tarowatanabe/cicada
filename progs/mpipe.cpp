@@ -17,7 +17,6 @@
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/tokenizer.hpp>
 
 #include <utils/mpi.hpp>
 #include <utils/mpi_stream.hpp>
@@ -26,7 +25,6 @@
 #include <utils/compress_stream.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/subprocess.hpp>
-#include <utils/space_separator.hpp>
 
 
 struct MapReduce
