@@ -17,6 +17,7 @@
 
 #include <utils/simple_vector.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/piece.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -162,7 +163,7 @@ namespace cicada
     void unite(const HyperGraph& x);
 
   public:
-    void assign(const std::string& x);
+    void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
 
     friend

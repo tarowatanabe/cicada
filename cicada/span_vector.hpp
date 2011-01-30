@@ -17,6 +17,7 @@
 #include <cicada/symbol.hpp>
 
 #include <utils/hashmurmur.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -71,7 +72,7 @@ namespace cicada
 
   public:
     SpanVector() : __spans() {}
-    SpanVector(const std::string& x) : __spans() { assign(x); }
+    SpanVector(const utils::piece& x) : __spans() { assign(x); }
     SpanVector(size_type __n) : __spans(__n) {}
     SpanVector(size_type __n, const value_type& __value) : __spans(__n, __value) {}
     template <typename Iterator>
@@ -81,7 +82,7 @@ namespace cicada
     template <typename Iterator>
     void assign(Iterator first, Iterator last) { __spans.assign(first, last); }
     
-    void assign(const std::string& line);
+    void assign(const utils::piece& line);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
     
     // insert/erase...

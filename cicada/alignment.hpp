@@ -22,6 +22,7 @@
 
 #include <utils/hashmurmur.hpp>
 #include <utils/piece.hpp>
+#include <utils/lexical_cast.hpp>
 
 namespace cicada
 {
@@ -57,8 +58,8 @@ namespace cicada
 	if (pos == utils::piece::npos())
 	  throw std::runtime_error(std::string("invalid point? ") + x);
 	
-	source = atoi(x.substr(0, pos).c_str());
-	target = atoi(x.substr(pos + 1).c_str());
+	source = boost::lexical_cast<index_type>(x.substr(0, pos));
+	target = boost::lexical_cast<index_type>(x.substr(pos + 1));
       }
 
       friend

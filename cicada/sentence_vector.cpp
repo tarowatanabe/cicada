@@ -45,10 +45,10 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, sentence_set_type(), space_type> sentence_vector;
   };
 
-  void SentenceVector::assign(const std::string& x)
+  void SentenceVector::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter = x.begin();
-    std::string::const_iterator end = x.end();
+    std::string::const_iterator iter(x.begin());
+    std::string::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)

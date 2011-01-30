@@ -16,6 +16,8 @@
 
 #include <boost/variant.hpp>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
   
@@ -56,11 +58,11 @@ namespace cicada
     AttributeVector(const AttributeVector& x) : __values(x.__values) {}
     template <typename Iterator>
     AttributeVector(Iterator first, Iterator last) : __values(first, last) { }
-    AttributeVector(const std::string& x) : __values() { assign(x); }
+    AttributeVector(const utils::piece& x) : __values() { assign(x); }
 
   public:
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
-    void assign(const std::string& x);
+    void assign(const utils::piece& x);
 
     template <typename Iterator>
     void assign(Iterator first, Iterator last)

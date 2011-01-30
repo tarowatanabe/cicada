@@ -241,10 +241,10 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, hypergraph_parsed_type(), space_type> hypergraph;
   };
 
-  void HyperGraph::assign(const std::string& x)
+  void HyperGraph::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter = x.begin();
-    std::string::const_iterator end = x.end();
+    std::string::const_iterator iter(x.begin());
+    std::string::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     

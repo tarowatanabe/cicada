@@ -14,6 +14,7 @@
 #include <cicada/feature_vector.hpp>
 
 #include <utils/vector2.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -88,7 +89,7 @@ namespace cicada
   public:
     Lattice() : lattice(), dist_short(), dist_long() {}
     Lattice(size_type size) : lattice(size), dist_short(), dist_long() {}
-    Lattice(const std::string& x) { assign(x); }
+    Lattice(const utils::piece& x) { assign(x); }
     Lattice(const Sentence& x) : lattice(x.size()), dist_short(), dist_long()
     {
       iterator liter = lattice.begin();
@@ -97,7 +98,7 @@ namespace cicada
 	*liter = arc_set_type(1, arc_type(*iter));
     }
     
-    void assign(const std::string& x);
+    void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
 
     void resize(size_type size) { lattice.resize(size); }

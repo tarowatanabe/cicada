@@ -89,12 +89,12 @@ namespace cicada
     return qi::phrase_parse(iter, end, span_vector_impl::instance(), standard::space, __spans);
   }
   
-  void SpanVector::assign(const std::string& line)
+  void SpanVector::assign(const utils::piece& line)
   {
     clear();
     
-    std::string::const_iterator iter = line.begin();
-    std::string::const_iterator end = line.end();
+    std::string::const_iterator iter(line.begin());
+    std::string::const_iterator end(line.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)

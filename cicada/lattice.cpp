@@ -153,10 +153,10 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, Lattice::lattice_type(), space_type>           lattice_grammar;
   };
 
-  void Lattice::assign(const std::string& x)
+  void Lattice::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter = x.begin();
-    std::string::const_iterator end = x.end();
+    std::string::const_iterator iter(x.begin());
+    std::string::const_iterator end(x.end());
 
     const bool result = assign(iter, end);
     if (! result || iter != end)

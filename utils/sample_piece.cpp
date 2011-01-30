@@ -3,6 +3,7 @@
 #include "space_separator.hpp"
 
 #include <boost/tokenizer.hpp>
+#include <boost/lexical_cast.hpp>
 
 int main(int argc, char** argv)
 {
@@ -45,4 +46,5 @@ int main(int argc, char** argv)
 	    << "greater: " << (utils::ipiece(str3) > str5) << std::endl
 	    << "equal: " << (utils::ipiece(str3) == str5) << std::endl;
   
+  std::cout << "cast: " << boost::lexical_cast<int>(utils::ipiece("500")) << std::endl;
 }

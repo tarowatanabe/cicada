@@ -11,6 +11,8 @@
 
 #include <cicada/sentence.hpp>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
   class SentenceVector
@@ -40,11 +42,11 @@ namespace cicada
     SentenceVector() {}
     SentenceVector(size_type __n) : __sents(__n) {}
     SentenceVector(size_type __n, const sentence_type& x) : __sents(__n, x) {}
-    SentenceVector(const std::string& x) { assign(x); }
+    SentenceVector(const utils::piece& x) { assign(x); }
     SentenceVector(const SentenceVector& x) : __sents(x.__sents) {}
 
   public:
-    void assign(const std::string& x);
+    void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
     
   public:
