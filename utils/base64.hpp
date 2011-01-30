@@ -12,6 +12,7 @@
 #include <stdexcept>
 
 #include <utils/bithack.hpp>
+#include <utils/piece.hpp>
 
 #include <boost/archive/iterators/binary_from_base64.hpp>
 #include <boost/archive/iterators/base64_from_binary.hpp>
@@ -241,7 +242,17 @@ namespace utils
     encode_base64(x, std::back_inserter(encoded));
     return encoded;
   }
-  
+
+  template <typename Tp>
+  inline
+  Tp decode_base64(const utils::piece& x)
+  {
+    Tp value;
+    
+    struct_base64_decoder<sizeof(Tp)>::decode(reinterpret_cast<unsigned char*>(&value), x.begin(), x.end());
+    
+    return value;
+  }
   
   template <typename Tp>
   inline
