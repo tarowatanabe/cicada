@@ -31,10 +31,10 @@ namespace cicada
     return qi::phrase_parse(iter, end, *(word), standard::space, __sent);
   }
   
-  void Sentence::assign(const std::string& x)
+  void Sentence::assign(const utils::piece& x)
   {
-    std::string::const_iterator iter = x.begin();
-    std::string::const_iterator end = x.end();
+    std::string::const_iterator iter(x.begin());
+    std::string::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     

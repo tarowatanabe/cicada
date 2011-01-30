@@ -21,6 +21,7 @@
 #include <string>
 
 #include <utils/hashmurmur.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -36,7 +37,7 @@ namespace cicada
       Point() : source(), target() {}
       template <typename Integral>
       Point(const std::pair<Integral, Integral>& x) : source(x.first), target(x.second) {}
-      Point(const std::string& x) { assign(x); }
+      Point(const utils::piece& x) { assign(x); }
       Point(const index_type& _source, const index_type& _target) : source(_source), target(_target) {}
 
       template <typename Integral>
@@ -50,10 +51,10 @@ namespace cicada
 	source = x.source;
 	target = x.target;
       }
-      void assign(const std::string& x)
+      void assign(const utils::piece& x)
       {
-	std::string::size_type pos = x.find('-');
-	if (pos == std::string::npos)
+	utils::piece::size_type pos = x.find('-');
+	if (pos == utils::piece::npos())
 	  throw std::runtime_error(std::string("invalid point? ") + x);
 	
 	source = atoi(x.substr(0, pos).c_str());
@@ -86,14 +87,14 @@ namespace cicada
 
   public:
     Alignment() : __align() {}
-    Alignment(const std::string& x) : __align() { assign(x); }
+    Alignment(const utils::piece& x) : __align() { assign(x); }
     Alignment(size_type __n) : __align(__n) {}
     Alignment(size_type __n, const value_type& __value) : __align(__n, __value) {}
     template <typename Iterator>
     Alignment(Iterator first, Iterator last) : __align(first, last) {}
     
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
-    void assign(const std::string& line);
+    void assign(const utils::piece& line);
     void assign(size_type __n, const value_type& __value) { __align.assign(__n, __value); }
     template <typename Iterator>
     void assign(Iterator first, Iterator last) { __align.assign(first, last); }

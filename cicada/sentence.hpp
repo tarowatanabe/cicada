@@ -13,6 +13,7 @@
 #include <cicada/symbol.hpp>
 
 #include <utils/hashmurmur.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -44,14 +45,13 @@ namespace cicada
     Sentence(size_type __n, const word_type& __word) : __sent(__n, __word) {}
     template <typename Iterator>
     Sentence(Iterator first, Iterator last) : __sent(first, last) {}
-    Sentence(const std::string& x) { assign(x); }
+    Sentence(const utils::piece& x) { assign(x); }
     
     void assign(size_type __n, const word_type& __word) { __sent.assign(__n, __word); }
     template <typename Iterator>
     void assign(Iterator first, Iterator last) { __sent.assign(first, last); }
-    void assign(const std::string& x);
-
-
+    void assign(const utils::piece& x);
+    
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
     
     // insert/erase...

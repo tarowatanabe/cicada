@@ -14,6 +14,7 @@
 #include <cicada/feature_vector.hpp>
 
 #include <utils/bithack.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -41,14 +42,13 @@ namespace cicada
     TreeRule(const label_type& __label) : label(__label), antecedents() {}
     template <typename Iterator>
     TreeRule(const label_type& __label, Iterator first, Iterator last) : label(__label), antecedents(first, last) {}
-    explicit TreeRule(const std::string& x) : label(), antecedents() { assign(x); }
-    explicit TreeRule(const char* x) : label(), antecedents() { assign(x); }
+    TreeRule(const utils::piece& x) : label(), antecedents() { assign(x); }
 
   public:
     static rule_ptr_type create(const TreeRule& x);
     
   public:
-    void assign(const std::string& x);
+    void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
     
     void clear()

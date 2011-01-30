@@ -38,10 +38,10 @@ namespace cicada
     return qi::phrase_parse(iter, end, *(qi::int_ >> '-' >> qi::int_), standard::space, __align);
   }
 
-  void Alignment::assign(const std::string& line)
+  void Alignment::assign(const utils::piece& line)
   {
-    std::string::const_iterator iter = line.begin();
-    std::string::const_iterator end = line.end();
+    std::string::const_iterator iter(line.begin());
+    std::string::const_iterator end(line.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)

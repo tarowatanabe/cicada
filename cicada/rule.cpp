@@ -127,14 +127,14 @@ namespace cicada
     return result;
   }
 
-  void Rule::assign(const std::string& x)
+  void Rule::assign(const utils::piece& x)
   {
     clear();
     
     if (x.empty()) return;
-
-    std::string::const_iterator iter = x.begin();
-    std::string::const_iterator end = x.end();
+    
+    std::string::const_iterator iter(x.begin());
+    std::string::const_iterator end(x.end());
     
     const bool result = assign(iter, end);
     if (! result || iter != end)

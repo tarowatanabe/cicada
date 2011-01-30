@@ -14,6 +14,7 @@
 #include <cicada/symbol_vector.hpp>
 
 #include <utils/bithack.hpp>
+#include <utils/piece.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -30,7 +31,7 @@ namespace cicada
     typedef boost::shared_ptr<Rule> rule_ptr_type;
     
   public:
-    Rule(const std::string& x) { assign(x); }
+    Rule(const utils::piece& x) { assign(x); }
     Rule(const symbol_type& x_lhs, const symbol_set_type& x_rhs) : lhs(x_lhs), rhs(x_rhs) {}
     template <typename Iterator>
     Rule(const symbol_type& __lhs, Iterator first, Iterator last) : lhs(__lhs), rhs(first, last) {}
@@ -39,7 +40,7 @@ namespace cicada
     static rule_ptr_type create(const Rule& x);
     
   public:
-    void assign(const std::string& x);
+    void assign(const utils::piece& x);
     bool assign(std::string::const_iterator& iter, std::string::const_iterator end);
     
     void clear()
