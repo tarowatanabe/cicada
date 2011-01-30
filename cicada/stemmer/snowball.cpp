@@ -9,6 +9,8 @@
 
 #include "libstemmer_c/include/libstemmer.h"
 
+#include "utils/piece.hpp"
+
 namespace cicada
 {
   namespace stemmer
@@ -25,7 +27,7 @@ namespace cicada
 	  sb_stemmer_delete(pimpl);
       }
       
-      std::string operator()(const std::string& word) const
+      std::string operator()(const utils::piece& word) const
       {
 	if (! pimpl) return word;
 
