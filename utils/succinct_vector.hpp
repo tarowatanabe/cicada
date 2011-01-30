@@ -17,6 +17,7 @@
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/device/file.hpp>
 #include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <utils/atomicop.hpp>
 #include <utils/bithack.hpp>
@@ -463,7 +464,7 @@ namespace utils
       repository_type::const_iterator iter = repository.find("size");
       if (iter == repository.end())
 	throw std::runtime_error("no size...");
-      __size = atoll(iter->second.c_str());
+      __size = boost::lexical_cast<size_type>(iter->second);
 
       repository_type::const_iterator titer = repository.find("type");
       if (titer == repository.end())

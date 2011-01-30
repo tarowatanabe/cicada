@@ -14,6 +14,7 @@
 #include <iterator>
 
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <utils/repository.hpp>
 #include <utils/map_file.hpp>
@@ -332,7 +333,7 @@ namespace utils
       repository_type::const_iterator iter = rep.find("size");
       if (iter == rep.end())
 	throw std::runtime_error("no size?");
-      __size = atoll(iter->second.c_str());
+      __size = boost::lexical_cast<size_type>(iter->second);
     }
 
     

@@ -8,6 +8,8 @@
 
 #include "ngram_index.hpp"
 
+#include <boost/lexical_cast.hpp>
+
 namespace cicada
 {
 
@@ -25,7 +27,7 @@ namespace cicada
     repository_type::const_iterator oiter = rep.find("order");
     if (oiter == rep.end())
       throw std::runtime_error("no order");
-    const int order = atol(oiter->second.c_str());
+    const int order = boost::lexical_cast<int>(oiter->second);
       
     offsets.push_back(0);
     for (int n = 1; n <= order; ++ n) {
@@ -36,7 +38,7 @@ namespace cicada
       if (iter == rep.end())
 	throw std::runtime_error(std::string("no ngram offset? ") + stream_ngram.str());
 	
-      offsets.push_back(atoll(iter->second.c_str()));
+      offsets.push_back(boost::lexical_cast<size_type>(iter->second));
     }
   }
   
@@ -52,13 +54,13 @@ namespace cicada
     repository_type::const_iterator siter = rep.find("shard");
     if (siter == rep.end())
       throw std::runtime_error("no shard size...");
-    __shards.resize(atoi(siter->second.c_str()));
+    __shards.resize(boost::lexical_cast<size_type>(siter->second));
     
     // order
     repository_type::const_iterator oiter = rep.find("order");
     if (oiter == rep.end())
       throw std::runtime_error("no order");
-    __order = atoi(oiter->second.c_str());
+    __order = boost::lexical_cast<int>(oiter->second);
     
     // vocabulary...
     __vocab.open(rep.path("vocab"));
