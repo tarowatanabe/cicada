@@ -459,15 +459,11 @@ namespace utils
   struct __piece_ichar_traits
   {
     
-    static bool eq(const char& c1, const char& c2)
-    {
-      return ::toupper(c1) == ::toupper(c2);
-    }
-    
     static const char* find(const char* __s, size_t __n, const char& __a)
     {
+      const char __u = ::toupper(__a);
       for (std::size_t __i = 0; __i < __n; ++__i)
-        if (eq(__s[__i], __a))
+        if (::toupper(__s[__i]) == __u)
           return __s + __i;
       return 0;
     }
