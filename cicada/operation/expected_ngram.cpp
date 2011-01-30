@@ -13,6 +13,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -24,19 +25,19 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "expected-ngram")
+      if (utils::ipiece(param.name()) != "expected-ngram")
 	throw std::runtime_error("this is not an expected-ngram computer"); 
     
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	if (utils::ipiece(piter->first) == "order")
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "bos-eos") == 0)
+	else if (utils::ipiece(piter->first) == "bos-eos")
 	  bos_eos = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "scale") == 0)
+	else if (utils::ipiece(piter->first) == "scale")
 	  scale = boost::lexical_cast<double>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;

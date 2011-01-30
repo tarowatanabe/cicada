@@ -11,6 +11,7 @@
 #include "utils/indexed_set.hpp"
 #include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -135,7 +136,7 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (param.name() != "distortion")
+      if (utils::ipiece(param.name()) != "distortion")
 	throw std::runtime_error("is this really distortion feature function? " + parameter);
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)

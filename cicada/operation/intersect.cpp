@@ -11,6 +11,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -22,13 +23,13 @@ namespace cicada
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (param.name() != "intersect")
+      if (utils::ipiece(param.name()) != "intersect")
 	throw std::runtime_error("this is not a intersector");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "lattice") == 0)
+	if (utils::ipiece(piter->first) == "lattice")
 	  lattice_mode = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "target") == 0)
+	else if (utils::ipiece(piter->first) == "target")
 	  target_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for intersect: " << piter->first << "=" << piter->second << std::endl;

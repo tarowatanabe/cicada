@@ -12,6 +12,7 @@
 
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sgi_hash_map.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -273,13 +274,13 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (param.name() != "variational")
+      if (utils::ipiece(param.name()) != "variational")
 	throw std::runtime_error("is this variational feature?" + parameter);
       
       int order = 3;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	if (utils::ipiece(piter->first) == "order")
 	  order = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;

@@ -13,7 +13,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
-
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -37,17 +37,17 @@ namespace cicada
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (param.name() != "compose-tree")
+      if (utils::ipiece(param.name()) != "compose-tree")
 	throw std::runtime_error("this is not a Tree composer");
 	
       bool source = false;
       bool target = false;
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  if (strcasecmp(piter->second.c_str(), "source") == 0)
+	if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
 	    source = true;
-	  else if (strcasecmp(piter->second.c_str(), "target") == 0)
+	  else if (utils::ipiece(piter->second) == "target")
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
@@ -117,17 +117,17 @@ namespace cicada
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (param.name() != "compose-earley")
+      if (utils::ipiece(param.name()) != "compose-earley")
 	throw std::runtime_error("this is not a Earley composer");
 	
       bool source = false;
       bool target = false;
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  if (strcasecmp(piter->second.c_str(), "source") == 0)
+	if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
 	    source = true;
-	  else if (strcasecmp(piter->second.c_str(), "target") == 0)
+	  else if (utils::ipiece(piter->second) == "target")
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
@@ -193,17 +193,17 @@ namespace cicada
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (param.name() != "compose-cky")
+      if (utils::ipiece(param.name()) != "compose-cky")
 	throw std::runtime_error("this is not a CKY composer");
 
       bool source = false;
       bool target = false;
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  if (strcasecmp(piter->second.c_str(), "source") == 0)
+	if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
 	    source = true;
-	  else if (strcasecmp(piter->second.c_str(), "target") == 0)
+	  else if (utils::ipiece(piter->second) == "target")
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
@@ -270,19 +270,19 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "compose-phrase")
+      if (utils::ipiece(param.name()) != "compose-phrase")
 	throw std::runtime_error("this is not a phrase composer");
 
       bool source = false;
       bool target = false;
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "distortion") == 0)
+	if (utils::ipiece(piter->first) == "distortion")
 	  distortion = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  if (strcasecmp(piter->second.c_str(), "source") == 0)
+	else if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
 	    source = true;
-	  else if (strcasecmp(piter->second.c_str(), "target") == 0)
+	  else if (utils::ipiece(piter->second) == "target")
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
@@ -348,16 +348,16 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "compose-alignment")
+      if (utils::ipiece(param.name()) != "compose-alignment")
 	throw std::runtime_error("this is not a alignment composer");
 
       bool source = false;
       bool target = false;
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "lattice") == 0)
+	if (utils::ipiece(piter->first) == "lattice")
 	  lattice_mode = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "forest") == 0) {
+	else if (utils::ipiece(piter->first) == "forest") {
 	  forest_mode = utils::lexical_cast<bool>(piter->second);
 	} else
 	  std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;

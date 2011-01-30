@@ -12,6 +12,7 @@
 #include "utils/sgi_hash_map.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/chart.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -260,7 +261,7 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (param.name() != "span")
+      if (utils::ipiece(param.name()) != "span")
 	throw std::runtime_error("is this really span feature function? " + parameter);
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)

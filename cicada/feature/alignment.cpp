@@ -5,6 +5,8 @@
 #include "feature/alignment.hpp"
 #include "parameter.hpp"
 
+#include "utils/piece.hpp"
+
 namespace cicada
 {
   namespace feature
@@ -36,16 +38,16 @@ namespace cicada
 	
 	const parameter_type param(parameter);
 	
-	if (param.name() != "relative-position")
+	if (utils::ipiece(param.name()) != "relative-position")
 	  throw std::runtime_error("is this really relative position feature function? " + parameter);
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
+	  if (utils::ipiece(piter->first) == "cluster") {
 	    if (! boost::filesystem::exists(piter->second))
 	      throw std::runtime_error("no cluster file: " + piter->second);
 	    
 	    normalizers.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
-	  } else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
+	  } else if (utils::ipiece(piter->first) == "stemmer")
 	    normalizers.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
 	  else
 	    std::cerr << "WARNING: unsupported parameter for relative-position: " << piter->first << "=" << piter->second << std::endl;
@@ -138,7 +140,7 @@ namespace cicada
 	
 	const parameter_type param(parameter);
 	
-	if (param.name() != "path")
+	if (utils::ipiece(param.name()) != "path")
 	  throw std::runtime_error("is this really path feature function? " + parameter);
 	
 	__state_size   = sizeof(int);
@@ -164,7 +166,7 @@ namespace cicada
 	
 	const parameter_type param(parameter);
 	
-	if (param.name() != "null-path")
+	if (utils::ipiece(param.name()) != "null-path")
 	  throw std::runtime_error("is this really null-path feature function? " + parameter);
 
 	__state_size   = sizeof(int);
@@ -221,16 +223,16 @@ namespace cicada
 	
 	const parameter_type param(parameter);
 	
-	if (param.name() != "target-bigram")
+	if (utils::ipiece(param.name()) != "target-bigram")
 	  throw std::runtime_error("is this really target bigram feature function? " + parameter);
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
+	  if (utils::ipiece(piter->first) == "cluster") {
 	    if (! boost::filesystem::exists(piter->second))
 	      throw std::runtime_error("no cluster file: " + piter->second);
 	    
 	    normalizers.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
-	  } else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
+	  } else if (utils::ipiece(piter->first) == "stemmer")
 	    normalizers.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
 	  else
 	    std::cerr << "WARNING: unsupported parameter for target-bigram: " << piter->first << "=" << piter->second << std::endl;
@@ -392,23 +394,23 @@ namespace cicada
 	
 	const parameter_type param(parameter);
 	
-	if (param.name() != "word-pair")
+	if (utils::ipiece(param.name()) != "word-pair")
 	  throw std::runtime_error("is this really word pair feature function? " + parameter);
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "cluster-source") == 0) {
+	  if (utils::ipiece(piter->first) == "cluster-source") {
 	    if (! boost::filesystem::exists(piter->second))
 	      throw std::runtime_error("no cluster file: " + piter->second);
 	    
 	    normalizers_source.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
-	  } else if (strcasecmp(piter->first.c_str(), "cluster-target") == 0) {
+	  } else if (utils::ipiece(piter->first) == "cluster-target") {
 	    if (! boost::filesystem::exists(piter->second))
 	      throw std::runtime_error("no cluster file: " + piter->second);
 	    
 	    normalizers_target.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
-	  } else if (strcasecmp(piter->first.c_str(), "stemmer-source") == 0)
+	  } else if (utils::ipiece(piter->first) == "stemmer-source")
 	    normalizers_source.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
-	  else if (strcasecmp(piter->first.c_str(), "stemmer-target") == 0)
+	  else if (utils::ipiece(piter->first) == "stemmer-target")
 	    normalizers_target.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
 	  else
 	    std::cerr << "WARNING: unsupported parameter for word-pair: " << piter->first << "=" << piter->second << std::endl;

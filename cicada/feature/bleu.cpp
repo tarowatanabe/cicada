@@ -10,6 +10,7 @@
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/piece.hpp"
 
 #include "cicada/feature/bleu.hpp"
 #include "cicada/parameter.hpp"
@@ -622,7 +623,7 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (param.name() != "bleu")
+      if (utils::ipiece(param.name()) != "bleu")
 	throw std::runtime_error("this is not Bleu feature: " + parameter);
 
       int order = 4;
@@ -634,15 +635,15 @@ namespace cicada
       path_type   refset_file;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	if (utils::ipiece(piter->first) == "order")
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
+	else if (utils::ipiece(piter->first) == "exact")
 	  exact = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	else if (utils::ipiece(piter->first) == "tokenizer")
 	  tokenizer = &cicada::Tokenizer::create(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "refset") == 0)
+	else if (utils::ipiece(piter->first) == "refset")
 	  refset_file = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;

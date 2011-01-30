@@ -132,7 +132,7 @@ sb: skip bigram\n\
 
       scorer_ptr_type scorer;
 
-      if (param.name() == "combined") {
+      if (utils::ipiece(param.name()) == "combined") {
 	bool error = false;
 	bool reward = false;
 
@@ -172,7 +172,7 @@ sb: skip bigram\n\
 	
 	scorer.reset(combined.release());
 	
-      } else if (param.name() == "bleu" || param.name() == "bleu-linear") {
+      } else if (utils::ipiece(param.name()) == "bleu" || utils::ipiece(param.name()) == "bleu-linear") {
 	int  order = 4;
 	const tokenizer_type* tokenizer = 0;
 	bool exact = false;
@@ -210,7 +210,7 @@ sb: skip bigram\n\
 	
 	scorer = scorer_ptr_type(new BleuScorer(order));
 	scorer->tokenizer = tokenizer;
-      } else if (param.name() == "per") {
+      } else if (utils::ipiece(param.name()) == "per") {
 	const tokenizer_type* tokenizer = 0;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -222,7 +222,7 @@ sb: skip bigram\n\
 	
 	scorer = scorer_ptr_type(new PERScorer());
 	scorer->tokenizer = tokenizer;
-      } else if (param.name() == "wer") {
+      } else if (utils::ipiece(param.name()) == "wer") {
 	const tokenizer_type* tokenizer = 0;
 	const Matcher* matcher = 0;
 	
@@ -247,7 +247,7 @@ sb: skip bigram\n\
 	
 	scorer = scorer_ptr_type(new WERScorer(weights, matcher));
 	scorer->tokenizer = tokenizer;
-      } else if (param.name() == "ter") {
+      } else if (utils::ipiece(param.name()) == "ter") {
 	const tokenizer_type* tokenizer = 0;
 	const Matcher* matcher = 0;
 	
@@ -274,7 +274,7 @@ sb: skip bigram\n\
 	
 	scorer = scorer_ptr_type(new TERScorer(weights, matcher));
 	scorer->tokenizer = tokenizer;
-      } else if (param.name() == "sk") {
+      } else if (utils::ipiece(param.name()) == "sk") {
 	int p = 4;
 	double decay = 0.8;
 	
@@ -293,7 +293,7 @@ sb: skip bigram\n\
 
 	scorer = scorer_ptr_type(new SKScorer(p, decay));
 	scorer->tokenizer = tokenizer;
-      } else if (param.name() == "wlcs") {
+      } else if (utils::ipiece(param.name()) == "wlcs") {
 	double alpha = 1.0;
 	
 	const tokenizer_type* tokenizer = 0;
@@ -309,7 +309,7 @@ sb: skip bigram\n\
 	
 	scorer = scorer_ptr_type(new WLCSScorer(alpha));
 	scorer->tokenizer = tokenizer;
-      } else if (param.name() == "sb") {
+      } else if (utils::ipiece(param.name()) == "sb") {
 	int window = 4;
 	
 	const tokenizer_type* tokenizer = 0;

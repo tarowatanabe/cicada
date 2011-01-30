@@ -5,6 +5,7 @@
 #include "bleu_multi.hpp"
 
 #include "cicada/parameter.hpp"
+#include "utils/piece.hpp"
 
 namespace cicada
 {
@@ -16,7 +17,7 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (param.name() != "bleu-multi" && param.name() != "bleu-multiple")
+      if (utils::ipiece(param.name()) != "bleu-multi" && utils::ipiece(param.name()) != "bleu-multiple")
 	throw std::runtime_error("this is not bleu-multi feature: " + parameter);
       
       std::string order;
@@ -28,15 +29,15 @@ namespace cicada
       std::vector<std::string, std::allocator<std::string> > names;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	if (utils::ipiece(piter->first) == "order")
 	  order = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
+	else if (utils::ipiece(piter->first) == "exact")
 	  exact = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	else if (utils::ipiece(piter->first) == "tokenizer")
 	  tokenizer = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	else if (utils::ipiece(piter->first) == "name")
 	  names.push_back(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "size") == 0)
+	else if (utils::ipiece(piter->first) == "size")
 	  size = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu-multi: " << piter->first << "=" << piter->second << std::endl;

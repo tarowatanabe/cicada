@@ -11,6 +11,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 #include <boost/functional/hash.hpp>
 
@@ -26,13 +27,13 @@ namespace cicada
       excludes.set_empty_key(symbol_type());
     
       param_type param(parameter);
-      if (param.name() != "permute")
+      if (utils::ipiece(param.name()) != "permute")
 	throw std::runtime_error("this is not a permuter");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "size") == 0)
+	if (utils::ipiece(piter->first) == "size")
 	  size = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "exclude") == 0)
+	else if (utils::ipiece(piter->first) == "exclude")
 	  excludes.insert(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for permute: " << piter->first << "=" << piter->second << std::endl;

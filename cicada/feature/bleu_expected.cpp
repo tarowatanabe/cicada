@@ -7,6 +7,7 @@
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/piece.hpp"
 
 #include "cicada/feature/bleu_expected.hpp"
 #include "cicada/parameter.hpp"
@@ -479,13 +480,13 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (param.name() != "bleu-expected")
+      if (utils::ipiece(param.name()) != "bleu-expected")
 	throw std::runtime_error("this is not BleuExpected feature: " + parameter);
 
       int order = 4;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	if (utils::ipiece(piter->first) == "order")
 	  order = boost::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;

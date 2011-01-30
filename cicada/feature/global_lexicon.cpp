@@ -6,7 +6,7 @@
 #include "cicada/feature/global_lexicon.hpp"
 #include "cicada/parameter.hpp"
 
-
+#include "utils/piece.hpp"
 #include "utils/sgi_hash_set.hpp"
 
 namespace cicada
@@ -90,13 +90,13 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (param.name() != "global-lexicon")
+      if (utils::ipiece(param.name()) != "global-lexicon")
 	throw std::runtime_error("is this really a global-lexicon feature function? " + parameter);
 
       boost::filesystem::path path;
-      
+       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "file") == 0)
+	if (utils::ipiece(piter->first) == "file")
 	  path = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for global lexicon: " << piter->first << "=" << piter->second << std::endl;

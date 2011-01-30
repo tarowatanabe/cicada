@@ -12,6 +12,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -25,30 +26,30 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "prune")
+      if (utils::ipiece(param.name()) != "prune")
 	throw std::runtime_error("this is not a pruner");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "beam") == 0)
+	if (utils::ipiece(piter->first) == "beam")
 	  beam = boost::lexical_cast<double>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "kbest") == 0)
+	else if (utils::ipiece(piter->first) == "kbest")
 	  kbest = boost::lexical_cast<size_t>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "density") == 0)
+	else if (utils::ipiece(piter->first) == "density")
 	  density = boost::lexical_cast<double>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "scale") == 0)
+	else if (utils::ipiece(piter->first) == "scale")
 	  scale = boost::lexical_cast<double>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "semiring") == 0) {
-	  const std::string& name = piter->second;
-	
-	  if (strcasecmp(name.c_str(), "tropical") == 0)
+	else if (utils::ipiece(piter->first) == "semiring")) {
+	const utils::ipiece name = piter->second;
+	  
+	  if (name == "tropical")
 	    semiring_tropical = true;
-	  else if (strcasecmp(name.c_str(), "logprob") == 0)
+	  else if (name == "logprob")
 	    semiring_logprob = true;
-	  else if (strcasecmp(name.c_str(), "log") == 0)
+	  else if (name == "log")
 	    semiring_log = true;
 	  else
 	    throw std::runtime_error("unknown semiring: " + name);

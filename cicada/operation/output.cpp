@@ -18,6 +18,7 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
 #include <utils/sgi_hash_map.hpp>
+#include <utils/piece.hpp>
 
 #include <google/dense_hash_map>
 
@@ -168,39 +169,39 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "output")
+      if (utils::ipiece(param.name()) != "output")
 	throw std::runtime_error("this is not a outputter");
 
     
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "kbest") == 0)
+	if (utils::ipiece(piter->first) == "kbest")
 	  kbest_size = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "unique") == 0)
+	else if (utils::ipiece(piter->first) == "unique")
 	  kbest_unique = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "graphviz") == 0)
+	else if (utils::ipiece(piter->first) == "graphviz")
 	  graphviz = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "statistics") == 0)
+	else if (utils::ipiece(piter->first) == "statistics")
 	  statistics = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "no-id") == 0)
+	else if (utils::ipiece(piter->first) == "no-id")
 	  no_id = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "file") == 0)
+	else if (utils::ipiece(piter->first) == "file")
 	  file = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "directory") == 0)
+	else if (utils::ipiece(piter->first) == "directory")
 	  directory = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "insertion-prefix") == 0)
+	else if (utils::ipiece(piter->first) == "insertion-prefix")
 	  insertion_prefix = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "yield") == 0) {
-	  const std::string& value = piter->second;
-	    
-	  if (strcasecmp(value.c_str(), "sentence") == 0 || strcasecmp(value.c_str(), "string") == 0)
+	else if (utils::ipiece(piter->first) == "yield") {
+	  const utils::ipiece value = piter->second;
+	
+	  if (value == "sentence" || value == "string")
 	    yield_string = true;
-	  else if (strcasecmp(value.c_str(), "derivation") == 0 || strcasecmp(value.c_str(), "tree") == 0)
+	  else if (value == "derivation" || value == "tree")
 	    yield_tree = true;
-	  else if (strcasecmp(value.c_str(), "alignment") == 0 || strcasecmp(value.c_str(), "align") == 0)
+	  else if (value == "alignment" || value == "align")
 	    yield_alignment = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + value);

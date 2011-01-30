@@ -11,6 +11,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -28,19 +29,19 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "clear")
+      if (utils::ipiece(param.name()) != "clear")
 	throw std::runtime_error("this is not data clearer");
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "hypergraph") == 0)
+	if (utils::ipiece(piter->first) == "hypergraph")
 	  clear_hypergraph = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "lattice") == 0)
+	else if (utils::ipiece(piter->first) == "lattice")
 	  clear_lattice = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "spans") == 0 || strcasecmp(piter->first.c_str(), "span") == 0)
+	else if (utils::ipiece(piter->first) == "spans" || utils::ipiece(piter->first) == "span")
 	  clear_spans = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "targets") == 0 || strcasecmp(piter->first.c_str(), "bitext") == 0)
+	else if (utils::ipiece(piter->first) == "targets" || utils::ipiece(piter->first) == "bitext")
 	  clear_targets = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "counts") == 0 || strcasecmp(piter->first.c_str(), "ngram-counts") == 0)
+	else if (utils::ipiece(piter->first) == "counts" || utils::ipiece(piter->first) == "ngram-counts")
 	  clear_counts = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for clear: " << piter->first << "=" << piter->second << std::endl;

@@ -13,7 +13,7 @@
 
 #include "utils/array_power2.hpp"
 #include "utils/hashmurmur.hpp"
-
+#include "utils/piece.hpp"
 
 namespace cicada
 {
@@ -556,7 +556,7 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (param.name() != "ngram")
+      if (utils::ipiece(param.name()) != "ngram")
 	throw std::runtime_error("is this really ngram feature function? " + parameter);
 
       path_type   path;
@@ -570,19 +570,19 @@ namespace cicada
       std::string name;
 
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "file") == 0)
+	if (utils::ipiece(piter->first) == "file")
 	  path = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "cluster") == 0)
+	else if (utils::ipiece(piter->first) == "cluster")
 	  cluster_path = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "order") == 0)
+	else if (utils::ipiece(piter->first) == "order")
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "coarse-file") == 0)
+	else if (utils::ipiece(piter->first) == "coarse-file")
 	  coarse_path = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "coarse-order") == 0)
+	else if (utils::ipiece(piter->first) == "coarse-order")
 	  coarse_order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "coarse-cluster") == 0)
+	else if (utils::ipiece(piter->first) == "coarse-cluster")
 	  coarse_cluster_path = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for ngram: " << piter->first << "=" << piter->second << std::endl;

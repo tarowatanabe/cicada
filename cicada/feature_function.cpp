@@ -24,6 +24,7 @@
 #include "feature/span.hpp"
 #include "feature/variational.hpp"
 
+#include "utils/piece.hpp"
 
 namespace cicada
 {
@@ -122,50 +123,50 @@ word-pair: word pair feature\n\
     
     const parameter_type param(parameter);
     
-    if (param.name() == "ngram")
+    if (utils::ipiece(param.name()) == "ngram")
       return feature_function_ptr_type(new feature::NGram(parameter));
-    else if (param.name() == "neighbours" || param.name() == "neighbors")
+    else if (utils::ipiece(param.name()) == "neighbours" || utils::ipiece(param.name()) == "neighbors")
       return feature_function_ptr_type(new feature::Neighbours(parameter));
-    else if (param.name() == "ngram-tree")
+    else if (utils::ipiece(param.name()) == "ngram-tree")
       return feature_function_ptr_type(new feature::NGramTree(parameter));
-    else if (param.name() == "antecedent")
+    else if (utils::ipiece(param.name()) == "antecedent")
       return feature_function_ptr_type(new feature::Antecedent(parameter));
-    else if (param.name() == "parent")
+    else if (utils::ipiece(param.name()) == "parent")
       return feature_function_ptr_type(new feature::Parent(parameter));
-    else if (param.name() == "permute")
+    else if (utils::ipiece(param.name()) == "permute")
       return feature_function_ptr_type(new feature::Permute(parameter));
-    else if (param.name() == "bleu")
+    else if (utils::ipiece(param.name()) == "bleu")
       return feature_function_ptr_type(new feature::Bleu(parameter));
-    else if (param.name() == "bleu-expected")
+    else if (utils::ipiece(param.name()) == "bleu-expected")
       return feature_function_ptr_type(new feature::BleuExpected(parameter));
-    else if (param.name() == "bleu-linear")
+    else if (utils::ipiece(param.name()) == "bleu-linear")
       return feature_function_ptr_type(new feature::BleuLinear(parameter));
-    else if (param.name() == "bleu-multi" || param.name() == "bleu-multiple")
+    else if (utils::ipiece(param.name()) == "bleu-multi" || utils::ipiece(param.name()) == "bleu-multiple")
       return feature_function_ptr_type(new feature::BleuMulti(parameter));
-    else if (param.name() == "distortion")
+    else if (utils::ipiece(param.name()) == "distortion")
       return feature_function_ptr_type(new feature::Distortion(parameter));
-    else if (param.name() == "global-lexicon")
+    else if (utils::ipiece(param.name()) == "global-lexicon")
       return feature_function_ptr_type(new feature::GlobalLexicon(parameter));
-    else if (param.name() == "lexicalized-reordering"
-	     || param.name() == "lexicalized-reorder"
-	     || param.name() == "lexical-reordering"
-	     || param.name() == "lexical-reorder")
+    else if (utils::ipiece(param.name()) == "lexicalized-reordering"
+	     || utils::ipiece(param.name()) == "lexicalized-reorder"
+	     || utils::ipiece(param.name()) == "lexical-reordering"
+	     || utils::ipiece(param.name()) == "lexical-reorder")
       return feature_function_ptr_type(new feature::LexicalizedReordering(parameter));
-    else if (param.name() == "span")
+    else if (utils::ipiece(param.name()) == "span")
       return feature_function_ptr_type(new feature::Span(parameter));
-    else if (param.name() == "variational")
+    else if (utils::ipiece(param.name()) == "variational")
       return feature_function_ptr_type(new feature::Variational(parameter));
-    else if (param.name() == "word-penalty")
+    else if (utils::ipiece(param.name()) == "word-penalty")
       return feature_function_ptr_type(new feature::WordPenalty());
-    else if (param.name() == "rule-penalty")
+    else if (utils::ipiece(param.name()) == "rule-penalty")
       return feature_function_ptr_type(new feature::RulePenalty());
-    else if (param.name() == "relative-position")
+    else if (utils::ipiece(param.name()) == "relative-position")
       return feature_function_ptr_type(new feature::RelativePosition(parameter));
-    else if (param.name() == "null-path")
+    else if (utils::ipiece(param.name()) == "null-path")
       return feature_function_ptr_type(new feature::NullPath(parameter));
-    else if (param.name() == "target-bigram")
+    else if (utils::ipiece(param.name()) == "target-bigram")
       return feature_function_ptr_type(new feature::TargetBigram(parameter));
-    else if (param.name() == "word-pair")
+    else if (utils::ipiece(param.name()) == "word-pair")
       return feature_function_ptr_type(new feature::WordPair(parameter));
     else
       throw std::runtime_error("unknown featuer: " + parameter);

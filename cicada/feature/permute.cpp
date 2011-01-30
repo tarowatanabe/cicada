@@ -12,6 +12,7 @@
 #include "utils/lexical_cast.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -90,16 +91,16 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (param.name() != "permute")
+      if (utils::ipiece(param.name()) != "permute")
 	throw std::runtime_error("is this really permute feature function? " + parameter);
 
       bool      collapse = false;
       path_type path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "collapse") == 0)
+	if (utils::ipiece(piter->first) == "collapse")
 	  collapse = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	else if (utils::ipiece(piter->first) == "weights")
 	  path = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for permute: " << piter->first << "=" << piter->second << std::endl;

@@ -13,6 +13,7 @@
 
 #include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -343,7 +344,7 @@ namespace cicada
       
       const parameter_type param(parameter);
 
-      if (param.name() != "ngram-tree")
+      if (utils::ipiece(param.name()) != "ngram-tree")
 	throw std::runtime_error("is this really ngram tree feature function? " + parameter);
       
       impl_type::normalizer_set_type normalizers;
@@ -352,18 +353,18 @@ namespace cicada
       bool source_root_mode = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "cluster") == 0) {
+	if (utils::ipiece(piter->first) == "cluster") {
 	  if (! boost::filesystem::exists(piter->second))
 	    throw std::runtime_error("no cluster file: " + piter->second);
 	  
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
-	} else if (strcasecmp(piter->first.c_str(), "stemmer") == 0)
+	} else if (utils::ipiece(piter->first) == "stemmer")
 	  normalizers.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
-	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "alignment") == 0)
+	else if (utils::ipiece(piter->first) == "alignment")
 	  alignment_mode = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "source-root") == 0)
+	else if (utils::ipiece(piter->first) == "source-root")
 	  source_root_mode = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for ngram-tree: " << piter->first << "=" << piter->second << std::endl;

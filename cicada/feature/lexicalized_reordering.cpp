@@ -12,6 +12,7 @@
 #include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/simple_vector.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -73,18 +74,18 @@ namespace cicada
       
 	const parameter_type param(parameter);
 
-	if (param.name() != "lexicalized-reordering"
-	    && param.name() != "lexicalized-reorder"
-	    && param.name() != "lexical-reordering"
-	    && param.name() != "lexical-reorder")
+	if (utils::ipiece(param.name()) != "lexicalized-reordering"
+	    && utils::ipiece(param.name()) != "lexicalized-reorder"
+	    && utils::ipiece(param.name()) != "lexical-reordering"
+	    && utils::ipiece(param.name()) != "lexical-reorder")
 	  throw std::runtime_error("is this really lexicalized reordering feature function? " + parameter);
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (strcasecmp(piter->first.c_str(), "bidirectional") == 0 || strcasecmp(piter->first.c_str(), "bi") == 0)
+	  if (utils::ipiece(piter->first) == "bidirectional" || utils::ipiece(piter->first) == "bi")
 	    bidirectional = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "monotonicity") == 0 || strcasecmp(piter->first.c_str(), "mono") == 0)
+	  else if (utils::ipiece(piter->first) == "monotonicity" || utils::ipiece(piter->first) == "mono")
 	    monotonicity = utils::lexical_cast<bool>(piter->second);
-	  else if (strcasecmp(piter->first.c_str(), "feature") == 0)
+	  else if (utils::ipiece(piter->first) == "feature")
 	    attribute_names.push_back(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for lexicalized reordering: " << piter->first << "=" << piter->second << std::endl;

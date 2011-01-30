@@ -11,6 +11,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -22,7 +23,7 @@ namespace cicada
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (param.name() != "remove-epsilon")
+      if (utils::ipiece(param.name()) != "remove-epsilon")
 	throw std::runtime_error("this is not an epsilon remover");
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)

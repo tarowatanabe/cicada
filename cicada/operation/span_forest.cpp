@@ -13,6 +13,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -24,7 +25,7 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "span-forest")
+      if (utils::ipiece(param.name()) != "span-forest")
 	throw std::runtime_error("this is not a span annotator");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)

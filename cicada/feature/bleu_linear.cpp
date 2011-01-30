@@ -16,6 +16,7 @@
 #include "utils/indexed_set.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
 #include <boost/tokenizer.hpp>
@@ -385,7 +386,7 @@ namespace cicada
       
       const parameter_type param(parameter);
       
-      if (param.name() != "bleu-linear")
+      if (utils::ipiece(param.name()) != "bleu-linear")
 	throw std::runtime_error("this is not BleuLinear feature: " + parameter);
 
       int order        = 4;
@@ -398,17 +399,17 @@ namespace cicada
       path_type   refset_file;
 
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	if (utils::ipiece(piter->first) == "order")
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "precision") == 0)
+	else if (utils::ipiece(piter->first) == "precision")
 	  precision = boost::lexical_cast<double>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "ratio") == 0)
+	else if (utils::ipiece(piter->first) == "ratio")
 	  ratio = boost::lexical_cast<double>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "tokenizer") == 0)
+	else if (utils::ipiece(piter->first) == "tokenizer")
 	  tokenizer = &cicada::Tokenizer::create(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "name") == 0)
+	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
-	else if (strcasecmp(piter->first.c_str(), "refset") == 0)
+	else if (utils::ipiece(piter->first) == "refset")
 	  refset_file = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu-linear: " << piter->first << "=" << piter->second << std::endl;

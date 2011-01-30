@@ -11,6 +11,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -24,11 +25,11 @@ namespace cicada
       typedef cicada::Parameter param_type;
 
       param_type param(parameter);
-      if (param.name() != "normalize")
+      if (utils::ipiece(param.name()) != "normalize")
 	throw std::runtime_error("this is not a feature normalizer");
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "prefix") == 0)
+	if (utils::ipiece(piter->first) == "prefix")
 	  feature_prefix = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for feature normalizer: " << piter->first << "=" << piter->second << std::endl;
