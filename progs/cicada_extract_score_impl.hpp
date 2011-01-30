@@ -1703,11 +1703,12 @@ public:
       //index.insert(modified.source.c_str(), modified.source.size(), id);
       
       codes.clear();
-      tokenizer_type tokenizer(modified.source);
+      const utils::piece source_piece(modified.source);
+      tokenizer_type tokenizer(source_piece);
 	  
       tokenizer_type::iterator titer_end = tokenizer.end();
       for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-	const std::string& seg = *titer;
+	const utils::piece& seg = *titer;
 	    
 	codes.push_back(segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
       }
