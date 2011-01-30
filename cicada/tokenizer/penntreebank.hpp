@@ -132,7 +132,7 @@ namespace cicada
 	patterns.push_back(pattern_type(regex_type("\'([sSmMdD]|ll|LL|re|RE|ve|VE) "), " \'$1 ")); // as in it's I'm we'd, 'll 're
 	patterns.push_back(pattern_type(regex_type("(n\'t|N\'T) "), " $1 "));
 	
-	patterns.push_back(pattern_type(regex_type(" ([Cc])annot "), " $1an not"));
+	patterns.push_back(pattern_type(regex_type(" ([Cc])annot "), " $1an not "));
 	patterns.push_back(pattern_type(regex_type(" ([Dd])\'ye "), " $1\' ye "));
 	patterns.push_back(pattern_type(regex_type(" ([Gg])imme "), " $1im me "));
 	patterns.push_back(pattern_type(regex_type(" ([Gg])onna "), " $1on na "));
