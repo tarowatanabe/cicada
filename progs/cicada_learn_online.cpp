@@ -160,7 +160,6 @@ int main(int argc, char ** argv)
       return 0;
     }
 
-    
     threads = utils::bithack::max(threads, 1);
     
     weight_set_type weights;
@@ -174,9 +173,9 @@ int main(int argc, char ** argv)
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
     
-    if (strcasecmp(algorithm.c_str(), "mira") == 0)
+    if (utils::ipiece(algorithm) == "mira")
       ::optimize<OptimizeMIRA>(weights, weights_average, generator);
-    else if (strcasecmp(algorithm.c_str(), "cp") == 0)
+    else if (utils::ipiece(algorithm) == "cp")
       ::optimize<OptimizeCP>(weights, weights_average, generator);
     else
       throw std::runtime_error("unsupported learning algorithm: " + algorithm);

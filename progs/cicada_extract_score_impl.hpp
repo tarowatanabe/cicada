@@ -625,13 +625,13 @@ struct LexiconGHKM : public LexiconBase
 	      const lexicon_model_type& __lexicon_target_source)
     : LexiconBase(__lexicon_source_target, __lexicon_target_source) {}
   
-  void assign_source(const std::string& phrase)
+  void assign_source(const utils::piece& phrase)
   {
     source.clear();
     cicada::TreeRule(phrase).frontier(std::back_inserter(source));
   }
 
-  void assign_target(const std::string& phrase)
+  void assign_target(const utils::piece& phrase)
   {
     target.clear();
     cicada::TreeRule(phrase).frontier(std::back_inserter(target));

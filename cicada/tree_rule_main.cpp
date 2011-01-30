@@ -24,7 +24,7 @@ void post_order(const rule_type& rule)
   std::cout << "label: " << rule.label << std::endl;
 }
 
-void process(const std::string& rule_str)
+void process(const utils::piece& rule_str)
 {
   const rule_type rule(rule_str);
   
