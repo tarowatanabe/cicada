@@ -58,8 +58,8 @@ namespace cicada
       throw std::runtime_error("no shard size...");
 
     shards.clear();
-    shards.reserve(boost::lexical_cast<size_type>(siter->second));
-    shards.resize(boost::lexical_cast<size_type>(siter->second));
+    shards.reserve(boost::lexical_cast<size_t>(siter->second));
+    shards.resize(boost::lexical_cast<size_t>(siter->second));
     
     for (size_t shard = 0; shard != shards.size(); ++ shard) {
       std::ostringstream stream_shard;
