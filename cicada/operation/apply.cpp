@@ -13,6 +13,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -26,28 +27,27 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "apply")
+      if (utils::ipiece(param.name()) != "apply")
 	throw std::runtime_error("this is not a feature-functin applier");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "size") == 0)
+	if (utils::ipiece(piter->first) == "size")
 	  size = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "exact") == 0)
+	else if (utils::ipiece(piter->first) == "exact")
 	  exact = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "prune") == 0)
+	else if (utils::ipiece(piter->first) == "prune")
 	  prune = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "grow") == 0)
+	else if (utils::ipiece(piter->first) == "grow")
 	  grow = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "incremental") == 0)
+	else if (utils::ipiece(piter->first) == "incremental")
 	  incremental = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "forced") == 0)
+	else if (utils::ipiece(piter->first) == "forced")
 	  forced = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights") == 0)
+	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "weights-one") == 0)
+	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "feature") == 0
-		 || strcasecmp(piter->first.c_str(), "feature-function") == 0)
+	else if (utils::ipiece(piter->first) == "feature" || utils::ipiece(piter->first) == "feature-function")
 	  model_local.push_back(feature_function_type::create(piter->second));
 	else
 	  std::cerr << "WARNING: unsupported parameter for apply: " << piter->first << "=" << piter->second << std::endl;

@@ -11,6 +11,7 @@
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -23,22 +24,22 @@ namespace cicada
       typedef cicada::Parameter param_type;
     
       param_type param(parameter);
-      if (param.name() != "binarize")
+      if (utils::ipiece(param.name()) != "binarize")
 	throw std::runtime_error("this is not a binarizer");
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (strcasecmp(piter->first.c_str(), "order") == 0)
+	if (utils::ipiece(piter->first) == "order")
 	  order = boost::lexical_cast<int>(piter->second);
-	else if (strcasecmp(piter->first.c_str(), "direction") == 0) {
-	  const std::string& dir = piter->second;
-	
-	  if (strcasecmp(dir.c_str(), "left") == 0)
+	else if (utils::ipiece(piter->first) == "direction") {
+	  const utils::ipiece dir = piter->second;
+	  
+	  if (dir == "left")
 	    left = true;
-	  else if (strcasecmp(dir.c_str(), "right") == 0)
+	  else if (dir == "right")
 	    right = true;
-	  else if (strcasecmp(dir.c_str(), "all") == 0)
+	  else if (dir == "all")
 	    all = true;
-	  else if (strcasecmp(dir.c_str(), "terminal") == 0)
+	  else if (dir == "terminal")
 	    terminal = true;
 	  else
 	    throw std::runtime_error("unuspported direction: " + parameter);

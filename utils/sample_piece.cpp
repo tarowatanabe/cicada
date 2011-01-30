@@ -31,7 +31,8 @@ int main(int argc, char** argv)
 
   const char* str3 = "Good";
   const char* str4 = "GOOD";
-
+  const char* str5 = "Good-bye";
+  
   std::cout << "less: " << (utils::piece(str3) < str4) << std::endl
 	    << "greater: " << (utils::piece(str3) > str4) << std::endl
 	    << "equal: " << (utils::piece(str3) == str4) << std::endl;
@@ -39,5 +40,9 @@ int main(int argc, char** argv)
   std::cout << "less: " << (utils::ipiece(str3) < str4) << std::endl
 	    << "greater: " << (utils::ipiece(str3) > str4) << std::endl
 	    << "equal: " << (utils::ipiece(str3) == str4) << std::endl;
+  
+  std::cout << "less: " << (utils::ipiece(str3) < str5) << std::endl
+	    << "greater: " << (utils::ipiece(str3) > str5) << std::endl
+	    << "equal: " << (utils::ipiece(str3) == str5) << std::endl;
   
 }

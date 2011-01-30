@@ -46,9 +46,10 @@ namespace cicada
     
   public:
     Feature() : __id(__allocate_empty()) { }
+    Feature(const utils::piece& x) : __id(__allocate(x)) { }
     Feature(const feature_type& x) : __id(__allocate(x)) { }
     Feature(const char* x) : __id(__allocate(x)) { }
-    Feature(const id_type& x) : __id(x) {}
+    Feature(const id_type& x) : __id(x) { }
     template <typename Iterator>
     Feature(Iterator first, Iterator last) : __id(__allocate(feature_type(first, last))) { }
     

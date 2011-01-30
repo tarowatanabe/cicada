@@ -53,6 +53,7 @@ namespace cicada
     
   public:
     Symbol() : __id(__allocate_empty()) { }
+    Symbol(const utils::piece& x) : __id(__allocate(x)) { }
     Symbol(const symbol_type& x) : __id(__allocate(x)) { }
     Symbol(const char* x) : __id(__allocate(x)) { }
     Symbol(const id_type& x) : __id(x) {}

@@ -52,12 +52,12 @@ namespace utils
     // construct from basic_piece
     template <typename _T>
     basic_piece(const basic_piece<_T>& str)
-      : first_(str.first_), last_(str.last_) {}
+      : first_(str.begin()), last_(str.end()) {}
     template <typename _T>
     basic_piece(const basic_piece<_T>& str, size_type pos, size_type n = npos())
-      : first_(str.first_ + pos), last_(n == npos() ? str.last_ : std::min(str.first_ + pos + n, str.last_))
+      : first_(str.begin() + pos), last_(n == npos() ? str.end() : std::min(str.begin() + pos + n, str.end()))
     {
-      if (first_ > str.last_)
+      if (first_ > str.end())
 	throw std::out_of_range("basic_piece::basic_piece");
     }
     
@@ -93,16 +93,16 @@ namespace utils
     template <typename _T>
     void assign(const basic_piece<_T>& str)
     {
-      first_ = str.first_;
-      last_  = str.last_;
+      first_ = str.begin();
+      last_  = str.end();
     }
     template <typename _T>
     void assign(const basic_piece<_T>& str, size_type pos, size_type n = npos())
     {
-      first_ = str.first_ + pos;
-      last_  = (n == npos() ? str.last_ : std::min(str.first_ + pos + n, str.last_));
+      first_ = str.begin() + pos;
+      last_  = (n == npos() ? str.end() : std::min(str.begin() + pos + n, str.end()));
 
-      if (first_ > str.last_)
+      if (first_ > str.end())
 	throw std::out_of_range("basic_piece::assign");
     }
     
@@ -172,20 +172,14 @@ namespace utils
 
     int compare(const basic_piece& x) const
     {
-      const size_type __x = size();
-      const size_type __y = x.size();
-
-      int __result = traits_type::compare(data(), x.data(), utils::bithack::min(__x, __y));
+      const difference_type __x = size();
+      const difference_type __y = x.size();
+      
+      const int __result = traits_type::compare(data(), x.data(), utils::bithack::min(__x, __y));
       if (__result)
 	return __result;
-      else {
-	if (__x > __y)
-	  return 1;
-	else if (__x < __y)
-	  return -1;
-	else
-	  return 0;
-      }
+      else
+	return __x - __y;
     }
     
   private:
@@ -211,7 +205,7 @@ namespace utils
   inline
   bool operator!=(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return ! (x == y);
+    return x.compare(y) != 0;
   }
   
   template <typename _T>
@@ -225,7 +219,7 @@ namespace utils
   inline
   bool operator>(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return y < x;
+    return x.compare(y) > 0;
   }
   
   
@@ -233,14 +227,14 @@ namespace utils
   inline
   bool operator<=(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return ! (y < x);
+    return x.compare(y) <= 0;
   }
   
   template <typename _T>
   inline
   bool operator>=(const basic_piece<_T>& x, const basic_piece<_T>& y)
   {
-    return ! (x < y);
+    return x.compare(y) >= 0;
   }
   
   
@@ -320,12 +314,96 @@ namespace utils
   {
     return x <= basic_piece<_T>(y);
   }
-
+  
   template <typename _T>
   inline
   bool operator>=(const basic_piece<_T>& x, const std::string& y)
   {
     return x >= basic_piece<_T>(y);
+  }
+  
+  template <typename _T>
+  inline
+  bool operator==(const char* x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) == y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator!=(const char* x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) != y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator<(const char* x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) < y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator>(const char* x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) > y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator<=(const char* x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) <= y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator>=(const char* x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) >= y;
+  }
+
+  template <typename _T>
+  inline
+  bool operator==(const std::string& x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) == y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator!=(const std::string& x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) != y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator<(const std::string& x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) < y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator>(const std::string& x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) > y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator<=(const std::string& x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) <= y;
+  }
+  
+  template <typename _T>
+  inline
+  bool operator>=(const std::string& x, const basic_piece<_T>& y)
+  {
+    return basic_piece<_T>(x) >= y;
   }
   
   template <typename _T>

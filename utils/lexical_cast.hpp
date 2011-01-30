@@ -8,6 +8,8 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include <utils/piece.hpp>
+
 namespace utils
 {
   template <typename Target, typename Source>
@@ -19,6 +21,40 @@ namespace utils
 
   template <>
   inline
+  bool lexical_cast<bool, utils::ipiece>(const utils::ipiece& arg)
+  {
+    if (arg == "true")
+      return true;
+    else if (arg == "false")
+      return false;
+    else if (arg == "yes")
+      return true;
+    else if (arg == "no")
+      return false;
+    else if (arg == "nil")
+      return false;
+    else if (atol(arg.c_str()) > 0)
+      return true;
+    else
+      return false;
+  }
+  
+  template <>
+  inline
+  utils::piece lexical_cast<utils::piece, bool>(const bool& arg)
+  {
+    return (arg ? "true" : "false");
+  }
+
+  template <>
+  inline
+  bool lexical_cast<bool, utils::piece>(const utils::piece& arg)
+  {
+    return lexical_cast<bool>(utils::ipiece(arg));
+  }
+  
+  template <>
+  inline
   std::string lexical_cast<std::string, bool>(const bool& arg)
   {
     return (arg ? "true" : "false");
@@ -28,21 +64,9 @@ namespace utils
   inline
   bool lexical_cast<bool, std::string>(const std::string& arg)
   {
-    if (strcasecmp(arg.c_str(), "true") == 0)
-      return true;
-    else if (strcasecmp(arg.c_str(), "false") == 0)
-      return false;
-    else if (strcasecmp(arg.c_str(), "yes") == 0)
-      return true;
-    else if (strcasecmp(arg.c_str(), "no") == 0)
-      return false;
-    else if (strcasecmp(arg.c_str(), "nil") == 0)
-      return false;
-    else if (atoi(arg.c_str()) > 0)
-      return true;
-    else
-      return false;
+    return lexical_cast<bool>(utils::ipiece(arg));
   }
+
 };
 
 #endif

@@ -46,6 +46,7 @@ namespace cicada
     
   public:
     Attribute() : __id(__allocate_empty()) { }
+    Attribute(const utils::piece& x) : __id(__allocate(x)) { }
     Attribute(const attribute_type& x) : __id(__allocate(x)) { }
     Attribute(const char* x) : __id(__allocate(x)) { }
     Attribute(const id_type& x) : __id(x) {}
