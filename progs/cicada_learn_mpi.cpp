@@ -26,6 +26,7 @@
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
 #include "utils/space_separator.hpp"
+#include "utils/piece.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -925,8 +926,8 @@ void reduce_weights(weight_set_type& weights)
   typedef std::vector<device_ptr_type, std::allocator<device_ptr_type> > device_ptr_set_type;
   typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
 
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
@@ -950,14 +951,15 @@ void reduce_weights(weight_set_type& weights)
     for (int rank = 1; rank < mpi_size; ++ rank)
       while (stream[rank] && device[rank] && device[rank]->test()) {
 	if (std::getline(*stream[rank], line)) {
-	  tokenizer_type tokenizer(line);
+	  const utils::piece line_piece(line);
+	  tokenizer_type tokenizer(line_piece);
 	  
 	  tokenizer_type::iterator iter = tokenizer.begin();
 	  if (iter == tokenizer.end()) continue;
-	  std::string feature = *iter;
+	  const utils::piece feature = *iter;
 	  ++ iter;
 	  if (iter == tokenizer.end()) continue;
-	  std::string value = *iter;
+	  const utils::piece value = *iter;
 	  
 	  weights[feature] += utils::decode_base64<double>(value);
 	} else {

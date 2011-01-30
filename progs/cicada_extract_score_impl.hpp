@@ -38,6 +38,7 @@
 #include <cicada/alignment.hpp>
 #include <cicada/tree_rule.hpp>
 
+#include <utils/piece.hpp>
 #include <utils/space_separator.hpp>
 #include <utils/tempfile.hpp>
 #include <utils/hashmurmur.hpp>
@@ -1449,23 +1450,24 @@ public:
   
   const count_set_type& operator[](const phrase_type& phrase) const
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     
-    tokenizer_type tokenizer(phrase);
+    const utils::piece phrase_piece(phrase);
+    tokenizer_type tokenizer(phrase_piece);
     
     index_db_type::size_type node = 0;
     
     tokenizer_type::iterator titer_end = tokenizer.end();
     for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-      const std::string& seg = *titer;
+      const utils::piece& seg = *titer;
       
       const segment_db_type::pos_type id = segment.find(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0));
       if (id == segment_db_type::npos())
-	throw std::runtime_error("no segment?: " + seg);
+	throw std::runtime_error("no segment?: " + static_cast<std::string>(seg));
       
       node = index.find(&id, 1, node);
       if (! index.is_valid(node))
-	throw std::runtime_error("no phrase?: " + phrase + " at segment: " + seg);
+	throw std::runtime_error("no phrase?: " + phrase + " at segment: " + static_cast<std::string>(seg));
     }
 
     if (! index.exists(node))
@@ -1581,7 +1583,7 @@ public:
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
 
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     typedef succinctdb::succinct_hash<key_type, std::allocator<key_type> > segment_map_type;
 
     clear();
@@ -1644,11 +1646,12 @@ public:
 	  //index.insert(modified.source.c_str(), modified.source.size(), id);
 	  
 	  codes.clear();
-	  tokenizer_type tokenizer(modified.source);
+	  const utils::piece source_piece(modified.source);
+	  tokenizer_type tokenizer(source_piece);
 	  
 	  tokenizer_type::iterator titer_end = tokenizer.end();
 	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-	    const std::string& seg = *titer;
+	    const utils::piece& seg = *titer;
 	    
 	    codes.push_back(segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
 	  }

@@ -42,8 +42,8 @@ namespace cicada
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
-	else if (utils::ipiece(piter->first) == "semiring")) {
-	const utils::ipiece name = piter->second;
+	else if (utils::ipiece(piter->first) == "semiring") {
+	  const utils::ipiece name = piter->second;
 	  
 	  if (name == "tropical")
 	    semiring_tropical = true;
@@ -52,7 +52,7 @@ namespace cicada
 	  else if (name == "log")
 	    semiring_log = true;
 	  else
-	    throw std::runtime_error("unknown semiring: " + name);
+	    throw std::runtime_error("unknown semiring: " + piter->second);
 	
 	} else
 	  std::cerr << "WARNING: unsupported parameter for prune: " << piter->first << "=" << piter->second << std::endl;

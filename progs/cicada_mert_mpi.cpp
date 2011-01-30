@@ -659,8 +659,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
 
   typedef boost::tokenizer<utils::space_separator> tokenizer_type;
-
-
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 

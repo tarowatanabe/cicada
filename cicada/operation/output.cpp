@@ -204,7 +204,7 @@ namespace cicada
 	  else if (value == "alignment" || value == "align")
 	    yield_alignment = true;
 	  else
-	    throw std::runtime_error("unknown yield: " + value);
+	    throw std::runtime_error("unknown yield: " + piter->second);
 	} else
 	  std::cerr << "WARNING: unsupported parameter for output: " << piter->first << "=" << piter->second << std::endl;
       }
