@@ -44,6 +44,8 @@ namespace cicada
 
     void Intersect::operator()(data_type& data) const
     {
+      if (! data.hypergraph.is_valid()) return;
+      
       const sentence_set_type& targets = data.targets;
       hypergraph_type& hypergraph = data.hypergraph;
 	

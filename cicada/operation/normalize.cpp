@@ -40,6 +40,8 @@ namespace cicada
     {
       typedef hypergraph_type::feature_set_type feature_set_type;
 
+      if (! data.hypergraph.is_valid()) return;
+
       hypergraph_type& hypergraph = data.hypergraph;
 
       if (debug)

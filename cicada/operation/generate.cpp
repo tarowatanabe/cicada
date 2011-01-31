@@ -45,6 +45,8 @@ namespace cicada
 
     void GenerateEarley::operator()(data_type& data) const
     {
+      if (! data.hypergraph.is_valid()) return;
+
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type generated;
     

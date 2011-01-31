@@ -307,7 +307,7 @@ output: kbest or hypergraph output\n\
     if (input_bitext) {
       if (! parse_separator(iter, end))
 	throw std::runtime_error("invalid bitext format (separator)");
-
+      
       if (! data.targets.assign(iter, end))
 	throw std::runtime_error("invalid sentence set format");
     }
@@ -316,13 +316,8 @@ output: kbest or hypergraph output\n\
       throw std::runtime_error("invalid input format");
     
     // processing...
-    
-    if (data.lattice.empty() && ! data.hypergraph.is_valid()) {
-      
-    } else {
-      operation_ptr_set_type::const_iterator oiter_end = operations.end();
-      for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
-	(*oiter)->operator()(data);
-    }
+    operation_ptr_set_type::const_iterator oiter_end = operations.end();
+    for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
+      (*oiter)->operator()(data);
   }
 };

@@ -53,15 +53,16 @@ namespace cicada
     void ExpectedNGram::operator()(data_type& data) const
     {
       typedef cicada::semiring::Logprob<double> weight_type;
-
+      
       ngram_count_set_type& ngram_counts = data.ngram_counts;
       const hypergraph_type& hypergraph = data.hypergraph;
-
+      
+      ngram_counts.clear();
+      if (! hypergraph.is_valid()) return;
+      
       weight_set_type weights_zero;
       const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
-    
-      ngram_counts.clear();
-	
+          
       utils::resource ngram_start;
     
       if (weights_one)

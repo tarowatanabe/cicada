@@ -67,6 +67,8 @@ namespace cicada
 
     void Apply::operator()(data_type& data) const
     {
+      if (! data.hypergraph.is_valid()) return;
+      
       typedef cicada::semiring::Logprob<double> weight_type;
 
       hypergraph_type& hypergraph = data.hypergraph;

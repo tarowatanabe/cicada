@@ -56,6 +56,8 @@ namespace cicada
 
     void Binarize::operator()(data_type& data) const
     {
+      if (! data.hypergraph.is_valid()) return;
+
       hypergraph_type binarized;
     
       if (debug)
