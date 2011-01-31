@@ -18,9 +18,6 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
     
-Re-engineer tree-grammar/tree-transducer code:
-   Use special edge_tye to encapsulate edge-id so that we can differentiate
-   from a conventional "flat" tree-fragment, used in string-to-tree decoding.
 
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
