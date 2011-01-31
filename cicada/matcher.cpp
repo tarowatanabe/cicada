@@ -79,7 +79,7 @@ wordnet: matching by wordnet synsets\n\
     
     const parameter_type param(parameter);
 
-    if (param.name() == "lower") {
+    if (utils::ipiece(param.name()) == "lower") {
       const std::string name("lower");
       
       matcher_map_type::iterator iter = matchers_map.find(name);
@@ -111,7 +111,7 @@ wordnet: matching by wordnet synsets\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "wordnet" || param.name() == "wn") {
+    } else if (utils::ipiece(param.name()) == "wordnet" || utils::ipiece(param.name()) == "wn") {
       std::string path;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {

@@ -73,7 +73,7 @@ chinese: Chinese head finder\n\
 #endif
     
     const parameter_type param(parameter);
-    if (param.name() == "collins") {
+    if (utils::ipiece(param.name()) == "collins") {
       const std::string name("collins");
       
       finder_map_type::iterator iter = finders_map.find(name);
@@ -81,7 +81,7 @@ chinese: Chinese head finder\n\
 	iter = finders_map.insert(std::make_pair(name, finder_ptr_type(new head::Collins()))).first;
       
       return *(iter->second);
-    } else if (param.name() == "collins-modified" || param.name() == "modified-collins") {
+    } else if (utils::ipiece(param.name()) == "collins-modified" || utils::ipiece(param.name()) == "modified-collins") {
       const std::string name("collins");
       
       finder_map_type::iterator iter = finders_map.find(name);
@@ -89,7 +89,7 @@ chinese: Chinese head finder\n\
 	iter = finders_map.insert(std::make_pair(name, finder_ptr_type(new head::CollinsModified()))).first;
       
       return *(iter->second);
-    } else if (param.name() == "chinese") {
+    } else if (utils::ipiece(param.name()) == "chinese") {
       const std::string name("chinese");
       
       finder_map_type::iterator iter = finders_map.find(name);

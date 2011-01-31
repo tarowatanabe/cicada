@@ -89,7 +89,7 @@ tokenize: use the chain of tokenization\n\
     
     const parameter_type param(parameter);
     
-    if (param.name() == "lower") {
+    if (utils::ipiece(param.name()) == "lower") {
       const std::string name("lower");
       
       tokenizer_map_type::iterator iter = tokenizers_map.find(name);
@@ -99,7 +99,7 @@ tokenize: use the chain of tokenization\n\
       }
 
       return *(iter->second);
-    } else if (param.name() == "nist") {
+    } else if (utils::ipiece(param.name()) == "nist") {
       const std::string name("nist");
       
       tokenizer_map_type::iterator iter = tokenizers_map.find(name);
@@ -109,7 +109,7 @@ tokenize: use the chain of tokenization\n\
       }
 
       return *(iter->second);
-    } else if (param.name() == "penn") {
+    } else if (utils::ipiece(param.name()) == "penn" || utils::ipiece(param.name()) == "penntreebank") {
       const std::string name("penn");
       
       tokenizer_map_type::iterator iter = tokenizers_map.find(name);
@@ -119,7 +119,7 @@ tokenize: use the chain of tokenization\n\
       }
 
       return *(iter->second);
-    } else if (param.name() == "nonascii") {
+    } else if (utils::ipiece(param.name() == "nonascii")) {
       const std::string name("nonascii");
       
       tokenizer_map_type::iterator iter = tokenizers_map.find(name);
@@ -129,7 +129,7 @@ tokenize: use the chain of tokenization\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "stemmer") {
+    } else if (utils::ipiece(param.name()) == "stemmer") {
       std::string algorithm;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
@@ -151,7 +151,7 @@ tokenize: use the chain of tokenization\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "tokenize") {
+    } else if (utils::ipiece(param.name()) == "tokenize") {
       tokenizer_map_type::iterator iter = tokenizers_map.find(parameter);
       if (iter == tokenizers_map.end()) {
 	std::auto_ptr<tokenizer::Tokenize> tokenize(new tokenizer::Tokenize());

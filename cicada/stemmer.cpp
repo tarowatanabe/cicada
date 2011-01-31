@@ -87,7 +87,7 @@ lower: lower casing\n\
     
     const parameter_type param(parameter);
     
-    if (param.name() == "prefix") {
+    if (utils::ipiece(param.name()) == "prefix") {
       int size = 0;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "size")
@@ -108,7 +108,7 @@ lower: lower casing\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "suffix") {
+    } else if (utils::ipiece(param.name()) == "suffix") {
       int size = 0;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "size")
@@ -129,7 +129,7 @@ lower: lower casing\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "digit" || param.name() == "digits") {
+    } else if (utils::ipiece(param.name()) == "digit" || utils::ipiece(param.name()) == "digits") {
       const std::string name("digit");
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
@@ -139,7 +139,7 @@ lower: lower casing\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "latin") {
+    } else if (utils::ipiece(param.name()) == "latin") {
       const std::string name("latin");
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
@@ -149,7 +149,7 @@ lower: lower casing\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "lower") {
+    } else if (utils::ipiece(param.name()) == "lower") {
       const std::string name("lower");
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
@@ -159,7 +159,7 @@ lower: lower casing\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "arabic") {
+    } else if (utils::ipiece(param.name()) == "arabic") {
       const std::string name("arabic");
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
@@ -169,8 +169,8 @@ lower: lower casing\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "snowball") {
-
+    } else if (utils::ipiece(param.name()) == "snowball") {
+      
       std::string language;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
