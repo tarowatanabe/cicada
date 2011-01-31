@@ -170,6 +170,16 @@ namespace utils
       return basic_piece(first, last);
     }
 
+    size_type find(const char* __s, size_type __pos, size_type __n) const
+    {
+      const size_type __size = size();
+      const char* __data = first_;
+      for (/**/; __pos + __n <= __size; ++__pos)
+        if (traits_type::compare(__data + __pos, __s, __n) == 0)
+          return __pos;
+      return npos();
+    }
+    
     size_type find(char __c, size_type __pos = 0) const
     {
       size_type __ret = npos();
