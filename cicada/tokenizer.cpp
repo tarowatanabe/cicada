@@ -119,7 +119,7 @@ tokenize: use the chain of tokenization\n\
       }
 
       return *(iter->second);
-    } else if (utils::ipiece(param.name() == "nonascii")) {
+    } else if (utils::ipiece(param.name()) == "nonascii") {
       const std::string name("nonascii");
       
       tokenizer_map_type::iterator iter = tokenizers_map.find(name);
