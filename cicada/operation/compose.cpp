@@ -63,9 +63,11 @@ namespace cicada
 
     void ComposeTree::operator()(data_type& data) const
     {
+      if (! data.hypergraph.is_valid()) return;
+
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type composed;
-    
+
       if (debug)
 	std::cerr << "composition: tree" << std::endl;
 	
@@ -143,6 +145,8 @@ namespace cicada
     
     void ComposeEarley::operator()(data_type& data) const
     {
+      if (! data.hypergraph.is_valid()) return;
+
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type composed;
     
@@ -222,6 +226,9 @@ namespace cicada
       const lattice_type& lattice = data.lattice;
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type composed;
+      
+      hypergraph.clear();
+      if (lattice.empty()) return;
     
       if (debug)
 	std::cerr << "composition: cky" << std::endl;
@@ -301,6 +308,9 @@ namespace cicada
       const lattice_type& lattice = data.lattice;
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type composed;
+
+      hypergraph.clear();
+      if (lattice.empty()) return;
     
       if (debug)
 	std::cerr << "composition: phrase" << std::endl;
@@ -375,7 +385,17 @@ namespace cicada
       const lattice_type& lattice = data.lattice;
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type composed;
-	
+      
+      if (lattice_mode) {
+	if (lattice.empty()) {
+	  hypergraph.clear();
+	  return;
+	}
+      } else {
+	if (! hypergraph.is_valid())
+	  return;
+      }
+      
       lattice_type target;
       if (! data.targets.empty())
 	target = lattice_type(data.targets.front());
