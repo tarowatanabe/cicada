@@ -89,7 +89,7 @@ wordnet: matching by wordnet synsets\n\
       }
       
       return *(iter->second);
-    } else if (param.name() == "stemmer") {
+    } else if (utils::ipiece(param.name()) == "stemmer") {
       std::string algorithm;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
