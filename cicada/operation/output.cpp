@@ -318,9 +318,12 @@ namespace cicada
 	       << id << " ||| hypergraph-shortest-leaf: " << length_shortest << '\n'
 	       << id << " ||| hypergraph-longest-leaf: "  << length_longest << '\n';
 	}
-      } else if (graphviz)
+      } else if (graphviz) {
+	if (! no_id)
+	  os << id << " ||| ";
 	cicada::graphviz(os, hypergraph);
-      else if (kbest_size <= 0) {
+	os << '\n';
+      } else if (kbest_size <= 0) {
 	if (debug)
 	  std::cerr << "output graph: " << data.id << std::endl;
 	  
