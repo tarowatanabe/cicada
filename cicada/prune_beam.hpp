@@ -54,10 +54,10 @@ namespace cicada
       typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
       typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
       
-      if (source.goal == hypergraph_type::invalid)
-	throw std::runtime_error("invalid graph");
-      
       target.clear();
+      
+      if (! source.is_valid())
+	return;
       
       inside_type    inside(source.nodes.size());
       posterior_type posterior(source.edges.size());

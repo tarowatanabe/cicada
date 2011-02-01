@@ -110,9 +110,9 @@ int main(int argc, char** argv)
       target.clear();
       
       if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser, boost::spirit::standard::blank, source))
-	throw std::runtime_error("source sentence parsing failed at #: " + boost::lexical_cast<std::string>(line_no));
+	throw std::runtime_error("source sentence parsing failed at # " + boost::lexical_cast<std::string>(line_no));
       if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
-	throw std::runtime_error("target sentence parsing failed at #: " + boost::lexical_cast<std::string>(line_no));
+	throw std::runtime_error("target sentence parsing failed at # " + boost::lexical_cast<std::string>(line_no));
       
       const size_t source_size = source.size();
       const size_t target_size = target.size();
@@ -124,9 +124,9 @@ int main(int argc, char** argv)
 	if (double(utils::bithack::max(source_size, target_size)) / double(utils::bithack::min(source_size, target_size)) >= max_fertility) continue;
       
       if (! boost::spirit::karma::generate(oiter_type(os_src), generator, source))
-	throw std::runtime_error("source sentence generation failed at #: " + boost::lexical_cast<std::string>(line_no));
+	throw std::runtime_error("source sentence generation failed at # " + boost::lexical_cast<std::string>(line_no));
       if (! boost::spirit::karma::generate(oiter_type(os_trg), generator, target))
-	throw std::runtime_error("target sentence generation failed at #: " + boost::lexical_cast<std::string>(line_no));
+	throw std::runtime_error("target sentence generation failed at # " + boost::lexical_cast<std::string>(line_no));
     }
     if (siter != siter_end || titer != titer_end)
       throw std::runtime_error("# of lines do not match");

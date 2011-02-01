@@ -10,6 +10,7 @@
 #include <cicada/semiring.hpp>
 #include <cicada/sort.hpp>
 #include <cicada/kbest.hpp>
+#include <cicada/inside_outside.hpp>
 
 namespace cicada
 {
@@ -29,33 +30,29 @@ namespace cicada
     
     typedef typename function_type::value_type weight_type;
     
-    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
-    typedef std::vector<bool, std::allocator<bool> > survived_type;
+    typedef std::vector<bool, std::allocator<bool> > removed_type;
     
-    struct filter_survived
+    struct filter_pruned
     {
-      const survived_type& survived;
+      const removed_type& removed;
       
-      filter_survived(const survived_type& __survived) : survived(__survived) {}
+      filter_pruned(const removed_type& __removed) : removed(__removed) {}
       
       template <typename Edge>
       bool operator()(const Edge& edge) const
       {
-	return ! survived[edge.id];
+	return removed[edge.id];
       }
     };
 
     struct traversal
     {
-      typedef edge_set_type value_type;
+      typedef int value_type;
       
       template <typename Edge, typename Iterator>
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
-	yield.clear();
-	yield.push_back(edge.id);
-	for (/**/; first != last; ++ first)
-	  yield.insert(yield.end(), first->begin(), first->end());
+	// nothing!
       }
     };
     
@@ -77,30 +74,37 @@ namespace cicada
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
+      typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
+      typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
+
       typedef cicada::KBest<traversal, Function, kbest_filter> kbest_derivations_type;
 
-      if (! source.is_valid()) {
-	target.clear();
+      target.clear();
+      if (! source.is_valid())
 	return;
-      }
       
       kbest_derivations_type derivations(source, kbest_size, traversal(), function, kbest_filter());
       
-      edge_set_type derivation;
+      int derivation;
       weight_type   weight;
-      
-      survived_type survived(source.edges.size(), false);
-      
       for (size_type k = 0; k != kbest_size; ++ k) {
-	if (! derivations(k, derivation, weight))
-	  break;
+	weight_type weight_curr;
 	
-	typename edge_set_type::const_iterator eiter_end = derivation.end();
-	for (typename edge_set_type::const_iterator eiter = derivation.begin(); eiter != eiter_end; ++ eiter)
-	  survived[*eiter] = true;
+	if (! derivations(k, derivation, weight_curr))
+	  break;
+	weight = weight_curr;
       }
       
-      cicada::topologically_sort(source, target, filter_survived(survived), validate);
+      inside_type    inside(source.nodes.size());
+      posterior_type posterior(source.edges.size());
+      
+      inside_outside(source, inside, posterior, function, function);
+      
+      removed_type removed(source.edges.size(), false);
+      for (id_type id = 0; id != source.edges.size(); ++ id)
+	removed[id] = (posterior[id] < weight);
+      
+      topologically_sort(source, target, filter_pruned(removed), validate);
     }
     
     const function_type& function;
