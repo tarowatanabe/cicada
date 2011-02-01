@@ -39,6 +39,15 @@ namespace cicada
     {
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
+      
+      if (! graph.is_valid()) {
+	hypergraph_type graph_empty;
+	if (! no_id)
+	  os << id << " ||| ";
+	os << graph_empty << " ||| ||| 0" << '\n';
+	return;
+      }
+
 
       cicada::KBest<kbest_traversal_edges, Function, Filter> derivations(graph, kbest_size, kbest_traversal_edges(), function, filter);
       
@@ -133,6 +142,13 @@ namespace cicada
       typedef typename hypergraph_type::rule_type rule_type;
       typedef typename hypergraph_type::feature_set_type feature_set_type;
       
+      if (! graph.is_valid()) {
+	if (! no_id)
+	  os << id << " |||";
+	os << " ||| ||| 0" << '\n';
+	return;
+      }
+      
       cicada::KBest<Traversal, Function, Filter> derivations(graph, kbest_size, traversal, function, filter);
   
       typename Traversal::value_type derivation;
@@ -163,6 +179,8 @@ namespace cicada
 	yield_alignment(false),
 	graphviz(false),
 	statistics(false),
+	lattice_mode(false),
+	forest_mode(false),
 	no_id(false),
 	debug(__debug)
     {
@@ -171,8 +189,7 @@ namespace cicada
       param_type param(parameter);
       if (utils::ipiece(param.name()) != "output")
 	throw std::runtime_error("this is not a outputter");
-
-    
+      
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "kbest")
 	  kbest_size = boost::lexical_cast<int>(piter->second);
@@ -186,6 +203,10 @@ namespace cicada
 	  graphviz = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "statistics")
 	  statistics = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "lattice")
+	  lattice_mode = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "forest")
+	  forest_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "no-id")
 	  no_id = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "file")
@@ -228,6 +249,11 @@ namespace cicada
 	
       if (graphviz && statistics)
 	throw std::runtime_error("only one of graphviz or statistics can be specified...");
+      
+      if (lattice_mode && forest_mode)
+	throw std::runtime_error("only one of lattice or forest can be dumped");
+      if (int(lattice_mode) + forest_mode == 0)
+	forest_mode = true;
     }
 
     void Output::assign(const weight_set_type& __weights)
@@ -321,23 +347,28 @@ namespace cicada
       } else if (graphviz) {
 	if (! no_id)
 	  os << id << " ||| ";
-	cicada::graphviz(os, hypergraph);
+	if (lattice_mode)
+	  cicada::graphviz(os, data.lattice);
+	else
+	  cicada::graphviz(os, hypergraph);
 	os << '\n';
       } else if (kbest_size <= 0) {
 	if (debug)
-	  std::cerr << "output graph: " << data.id << std::endl;
-	  
-	if (no_id)
-	  os << hypergraph << '\n';
+	  std::cerr << "output: " << data.id << std::endl;
+	
+	if (! no_id)
+	  os << id << " ||| ";
+	if (lattice_mode)
+	  os << data.lattice << '\n';
 	else
-	  os << id << " ||| " << hypergraph << '\n';
-      } else if (hypergraph.is_valid()) {
+	  os << hypergraph << '\n';
+      } else {
 	if (debug)
 	  std::cerr << "output " << kbest_size << "-best for graph: "<< data.id << std::endl;
-
+	
 	weight_set_type weights_zero;
 	const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
-      
+	
 	if (weights_one) {
 	  if (kbest_unique) {
 	    if (yield_alignment)

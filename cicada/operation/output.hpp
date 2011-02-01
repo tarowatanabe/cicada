@@ -42,9 +42,11 @@ namespace cicada
       bool yield_string;
       bool yield_tree;
       bool yield_alignment;
-
+      
       bool graphviz;
       bool statistics;
+      bool lattice_mode;
+      bool forest_mode;
       bool no_id;
   
       int debug;

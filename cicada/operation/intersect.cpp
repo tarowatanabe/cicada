@@ -46,21 +46,30 @@ namespace cicada
     {
       if (! data.hypergraph.is_valid()) return;
       
+      if (lattice_mode) {
+	if (data.lattice.empty()) {
+	  data.hypergraph.clear();
+	  return;
+	}
+      } else {
+	if (data.targets.empty() || data.targets.front().empty()) {
+	  data.hypergraph.clear();
+	  return;
+	}
+      }
+      
       const sentence_set_type& targets = data.targets;
       hypergraph_type& hypergraph = data.hypergraph;
-	
+      
       hypergraph_type intersected;
-	
+      
       utils::resource start;
-	
+      
       if (lattice_mode)
 	cicada::intersect(hypergraph, data.lattice, intersected);
       else {
-	if (targets.empty())
-	  throw std::runtime_error("no target?");
-	  
 	lattice_type target(targets.front());
-	  
+	
 	cicada::intersect(hypergraph, target, intersected);
       }
     
