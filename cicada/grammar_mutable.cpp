@@ -230,7 +230,8 @@ namespace cicada
     if (! rule_target.rhs.empty() && rule_source.rhs.arity() != rule_target.rhs.arity())
       throw std::runtime_error("arity do not match");
     
-    cicada::sort(rule_source, rule_target);
+    if (! rule_target.rhs.empty())
+      cicada::sort(rule_source, rule_target);
     
     // we will transform into "plain" non-terminal, so that we can query!
     sequence_type source_index(rule_source.rhs.size());
@@ -369,7 +370,8 @@ namespace cicada
       if (! rule_target.rhs.empty() && rule_source.rhs.arity() != rule_target.rhs.arity())
       throw std::runtime_error("arity do not match");
       
-      cicada::sort(rule_source, rule_target);
+      if (! rule_target.rhs.empty())
+	cicada::sort(rule_source, rule_target);
       
       source_index.resize(rule_source.rhs.size());
       sequence_type::iterator iiter = source_index.begin();

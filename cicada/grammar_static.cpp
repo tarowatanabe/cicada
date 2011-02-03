@@ -295,12 +295,16 @@ namespace cicada
 	    const rule_ptr_type rule_source = read_phrase(lhs, pos_source, cache_sources, source_db);
 	    const rule_ptr_type rule_target = read_phrase(lhs, pos_target, cache_targets, target_db);
 	    
-	    rule_type rule_sorted_source(*rule_source);
-	    rule_type rule_sorted_target(*rule_target);
-	    
-	    cicada::sort(rule_sorted_source, rule_sorted_target);
-	    
-	    options.push_back(rule_pair_type(rule_type::create(rule_sorted_source), rule_type::create(rule_sorted_target)));
+	    if (rule_target->empty())
+	      options.push_back(rule_pair_type(rule_source, rule_target));
+	    else {
+	      rule_type rule_sorted_source(*rule_source);
+	      rule_type rule_sorted_target(*rule_target);
+	      
+	      cicada::sort(rule_sorted_source, rule_sorted_target);
+	      
+	      options.push_back(rule_pair_type(rule_type::create(rule_sorted_source), rule_type::create(rule_sorted_target)));
+	    }
 	    
 	    for (size_t feature = 0; feature < score_db.size(); ++ feature) {
 	      const score_type score = score_db[feature][pos_feature];
