@@ -104,35 +104,6 @@ namespace cicada
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
 
-    struct NodeCount
-    {
-      typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > node_count_type;
-      
-      typedef node_count_type::value_type     value_type;
-      
-      typedef node_count_type::const_iterator const_iterator;
-      typedef node_count_type::iterator       iterator;
-      
-      NodeCount() { node_count.set_empty_key(symbol_type()); }
-
-      int& operator[](const symbol_type& key) { return node_count[key]; }
-      
-      inline       iterator find(const symbol_type& key)       { return node_count.find(key); }
-      inline const_iterator find(const symbol_type& key) const { return node_count.find(key); }
-      
-      inline       iterator begin()       { return node_count.begin(); }
-      inline const_iterator begin() const { return node_count.begin(); }
-
-      inline       iterator end()       { return node_count.end(); }
-      inline const_iterator end() const { return node_count.end(); }
-      
-      std::pair<iterator, bool> insert(const value_type& x) { return node_count.insert(x); }
-
-      node_count_type node_count;
-    };
-
-    typedef NodeCount node_count_type;
-    typedef std::deque<node_count_type, std::allocator<node_count_type> >  node_count_set_type;
     
     struct NodeMap
     {
@@ -281,9 +252,6 @@ namespace cicada
 	    passive_set_type& passive_arcs = passives(first, last);
 	    node_map_type&    node_map     = nodes(first, last);
 	    
-	    node_counts.clear();
-	    node_counts.resize(passive_arcs.size());
-
 	    size_t passive_first = 0;
 	    
 	    // run 4 iterations... actually, we should loop until convergence which will be impractical.
@@ -311,8 +279,8 @@ namespace cicada
 		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
 		    apply_rule(yield_source ? riter->source : riter->target, riter->features, riter->attributes,
-			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, node_counts[p], node_counts, graph,
-			       first, last);
+			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+			       first, last, iter + 1);
 		}
 	      }
 	      
@@ -362,7 +330,8 @@ namespace cicada
 		    passive_set_type& passives,
 		    hypergraph_type& graph,
 		    const int lattice_first,
-		    const int lattice_last)
+		    const int lattice_last,
+		    const int level = 0)
     {
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
@@ -373,7 +342,7 @@ namespace cicada
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
       
-      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, 0), 0));
+      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
       if (result.second) {
 	hypergraph_type::node_type& node = graph.add_node();
 	
@@ -399,65 +368,6 @@ namespace cicada
       std::cerr << std::endl;
 #endif
       
-    }
-
-    template <typename Iterator>
-    void apply_rule(const rule_ptr_type& rule,
-		    const feature_set_type& features,
-		    const attribute_set_type& attributes,
-		    Iterator first,
-		    Iterator last,
-		    node_map_type& node_map,
-		    passive_set_type& passives,
-		    const node_count_type& node_count,
-		    node_count_set_type& node_counts,
-		    hypergraph_type& graph,
-		    const int lattice_first,
-		    const int lattice_last)
-    {
-      hypergraph_type::edge_type& edge = graph.add_edge(first, last);
-      edge.rule = rule;
-      edge.features = features;
-      edge.attributes = attributes;
-      
-      // assign metadata...
-      edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
-      edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
-
-      node_count_type::const_iterator citer = node_count.find(rule->lhs);
-      const int count = (citer != node_count.end() ? citer->second : 0);
-      
-      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, count), 0));
-      
-      if (result.second) {
-	hypergraph_type::node_type& node = graph.add_node();
-	
-	if (rule->lhs == goal_rule->lhs)
-	  graph.goal = node.id;
-	else {
-	  passives.push_back(node.id);
-	  
-	  // node_counts...
-	  node_counts.push_back(node_count);
-	  ++ node_counts.back()[rule->lhs];
-	}
-	
-	if (node.id >= non_terminals.size())
-	  non_terminals.resize(node.id + 1);
-	non_terminals[node.id] = rule->lhs;
-	
-	result.first->second = node.id;
-      }
-      
-      graph.connect_edge(edge.id, result.first->second);
-
-#if 0
-      std::cerr << "new rule: " << *(edge.rule)
-		<< " head: " << edge.head
-		<< ' ';
-      std::copy(edge.tails.begin(), edge.tails.end(), std::ostream_iterator<int>(std::cerr, " "));
-      std::cerr << std::endl;
-#endif
     }
     
     bool extend_actives(const transducer_type& transducer,
@@ -508,8 +418,6 @@ namespace cicada
     passive_chart_type     passives;
     node_map_chart_type    nodes;
 
-    node_count_set_type    node_counts;
-    
     non_terminal_set_type non_terminals;
   };
   
