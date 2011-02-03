@@ -255,7 +255,7 @@ namespace cicada
 	    size_t passive_first = 0;
 	    
 	    // run 4 iterations... actually, we should loop until convergence which will be impractical.
-	    for (int iter = 0; iter != 4; ++ iter) {
+	    for (int level = 0; level != 4; ++ level) {
 	      
 	      const size_t passive_size = passive_arcs.size();
 	      
@@ -280,7 +280,7 @@ namespace cicada
 		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
 		    apply_rule(yield_source ? riter->source : riter->target, riter->features, riter->attributes,
 			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-			       first, last, iter + 1);
+			       first, last, level + 1);
 		}
 	      }
 	      
