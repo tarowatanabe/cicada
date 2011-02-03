@@ -283,19 +283,21 @@ namespace cicada
 	    
 	    node_counts.clear();
 	    node_counts.resize(passive_arcs.size());
-	    
-	    // run 4 iterations... actually, we should loop until convergence which will be inpractical.
-	    for (int iter = 0; iter != 4; ++ iter) {
 
-	      const size_t passive_size = passive_arcs.size();
+	    size_t passive_first = 0;
 	    
-	      for (size_t table = 0; table != grammar.size(); ++ table) {
-		const transducer_type& transducer = grammar[table];
+	    // run 4 iterations... actually, we should loop until convergence which will be impractical.
+	    for (int iter = 0; iter != 4; ++ iter) {
+	      
+	      const size_t passive_size = passive_arcs.size();
+	      
+	      for (size_t p = passive_first; p != passive_size; ++ p) {
+		const symbol_type& non_terminal = non_terminals[passive_arcs[p]];
 		
-		if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
-		
-		for (size_t p = 0; p != passive_arcs.size(); ++ p) {
-		  const symbol_type& non_terminal = non_terminals[passive_arcs[p]];
+		for (size_t table = 0; table != grammar.size(); ++ table) {
+		  const transducer_type& transducer = grammar[table];
+		  
+		  if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
 		  
 		  const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
 		  if (node == transducer.root()) continue;
@@ -315,6 +317,8 @@ namespace cicada
 	      }
 	      
 	      if (passive_size == passive_arcs.size()) break;
+	      
+	      passive_first = passive_size;
 	    }
 	  }
 	  
@@ -420,11 +424,9 @@ namespace cicada
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
       
-      int& count = node_count[rule->lhs];
+      const int& count = node_count[rule->lhs];
       
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, count), 0));
-      
-      ++ count;
       
       if (result.second) {
 	hypergraph_type::node_type& node = graph.add_node();
@@ -433,7 +435,10 @@ namespace cicada
 	  graph.goal = node.id;
 	else {
 	  passives.push_back(node.id);
-	  node_counts.resize(node_counts.size() + 1);
+	  
+	  // node_counts...
+	  node_counts.push_back(node_count);
+	  ++ node_counts.back()[rule->lhs];
 	}
 	
 	if (node.id >= non_terminals.size())
