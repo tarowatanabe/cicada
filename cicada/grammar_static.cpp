@@ -295,7 +295,7 @@ namespace cicada
 	    const rule_ptr_type rule_source = read_phrase(lhs, pos_source, cache_sources, source_db);
 	    const rule_ptr_type rule_target = read_phrase(lhs, pos_target, cache_targets, target_db);
 	    
-	    if (rule_target->empty())
+	    if (rule_target->rhs.empty())
 	      options.push_back(rule_pair_type(rule_source, rule_target));
 	    else {
 	      rule_type rule_sorted_source(*rule_source);
