@@ -106,17 +106,32 @@ namespace cicada
     
     struct NodeMap
     {
-      typedef google::dense_hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > node_map_type;
+      typedef std::pair<symbol_type, int> symbol_index_type;
       
+      struct symbol_index_hash : public utils::hashmurmur<size_t>
+      {
+	typedef utils::hashmurmur<size_t> hasher_type;
+
+	size_t operator()(const symbol_index_type& x) const
+	{
+	  return hasher_type::operator()(x);
+	}
+      };
+
+      typedef google::dense_hash_map<symbol_index_type,
+				     hypergraph_type::id_type,
+				     boost::hash<symbol_index_type>,
+				     std::equal_to<symbol_index_type> > node_map_type;
+    
       typedef node_map_type::value_type     value_type;
-      
+    
       typedef node_map_type::const_iterator const_iterator;
       typedef node_map_type::iterator       iterator;
       
-      NodeMap() : node_map() { node_map.set_empty_key(symbol_type()); }
+      NodeMap() : node_map() { node_map.set_empty_key(symbol_index_type()); }
 
-      inline       iterator find(const symbol_type& key)       { return node_map.find(key); }
-      inline const_iterator find(const symbol_type& key) const { return node_map.find(key); }
+      inline       iterator find(const symbol_index_type& key)       { return node_map.find(key); }
+      inline const_iterator find(const symbol_index_type& key) const { return node_map.find(key); }
       
       inline       iterator begin()       { return node_map.begin(); }
       inline const_iterator begin() const { return node_map.begin(); }
@@ -321,7 +336,7 @@ namespace cicada
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
       
-      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(rule->lhs, 0));
+      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, 0), 0));
       if (result.second) {
 	hypergraph_type::node_type& node = graph.add_node();
 	
