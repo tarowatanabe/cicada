@@ -263,9 +263,8 @@ namespace cicada
 	      closure.insert(non_terminals[*piter]);
 	    
 	    // run 4 iterations... actually, we should loop until convergence which will be impractical.
-	    int closure_loop = 0;
+	    int  closure_loop = 0;
 	    for (int level = 0; /**/; ++ level) {
-	      
 	      const size_t passive_size = passive_arcs.size();
 	      const size_t closure_size = closure.size();
 	      
@@ -302,8 +301,12 @@ namespace cicada
 	      if (passive_size == passive_arcs.size()) break;
 	      
 	      passive_first = passive_size;
+
+	      if (closure_size != closure.size())
+		closure_loop = 0;
+	      else
+		++ closure_loop;
 	      
-	      closure_loop += (closure_size == closure.size());
 	      if (closure_loop == 4) break;
 	    }
 	  }
