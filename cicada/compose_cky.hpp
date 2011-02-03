@@ -292,7 +292,7 @@ namespace cicada
 	      const size_t passive_size = passive_arcs.size();
 	      
 	      for (size_t p = passive_first; p != passive_size; ++ p) {
-		const symbol_type& non_terminal = non_terminals[passive_arcs[p]];
+		const symbol_type non_terminal = non_terminals[passive_arcs[p]];
 		
 		for (size_t table = 0; table != grammar.size(); ++ table) {
 		  const transducer_type& transducer = grammar[table];
