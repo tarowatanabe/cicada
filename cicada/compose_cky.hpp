@@ -103,24 +103,43 @@ namespace cicada
     typedef hypergraph_type::id_type passive_type;
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
+
+    struct NodeCount
+    {
+      typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > node_count_type;
+      
+      typedef node_count_type::value_type     value_type;
+      
+      typedef node_count_type::const_iterator const_iterator;
+      typedef node_count_type::iterator       iterator;
+      
+      NodeCount() { node_count.set_empty_key(symbol_type()); }
+
+      int& operator[](const symbol_type& key) { return node_count[key]; }
+      
+      inline       iterator find(const symbol_type& key)       { return node_count.find(key); }
+      inline const_iterator find(const symbol_type& key) const { return node_count.find(key); }
+      
+      inline       iterator begin()       { return node_count.begin(); }
+      inline const_iterator begin() const { return node_count.begin(); }
+
+      inline       iterator end()       { return node_count.end(); }
+      inline const_iterator end() const { return node_count.end(); }
+      
+      std::pair<iterator, bool> insert(const value_type& x) { return node_count.insert(x); }
+
+      node_count_type node_count;
+    };
+
+    typedef NodeCount node_count_type;
+    typedef std::deque<node_count_type, std::allocator<node_count_type> >  node_count_set_type;
     
     struct NodeMap
     {
-      typedef std::pair<symbol_type, int> symbol_index_type;
-      
-      struct symbol_index_hash : public utils::hashmurmur<size_t>
-      {
-	typedef utils::hashmurmur<size_t> hasher_type;
-
-	size_t operator()(const symbol_index_type& x) const
-	{
-	  return hasher_type::operator()(x);
-	}
-      };
-
+      typedef std::pair<symbol_type, int> symbol_index_type;      
       typedef google::dense_hash_map<symbol_index_type,
 				     hypergraph_type::id_type,
-				     boost::hash<symbol_index_type>,
+				     utils::hashmurmur<size_t>,
 				     std::equal_to<symbol_index_type> > node_map_type;
     
       typedef node_map_type::value_type     value_type;
@@ -143,6 +162,7 @@ namespace cicada
       
       node_map_type node_map;
     };
+
     typedef NodeMap node_map_type;
 
     typedef utils::chart<node_map_type, std::allocator<node_map_type> > node_map_chart_type;
@@ -256,36 +276,49 @@ namespace cicada
 	  // handle unary rules...
 	  // order is very important...
 	  // actually, we need to loop-forever...
-	  
-	  passive_set_type& passive_arcs = passives(first, last);
-	  node_map_type& node_map        = nodes(first, last);
-	  
-	  for (size_t table = 0; table != grammar.size(); ++ table) {
-	    const transducer_type& transducer = grammar[table];
+
+	  if (! passives(first, last).empty()) {
+	    passive_set_type& passive_arcs = passives(first, last);
+	    node_map_type&    node_map     = nodes(first, last);
 	    
-	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+	    node_counts.clear();
+	    node_counts.resize(passive_arcs.size());
 	    
-	    for (size_t p = 0; p != passive_arcs.size(); ++ p) {
-	      const symbol_type& non_terminal = non_terminals[passive_arcs[p]];
+	    // run 4 iterations... actually, we should loop until convergence which will be inpractical.
+	    for (int iter = 0; iter != 4; ++ iter) {
+
+	      const size_t passive_size = passive_arcs.size();
+	    
+	      for (size_t table = 0; table != grammar.size(); ++ table) {
+		const transducer_type& transducer = grammar[table];
+		
+		if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+		
+		for (size_t p = 0; p != passive_arcs.size(); ++ p) {
+		  const symbol_type& non_terminal = non_terminals[passive_arcs[p]];
+		  
+		  const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
+		  if (node == transducer.root()) continue;
+		  
+		  const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+		  
+		  if (rules.empty()) continue;
+		  
+		  // passive_arcs "MAY" be modified!
+		  
+		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+		    apply_rule(yield_source ? riter->source : riter->target, riter->features, riter->attributes,
+			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, node_counts[p], node_counts, graph,
+			       first, last);
+		}
+	      }
 	      
-	      const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
-	      if (node == transducer.root()) continue;
-	      
-	      const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
-	      
-	      if (rules.empty()) continue;
-	      
-	      // passive_arcs "MAY" be modified!
-	      
-	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(yield_source ? riter->source : riter->target, riter->features, riter->attributes,
-			   &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-			   first, last);
+	      if (passive_size == passive_arcs.size()) break;
 	    }
 	  }
 	  
-	  // extend applied unary rules...
+	  // extend root with passive items at [first, last)
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
 	    
@@ -363,6 +396,63 @@ namespace cicada
 #endif
       
     }
+
+    template <typename Iterator>
+    void apply_rule(const rule_ptr_type& rule,
+		    const feature_set_type& features,
+		    const attribute_set_type& attributes,
+		    Iterator first,
+		    Iterator last,
+		    node_map_type& node_map,
+		    passive_set_type& passives,
+		    node_count_type& node_count,
+		    node_count_set_type& node_counts,
+		    hypergraph_type& graph,
+		    const int lattice_first,
+		    const int lattice_last)
+    {
+      hypergraph_type::edge_type& edge = graph.add_edge(first, last);
+      edge.rule = rule;
+      edge.features = features;
+      edge.attributes = attributes;
+      
+      // assign metadata...
+      edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
+      edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
+      
+      int& count = node_count[rule->lhs];
+      
+      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, count), 0));
+      
+      ++ count;
+      
+      if (result.second) {
+	hypergraph_type::node_type& node = graph.add_node();
+	
+	if (rule->lhs == goal_rule->lhs)
+	  graph.goal = node.id;
+	else {
+	  passives.push_back(node.id);
+	  node_counts.resize(node_counts.size() + 1);
+	}
+	
+	if (node.id >= non_terminals.size())
+	  non_terminals.resize(node.id + 1);
+	non_terminals[node.id] = rule->lhs;
+	
+	result.first->second = node.id;
+      }
+      
+      graph.connect_edge(edge.id, result.first->second);
+
+#if 0
+      std::cerr << "new rule: " << *(edge.rule)
+		<< " head: " << edge.head
+		<< ' ';
+      std::copy(edge.tails.begin(), edge.tails.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::cerr << std::endl;
+#endif
+    }
     
     bool extend_actives(const transducer_type& transducer,
 			const active_set_type& actives, 
@@ -411,6 +501,8 @@ namespace cicada
     active_chart_set_type  actives;
     passive_chart_type     passives;
     node_map_chart_type    nodes;
+
+    node_count_set_type    node_counts;
     
     non_terminal_set_type non_terminals;
   };
