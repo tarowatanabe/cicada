@@ -265,7 +265,7 @@ namespace cicada
 		if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
 		
 		for (size_t p = passive_first; p != passive_size; ++ p) {
-		  const symbol_type& non_terminal = non_terminals[passive_arcs[p]];
+		  const symbol_type non_terminal = non_terminals[passive_arcs[p]];
 		  
 		  const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
 		  if (node == transducer.root()) continue;
