@@ -22,6 +22,7 @@
 #include <utils/hashmurmur.hpp>
 
 #include <google/dense_hash_map>
+#include <google/dense_hash_set>
 
 namespace cicada
 {
@@ -51,6 +52,8 @@ namespace cicada
 	attr_span_last("span-last")
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal(1))));
+
+      closure.set_empty_key(symbol_type());
     }
     
     struct ActiveItem
@@ -139,7 +142,7 @@ namespace cicada
     typedef utils::chart<node_map_type, std::allocator<node_map_type> > node_map_chart_type;
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
-
+    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
     
     
     void operator()(const lattice_type& lattice,
@@ -254,10 +257,17 @@ namespace cicada
 	    
 	    size_t passive_first = 0;
 	    
+	    closure.clear();
+	    passive_set_type::const_iterator piter_end = passive_arcs.end();
+	    for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter)
+	      closure.insert(non_terminals[*piter]);
+	    
 	    // run 4 iterations... actually, we should loop until convergence which will be impractical.
-	    for (int level = 0; level != 4; ++ level) {
+	    int closure_loop = 0;
+	    for (int level = 0; /**/; ++ level) {
 	      
 	      const size_t passive_size = passive_arcs.size();
+	      const size_t closure_size = closure.size();
 	      
 	      for (size_t table = 0; table != grammar.size(); ++ table) {
 		const transducer_type& transducer = grammar[table];
@@ -277,16 +287,24 @@ namespace cicada
 		  // passive_arcs "MAY" be modified!
 		  
 		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		    apply_rule(yield_source ? riter->source : riter->target, riter->features, riter->attributes,
+		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+		    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
+		    
+		    apply_rule(rule, riter->features, riter->attributes,
 			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
 			       first, last, level + 1);
+		    
+		    closure.insert(rule->lhs);
+		  }
 		}
 	      }
 	      
 	      if (passive_size == passive_arcs.size()) break;
 	      
 	      passive_first = passive_size;
+	      
+	      closure_loop += (closure_size == closure.size());
+	      if (closure_loop == 4) break;
 	    }
 	  }
 	  
@@ -319,7 +337,7 @@ namespace cicada
     }
 
   private:
-        
+    
     template <typename Iterator>
     void apply_rule(const rule_ptr_type& rule,
 		    const feature_set_type& features,
@@ -419,6 +437,7 @@ namespace cicada
     node_map_chart_type    nodes;
 
     non_terminal_set_type non_terminals;
+    closure_type          closure;
   };
   
   inline
