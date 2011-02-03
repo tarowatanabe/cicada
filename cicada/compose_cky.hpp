@@ -409,7 +409,7 @@ namespace cicada
 		    Iterator last,
 		    node_map_type& node_map,
 		    passive_set_type& passives,
-		    node_count_type& node_count,
+		    const node_count_type& node_count,
 		    node_count_set_type& node_counts,
 		    hypergraph_type& graph,
 		    const int lattice_first,
@@ -423,8 +423,9 @@ namespace cicada
       // assign metadata...
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
-      
-      const int& count = node_count[rule->lhs];
+
+      node_count_type::const_iterator citer = node_count.find(rule->lhs);
+      const int count = (citer != node_count.end() ? citer->second : 0);
       
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, count), 0));
       
