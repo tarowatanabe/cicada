@@ -52,7 +52,8 @@ namespace cicada
 	attr_span_last("span-last")
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal(1))));
-
+      
+      node_map.set_empty_key(symbol_index_type());
       closure.set_empty_key(symbol_type());
     }
     
@@ -107,42 +108,12 @@ namespace cicada
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
 
+    typedef std::pair<symbol_type, int> symbol_index_type;
+    typedef google::dense_hash_map<symbol_index_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_index_type> > node_map_type;
     
-    struct NodeMap
-    {
-      typedef std::pair<symbol_type, int> symbol_index_type;      
-      typedef google::dense_hash_map<symbol_index_type,
-				     hypergraph_type::id_type,
-				     utils::hashmurmur<size_t>,
-				     std::equal_to<symbol_index_type> > node_map_type;
-    
-      typedef node_map_type::value_type     value_type;
-    
-      typedef node_map_type::const_iterator const_iterator;
-      typedef node_map_type::iterator       iterator;
-      
-      NodeMap() : node_map() { node_map.set_empty_key(symbol_index_type()); }
-
-      inline       iterator find(const symbol_index_type& key)       { return node_map.find(key); }
-      inline const_iterator find(const symbol_index_type& key) const { return node_map.find(key); }
-      
-      inline       iterator begin()       { return node_map.begin(); }
-      inline const_iterator begin() const { return node_map.begin(); }
-
-      inline       iterator end()       { return node_map.end(); }
-      inline const_iterator end() const { return node_map.end(); }
-      
-      std::pair<iterator, bool> insert(const value_type& x) { return node_map.insert(x); }
-      
-      node_map_type node_map;
-    };
-
-    typedef NodeMap node_map_type;
-
-    typedef utils::chart<node_map_type, std::allocator<node_map_type> > node_map_chart_type;
+    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
-    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
     
     
     void operator()(const lattice_type& lattice,
@@ -156,12 +127,10 @@ namespace cicada
       // initialize internal structure...
       actives.clear();
       passives.clear();
-      nodes.clear();
       non_terminals.clear();
       
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
-      nodes.resize(lattice.size() + 1);
       
       // initialize active chart
       for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -171,11 +140,14 @@ namespace cicada
 	  if (grammar[table].valid_span(pos, pos, 0))
 	    actives[table](pos, pos).push_back(active_type(root));
       }
+
       
       for (size_t length = 1; length <= lattice.size(); ++ length)
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
-
+	  
+	  node_map.clear();
+	  
 	  //std::cerr << "span: " << first << ".." << last << " distance: " << lattice.shortest_distance(first, last) << std::endl;
 	  
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -230,7 +202,6 @@ namespace cicada
 	    // apply rules on actives at [first, last)
 	    
 	    active_set_type&  cell         = actives[table](first, last);
-	    node_map_type&    node_map     = nodes(first, last);
 	    passive_set_type& passive_arcs = passives(first, last);
 	    
 	    active_set_type::const_iterator citer_end = cell.end();
@@ -253,7 +224,6 @@ namespace cicada
 
 	  if (! passives(first, last).empty()) {
 	    passive_set_type& passive_arcs = passives(first, last);
-	    node_map_type&    node_map     = nodes(first, last);
 	    
 	    size_t passive_first = 0;
 	    
@@ -328,7 +298,10 @@ namespace cicada
       
       // finally, collect all the parsed rules, and proceed to [goal] rule...
       // passive arcs will not be updated!
-      node_map_type&    node_map     = nodes(0, lattice.size());
+      
+      // we will clear node map so that we will always create new node..
+      node_map.clear();
+      
       passive_set_type& passive_arcs = passives(0, lattice.size());
       for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	if (non_terminals[passive_arcs[p]] == goal)
@@ -437,10 +410,10 @@ namespace cicada
 
     active_chart_set_type  actives;
     passive_chart_type     passives;
-    node_map_chart_type    nodes;
 
-    non_terminal_set_type non_terminals;
+    node_map_type         node_map;
     closure_type          closure;
+    non_terminal_set_type non_terminals;
   };
   
   inline
