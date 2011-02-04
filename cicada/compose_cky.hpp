@@ -233,7 +233,7 @@ namespace cicada
 	    closure.clear();
 	    passive_set_type::const_iterator piter_end = passive_arcs.end();
 	    for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter)
-	      closure[non_terminals[*piter]] = 1;
+	      closure[non_terminals[*piter]] = 0;
 	    
 	    // run 4 iterations... actually, we should loop until convergence which will be impractical.
 	    int  closure_loop = 0;
@@ -270,11 +270,11 @@ namespace cicada
 		    
 		    closure_head.insert(lhs);
 		    closure_level_type::const_iterator citer = closure.find(lhs);
-		    const int level = (citer != closure.end() ? citer->second : 1);
+		    const int level = (citer != closure.end() ? citer->second : 0);
 		    
 		    apply_rule(rule, riter->features, riter->attributes,
 			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-			       first, last, level);
+			       first, last, level + 1);
 		  }
 		}
 	      }
@@ -283,10 +283,12 @@ namespace cicada
 	      
 	      passive_first = passive_size;
 	      
+	      // we use level-one, that is the label assigned for new-lhs!
 	      closure_type::const_iterator hiter_end = closure_head.end();
 	      for (closure_type::const_iterator hiter = closure_head.begin(); hiter != hiter_end; ++ hiter)
 		closure.insert(std::make_pair(*hiter, 1));
 	      
+	      // increment non-terminal level when used as tails...
 	      closure_type::const_iterator titer_end = closure_tail.end();
 	      for (closure_type::const_iterator titer = closure_tail.begin(); titer != titer_end; ++ titer)
 		++ closure[*titer];
@@ -323,9 +325,13 @@ namespace cicada
       
       passive_set_type& passive_arcs = passives(0, lattice.size());
       for (size_t p = 0; p != passive_arcs.size(); ++ p)
-	if (non_terminals[passive_arcs[p]] == goal)
+	if (non_terminals[passive_arcs[p]] == goal) {
+	  //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
+	  
 	  apply_rule(goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-		     0, lattice.size());
+		     0, lattice.size(),
+		     0, true);
+	}
       
       // we will sort to remove unreachable nodes......
       graph.topologically_sort();
@@ -344,7 +350,8 @@ namespace cicada
 		    hypergraph_type& graph,
 		    const int lattice_first,
 		    const int lattice_last,
-		    const int level = 0)
+		    const int level = 0,
+		    const bool is_goal = false)
     {
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
@@ -354,24 +361,33 @@ namespace cicada
       // assign metadata...
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
-      
-      std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
-      if (result.second) {
-	hypergraph_type::node_type& node = graph.add_node();
+
+      if (is_goal) {
+	if (! graph.is_valid()) {
+	  graph.goal = graph.add_node().id;
+	  
+	  if (graph.goal >= non_terminals.size())
+	    non_terminals.resize(graph.goal + 1);
+	  non_terminals[graph.goal] = rule->lhs;
+	}
 	
-	if (rule->lhs == goal_rule->lhs)
-	  graph.goal = node.id;
-	else
+	graph.connect_edge(edge.id, graph.goal);
+      } else {
+	std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
+	if (result.second) {
+	  hypergraph_type::node_type& node = graph.add_node();
+	  
 	  passives.push_back(node.id);
+	  
+	  if (node.id >= non_terminals.size())
+	    non_terminals.resize(node.id + 1);
+	  non_terminals[node.id] = rule->lhs;
+	  
+	  result.first->second = node.id;
+	}
 	
-	if (node.id >= non_terminals.size())
-	  non_terminals.resize(node.id + 1);
-	non_terminals[node.id] = rule->lhs;
-	
-	result.first->second = node.id;
+	graph.connect_edge(edge.id, result.first->second);
       }
-      
-      graph.connect_edge(edge.id, result.first->second);
 
 #if 0
       std::cerr << "new rule: " << *(edge.rule)
