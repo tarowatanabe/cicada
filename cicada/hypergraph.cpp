@@ -541,9 +541,10 @@ namespace cicada
 	  os << '{';
 
 	  if (! edge.tails.empty()) {
+	    typedef std::ostream_iterator<char> iterator_type;
+	    
 	    os << "\"tail\":[";
-	    std::copy(edge.tails.begin(), edge.tails.end() - 1, std::ostream_iterator<hypergraph_type::id_type>(os, ","));
-	    os << edge.tails.back();
+	    karma::generate(iterator_type(os), karma::uint_ % ',', edge.tails);
 	    os << "],";
 	  }
 	  
@@ -553,10 +554,8 @@ namespace cicada
 	    os << "},";
 	  }
 	  
-	  if (! edge.attributes.empty()) {
-	    os << "\"attribute\":" << edge.attributes;
-	    os << ',';
-	  }
+	  if (! edge.attributes.empty())
+	    os << "\"attribute\":" << edge.attributes << ',';
 	  
 	  os << "\"rule\":" << (! edge.rule ? 0 : rules_unique.find(&(*edge.rule))->second);
 	  

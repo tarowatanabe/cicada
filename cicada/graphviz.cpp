@@ -262,20 +262,20 @@ namespace cicada
     graphviz_impl::grammar_tail_type&    grammar_tail    = graphviz_impl::instance_tail();
     graphviz_impl::grammar_feature_type& grammar_feature = graphviz_impl::instance_feature();
     
-    os << "digraph { rankdir=BT; ordering=in;" << ' ';
+    os << "digraph { rankdir=BT; ordering=in;";
     
     hypergraph_type::node_set_type::const_iterator niter_end = hypergraph.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = hypergraph.nodes.begin(); niter != niter_end; ++ niter) {
       const node_type& node = *niter;
       
-      os << " node_" << node.id << " [label=\"" << node.id << "\", shape=circle, height=0.1, width=0.1];" << ' ';
+      os << " node_" << node.id << " [label=\"" << node.id << "\", shape=circle, height=0.1, width=0.1];";
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const edge_type& edge = hypergraph.edges[*eiter];
 
 	if (edge.rule) {
-	  os << "  edge_" << edge.id << " [label=\"{";
+	  os << " edge_" << edge.id << " [label=\"{";
 	  
 	  boost::spirit::karma::generate(iterator_type(os), grammar_rule, *edge.rule);
 	  if (! edge.tails.empty()) {
@@ -290,14 +290,14 @@ namespace cicada
 	    boost::spirit::karma::generate(iterator_type(os), grammar_feature, edge.features);
 	  }
 	  
-	  os << "\", shape=record];" << ' ';
+	  os << "\", shape=record];";
 	} else
-	  os << "  edge_" << edge.id << " [label=\"\", shape=rect];" << ' ';
+	  os << " edge_" << edge.id << " [label=\"\", shape=rect];";
 	
-	os << "    edge_" << edge.id << " -> node_" << node.id << ';' << ' ';
+	os << " edge_" << edge.id << " -> node_" << node.id << ';';
 	edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
 	for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
-	  os << "    node_" << *niter << " -> edge_" << edge.id << ';' << ' ';
+	  os << " node_" << *niter << " -> edge_" << edge.id << ';';
 	
       }
     }
@@ -317,17 +317,17 @@ namespace cicada
     graphviz_impl::grammar_label_type&   grammar_label   = graphviz_impl::instance_label();
     graphviz_impl::grammar_feature_type& grammar_feature = graphviz_impl::instance_feature();
 
-    os << "digraph { ordering=out;" << ' ';
-
+    os << "digraph { ordering=out;";
+    
     int id_edge = 0;
     for (size_t id = 0; id != lattice.size(); ++ id) {
-      os << " node_" << id << " [label=\"" << id << "\", shape=circle, height=0.1, width=0.1];" << ' ';
+      os << " node_" << id << " [label=\"" << id << "\", shape=circle, height=0.1, width=0.1];";
       
       lattice_type::arc_set_type::const_iterator aiter_end = lattice[id].end();
       for (lattice_type::arc_set_type::const_iterator aiter = lattice[id].begin(); aiter != aiter_end; ++ aiter) {
 	const lattice_type::arc_type& arc = *aiter;
 	
-	os << "   edge_" << id_edge << " [label=\"";
+	os << " edge_" << id_edge << " [label=\"";
 	
 	boost::spirit::karma::generate(iterator_type(os), grammar_label, arc.label);
 	if (! arc.features.empty()) {
@@ -335,15 +335,15 @@ namespace cicada
 	  boost::spirit::karma::generate(iterator_type(os), grammar_feature, arc.features);
 	}
 	
-	os << "\", shape=record];" << ' ';
+	os << "\", shape=record];";
 	
-	os << "   node_" << id << " -> edge_" << id_edge << ';' << ' ';
-	os << "   edge_" << id_edge << " -> node_" << (id + arc.distance) << ';' << ' ';
+	os << " node_" << id << " -> edge_" << id_edge << ';';
+	os << " edge_" << id_edge << " -> node_" << (id + arc.distance) << ';';
 	++ id_edge;
       }
     }
     
-    os << " node_" << lattice.size() << " [label=\"" << lattice.size() << "\", shape=circle, height=0.1, width=0.1];" << ' ';
+    os << " node_" << lattice.size() << " [label=\"" << lattice.size() << "\", shape=circle, height=0.1, width=0.1];";
     
     os << '}';
     
