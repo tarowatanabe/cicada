@@ -55,6 +55,8 @@ namespace cicada
       
       node_map.set_empty_key(symbol_index_type());
       closure.set_empty_key(symbol_type());
+      closure_head.set_empty_key(symbol_type());
+      closure_tail.set_empty_key(symbol_type());
     }
     
     struct ActiveItem
@@ -111,6 +113,7 @@ namespace cicada
     typedef std::pair<symbol_type, int> symbol_index_type;
     typedef google::dense_hash_map<symbol_index_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_index_type> > node_map_type;
     
+    typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
     typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
@@ -230,13 +233,16 @@ namespace cicada
 	    closure.clear();
 	    passive_set_type::const_iterator piter_end = passive_arcs.end();
 	    for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter)
-	      closure.insert(non_terminals[*piter]);
+	      closure[non_terminals[*piter]] = 1;
 	    
 	    // run 4 iterations... actually, we should loop until convergence which will be impractical.
 	    int  closure_loop = 0;
-	    for (int level = 0; /**/; ++ level) {
+	    for (;;) {
 	      const size_t passive_size = passive_arcs.size();
 	      const size_t closure_size = closure.size();
+	      
+	      closure_head.clear();
+	      closure_tail.clear();
 	      
 	      for (size_t table = 0; table != grammar.size(); ++ table) {
 		const transducer_type& transducer = grammar[table];
@@ -255,15 +261,20 @@ namespace cicada
 		  
 		  // passive_arcs "MAY" be modified!
 		  
+		  closure_tail.insert(non_terminal);
+		  
 		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 		    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
+		    const symbol_type& lhs = rule->lhs;
+		    
+		    closure_head.insert(lhs);
+		    closure_level_type::const_iterator citer = closure.find(lhs);
+		    const int level = (citer != closure.end() ? citer->second : 1);
 		    
 		    apply_rule(rule, riter->features, riter->attributes,
 			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-			       first, last, level + 1);
-		    
-		    closure.insert(rule->lhs);
+			       first, last, level);
 		  }
 		}
 	      }
@@ -271,7 +282,15 @@ namespace cicada
 	      if (passive_size == passive_arcs.size()) break;
 	      
 	      passive_first = passive_size;
-
+	      
+	      closure_type::const_iterator hiter_end = closure_head.end();
+	      for (closure_type::const_iterator hiter = closure_head.begin(); hiter != hiter_end; ++ hiter)
+		closure.insert(std::make_pair(*hiter, 1));
+	      
+	      closure_type::const_iterator titer_end = closure_tail.end();
+	      for (closure_type::const_iterator titer = closure_tail.begin(); titer != titer_end; ++ titer)
+		++ closure[*titer];
+	      
 	      if (closure_size != closure.size())
 		closure_loop = 0;
 	      else
@@ -412,7 +431,9 @@ namespace cicada
     passive_chart_type     passives;
 
     node_map_type         node_map;
-    closure_type          closure;
+    closure_level_type    closure;
+    closure_type          closure_head;
+    closure_type          closure_tail;
     non_terminal_set_type non_terminals;
   };
   
