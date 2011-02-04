@@ -59,7 +59,7 @@ namespace cicada
   typedef std::pair<std::string, attribute_data_type> attribute_parsed_type;
   typedef std::vector<attribute_parsed_type> attribute_parsed_set_type;
 
-  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, attribute_parsed_set_type, int, int, int> edge_parsed_type;
+  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, attribute_parsed_set_type, unsigned int, int, int> edge_parsed_type;
   
   typedef std::vector<edge_parsed_type> node_parsed_type;
   typedef std::vector<node_parsed_type> node_parsed_set_type;
@@ -94,7 +94,7 @@ namespace cicada
       rule_string_action = rule_string [add_rule(rules)];
       rule_string_set = '[' >> -(rule_string_action % ',')  >> ']';
       
-      tail_node_set %= '[' >> -(qi::int_ % ',') >> ']';
+      tail_node_set %= '[' >> -(qi::uint_ % ',') >> ']';
       
       feature       %= '\"' >> qi::lexeme[*(escape_char | ~standard::char_('\"'))] >> "\":" >> qi::double_;
       feature_set   %= '{' >> -(feature % ',' )  >> '}';
@@ -110,7 +110,7 @@ namespace cicada
 	       >> -(qi::lit("\"tail\"")      >> ':' >> tail_node_set >> ',')
 	       >> -(qi::lit("\"feature\"")   >> ':' >> feature_set >> ',')
 	       >> -(qi::lit("\"attribute\"") >> ':' >> attribute_set >> ',')
-	       >> qi::lit("\"rule\"")        >> ':' >> qi::int_
+	       >> qi::lit("\"rule\"")        >> ':' >> qi::uint_
 	       >> -(',' >> qi::lit("\"first\"") >> ':' >> qi::int_) // backward compatibility
 	       >> -(',' >> qi::lit("\"last\"")  >> ':' >> qi::int_) // backward compatibility
 	       >> '}');
