@@ -491,7 +491,6 @@ namespace cicada
 	    rule_unique_map_type::iterator riter = rules_unique.find(&rule);
 	    
 	    if (riter == rules_unique.end()) {
-	      
 	      // + 1 for none-rule which will be zero-rule-id
 	      const int rule_id = rules_unique.size() + 1;
 	      
@@ -526,7 +525,7 @@ namespace cicada
 	if (! initial_node)
 	  os << ", ";
 	initial_node = false;
-
+	
 	os << '[';
 	
 	bool initial_edge = true;

@@ -268,9 +268,10 @@ namespace cicada
 		    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
 		    const symbol_type& lhs = rule->lhs;
 		    
-		    closure_head.insert(lhs);
 		    closure_level_type::const_iterator citer = closure.find(lhs);
 		    const int level = (citer != closure.end() ? citer->second : 0);
+		    
+		    closure_head.insert(lhs);
 		    
 		    apply_rule(rule, riter->features, riter->attributes,
 			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
