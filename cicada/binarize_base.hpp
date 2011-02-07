@@ -13,6 +13,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/sort.hpp>
 
+#include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/chart.hpp>
 
