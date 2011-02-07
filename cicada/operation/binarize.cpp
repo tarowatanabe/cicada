@@ -19,7 +19,7 @@ namespace cicada
   {
 
     Binarize::Binarize(const std::string& parameter, const int __debug)
-      : order(-1), left(false), right(false), all(false), terminal(false), cky(false), debug(__debug)
+      : order(-1), left(false), right(false), all(false), terminal(false), cyk(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -42,7 +42,7 @@ namespace cicada
 	  else if (dir == "terminal")
 	    terminal = true;
 	  else if (dir == "cyk" || dir == "cky")
-	    cyk = true
+	    cyk = true;
 	  else
 	    throw std::runtime_error("unuspported direction: " + parameter);
 	} else

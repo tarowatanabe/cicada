@@ -90,7 +90,7 @@ namespace cicada
 	  labels[i] = label_set_type(1, source.edges[node.edges.front()].rule->lhs.non_terminal_strip());
 	  
 	  if (span.first + 1 == span.second)
-	    terminals[span.first] = labels[id].front();
+	    terminals[span.first] = labels[i].front();
 	}
 	
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -150,7 +150,7 @@ namespace cicada
 	      labels[parent].insert(labels[parent].end(), labels[right].begin(), labels[right].end());
 	    }
 	    
-	    middles.push_back(middle);
+	    middles[parent].push_back(middle);
 	  }
 	}
       
