@@ -45,6 +45,7 @@ namespace cicada
 
   public:
     SymbolVector() : __impl() {}
+    SymbolVector(size_type size) : __impl(size) {}
     SymbolVector(size_type size, const symbol_type& word) : __impl(size, word) {}
     template <typename Iterator>
     SymbolVector(Iterator first, Iterator last) : __impl(first, last) {}

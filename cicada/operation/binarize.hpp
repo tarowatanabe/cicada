@@ -28,6 +28,7 @@ namespace cicada
       bool right;
       bool all;
       bool terminal;
+      bool cyk;
   
       int debug;
     };

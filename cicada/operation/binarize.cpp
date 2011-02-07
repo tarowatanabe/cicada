@@ -19,7 +19,7 @@ namespace cicada
   {
 
     Binarize::Binarize(const std::string& parameter, const int __debug)
-      : order(-1), left(false), right(false), all(false), terminal(false), debug(__debug)
+      : order(-1), left(false), right(false), all(false), terminal(false), cky(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -41,16 +41,18 @@ namespace cicada
 	    all = true;
 	  else if (dir == "terminal")
 	    terminal = true;
+	  else if (dir == "cyk" || dir == "cky")
+	    cyk = true
 	  else
 	    throw std::runtime_error("unuspported direction: " + parameter);
 	} else
 	  std::cerr << "WARNING: unsupported parameter for binarize: " << piter->first << "=" << piter->second << std::endl;
       }
 
-      if (int(left) + right + all + terminal == 0)
+      if (int(left) + right + all + terminal + cyk == 0)
 	throw std::runtime_error("what direction? left, right or all");
       
-      if (int(left) + right + all + terminal > 1)
+      if (int(left) + right + all + terminal + cyk > 1)
 	throw std::runtime_error("we do not binarization in many directions!");
     }
 
@@ -73,6 +75,8 @@ namespace cicada
 	cicada::binarize_all(data.hypergraph, binarized);
       else if (terminal)
 	cicada::binarize_terminal(data.hypergraph, binarized);
+      else if (cyk)
+	cicada::binarize_cyk(data.hypergraph, binarized, order);
       else
 	throw std::runtime_error("unsupported direction!");
     
