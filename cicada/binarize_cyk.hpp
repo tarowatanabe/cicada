@@ -29,7 +29,9 @@ namespace cicada
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > ancestor_set_type;
     typedef std::deque<ancestor_set_type, std::allocator<ancestor_set_type> > ancestor_nodes_type;
     
-    typedef utils::chart<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_chart_type;
+
+    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> >  node_set_type;
+    typedef utils::chart<node_set_type, std::allocator<node_set_type> > node_chart_type;
 
     typedef std::vector<int, std::allocator<int> > middle_set_type;
     typedef std::deque<middle_set_type, std::allocator<middle_set_type> > middle_nodes_type;
@@ -60,17 +62,17 @@ namespace cicada
       
       // start traversing in bottom-up fashion...
       labels.clear();
-      labels.resize(target.nodes.size());
+      labels.resize(source.nodes.size());
       
       ancestors.clear();
-      ancestors.resize(target.nodes.size());
+      ancestors.resize(source.nodes.size());
 
       middles.clear();
-      middles.resize(target.nodes.size());
+      middles.resize(source.nodes.size());
       
       nodes.clear();
       nodes.reserve(spans.back().second + 1);
-      nodes.resize(spans.back().second + 1, hypergraph_type::invalid);
+      nodes.resize(spans.back().second + 1);
 
       terminals.clear();
       terminals.reserve(spans.back().second);
@@ -80,10 +82,9 @@ namespace cicada
       target.goal = source.goal;
       for (size_t i = 0; i != target.nodes.size(); ++ i) {
 	target.nodes[i].id = i;
-
+	
 	const span_type& span = spans[i];
-	if (nodes(span.first, span.second) == hypergraph_type::invalid)
-	  nodes(span.first, span.second) = i;
+	nodes(span.first, span.second).push_back(i);
 	
 	const hypergraph_type::node_type& node = source.nodes[i];
 	if (! node.edges.empty()) {
@@ -122,30 +123,32 @@ namespace cicada
 	  const int last = first + k;
 	  
 	  for (int middle = first + 1; middle != last; ++ middle) {
-	    const hypergraph_type::id_type left   = nodes(first, middle);
-	    const hypergraph_type::id_type right  = nodes(middle, last);
-
+	    
+	    if (nodes(first, middle).empty() || nodes(middle, last).empty()) continue;
+	    
+	    const hypergraph_type::id_type left   = nodes(first, middle).back();
+	    const hypergraph_type::id_type right  = nodes(middle, last).back();
+	    
 	    intersected.clear();
 	    std::set_intersection(ancestors[left].begin(), ancestors[left].end(), ancestors[right].begin(), ancestors[right].end(), std::back_inserter(intersected));
 	    
 	    if (intersected.empty()) continue;
 	    
-	    if (nodes(first, last) == hypergraph_type::invalid) {
-	      nodes(first, last) = target.add_node().id;
+	    if (nodes(first, last).empty()) {
+	      nodes(first, last).push_back(target.add_node().id);
 	      
 	      ancestors.push_back(ancestor_set_type());
 	      labels.push_back(label_set_type(terminals.begin() + first, terminals.begin() + last));
 	      middles.push_back(middle_set_type());
 	    }
 	    
-	    const hypergraph_type::id_type parent = nodes(first, last);
-	    
+	    const hypergraph_type::id_type parent = nodes(first, last).front();
 	    
 	    unioned.clear();
 	    std::set_union(ancestors[parent].begin(), ancestors[parent].end(), intersected.begin(), intersected.end(), std::back_inserter(unioned));
 	    ancestors[parent].swap(unioned);
 	    
-	    if (labels[parent].size() < labels[left].size() + labels[right].size()) {
+	    if (labels[parent].size() > labels[left].size() + labels[right].size()) {
 	      labels[parent] = labels[left];
 	      labels[parent].insert(labels[parent].end(), labels[right].begin(), labels[right].end());
 	    }
@@ -161,17 +164,21 @@ namespace cicada
       for (int k = 2; k <= length; ++ k)
 	for (int first = 0; first + k <= length; ++ first) {
 	  const int last = first + k;
+
+	  if (nodes(first, last).empty()) continue;
 	  
-	  const hypergraph_type::id_type parent = nodes(first, last);
+	  const hypergraph_type::id_type parent = nodes(first, last).front();
 	  
 	  const symbol_type lhs = '[' + join_labels(labels[parent].begin(), labels[parent].end())+ ']';
 	  
 	  middle_set_type::const_iterator miter_end = middles[parent].end();
 	  for (middle_set_type::const_iterator miter = middles[parent].begin(); miter != miter_end; ++ miter) {
 	    const int& middle = *miter;
-
-	    const hypergraph_type::id_type left   = nodes(first, middle);
-	    const hypergraph_type::id_type right  = nodes(middle, last);
+	    
+	    if (nodes(first, middle).empty() || nodes(middle, last).empty()) continue;
+	    
+	    const hypergraph_type::id_type left   = nodes(first, middle).back();
+	    const hypergraph_type::id_type right  = nodes(middle, last).back();
 	    
 	    tails.front() = left;
 	    tails.back()  = right;
@@ -183,6 +190,8 @@ namespace cicada
 	    edge.rule = rule_type::create(rule_type(lhs, rhs.begin(), rhs.end()));
 	    
 	    // what features assigned???
+	    
+	    target.connect_edge(edge.id, parent);
 	  }
 	}
 
@@ -198,7 +207,7 @@ namespace cicada
       std::ostringstream stream;
       if (first != last) {
 	std::copy(first, last - 1, std::ostream_iterator<std::string>(stream, "+"));
-	stream << '+' << *(last - 1);
+	stream << *(last - 1);
       }
       return stream.str();
     }
