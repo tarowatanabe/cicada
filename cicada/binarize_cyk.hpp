@@ -67,6 +67,9 @@ namespace cicada
       ancestors.clear();
       ancestors.resize(source.nodes.size());
 
+      parents.clear();
+      parents.resize(source.nodes.size(), hypergraph_type::invalid);
+
       middles.clear();
       middles.resize(source.nodes.size());
       
@@ -107,13 +110,33 @@ namespace cicada
 	    target.connect_edge(edge_new.id, i);
 	  }
 	  
-	  // clip by order...
 	  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-	    if (order <= 0 || ancestors[*titer].size() < order)
-	      ancestors[*titer].push_back(i);
+	    parents[*titer] = i;
 	}
       }
+      
+      // collect ancestors...
+      if (order <= 0) {
+	for (size_t i = 0; i != target.nodes.size(); ++ i) {
+	  hypergraph_type::id_type parent = parents[i];
+	  
+	  while (parent != hypergraph_type::invalid) {
+	    ancestors[i].push_back(parent);
+	    parent = parents[parent];
+	  }
+	}
+      } else {
+	for (size_t i = 0; i != target.nodes.size(); ++ i) {
+	  hypergraph_type::id_type parent = parents[i];
+
+	  for (int j = 0; j != order && parent != hypergraph_type::invalid; ++ j) {
+	    ancestors[i].push_back(parent);
+	    parent = parents[parent];
+	  }
+	}
+      }
+      
       
       // now enumerate cyk chart...
       const int length = spans.back().second;
@@ -217,9 +240,12 @@ namespace cicada
     
     label_set_type      terminals;
     label_nodes_type    labels;
+    
+    ancestor_set_type   parents;
     ancestor_set_type   intersected;
     ancestor_set_type   unioned;
     ancestor_nodes_type ancestors;
+
     
     middle_nodes_type   middles;
 
