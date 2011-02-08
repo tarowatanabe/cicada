@@ -228,7 +228,7 @@ void options(int argc, char** argv)
 
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
-
+  
   po::positional_options_description pos;
   pos.add("input", -1); // all the files
 
