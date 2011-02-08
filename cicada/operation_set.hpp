@@ -91,7 +91,9 @@ namespace cicada
     }
     
   public:
+    void clear();
     void assign(const weight_set_type& weights);
+    
     void operator()(const std::string& line);
     
     const output_data_type& get_output_data() const { return output_data; }

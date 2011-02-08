@@ -63,8 +63,7 @@ void options(int argc, char** argv);
 
 void cicada_stdout(operation_set_type& operations);
 void cicada_process(operation_set_type& operations);
-
-
+void synchronize();
 
 int main(int argc, char ** argv)
 {
@@ -181,6 +180,10 @@ int main(int argc, char ** argv)
       cicada_stdout(operations);
     else
       cicada_process(operations);
+    
+    operations.clear();
+    
+    synchronize();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -555,7 +558,6 @@ struct Task
        operation_set_type& __operations)
     : queue(__queue),
       operations(__operations) {}
-  
 
   void operator()()
   {
@@ -704,11 +706,6 @@ void cicada_process(operation_set_type& operations)
   }
   
   thread.join();
-  
-  // synchronize disk before synchronization...
-  ::sync();
-
-  synchronize();
 }
 
 

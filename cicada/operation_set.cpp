@@ -254,15 +254,18 @@ output: kbest or hypergraph output\n\
   
     return phrase_parse(iter, end, "|||", space);
   }
+
+  void OperationSet::clear()
+  {
+    operation_ptr_set_type::iterator oiter_end = operations.end();
+    for (operation_ptr_set_type::iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
+      (*oiter)->clear();
+  }
   
   void OperationSet::operator()(const std::string& line)
   {
     // clear...
-    {
-      operation_ptr_set_type::iterator oiter_end = operations.end();
-      for (operation_ptr_set_type::iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
-	(*oiter)->clear();
-    }
+    clear();
     
     // perform parsing...
     std::string::const_iterator iter = line.begin();
