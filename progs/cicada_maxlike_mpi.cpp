@@ -117,7 +117,7 @@ int cube_size = 200;
 bool softmax_margin = false;
 
 bool learn_sgd = false;
-bool learn_maxent = false;
+bool learn_lbfgs = false;
 
 bool mix_optimized = false;
 
@@ -167,10 +167,10 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_maxent) + learn_sgd > 1)
-      throw std::runtime_error("eitehr learn-{maxent,sgd}");
-    if (int(learn_maxent) + learn_sgd == 0)
-      learn_maxent = true;
+    if (int(learn_lbfgs) + learn_sgd > 1)
+      throw std::runtime_error("eitehr learn-{lbfgs,sgd}");
+    if (int(learn_lbfgs) + learn_sgd == 0)
+      learn_lbfgs = true;
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
@@ -1334,8 +1334,8 @@ void options(int argc, char** argv)
     
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
 
-    ("learn-maxent",  po::bool_switch(&learn_maxent),  "batch LBFGS algorithm")
-    ("learn-sgd",     po::bool_switch(&learn_sgd),     "online SGD algorithm")
+    ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
+    ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
