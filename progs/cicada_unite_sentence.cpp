@@ -772,10 +772,10 @@ struct TERAligner : public TER, public M
   ter_type ter;
 };
 
-
+typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
 
-path_type input_file = "-";
+path_set_type input_files;
 path_type output_file = "-";
 path_type confidence_feature_file;
 path_type count_feature_file;
@@ -796,6 +796,212 @@ int debug = 0;
 
 // input mode... use of one-line lattice input or sentence input?
 void options(int argc, char** argv);
+
+
+void merge_sentences_all(const sentence_set_type& sentences,
+			 const feature_list_type& features_confidence,
+			 const feature_list_type& features_count,
+			 const feature_type& feature_confidence,
+			 const feature_type& feature_count,
+			 lattice_type& merged_all)
+{
+  if (! features_confidence.empty() && sentences.size() != features_confidence.size())
+    throw std::runtime_error("confidence feature list size does not match # of sentences");
+  if (! features_count.empty() && sentences.size() != features_count.size())
+    throw std::runtime_error("count feature list does not match # of sentences");
+  
+  const matcher_type* __matcher = 0;
+  if (! matcher.empty())
+    __matcher = &matcher_type::create(matcher);
+  
+  
+  typedef std::multimap<double, int, std::less<double>, std::allocator<std::pair<const double, int> > > ter_sent_type;
+
+  // we will merge sentences in lower-ter order...
+
+  merged_all.clear();
+  lattice_type  merged;
+  lattice_type  merged_new;
+  
+  for (size_t sent = 0; sent != sentences.size(); ++ sent) 
+    if (! sentences[sent].empty()) {
+
+      // perform merging...
+      if (debug)
+	std::cerr << "merging with bed sentence: " << sentences[sent] << std::endl;
+      
+      merged.clear();
+      merged_new.clear();
+      
+      ter_sent_type ters;
+	  
+      boost::shared_ptr<cicada::eval::Scorer> scorer(match_lower
+						     ? cicada::eval::Scorer::create("ter:tokenizer=lower")
+						     : cicada::eval::Scorer::create("ter"));
+      scorer->insert(sentences[sent]);
+	  
+      for (size_t id = 0; id != sentences.size(); ++ id)
+	if (id != sent && ! sentences[id].empty()) 
+	  ters.insert(std::make_pair(scorer->score(sentences[id])->score(), id));
+	  
+      int rank = 1;
+      const double conf = 1.0 / (1.0 + rank);
+	
+      feature_set_type features;
+      if (! features_confidence.empty())
+	features[features_confidence[sent]] = conf;
+      if (! features_count.empty())
+	features[features_count[sent]] = count_weight;
+      if (! feature_confidence.empty())
+	features[feature_confidence] = conf;
+      if (! feature_count.empty())
+	features[feature_count] = count_weight;
+	  
+      if (match_lower) {
+	TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
+	aligner(merged, sentences[sent], merged_new, features);
+      } else {
+	TERAligner<Normalizer> aligner(weights, __matcher, debug);
+	aligner(merged, sentences[sent], merged_new, features);
+      }
+	
+      merged.swap(merged_new);
+      merged_new.clear();
+      
+      double score = 0.0;
+      
+      ++ rank;
+	  
+      ter_sent_type::const_iterator titer_end = ters.end();
+      for (ter_sent_type::const_iterator titer = ters.begin(); titer != titer_end; ++ titer, ++ rank) {
+	const int id = titer->second;
+
+	if (debug)
+	  std::cerr << "merging: " << sentences[id] << std::endl;
+
+	const double conf = 1.0 / (1.0 + rank);
+	    
+	feature_set_type features;
+	if (! features_confidence.empty())
+	  features[features_confidence[id]] = conf;
+	if (! features_count.empty())
+	  features[features_count[id]] = count_weight;
+	if (! feature_confidence.empty())
+	  features[feature_confidence] = conf;
+	if (! feature_count.empty())
+	  features[feature_count] = count_weight;
+	    
+	double score_local = 0.0;
+	if (match_lower) {
+	  TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
+	  score_local = aligner(merged, sentences[id], merged_new, features);
+	} else {
+	  TERAligner<Normalizer> aligner(weights, __matcher, debug);
+	  score_local = aligner(merged, sentences[id], merged_new, features);
+	}
+	if (debug)
+	  std::cerr << "TER: " << score_local << std::endl;
+	    
+	score += score_local;
+	    
+	merged.swap(merged_new);
+	merged_new.clear();
+      }
+	  
+      if (debug)
+	std::cerr << "lattice size: " << merged.size() << std::endl;
+	  
+      // merged is now merged into meregd_all
+
+      if (merged_all.empty()) {
+	merged_all.push_back(lattice_type::arc_set_type());
+	merged_all.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), 1));
+	merged_all.back().back().features["edit-distance"] = score / merged.size();
+	  
+	for (size_t i = 0; i != merged.size(); ++ i)
+	  merged_all.push_back(merged[i]);
+      } else {
+	merged_new.clear();
+	merged_new.push_back(lattice_type::arc_set_type());
+	merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), 1));
+	merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), merged_all.size() + 2));
+	merged_new.back().back().features["edit-distance"] = score / merged.size();
+	
+	for (size_t i = 0; i != merged_all.size(); ++ i)
+	  merged_new.push_back(merged_all[i]);
+	
+	merged_new.push_back(lattice_type::arc_set_type());
+	merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), merged.size() + 1));
+	  
+	for (size_t i = 0; i != merged.size(); ++ i)
+	  merged_new.push_back(merged[i]);
+	  
+	merged_all.swap(merged_new);
+	merged_new.clear();
+      }
+    }
+}
+
+void merge_sentences(const sentence_set_type& sentences,
+		     const feature_list_type& features_confidence,
+		     const feature_list_type& features_count,
+		     const feature_type& feature_confidence,
+		     const feature_type& feature_count,
+		     lattice_type& merged)
+{
+  if (! features_confidence.empty() && sentences.size() != features_confidence.size())
+    throw std::runtime_error("confidence feature list size does not match # of sentences");
+  if (! features_count.empty() && sentences.size() != features_count.size())
+    throw std::runtime_error("count feature list does not match # of sentences");
+  
+  const matcher_type* __matcher = 0;
+  if (! matcher.empty())
+    __matcher = &matcher_type::create(matcher);
+  
+  merged.clear();
+  lattice_type merged_new;
+  sentence_type sentence;
+  
+  int rank = 1;
+  for (size_t id = 0; id != sentences.size(); ++ id, ++ rank) {
+    const sentence_type& sentence = sentences[id];
+    
+    if (sentence.empty()) continue;
+    
+    // perform merging...
+    if (debug)
+      std::cerr << "merging: " << sentence << std::endl;
+    
+    const double conf = 1.0 / (1.0 + rank);
+    
+    feature_set_type features;
+    if (! features_confidence.empty())
+      features[features_confidence[id]] = conf;
+    if (! features_count.empty())
+      features[features_count[id]] = count_weight;
+    if (! feature_confidence.empty())
+      features[feature_confidence] = conf;
+    if (! feature_count.empty())
+      features[feature_count] = count_weight;
+    
+    if (match_lower) {
+      TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
+      aligner(merged, sentence, merged_new, features);
+    } else {
+      TERAligner<Normalizer> aligner(weights, __matcher, debug);
+      aligner(merged, sentence, merged_new, features);
+    }
+    
+    merged.swap(merged_new);
+    merged_new.clear();
+    
+    if (debug)
+      std::cerr << "lattice size: " << merged.size() << std::endl;
+    
+    if (debug >= 2)
+      std::cerr << merged << std::endl;
+  }
+}
 
 int main(int argc, char ** argv)
 {
@@ -827,214 +1033,102 @@ int main(int argc, char ** argv)
 
     cicada::Feature feature_confidence(confidence);
     cicada::Feature feature_count(count);
-
-    sentence_set_type sentences;
-    {
-      sentence_type sentence;
-      std::string   line;
-      
-      utils::compress_istream is(input_file, 1024 * 1024);
-      while (std::getline(is, line)) {
-	std::string::const_iterator iter = line.begin();
-	std::string::const_iterator end = line.end();
-	
-	if (! sentence.assign(iter, end))
-	  throw std::runtime_error("invalid sentence...");
-	
-	sentences.push_back(sentence);
-      }
-    }
     
-    if (! features_confidence.empty() && sentences.size() != features_confidence.size())
-      throw std::runtime_error("confidence feature list size does not match # of sentences");
-    if (! features_count.empty() && sentences.size() != features_count.size())
-      throw std::runtime_error("count feature list does not match # of sentences");
-
-    const matcher_type* __matcher = 0;
-    if (! matcher.empty())
-      __matcher = &matcher_type::create(matcher);
+    if (input_files.empty())
+      input_files.push_back("-");
     
-    if (merge_all) {
-      typedef std::multimap<double, int, std::less<double>, std::allocator<std::pair<const double, int> > > ter_sent_type;
-
-      // we will merge sentences in lower-ter order...
+    if (input_files.size() == 1) {
       
-      lattice_type merged_all;
-      
-      for (size_t sent = 0; sent != sentences.size(); ++ sent) 
-	if (! sentences[sent].empty()) {
-
-	  // perform merging...
-	  if (debug)
-	    std::cerr << "merging with bed sentence: " << sentences[sent] << std::endl;
-	  
-	  lattice_type  merged;
-	  lattice_type  merged_new;
-	  
-	  ter_sent_type ters;
-	  
-	  boost::shared_ptr<cicada::eval::Scorer> scorer(match_lower
-							 ? cicada::eval::Scorer::create("ter:tokenizer=lower")
-							 : cicada::eval::Scorer::create("ter"));
-	  scorer->insert(sentences[sent]);
-	  
-	  for (size_t id = 0; id != sentences.size(); ++ id)
-	    if (id != sent && ! sentences[id].empty()) 
-	      ters.insert(std::make_pair(scorer->score(sentences[id])->score(), id));
-	  
-	  int rank = 1;
-	  const double conf = 1.0 / (1.0 + rank);
+      sentence_set_type sentences;
+      {
+	sentence_type sentence;
+	std::string   line;
 	
-	  feature_set_type features;
-	  if (! features_confidence.empty())
-	    features[features_confidence[sent]] = conf;
-	  if (! features_count.empty())
-	    features[features_count[sent]] = count_weight;
-	  if (! feature_confidence.empty())
-	    features[feature_confidence] = conf;
-	  if (! feature_count.empty())
-	    features[feature_count] = count_weight;
+	utils::compress_istream is(input_files.front(), 1024 * 1024);
+	while (std::getline(is, line)) {
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
 	  
-	  if (match_lower) {
-	    TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
-	    aligner(merged, sentences[sent], merged_new, features);
-	  } else {
-	    TERAligner<Normalizer> aligner(weights, __matcher, debug);
-	    aligner(merged, sentences[sent], merged_new, features);
-	  }
-	
-	  merged.swap(merged_new);
-	  merged_new.clear();
+	  if (! sentence.assign(iter, end))
+	    throw std::runtime_error("invalid sentence...");
 	  
-	  double score = 0.0;
-	  
-	  ++ rank;
-	  
-	  ter_sent_type::const_iterator titer_end = ters.end();
-	  for (ter_sent_type::const_iterator titer = ters.begin(); titer != titer_end; ++ titer, ++ rank) {
-	    const int id = titer->second;
-
-	    if (debug)
-	      std::cerr << "merging: " << sentences[id] << std::endl;
-
-	    const double conf = 1.0 / (1.0 + rank);
-	    
-	    feature_set_type features;
-	    if (! features_confidence.empty())
-	      features[features_confidence[id]] = conf;
-	    if (! features_count.empty())
-	      features[features_count[id]] = count_weight;
-	    if (! feature_confidence.empty())
-	      features[feature_confidence] = conf;
-	    if (! feature_count.empty())
-	      features[feature_count] = count_weight;
-	    
-	    double score_local = 0.0;
-	    if (match_lower) {
-	      TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
-	      score_local = aligner(merged, sentences[id], merged_new, features);
-	    } else {
-	      TERAligner<Normalizer> aligner(weights, __matcher, debug);
-	      score_local = aligner(merged, sentences[id], merged_new, features);
-	    }
-	    if (debug)
-	      std::cerr << "TER: " << score_local << std::endl;
-	    
-	    score += score_local;
-	    
-	    merged.swap(merged_new);
-	    merged_new.clear();
-	  }
-	  
-	  if (debug)
-	    std::cerr << "lattice size: " << merged.size() << std::endl;
-	  
-	  // merged is now merged into meregd_all
-
-	  if (merged_all.empty()) {
-	    merged_all.push_back(lattice_type::arc_set_type());
-	    merged_all.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), 1));
-	    merged_all.back().back().features["edit-distance"] = score / merged.size();
-	  
-	    for (size_t i = 0; i != merged.size(); ++ i)
-	      merged_all.push_back(merged[i]);
-	  } else {
-	    merged_new.clear();
-	    merged_new.push_back(lattice_type::arc_set_type());
-	    merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), 1));
-	    merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), merged_all.size() + 2));
-	    merged_new.back().back().features["edit-distance"] = score / merged.size();
-	  
-	    for (size_t i = 0; i != merged_all.size(); ++ i)
-	      merged_new.push_back(merged_all[i]);
-	  
-	    merged_new.push_back(lattice_type::arc_set_type());
-	    merged_new.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), merged.size() + 1));
-	  
-	    for (size_t i = 0; i != merged.size(); ++ i)
-	      merged_new.push_back(merged[i]);
-	  
-	    merged_all.swap(merged_new);
-	    merged_new.clear();
-	  }
+	  sentences.push_back(sentence);
 	}
+      }
       
-      utils::compress_ostream os(output_file, 1024 * 1024);
-
-      if (output_graphviz)
-	cicada::graphviz(os, merged_all);
-      else
-	os << merged_all << '\n';
-    } else {
       lattice_type merged;
-      lattice_type merged_new;
-      sentence_type sentence;
       
-      int rank = 1;
-      for (size_t id = 0; id != sentences.size(); ++ id, ++ rank) {
-	const sentence_type& sentence = sentences[id];
-
-	if (sentence.empty()) continue;
-	
-	// perform merging...
-	if (debug)
-	  std::cerr << "merging: " << sentence << std::endl;
-
-	const double conf = 1.0 / (1.0 + rank);
-	
-	feature_set_type features;
-	if (! features_confidence.empty())
-	  features[features_confidence[id]] = conf;
-	if (! features_count.empty())
-	  features[features_count[id]] = count_weight;
-	if (! feature_confidence.empty())
-	  features[feature_confidence] = conf;
-	if (! feature_count.empty())
-	  features[feature_count] = count_weight;
-	
-	if (match_lower) {
-	  TERAligner<NormalizerLower> aligner(weights, __matcher, debug);
-	  aligner(merged, sentence, merged_new, features);
-	} else {
-	  TERAligner<Normalizer> aligner(weights, __matcher, debug);
-	  aligner(merged, sentence, merged_new, features);
-	}
-	
-	merged.swap(merged_new);
-	merged_new.clear();
+      if (merge_all)
+	merge_sentences_all(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
+      else
+	merge_sentences(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
       
-	if (debug)
-	  std::cerr << "lattice size: " << merged.size() << std::endl;
-	
-	if (debug >= 2)
-	  std::cerr << merged << std::endl;
-      }
-    
       utils::compress_ostream os(output_file, 1024 * 1024);
+      
       if (output_graphviz)
-	cicada::graphviz(os, merged);
+	cicada::graphviz(os, merged) << '\n';
       else
 	os << merged << '\n';
+    } else {
+      if (! features_confidence.empty())
+	if (input_files.size() != features_confidence.size())
+	  throw std::runtime_error("input file do not match with # of confidence feature");
+      
+      if (! features_count.empty())
+	if (input_files.size() != features_count.size())
+	  throw std::runtime_error("input file do not match with # of count feature");
+      
+      typedef std::vector<std::istream*, std::allocator<std::istream*> > istream_set_type;
+      
+      istream_set_type istreams(input_files.size());
+      for (size_t i = 0; i != input_files.size(); ++ i)
+	istreams[i] = new utils::compress_istream(input_files[i], 1024 * 1024);
+      
+      utils::compress_ostream os(output_file, 1024 * 1024);
+      
+      lattice_type merged;
+
+      sentence_set_type sentences;
+      sentence_type     sentence;
+      std::string line;
+      
+      for (;;) {
+	int rank = 1;
+	
+	sentences.clear();
+	size_t num_failed = 0;
+	for (size_t id = 0; id != istreams.size(); ++ id, ++ rank) {
+	  if (std::getline(*istreams[id], line)) {
+	    std::string::const_iterator iter = line.begin();
+	    std::string::const_iterator end = line.end();
+	    
+	    if (! sentence.assign(iter, end))
+	      throw std::runtime_error("invalid sentence...");
+	    
+	    sentences.push_back(sentence);
+	  } else
+	    ++ num_failed;
+	}
+	
+	if (num_failed) {
+	  if (num_failed != istreams.size())
+	    throw std::runtime_error("# of lines do not match");
+	  break;
+	}
+	
+	if (merge_all)
+	  merge_sentences_all(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
+	else
+	  merge_sentences(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
+	
+	if (output_graphviz)
+	  cicada::graphviz(os, merged) << '\n';
+	else
+	  os << merged << '\n';
+      }
+      
+      for (size_t i = 0; i != istreams.size(); ++ i)
+	delete istreams[i];
     }
   }
   catch (const std::exception& err) {
@@ -1053,8 +1147,8 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input lattices")
-    ("output", po::value<path_type>(&output_file)->default_value("-"),  "output merged lattice")
+    ("input",  po::value<path_set_type>(&input_files)->multitoken(),   "input sentences")
+    ("output", po::value<path_type>(&output_file)->default_value("-"), "output merged lattice")
     
     ("confidence-feature-file", po::value<path_type>(&confidence_feature_file), "confidence feature file")
     ("count-feature-file",      po::value<path_type>(&count_feature_file),      "count feature file")
@@ -1078,9 +1172,16 @@ void options(int argc, char** argv)
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
 
-  po::store(po::parse_command_line(argc, argv, desc, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
+  po::positional_options_description pos;
+  pos.add("input", -1); // all the files
+
+  po::command_line_parser parser(argc, argv);
+  parser.style(po::command_line_style::unix_style & (~po::command_line_style::allow_guessing));
+  parser.options(desc);
+  parser.positional(pos);
   
-  po::notify(variables);
+  po::store(parser.run(), variables);
+  po::notify(variables); 
   
   if (variables.count("help")) {
     std::cout << argv[0] << " [options]\n"
