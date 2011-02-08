@@ -171,6 +171,8 @@ int main(int argc, char ** argv)
       while (std::getline(is, line))
 	operations(line);
     }
+
+    operations.clear();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
