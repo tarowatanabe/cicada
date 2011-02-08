@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
+#include <unistd.h>
 
 #include "cicada_impl.hpp"
 
@@ -170,6 +171,8 @@ int main(int argc, char ** argv)
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
 	boost::filesystem::remove_all(*iter);
+
+      ::sync();
     }
 
     MPI::COMM_WORLD.Barrier();
@@ -330,78 +333,54 @@ struct ReduceStdout
   
   void operator()()
   {
-#if 0
-    if (input_directory_mode) {
-      std::string buffer;
-
-      utils::compress_ostream os(path, 1024 * 1024);
-
-      for (;;) {
-	queue.pop_swap(buffer);
-	
-	if (buffer.empty()) break;
-
-	std::string::const_iterator iter = buffer.begin();
-	for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
-	
-	os << buffer.substr(iter - buffer.begin() + 1);
-	os << std::flush;
-      }
-
-    } else {
-#endif
-      typedef size_t id_type;
-      typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
+    typedef size_t id_type;
+    typedef std::map<id_type, std::string, std::less<id_type>, std::allocator<std::pair<const id_type, std::string> > > buffer_map_type;
     
-      buffer_map_type maps;
-      std::string buffer;
-      std::string buffer_tokenized;
+    buffer_map_type maps;
+    std::string buffer;
+    std::string buffer_tokenized;
     
-      id_type     id = 0;
-      id_type     buffer_id;
+    id_type     id = 0;
+    id_type     buffer_id;
       
-      utils::compress_ostream os(path, 1024 * 1024);
+    utils::compress_ostream os(path, 1024 * 1024);
       
-      for (;;) {
-	queue.pop_swap(buffer);
+    for (;;) {
+      queue.pop_swap(buffer);
+      
+      if (buffer.empty()) break;
+      
+      std::string::const_iterator iter = buffer.begin();
+      for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
 	
-	if (buffer.empty()) break;
-	
-	std::string::const_iterator iter = buffer.begin();
-	for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
-	
-	// tokenize here...
-	buffer_id = boost::lexical_cast<size_t>(buffer.substr(0, iter - buffer.begin()));
-	buffer_tokenized    = buffer.substr(iter + 1 - buffer.begin());
-
-	if (buffer_id == id) {
-	  os << buffer_tokenized;
-	  os << std::flush;
-	  ++ id;
-	} else
-	  maps[buffer_id].swap(buffer_tokenized);
-	
-	for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
-	  os << iter->second;
-	  maps.erase(iter ++);
-	}
+      // tokenize here...
+      buffer_id = boost::lexical_cast<size_t>(buffer.substr(0, iter - buffer.begin()));
+      buffer_tokenized    = buffer.substr(iter + 1 - buffer.begin());
+      
+      if (buffer_id == id) {
+	os << buffer_tokenized;
 	os << std::flush;
-      }
+	++ id;
+      } else
+	maps[buffer_id].swap(buffer_tokenized);
       
       for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
 	os << iter->second;
 	maps.erase(iter ++);
       }
       os << std::flush;
-      
-      if (! maps.empty())
-	throw std::runtime_error("id mismatch! expecting: " + boost::lexical_cast<std::string>(id)
-				 + " next: " + boost::lexical_cast<std::string>(maps.begin()->first));
-#if 0
     }
-#endif
+      
+    for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+      os << iter->second;
+      maps.erase(iter ++);
+    }
+    os << std::flush;
+      
+    if (! maps.empty())
+      throw std::runtime_error("id mismatch! expecting: " + boost::lexical_cast<std::string>(id)
+			       + " next: " + boost::lexical_cast<std::string>(maps.begin()->first));
   }
-  
   
   queue_type& queue;
   path_type   path;
@@ -566,10 +545,6 @@ void cicada_stdout(operation_set_type& operations)
   }
   
   thread.join();
-
-  MPI::COMM_WORLD.Barrier();
-  
-  synchronize();
 }
 
 struct Task
@@ -729,8 +704,9 @@ void cicada_process(operation_set_type& operations)
   }
   
   thread.join();
-
-  MPI::COMM_WORLD.Barrier();
+  
+  // synchronize disk before synchronization...
+  ::sync();
 
   synchronize();
 }

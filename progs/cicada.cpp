@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <stdexcept>
+#include <unistd.h>
 
 #include "cicada_impl.hpp"
 
@@ -147,6 +148,8 @@ int main(int argc, char ** argv)
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
 	boost::filesystem::remove_all(*iter);
+
+      ::sync();
     }
     
     // we will force non directory-input-mode....
