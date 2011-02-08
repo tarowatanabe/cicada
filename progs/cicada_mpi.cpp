@@ -222,14 +222,15 @@ void synchronize()
     std::vector<MPI::Request, std::allocator<MPI::Request> > request(mpi_size);
     std::vector<bool, std::allocator<bool> > terminated(mpi_size, false);
     
-    for (int rank = 0; rank != mpi_size; ++ rank)
+    terminated[0] = true;
+    for (int rank = 1; rank != mpi_size; ++ rank)
       request[rank] = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, rank, notify_tag);
     
     int non_found_iter = 0;
     for (;;) {
       bool found = false;
       
-      for (int rank = 0; rank != mpi_size; ++ rank)
+      for (int rank = 1; rank != mpi_size; ++ rank)
 	if (! terminated[rank] && request[rank].Test()) {
 	  terminated[rank] = true;
 	  found = true;
