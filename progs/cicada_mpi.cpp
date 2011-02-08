@@ -183,6 +183,8 @@ int main(int argc, char ** argv)
     
     operations.clear();
     
+    ::sync();
+
     synchronize();
   }
   catch (const std::exception& err) {
