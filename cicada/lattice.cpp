@@ -8,6 +8,8 @@
 #include "lattice.hpp"
 #include "vocab.hpp"
 
+#include "unite.hpp"
+
 #include <boost/numeric/conversion/bounds.hpp>
 
 #include <boost/spirit/include/qi.hpp>
@@ -30,6 +32,11 @@ BOOST_FUSION_ADAPT_STRUCT(
 
 namespace cicada
 {
+
+  void Lattice::unite(const Lattice& x)
+  {
+    cicada::unite(*this, x);
+  }
   
   void Lattice::initialize_distance()
   {

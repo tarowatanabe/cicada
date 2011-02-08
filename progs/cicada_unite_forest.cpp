@@ -16,29 +16,10 @@
 
 #include <google/dense_hash_set>
 
-typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
-
-struct rule_ptr_hash
-{
-  size_t operator()(const rule_ptr_type& x) const
-  {
-    return (x ? hash_value(*x) : size_t(0));
-  }
-};
-
-struct rule_ptr_equal
-{
-  bool operator()(const rule_ptr_type& x, const rule_ptr_type& y) const
-  {
-    return (x == y || (x && y && *x == *y));
-  }
-};
-
-typedef google::dense_hash_set<rule_ptr_type, rule_ptr_hash, rule_ptr_equal> rule_set_type;
-
+typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 typedef std::vector<feature_type, std::allocator<feature_type> > feature_list_type;
 
-path_type input_file = "-";
+path_set_type input_files;
 path_type output_file = "-";
 path_type confidence_feature_file;
 path_type count_feature_file;
@@ -88,64 +69,133 @@ int main(int argc, char ** argv)
     cicada::Feature feature_confidence(confidence);
     cicada::Feature feature_count(count);
     
-    utils::compress_istream is(input_file, 1024 * 1024);
-    std::string line;
+    if (input_files.empty())
+      input_files.push_back("-");
     
-    int rank = 1;
-    int id = 0;
-    for (/**/; std::getline(is, line); ++ id, ++ rank) {
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
+    if (input_files.size() == 1) {
+      utils::compress_istream is(input_files.front(), 1024 * 1024);
+      std::string line;
       
-      if (! hypergraph.assign(iter, end))
-	throw std::runtime_error("invalid hypergraph format");
-
-      if (! hypergraph.is_valid()) continue;
-
-      const double conf = 1.0 / (1.0 + rank);
-
-      feature_set_type features;
-      if (! features_confidence.empty()) {
-	if (id >= static_cast<int>(features_confidence.size()))
-	  throw std::runtime_error("# of confidence features do not match");
-	features[features_confidence[id]] = conf;
-      }
-      if (! features_count.empty()) {
-	if (id >= static_cast<int>(features_count.size()))
-	  throw std::runtime_error("# of count features do not match");
-	features[features_count[id]] = count_weight;
-      }
-      if (! feature_confidence.empty())
-	features[feature_confidence] = conf;
-      if (! feature_count.empty())
-	features[feature_count] = count_weight;
-      
-      if (! features.empty()) {
-	hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
-	for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
-	  eiter->features += features;
-      } 
-      
-      merged.unite(hypergraph);
-    }
-    
-    utils::compress_ostream os(output_file, 1024 * 1024);
-    
-    if (output_graphviz)
-      cicada::graphviz(os, merged);
-    else {
-      // uniquify rules...
-      rule_set_type rules;
-      rules.set_empty_key(rule_ptr_type());
-      
-      hypergraph_type::edge_set_type::iterator eiter_end = merged.edges.end();
-      for (hypergraph_type::edge_set_type::iterator eiter = merged.edges.begin(); eiter != eiter_end; ++ eiter) {
-	hypergraph_type::edge_type& edge = *eiter;
+      int rank = 1;
+      int id = 0;
+      for (/**/; std::getline(is, line); ++ id, ++ rank) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
 	
-	edge.rule = *(rules.insert(edge.rule).first);
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid hypergraph format");
+	
+	if (! hypergraph.is_valid()) continue;
+	
+	const double conf = 1.0 / (1.0 + rank);
+	
+	feature_set_type features;
+	if (! features_confidence.empty()) {
+	  if (id >= static_cast<int>(features_confidence.size()))
+	    throw std::runtime_error("# of confidence features do not match");
+	  features[features_confidence[id]] = conf;
+	}
+	if (! features_count.empty()) {
+	  if (id >= static_cast<int>(features_count.size()))
+	    throw std::runtime_error("# of count features do not match");
+	  features[features_count[id]] = count_weight;
+	}
+	if (! feature_confidence.empty())
+	  features[feature_confidence] = conf;
+	if (! feature_count.empty())
+	  features[feature_count] = count_weight;
+	
+	if (! features.empty()) {
+	  hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
+	  for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
+	    eiter->features += features;
+	} 
+	
+	merged.unite(hypergraph);
       }
       
-      os << merged << '\n';
+      utils::compress_ostream os(output_file, 1024 * 1024);
+      
+      if (output_graphviz)
+	cicada::graphviz(os, merged) << '\n';
+      else
+	os << merged << '\n';
+      
+    } else {
+      // we will handle multiple files!
+      
+      if (! features_confidence.empty())
+	if (input_files.size() != features_confidence.size())
+	  throw std::runtime_error("input file do not match with # of confidence feature");
+
+      if (! features_count.empty())
+	if (input_files.size() != features_count.size())
+	  throw std::runtime_error("input file do not match with # of count feature");
+      
+      typedef std::vector<std::istream*, std::allocator<std::istream*> > istream_set_type;
+      
+      istream_set_type istreams(input_files.size());
+      for (size_t i = 0; i != input_files.size(); ++ i)
+	istreams[i] = new utils::compress_istream(input_files[i], 1024 * 1024);
+      
+      utils::compress_ostream os(output_file, 1024 * 1024);
+      
+      std::string line;
+      
+      for (;;) {
+	int rank = 1;
+	
+	merged.clear();
+	hypergraph.clear();
+	
+	size_t num_failed = 0;
+	for (size_t id = 0; id != istreams.size(); ++ id, ++ rank) {
+	  if (std::getline(*istreams[id], line)) {
+	    std::string::const_iterator iter = line.begin();
+	    std::string::const_iterator end = line.end();
+	    
+	    if (! hypergraph.assign(iter, end))
+	      throw std::runtime_error("invalid hypergraph format");
+	    
+	    if (! hypergraph.is_valid()) continue;
+	    
+	    const double conf = 1.0 / (1.0 + rank);
+	    
+	    feature_set_type features;
+	    if (! features_confidence.empty())
+	      features[features_confidence[id]] = conf;
+	    if (! features_count.empty())
+	      features[features_count[id]] = count_weight;
+	    if (! feature_confidence.empty())
+	      features[feature_confidence] = conf;
+	    if (! feature_count.empty())
+	      features[feature_count] = count_weight;
+	    
+	    if (! features.empty()) {
+	      hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
+	      for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
+		eiter->features += features;
+	    } 
+	    
+	    merged.unite(hypergraph);
+	  } else
+	    ++ num_failed;
+	}
+	
+	if (num_failed) {
+	  if (num_failed != istreams.size())
+	    throw std::runtime_error("# of lines do not match");
+	  break;
+	}
+	
+	if (output_graphviz)
+	  cicada::graphviz(os, merged) << '\n';
+	else
+	  os << merged << '\n';
+      }
+      
+      for (size_t i = 0; i != istreams.size(); ++ i)
+	delete istreams[i];
     }
   }
   catch (const std::exception& err) {
@@ -164,7 +214,7 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("input",  po::value<path_type>(&input_file)->default_value("-"),   "input hypergraphs")
+    ("input",  po::value<path_set_type>(&input_files)->multitoken(),   "input hypergraphs")
     ("output", po::value<path_type>(&output_file)->default_value("-"),  "output merged hypergraph")
 
     ("confidence-feature-file", po::value<path_type>(&confidence_feature_file), "confidence feature file")
@@ -179,8 +229,15 @@ void options(int argc, char** argv)
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
 
-  po::store(po::parse_command_line(argc, argv, desc, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
-  
+  po::positional_options_description pos;
+  pos.add("input", -1); // all the files
+
+  po::command_line_parser parser(argc, argv);
+  parser.style(po::command_line_style::unix_style & (~po::command_line_style::allow_guessing));
+  parser.options(desc);
+  parser.positional(pos);
+
+  po::store(parser.run(), variables);
   po::notify(variables);
   
   if (variables.count("help")) {

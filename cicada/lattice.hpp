@@ -155,6 +155,9 @@ namespace cicada
     void clear() { lattice.clear(); dist_short.clear(); dist_long.clear(); }
 
     void initialize_distance();
+    
+    void unite(const Lattice& x);
+    
   public:
     friend
     std::ostream& operator<<(std::ostream& os, const Lattice& x);

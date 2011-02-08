@@ -7,6 +7,7 @@
 #define __CICADA__UNITE__HPP__ 1
 
 #include <cicada/hypergraph.hpp>
+#include <cicada/lattice.hpp>
 #include <cicada/sort.hpp>
 
 namespace cicada
@@ -19,9 +20,42 @@ namespace cicada
     typedef hypergraph_type::node_type node_type;
     typedef hypergraph_type::edge_type edge_type;
 
+    typedef Lattice lattice_type;
+
+    typedef lattice_type::feature_set_type feature_set_type;
+
     typedef Symbol symbol_type;
     typedef Vocab  vocab_type;
     typedef Rule   rule_type;
+
+    
+    void operator()(lattice_type& x, const lattice_type& y)
+    {
+      if (&x == &y || y.empty()) return;
+      if (x.empty()) {
+	x = y;
+	return;
+      }
+      
+      lattice_type merged;
+      
+      merged.push_back(lattice_type::arc_set_type());
+      merged.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), 1));
+      merged.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), x.size() + 2));
+      
+      for (size_t i = 0; i != x.size(); ++ i)
+	merged.push_back(x[i]);
+      
+      merged.push_back(lattice_type::arc_set_type());
+      merged.back().push_back(lattice_type::arc_type(vocab_type::EPSILON, feature_set_type(), y.size() + 1));
+      
+      for (size_t i = 0; i != y.size(); ++ i)
+	merged.push_back(y[i]);
+      
+      x.swap(merged);
+
+      x.initialize_distance();
+    }
     
     void operator()(hypergraph_type& x, const hypergraph_type& y)
     {
@@ -157,6 +191,24 @@ namespace cicada
   
   inline
   void unite(HyperGraph& x, const HyperGraph& y)
+  {
+    Unite __unite;
+    
+    __unite(x, y);
+  }
+
+  inline
+  void unite(const Lattice& x, const Lattice& y, Lattice& merged)
+  {
+    Unite __unite;
+    
+    merged = x;
+    
+    __unite(merged, y);
+  }
+  
+  inline
+  void unite(Lattice& x, const Lattice& y)
   {
     Unite __unite;
     
