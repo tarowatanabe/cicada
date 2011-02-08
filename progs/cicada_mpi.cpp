@@ -225,29 +225,40 @@ void synchronize()
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
   if (mpi_rank == 0) {
-    std::vector<MPI::Request, std::allocator<MPI::Request> > request(mpi_size);
-    std::vector<bool, std::allocator<bool> > terminated(mpi_size, false);
+    std::vector<MPI::Request, std::allocator<MPI::Request> > request_recv(mpi_size);
+    std::vector<MPI::Request, std::allocator<MPI::Request> > request_send(mpi_size);
+    std::vector<int, std::allocator<int> > terminated(mpi_size, 0);
     
-    terminated[0] = true;
-    for (int rank = 1; rank != mpi_size; ++ rank)
-      request[rank] = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, rank, notify_tag);
+    terminated[0] = 2;
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      request_recv[rank] = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, rank, notify_tag);
+      request_send[rank] = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, rank, notify_tag);
+    }
     
     int non_found_iter = 0;
     for (;;) {
       bool found = false;
       
       for (int rank = 1; rank != mpi_size; ++ rank)
-	if (! terminated[rank] && request[rank].Test()) {
-	  terminated[rank] = true;
+	if (terminated[rank] == 0 && request_recv[rank].Test()) {
+	  ++ terminated[rank];
 	  found = true;
 	}
       
-      if (std::count(terminated.begin(), terminated.end(), true) == mpi_size) break;
+      for (int rank = 1; rank != mpi_size; ++ rank)
+	if (terminated[rank] == 1 && request_send[rank].Test()) {
+	  ++ terminated[rank];
+	  found = true;
+	}
+      
+      if (std::count(terminated.begin(), terminated.end(), 2) == mpi_size) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
-  } else
+  } else {
     MPI::COMM_WORLD.Send(0, 0, MPI::INT, 0, notify_tag);
+    MPI::COMM_WORLD.Recv(0, 0, MPI::INT, 0, notify_tag);
+  }
 }
 
 struct MapStdout
