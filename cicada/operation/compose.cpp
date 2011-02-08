@@ -197,8 +197,8 @@ namespace cicada
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (utils::ipiece(param.name()) != "compose-cky")
-	throw std::runtime_error("this is not a CKY composer");
+      if (utils::ipiece(param.name()) != "compose-cky" && utils::ipiece(param.name()) != "compose-cyk")
+	throw std::runtime_error("this is not a CKY(CYK) composer");
 
       bool source = false;
       bool target = false;
