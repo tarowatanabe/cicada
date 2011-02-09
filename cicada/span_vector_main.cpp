@@ -8,6 +8,9 @@
 
 int main(int argc, char** argv)
 {
+  std::cout << "span: " << cicada::SpanVector::Span("1-2") << std::endl;
+  std::cout << "span: " << cicada::SpanVector::Span("1-1:good") << std::endl;
+
   cicada::SpanVector input;
   while (std::cin >> input)
     std::cout << input << std::endl;
