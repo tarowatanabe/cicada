@@ -159,9 +159,9 @@ namespace cicada
 	goal_edge_y.id = x.edges.size() - 1;
 
 	goal_edge_x.rule = rule_type::create(rule_type(vocab_type::GOAL,
-						       rule_type::symbol_set_type(1, goal_x.non_terminal(1))));
+						       rule_type::symbol_set_type(1, goal_x.non_terminal())));
 	goal_edge_y.rule = rule_type::create(rule_type(vocab_type::GOAL,
-						       rule_type::symbol_set_type(1, goal_y.non_terminal(1))));
+						       rule_type::symbol_set_type(1, goal_y.non_terminal())));
 	
 	goal_edge_x.head = goal_node.id;
 	goal_edge_y.head = goal_node.id;
