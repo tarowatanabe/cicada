@@ -109,7 +109,9 @@ int main(int argc, char** argv)
 	boost::filesystem::remove_all(*iter);
     }
     
-    queue_type queue(1024);
+    static const size_t queue_size = 256;
+    
+    queue_type queue(queue_size);
     task_type task(queue, output_file, max_length, max_fertility, max_span, min_hole, ternary, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
@@ -181,7 +183,7 @@ int main(int argc, char** argv)
 	    found = true;
 	  }
 	
-	if (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg) && queue.size() < 1024) {
+	if (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg) && queue.size() < queue_size) {
 	  while (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg)) {
 	    is_src >> bitext.source;
 	    is_trg >> bitext.target;

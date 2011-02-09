@@ -105,7 +105,7 @@ int main(int argc, char** argv)
 	boost::filesystem::remove_all(*iter);
     }
 
-    static size_t queue_size = 128;
+    static const size_t queue_size = 64;
     
     queue_type queue(queue_size);
     task_type task(queue, output_file, max_nodes, max_height, exhaustive, inverse, max_malloc);

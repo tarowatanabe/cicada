@@ -103,8 +103,10 @@ int main(int argc, char** argv)
       for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
 	boost::filesystem::remove_all(*iter);
     }
+
+    static const size_t queue_size = 1024;
     
-    queue_type queue(1024);
+    queue_type queue(queue_size);
     task_type task(queue, output_file, max_length, max_fertility, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
@@ -168,7 +170,7 @@ int main(int argc, char** argv)
 	    found = true;
 	  }
 	
-	if (is_src && is_trg && is_alg && queue.size() < 1024) {
+	if (is_src && is_trg && is_alg && queue.size() < queue_size) {
 	  while (is_src && is_trg && is_alg) {
 	    is_src >> bitext.source;
 	    is_trg >> bitext.target;
