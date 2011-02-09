@@ -1,7 +1,9 @@
 Grammar for cicada:
 
-[lhs] ||| [x,1] abc bb ||| ddd [x,1] ||| feature=1.0 feature2=5.6
+string-to-string rules (aka Hiero rules):
 
-We are planning tree-to-string/string-to-tree transduction rules:
+[lhs] ||| [x,1] abc bb ||| ddd [x,1] ||| feature=1.0 feature2=5.6 ||| attr1=1.6
 
-([LHS] ([NN,1] terminal ([NP] xxx) [NP,2])) ||| ([LHS] ([VP] (yyy [x,2] zzz)) [x,1]) ||| feature
+tree-to-string/string-to-tree transduction rules:
+
+[LHS]([NN,1](terminal [NP](xxx) [NP,2])) ||| [LHS]([VP](yyy [x,2] zzz) [x,1]) ||| feature=6.8 ||| attr2="attribute 2"
