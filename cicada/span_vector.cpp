@@ -35,7 +35,7 @@ namespace cicada
 {
 
   template <typename Iterator, typename Container>
-  struct span_vector_parser : boost::spirit::qi::grammar<Iterator, Container(), boost::spirit::standard::space_type>
+  struct span_vector_parser : boost::spirit::qi::grammar<Iterator, Container()>
   {
     span_vector_parser() : span_vector_parser::base_type(spans)
     {
@@ -43,11 +43,13 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       
       label %= qi::lexeme[+(standard::char_ - standard::space)];
-      spans %= *(qi::int_ >> '-' >> qi::int_ >> -(':' >> label));
+      span  %= qi::int_ >> '-' >> qi::int_ >> -(':' >> label);
+      spans %= -(span % (+standard::space));
     }
     
-    boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> label;
-    boost::spirit::qi::rule<Iterator, Container(), boost::spirit::standard::space_type> spans;
+    boost::spirit::qi::rule<Iterator, std::string()> label;
+    boost::spirit::qi::rule<Iterator, typename Container::value_type()> span;
+    boost::spirit::qi::rule<Iterator, Container()> spans;
   };
 
   namespace span_vector_impl
@@ -86,7 +88,7 @@ namespace cicada
     
     clear();
     
-    return qi::phrase_parse(iter, end, span_vector_impl::instance(), standard::space, __spans);
+    return qi::parse(iter, end, span_vector_impl::instance(), __spans);
   }
   
   void SpanVector::assign(const utils::piece& line)
@@ -139,14 +141,13 @@ namespace cicada
     std::string::const_iterator iter(x.begin());
     std::string::const_iterator end(x.end());
     
-    qi::rule<std::string::const_iterator, std::string(), standard::space_type> label;
+    qi::rule<std::string::const_iterator, std::string()> label;
     
     label %= qi::lexeme[+(standard::char_ - standard::space)];
     
-    const bool result = qi::phrase_parse(iter, end,
-					 qi::int_ >> '-' >> qi::int_ >> -(':' >> label),
-					 standard::space,
-					 *this);
+    const bool result = qi::parse(iter, end,
+				  qi::int_ >> '-' >> qi::int_ >> -(':' >> label),
+				  *this);
     
     if (! result || iter != end)
       throw std::runtime_error("span format error: " + x);
