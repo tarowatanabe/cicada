@@ -179,6 +179,7 @@ path_type input_file = "-";
 path_type output_file = "-";
 path_type map_file;
 
+std::string root;
 bool normalize = false;
 
 int debug = 0;
@@ -221,6 +222,11 @@ int main(int argc, char** argv)
     std::string line;
     iter_type iter(is);
     iter_type iter_end;
+    
+    hypergraph_type::symbol_type root_label(root);
+    if (! root_label.empty())
+      if (! root_label.is_non_terminal())
+	throw std::runtime_error("invalid root label: " + root);
 
     int num = 0;
     while (iter != iter_end) {
@@ -332,6 +338,16 @@ int main(int argc, char** argv)
       // we assume that the last item is always the last rule leading to goal...
       if (node_last != hypergraph_type::invalid) {
 	hypergraph.goal = node_last;
+	
+	if (! root_label.empty()) {
+	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = hypergraph.nodes[node_last].edges.end();
+	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = hypergraph.nodes[node_last].edges.begin(); eiter != eiter_end; ++ eiter) {
+	    hypergraph_type::edge_type& edge = hypergraph.edges[*eiter];
+	    
+	    edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(root_label, edge.rule->rhs));
+	  }
+	}
+	
 	hypergraph.topologically_sort();
       }
       
@@ -355,6 +371,7 @@ void options(int argc, char** argv)
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
+    ("root",      po::value<std::string>(&root), "root label")
     
     ("normalize", po::bool_switch(&normalize), "normalize category, such as [,] [.] etc.")
     

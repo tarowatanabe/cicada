@@ -68,8 +68,8 @@ namespace cicada
       //
       // check if we share the same goal... otherwise, we will create new edge and fill...
       // 
-      const symbol_type& goal_x = x.edges[x.nodes[x.goal].edges.front()].rule->lhs;
-      const symbol_type& goal_y = y.edges[y.nodes[y.goal].edges.front()].rule->lhs;
+      const symbol_type goal_x = x.edges[x.nodes[x.goal].edges.front()].rule->lhs;
+      const symbol_type goal_y = y.edges[y.nodes[y.goal].edges.front()].rule->lhs;
 
       if (goal_x == goal_y) {
 	const int y_node_offset = x.nodes.size();
@@ -124,14 +124,12 @@ namespace cicada
 	
 	// merge nodes
 	for (id_type id = 0; id < y.nodes.size(); ++ id) {
-	  const id_type id_new = id + y_node_offset;
-	  
 	  const node_type& node_old = y.nodes[id];
-	  node_type& node_new = x.nodes[id_new];
+	  node_type& node_new = x.nodes[id + y_node_offset];
 	  
 	  node_new = node_old;
 	    
-	  node_new.id =  id_new;
+	  node_new.id = id + y_node_offset;
 	  node_type::edge_set_type::iterator eiter_end = node_new.edges.end();
 	  for (node_type::edge_set_type::iterator eiter = node_new.edges.begin(); eiter != eiter_end; ++ eiter)
 	    *eiter += y_edge_offset;
@@ -173,6 +171,8 @@ namespace cicada
 	
 	goal_node.edges.push_back(goal_edge_x.id);
 	goal_node.edges.push_back(goal_edge_y.id);
+	
+	x.goal = goal_node.id;
       }
       
       cicada::topologically_sort(x);
