@@ -44,7 +44,7 @@ namespace cicada
       
       label %= qi::lexeme[+(standard::char_ - standard::space)];
       span  %= qi::int_ >> '-' >> qi::int_ >> -(':' >> label);
-      spans %= -(span % (+standard::space));
+      spans %= qi::omit[*standard::space] >> -(span % (+standard::space)) >> qi::omit[*standard::space];
     }
     
     boost::spirit::qi::rule<Iterator, std::string()> label;
@@ -146,7 +146,7 @@ namespace cicada
     label %= qi::lexeme[+(standard::char_ - standard::space)];
     
     const bool result = qi::parse(iter, end,
-				  qi::int_ >> '-' >> qi::int_ >> -(':' >> label),
+				  qi::omit[*standard::space] >> qi::int_ >> '-' >> qi::int_ >> -(':' >> label) >> qi::omit[*standard::space],
 				  *this);
     
     if (! result || iter != end)
