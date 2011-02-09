@@ -53,6 +53,8 @@ eval/wlcs.hpp
 libcicada_eval_la_SOURCES = \
 eval/bleu.cpp \
 eval/combined.cpp \
+eval/decode.hpp \
+eval/encode.hpp \
 eval/f.cpp \
 eval/per.cpp \
 eval/score.cpp \
@@ -242,6 +244,7 @@ graphviz.hpp \
 head_finder.hpp \
 hypergraph.hpp \
 inside_outside.hpp \
+intersect.hpp \
 kbest.hpp \
 lattice.hpp \
 matcher.hpp \
@@ -327,7 +330,8 @@ libcicada_la_LDFLAGS = \
 	$(BOOST_FILESYSTEM_LDFLAGS) \
 	$(BOOST_IOSTREAMS_LDFLAGS) \
 	$(BOOST_REGEX_LDFLAGS) \
-	$(BOOST_SYSTEM_LDFLAGS)
+	$(BOOST_SYSTEM_LDFLAGS) \
+	-version-info $(CICADA_LTVERSION)
 
 libcicada_la_LIBADD = \
 	libcicada-eval.la \

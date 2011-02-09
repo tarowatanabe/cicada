@@ -2,12 +2,23 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.61])
-AC_INIT([cicada], [0.0.1], [taro.watanabe@nict.go.jp])
+
+AC_INIT([cicada], [0.1.0], [taro.watanabe@nict.go.jp])
 
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([config])
 
-AM_INIT_AUTOMAKE(cicada, 0.0.1)
+AM_INIT_AUTOMAKE(cicada, 0.1.0)
+
+# Before making a release, the LTVERSION string should be modified.
+# The string is of the form C:R:A.
+# - If interfaces have been changed or added, but binary compatibility has
+#   been preserved, change to C+1:0:A+1
+# - If binary compatibility has been broken (eg removed or changed interfaces)
+#   change to C+1:0:0
+# - If the interface is the same as the previous version, change to C:R+1:A
+CICADA_LTVERSION=0:1:0
+AC_SUBST(CICADA_LTVERSION)
 
 AC_CONFIG_HEADERS(utils/config.h)
 
@@ -169,7 +180,7 @@ orig_LDFLAGS="$LDFLAGS"
 CPPFLAGS="$orig_CPPFLAGS $ICU_CPPFLAGS"
 LDFLAGS="$orig_LDFLAGS $ICU_LDFLAGS"
 
-BOOST_REQUIRE([1.38])
+BOOST_REQUIRE([1.42])
 BOOST_PROGRAM_OPTIONS
 BOOST_THREADS
 BOOST_FILESYSTEM

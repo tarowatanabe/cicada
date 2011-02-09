@@ -17,6 +17,8 @@ libutils_la_SOURCES = \
 	map_file_allocator.cpp \
 	tempfile.cpp
 
+libutils_la_LDFLAGS = -version-info $(CICADA_LTVERSION)
+
 libutils_la_LIBADD = \
 	$(ICU_LDFLAGS) \
 	$(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS) \
@@ -32,6 +34,7 @@ alloc_vector.hpp \
 allocinfo_allocator.hpp \
 arc_list.hpp \
 array_power2.hpp \
+async_device.hpp \
 atomicop.hpp \
 b_heap.hpp \
 base64.hpp \
@@ -40,6 +43,10 @@ bitpack.hpp \
 bit_vector.hpp \
 bounded_queue.hpp \
 byte_aligned_code.hpp \
+byte_aligned_vector.hpp \
+byte_aligned_delta_vector.hpp \
+byte_aligned_pair_delta_vector.hpp \
+chart.hpp \
 chunk_vector.hpp \
 compact_trie.hpp \
 compact_trie_dense.hpp \
@@ -56,6 +63,7 @@ icu_filter.hpp \
 indexed_hashtable.hpp \
 indexed_map.hpp \
 indexed_set.hpp \
+indexed_trie.hpp \
 istream_line_iterator.hpp \
 lexical_cast.hpp \
 lockfree_list_queue.hpp \
@@ -70,6 +78,7 @@ mpi_allocator.hpp \
 mpi_device.hpp \
 mpi_device_bcast.hpp \
 mpi_stream.hpp \
+mpi_stream_simple.hpp \
 mpi_traits.hpp \
 packed_device.hpp \
 packed_vector.hpp \
@@ -87,6 +96,7 @@ sparse_map.hpp \
 sparse_set.hpp \
 spinlock.hpp \
 static_allocator.hpp \
+subprocess.hpp \
 succinct_vector.hpp \
 symbol.hpp \
 symbol_sequence.hpp \
@@ -95,6 +105,8 @@ tempfile.hpp \
 thread_specific_ptr.hpp \
 vector2.hpp \
 vector3.hpp \
+vector2_aligned.hpp \
+vector3_aligned.hpp \
 vertical_coded_device.hpp \
 vertical_coded_vector.hpp
 
@@ -129,9 +141,12 @@ sample_tempfile \
 sample_vector2 \
 sample_vertical_coded_vector
 
-noinst_SCRIPTS = \
+dist_noinst_SCRIPTS = \
 bitpack_gen.py \
 group_aligned_code_offsets.py
+
+noinst_HEADERS = \
+bitpack_impl.hpp
 
 bitpack8.cpp  : bitpack_impl.hpp bitpack8_impl.hpp
 bitpack16.cpp  : bitpack_impl.hpp bitpack16_impl.hpp
