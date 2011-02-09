@@ -134,25 +134,51 @@ int main(int argc, char** argv)
 	  for (node_set_type::iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
 	    
 	    hypergraph_type::node_type& head = graph.add_node();
-
+	    
 	    niter->id = head.id;
 	    tails.clear();
 	    symbols.clear();
-	    
-	    terminal_set_type::const_iterator titer_end = niter->terminals.end();
-	    for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer) {
-	      
-	      hypergraph_type::node_type& node = graph.add_node();
-	      
-	      tails.push_back(node.id);
-	      if (head_mode)
+
+	    if (head_mode) {
+	      int pos = 0;
+	      terminal_set_type::const_iterator titer_end = niter->terminals.end();
+	      for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer, ++ pos) {
+		
+		hypergraph_type::node_type& node = graph.add_node();
+		
+		tails.push_back(node.id);
 		symbols.push_back('[' + titer->second + "*]");
-	      else
+		
+		hypergraph_type::edge_type& edge = graph.add_edge();
+		edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
+		graph.connect_edge(edge.id, node.id);
+		
+		if (pos != niter->head) {
+		  hypergraph_type::node_type& node = graph.add_node();
+
+		  const symbol_type symbol_new = '[' + titer->second + ']';
+		  
+		  hypergraph_type::edge_type& edge = graph.add_edge(&tails.back(), (&tails.back()) + 1);
+		  edge.rule = rule_type::create(rule_type(symbol_new, rule_type::symbol_set_type(1, symbols.back())));
+		  graph.connect_edge(edge.id, node.id);
+		  
+		  tails.back() = node.id;
+		  symbols.back() = symbol_new;
+		}
+	      }
+	    } else {
+	      terminal_set_type::const_iterator titer_end = niter->terminals.end();
+	      for (terminal_set_type::const_iterator titer = niter->terminals.begin(); titer != titer_end; ++ titer) {
+		
+		hypergraph_type::node_type& node = graph.add_node();
+		
+		tails.push_back(node.id);
 		symbols.push_back('[' + titer->second + ']');
-	      
-	      hypergraph_type::edge_type& edge = graph.add_edge();
-	      edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
-	      graph.connect_edge(edge.id, node.id);
+		
+		hypergraph_type::edge_type& edge = graph.add_edge();
+		edge.rule = rule_type::create(rule_type(symbols.back(), rule_type::symbol_set_type(1, titer->first)));
+		graph.connect_edge(edge.id, node.id);
+	      }
 	    }
 	    
 	    niter->cat = '[' + niter->terminals[niter->head].second + ']';
