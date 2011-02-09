@@ -25,11 +25,12 @@ namespace cicada
     
     typedef std::vector<std::string, std::allocator<std::string> > label_set_type;
     typedef std::deque<label_set_type, std::allocator<label_set_type> > label_nodes_type;
+
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > category_set_type;
     
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > ancestor_set_type;
     typedef std::deque<ancestor_set_type, std::allocator<ancestor_set_type> > ancestor_nodes_type;
     
-
     typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> >  node_set_type;
     typedef utils::chart<node_set_type, std::allocator<node_set_type> > node_chart_type;
 
@@ -181,18 +182,21 @@ namespace cicada
 	}
       
       // finally, register hyperedges into target!
+
+      categories.clear();
+      categories.resize(labels.size());
       
       hypergraph_type::edge_type::node_set_type tails(2);
       rule_type::symbol_set_type rhs(2);
       for (int k = 2; k <= length; ++ k)
 	for (int first = 0; first + k <= length; ++ first) {
 	  const int last = first + k;
-
+	  
 	  if (nodes(first, last).empty()) continue;
 	  
 	  const hypergraph_type::id_type parent = nodes(first, last).front();
 	  
-	  const symbol_type lhs = '[' + join_labels(labels[parent].begin(), labels[parent].end())+ ']';
+	  const symbol_type lhs = category(parent);
 	  
 	  middle_set_type::const_iterator miter_end = middles[parent].end();
 	  for (middle_set_type::const_iterator miter = middles[parent].begin(); miter != miter_end; ++ miter) {
@@ -205,9 +209,9 @@ namespace cicada
 	    
 	    tails.front() = left;
 	    tails.back()  = right;
-
-	    rhs.front() = '[' + join_labels(labels[left].begin(), labels[left].end()) + ']';
-	    rhs.back()  = '[' + join_labels(labels[right].begin(), labels[right].end()) + ']';
+	    
+	    rhs.front() = category(left);
+	    rhs.back()  = category(right);
 	    
 	    hypergraph_type::edge_type& edge = target.add_edge(tails.begin(), tails.end());
 	    edge.rule = rule_type::create(rule_type(lhs, rhs.begin(), rhs.end()));
@@ -223,23 +227,30 @@ namespace cicada
 	topologically_sort(target, sorted);
       target.swap(sorted);
     }
-    
-    template <typename Iterator>
-    std::string join_labels(Iterator first, Iterator last)
+
+    const symbol_type& category(hypergraph_type::id_type id)
     {
-      std::ostringstream stream;
-      if (first != last) {
-	std::copy(first, last - 1, std::ostream_iterator<std::string>(stream, "+"));
-	stream << *(last - 1);
+      if (categories[id].empty()) {
+	if (! labels[id].empty()) {
+	  std::ostringstream stream;
+	  stream << '[';
+	  std::copy(labels[id].begin(), labels[id].end() - 1, std::ostream_iterator<std::string>(stream, "+"));
+	  stream << labels[id].back();
+	  stream << ']';
+	  
+	  categories[id] = stream.str();
+	} else
+	  categories[id] = "[x]"; // this should not happen...
       }
-      return stream.str();
+      return categories[id];
     }
-    
     
     span_set_type spans;
     
     label_set_type      terminals;
     label_nodes_type    labels;
+
+    category_set_type   categories;
     
     ancestor_set_type   parents;
     ancestor_set_type   intersected;
