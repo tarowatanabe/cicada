@@ -35,7 +35,7 @@ namespace cicada
     
     clear();
     
-    return qi::phrase_parse(iter, end, *(qi::int_ >> '-' >> qi::int_), standard::space, __align);
+    return qi::phrase_parse(iter, end, *(qi::lexeme[qi::int_ >> '-' >> qi::int_]), standard::space, __align);
   }
 
   void Alignment::assign(const utils::piece& line)
@@ -56,7 +56,7 @@ namespace cicada
     std::string::const_iterator iter(x.begin());
     std::string::const_iterator end(x.end());
     
-    const bool result = qi::phrase_parse(iter, end, qi::int_ >> '-' >> qi::int_, standard::space, *this);
+    const bool result = qi::phrase_parse(iter, end, qi::lexeme[qi::int_ >> '-' >> qi::int_], standard::space, *this);
     if (! result || iter != end)
       throw std::runtime_error("invalid point format? " + x);
   }
