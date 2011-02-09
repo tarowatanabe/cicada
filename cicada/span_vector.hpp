@@ -50,6 +50,15 @@ namespace cicada
       bool empty() const { return first == last; }
       void clear() { first = 0; last = 0; label = label_type(); }
 
+    public:
+      friend
+      size_t hash_value(Span const& x);
+      friend
+      std::ostream& operator<<(std::ostream& os, const Span& x);
+      friend
+      std::istream& operator>>(std::istream& is, Span& x);
+      
+    public:
       index_type first;
       index_type last;
       label_type label;
@@ -132,19 +141,11 @@ namespace cicada
     
     friend
     size_t hash_value(SpanVector const& x);
-    
-    friend
-    size_t hash_value(span_type const& x);
-    
+        
     friend
     std::ostream& operator<<(std::ostream& os, const SpanVector& x);
     friend
     std::istream& operator>>(std::istream& is, SpanVector& x);
-
-    friend
-    std::ostream& operator<<(std::ostream& os, const span_type& x);
-    friend
-    std::istream& operator>>(std::istream& is, span_type& x);
     
     friend
     bool operator==(const SpanVector& x, const SpanVector& y);
