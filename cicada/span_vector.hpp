@@ -134,6 +134,9 @@ namespace cicada
     size_t hash_value(SpanVector const& x);
     
     friend
+    size_t hash_value(span_type const& x);
+    
+    friend
     std::ostream& operator<<(std::ostream& os, const SpanVector& x);
     friend
     std::istream& operator>>(std::istream& is, SpanVector& x);
@@ -165,6 +168,12 @@ namespace cicada
   size_t hash_value(SpanVector const& x)
   { 
     return utils::hashmurmur<size_t>()(x.__spans.begin(), x.__spans.end(), 0);
+  }
+  
+  inline
+  size_t hash_value(SpanVector::span_type const& x)
+  { 
+    return utils::hashmurmur<size_t>()(x);
   }
 
   inline
