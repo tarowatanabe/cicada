@@ -48,6 +48,18 @@ namespace cicada
       throw std::runtime_error("alignment format error");
   }
   
+  void Alignment::point_type::assign(const utils::piece& x)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    std::string::const_iterator iter(x.begin());
+    std::string::const_iterator end(x.end());
+    
+    const bool result = qi::phrase_parse(iter, end, qi::int_ >> '-' >> qi::int_, standard::space, *this);
+    if (! result || iter != end)
+      throw std::runtime_error("invalid point format? " + x);
+  }
 
   std::ostream& operator<<(std::ostream& os, const Alignment::point_type& x)
   {
@@ -68,17 +80,12 @@ namespace cicada
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-
+    
     std::string point;
-
-    if (is >> point) {
-      std::string::const_iterator iter = point.begin();
-      std::string::const_iterator end = point.end();
-      
-      const bool result = qi::phrase_parse(iter, end, qi::int_ >> '-' >> qi::int_, standard::space, x);
-      if (! result || iter != end)
-	throw std::runtime_error("invalid point format? " + point);
-    } else {
+    
+    if (is >> point)
+      x.assign(point);
+    else {
       x.source = 0;
       x.target = 0;
     }

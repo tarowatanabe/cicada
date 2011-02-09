@@ -131,6 +131,27 @@ namespace cicada
     return os;
   }
 
+  void SpanVector::span_type::assign(const utils::piece& x)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    std::string::const_iterator iter(x.begin());
+    std::string::const_iterator end(x.end());
+    
+    qi::rule<std::string::const_iterator, std::string(), standard::space_type> label;
+    
+    label %= qi::lexeme[+(standard::char_ - standard::space)];
+    
+    const bool result = qi::phrase_parse(iter, end,
+					 qi::int_ >> '-' >> qi::int_ >> -(':' >> label),
+					 standard::space,
+					 *this);
+    
+    if (! result || iter != end)
+      throw std::runtime_error("span format error: " + x);
+  }
+  
   std::istream& operator>>(std::istream& is, SpanVector::span_type& x)
   {
     namespace qi = boost::spirit::qi;
@@ -139,22 +160,8 @@ namespace cicada
     std::string token;
     
     x.clear();
-    if (is >> token) {
-      std::string::const_iterator iter = token.begin();
-      std::string::const_iterator end = token.end();
-      
-      qi::rule<std::string::const_iterator, std::string(), standard::space_type> label;
-      
-      label %= qi::lexeme[+(standard::char_ - standard::space)];
-      
-      const bool result = qi::phrase_parse(iter, end,
-					   qi::int_ >> '-' >> qi::int_ >> -(':' >> label),
-					   standard::space,
-					   x);
-      
-      if (! result || iter != end)
-	throw std::runtime_error("span format error");
-    }
+    if (is >> token)
+      x.assign(token);
     return is;
   }
   

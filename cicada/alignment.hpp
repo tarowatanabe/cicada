@@ -52,15 +52,7 @@ namespace cicada
 	source = x.source;
 	target = x.target;
       }
-      void assign(const utils::piece& x)
-      {
-	utils::piece::size_type pos = x.find('-');
-	if (pos == utils::piece::npos())
-	  throw std::runtime_error(std::string("invalid point? ") + x);
-	
-	source = boost::lexical_cast<index_type>(x.substr(0, pos));
-	target = boost::lexical_cast<index_type>(x.substr(pos + 1));
-      }
+      void assign(const utils::piece& x);
 
       friend
       size_t hash_value(Point const& x);

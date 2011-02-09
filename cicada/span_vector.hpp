@@ -40,6 +40,7 @@ namespace cicada
       template <typename Integral>
       Span(const std::pair<Integral, Integral>& x, const label_type& __label)
 	: first(x.first), last(x.second), label(__label) {}
+      Span(const utils::piece& x) { assign(x); }
       
       Span(index_type _first, index_type _last)
 	: first(_first), last(_last), label() {}
@@ -49,6 +50,28 @@ namespace cicada
       difference_type size() const { return difference_type(last) - difference_type(first); }
       bool empty() const { return first == last; }
       void clear() { first = 0; last = 0; label = label_type(); }
+      
+      template <typename Integral>
+      void assign(const std::pair<Integral, Integral>& x)
+      {
+	first = x.first;
+	last  = x.second;
+	label = label_type();
+      }
+      template <typename Integral>
+      void assign(const std::pair<Integral, Integral>& x, const label_type& __label)
+      {
+	first = x.first;
+	last  = x.second;
+	label = __label;
+      }
+      void assign(const Span& x)
+      {
+	first = x.first;
+	last  = x.last;
+	label = x.label;
+      }
+      void assign(const utils::piece& x);
 
     public:
       friend
