@@ -114,7 +114,7 @@ namespace cicada
     // insert a word as a vocabulary
     // we will support dynamic updating even if we write into a file!
     id_type insert(const symbol_type& word) { return insert(static_cast<const std::string&>(word)); }
-    id_type insert(const std::string& word);
+    id_type insert(const utils::piece& word);
     
     // dump the vocabularies content, inserted so-forth...
     // we will perform vocabulary merging...
