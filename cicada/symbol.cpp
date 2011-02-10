@@ -120,7 +120,7 @@ namespace cicada
       
       qi::parse(iter, iter_end,
 		qi::lit('[')
-		>> +(standard::char_ - ',') >> ',' >> qi::int_ [ phoenix::ref(maps[__id]) = qi::_1 ]
+		>> +(standard::char_ - ',' - ']') >> ',' >> qi::int_ [ phoenix::ref(maps[__id]) = qi::_1 ]
 		>> qi::lit(']'));
     }
       
@@ -150,12 +150,16 @@ namespace cicada
       maps.resize(flag_pos + 1, false);
     
     if (! maps[scan_pos]) {
-      const symbol_type& word = symbol();
-      const size_type size = word.size();
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
       
-      // at least we have [<char>]
+      const symbol_type& word = symbol();
+      
+      symbol_type::const_iterator iter = word.begin();
+      symbol_type::const_iterator iter_end = word.end();
+      
       maps[scan_pos] = true;
-      maps[flag_pos] = (size >= 3 && word[0] == '[' && word[size - 1] == ']');
+      maps[flag_pos] = qi::parse(iter, iter_end, '[' >> +(standard::char_ - ',' - ']') >> -(',' >> qi::int_) >> ']') && iter == iter_end;
     }
     
     return maps[flag_pos];
@@ -209,7 +213,7 @@ namespace cicada
       namespace phoenix = boost::phoenix;
 
       const symbol_type& word = symbol();
-
+      
       symbol_type::const_iterator iter = word.begin();
       symbol_type::const_iterator iter_end = word.end();
 
@@ -218,7 +222,7 @@ namespace cicada
       std::string label;
       if (qi::parse(iter, iter_end,
 		    qi::lit('[')
-		    >> +(standard::char_ - ',') [ phoenix::ref(label) = qi::_1 ] >> -(',' >> qi::int_)
+		    >> +(standard::char_ - ',' - ']') [ phoenix::ref(label) = qi::_1 ] >> -(',' >> qi::int_)
 		    >> qi::lit(']')))
 	maps[__id] = Symbol('[' + label + ']').id();
     }
