@@ -171,8 +171,11 @@ namespace cicada
       
       std::pair<attribute_index_type::iterator, bool> result = index.insert(x);
       
-      if (result.second)
-	__attributes().push_back(x);
+      if (result.second) {
+	attribute_set_type& attributes = __attributes();
+	attributes.push_back(x);
+	const_cast<piece_type&>(*result.first) = attributes.back();	
+      }
       
       return result.first - index.begin();
     }

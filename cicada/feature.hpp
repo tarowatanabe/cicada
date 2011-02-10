@@ -171,8 +171,11 @@ namespace cicada
       
       std::pair<feature_index_type::iterator, bool> result = index.insert(x);
       
-      if (result.second)
-	__features().push_back(x);
+      if (result.second) {
+	feature_set_type& features = __features();
+	features.push_back(x);
+	const_cast<piece_type&>(*result.first) = features.back();
+      }
       
       return result.first - index.begin();
     }

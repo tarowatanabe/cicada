@@ -282,8 +282,11 @@ namespace cicada
       
       std::pair<symbol_index_type::iterator, bool> result = index.insert(x);
       
-      if (result.second)
-	__symbols().push_back(x);
+      if (result.second) {
+	symbol_set_type& symbols = __symbols();
+	symbols.push_back(x);
+	const_cast<piece_type&>(*result.first) = symbols.back();
+      }
       
       return result.first - index.begin();
     }
