@@ -20,7 +20,8 @@ namespace cicada
     typedef Symbol::non_terminal_symbol_map_type  non_terminal_symbol_map_type;
   };
   
-  Symbol::mutex_type    Symbol::__mutex;
+  Symbol::mutex_type    Symbol::__mutex_index;
+  Symbol::mutex_type    Symbol::__mutex_data;
   
 
 #ifdef HAVE_TLS
@@ -116,7 +117,7 @@ namespace cicada
 
   void Symbol::write(const path_type& path)
   {
-    lock_type lock(__mutex);
+    lock_type lock(__mutex_data);
     
     Vocab vocab(path, std::max(size_type(__symbols().size() / 2), size_type(1024)));
     symbol_set_type::const_iterator siter_end = __symbols().end();

@@ -82,7 +82,7 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex);
+	lock_type lock(__mutex_data);
 	maps[__id] = &(__symbols()[__id]);
       }
       
@@ -234,7 +234,7 @@ namespace cicada
   public:
     static bool exists(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
       
       const symbol_index_type& index = __index();
       
@@ -242,14 +242,15 @@ namespace cicada
     }
     static size_t allocated()
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_data);
       
       return __symbols().size();
     }
     static void write(const path_type& path);
     
   private:
-    static mutex_type    __mutex;
+    static mutex_type    __mutex_index;
+    static mutex_type    __mutex_data;
     
     static symbol_map_type& __symbol_maps();
     static index_map_type& __index_maps();
@@ -276,13 +277,15 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
 
       symbol_index_type& index = __index();
       
       std::pair<symbol_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
+	lock_type lock(__mutex_data);
+
 	symbol_set_type& symbols = __symbols();
 	symbols.push_back(x);
 	const_cast<piece_type&>(*result.first) = symbols.back();

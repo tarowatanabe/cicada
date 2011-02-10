@@ -14,7 +14,8 @@ namespace cicada
     typedef Attribute::attribute_map_type attribute_map_type;
   };
   
-  Attribute::mutex_type    Attribute::__mutex;
+  Attribute::mutex_type    Attribute::__mutex_index;
+  Attribute::mutex_type    Attribute::__mutex_data;
   
 #ifdef HAVE_TLS
   static __thread AttributeImpl::attribute_map_type* attribute_maps_tls = 0;
