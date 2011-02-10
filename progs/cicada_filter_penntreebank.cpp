@@ -367,7 +367,8 @@ int main(int argc, char** argv)
 	if (! std::getline(*ms, line))
 	  throw std::runtime_error("# of lines do not match with map-file");
 
-	boost::tokenizer<utils::space_separator> tokenizer(line);
+	utils::piece line_piece(line);
+	boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer(line_piece);
 	
 	sent.assign(tokenizer.begin(), tokenizer.end());
 	

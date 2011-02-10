@@ -590,7 +590,7 @@ void read_corpus(const path_type& file,
   typedef std::multimap<const word_count_type*, word_type, greater_countp<word_count_type>, std::allocator<std::pair<const word_count_type* const, word_type> > > sorted_type;
 
   
-  typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
   
   utils::compress_istream is(file, 1024 * 1024);
   
@@ -600,7 +600,8 @@ void read_corpus(const path_type& file,
   word_count_set_type word_counts;
     
   while (std::getline(is, line)) {
-    tokenizer_type tokenizer(line);
+    utils::piece line_piece(line);
+    tokenizer_type tokenizer(line_piece);
     
     sent.clear();
     sent.push_back(vocab_type::BOS);
