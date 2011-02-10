@@ -21,6 +21,7 @@ int main(int argc, char** argv)
   std::cout << symbol_type("[x,3]") << " non-terminal-index? " << symbol_type("[x,3]").non_terminal(4) << std::endl;
   std::cout << symbol_type("[x,3]") << " non-terminal-index? " << symbol_type("[x,3]").non_terminal(5) << std::endl;
   std::cout << symbol_type("[x,3]") << " non-terminal-index? " << symbol_type("[x,3]").non_terminal(0) << std::endl;
+  std::cout << symbol_type("[x,3]") << " non-terminal-strip? " << symbol_type("[x,3]").non_terminal(5).non_terminal_strip() << std::endl;
   
   std::cout << symbol_type("[x,3]") << " non-terminal? " << symbol_type("[x,3]").non_terminal() << std::endl;
   std::cout << symbol_type("[x]") << " non-terminal? " << symbol_type("[x]").non_terminal() << std::endl;
