@@ -19,6 +19,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/piece.hpp>
+#include <utils/chunk_vector.hpp>
 
 namespace cicada
 {
@@ -30,8 +31,9 @@ namespace cicada
     friend struct FeatureImpl;
     
   public:
-    typedef std::string feature_type;
-    typedef uint32_t    id_type;
+    typedef std::string  feature_type;
+    typedef utils::piece piece_type;
+    typedef uint32_t     id_type;
     
     typedef feature_type::size_type              size_type;
     typedef feature_type::difference_type        difference_type;
@@ -51,11 +53,13 @@ namespace cicada
     Feature(const char* x) : __id(__allocate(x)) { }
     Feature(const id_type& x) : __id(x) { }
     template <typename Iterator>
-    Feature(Iterator first, Iterator last) : __id(__allocate(feature_type(first, last))) { }
+    Feature(Iterator first, Iterator last) : __id(__allocate(piece_type(first, last))) { }
     
+    void assign(const piece_type& x) { __id = __allocate(x); }
     void assign(const feature_type& x) { __id = __allocate(x); }
+    void assign(const char* x) { __id = __allocate(x); }
     template <typename Iterator>
-    void assign(Iterator first, Iterator last) { __id = __allocate(feature_type(first, last)); }
+    void assign(Iterator first, Iterator last) { __id = __allocate(piece_type(first, last)); }
     
   public:
     void swap(Feature& x) { std::swap(__id, x.__id); }
@@ -115,27 +119,21 @@ namespace cicada
     bool operator>=(const Feature& x, const Feature& y);
     
   private:
-    struct hasher : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-
-      size_t operator()(const feature_type& x) const
-      {
-	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
-      }
-    };
-
-  private:
-    typedef utils::indexed_set<feature_type, hasher, std::equal_to<feature_type>, std::allocator<feature_type> > feature_set_type;
+    typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > feature_index_type;
+    typedef utils::chunk_vector<feature_type, 4096 / sizeof(feature_type), std::allocator<feature_type> > feature_set_type;
 
     typedef std::vector<const feature_type*, std::allocator<const feature_type*> > feature_map_type;
     
   public:
-    static bool exists(const feature_type& x)
+    static bool exists(const piece_type& x)
     {
       lock_type lock(__mutex);
-      return __features().find(x) != __features().end();
+      
+      const feature_index_type& index = __index();
+      
+      return index.find(x) != index.end();
     }
+    
     static size_t allocated()
     {
       lock_type lock(__mutex);
@@ -153,17 +151,30 @@ namespace cicada
       return feats;
     }
     
+    static feature_index_type& __index()
+    {
+      static feature_index_type index;
+      return index;
+    }
+    
     static const id_type& __allocate_empty()
     {
       static const id_type __id = __allocate(feature_type());
       return __id;
     }
     
-    static id_type __allocate(const feature_type& x)
+    static id_type __allocate(const piece_type& x)
     {
       lock_type lock(__mutex);
-      feature_set_type::iterator siter = __features().insert(x).first;
-      return siter - __features().begin();
+      
+      feature_index_type& index = __index();
+      
+      std::pair<feature_index_type::iterator, bool> result = index.insert(x);
+      
+      if (result.second)
+	__features().push_back(x);
+      
+      return result.first - index.begin();
     }
     
   private:

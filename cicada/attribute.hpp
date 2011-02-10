@@ -19,6 +19,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/piece.hpp>
+#include <utils/chunk_vector.hpp>
 
 namespace cicada
 {
@@ -30,8 +31,9 @@ namespace cicada
     friend struct AttributeImpl;
     
   public:
-    typedef std::string attribute_type;
-    typedef uint32_t    id_type;
+    typedef std::string  attribute_type;
+    typedef utils::piece piece_type;
+    typedef uint32_t     id_type;
     
     typedef attribute_type::size_type              size_type;
     typedef attribute_type::difference_type        difference_type;
@@ -51,11 +53,13 @@ namespace cicada
     Attribute(const char* x) : __id(__allocate(x)) { }
     Attribute(const id_type& x) : __id(x) {}
     template <typename Iterator>
-    Attribute(Iterator first, Iterator last) : __id(__allocate(attribute_type(first, last))) { }
+    Attribute(Iterator first, Iterator last) : __id(__allocate(piece_type(first, last))) { }
     
+    void assign(const piece_type& x) { __id = __allocate(x); }
     void assign(const attribute_type& x) { __id = __allocate(x); }
+    void assign(const char* x) { __id = __allocate(x); }
     template <typename Iterator>
-    void assign(Iterator first, Iterator last) { __id = __allocate(attribute_type(first, last)); }
+    void assign(Iterator first, Iterator last) { __id = __allocate(piece_type(first, last)); }
     
   public:
     void swap(Attribute& x) { std::swap(__id, x.__id); }
@@ -113,29 +117,23 @@ namespace cicada
     bool operator<=(const Attribute& x, const Attribute& y);
     friend
     bool operator>=(const Attribute& x, const Attribute& y);
-    
-  private:
-    struct hasher : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-
-      size_t operator()(const attribute_type& x) const
-      {
-	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
-      }
-    };
 
   private:
-    typedef utils::indexed_set<attribute_type, hasher, std::equal_to<attribute_type>, std::allocator<attribute_type> > attribute_set_type;
+    typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > attribute_index_type;
+    typedef utils::chunk_vector<attribute_type, 4096 / sizeof(attribute_type), std::allocator<attribute_type> > attribute_set_type;
 
     typedef std::vector<const attribute_type*, std::allocator<const attribute_type*> > attribute_map_type;
     
   public:
-    static bool exists(const attribute_type& x)
+    static bool exists(const piece_type& x)
     {
       lock_type lock(__mutex);
-      return __attributes().find(x) != __attributes().end();
+      
+      const attribute_index_type& index = __index();
+      
+      return index.find(x) != index.end();
     }
+    
     static size_t allocated()
     {
       lock_type lock(__mutex);
@@ -149,8 +147,14 @@ namespace cicada
     
     static attribute_set_type& __attributes()
     {
-      static attribute_set_type attrs;
-      return attrs;
+      static attribute_set_type feats;
+      return feats;
+    }
+    
+    static attribute_index_type& __index()
+    {
+      static attribute_index_type index;
+      return index;
     }
     
     static const id_type& __allocate_empty()
@@ -159,11 +163,18 @@ namespace cicada
       return __id;
     }
     
-    static id_type __allocate(const attribute_type& x)
+    static id_type __allocate(const piece_type& x)
     {
       lock_type lock(__mutex);
-      attribute_set_type::iterator siter = __attributes().insert(x).first;
-      return siter - __attributes().begin();
+      
+      attribute_index_type& index = __index();
+      
+      std::pair<attribute_index_type::iterator, bool> result = index.insert(x);
+      
+      if (result.second)
+	__attributes().push_back(x);
+      
+      return result.first - index.begin();
     }
     
   private:

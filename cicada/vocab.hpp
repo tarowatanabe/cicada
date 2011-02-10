@@ -204,12 +204,12 @@ namespace cicada
 	  return __find(id);
 	} else if (__succinct_hash && id - __succinct_hash_mapped->size() < __succinct_hash->size()) {
 	  succinct_hash_type::const_iterator iter = (__succinct_hash->begin() + id - __succinct_hash_mapped->size());
-	  return symbol_type(std::string(iter.begin(), iter.end()));
+	  return symbol_type(iter.begin(), iter.end());
 	} else
 	  return UNK;
       } else if (__succinct_hash && id < __succinct_hash->size()) {
 	succinct_hash_type::const_iterator iter = (__succinct_hash->begin() + id);
-	return symbol_type(std::string(iter.begin(), iter.end()));
+	return symbol_type(iter.begin(), iter.end());
       } else
 	return UNK;
     }
@@ -257,7 +257,7 @@ namespace cicada
 	return symbol_type(__word);
       
       succinct_hash_mapped_type::const_iterator iter = (__succinct_hash_mapped->begin() + id);
-      __word = symbol_type(std::string(iter.begin(), iter.end())).id();
+      __word = symbol_type(iter.begin(), iter.end()).id();
       
       cache_new.value = (uint64_t(__word) << 32) | (uint64_t(id) & 0xffffffff);
       

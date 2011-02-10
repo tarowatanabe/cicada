@@ -21,6 +21,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/piece.hpp>
+#include <utils/chunk_vector.hpp>
 
 namespace cicada
 {
@@ -33,8 +34,9 @@ namespace cicada
     friend struct SymbolImpl;
 
   public:
-    typedef std::string symbol_type;
-    typedef uint32_t    id_type;
+    typedef std::string  symbol_type;
+    typedef utils::piece piece_type;
+    typedef uint32_t     id_type;
     
     typedef symbol_type::size_type              size_type;
     typedef symbol_type::difference_type        difference_type;
@@ -53,16 +55,18 @@ namespace cicada
     
   public:
     Symbol() : __id(__allocate_empty()) { }
-    Symbol(const utils::piece& x) : __id(__allocate(x)) { }
+    Symbol(const piece_type& x) : __id(__allocate(x)) { }
     Symbol(const symbol_type& x) : __id(__allocate(x)) { }
     Symbol(const char* x) : __id(__allocate(x)) { }
     Symbol(const id_type& x) : __id(x) {}
     template <typename Iterator>
-    Symbol(Iterator first, Iterator last) : __id(__allocate(symbol_type(first, last))) { }
+    Symbol(Iterator first, Iterator last) : __id(__allocate(piece_type(first, last))) { }
     
+    void assign(const piece_type& x) { __id = __allocate(x); }
     void assign(const symbol_type& x) { __id = __allocate(x); }
+    void assign(const char* x) { __id = __allocate(x); }
     template <typename Iterator>
-    void assign(Iterator first, Iterator last) { __id = __allocate(symbol_type(first, last)); }
+    void assign(Iterator first, Iterator last) { __id = __allocate(piece_type(first, last)); }
     
   public:
     void swap(Symbol& x) { std::swap(__id, x.__id); }
@@ -217,19 +221,10 @@ namespace cicada
     friend
     bool operator>=(const Symbol& x, const Symbol& y);
     
-  private:
-    struct hasher : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const symbol_type& x) const
-      {
-	return hasher_type::operator()(x.begin(), x.end(), size_t(0));
-      }
-    };
     
   private:
-    typedef utils::indexed_set<symbol_type, hasher, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_set_type;
+    typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > symbol_index_type;
+    typedef utils::chunk_vector<symbol_type, 4096 / sizeof(symbol_type), std::allocator<symbol_type> > symbol_set_type;
 
     typedef std::vector<const symbol_type*, std::allocator<const symbol_type*> > symbol_map_type;
     typedef std::vector<int, std::allocator<int> >   index_map_type;
@@ -237,14 +232,18 @@ namespace cicada
     typedef std::vector<id_type, std::allocator<id_type> > non_terminal_symbol_map_type;
     
   public:
-    static bool exists(const symbol_type& x)
+    static bool exists(const piece_type& x)
     {
       lock_type lock(__mutex);
-      return __symbols().find(x) != __symbols().end();
+      
+      const symbol_index_type& index = __index();
+      
+      return index.find(x) != index.end();
     }
     static size_t allocated()
     {
       lock_type lock(__mutex);
+      
       return __symbols().size();
     }
     static void write(const path_type& path);
@@ -263,17 +262,30 @@ namespace cicada
       return syms;
     }
     
+    static symbol_index_type& __index()
+    {
+      static symbol_index_type index;
+      return index;
+    }
+    
     static const id_type& __allocate_empty()
     {
-      static const id_type __id = __allocate(symbol_type());
+      static const id_type __id = __allocate("");
       return __id;
     }
     
-    static id_type __allocate(const symbol_type& x)
+    static id_type __allocate(const piece_type& x)
     {
       lock_type lock(__mutex);
-      symbol_set_type::iterator siter = __symbols().insert(x).first;
-      return siter - __symbols().begin();
+
+      symbol_index_type& index = __index();
+      
+      std::pair<symbol_index_type::iterator, bool> result = index.insert(x);
+      
+      if (result.second)
+	__symbols().push_back(x);
+      
+      return result.first - index.begin();
     }
     
   private:
