@@ -102,99 +102,13 @@ namespace cicada
     
     
     bool is_terminal() const { return ! is_non_terminal(); }
-    bool is_non_terminal() const
-    {
-      const size_type scan_pos = (__id << 1);
-      const size_type flag_pos = (__id << 1) + 1;
-
-      non_terminal_map_type& maps = __non_terminal_maps();
-      if (flag_pos >= maps.size())
-	maps.resize(flag_pos + 1, false);
-      
-      if (! maps[scan_pos]) {
-	const symbol_type& word = symbol();
-	const size_type size = word.size();
-	
-	// at least we have [<char>]
-	maps[scan_pos] = true;
-	maps[flag_pos] = (size >= 3 && word[0] == '[' && word[size - 1] == ']');
-      }
-      
-      return maps[flag_pos];
-    }
+    bool is_non_terminal() const;
     
-    int non_terminal_index() const
-    {
-      if (! is_non_terminal())
-	return 0;
-      
-      index_map_type& maps = __index_maps();
-      if (__id >= maps.size())
-	maps.resize(__id + 1, -1);
-
-      if (maps[__id] < 0) {
-	const symbol_type& word = symbol();
-	const size_type size = word.size();
-	
-	// at leas we have [<char>,<digit>]
-	maps[__id] = 0;
-	if (size >= 5 && word[0] == '[' && word[size - 1] == ']') {
-	  // first-index and # of char...
-	  symbol_type::size_type pos = word.find(',');
-	  maps[__id] = (pos != symbol_type::npos ? atoi(word.c_str() + pos + 1) : 0);
-	}
-      }
-      
-      return maps[__id];
-    }
-
-    std::string non_terminal_strip() const
-    {
-      if (! is_non_terminal())
-	return *this;
-      
-      const std::string& stripped = static_cast<const std::string&>(non_terminal());
-      return stripped.substr(1, stripped.size() - 2);
-    }
     
-    Symbol non_terminal() const
-    {
-      if (! is_non_terminal())
-	return *this;
-      
-      non_terminal_symbol_map_type& maps = __non_terminal_symbol_maps();
-      if (__id >= maps.size())
-	maps.resize(__id + 1, id_type(-1));
-      
-      if (maps[__id] == id_type(-1)) {
-	const symbol_type& word = symbol();
-	
-	symbol_type::size_type pos = word.find(',');
-	
-	maps[__id] = __id;
-	if (pos != symbol_type::npos)
-	  maps[__id] = Symbol(word.substr(0, pos) + ']').id();
-      }
-      
-      return maps[__id];
-    }
-    
-    Symbol non_terminal(const int index) const
-    {
-      if (! is_non_terminal() || index < 0)
-	return *this;
-      
-      if (index == 0)
-	return non_terminal();
-      
-      const symbol_type& word = symbol();
-      const symbol_type::size_type pos = word.find(',');
-      
-      if (pos == symbol_type::npos)
-	return Symbol(word.substr(0, word.size() - 1) + ',' + boost::lexical_cast<std::string>(index) + ']');
-      else
-	return Symbol(word.substr(0, pos) + ',' + boost::lexical_cast<std::string>(index) + ']');
-    }
+    piece_type non_terminal_strip() const;
+    int non_terminal_index() const;
+    Symbol non_terminal() const;
+    Symbol non_terminal(const int index) const;
     
   public:
     // boost hash
@@ -227,9 +141,9 @@ namespace cicada
     typedef utils::chunk_vector<symbol_type, 4096 / sizeof(symbol_type), std::allocator<symbol_type> > symbol_set_type;
 
     typedef std::vector<const symbol_type*, std::allocator<const symbol_type*> > symbol_map_type;
-    typedef std::vector<int, std::allocator<int> >   index_map_type;
-    typedef std::vector<bool, std::allocator<bool> > non_terminal_map_type;
-    typedef std::vector<id_type, std::allocator<id_type> > non_terminal_symbol_map_type;
+    
+    
+    
     
   public:
     static bool exists(const piece_type& x)
@@ -253,9 +167,6 @@ namespace cicada
     static mutex_type    __mutex_data;
     
     static symbol_map_type& __symbol_maps();
-    static index_map_type& __index_maps();
-    static non_terminal_map_type& __non_terminal_maps();
-    static non_terminal_symbol_map_type& __non_terminal_symbol_maps();
     
     static symbol_set_type& __symbols()
     {
