@@ -22,7 +22,6 @@
 
 #include <utils/hashmurmur.hpp>
 #include <utils/piece.hpp>
-#include <utils/lexical_cast.hpp>
 
 namespace cicada
 {

@@ -18,6 +18,8 @@
 
 #include "alignment.hpp"
 
+#include "utils/lexical_cast.hpp"
+
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Alignment::point_type,
 			  (cicada::Alignment::index_type, source)
