@@ -4,6 +4,7 @@
 
 #include <utils/config.hpp>
 #include <utils/thread_specific_ptr.hpp>
+#include <utils/lexical_cast.hpp>
 
 #include "symbol.hpp"
 
@@ -113,7 +114,6 @@ namespace cicada
     return *non_terminal_symbol_maps;
 #endif
   }
-
 
   void Symbol::write(const path_type& path)
   {

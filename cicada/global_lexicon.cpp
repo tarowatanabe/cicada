@@ -79,7 +79,7 @@ namespace cicada
       if (iter == rep.end())
 	throw std::runtime_error("no size?");
 
-      const size_type size = atoi(iter->second.c_str());
+      const size_type size = boost::lexical_cast<size_type>(iter->second);
       
       const path_type tmp_dir = utils::tempfile::tmp_dir();
       

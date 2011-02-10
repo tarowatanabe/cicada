@@ -125,6 +125,7 @@ sample_group_aligned_code \
 sample_icu_filter \
 sample_indexed_set \
 sample_istream_line_iterator \
+sample_lexical_cast \
 sample_lockfree_list_queue \
 sample_lockfree_queue \
 sample_malloc_stats \
@@ -210,6 +211,9 @@ sample_indexed_set_SOURCES = sample_indexed_set.cpp
 sample_indexed_set_LDFLAGS = $(BOOST_THREAD_LDFLAGS) $(BOOST_THREAD_LIBS)
 
 sample_istream_line_iterator_SOURCES = sample_istream_line_iterator.cpp
+
+sample_lexical_cast_SOURCES = sample_lexical_cast.cpp
+sample_lexical_cast_LDADD = $(LIBUTILS)
 
 sample_lockfree_list_queue_SOURCES = sample_lockfree_list_queue.cpp
 sample_lockfree_list_queue_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
