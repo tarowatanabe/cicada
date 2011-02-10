@@ -348,7 +348,7 @@ namespace cicada
       const size_type cache_pos = hasher_type::operator()(pos, lhs.id()) & (cache_phrases.size() - 1);
       
       cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
-      if (cache.pos != pos) {
+      if (cache.pos != pos || ! cache.rule || cache.rule->lhs != lhs) {
 	typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
 	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
 	typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
