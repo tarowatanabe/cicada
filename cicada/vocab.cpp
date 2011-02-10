@@ -31,7 +31,7 @@ namespace cicada
 
   // normal vocab services...
   
-  Symbol::id_type Vocab::insert(const std::string& word)
+  Symbol::id_type Vocab::insert(const utils::piece& word)
   {
     if (__succinct_hash_stream)
       return __succinct_hash_stream->insert(word.c_str(), word.size(), __hasher(word.begin(), word.end(), 0));
