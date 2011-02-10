@@ -160,7 +160,7 @@ namespace cicada
     
     static const id_type& __allocate_empty()
     {
-      static const id_type __id = __allocate(attribute_type());
+      static const id_type __id = __allocate("");
       return __id;
     }
     
