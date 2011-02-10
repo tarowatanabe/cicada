@@ -13,6 +13,7 @@
 #include "utils/compact_trie_dense.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/piece.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/lexical_cast.hpp>
 
