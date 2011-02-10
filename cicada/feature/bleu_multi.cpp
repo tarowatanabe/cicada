@@ -5,7 +5,9 @@
 #include "bleu_multi.hpp"
 
 #include "cicada/parameter.hpp"
+
 #include "utils/piece.hpp"
+#include "utils/lexical_cast.hpp"
 
 namespace cicada
 {
