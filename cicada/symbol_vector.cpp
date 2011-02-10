@@ -35,12 +35,13 @@ namespace cicada
   
   std::istream& operator>>(std::istream& is, SymbolVector& x)
   {
-    typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     
     std::string line;
     x.clear();
     if (std::getline(is, line)) {
-      tokenizer_type tokenizer(line);
+      utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
       x.assign(tokenizer.begin(), tokenizer.end());
     }
     

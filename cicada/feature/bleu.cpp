@@ -663,13 +663,14 @@ namespace cicada
       pimpl->refset.clear();
       
       if (! refset_file.empty()) {
-	typedef boost::tokenizer<utils::space_separator> tokenizer_type;
+	typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
 	
 	utils::compress_istream is(refset_file, 1024 * 1024);
 	std::string line;
 	
 	while (std::getline(is, line)) {
-	  tokenizer_type tokenizer(line);
+	  utils::piece line_piece(line);
+	  tokenizer_type tokenizer(line_piece);
 	  
 	  tokenizer_type::iterator iter = tokenizer.begin();
 	  if (iter == tokenizer.end()) continue;
