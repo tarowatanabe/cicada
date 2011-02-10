@@ -19,6 +19,7 @@
 
 #include "utils/program_options.hpp"
 #include "utils/space_separator.hpp"
+#include "utils/lexical_cast.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef boost::tokenizer<utils::space_separator> tokenizer_type;
@@ -246,7 +247,7 @@ int main(int argc, char** argv)
 	if (tokens.front() != "*")
 	  throw std::runtime_error("invalid cabocha F1 format: no star");
 	
-	const int index = boost::lexical_cast<int>(tokens[1]);
+	const int index = utils::lexical_cast<int>(tokens[1]);
 	if (index != static_cast<int>(nodes.size()))
 	  throw std::runtime_error("invalid cabocha F1 format: node size do not match");
 	

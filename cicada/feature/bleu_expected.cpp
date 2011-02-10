@@ -487,7 +487,7 @@ namespace cicada
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "order")
-	  order = boost::lexical_cast<int>(piter->second);
+	  order = utils::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }

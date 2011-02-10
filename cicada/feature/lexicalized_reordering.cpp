@@ -128,7 +128,7 @@ namespace cicada
 	// assign default...
 	for (size_t i = 0; i != attribute_names.size(); ++ i)
 	  if (attribute_names[i].empty())
-	    attribute_names[i] = "rule-table-" + boost::lexical_cast<std::string>(i);
+	    attribute_names[i] = "rule-table-" + utils::lexical_cast<std::string>(i);
       }
 
       void clear() { cache_states.clear(); }

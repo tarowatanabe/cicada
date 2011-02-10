@@ -285,7 +285,7 @@ namespace cicada
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "distortion")
-	  distortion = boost::lexical_cast<int>(piter->second);
+	  distortion = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "yield") {
 	  if (utils::ipiece(piter->second) == "source")
 	    source = true;

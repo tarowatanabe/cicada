@@ -29,6 +29,7 @@
 
 #include <boost/thread.hpp>
 
+#include "utils/lexical_cast.hpp"
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
 
@@ -256,7 +257,7 @@ namespace cicada
 	if (feature >= static_cast<int>(feature_names_default.size()))
 	  feature_names_default.resize(feature + 1);
 	if (feature_names_default[feature].empty())
-	  feature_names_default[feature] = "rule-table-" + boost::lexical_cast<std::string>(feature);
+	  feature_names_default[feature] = "rule-table-" + utils::lexical_cast<std::string>(feature);
 	
 	rules.back().features[feature_names_default[feature]] = fiter->second;
 	
@@ -272,7 +273,7 @@ namespace cicada
 	if (attribute >= static_cast<int>(attribute_names_default.size()))
 	  attribute_names_default.resize(attribute + 1);
 	if (attribute_names_default[attribute].empty())
-	  attribute_names_default[attribute] = "rule-table-" + boost::lexical_cast<std::string>(attribute);
+	  attribute_names_default[attribute] = "rule-table-" + utils::lexical_cast<std::string>(attribute);
 	
 	rules.back().attributes[attribute_names_default[attribute]] = aiter->second;
 	
@@ -302,7 +303,7 @@ namespace cicada
     for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
       
       if (utils::ipiece(piter->first) == "max-span") {
-	max_span = boost::lexical_cast<int>(piter->second);
+	max_span = utils::lexical_cast<int>(piter->second);
 	continue;
       }
       
@@ -398,7 +399,7 @@ namespace cicada
 	    if (feature >= static_cast<int>(feature_names_default.size()))
 	      feature_names_default.resize(feature + 1);
 	    if (feature_names_default[feature].empty())
-	      feature_names_default[feature] = "rule-table-" + boost::lexical_cast<std::string>(feature);
+	      feature_names_default[feature] = "rule-table-" + utils::lexical_cast<std::string>(feature);
 	    
 	    rules.back().features[feature_names_default[feature]] = fiter->second;
 	  }
@@ -419,7 +420,7 @@ namespace cicada
 	    if (attribute >= static_cast<int>(attribute_names_default.size()))
 	      attribute_names_default.resize(attribute + 1);
 	    if (attribute_names_default[attribute].empty())
-	      attribute_names_default[attribute] = "rule-table-" + boost::lexical_cast<std::string>(attribute);
+	      attribute_names_default[attribute] = "rule-table-" + utils::lexical_cast<std::string>(attribute);
 	    
 	    rules.back().attributes[attribute_names_default[attribute]] = aiter->second;
 	  }

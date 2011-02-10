@@ -31,13 +31,13 @@ namespace cicada
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "beam")
-	  beam = boost::lexical_cast<double>(piter->second);
+	  beam = utils::lexical_cast<double>(piter->second);
 	else if (utils::ipiece(piter->first) == "kbest")
-	  kbest = boost::lexical_cast<size_t>(piter->second);
+	  kbest = utils::lexical_cast<size_t>(piter->second);
 	else if (utils::ipiece(piter->first) == "density")
-	  density = boost::lexical_cast<double>(piter->second);
+	  density = utils::lexical_cast<double>(piter->second);
 	else if (utils::ipiece(piter->first) == "scale")
-	  scale = boost::lexical_cast<double>(piter->second);
+	  scale = utils::lexical_cast<double>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")

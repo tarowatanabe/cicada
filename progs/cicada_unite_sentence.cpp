@@ -20,6 +20,7 @@
 #include "utils/sgi_hash_set.hpp"
 #include "utils/program_options.hpp"
 #include "utils/resource.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/program_options.hpp>
 
@@ -544,8 +545,8 @@ struct TranslationErrorRate : public TER, public M
 
     if (sentence.size() != shifted.size())
       throw std::runtime_error(std::string("size do not match:")
-			       + " original: " + boost::lexical_cast<std::string>(sentence.size())
-			       + " shifted: "  + boost::lexical_cast<std::string>(shifted.size()));
+			       + " original: " + utils::lexical_cast<std::string>(sentence.size())
+			       + " shifted: "  + utils::lexical_cast<std::string>(shifted.size()));
   }
 
   void gather_all_possible_shifts(const sentence_type& hyp,

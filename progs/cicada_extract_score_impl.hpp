@@ -53,6 +53,7 @@
 #include <utils/malloc_stats.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/base64.hpp>
+#include <utils/lexical_cast.hpp>
 
 #include <succinct_db/succinct_trie_db.hpp>
 #include <succinct_db/succinct_hash.hpp>
@@ -1508,7 +1509,7 @@ public:
     index.write(rep.path("index"));
     counts.write(rep.path("counts"));
     
-    rep["counts-size"] = boost::lexical_cast<std::string>(counts_size);
+    rep["counts-size"] = utils::lexical_cast<std::string>(counts_size);
   }
   
   void open(const path_type& path)
@@ -1525,7 +1526,7 @@ public:
     repository_type::const_iterator iter = rep.find("counts-size");
     if (iter == rep.end())
       throw std::runtime_error("no counts size...");
-    counts_size = boost::lexical_cast<size_type>(iter->second);
+    counts_size = utils::lexical_cast<size_type>(iter->second);
     
     segment.open(rep.path("segment"));
     index.open(rep.path("index"));

@@ -22,11 +22,11 @@
 
 #include "cicada_lexicon_global_impl.hpp"
 
+#include "utils/lexical_cast.hpp"
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
 #include "utils/mpi_device_bcast.hpp"
 #include "utils/mpi_stream.hpp"
-
 
 path_type source_file = "-";
 path_type target_file = "-";
@@ -147,9 +147,9 @@ void learn(const path_type& path,
   if (mpi_rank == 0) {
     repository_type rep(path, repository_type::write);
     
-    rep["bitext-size"] = boost::lexical_cast<std::string>(bitexts.size());
-    rep["vocab-size"]  = boost::lexical_cast<std::string>(vocab.size());
-    rep["size"] = boost::lexical_cast<std::string>(mpi_size);
+    rep["bitext-size"] = utils::lexical_cast<std::string>(bitexts.size());
+    rep["vocab-size"]  = utils::lexical_cast<std::string>(vocab.size());
+    rep["size"] = utils::lexical_cast<std::string>(mpi_size);
   }
 
   if (mpi_rank == 0 && debug)
@@ -164,7 +164,7 @@ void learn(const path_type& path,
   repository_type rep(path, repository_type::read);
   
   queue_type      queue(1);
-  const path_type path_lexicon = rep.path(std::string("lexicon.") + boost::lexical_cast<std::string>(mpi_rank) + ".gz");
+  const path_type path_lexicon = rep.path(std::string("lexicon.") + utils::lexical_cast<std::string>(mpi_rank) + ".gz");
   
   thread_ptr_type mapper;
   if (learn_maxent)

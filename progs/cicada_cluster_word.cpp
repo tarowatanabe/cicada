@@ -28,6 +28,7 @@
 #include <utils/simple_vector.hpp>
 #include <utils/space_separator.hpp>
 #include <utils/mathop.hpp>
+#include <utils/lexical_cast.hpp>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -532,7 +533,7 @@ void dump_clusters(const path_type& file,
   // sri-mode classes...
   class_set_type classes(clusters.size());
   for (size_t i = 0; i != clusters.size(); ++ i)
-    classes[i] = "<class-" + boost::lexical_cast<std::string>(i+1) + ">";
+    classes[i] = "<class-" + utils::lexical_cast<std::string>(i+1) + ">";
   
   word_class_count_set_type::const_iterator witer_end = words.end();
   for (word_class_count_set_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer)

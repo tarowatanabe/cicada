@@ -289,7 +289,7 @@ namespace cicada
 				     const int span_size) const
       {
 	return (static_cast<const std::string&>(feature_name_prefix) + ":"
-		+ node + antecedent + '|' + prefix + '|' + suffix + '|' + boost::lexical_cast<std::string>(span_size));
+		+ node + antecedent + '|' + prefix + '|' + suffix + '|' + utils::lexical_cast<std::string>(span_size));
       }
     };
     

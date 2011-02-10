@@ -19,6 +19,7 @@
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -329,7 +330,7 @@ struct OptimizeOnline
 
     path_pair_set_type paths;
     for (int sample = 0; /**/; ++ sample) {
-      const std::string file_name = boost::lexical_cast<std::string>(sample) + ".gz";
+      const std::string file_name = utils::lexical_cast<std::string>(sample) + ".gz";
       
       const path_type path_forest      = forest_path / file_name;
       const path_type path_intersected = intersected_path / file_name;
@@ -653,7 +654,7 @@ struct OptimizeLBFGS
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
     for (int sample = 0; /**/; ++ sample) {
-      const std::string file_name = boost::lexical_cast<std::string>(sample) + ".gz";
+      const std::string file_name = utils::lexical_cast<std::string>(sample) + ".gz";
       
       const path_type path_forest      = optimizer.forest_path / file_name;
       const path_type path_intersected = optimizer.intersected_path / file_name;
@@ -770,7 +771,7 @@ size_t enumerate_forest(const path_type& dir)
     workers.add_thread(new boost::thread(task_type(queue, sizes[i])));
   
   for (int i = 0; /**/; ++ i) {
-    path_type path = dir / (boost::lexical_cast<std::string>(i) + ".gz");
+    path_type path = dir / (utils::lexical_cast<std::string>(i) + ".gz");
     if (! boost::filesystem::exists(path)) break;
     
     queue.push_swap(path);

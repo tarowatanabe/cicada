@@ -21,7 +21,7 @@ namespace cicada
     repository_type::const_iterator oiter = rep.find("offset");
     if (oiter == rep.end())
       throw std::runtime_error("no offset?");
-    offset = boost::lexical_cast<size_type>(oiter->second);
+    offset = utils::lexical_cast<size_type>(oiter->second);
     
     if (boost::filesystem::exists(rep.path("quantized"))) {
       quantized.open(rep.path("quantized"));
@@ -58,8 +58,8 @@ namespace cicada
       throw std::runtime_error("no shard size...");
 
     shards.clear();
-    shards.reserve(boost::lexical_cast<size_t>(siter->second));
-    shards.resize(boost::lexical_cast<size_t>(siter->second));
+    shards.reserve(utils::lexical_cast<size_t>(siter->second));
+    shards.resize(utils::lexical_cast<size_t>(siter->second));
     
     for (size_t shard = 0; shard != shards.size(); ++ shard) {
       std::ostringstream stream_shard;

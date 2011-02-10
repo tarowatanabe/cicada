@@ -44,6 +44,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/sgi_hash_map.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -974,7 +975,7 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average, Genera
     while (std::getline(is, line))
       if (! line.empty()) {
 	if (! input_id_mode)
-	  samples.push_back(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	  samples.push_back(utils::lexical_cast<std::string>(id) + " ||| " + line);
 	else
 	  samples.push_back(line);
 	++ id;
@@ -1101,12 +1102,12 @@ void optimize(weight_set_type& weights, weight_set_type& weights_average, Genera
     
     if (dump_weights) {
 
-      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)), weights_mixed));
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights_mixed));
       
       weights_average = weights_accumulated;
       weights_average /= norm_accumulated;
       
-      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"), weights_average));
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1) + ".average"), weights_average));
     }
     
     for (typename optimizer_set_type::iterator oiter = optimizers.begin(); oiter != oiter_end; ++ oiter) {

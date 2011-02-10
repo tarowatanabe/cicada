@@ -373,7 +373,7 @@ namespace cicada
       
       const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next, const int span) const
       {
-	return (static_cast<const std::string&>(feature_name_prefix) + ":" + node + '|' + prev + '|' + next + '|' + boost::lexical_cast<std::string>(span));
+	return (static_cast<const std::string&>(feature_name_prefix) + ":" + node + '|' + prev + '|' + next + '|' + utils::lexical_cast<std::string>(span));
       }
       
       void neighbours_final_score(const state_ptr_type& __state,

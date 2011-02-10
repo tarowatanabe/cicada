@@ -15,7 +15,7 @@
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
 #include "utils/lockfree_list_queue.hpp"
-
+#include "utils/lexical_cast.hpp"
 #include "utils/program_options.hpp"
 
 #include <boost/program_options.hpp>
@@ -300,7 +300,7 @@ struct MapStdout
 	if (input_id_mode)
 	  queue.push(std::make_pair(line, false));
 	else
-	  queue.push(std::make_pair(boost::lexical_cast<std::string>(id) + " ||| " + line, false));
+	  queue.push(std::make_pair(utils::lexical_cast<std::string>(id) + " ||| " + line, false));
 	
 	++ id;
       }
@@ -331,7 +331,7 @@ struct TaskStdout
       
       operations(line);
       
-      queue_os.push(boost::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
+      queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
     }
 
     queue_os.push(std::string());
@@ -373,7 +373,7 @@ struct ReduceStdout
       for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
 	
       // tokenize here...
-      buffer_id = boost::lexical_cast<size_t>(buffer.substr(0, iter - buffer.begin()));
+      buffer_id = utils::lexical_cast<size_t>(buffer.substr(0, iter - buffer.begin()));
       buffer_tokenized    = buffer.substr(iter + 1 - buffer.begin());
       
       if (buffer_id == id) {
@@ -397,8 +397,8 @@ struct ReduceStdout
     os << std::flush;
       
     if (! maps.empty())
-      throw std::runtime_error("id mismatch! expecting: " + boost::lexical_cast<std::string>(id)
-			       + " next: " + boost::lexical_cast<std::string>(maps.begin()->first));
+      throw std::runtime_error("id mismatch! expecting: " + utils::lexical_cast<std::string>(id)
+			       + " next: " + utils::lexical_cast<std::string>(maps.begin()->first));
   }
   
   queue_type& queue;
@@ -661,7 +661,7 @@ void cicada_process(operation_set_type& operations)
 	    if (input_id_mode)
 	      stream[rank]->write(line);
 	    else
-	      stream[rank]->write(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	      stream[rank]->write(utils::lexical_cast<std::string>(id) + " ||| " + line);
 	    
 	    ++ id;
 	    
@@ -672,7 +672,7 @@ void cicada_process(operation_set_type& operations)
 	  if (input_id_mode)
 	    queue.push(line);
 	  else
-	    queue.push(boost::lexical_cast<std::string>(id) + " ||| " + line);
+	    queue.push(utils::lexical_cast<std::string>(id) + " ||| " + line);
 	  
 	  ++ id;
 	  

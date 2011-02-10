@@ -636,7 +636,7 @@ namespace cicada
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "order")
-	  order = boost::lexical_cast<int>(piter->second);
+	  order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "exact")
 	  exact = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "tokenizer")
@@ -675,7 +675,7 @@ namespace cicada
 	  tokenizer_type::iterator iter = tokenizer.begin();
 	  if (iter == tokenizer.end()) continue;
 	  
-	  const int id = boost::lexical_cast<int>(*iter);
+	  const int id = utils::lexical_cast<int>(*iter);
 	  ++ iter;
 	  
 	  if (iter == tokenizer.end()) continue;

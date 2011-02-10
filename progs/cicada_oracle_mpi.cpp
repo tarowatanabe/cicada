@@ -53,6 +53,7 @@
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -189,14 +190,14 @@ int main(int argc, char ** argv)
 	if (forest_mode) {
 	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
 	    if (oracles_forest[id].is_valid()) {
-	      utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
 	      
 	      os << id << " ||| " << oracles_forest[id] << '\n';
 	    }
 	} else {
 	  for (size_t id = 0; id != oracles.size(); ++ id)
 	    if (! oracles[id].empty()) {
-	      utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
 	      
 	      os << id << " ||| " << oracles[id] << '\n';
 	    }
@@ -468,7 +469,7 @@ void read_tstset(const path_set_type& files,
     if (boost::filesystem::is_directory(*titer)) {
 
       for (int i = mpi_rank; /**/; i += mpi_size) {
-	const path_type path = (*titer) / (boost::lexical_cast<std::string>(i) + ".gz");
+	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	
@@ -483,7 +484,7 @@ void read_tstset(const path_set_type& files,
 	    throw std::runtime_error("format error?: " + path.file_string());
 	
 	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + path.file_string());
+	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.file_string());
 	  
 	  if (id % mpi_size != mpi_rank)
 	    throw std::runtime_error("difference it?");
@@ -505,7 +506,7 @@ void read_tstset(const path_set_type& files,
 	  throw std::runtime_error("format error?: " + titer->file_string());
 	
 	if (id >= static_cast<int>(graphs.size()))
-	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + titer->file_string());
+	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->file_string());
 	
 	if (id % mpi_size == mpi_rank)
 	  graphs[id].unite(hypergraph);

@@ -19,6 +19,7 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/sgi_hash_set.hpp>
 #include <utils/bithack.hpp>
+#include <utils/lexical_cast.hpp>
 
 namespace cicada
 {
@@ -483,8 +484,8 @@ namespace cicada
 
 	if (sentence.size() != shifted.size())
 	  throw std::runtime_error(std::string("size do not match:")
-				   + " original: " + boost::lexical_cast<std::string>(sentence.size())
-				   + " shifted: "  + boost::lexical_cast<std::string>(shifted.size()));
+				   + " original: " + utils::lexical_cast<std::string>(sentence.size())
+				   + " shifted: "  + utils::lexical_cast<std::string>(shifted.size()));
       }
 
       void gather_all_possible_shifts(const sentence_type& hyp,

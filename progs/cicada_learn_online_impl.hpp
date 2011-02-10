@@ -24,6 +24,7 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/vector2.hpp>
+#include <utils/lexical_cast.hpp>
 
 #include <cicada/optimize/line_search.hpp>
 
@@ -167,7 +168,7 @@ void read_sample(const path_type& input_path,
   if (directory_mode) {
     for (int i = 0; /**/; ++ i) 
       if (shard_size <= 0 || i % shard_size == shard_rank) {
-	const path_type path = input_path / (boost::lexical_cast<std::string>(i) + ".gz");
+	const path_type path = input_path / (utils::lexical_cast<std::string>(i) + ".gz");
 	
 	if (! boost::filesystem::exists(path)) break;
 
@@ -221,7 +222,7 @@ void read_sample(const path_type& input_path,
 	  throw std::runtime_error("id exceeds sample size");
 	
 	if (! line.empty())
-	  samples[id] = boost::lexical_cast<std::string>(id) + " ||| " + line;
+	  samples[id] = utils::lexical_cast<std::string>(id) + " ||| " + line;
       }
   }
 }
@@ -241,7 +242,7 @@ void read_oracle(const path_set_type& files,
     if (boost::filesystem::is_directory(*fiter)) {
       for (int i = 0; /**/; ++ i) 
 	if (shard_size <= 0 || i % shard_size == shard_rank) {
-	  const path_type path = (*fiter) / (boost::lexical_cast<std::string>(i) + ".gz");
+	  const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 	  
 	  if (! boost::filesystem::exists(path)) break;
 	  
@@ -310,7 +311,7 @@ void read_oracle(const path_set_type& files,
     
     if (boost::filesystem::is_directory(*fiter)) {
       for (int i = 0; /**/; ++ i) {
-	const path_type path = (*fiter) / (boost::lexical_cast<std::string>(i) + ".gz");
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 	
 	if (! boost::filesystem::exists(path)) break;
 	
@@ -326,7 +327,7 @@ void read_oracle(const path_set_type& files,
 	    throw std::runtime_error("format error?: " + fiter->file_string());
 	  
 	  if (id >= graphs.size())
-	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + fiter->file_string());
+	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + fiter->file_string());
 	  
 	  graphs[id].unite(hypergraph);
 	}
@@ -344,7 +345,7 @@ void read_oracle(const path_set_type& files,
 	  throw std::runtime_error("format error?: " + fiter->file_string());
 	
 	if (id >= graphs.size())
-	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + fiter->file_string());
+	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + fiter->file_string());
 	
 	graphs[id].unite(hypergraph);
       }
@@ -421,7 +422,7 @@ void read_refset(const path_set_type& files,
   
   for (size_t seg = 0; seg != document.size(); ++ seg) {
     if (document[seg].empty())
-      throw std::runtime_error("no reference at segment: " + boost::lexical_cast<std::string>(seg));
+      throw std::runtime_error("no reference at segment: " + utils::lexical_cast<std::string>(seg));
     
     scorers[seg] = scorer_type::create(scorer_name);
     bleus[seg] = feature_function_type::create(scorer_name);

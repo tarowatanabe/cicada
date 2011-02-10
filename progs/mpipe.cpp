@@ -25,7 +25,7 @@
 #include <utils/compress_stream.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/subprocess.hpp>
-
+#include "utils/lexical_cast.hpp"
 
 struct MapReduce
 {
@@ -215,7 +215,7 @@ struct Dumper
     }
     
     if (! values.empty() && curr != values.begin()->first) {
-      throw std::runtime_error("invalid id: expected: " + boost::lexical_cast<std::string>(curr) + " current: " + boost::lexical_cast<std::string>(values.begin()->first));
+      throw std::runtime_error("invalid id: expected: " + utils::lexical_cast<std::string>(curr) + " current: " + utils::lexical_cast<std::string>(values.begin()->first));
     }
     
     value_set_type::const_iterator viter_end = values.end();
@@ -247,7 +247,7 @@ void tokenize(const std::string& buffer, MapReduce::value_type& value)
 
   for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
   
-  value.first = boost::lexical_cast<int>(buffer.substr(0, iter - buffer.begin()));
+  value.first = utils::lexical_cast<int>(buffer.substr(0, iter - buffer.begin()));
   value.second = buffer.substr(iter + 1 - buffer.begin());
 }
 
@@ -365,7 +365,7 @@ int main(int argc, char** argv)
 	    if (rank == 0)
 	      queue_send.push(value);
 	    else
-	      ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
+	      ostream[rank]->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
 	    
 	    ++ id;
 	    
@@ -394,7 +394,7 @@ int main(int argc, char** argv)
 	  
 	  for (int rank = 1; rank < mpi_size && value.first >= 0; ++ rank)
 	    if (ostream[rank]->test() && queue_is.pop(value, true) && value.first >= 0) {
-	      ostream[rank]->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
+	      ostream[rank]->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
 	    
 	      found = true;
 	    }
@@ -519,7 +519,7 @@ int main(int argc, char** argv)
 	    if (value.first < 0)
 	      terminated = true;
 	    else
-	      os->write(boost::lexical_cast<std::string>(value.first) + ' ' + value.second);
+	      os->write(utils::lexical_cast<std::string>(value.first) + ' ' + value.second);
 	    
 	    found = true;
 	  }

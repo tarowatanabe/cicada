@@ -45,6 +45,7 @@
 #include "utils/bithack.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -1331,12 +1332,12 @@ void optimize(const sample_set_type& samples,
     
     if (mpi_rank == 0 && dump_weights) {
       
-      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1)), weights_mixed));
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1)), weights_mixed));
       
       weights_average = weights_accumulated;
       weights_average /= norm_accumulated;
       
-      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + boost::lexical_cast<std::string>(iter + 1) + ".average"), weights_average));
+      queue_dumper.push(std::make_pair(add_suffix(output_file, "." + utils::lexical_cast<std::string>(iter + 1) + ".average"), weights_average));
     }
     
     if (mix_weights)

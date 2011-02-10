@@ -20,6 +20,8 @@
 
 #include "cicada_lexicon_global_impl.hpp"
 
+#include "utils/lexical_cast.hpp"
+
 path_type source_file = "-";
 path_type target_file = "-";
 
@@ -110,9 +112,9 @@ void learn(const path_type& path,
   {
     repository_type rep(path, repository_type::write);
     
-    rep["bitext-size"] = boost::lexical_cast<std::string>(bitexts.size());
-    rep["vocab-size"]  = boost::lexical_cast<std::string>(vocab.size());
-    rep["size"] = boost::lexical_cast<std::string>(threads);
+    rep["bitext-size"] = utils::lexical_cast<std::string>(bitexts.size());
+    rep["vocab-size"]  = utils::lexical_cast<std::string>(vocab.size());
+    rep["size"] = utils::lexical_cast<std::string>(threads);
   }
   
   if (debug)
@@ -125,7 +127,7 @@ void learn(const path_type& path,
   thread_ptr_set_type mapper(threads);
   
   for (int i = 0; i < mapper.size(); ++ i) {
-    const path_type path_lexicon = rep.path(std::string("lexicon.") + boost::lexical_cast<std::string>(i) + ".gz");
+    const path_type path_lexicon = rep.path(std::string("lexicon.") + utils::lexical_cast<std::string>(i) + ".gz");
     
     if (learn_maxent)
       mapper[i].reset(new thread_type(Mapper<OptimizeLBFGS>(bitexts,

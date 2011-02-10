@@ -575,11 +575,11 @@ namespace cicada
 	else if (utils::ipiece(piter->first) == "cluster")
 	  cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "order")
-	  order = boost::lexical_cast<int>(piter->second);
+	  order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-file")
 	  coarse_path = piter->second;
 	else if (utils::ipiece(piter->first) == "coarse-order")
-	  coarse_order = boost::lexical_cast<int>(piter->second);
+	  coarse_order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-cluster")
 	  coarse_cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "name")
@@ -592,7 +592,7 @@ namespace cicada
 	throw std::runtime_error("no ngram file? " + path.file_string());
       
       if (order <= 0)
-	throw std::runtime_error("invalid ngram order: " + boost::lexical_cast<std::string>(order));
+	throw std::runtime_error("invalid ngram order: " + utils::lexical_cast<std::string>(order));
 
       if (coarse_order > order)
 	throw std::runtime_error("invalid coarse order: coarse-order <= order");

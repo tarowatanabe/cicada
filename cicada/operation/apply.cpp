@@ -32,7 +32,7 @@ namespace cicada
 
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "size")
-	  size = boost::lexical_cast<int>(piter->second);
+	  size = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "exact")
 	  exact = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "prune")

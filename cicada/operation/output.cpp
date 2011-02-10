@@ -192,7 +192,7 @@ namespace cicada
       
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "kbest")
-	  kbest_size = boost::lexical_cast<int>(piter->second);
+	  kbest_size = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique")
 	  kbest_unique = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
@@ -284,7 +284,7 @@ namespace cicada
       if (output_data.use_buffer)
 	os_buffer.push(boost::iostreams::back_inserter(const_cast<std::string&>(output_data.buffer)));
       else if (! output_data.os) {
-	const path_type path = (! file.empty() ? file  : directory / (boost::lexical_cast<std::string>(id) + ".gz"));
+	const path_type path = (! file.empty() ? file  : directory / (utils::lexical_cast<std::string>(id) + ".gz"));
 	const_cast<boost::shared_ptr<std::ostream>&>(output_data.os).reset(new utils::compress_ostream(path, 1024 * 1024));
       }
 	

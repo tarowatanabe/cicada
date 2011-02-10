@@ -48,6 +48,7 @@
 #include "utils/space_separator.hpp"
 #include "utils/base64.hpp"
 #include "utils/piece.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -718,7 +719,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	    if (*iter != "|||") continue;
 	    ++ iter;
 
-	    id = boost::lexical_cast<int>(id_str);
+	    id = utils::lexical_cast<int>(id_str);
 	    x = utils::decode_base64<double>(x_str);
 	    sentence.assign(iter, tokenizer.end());
 	    
@@ -931,7 +932,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 
 	if (i % (mpi_size - 1) != (mpi_rank - 1)) continue;
 	
-	const path_type path = (*titer) / (boost::lexical_cast<std::string>(i) + ".gz");
+	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	

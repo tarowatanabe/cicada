@@ -79,7 +79,7 @@ namespace cicada
       if (iter == rep.end())
 	throw std::runtime_error("no size?");
 
-      const size_type size = boost::lexical_cast<size_type>(iter->second);
+      const size_type size = utils::lexical_cast<size_type>(iter->second);
       
       const path_type tmp_dir = utils::tempfile::tmp_dir();
       
@@ -95,7 +95,7 @@ namespace cicada
 	typedef std::pair<word_type, weight_type> word_weight_type;
 	typedef std::vector<word_weight_type, std::allocator<word_weight_type> > word_weight_set_type;
 
-	const path_type path = rep.path(std::string("lexicon.") + boost::lexical_cast<std::string>(node) + ".gz");
+	const path_type path = rep.path(std::string("lexicon.") + utils::lexical_cast<std::string>(node) + ".gz");
 	
 	if (! boost::filesystem::exists(path))
 	  throw std::runtime_error(std::string("no lexicon file: ") + path.file_string());

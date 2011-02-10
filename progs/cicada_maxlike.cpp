@@ -45,6 +45,7 @@
 #include "utils/resource.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -995,7 +996,7 @@ void read_tstset(const path_set_type& files,
     if (boost::filesystem::is_directory(*titer)) {
       
       for (int i = 0; /**/; ++ i) {
-	const path_type path = (*titer) / (boost::lexical_cast<std::string>(i) + ".gz");
+	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	
@@ -1011,7 +1012,7 @@ void read_tstset(const path_set_type& files,
 	    throw std::runtime_error("format error?: " + path.file_string());
 	
 	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + path.file_string());
+	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.file_string());
 	
 	  graphs[id].unite(hypergraph);
 	}
@@ -1029,7 +1030,7 @@ void read_tstset(const path_set_type& files,
 	  throw std::runtime_error("format error?: " + titer->file_string());
 	
 	if (id >= static_cast<int>(graphs.size()))
-	  throw std::runtime_error("tstset size exceeds refset size?" + boost::lexical_cast<std::string>(id) + ": " + titer->file_string());
+	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->file_string());
 	
 	graphs[id].unite(hypergraph);
       }

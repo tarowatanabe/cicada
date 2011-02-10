@@ -16,6 +16,7 @@
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
+#include <utils/lexical_cast.hpp>
 
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
@@ -192,7 +193,7 @@ int main(int argc, char** argv)
 	os_trg.precision(20);
       
 	for (int shard = 0; shard != mpi_size; ++ shard)
-	  os_file << (boost::lexical_cast<std::string>(shard) + ".gz") << '\n';
+	  os_file << (utils::lexical_cast<std::string>(shard) + ".gz") << '\n';
 	
 	root_count_set_type::const_iterator siter_end = root_sources.end();
 	for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
@@ -517,7 +518,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
   
-  utils::compress_ostream os(output_file / (boost::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
+  utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
   
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(modified,
@@ -640,7 +641,7 @@ void index_counts(const path_set_type& modified_files,
   
   repository_type rep(path_index, repository_type::read);
   
-  modified_counts[mpi_rank].write(rep.path(boost::lexical_cast<std::string>(mpi_rank)));
+  modified_counts[mpi_rank].write(rep.path(utils::lexical_cast<std::string>(mpi_rank)));
   
   ::sync();
   
@@ -684,7 +685,7 @@ void index_counts(const path_set_type& modified_files,
   for (int rank = 0; rank != mpi_size; ++ rank) {
     MPI::COMM_WORLD.Barrier();
     
-    const path_type path = rep.path(boost::lexical_cast<std::string>(rank));
+    const path_type path = rep.path(utils::lexical_cast<std::string>(rank));
     
     while (! modified_counts[rank].exists(path))
       boost::thread::yield();

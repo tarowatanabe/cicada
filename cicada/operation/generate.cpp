@@ -35,9 +35,9 @@ namespace cicada
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "depth")
-	  depth = boost::lexical_cast<int>(piter->second);
+	  depth = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "width")
-	  width = boost::lexical_cast<int>(piter->second);
+	  width = utils::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for generator: " << piter->first << "=" << piter->second << std::endl;
       }

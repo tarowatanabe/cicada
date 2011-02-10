@@ -63,7 +63,7 @@ namespace cicada
       {
 	feature_names.resize(order);
 	for (int n = 0; n < order; ++ n)
-	  feature_names[n] = "variational" + boost::lexical_cast<std::string>(n + 1);
+	  feature_names[n] = "variational" + utils::lexical_cast<std::string>(n + 1);
       }
       
     public:
@@ -281,7 +281,7 @@ namespace cicada
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "order")
-	  order = boost::lexical_cast<int>(piter->second);
+	  order = utils::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
       }

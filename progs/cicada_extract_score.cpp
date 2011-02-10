@@ -16,6 +16,7 @@
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
+#include <utils/lexical_cast.hpp>
 
 typedef boost::filesystem::path                                    path_type;
 typedef std::vector<path_type, std::allocator<path_type> >         path_set_type;
@@ -192,7 +193,7 @@ int main(int argc, char** argv)
       os_trg.precision(20);
 
       for (int shard = 0; shard != threads; ++ shard)
-	os_file << (boost::lexical_cast<std::string>(shard) + ".gz") << '\n';
+	os_file << (utils::lexical_cast<std::string>(shard) + ".gz") << '\n';
       
       root_count_set_type::const_iterator siter_end = root_sources.end();
       for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
@@ -272,7 +273,7 @@ void score_counts(const path_type& output_file,
 						     max_malloc,
 						     debug)));
   for (int shard = 0; shard != threads; ++ shard) {
-    const path_type path = output_file / (boost::lexical_cast<std::string>(shard) + ".gz");
+    const path_type path = output_file / (utils::lexical_cast<std::string>(shard) + ".gz");
     
     // TODO: ZERO BUFFER!
     ostreams[shard].reset(new utils::compress_ostream(path, 0));

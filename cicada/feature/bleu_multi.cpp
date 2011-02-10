@@ -38,13 +38,13 @@ namespace cicada
 	else if (utils::ipiece(piter->first) == "name")
 	  names.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "size")
-	  size = boost::lexical_cast<int>(piter->second);
+	  size = utils::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu-multi: " << piter->first << "=" << piter->second << std::endl;
       }
       
       if (size <= 0)
-	throw std::runtime_error("invalid bleu-multi size: " + boost::lexical_cast<std::string>(size));
+	throw std::runtime_error("invalid bleu-multi size: " + utils::lexical_cast<std::string>(size));
       
       if (static_cast<int>(names.size()) > size)
 	throw std::runtime_error("feature-name size and bleu size do not match");
@@ -55,7 +55,7 @@ namespace cicada
       base_type::__state_size = 0;
       for (size_t i = 0; i != names.size(); ++ i) {
 	if (names[i].empty())
-	  names[i] = "bleu-multi:" + boost::lexical_cast<std::string>(i);
+	  names[i] = "bleu-multi:" + utils::lexical_cast<std::string>(i);
 	
 	parameter_type param_bleu(param);
 	param_bleu.name() = "bleu";
@@ -64,7 +64,7 @@ namespace cicada
 	
 	param_bleu.push_back(std::make_pair("name", names[i]));
 	
-	bleus.push_back(feature_function_type::create(boost::lexical_cast<std::string>(param_bleu)));
+	bleus.push_back(feature_function_type::create(utils::lexical_cast<std::string>(param_bleu)));
 	
 	base_type::__state_size += bleus.back()->state_size();
       }

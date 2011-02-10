@@ -30,7 +30,7 @@ namespace cicada
     
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "order")
-	  order = boost::lexical_cast<int>(piter->second);
+	  order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "bos-eos")
 	  bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
@@ -38,7 +38,7 @@ namespace cicada
 	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "scale")
-	  scale = boost::lexical_cast<double>(piter->second);
+	  scale = utils::lexical_cast<double>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu: " << piter->first << "=" << piter->second << std::endl;
       }

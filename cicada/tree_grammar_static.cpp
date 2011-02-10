@@ -26,6 +26,7 @@
 #include "utils/arc_list.hpp"
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -549,7 +550,7 @@ namespace cicada
       
       score_db[feature].write(rep.path(stream_score.str()));
 
-      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+      const std::string name(std::string("feature") + utils::lexical_cast<std::string>(feature));
       
       rep[name] = feature_names[feature];
     }
@@ -560,13 +561,13 @@ namespace cicada
       
       attr_db[attribute].write(rep.path(stream_score.str()));
 
-      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+      const std::string name(std::string("attribute") + utils::lexical_cast<std::string>(attribute));
       
       rep[name] = attribute_names[attribute];
     }
     
-    rep["feature-size"] = boost::lexical_cast<std::string>(feature_size);
-    rep["attribute-size"] = boost::lexical_cast<std::string>(attribute_size);
+    rep["feature-size"] = utils::lexical_cast<std::string>(feature_size);
+    rep["attribute-size"] = utils::lexical_cast<std::string>(attribute_size);
   }
   
   
@@ -587,7 +588,7 @@ namespace cicada
     if (iter == rep.end())
       throw std::runtime_error("no feature size?");
 
-    const size_type feature_size = boost::lexical_cast<size_type>(iter->second.c_str());
+    const size_type feature_size = utils::lexical_cast<size_type>(iter->second.c_str());
     
     feature_names.reserve(feature_size);
     feature_names.resize(feature_size);
@@ -600,7 +601,7 @@ namespace cicada
       
       score_db[feature].read(rep.path(stream_score.str()));
       
-      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+      const std::string name(std::string("feature") + utils::lexical_cast<std::string>(feature));
       repository_type::const_iterator iter = rep.find(name);
       if (iter == rep.end())
 	throw std::runtime_error(std::string("no feature name?: ") + name);
@@ -611,7 +612,7 @@ namespace cicada
     repository_type::const_iterator aiter = rep.find("attribute-size");
     if (aiter == rep.end()) return;
     
-    const size_type attribute_size = boost::lexical_cast<size_type>(aiter->second);
+    const size_type attribute_size = utils::lexical_cast<size_type>(aiter->second);
     
     attribute_names.reserve(attribute_size);
     attribute_names.resize(attribute_size);
@@ -624,7 +625,7 @@ namespace cicada
       
       attr_db[attribute].read(rep.path(stream_score.str()));
       
-      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+      const std::string name(std::string("attribute") + utils::lexical_cast<std::string>(attribute));
       repository_type::const_iterator iter = rep.find(name);
       if (iter == rep.end())
 	throw std::runtime_error(std::string("no attribute name?: ") + name);
@@ -1002,7 +1003,7 @@ namespace cicada
       utils::tempfile::permission(score_streams[feature].path);
       score_db[feature].score.open(score_streams[feature].path);
 
-      const std::string name(std::string("feature") + boost::lexical_cast<std::string>(feature));
+      const std::string name(std::string("feature") + utils::lexical_cast<std::string>(feature));
 
       parameter_type::const_iterator piter = param.find(name);
       if (piter != param.end())
@@ -1010,7 +1011,7 @@ namespace cicada
       
       // default name...!
       if (feature_names[feature] == feature_type())
-	feature_names[feature] = std::string("tree-rule-table-") + boost::lexical_cast<std::string>(feature);
+	feature_names[feature] = std::string("tree-rule-table-") + utils::lexical_cast<std::string>(feature);
     }
     
     if (attribute_size < 0)
@@ -1034,7 +1035,7 @@ namespace cicada
       utils::tempfile::permission(attr_streams[attribute].path);
       attr_db[attribute].score.open(attr_streams[attribute].path);
 
-      const std::string name(std::string("attribute") + boost::lexical_cast<std::string>(attribute));
+      const std::string name(std::string("attribute") + utils::lexical_cast<std::string>(attribute));
 
       parameter_type::const_iterator piter = param.find(name);
       if (piter != param.end())
@@ -1042,7 +1043,7 @@ namespace cicada
       
       // default name...!
       if (attribute_names[attribute] == attribute_type())
-	attribute_names[attribute] = std::string("tree-rule-table-") + boost::lexical_cast<std::string>(attribute);
+	attribute_names[attribute] = std::string("tree-rule-table-") + utils::lexical_cast<std::string>(attribute);
     }
   }
   

@@ -27,6 +27,7 @@
 #include "utils/mpi_stream_simple.hpp"
 #include "utils/space_separator.hpp"
 #include "utils/piece.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -839,7 +840,7 @@ void read_forest(const path_set_type& forest_path,
       std::cerr << "reading forest: " << piter->file_string() << std::endl;
 
     for (size_t i = mpi_rank; /**/; i += mpi_size) {
-      const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
+      const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
       
       const path_type path_forest = (*piter) / file_name;
       
@@ -876,7 +877,7 @@ void read_forest(const path_set_type& forest_path,
       std::cerr << "reading intersected forest: " << piter->file_string() << std::endl;
 
     for (size_t i = mpi_rank; i < graphs_intersected.size(); i += mpi_size) {
-      const std::string file_name = boost::lexical_cast<std::string>(i) + ".gz";
+      const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
       
       const path_type path_intersected = (*piter) / file_name;
       

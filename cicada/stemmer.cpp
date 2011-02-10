@@ -16,6 +16,7 @@
 #include <utils/sgi_hash_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
+#include "utils/lexical_cast.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -91,15 +92,15 @@ lower: lower casing\n\
       int size = 0;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "size")
-	  size = boost::lexical_cast<int>(piter->second);
+	  size = utils::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "unsupported parameter for prefix stemmer: " << piter->first << "=" << piter->second << std::endl;
       }
 
       if (size <= 0)
-	throw std::runtime_error("invalid prefix size: " + boost::lexical_cast<std::string>(size));
+	throw std::runtime_error("invalid prefix size: " + utils::lexical_cast<std::string>(size));
       
-      const std::string name = "prefix:" + boost::lexical_cast<std::string>(size);
+      const std::string name = "prefix:" + utils::lexical_cast<std::string>(size);
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
@@ -112,15 +113,15 @@ lower: lower casing\n\
       int size = 0;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "size")
-	  size = boost::lexical_cast<int>(piter->second);
+	  size = utils::lexical_cast<int>(piter->second);
 	else
 	  std::cerr << "unsupported parameter for suffix stemmer: " << piter->first << "=" << piter->second << std::endl;
       }
       
       if (size <= 0)
-	throw std::runtime_error("invalid suffix size: " + boost::lexical_cast<std::string>(size));
+	throw std::runtime_error("invalid suffix size: " + utils::lexical_cast<std::string>(size));
       
-      const std::string name = "suffix:" + boost::lexical_cast<std::string>(size);
+      const std::string name = "suffix:" + utils::lexical_cast<std::string>(size);
       
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {

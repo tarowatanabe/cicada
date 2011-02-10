@@ -27,6 +27,7 @@
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -299,7 +300,7 @@ namespace cicada
 	    if (feature >= static_cast<int>(feature_names_default.size()))
 	      feature_names_default.resize(feature + 1);
 	    if (feature_names_default[feature].empty())
-	      feature_names_default[feature] = "tree-rule-table-" + boost::lexical_cast<std::string>(feature);
+	      feature_names_default[feature] = "tree-rule-table-" + utils::lexical_cast<std::string>(feature);
 	    
 	    features[feature_names_default[feature]] = fiter->second;
 	  }
@@ -322,7 +323,7 @@ namespace cicada
 	    if (attribute >= static_cast<int>(attribute_names_default.size()))
 	      attribute_names_default.resize(attribute + 1);
 	    if (attribute_names_default[attribute].empty())
-	      attribute_names_default[attribute] = "tree-rule-table-" + boost::lexical_cast<std::string>(attribute);
+	      attribute_names_default[attribute] = "tree-rule-table-" + utils::lexical_cast<std::string>(attribute);
 	    
 	    attributes[attribute_names_default[attribute]] = aiter->second;
 	  }
@@ -389,7 +390,7 @@ namespace cicada
 	if (feature >= static_cast<int>(feature_names_default.size()))
 	  feature_names_default.resize(feature + 1);
 	if (feature_names_default[feature].empty())
-	  feature_names_default[feature] = "tree-rule-table-" + boost::lexical_cast<std::string>(feature);
+	  feature_names_default[feature] = "tree-rule-table-" + utils::lexical_cast<std::string>(feature);
 	
 	features[feature_names_default[feature]] = fiter->second;
 	
@@ -405,7 +406,7 @@ namespace cicada
 	if (attribute >= static_cast<int>(attribute_names_default.size()))
 	  attribute_names_default.resize(attribute + 1);
 	if (attribute_names_default[attribute].empty())
-	  attribute_names_default[attribute] = "tree-rule-table-" + boost::lexical_cast<std::string>(attribute);
+	  attribute_names_default[attribute] = "tree-rule-table-" + utils::lexical_cast<std::string>(attribute);
 	
 	attributes[attribute_names_default[attribute]] = aiter->second;
 	
