@@ -110,17 +110,13 @@ namespace cicada
       namespace phoenix = boost::phoenix;
       
       const symbol_type& word = symbol();
-	
-      // at leas we have [<char>,<digit>]
-      maps[__id] = 0;
-
+      
       symbol_type::const_iterator iter = word.begin();
       symbol_type::const_iterator iter_end = word.end();
       
-      qi::parse(iter, iter_end,
-		qi::lit('[')
-		>> +(standard::char_ - ',' - ']') >> ',' >> qi::int_ [ phoenix::ref(maps[__id]) = qi::_1 ]
-		>> qi::lit(']'));
+      if (! qi::parse(iter, iter_end,
+		      '[' >> +(standard::char_ - ',' - ']') >> ',' >> qi::int_ [ phoenix::ref(maps[__id]) = qi::_1 ] >> ']'))
+	maps[__id] = 0;
     }
       
     return maps[__id];
