@@ -11,6 +11,8 @@ int main(int argc, char** argv)
   typedef cicada::Symbol symbol_type;
   
   std::cout << symbol_type("good") << " is a non-terminal? " << symbol_type("good").is_non_terminal() << std::endl;
+
+  std::cout << symbol_type("[,]") << " is a non-terminal? " << symbol_type("[,]").is_non_terminal() << std::endl;
   
   std::cout << symbol_type("[x]") << " is a non-terminal? " << symbol_type("[x]").is_non_terminal() << std::endl;
 
