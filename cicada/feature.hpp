@@ -121,7 +121,6 @@ namespace cicada
   private:
     typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > feature_index_type;
     typedef utils::chunk_vector<feature_type, 4096 / sizeof(feature_type), std::allocator<feature_type> > feature_set_type;
-
     typedef std::vector<const feature_type*, std::allocator<const feature_type*> > feature_map_type;
     
   public:

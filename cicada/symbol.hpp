@@ -139,11 +139,7 @@ namespace cicada
   private:
     typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > symbol_index_type;
     typedef utils::chunk_vector<symbol_type, 4096 / sizeof(symbol_type), std::allocator<symbol_type> > symbol_set_type;
-
     typedef std::vector<const symbol_type*, std::allocator<const symbol_type*> > symbol_map_type;
-    
-    
-    
     
   public:
     static bool exists(const piece_type& x)
