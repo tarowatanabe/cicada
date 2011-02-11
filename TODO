@@ -1,5 +1,3 @@
-VERSIONING!
-
 Do we allow state-less features applied during composition???
 	We need composition-based features for phrase-based MT
 	to compute distortion/lexicalized reordering etc. not represented in
@@ -55,3 +53,7 @@ Added binarization to cicada-extract, or use cicada tool for binarization?
 
 Revise parent feature:
   we do not trust the label from rule, but use state propagated root label...
+
+MONOLINGUAL PARSING!
+  It is possible to do parsing, given cky composer... (or, we may implement earley-composer...)
+  But, the problem is: how to normalize penntreebank... 
