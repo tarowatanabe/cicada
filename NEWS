@@ -1,3 +1,7 @@
+2011-2-14
+Better vocabulary management by eliminating temporary buffer
+Use boost.spirit for parsing/generating numerics
+
 2011-1-17
 Support tree-to-string translation (probably, the code will work for tree-to-tree)
 Added sort-tail operation which sort tails by its order in rule's non-terminal index.
