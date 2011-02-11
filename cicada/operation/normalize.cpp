@@ -9,7 +9,6 @@
 
 #include <cicada/operation/normalize.hpp>
 
-#include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
 

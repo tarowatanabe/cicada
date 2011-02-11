@@ -12,7 +12,6 @@
 
 #include <utils/config.hpp>
 #include <utils/thread_specific_ptr.hpp>
-#include <utils/lexical_cast.hpp>
 
 #include "symbol.hpp"
 

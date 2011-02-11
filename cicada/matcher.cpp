@@ -12,7 +12,6 @@
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
-#include <utils/lexical_cast.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
 
