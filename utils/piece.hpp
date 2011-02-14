@@ -203,10 +203,16 @@ namespace utils
       const difference_type __y = x.size();
       
       const int __result = traits_type::compare(data(), x.data(), utils::bithack::min(__x, __y));
+      const int __mask = int(__result != 0) - 1;
+      
+      return ((~__mask) & __result) | (__mask & int(__x - __y));
+      
+#if 0
       if (__result)
 	return __result;
       else
 	return __x - __y;
+#endif
     }
     
   private:
