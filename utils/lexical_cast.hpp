@@ -59,7 +59,7 @@ namespace utils
       
       Target parsed;
       typename __lexical_cast_parser<Target, boost::is_float<Target>::value, boost::is_signed<Target>::value>::parser_type parser;
-    
+      
       if (! qi::phrase_parse(iter, iter_end, parser, standard::space, parsed) || iter != iter_end)
 	throw std::bad_cast();
       
@@ -209,7 +209,7 @@ namespace utils
     {
       return __lexical_cast_parse<long double>(arg);
     }
-
+    
     template <>
     inline
     std::string __lexical_cast<std::string, int64_t>(const int64_t& arg)
@@ -298,25 +298,25 @@ namespace utils
       utils::piece::const_iterator iter = arg.begin();
       utils::piece::const_iterator iter_end = arg.end();
     
-      int parsed = 0;
+      bool parsed = false;
       const bool result = qi::phrase_parse(iter, iter_end,
-					   qi::no_case["true"] [phoenix::ref(parsed) = 1] 
-					   || qi::no_case["yes"] [phoenix::ref(parsed) = 1] 
-					   || qi::no_case["no"] [phoenix::ref(parsed) = 0] 
-					   || qi::no_case["nil"] [phoenix::ref(parsed) = 0] 
-					   || qi::int_ [phoenix::ref(parsed) = qi::_1],
+					   qi::no_case["true"] [phoenix::ref(parsed) = true] 
+					   || qi::no_case["yes"] [phoenix::ref(parsed) = true] 
+					   || qi::no_case["no"] [phoenix::ref(parsed) = false] 
+					   || qi::no_case["nil"] [phoenix::ref(parsed) = false] 
+					   || qi::int_ [phoenix::ref(parsed) = (qi::_1 > 0)],
 					   standard::space);
     
-      return result && iter == iter_end && parsed > 0;
+      return result && iter == iter_end && parsed;
     }
-  
+
     template <>
     inline
     std::string __lexical_cast<std::string, bool>(const bool& arg)
     {
       return (arg ? "true" : "false");
     }
-  
+
 #define __LEXICAL_CAST_PARSE__(trg, src)		\
     template <>						\
     inline						\
@@ -364,6 +364,8 @@ namespace utils
     __LEXICAL_CAST_PARSE__(long double, std::string)
     __LEXICAL_CAST_PARSE__(long double, __lexical_cast_char_pointer)
     
+
+#undef __LEXICAL_CAST_PARSE__
   };
   
   template <typename Target, typename Source>
@@ -372,7 +374,7 @@ namespace utils
   {
     typedef typename impl::__lexical_cast_array_to_pointer_decay<Source>::type src;
     
-    return impl::__lexical_cast<Target, src >(arg);
+    return impl::__lexical_cast<Target, src>(arg);
   }
 
 };
