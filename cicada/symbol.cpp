@@ -126,7 +126,7 @@ namespace cicada
   {
 #ifdef HAVE_TLS
     if (! non_terminal_maps_tls) {
-      non_terminal_maps.reset(new SymbolImp::non_terminal_map_type());
+      non_terminal_maps.reset(new SymbolImpl::non_terminal_map_type());
       non_terminal_maps_tls = non_terminal_maps.get();
     }
     
