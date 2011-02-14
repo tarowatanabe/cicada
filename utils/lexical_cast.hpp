@@ -221,7 +221,7 @@ namespace utils
   {
     typedef typename impl::__lexical_cast_array_to_pointer_decay<Source>::type src;
     
-    return impl::__lexical_cast<Target, src, boost::is_arithmetic<Target>::value, boost::is_arithmetic<Source>::value>::cast(arg);
+    return impl::__lexical_cast<Target, src, boost::is_arithmetic<Target>::value, boost::is_arithmetic<src>::value>::cast(arg);
   }
 
 };
