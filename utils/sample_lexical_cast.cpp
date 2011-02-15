@@ -99,8 +99,8 @@ int main(int argc, char** argv)
     double integer;
     
     for (int i = 0; i != 1024 * 64; ++ i) {
-      sprintf(buffer, "%G", double(random()) / random());
-      sscanf(buffer, "%G", &integer);
+      sprintf(buffer, "%g", double(random()) / random());
+      sscanf(buffer, "%g", &integer);
     }
     
     utils::resource std_end;
