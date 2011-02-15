@@ -90,7 +90,7 @@ int main(int argc, char** argv)
     utils::resource utils_start;
     
     for (int i = 0; i != 1024 * 64; ++ i)
-      utils::lexical_cast<double>(utils::lexical_cast<std::string>(random() / random()));
+      utils::lexical_cast<double>(utils::lexical_cast<std::string>(double(random()) / random()));
     
     utils::resource utils_end;
     
@@ -99,8 +99,8 @@ int main(int argc, char** argv)
     double integer;
     
     for (int i = 0; i != 1024 * 64; ++ i) {
-      sprintf(buffer, "%g", random() / random());
-      sscanf(buffer, "%g", &integer);
+      sprintf(buffer, "%gL", double(random()) / random());
+      sscanf(buffer, "%gL", &integer);
     }
     
     utils::resource std_end;
