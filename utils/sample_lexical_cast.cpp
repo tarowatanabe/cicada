@@ -100,7 +100,8 @@ int main(int argc, char** argv)
     
     for (int i = 0; i != 1024 * 64; ++ i) {
       sprintf(buffer, "%g", double(random()) / random());
-      sscanf(buffer, "%lg", &integer);
+      std::string tmp(buffer);
+      sscanf(tmp.c_str(), "%lg", &integer);
     }
     
     utils::resource std_end;
