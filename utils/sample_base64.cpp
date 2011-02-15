@@ -10,8 +10,8 @@ int main(int argc, char** argv)
 {
   srandom(time(0) * getpid());
   
-  for (int i = 0; i != 1024 * 4; ++ i) {
-    const double value =  random() / random();
+  for (int i = 0; i != 1024 * 32; ++ i) {
+    const double value =  double(random()) / random();
     
     std::string stream;
     utils::encode_base64(value, std::back_inserter(stream));
