@@ -17,6 +17,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/b_heap.hpp>
+#include <utils/std_heap.hpp>
 
 #include <google/dense_hash_set>
 
@@ -117,7 +118,8 @@ namespace cicada
     //typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_heap_type;
     
     typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_heap_base_type;
-    typedef utils::b_heap<const derivation_type*, derivation_heap_base_type, compare_heap_type, 512 / sizeof(const derivation_type*)> derivation_heap_type;
+    //typedef utils::b_heap<const derivation_type*, derivation_heap_base_type, compare_heap_type, 512 / sizeof(const derivation_type*)> derivation_heap_type;
+    typedef utils::std_heap<const derivation_type*, derivation_heap_base_type, compare_heap_type> derivation_heap_type;
     
     
     typedef std::vector<const derivation_type*, std::allocator<const derivation_type*> > derivation_list_type;

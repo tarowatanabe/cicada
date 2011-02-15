@@ -20,6 +20,7 @@
 #include <utils/hashmurmur.hpp>
 
 #include <utils/b_heap.hpp>
+#include <utils/std_heap.hpp>
 
 namespace cicada
 {
@@ -146,7 +147,8 @@ namespace cicada
     //typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_type;
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
-    typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
+    //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
+    typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
     typedef google::dense_hash_map<state_type, candidate_type*, model_type::state_hash, model_type::state_equal > state_node_map_type;
     typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_set_unique_type;

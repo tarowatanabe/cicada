@@ -18,7 +18,7 @@ template <typename Heap>
 void process()
 {
   Heap heap;
-  
+
   for (int i = 0; i < 1024 * 1024 * 4; ++ i)
     if (heap.empty())
       heap.push(random());
@@ -27,7 +27,6 @@ void process()
       heap.pop();
     } else
       heap.push(random());
-  
 }
 
 int main(int argc, char**argv)
@@ -56,13 +55,14 @@ int main(int argc, char**argv)
   if (vec != vec_heap)
     std::cerr << "differ" << std::endl;
 
-  utils::resource b_heap_start;
-  process<utils::b_heap<int> >();
-  utils::resource b_heap_end;
-  
   utils::resource std_heap_start;
   process<std::priority_queue<int> >();
   utils::resource std_heap_end;
+
+  utils::resource b_heap_start;
+  process<utils::b_heap<int, std::vector<int>, std::less<int>, 512 /sizeof(int)> >();
+  utils::resource b_heap_end;
+  
   
     std::cout << "b heap cpu time: " << (b_heap_end.cpu_time() - b_heap_start.cpu_time())
 	      << " user time: " << (b_heap_end.user_time() - b_heap_start.user_time())

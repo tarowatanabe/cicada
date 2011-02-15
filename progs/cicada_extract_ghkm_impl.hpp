@@ -43,6 +43,7 @@
 #include <utils/malloc_stats.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/b_heap.hpp>
+#include <utils/std_heap.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -594,7 +595,8 @@ struct ExtractGHKM
 			rule_pair_set_type& rule_pairs)
   {
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
-    typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
+    //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
+    typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_unique_type;
     
     candidate_set_type    candidates;
