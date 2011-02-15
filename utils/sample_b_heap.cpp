@@ -13,11 +13,14 @@
 
 #include <utils/resource.hpp>
 #include <utils/b_heap.hpp>
+#include <utils/std_heap.hpp>
 
 template <typename Heap>
 void process()
 {
   Heap heap;
+
+  heap.reserve(1024 * 1024);
 
   for (int i = 0; i < 1024 * 1024 * 4; ++ i)
     if (heap.empty())
@@ -56,7 +59,7 @@ int main(int argc, char**argv)
     std::cerr << "differ" << std::endl;
 
   utils::resource std_heap_start;
-  process<std::priority_queue<int> >();
+  process<utils::std_heap<int> >();
   utils::resource std_heap_end;
 
   utils::resource b_heap_start;
