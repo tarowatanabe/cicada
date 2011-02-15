@@ -54,12 +54,12 @@ namespace utils
     void push(const value_type& x)
     {
       c.push_back(x);
-      std::push_heap(c.begin(), c.end(), comp);
+      std::push_heap(c.begin(), c.end(), static_cast<_Compare&>(*this));
     }
     
     void pop()
     {
-      std::pop_heap(c.begin(), c.end(), comp);
+      std::pop_heap(c.begin(), c.end(), static_cast<_Compare&>(*this));
       c.pop_back();
     }
     
