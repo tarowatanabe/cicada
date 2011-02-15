@@ -61,7 +61,7 @@ int main(int argc, char** argv)
     int integer;
     
     for (int i = 0; i != 1024 * 64; ++ i) {
-      sprintf(buffer, "%d", random());
+      sprintf(buffer, "%d", static_cast<int>(random()));
       sscanf(buffer, "%d", &integer);
     }
     
@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     utils::resource boost_start;
     
     for (int i = 0; i != 1024 * 64; ++ i)
-      boost::lexical_cast<double>(boost::lexical_cast<std::string>(random() / random()));
+      boost::lexical_cast<double>(boost::lexical_cast<std::string>(double(random()) / random()));
     
     utils::resource boost_end;
     
