@@ -170,7 +170,7 @@ namespace utils
       
       // if not directory, remove
       if (boost::filesystem::exists(repository_dir) && ! boost::filesystem::is_directory(repository_dir))
-	boost::filesystem::remove_all(repository_dir);
+	utils::filesystem::remove_all(repository_dir);
       
       // create directory
       boost::filesystem::create_directories(repository_dir);
@@ -178,7 +178,7 @@ namespace utils
       // remove all the files under the repository_dir
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(repository_dir); iter != iter_end; ++ iter)
-	boost::filesystem::remove_all(*iter);
+	utils::filesystem::remove_all(*iter);
     }
     
     // close the repository... this will dump the contents of props at props.list if write-mode
