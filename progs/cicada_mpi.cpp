@@ -400,6 +400,13 @@ struct ReduceStdout
       maps.erase(iter ++);
     }
     
+    // we will do twice, in case we have wrap-around for id...!
+    if (! maps.empty())
+      for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
+	os << iter->second;
+	maps.erase(iter ++);
+      }
+    
     os << std::flush;
     
     if (! maps.empty())
