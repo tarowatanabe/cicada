@@ -174,9 +174,9 @@ int main(int argc, char ** argv)
 	  utils::filesystem::remove_all(*iter);
     }
     
-    ::sync();
-    
     synchronize();
+    
+    ::sync();
     
     if (! operations.get_output_data().file.empty())
       cicada_stdout(operations);
@@ -185,9 +185,9 @@ int main(int argc, char ** argv)
     
     operations.clear();
     
-    ::sync();
-    
     synchronize();
+    
+    ::sync();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
