@@ -94,19 +94,88 @@ namespace utils
     {
       typedef boost::spirit::karma::uint_generator<Tp> generator_type;
     };
+
+    template <typename Tp, size_t Size, typename Alloc=std::allocator<Tp> >
+    class __lexical_cast_buffer
+    {
+    private:
+      typedef std::vector<Tp, Alloc> buffer_type;
+    public:
+      typedef size_t    size_type;
+      typedef ptrdiff_t difference_type;
+
+      typedef Tp  value_type;
+      typedef Tp* pointer;
+      
+      typedef Tp*       iterator;
+      typedef const Tp* const_iterator;
+
+      typedef Tp&       reference;
+      typedef const Tp& const_reference;
+      
+    public:
+      __lexical_cast_buffer() : buffer_static(), buffer_dynamic(), first(buffer_static), last(buffer_static) {}
+      
+    private:
+      __lexical_cast_buffer(const __lexical_cast_buffer&) {}
+      __lexical_cast_buffer& operator=(const __lexical_cast_buffer& x) { return *this; }
+
+    public:
+      iterator begin() { return first; }
+      const_iterator begin() const { return first; }
+      
+      iterator end() { return last; }
+      const_iterator end() const { return last; }
+
+      bool empty() const { return first == last; }
+      size_type size() const { return last - first; }
+
+      void clear()
+      {
+	buffer_dynamic.clear();
+	first = buffer_static;
+	last = buffer_static;
+      }
+
+      void push_back(const value_type& x)
+      {
+	const size_type __size = size();
+	
+	if (__size < Size) {
+	  *last = x;
+	  ++ last;
+	} else {
+	  if (__size == Size)
+	    buffer_dynamic = buffer_type(first, last);
+	  buffer_dynamic.push_back(x);
+	  
+	  first = &(*buffer_dynamic.begin());
+	  last  = &(*buffer_dynamic.end());
+	}
+      }
+      
+    private:
+      Tp          buffer_static[Size];
+      buffer_type buffer_dynamic;
+
+      iterator first;
+      iterator last;
+    };
+    
     
     template <typename Source>
     std::string __lexical_cast_generate(const Source& arg)
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
+
+      typedef __lexical_cast_buffer<char, 64> buffer_type;
       
-      std::vector<char> buffer(64);
-      buffer.clear();
+      buffer_type buffer;
       
       typename __lexical_cast_generator<Source, boost::is_float<Source>::value, boost::is_signed<Source>::value>::generator_type generator;
       
-      std::back_insert_iterator<std::vector<char> > iter(buffer);
+      std::back_insert_iterator<buffer_type > iter(buffer);
       if (! karma::generate(iter, generator, arg))
 	throw std::bad_cast();
       
