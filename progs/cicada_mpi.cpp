@@ -366,6 +366,8 @@ struct ReduceStdout
       queue.pop_swap(buffer);
       
       if (buffer.empty()) break;
+
+      bool dump = false;
       
       utils::piece buffer_piece(buffer);
       
@@ -378,16 +380,19 @@ struct ReduceStdout
       
       if (buffer_id == id) {
 	os << buffer_tokenized;
-	os << std::flush;
+	dump = true;
 	++ id;
       } else
 	maps[buffer_id] = static_cast<std::string>(buffer_tokenized);
       
       for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
 	os << iter->second;
+	dump = true;
 	maps.erase(iter ++);
       }
-      os << std::flush;
+      
+      if (dump)
+	os << std::flush;
     }
       
     for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
