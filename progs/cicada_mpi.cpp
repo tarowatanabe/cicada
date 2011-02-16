@@ -172,9 +172,9 @@ int main(int argc, char ** argv)
       for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
 	while (boost::filesystem::exists(*iter))
 	  utils::filesystem::remove_all(*iter);
-      
-      ::sync();
     }
+    
+    ::sync();
     
     synchronize();
     
@@ -186,7 +186,7 @@ int main(int argc, char ** argv)
     operations.clear();
     
     ::sync();
-
+    
     synchronize();
   }
   catch (const std::exception& err) {
