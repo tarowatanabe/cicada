@@ -22,7 +22,10 @@ void process()
 
   heap.reserve(1024 * 1024);
 
-  for (int i = 0; i < 1024 * 1024 * 4; ++ i)
+  for (int i = 0; i < 1024 * 1024; ++ i)
+    heap.push(random());
+
+  for (int i = 0; i < 1024 * 1024; ++ i)
     if (heap.empty())
       heap.push(random());
     else if (random() & 1) {
@@ -30,6 +33,11 @@ void process()
       heap.pop();
     } else
       heap.push(random());
+
+  while (! heap.empty()) {
+    const int top = heap.top();
+    heap.pop();
+  }
 }
 
 int main(int argc, char**argv)
