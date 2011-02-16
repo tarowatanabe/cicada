@@ -41,6 +41,16 @@ int main(int argc, char** argv)
 
   ::srandom(time(0));
   
+  for (int i = 0; i < 1024; ++ i) {
+    const uint64_t value = (uint64_t(random()) << 32) | random();
+
+    const uint64_t value_converted = utils::lexical_cast<uint64_t>(utils::lexical_cast<std::string>(value));
+
+    if (value != value_converted)
+      std::cerr << "differ: " << value << " " << value_converted << std::endl;
+  }
+  
+  
   {
     utils::resource boost_start;
     
