@@ -394,13 +394,14 @@ struct ReduceStdout
       if (dump)
 	os << std::flush;
     }
-      
+    
     for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
       os << iter->second;
       maps.erase(iter ++);
     }
+    
     os << std::flush;
-      
+    
     if (! maps.empty())
       throw std::runtime_error("id mismatch! expecting: " + utils::lexical_cast<std::string>(id)
 			       + " next: " + utils::lexical_cast<std::string>(maps.begin()->first));
