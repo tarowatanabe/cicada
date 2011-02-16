@@ -357,31 +357,31 @@ struct ReduceStdout
     
     buffer_map_type maps;
     std::string buffer;
-    std::string buffer_tokenized;
     
     id_type     id = 0;
-    id_type     buffer_id;
-      
+    
     utils::compress_ostream os(path, 1024 * 1024);
-      
+    
     for (;;) {
       queue.pop_swap(buffer);
       
       if (buffer.empty()) break;
       
-      std::string::const_iterator iter = buffer.begin();
-      for (/**/; iter != buffer.end() && ! std::isspace(*iter); ++ iter);
-	
+      utils::piece buffer_piece(buffer);
+      
+      utils::piece::const_iterator iter = buffer_piece.begin();
+      for (/**/; iter != buffer_piece.end() && ! std::isspace(*iter); ++ iter);
+      
       // tokenize here...
-      buffer_id = utils::lexical_cast<size_t>(buffer.substr(0, iter - buffer.begin()));
-      buffer_tokenized    = buffer.substr(iter + 1 - buffer.begin());
+      const id_type      buffer_id        = utils::lexical_cast<id_type>(buffer_piece.substr(0, iter - buffer_piece.begin()));
+      const utils::piece buffer_tokenized = buffer_piece.substr(iter + 1 - buffer_piece.begin());
       
       if (buffer_id == id) {
 	os << buffer_tokenized;
 	os << std::flush;
 	++ id;
       } else
-	maps[buffer_id].swap(buffer_tokenized);
+	maps[buffer_id] = static_cast<std::string>(buffer_tokenized);
       
       for (buffer_map_type::iterator iter = maps.find(id); iter != maps.end() && iter->first == id; ++ id) {
 	os << iter->second;
