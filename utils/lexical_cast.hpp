@@ -100,6 +100,17 @@ namespace utils
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
+      
+      std::vector<char> buffer(64);
+      buffer.clear();
+      
+      typename __lexical_cast_generator<Source, boost::is_float<Source>::value, boost::is_signed<Source>::value>::generator_type generator;
+      
+      std::back_insert_iterator<std::vector<char> > iter(buffer);
+      if (! karma::generate(iter, generator, arg))
+	throw std::bad_cast();
+      
+      return std::string(buffer.begin(), buffer.end());
 
 #if 0
       // a little bit dangerous, though...
@@ -113,7 +124,8 @@ namespace utils
       
       return buffer;
 #endif
-      
+     
+#if 0 
       std::string generated;
       typename __lexical_cast_generator<Source, boost::is_float<Source>::value, boost::is_signed<Source>::value>::generator_type generator;
       
@@ -122,6 +134,7 @@ namespace utils
 	throw std::bad_cast();
       
       return generated;
+#endif
     }
   
   
