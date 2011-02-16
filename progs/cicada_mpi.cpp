@@ -170,7 +170,8 @@ int main(int argc, char ** argv)
       
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(directory); iter != iter_end; ++ iter)
-	utils::filesystem::remove_all(*iter);
+	while (boost::filesystem::exists(*iter))
+	  utils::filesystem::remove_all(*iter);
       
       ::sync();
     }
