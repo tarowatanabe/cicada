@@ -413,14 +413,27 @@ struct ScorerMOSESReordering
     if (phrase_pair.counts_target.size() != 5)
       throw std::runtime_error("target counts size do not match");
     
-    //std::ostream_iterator<char> iter(os);
+    std::ostream_iterator<char> iter(os);
+
+    if (mode_source_only) {
+      if (! karma::generate(iter, standard::string << " |||", phrase_pair.source))
+	throw std::runtime_error("failed generation");
+    } else if (mode_target_only) {
+      if (! karma::generate(iter, standard::string << " |||", phrase_pair.target))
+	throw std::runtime_error("failed generation");
+    } else {
+      if (! karma::generate(iter, standard::string << " ||| " << standard::string << " |||", phrase_pair.source, phrase_pair.target))
+	throw std::runtime_error("failed generation");
+    }
     
+#if 0
     if (mode_source_only)
       os << phrase_pair.source << " |||";
     else if (mode_target_only)
       os << phrase_pair.target << " |||";
     else
       os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
+#endif
 
     const phrase_pair_type::counts_type& counts = (mode_source_only 
 						   ? phrase_pair.counts_source
@@ -441,15 +454,26 @@ struct ScorerMOSESReordering
 	const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
 	const double prob_next_mono   = (dirichlet_prior + count_next_mono) / (dirichlet_prior * 2 + count);
 	const double prob_next_others = (dirichlet_prior + count_next_swap + count_next_others) / (dirichlet_prior * 2 + count);
-	
+
+	if (! karma::generate(iter,
+			      ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
+			      prob_prev_mono, prob_prev_others,
+			      prob_next_mono, prob_next_others))
+	  throw std::runtime_error("failed generation");
+#if 0
 	os << ' ' << prob_prev_mono << ' ' << prob_prev_others
 	   << ' ' << prob_next_mono << ' ' << prob_next_others
 	   << '\n';
+#endif
       } else {
 	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
 	const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
 	
-	os << ' ' << prob_prev_mono << ' ' << prob_prev_others << '\n';
+	if (! karma::generate(iter,
+			      ' ' << double10 << ' ' << double10 << '\n',
+			      prob_prev_mono, prob_prev_others))
+	  throw std::runtime_error("failed generation");
+	//os << ' ' << prob_prev_mono << ' ' << prob_prev_others << '\n';
       }
     } else {
       if (mode_bidirectional) {
@@ -461,15 +485,26 @@ struct ScorerMOSESReordering
 	const double prob_next_swap   = (dirichlet_prior + count_next_swap)   / (dirichlet_prior * 3 + count);
 	const double prob_next_others = (dirichlet_prior + count_next_others) / (dirichlet_prior * 3 + count);
 	
+	if (! karma::generate(iter,
+			      ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
+			      prob_prev_mono, prob_prev_swap, prob_prev_others,
+			      prob_next_mono, prob_next_swap, prob_next_others))
+	  throw std::runtime_error("failed generation");
+#if 0
 	os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others
 	   << ' ' << prob_next_mono << ' ' << prob_next_swap << ' ' << prob_next_others
 	   << '\n';
+#endif
       } else {
 	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
 	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
 	const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
 	
-	os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others << '\n';
+	if (! karma::generate(iter,
+			      ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
+			      prob_prev_mono, prob_prev_swap, prob_prev_others))
+	  throw std::runtime_error("failed generation");
+	//os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others << '\n';
       }
     }
   }  
