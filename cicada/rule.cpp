@@ -5,6 +5,8 @@
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
+#include <iterator>
+
 #include "rule.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
@@ -155,7 +157,14 @@ namespace cicada
   
   std::ostream& operator<<(std::ostream& os, const Rule& x)
   {
-    os << x.lhs << " ||| " << x.rhs;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    std::ostream_iterator<char> iter(os);
+    
+    if (! karma::generate(iter, standard::string << " ||| " << -(standard::string % ' '), x.lhs, x.rhs))
+      throw std::runtime_error("rule generation failed");
+    
     return os;
   }
   
