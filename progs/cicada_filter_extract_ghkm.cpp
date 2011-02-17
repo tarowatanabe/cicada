@@ -122,6 +122,16 @@ struct ScorerCICADA
 {
   ExtractRootGHKM root_extractor;
 
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 10;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<double, real_precision> double10;
+  
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_set_type& root_count_source,
 		  const root_count_set_type& root_count_target,
@@ -167,17 +177,17 @@ struct ScorerCICADA
     
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string << " |||"
-			  << ' ' << karma::double_ << ' ' << karma::double_
-			  << ' ' << karma::double_ << ' ' << karma::double_
-			  << ' ' << karma::double_
-			  << ' ' << karma::double_
+			  << ' ' << double10 << ' ' << double10
+			  << ' ' << double10 << ' ' << double10
+			  << ' ' << double10
+			  << ' ' << double10
 			  << '\n',
 			  phrase_pair.source, phrase_pair.target,
 			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
 			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source),
 			  std::log(prob_root_source),
 			  std::log(prob_root_target)))
-	throw std::runtime_error("failed generation");
+      throw std::runtime_error("failed generation");
     
 #if 0
     os << phrase_pair.source

@@ -124,6 +124,16 @@ struct ScorerCICADA
 {
   ExtractPhraseSCFG phrase_extractor;
   
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 10;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<double, real_precision> double10;
+  
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_set_type& root_count_source,
 		  const root_count_set_type& root_count_target,
@@ -174,10 +184,10 @@ struct ScorerCICADA
 
       if (! karma::generate(iter,
 			    standard::string << " ||| " << standard::string << " ||| " << standard::string << " |||"
-			    << ' ' << karma::double_ << ' ' << karma::double_
-			    << ' ' << karma::double_ << ' ' << karma::double_
-			    << ' ' << karma::double_
-			    << ' ' << karma::double_
+			    << ' ' << double10 << ' ' << double10
+			    << ' ' << double10 << ' ' << double10
+			    << ' ' << double10
+			    << ' ' << double10
 			    << '\n',
 			    phrase_source.first, phrase_source.second, phrase_target.second,
 			    std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
@@ -202,8 +212,8 @@ struct ScorerCICADA
       
       if (! karma::generate(iter,
 			    standard::string << " ||| " << standard::string << " ||| " << standard::string << " |||"
-			    << ' ' << karma::double_ << ' ' << karma::double_
-			    << ' ' << karma::double_ << ' ' << karma::double_
+			    << ' ' << double10 << ' ' << double10
+			    << ' ' << double10 << ' ' << double10
 			    << '\n',
 			    phrase_source.first, phrase_source.second, phrase_target.second,
 			    std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),

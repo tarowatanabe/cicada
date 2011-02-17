@@ -13,6 +13,7 @@
 
 #include <boost/program_options.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/spirit/include/karma.hpp>
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
@@ -140,11 +141,25 @@ void process(std::istream& is,
 
 struct ScorerCICADA
 {
+  
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 10;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<double, real_precision> double10;
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
 		  std::ostream& os)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
     if (phrase_pair.counts.size() != 5)
       throw std::runtime_error("counts size do not match");
     if (phrase_pair.counts_source.size() != 5)
@@ -158,31 +173,63 @@ struct ScorerCICADA
     
     const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
     const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
-
+    
+    std::ostream_iterator<char> iter(os);
+    
+    if (! karma::generate(iter,
+			  standard::string << " ||| " << standard::string << " |||"
+			  << ' ' << double10 << ' ' << double10
+			  << ' ' << double10 << ' ' << double10
+			  << '\n',
+			  phrase_pair.source, phrase_pair.target,
+			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
+			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
+      throw std::runtime_error("failed generation");
+    
+#if 0
     os << phrase_pair.source
        << " ||| " << phrase_pair.target
        << " |||"
        << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
        << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
        << '\n';
+#endif
   }
 };
 
 struct ScorerCICADAReordering
 {
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 10;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<double, real_precision> double10;
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
 		  std::ostream& os)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
     if (phrase_pair.counts.size() != 5)
       throw std::runtime_error("counts size do not match");
     if (phrase_pair.counts_source.size() != 5)
       throw std::runtime_error("source counts size do not match");
     if (phrase_pair.counts_target.size() != 5)
       throw std::runtime_error("target counts size do not match");
+
+    std::ostream_iterator<char> iter(os);
+
+    if (! karma::generate(iter, standard::string << " ||| " << standard::string << " |||", phrase_pair.source, phrase_pair.target))
+      throw std::runtime_error("failed generation");
     
-    os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
+    //os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
     
     const double& count = phrase_pair.counts.front();
     const double& count_source = phrase_pair.counts_source.front();
@@ -191,9 +238,16 @@ struct ScorerCICADAReordering
     const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
     const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
 
+    if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << " |||",
+			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
+			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
+      throw std::runtime_error("failed generation");
+			  
+#if 0
     os << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
        << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
        << " |||";
+#endif
 
     // we will dump reordering table as "attributes"
     {
@@ -217,15 +271,25 @@ struct ScorerCICADAReordering
 	  const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
 	  const double prob_next_mono   = (dirichlet_prior + count_next_mono) / (dirichlet_prior * 2 + count);
 	  const double prob_next_others = (dirichlet_prior + count_next_swap + count_next_others) / (dirichlet_prior * 2 + count);
-	
+	  
+	  if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
+				std::log(prob_prev_mono), std::log(prob_prev_others),
+				std::log(prob_next_mono), std::log(prob_next_others)))
+	    throw std::runtime_error("failed generation");
+#if 0
 	  os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_others)
 	     << ' ' << std::log(prob_next_mono) << ' ' << std::log(prob_next_others)
 	     << '\n';
+#endif
 	} else {
 	  const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
 	  const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
 	
-	  os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_others) << '\n';
+	  if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << '\n',
+				std::log(prob_prev_mono), std::log(prob_prev_others)))
+	    throw std::runtime_error("failed generation");
+	  
+	  //os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_others) << '\n';
 	}
       } else {
 	if (mode_bidirectional) {
@@ -237,15 +301,25 @@ struct ScorerCICADAReordering
 	  const double prob_next_swap   = (dirichlet_prior + count_next_swap)   / (dirichlet_prior * 3 + count);
 	  const double prob_next_others = (dirichlet_prior + count_next_others) / (dirichlet_prior * 3 + count);
 	
+	  if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
+				std::log(prob_prev_mono), std::log(prob_prev_swap), std::log(prob_prev_others),
+				std::log(prob_next_mono), std::log(prob_next_swap), std::log(prob_next_others)))
+	    throw std::runtime_error("failed generation");
+#if 0
 	  os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others)
 	     << ' ' << std::log(prob_next_mono) << ' ' << std::log(prob_next_swap) << ' ' << std::log(prob_next_others)
 	     << '\n';
+#endif
 	} else {
 	  const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
 	  const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
 	  const double prob_prev_others = (dirichlet_prior + count_prev_others) / (dirichlet_prior * 3 + count);
 	
-	  os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others) << '\n';
+	  if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
+				std::log(prob_prev_mono), std::log(prob_prev_swap), std::log(prob_prev_others)))
+	    throw std::runtime_error("failed generation");
+	  
+	  //os << ' ' << std::log(prob_prev_mono) << ' ' << std::log(prob_prev_swap) << ' ' << std::log(prob_prev_others) << '\n';
 	}
       }
     }
@@ -254,11 +328,24 @@ struct ScorerCICADAReordering
 
 struct ScorerMOSES
 {
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 10;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<double, real_precision> double10;
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
 		  std::ostream& os)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
     if (phrase_pair.counts.size() != 5)
       throw std::runtime_error("counts size do not match");
     if (phrase_pair.counts_source.size() != 5)
@@ -272,7 +359,22 @@ struct ScorerMOSES
     
     const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
     const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
+    
+    std::ostream_iterator<char> iter(os);
+    
+    if (! karma::generate(iter,
+			  standard::string << " ||| " << standard::string << " |||"
+			  << ' ' << double10 << ' ' << double10
+			  << ' ' << double10 << ' ' << double10
+			  << ' ' << double10
+			  << '\n',
+			  phrase_pair.source, phrase_pair.target,
+			  prob_source_target, phrase_pair.lexicon_source_target,
+			  prob_target_source, phrase_pair.lexicon_target_source,
+			  boost::math::constants::e<double>()))
+      throw std::runtime_error("failed generation");
 
+#if 0
     os << phrase_pair.source
        << " ||| " << phrase_pair.target
        << " |||"
@@ -280,22 +382,38 @@ struct ScorerMOSES
        << ' ' << prob_target_source << ' ' << phrase_pair.lexicon_target_source
        << ' ' << boost::math::constants::e<double>()
        << '\n';
+#endif
   }
 };
 
 struct ScorerMOSESReordering
 {
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 10;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<double, real_precision> double10;
+
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
 		  std::ostream& os)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
     if (phrase_pair.counts.size() != 5)
       throw std::runtime_error("counts size do not match");
     if (phrase_pair.counts_source.size() != 5)
       throw std::runtime_error("source counts size do not match");
     if (phrase_pair.counts_target.size() != 5)
       throw std::runtime_error("target counts size do not match");
+    
+    //std::ostream_iterator<char> iter(os);
     
     if (mode_source_only)
       os << phrase_pair.source << " |||";
