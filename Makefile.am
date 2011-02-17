@@ -4,6 +4,7 @@ ACLOCAL_AMFLAGS = -I config
 SUBDIRS = utils succinct_db libstemmer_c wn cicada progs scripts
 
 EXTRA_DIST = \
+TODO \
 README \
 README.alignment \
 README.attributes \
