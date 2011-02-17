@@ -299,10 +299,9 @@ struct PhrasePairGenerator
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      phrase %= +standard::char_;
       counts %= double20 % ' ';
-      phrase_pair %= (phrase
-		      << " ||| " << phrase
+      phrase_pair %= (standard::string
+		      << " ||| " << standard::string
 		      << " ||| " << counts
 		      << " ||| " << counts
 		      << " ||| " << counts
@@ -320,7 +319,6 @@ struct PhrasePairGenerator
     
     boost::spirit::karma::real_generator<double, real_precision> double20;
     
-    boost::spirit::karma::rule<Iterator, std::string()> phrase;
     boost::spirit::karma::rule<Iterator, counts_type()> counts;
     boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;
   };

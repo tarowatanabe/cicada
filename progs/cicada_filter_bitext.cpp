@@ -58,7 +58,7 @@ struct sentence_generator : boost::spirit::karma::grammar<Iterator, sentence_typ
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
     
-    tokens  %= -((+standard::char_) % ' ') << '\n';
+    tokens  %= -(standard::string % ' ') << '\n';
   }
   
   typedef boost::spirit::standard::blank_type blank_type;

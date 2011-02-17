@@ -78,10 +78,6 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      using karma::buffer;
-      using standard::char_;
-      using karma::double_;
-      
       escape_char.add
 	('\\', "\\\\")
 	('\"', "\\\"")
@@ -93,7 +89,7 @@ namespace cicada
 	('\t', "\\t")
 	(' ', "\\u0020");
       
-      key %= ('\"' << +(escape_char | ~char_('\"')) << '\"');
+      key %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"');
       data %= int64_ | double10 | key;
       
       attribute %= key << ':' << data;

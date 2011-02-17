@@ -178,13 +178,11 @@ struct PhrasePairGenerator
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      phrase %= +standard::char_;
       alignment %= -((karma::int_ << '-' << karma::int_) % ' ');
       counts %= karma::int_ % ' ';
-      phrase_pair %= phrase << " ||| " << phrase << " ||| " << alignment << " ||| " << counts;
+      phrase_pair %= standard::string << " ||| " << standard::string << " ||| " << alignment << " ||| " << counts;
     }
     
-    boost::spirit::karma::rule<Iterator, std::string()> phrase;
     boost::spirit::karma::rule<Iterator, alignment_type()> alignment;
     boost::spirit::karma::rule<Iterator, counts_type()> counts;
     boost::spirit::karma::rule<Iterator, phrase_pair_type()> phrase_pair;

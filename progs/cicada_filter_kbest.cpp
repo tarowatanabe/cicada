@@ -115,7 +115,7 @@ struct Task
 	const tokens_type& features = boost::fusion::get<2>(kbest);
 	
 	os << " ||| ";
-	if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), features))
+	if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -(boost::spirit::standard::string % ' '), features))
 	  throw std::runtime_error("tokens generation failed...?");
       }
       
@@ -183,7 +183,7 @@ int main(int argc, char** argv)
 	  
 	  const tokens_type& tokens = boost::fusion::get<1>(kbest);
 	  
-	  if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os_filter), -((+boost::spirit::standard::char_) % ' '), tokens))
+	  if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os_filter), -(boost::spirit::standard::string % ' '), tokens))
 	    throw std::runtime_error("tokens generation failed...?");
 	  os_filter << '\n';
 	  
@@ -209,14 +209,14 @@ int main(int argc, char** argv)
       
 	const tokens_type& tokens = boost::fusion::get<1>(kbest);
       
-	if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), tokens))
+	if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -(boost::spirit::standard::string % ' '), tokens))
 	  throw std::runtime_error("tokens generation failed...?");
       
 	if (features_mode) {
 	  const tokens_type& features = boost::fusion::get<2>(kbest);
-	
+	  
 	  os << " ||| ";
-	  if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -((+boost::spirit::standard::char_) % ' '), features))
+	  if (! boost::spirit::karma::generate(std::ostream_iterator<char>(os), -(boost::spirit::standard::string % ' '), features))
 	    throw std::runtime_error("tokens generation failed...?");
 	}
 
