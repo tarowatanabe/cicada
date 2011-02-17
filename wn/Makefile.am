@@ -23,3 +23,5 @@ noinst_PROGRAMS = \
 
 wn_main_SOURCES = wn_main.cpp
 wn_main_LDADD   = libwn.la
+
+EXTRA_DIST = license.txt
