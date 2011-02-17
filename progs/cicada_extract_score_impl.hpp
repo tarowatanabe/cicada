@@ -21,6 +21,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/array.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/range.hpp>
 
 #include <string>
 #include <vector>
@@ -2053,6 +2054,16 @@ struct PhrasePairScoreReducer
       return x->first > y->first;
     }
   };
+
+  struct real_precision : boost::spirit::karma::real_policies<count_type>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 20;
+    }
+  };
+  
+  boost::spirit::karma::real_generator<count_type, real_precision> double20;
   
   void dump_phrase_pair(const phrase_pair_set_type& counts)
   {
@@ -2111,24 +2122,35 @@ struct PhrasePairScoreReducer
       const int shard = hasher(first->target.begin(), first->target.end(), 0) % modified_counts.size();
       const modified_counts_type::count_set_type& counts_target = modified_counts[shard][first->target];
       
-      os << first->source << " ||| " << first->target << ' ';
+      os << first->source << " ||| " << first->target;
+      
+      namespace karma = boost::spirit::karma;
+      namespace standard = boost::spirit::standard;
+
+      typedef std::ostream_iterator<char> iterator_type;
+
+      iterator_type iter(os);
       
       // cont(LHS RHS)
-      os << "||| "; std::copy(counts_pair.counts.begin(), counts_pair.counts.end(), std::ostream_iterator<count_type>(os, " "));
+      if (! karma::generate(iter, " ||| " << -(double20 % ' '), counts_pair.counts))
+	throw std::runtime_error("generation failed");
       
       // count(LHS)
-      os << "||| "; std::copy(counts_source.counts.begin(), counts_source.counts.end(), std::ostream_iterator<count_type>(os, " "));
+      if (! karma::generate(iter, " ||| " << -(double20 % ' '), counts_source.counts))
+	throw std::runtime_error("generation failed");
       
       // count(RHS)
-      os << "||| "; std::copy(counts_target.begin(), counts_target.end() - 1, std::ostream_iterator<count_type>(os, " "));
+      if (! karma::generate(iter, " ||| " << -(double20 % ' '), boost::make_iterator_range(counts_target.begin(), counts_target.end() - 1)))
+	throw std::runtime_error("generation failed");
       
       // observed(LHS) observed(RHS)
-      os << "||| "; os << observed_source << ' ' << counts_target.back() << ' ';
+      if (! karma::generate(iter, " ||| " << double20 << ' ' << double20, observed_source, counts_target.back()))
+	throw std::runtime_error("generation failed");
       
       // lex(rhs | lhs) lex(rhs | lhs)
-      os << "||| "; os << lex_target_source << ' ' << lex_source_target << '\n';
+      if (! karma::generate(iter, " ||| " << double20 << ' ' << double20 << '\n', lex_target_source, lex_source_target))
+	throw std::runtime_error("generation failed");
     }
-
   }
   
   void operator()()

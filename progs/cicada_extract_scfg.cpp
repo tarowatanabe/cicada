@@ -37,6 +37,7 @@ int max_fertility = 10;
 int max_span = 15;
 int min_hole = 1;
 bool ternary = false;
+bool sentential = false;
 bool inverse = false;
 
 double max_malloc = 8; // 8 GB
@@ -76,7 +77,7 @@ int main(int argc, char** argv)
     utils::resource start_extract;
     
     queue_type queue(1024 * threads);
-    task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_span, min_hole, ternary, inverse, max_malloc));
+    task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_span, min_hole, ternary, sentential, inverse, max_malloc));
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -175,6 +176,7 @@ void options(int argc, char** argv)
     ("max-span",      po::value<int>(&max_span)->default_value(max_span),           "maximum span for rule")
     ("min-hole",      po::value<int>(&min_hole)->default_value(min_hole),           "minimum hole for antecedent non-terminals")
     ("ternary",       po::bool_switch(&ternary),                                    "extract ternary rules")
+    ("sentential",    po::bool_switch(&sentential),                                 "extract sentential rules")
     ("inverse",       po::bool_switch(&inverse),                                    "inversed word alignment")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")

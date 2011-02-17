@@ -325,12 +325,14 @@ struct ExtractSCFG
 	      const int __max_span,
 	      const int __min_hole,
 	      const bool __ternary,
+	      const bool __sentential,
 	      const bool __inverse)
     : max_length(__max_length),
       max_fertility(__max_fertility),
       max_span(__max_span),
       min_hole(__min_hole),
       ternary(__ternary),
+      sentential(__sentential),
       inverse(__inverse) {}
 		
   int max_length;
@@ -338,8 +340,9 @@ struct ExtractSCFG
   int max_span;
   int min_hole;
   bool ternary;
+  bool sentential;
   bool inverse;
-
+  
   alignment_multiple_type alignment_source_target;
   alignment_multiple_type alignment_target_source;
   
@@ -359,7 +362,7 @@ struct ExtractSCFG
       return vocab_type::X;
     }
   };
-
+  
   struct ExtractCategoryBase
   {
     typedef utils::chart<symbol_type, std::allocator<std::string> > label_chart_type;
@@ -515,6 +518,7 @@ struct ExtractSCFG
     const size_type target_size = target.size();
     
     rule_pair_list_type rule_pair_list;
+    rule_pair_list_type sentential_pair_list;
     rule_pair_type rule_pair;
     
     span_pair_set_type::const_iterator iter_end = spans.end();
@@ -525,18 +529,26 @@ struct ExtractSCFG
       const int source_count = alignment_count_source[iter->source.second] - alignment_count_source[iter->source.first];
       //const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
       
+      const bool sentential_mode = sentential && source_length == source_size && target_length == target_size;
+      const bool rule_mode = max_span <= 0 || source_length <= max_span;
+      
       if (max_length <= 0 || source_length <= max_length || target_length <= max_length)
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
 	  // extract rule...
 	  
 	  extract_rule(source, target, *iter, category, rule_pair);
-	  
 	  const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
+	  
+	  if (sentential_mode) {
+	    extract_rule(source, target, *iter, category, rule_pair, true);
+	    const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
+	  }
 	}
       
       // consider hole!
-      if (max_span <= 0 || source_length <= max_span) {
+      if (rule_mode || sentential_mode) {
 	rule_pair_list.clear();
+	sentential_pair_list.clear();
 	
 	span_pair_set_type::const_iterator niter_end = spans_unique.end();
 	
@@ -558,10 +570,16 @@ struct ExtractSCFG
 	    if (max_length <= 0 || source_length1 <= max_length || target_length1 <= max_length)
 	      if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
 		// extract rule...
-
-		extract_rule(source, target, *iter, *niter1, category, rule_pair);
 		
-		rule_pair_list.push_back(rule_pair);
+		if (rule_mode) {
+		  extract_rule(source, target, *iter, *niter1, category, rule_pair);
+		  rule_pair_list.push_back(rule_pair);
+		}
+		
+		if (sentential_mode) {
+		  extract_rule(source, target, *iter, *niter1, category, rule_pair, true);
+		  sentential_pair_list.push_back(rule_pair);
+		}
 	      }
 	    
 	    // second non-terminal...
@@ -586,9 +604,15 @@ struct ExtractSCFG
 		  if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
 		    // extract rule...
 		    
-		    extract_rule(source, target, *iter, *niter1, *niter2, category, rule_pair);
+		    if (rule_mode) {
+		      extract_rule(source, target, *iter, *niter1, *niter2, category, rule_pair);
+		      rule_pair_list.push_back(rule_pair);
+		    }
 		    
-		    rule_pair_list.push_back(rule_pair);
+		    if (sentential_mode) {
+		      extract_rule(source, target, *iter, *niter1, *niter2, category, rule_pair, true);
+		      sentential_pair_list.push_back(rule_pair);
+		    }
 		  }
 
 		
@@ -617,9 +641,15 @@ struct ExtractSCFG
 			if (max_fertility <= 0 || fertility(source_length3, target_length3) < max_fertility) {
 			  // extract rule...
 			  
-			  extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair);
+			  if (rule_mode) {
+			    extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair);
+			    rule_pair_list.push_back(rule_pair);
+			  }
 			  
-			  rule_pair_list.push_back(rule_pair);
+			  if (sentential_mode) {
+			    extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair, true);
+			    sentential_pair_list.push_back(rule_pair);
+			  }
 			}
 		    }
 	      }
@@ -635,6 +665,17 @@ struct ExtractSCFG
 
 	  rule_pair_list.clear();
 	}
+	
+	// add into rule-pairs...
+	if (! sentential_pair_list.empty()) {
+	  const double count = 1.0 / sentential_pair_list.size();
+	  
+	  rule_pair_list_type::const_iterator riter_end = sentential_pair_list.end();
+	  for (rule_pair_list_type::const_iterator riter = sentential_pair_list.begin(); riter != riter_end; ++ riter)
+	    const_cast<rule_pair_type&>(*(rule_pairs.insert(*riter).first)).count += count;
+
+	  sentential_pair_list.clear();
+	}
       }
     }
   }
@@ -644,9 +685,10 @@ struct ExtractSCFG
 		    const sentence_type& target,
 		    const span_pair_type& spans,
 		    const Category& category,
-		    rule_pair_type& rule_pair)
+		    rule_pair_type& rule_pair,
+		    const bool sentential=false)
   {
-    const symbol_type& lhs = category(spans);
+    const symbol_type& lhs = (sentential ? vocab_type::S : category(spans));
 
     rule_pair.source = static_cast<const std::string&>(lhs);
     for (int src = spans.source.first; src != spans.source.second; ++ src)
@@ -672,9 +714,10 @@ struct ExtractSCFG
 		    const span_pair_type& spans,
 		    const span_pair_type& spans_nt1,
 		    const Category& category,
-		    rule_pair_type& rule_pair)
+		    rule_pair_type& rule_pair,
+		    const bool sentential=false)
   {
-    const symbol_type lhs = category(spans);
+    const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
     const symbol_type nt1 = category(spans_nt1);
 
     rule_pair.source = static_cast<const std::string&>(lhs);
@@ -724,14 +767,15 @@ struct ExtractSCFG
 		    const span_pair_type& __spans_nt1,
 		    const span_pair_type& __spans_nt2,
 		    const Category& category,
-		    rule_pair_type& rule_pair)
+		    rule_pair_type& rule_pair,
+		    const bool sentential=false)
   {
     // we will reorder wrt source side spans...
     const bool __is_ordered = is_ordered(__spans_nt1.source, __spans_nt2.source);
     const span_pair_type& spans_nt1 = (__is_ordered ? __spans_nt1 : __spans_nt2);
     const span_pair_type& spans_nt2 = (__is_ordered ? __spans_nt2 : __spans_nt1);
     
-    const symbol_type lhs = category(spans);
+    const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
     const symbol_type nt1 = category(spans_nt1);
     const symbol_type nt2 = category(spans_nt2);
     
@@ -825,7 +869,8 @@ struct ExtractSCFG
 		    const span_pair_type& __spans_nt2,
 		    const span_pair_type& __spans_nt3,
 		    const Category& category,
-		    rule_pair_type& rule_pair)
+		    rule_pair_type& rule_pair,
+		    const bool sentential=false)
   {
     typedef std::pair<span_type, symbol_type> span_category_type;
     
@@ -841,7 +886,7 @@ struct ExtractSCFG
     const span_pair_type& spans_nt2 = spans_nt[1];
     const span_pair_type& spans_nt3 = spans_nt[2];
 
-    const symbol_type lhs = category(spans);
+    const symbol_type lhs = (sentential ? vocab_type::S : category(spans));
     const symbol_type nt1 = category(spans_nt1);
     const symbol_type nt2 = category(spans_nt2);
     const symbol_type nt3 = category(spans_nt3);
@@ -1079,11 +1124,12 @@ struct Task
        const int max_span,
        const int min_hole,
        const bool ternary,
+       const bool sentential,
        const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_length, max_fertility, max_span, min_hole, ternary, inverse),
+      extractor(max_length, max_fertility, max_span, min_hole, ternary, sentential, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

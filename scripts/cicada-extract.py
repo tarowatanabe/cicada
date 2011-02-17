@@ -94,7 +94,9 @@ opt_parser = OptionParser(
     
     make_option("--ternary", default=None, action="store_true",
                 help="extract ternary rule"),
-
+    make_option("--sentential", default=None, action="store_true",
+                help="extract sentential rule"),
+    
     ## max-malloc
     make_option("--max-malloc", default=8, action="store", type="float",
                 metavar="MALLOC", help="maximum memory in GB (default: 8)"),
@@ -467,7 +469,7 @@ class ExtractSCFG(Extract):
     
     def __init__(self, toolkit=None, corpus=None, alignment=None,
                  model_dir="",
-                 max_length=7, max_fertility=4, max_span=15, min_hole=1, ternary=None,
+                 max_length=7, max_fertility=4, max_span=15, min_hole=1, ternary=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -506,6 +508,8 @@ class ExtractSCFG(Extract):
 
         if ternary:
             command += " --ternary"
+        if sentential:
+            command += " --sentential"
         
         command += " --max-malloc %g" %(max_malloc)
 
@@ -758,6 +762,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_span=options.max_span,
                               min_hole=options.min_hole,
                               ternary=options.ternary,
+                              sentential=options.sentential,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     elif options.ghkm:
