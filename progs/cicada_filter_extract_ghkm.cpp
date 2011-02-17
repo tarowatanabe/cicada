@@ -14,6 +14,7 @@
 #include <boost/program_options.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/spirit/include/karma.hpp>
 
 #include <utils/resource.hpp>
 #include <utils/bithack.hpp>
@@ -126,6 +127,9 @@ struct ScorerCICADA
 		  const root_count_set_type& root_count_target,
 		  std::ostream& os)
   {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+
     if (phrase_pair.counts.size() != 1)
       throw std::runtime_error("counts size do not match");
     if (phrase_pair.counts_source.size() != 1)
@@ -158,7 +162,24 @@ struct ScorerCICADA
     
     const double prob_root_source = (dirichlet_prior + count_source) / (dirichlet_prior * siter->observed + siter->counts.front());
     const double prob_root_target = (dirichlet_prior + count_target) / (dirichlet_prior * titer->observed + titer->counts.front());
+
+    std::ostream_iterator<char> iter(os);
     
+    if (! karma::generate(iter,
+			  standard::string << " ||| " << standard::string << " |||"
+			  << ' ' << karma::double_ << ' ' << karma::double_
+			  << ' ' << karma::double_ << ' ' << karma::double_
+			  << ' ' << karma::double_
+			  << ' ' << karma::double_
+			  << '\n',
+			  phrase_pair.source, phrase_pair.target,
+			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
+			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source),
+			  std::log(prob_root_source),
+			  std::log(prob_root_target)))
+	throw std::runtime_error("failed generation");
+    
+#if 0
     os << phrase_pair.source
        << " ||| " << phrase_pair.target
        << " |||"
@@ -167,6 +188,7 @@ struct ScorerCICADA
        << ' ' << std::log(prob_root_source)
        << ' ' << std::log(prob_root_target)
        << '\n';
+#endif
   }
 };
 
