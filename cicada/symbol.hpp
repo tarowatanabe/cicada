@@ -15,7 +15,6 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include <utils/indexed_set.hpp>
 #include <utils/hashmurmur.hpp>
