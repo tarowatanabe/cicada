@@ -175,7 +175,7 @@ namespace cicada
     std::string generated;
     std::back_insert_iterator<std::string> iter(generated);
     
-    karma::generate(iter, '[' << +(standard::char_) << ',' << karma::int_ << ']', non_terminal_strip(), index);
+    karma::generate(iter, '[' << standard::string << ',' << karma::int_ << ']', non_terminal_strip(), index);
     
     return Symbol(generated);
   }
