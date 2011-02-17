@@ -28,7 +28,7 @@ namespace cicada
     iterator_type iter(os);
     
     if (! karma::generate(iter, -(standard::string % ' '), x.__impl))
-      throw std::runtime_error("sentence generation failed...?");
+      throw std::runtime_error("symbol vector generation failed...?");
     
     return os;
   }
