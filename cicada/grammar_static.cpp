@@ -852,10 +852,12 @@ namespace cicada
     
     int feature_size = -1;
     int attribute_size = -1;
-    
+
     sequence_type source_prev;
     sequence_type source;
     sequence_type target;
+    
+    
     rule_parsed_type rule;
     
     id_set_type source_index;
@@ -895,9 +897,15 @@ namespace cicada
       // skip empty source...
       if (boost::fusion::get<1>(rule).empty()) continue;
       
+      // lhs...
+      const std::string& lhs = boost::fusion::get<0>(rule);
+      const word_type::id_type id_lhs = word_type(lhs.empty() ? vocab_type::X : word_type(lhs)).id();
+      
+      // source
       source.clear();
       source.insert(source.end(), boost::fusion::get<1>(rule).begin(), boost::fusion::get<1>(rule).end());
       
+      // target
       target.clear();
       target.insert(target.end(), boost::fusion::get<2>(rule).begin(), boost::fusion::get<2>(rule).end());
       
@@ -920,8 +928,9 @@ namespace cicada
 	  // insert...
 	  rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
 	}
-
+	
 	rule_options.clear();
+	
 	source_prev = source;
 
 	arity_source = 0;
@@ -936,10 +945,6 @@ namespace cicada
       if (arity_source != arity_target)
 	throw std::runtime_error("# of non-terminals do not match...");
        
-      // lhs...
-      const std::string& lhs = boost::fusion::get<0>(rule);
-      const word_type::id_type id_lhs = word_type(lhs.empty() ? vocab_type::X : word_type(lhs)).id();
-
 #if 0
       std::cerr << "lhs: " << lhs;
       std::cerr << " source: ";
@@ -992,10 +997,10 @@ namespace cicada
       
       // encode target...
       encode_phrase(target, codes_target);
-       
+      
       const id_type id_target = target_map.insert(&(*codes_target.begin()), codes_target.size(),
 						  hasher_type::operator()(codes_target.begin(), codes_target.end(), 0));
-       
+      
       // put into rule_options...
       rule_options.push_back(boost::make_tuple(id_rule ++, id_lhs, id_target));
     }
