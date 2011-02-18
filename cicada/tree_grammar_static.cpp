@@ -348,7 +348,7 @@ namespace cicada
     void write(const path_type& path) const;
 
     void read_text(const std::string& path);
-    void read_binary(const path_type& path);
+    void read_binary(const std::string& path);
     
   private:
     edge_db_type          edge_db;
@@ -520,7 +520,7 @@ namespace cicada
       throw std::runtime_error(std::string("no grammar file") + param.name());
     
     if (boost::filesystem::is_directory(path))
-      read_binary(path);
+      read_binary(parameter);
     else
       read_text(parameter);
   }
@@ -571,10 +571,13 @@ namespace cicada
   }
   
   
-  void TreeGrammarStaticImpl::read_binary(const path_type& path)
+  void TreeGrammarStaticImpl::read_binary(const std::string& parameter)
   {
     typedef utils::repository repository_type;
-	
+    typedef cicada::Parameter parameter_type;
+	  
+    const parameter_type param(parameter);
+    const path_type path = param.name();
     repository_type rep(path, repository_type::read);
     
     edge_db.open(rep.path("edge"));
@@ -602,11 +605,17 @@ namespace cicada
       score_db[feature].read(rep.path(stream_score.str()));
       
       const std::string name(std::string("feature") + utils::lexical_cast<std::string>(feature));
-      repository_type::const_iterator iter = rep.find(name);
-      if (iter == rep.end())
-	throw std::runtime_error(std::string("no feature name?: ") + name);
       
-      feature_names[feature] = iter->second;
+      parameter_type::const_iterator piter = param.find(name);
+      if (piter != param.end())
+	feature_names[feature] = piter->second;
+      else {
+	repository_type::const_iterator iter = rep.find(name);
+	if (iter == rep.end())
+	  throw std::runtime_error(std::string("no feature name?: ") + name);
+	
+	feature_names[feature] = iter->second;
+      }
     }
 
     repository_type::const_iterator aiter = rep.find("attribute-size");
@@ -626,11 +635,17 @@ namespace cicada
       attr_db[attribute].read(rep.path(stream_score.str()));
       
       const std::string name(std::string("attribute") + utils::lexical_cast<std::string>(attribute));
-      repository_type::const_iterator iter = rep.find(name);
-      if (iter == rep.end())
-	throw std::runtime_error(std::string("no attribute name?: ") + name);
       
-      attribute_names[attribute] = iter->second;
+      parameter_type::const_iterator piter = param.find(name);
+      if (piter != param.end())
+	attribute_names[attribute] = piter->second;
+      else {
+	repository_type::const_iterator iter = rep.find(name);
+	if (iter == rep.end())
+	  throw std::runtime_error(std::string("no attribute name?: ") + name);
+	
+	attribute_names[attribute] = iter->second;
+      }
     }
   }
 
