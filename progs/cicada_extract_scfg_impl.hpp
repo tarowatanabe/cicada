@@ -528,16 +528,16 @@ struct ExtractSCFG
       //const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
       
       const bool sentential_mode = sentential && source_length == source_size && target_length == target_size;
-      const bool rule_mode = max_span <= 0 || source_length <= max_span;
+      const bool rule_mode = (! sentential) && max_span <= 0 || source_length <= max_span;
       
       if (max_length <= 0 || source_length <= max_length || target_length <= max_length)
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
 	  // extract rule...
-	  
-	  extract_rule(source, target, *iter, category, rule_pair);
-	  const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
-	  
-	  if (sentential_mode) {
+
+	  if (! sentential) {
+	    extract_rule(source, target, *iter, category, rule_pair);
+	    const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
+	  } else if (sentential_mode) {
 	    extract_rule(source, target, *iter, category, rule_pair, true);
 	    const_cast<rule_pair_type&>(*(rule_pairs.insert(rule_pair).first)).count += 1;
 	  }
@@ -572,9 +572,7 @@ struct ExtractSCFG
 		if (rule_mode) {
 		  extract_rule(source, target, *iter, *niter1, category, rule_pair);
 		  rule_pair_list.push_back(rule_pair);
-		}
-		
-		if (sentential_mode) {
+		} else if (sentential_mode) {
 		  extract_rule(source, target, *iter, *niter1, category, rule_pair, true);
 		  sentential_pair_list.push_back(rule_pair);
 		}
@@ -605,9 +603,7 @@ struct ExtractSCFG
 		    if (rule_mode) {
 		      extract_rule(source, target, *iter, *niter1, *niter2, category, rule_pair);
 		      rule_pair_list.push_back(rule_pair);
-		    }
-		    
-		    if (sentential_mode) {
+		    } else if (sentential_mode) {
 		      extract_rule(source, target, *iter, *niter1, *niter2, category, rule_pair, true);
 		      sentential_pair_list.push_back(rule_pair);
 		    }
@@ -642,9 +638,7 @@ struct ExtractSCFG
 			  if (rule_mode) {
 			    extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair);
 			    rule_pair_list.push_back(rule_pair);
-			  }
-			  
-			  if (sentential_mode) {
+			  } else if (sentential_mode) {
 			    extract_rule(source, target, *iter, *niter1, *niter2, *niter3, category, rule_pair, true);
 			    sentential_pair_list.push_back(rule_pair);
 			  }
