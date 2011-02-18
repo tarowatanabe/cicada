@@ -528,7 +528,7 @@ struct ExtractSCFG
       //const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
       
       const bool sentential_mode = sentential && source_length == source_size && target_length == target_size;
-      const bool rule_mode = (! sentential) && max_span <= 0 || source_length <= max_span;
+      const bool rule_mode = (! sentential) && (max_span <= 0 || source_length <= max_span);
       
       if (max_length <= 0 || source_length <= max_length || target_length <= max_length)
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
