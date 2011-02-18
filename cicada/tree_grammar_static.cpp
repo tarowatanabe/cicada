@@ -611,10 +611,10 @@ namespace cicada
 	feature_names[feature] = piter->second;
       else {
 	repository_type::const_iterator iter = rep.find(name);
-	if (iter == rep.end())
+	if (iter != rep.end())
+	  feature_names[feature] = iter->second;
+	else
 	  throw std::runtime_error(std::string("no feature name?: ") + name);
-	
-	feature_names[feature] = iter->second;
       }
     }
 
@@ -641,10 +641,10 @@ namespace cicada
 	attribute_names[attribute] = piter->second;
       else {
 	repository_type::const_iterator iter = rep.find(name);
-	if (iter == rep.end())
+	if (iter != rep.end())
+	  attribute_names[attribute] = iter->second;
+	else
 	  throw std::runtime_error(std::string("no attribute name?: ") + name);
-	
-	attribute_names[attribute] = iter->second;
       }
     }
   }
