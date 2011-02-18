@@ -102,8 +102,8 @@ opt_parser = OptionParser(
                 metavar="MALLOC", help="maximum memory in GB (default: 8)"),
 
     # CICADA Toolkit directory
-    make_option("--toolkit-dir", default="", action="store", type="string",
-                metavar="DIRECTORY", help="toolkit directory"),
+    make_option("--cicada-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="cicada directory"),
     # MPI Implementation.. if different from standard location...
     make_option("--mpi-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="MPI directory"),
@@ -268,7 +268,7 @@ class MPI:
 	run_command(mpirun)
 
 
-class Toolkit:
+class CICADA:
     def __init__(self, dir=""):
 
 	self.dir = dir	
@@ -336,7 +336,7 @@ class Alignment:
         
 
 class Lexicon:
-    def __init__(self, toolkit=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
+    def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
                  threads=4, mpi=None, pbs=None,
                  debug=None):
         self.threads = threads
@@ -351,7 +351,7 @@ class Lexicon:
         self.data.append(corpus.source)
         self.data.append(corpus.target)
 
-        command = "%s" %(toolkit.cicada_lexicon)
+        command = "%s" %(cicada.cicada_lexicon)
         
         command += " --source \"%s\"" %(corpus.source)
         command += " --target \"%s\"" %(corpus.target)
@@ -424,7 +424,7 @@ class Extract:
 
 class ExtractPhrase(Extract):
     
-    def __init__(self, toolkit=None, corpus=None, alignment=None,
+    def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  max_length=7, max_fertility=4,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
@@ -438,9 +438,9 @@ class ExtractPhrase(Extract):
         self.logfile = "extract-phrase.log"
         self.name = "extract-phrase"
         
-        prog_name = toolkit.cicada_extract_phrase
+        prog_name = cicada.cicada_extract_phrase
         if mpi:
-            prog_name = toolkit.cicada_extract_phrase_mpi
+            prog_name = cicada.cicada_extract_phrase_mpi
         
         command = prog_name
         
@@ -467,7 +467,7 @@ class ExtractPhrase(Extract):
 
 class ExtractSCFG(Extract):
     
-    def __init__(self, toolkit=None, corpus=None, alignment=None,
+    def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  max_length=7, max_fertility=4, max_span=15, min_hole=1, ternary=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
@@ -484,9 +484,9 @@ class ExtractSCFG(Extract):
         if os.path.exists(corpus.source_span) and os.path.exists(corpus.target_span):
             raise ValueError, "both of source/target span specified... which one?"
         
-        prog_name = toolkit.cicada_extract_scfg
+        prog_name = cicada.cicada_extract_scfg
         if mpi:
-            prog_name = toolkit.cicada_extract_scfg_mpi
+            prog_name = cicada.cicada_extract_scfg_mpi
         
         command = prog_name
         
@@ -524,7 +524,7 @@ class ExtractSCFG(Extract):
 
 class ExtractGHKM(Extract):
     
-    def __init__(self, toolkit=None, corpus=None, alignment=None,
+    def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  non_terminal="", max_nodes=15, max_height=4,
                  exhaustive=None,
@@ -551,9 +551,9 @@ class ExtractGHKM(Extract):
         self.logfile = "extract-ghkm.log"
         self.name = "extract-ghkm"
         
-        prog_name = toolkit.cicada_extract_ghkm
+        prog_name = cicada.cicada_extract_ghkm
         if mpi:
-            prog_name = toolkit.cicada_extract_ghkm_mpi
+            prog_name = cicada.cicada_extract_ghkm_mpi
         
         command = prog_name
         
@@ -597,7 +597,7 @@ class ExtractGHKM(Extract):
 
 class ExtractTree(Extract):
     
-    def __init__(self, toolkit=None, corpus=None, alignment=None,
+    def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  max_nodes=15, max_height=4,
                  exhaustive=None,
@@ -612,9 +612,9 @@ class ExtractTree(Extract):
         self.logfile = "extract-tree.log"
         self.name = "extract-tree"
         
-        prog_name = toolkit.cicada_extract_tree
+        prog_name = cicada.cicada_extract_tree
         if mpi:
-            prog_name = toolkit.cicada_extract_tree_mpi
+            prog_name = cicada.cicada_extract_tree_mpi
         
         command = prog_name
         
@@ -644,7 +644,7 @@ class ExtractTree(Extract):
 
 class ExtractScore(Extract):
     
-    def __init__(self, toolkit=None, lexicon=None,
+    def __init__(self, cicada=None, lexicon=None,
                  model_dir="",
                  phrase=None, scfg=None, ghkm=None, tree=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
@@ -676,9 +676,9 @@ class ExtractScore(Extract):
 
         self.logfile = "extract-score.log"
                 
-        prog_name = toolkit.cicada_extract_score
+        prog_name = cicada.cicada_extract_score
         if mpi:
-            prog_name = toolkit.cicada_extract_score_mpi
+            prog_name = cicada.cicada_extract_score_mpi
         
         command = prog_name
         
@@ -711,7 +711,7 @@ if not options.lexical_dir:
 if not options.alignment_dir:
     options.alignment_dir = options.model_dir
 
-toolkit = Toolkit(options.toolkit_dir)
+cicada = CICADA(options.cicada_dir)
 
 mpi = None
 if options.mpi_host or options.mpi_host_file or options.mpi > 0:
@@ -734,7 +734,7 @@ corpus = Corpus(corpus=options.corpus,
 
 alignment = Alignment(options.alignment_dir, options.alignment)
 
-lexicon = Lexicon(toolkit=toolkit, corpus=corpus, alignment=alignment,
+lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
                   lexical_dir=options.lexical_dir,
                   prior=options.lexicon_prior,
                   threads=options.threads, mpi=mpi, pbs=pbs,
@@ -748,14 +748,14 @@ if options.first_step <= 4 and options.last_step >= 4:
 if options.first_step <= 5 and options.last_step >= 5:
     extract = None
     if options.phrase:
-        extract = ExtractPhrase(toolkit=toolkit, corpus=corpus, alignment=alignment,
+        extract = ExtractPhrase(cicada=cicada, corpus=corpus, alignment=alignment,
                                 model_dir=options.model_dir,
                                 max_length=options.max_length,
                                 max_fertility=options.max_fertility,
                                 max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                                 debug=options.debug)
     elif options.scfg:
-        extract = ExtractSCFG(toolkit=toolkit, corpus=corpus, alignment=alignment,
+        extract = ExtractSCFG(cicada=cicada, corpus=corpus, alignment=alignment,
                               model_dir=options.model_dir,
                               max_length=options.max_length,
                               max_fertility=options.max_fertility,
@@ -766,7 +766,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     elif options.ghkm:
-        extract = ExtractGHKM(toolkit=toolkit, corpus=corpus, alignment=alignment,
+        extract = ExtractGHKM(cicada=cicada, corpus=corpus, alignment=alignment,
                               model_dir=options.model_dir,
                               non_terminal=options.non_terminal,
                               max_nodes=options.max_nodes,
@@ -775,7 +775,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     elif options.tree:
-        extract = ExtractTree(toolkit=toolkit, corpus=corpus, alignment=alignment,
+        extract = ExtractTree(cicada=cicada, corpus=corpus, alignment=alignment,
                               model_dir=options.model_dir,
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
@@ -790,7 +790,7 @@ if options.first_step <= 5 and options.last_step >= 5:
     print "(5) extract phrase table finished @", time.ctime()
 
 if options.first_step <= 6 and options.last_step >= 6:
-    score = ExtractScore(toolkit=toolkit, lexicon=lexicon,
+    score = ExtractScore(cicada=cicada, lexicon=lexicon,
                          model_dir=options.model_dir,
                          phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
                          max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
