@@ -233,7 +233,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "composition: " << data.id " cky" << std::endl;
+	std::cerr << "composition: " << data.id << " cky" << std::endl;
 
       utils::resource start;
 
@@ -316,7 +316,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "composition: " << data.id " phrase" << std::endl;
+	std::cerr << "composition: " << data.id << " phrase" << std::endl;
 
       utils::resource start;
 
@@ -405,7 +405,7 @@ namespace cicada
 	target = lattice_type(data.targets.front());
 	
       if (debug)
-	std::cerr << "composition: " << data.id " alignment" << std::endl;
+	std::cerr << "composition: " << data.id << " alignment" << std::endl;
 	
       utils::resource start;
 	
