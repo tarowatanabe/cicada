@@ -51,7 +51,7 @@ namespace cicada
       hypergraph_type generated;
     
       if (debug)
-	std::cerr << "generation: earley" << std::endl;
+	std::cerr << "generation: " << data.id << " earley" << std::endl;
     
       utils::resource start;
     
@@ -65,7 +65,7 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "generated: earley"
+	std::cerr << "generate: " << data.id
 		  << " previous: # of nodes: " << hypergraph.nodes.size()
 		  << " # of edges: " << hypergraph.edges.size()
 		  << " generated: # of nodes: " << generated.nodes.size()

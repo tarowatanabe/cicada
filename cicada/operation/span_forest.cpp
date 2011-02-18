@@ -40,7 +40,7 @@ namespace cicada
       hypergraph_type spanned;
 
       if (debug)
-	std::cerr << "span annotation:"
+	std::cerr << "span annotation: " << data.id
 		  << " # of nodes: " << hypergraph.nodes.size()
 		  << " # of edges: " << hypergraph.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(hypergraph.is_valid())
@@ -58,7 +58,7 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "spanned:"
+	std::cerr << "spanned: " << data.id
 		  << " # of nodes: " << spanned.nodes.size()
 		  << " # of edges: " << spanned.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(spanned.is_valid())

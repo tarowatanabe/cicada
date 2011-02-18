@@ -81,7 +81,8 @@ namespace cicada
 		  << std::endl;
 	
       if (debug)
-	std::cerr << "# of nodes: " << intersected.nodes.size()
+	std::cerr << "intersect: " << data.id
+		  << " # of nodes: " << intersected.nodes.size()
 		  << " # of edges: " << intersected.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(intersected.is_valid())
 		  << std::endl;

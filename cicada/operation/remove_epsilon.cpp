@@ -36,7 +36,7 @@ namespace cicada
       lattice_type removed;
 	
       if (debug)
-	std::cerr << "remove epsilon" << std::endl;
+	std::cerr << "remove epsilon: " << data.id << std::endl;
 	
       utils::resource start;
 	
@@ -50,7 +50,8 @@ namespace cicada
 		  << std::endl;
 	
       if (debug)
-	std::cerr << "# of nodes: " << removed.size()
+	std::cerr << "remove epsilon: " << data.id
+		  << " # of nodes: " << removed.size()
 		  << " shortest distance: " << removed.shortest_distance()
 		  << " longest distance: " << removed.longest_distance()
 		  << std::endl;

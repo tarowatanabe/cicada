@@ -69,7 +69,7 @@ namespace cicada
       hypergraph_type composed;
 
       if (debug)
-	std::cerr << "composition: tree" << std::endl;
+	std::cerr << "composition: " << data.id << " tree" << std::endl;
 	
       utils::resource start;
 	
@@ -93,9 +93,10 @@ namespace cicada
 	std::cerr << "compose cpu time: " << (end.cpu_time() - start.cpu_time())
 		  << " user time: " << (end.user_time() - start.user_time())
 		  << std::endl;
-    
+      
       if (debug)
-	std::cerr << "# of nodes: " << composed.nodes.size()
+	std::cerr << "compose: " << data.id
+		  << " # of nodes: " << composed.nodes.size()
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
@@ -151,7 +152,7 @@ namespace cicada
       hypergraph_type composed;
     
       if (debug)
-	std::cerr << "composition: earley" << std::endl;
+	std::cerr << "composition: " << data.id << " earley" << std::endl;
 
       utils::resource start;
 
@@ -173,7 +174,8 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "# of nodes: " << composed.nodes.size()
+	std::cerr << "compose: " << data.id
+		  << " # of nodes: " << composed.nodes.size()
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
@@ -231,7 +233,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "composition: cky" << std::endl;
+	std::cerr << "composition: " << data.id " cky" << std::endl;
 
       utils::resource start;
 
@@ -252,7 +254,8 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "# of nodes: " << composed.nodes.size()
+	std::cerr << "compose: " << data.id
+		  << " # of nodes: " << composed.nodes.size()
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
@@ -313,7 +316,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "composition: phrase" << std::endl;
+	std::cerr << "composition: " << data.id " phrase" << std::endl;
 
       utils::resource start;
 
@@ -335,7 +338,8 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "# of nodes: " << composed.nodes.size()
+	std::cerr << "compose: " << data.id
+		  << " # of nodes: " << composed.nodes.size()
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
@@ -401,7 +405,7 @@ namespace cicada
 	target = lattice_type(data.targets.front());
 	
       if (debug)
-	std::cerr << "composition: alignment" << std::endl;
+	std::cerr << "composition: " << data.id " alignment" << std::endl;
 	
       utils::resource start;
 	
@@ -424,7 +428,8 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "# of nodes: " << composed.nodes.size()
+	std::cerr << "compose: " << data.id
+		  << " # of nodes: " << composed.nodes.size()
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;

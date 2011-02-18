@@ -59,12 +59,12 @@ namespace cicada
     void Binarize::operator()(data_type& data) const
     {
       if (! data.hypergraph.is_valid()) return;
-
+      
       hypergraph_type binarized;
-    
+      
       if (debug)
-	std::cerr << "binarization" << std::endl;
-    
+	std::cerr << "binarize: " << data.id << std::endl;
+      
       utils::resource start;
     
       if (left)
@@ -88,7 +88,8 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "# of nodes: " << binarized.nodes.size()
+	std::cerr << "binarize: " << data.id
+		  << " # of nodes: " << binarized.nodes.size()
 		  << " # of edges: " << binarized.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(binarized.is_valid())
 		  << std::endl;

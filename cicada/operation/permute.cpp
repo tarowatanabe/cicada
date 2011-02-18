@@ -48,7 +48,7 @@ namespace cicada
       hypergraph_type permuted;
     
       if (debug)
-	std::cerr << "permute" << std::endl;
+	std::cerr << "permute: " << data.id << std::endl;
     
       utils::resource start;
 	
@@ -65,7 +65,8 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "# of nodes: " << permuted.nodes.size()
+	std::cerr << "permute: " << data.id 
+		  << " # of nodes: " << permuted.nodes.size()
 		  << " # of edges: " << permuted.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(permuted.is_valid())
 		  << std::endl;

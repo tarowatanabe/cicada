@@ -76,9 +76,10 @@ namespace cicada
 	std::cerr << "expected ngram cpu time: " << (ngram_end.cpu_time() - ngram_start.cpu_time())
 		  << " user time: " << (ngram_end.user_time() - ngram_start.user_time())
 		  << std::endl;
-	
+      
       if (debug)
-	std::cerr << "expected ngram counts: size: " << ngram_counts.size() << std::endl;
+	std::cerr << "expected ngram: " << data.id
+		  << " counts: size: " << ngram_counts.size() << std::endl;
     }
 
     void ExpectedNGram::assign(const weight_set_type& __weights)

@@ -78,15 +78,16 @@ namespace cicada
     
       // assignment...
       __model.assign(data.id, data.hypergraph, data.lattice, data.spans, data.targets, data.ngram_counts);
-    
+      
       if (forced)
 	__model.apply_feature(true);
-    
+      
       weight_set_type weights_zero;
       const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
-    
+      
       if (debug)
-	std::cerr << "apply features: " << (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))) << std::endl;
+	std::cerr << "apply features: " << data.id
+		  << ' ' << (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))) << std::endl;
     
       utils::resource start;
     
@@ -118,9 +119,10 @@ namespace cicada
 	std::cerr << "apply cpu time: " << (end.cpu_time() - start.cpu_time())
 		  << " user time: " << (end.user_time() - start.user_time())
 		  << std::endl;
-
+      
       if (debug)
-	std::cerr << "# of nodes: " << applied.nodes.size()
+	std::cerr << "apply: " << data.id
+		  << " # of nodes: " << applied.nodes.size()
 		  << " # of edges: " << applied.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(applied.is_valid())
 		  << std::endl;
