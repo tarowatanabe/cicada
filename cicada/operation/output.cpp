@@ -292,6 +292,9 @@ namespace cicada
 			  ? static_cast<std::ostream&>(os_buffer)
 			  : *output_data.os);
 
+      if (debug)
+	std::cerr << "output: " << data.id << std::endl;
+
       utils::resource start;
 
       if (statistics) {
@@ -352,10 +355,7 @@ namespace cicada
 	else
 	  cicada::graphviz(os, hypergraph);
 	os << '\n';
-      } else if (kbest_size <= 0) {
-	if (debug)
-	  std::cerr << "output: " << data.id << std::endl;
-	
+      } else if (kbest_size <= 0) {	
 	if (! no_id)
 	  os << id << " ||| ";
 	if (lattice_mode)
@@ -363,9 +363,6 @@ namespace cicada
 	else
 	  os << hypergraph << '\n';
       } else {
-	if (debug)
-	  std::cerr << "output " << kbest_size << "-best for graph: "<< data.id << std::endl;
-	
 	weight_set_type weights_zero;
 	const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
 	
