@@ -51,24 +51,22 @@ namespace cicada
       hypergraph_type generated;
     
       if (debug)
-	std::cerr << "generation: " << data.id << " earley" << std::endl;
-    
+	std::cerr << "generate earley: " << data.id << std::endl;
+      
       utils::resource start;
-    
+      
       cicada::generate_earley(hypergraph, generated, depth, width);
-    
+      
       utils::resource end;
-    
+      
       if (debug)
 	std::cerr << "generate cpu time: " << (end.cpu_time() - start.cpu_time())
 		  << " user time: " << (end.user_time() - start.user_time())
 		  << std::endl;
-    
+      
       if (debug)
 	std::cerr << "generate: " << data.id
-		  << " previous: # of nodes: " << hypergraph.nodes.size()
-		  << " # of edges: " << hypergraph.edges.size()
-		  << " generated: # of nodes: " << generated.nodes.size()
+		  << " # of nodes: " << generated.nodes.size()
 		  << " # of edges: " << generated.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(generated.is_valid())
 		  << std::endl;

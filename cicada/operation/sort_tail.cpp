@@ -40,11 +40,8 @@ namespace cicada
       hypergraph_type sorted;
 
       if (debug)
-	std::cerr << "sort tail: " << data.id
-		  << " # of nodes: " << hypergraph.nodes.size()
-		  << " # of edges: " << hypergraph.edges.size()
-		  << " valid? " << utils::lexical_cast<std::string>(hypergraph.is_valid())
-		  << std::endl;
+	std::cerr << "sort tail: " << data.id << std::endl;
+		  
     
       utils::resource start;
 
@@ -58,7 +55,7 @@ namespace cicada
 		  << std::endl;
     
       if (debug)
-	std::cerr << "sorted tail: " << data.id
+	std::cerr << "sort tail: " << data.id
 		  << " # of nodes: " << sorted.nodes.size()
 		  << " # of edges: " << sorted.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(sorted.is_valid())

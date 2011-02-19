@@ -62,6 +62,9 @@ namespace cicada
       
       weight_set_type weights_zero;
       const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
+
+      if (debug)
+	std::cerr << "expected ngram: " << data.id << std::endl;
           
       utils::resource ngram_start;
     

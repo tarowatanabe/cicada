@@ -86,8 +86,10 @@ namespace cicada
       const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
       
       if (debug)
-	std::cerr << "apply features: " << data.id
-		  << ' ' << (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))) << std::endl;
+	std::cerr << "apply "
+		  << (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))) 
+		  << ": " << data.id
+		  << std::endl;
     
       utils::resource start;
     

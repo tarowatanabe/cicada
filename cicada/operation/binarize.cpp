@@ -63,7 +63,9 @@ namespace cicada
       hypergraph_type binarized;
       
       if (debug)
-	std::cerr << "binarize: " << data.id << std::endl;
+	std::cerr << "binarize "
+		  << (left ? "left" : (right ? "right" : (all ? "all" : (terminal ? "terminal" : "cyk"))))
+		  << ": " << data.id << std::endl;
       
       utils::resource start;
     

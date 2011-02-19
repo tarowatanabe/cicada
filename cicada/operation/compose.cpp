@@ -69,7 +69,7 @@ namespace cicada
       hypergraph_type composed;
 
       if (debug)
-	std::cerr << "composition: " << data.id << " tree" << std::endl;
+	std::cerr << "compose tree: " << data.id << std::endl;
 	
       utils::resource start;
 	
@@ -152,7 +152,7 @@ namespace cicada
       hypergraph_type composed;
     
       if (debug)
-	std::cerr << "composition: " << data.id << " earley" << std::endl;
+	std::cerr << "compose earley: " << data.id << std::endl;
 
       utils::resource start;
 
@@ -233,7 +233,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "composition: " << data.id << " cky" << std::endl;
+	std::cerr << "compose cky: " << data.id << std::endl;
 
       utils::resource start;
 
@@ -316,7 +316,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "composition: " << data.id << " phrase" << std::endl;
+	std::cerr << "compose phrase: " << data.id << std::endl;
 
       utils::resource start;
 
@@ -405,7 +405,7 @@ namespace cicada
 	target = lattice_type(data.targets.front());
 	
       if (debug)
-	std::cerr << "composition: " << data.id << " alignment" << std::endl;
+	std::cerr << "compose alignment: " << data.id << std::endl;
 	
       utils::resource start;
 	

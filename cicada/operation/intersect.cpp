@@ -62,6 +62,9 @@ namespace cicada
       hypergraph_type& hypergraph = data.hypergraph;
       
       hypergraph_type intersected;
+
+      if (debug)
+	std::cerr << "intersect: " << data.id << std::endl;
       
       utils::resource start;
       
