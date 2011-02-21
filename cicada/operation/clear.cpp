@@ -51,7 +51,7 @@ namespace cicada
     void Clear::operator()(data_type& data) const
     {
       if (debug)
-	std::cerr << "clear" << std::endl;
+	std::cerr << "clear: " << data.id << std::endl;
 
       if (clear_hypergraph)
 	data.hypergraph.clear();

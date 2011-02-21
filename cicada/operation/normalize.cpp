@@ -44,7 +44,7 @@ namespace cicada
       hypergraph_type& hypergraph = data.hypergraph;
 
       if (debug)
-	std::cerr << "normalize" << std::endl;
+	std::cerr << "normalize: " << data.id << std::endl;
 
       utils::resource start;
 	

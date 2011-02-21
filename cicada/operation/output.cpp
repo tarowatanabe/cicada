@@ -298,7 +298,7 @@ namespace cicada
       utils::resource start;
 
       if (statistics) {
-	if (! data.lattice.empty()) {
+	if (lattice_mode) {
 	  const size_t num_nodes = data.lattice.size() + 1;
 	  size_t num_edges = 0;
 	  size_t num_epsilon = 0;
@@ -324,9 +324,7 @@ namespace cicada
 	       << id << " ||| lattice-num-epsilon: " << num_epsilon << '\n'
 	       << id << " ||| lattice-shortest-distance: " << data.lattice.shortest_distance() << '\n'
 	       << id << " ||| lattice-longest-distance: "  << data.lattice.longest_distance() << '\n';
-	}
-	  
-	if (data.hypergraph.is_valid()) {
+	} else {
 	  std::vector<shortest_length_function::value_type, std::allocator<shortest_length_function::value_type> > lengths_shortest(data.hypergraph.nodes.size());
 	  std::vector<longest_length_function::value_type, std::allocator<longest_length_function::value_type> >   lengths_longest(data.hypergraph.nodes.size());
 	    

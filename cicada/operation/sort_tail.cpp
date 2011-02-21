@@ -41,8 +41,7 @@ namespace cicada
 
       if (debug)
 	std::cerr << "sort tail: " << data.id << std::endl;
-		  
-    
+      
       utils::resource start;
 
       cicada::sort_tail(hypergraph, sorted);
