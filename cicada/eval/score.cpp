@@ -72,10 +72,10 @@ namespace cicada
 	return score_ptr_type();
     }
 
-    Score::score_ptr_type Score::decode(const std::string& encoded)
+    Score::score_ptr_type Score::decode(const utils::piece& encoded)
     {
-      std::string::const_iterator iter     = encoded.begin();
-      std::string::const_iterator iter_end = encoded.end();
+      std::string::const_iterator iter(encoded.begin());
+      std::string::const_iterator iter_end(encoded.end());
       
       return decode(iter, iter_end);
     }

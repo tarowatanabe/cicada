@@ -97,7 +97,7 @@ namespace cicada
       std::string encode() const;
 
       static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
-      static score_ptr_type decode(const std::string& encoded);
+      static score_ptr_type decode(const utils::piece& encoded);
       
     protected:
       virtual const char* __description() const = 0;

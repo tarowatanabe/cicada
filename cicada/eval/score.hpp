@@ -16,6 +16,8 @@
 #include <cicada/sentence_vector.hpp>
 #include <cicada/tokenizer.hpp>
 
+#include <utils/piece.hpp>
+
 #include <boost/shared_ptr.hpp>
 
 namespace cicada
@@ -52,7 +54,7 @@ namespace cicada
       virtual std::string encode() const = 0;
 
       static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
-      static score_ptr_type decode(const std::string& encoded);
+      static score_ptr_type decode(const utils::piece& encoded);
       
     public:      
       friend

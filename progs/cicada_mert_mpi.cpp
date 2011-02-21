@@ -294,8 +294,7 @@ int main(int argc, char ** argv)
     // read reference set
     scorer_document_type scorers(scorer_name);
     
-    if (mpi_rank == 0)
-      read_refset(refset_files, scorers);
+    read_refset(refset_files, scorers);
     
     if (debug && mpi_rank == 0)
       std::cerr << "# of references: " << scorers.size() << std::endl;
@@ -693,7 +692,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     std::string line;
     int id;
     double x;
-    sentence_type sentence;
+    //sentence_type sentence;
     
     int non_found_iter = 0;
     while (1) {
@@ -718,15 +717,18 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	    if (iter == tokenizer.end()) continue;
 	    if (*iter != "|||") continue;
 	    ++ iter;
-
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece score_str = *iter;
+	    
 	    id = utils::lexical_cast<int>(id_str);
 	    x = utils::decode_base64<double>(x_str);
-	    sentence.assign(iter, tokenizer.end());
+	    //sentence.assign(iter, tokenizer.end());
 	    
 	    if (id >= static_cast<int>(segments.size()))
 	      segments.resize(id + 1);
 	    
-	    segments[id].push_back(std::make_pair(x, scorers[id]->score(sentence)));
+	    //segments[id].push_back(std::make_pair(x, scorers[id]->score(sentence)));
+	    segments[id].push_back(std::make_pair(x, scorer_type::score_type::decode(score_str)));
 	  } else {
 	    is[rank].reset();
 	    dev[rank].reset();
@@ -774,7 +776,10 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
 	
 	os << id << " ||| ";
 	utils::encode_base64(line->x, std::ostream_iterator<char>(os));
-	os << " ||| " << yield << '\n';
+	os << " ||| "
+	   << scorers[id]->score(yield)->encode()
+	   << '\n';
+	
       }
     }
   }
@@ -831,6 +836,8 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
   typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
 
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
@@ -852,9 +859,9 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       is[rank]->push(*dev[rank]);
     }
 
+    std::string line;
     int id;
-    std::string sep;
-    sentence_type sentence;
+    //sentence_type sentence;
 
     scorer_type::score_ptr_type score;
     
@@ -864,15 +871,31 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       for (int rank = 1; rank < mpi_size; ++ rank) 
 	while (is[rank] && dev[rank] && dev[rank]->test()) {
-	  if (*is[rank] >> id >> sep >> sentence) {
+	  if (std::getline(*is[rank], line)) {
+	    const utils::piece line_piece(line);
+	    tokenizer_type tokenizer(line_piece);
 	    
-	    if (sep != "|||")
-	      throw std::runtime_error("invalid separator...");
-
+	    tokenizer_type::iterator iter = tokenizer.begin();
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece id_str = *iter;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    if (*iter != "|||") continue;
+	    ++ iter;
+	    if (iter == tokenizer.end()) continue;
+	    const utils::piece score_str = *iter;
+	    
+	    if (! score)
+	      score = scorer_type::score_type::decode(score_str);
+	    else
+	      *score += *scorer_type::score_type::decode(score_str);
+	    
+#if 0
 	    if (! score)
 	      score = scorers[id]->score(sentence);
 	    else
 	      *score += *scorers[id]->score(sentence);
+#endif
 	    
 	  } else {
 	    is[rank].reset();
@@ -906,7 +929,8 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       cicada::viterbi(graphs[mpi_id], yield, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
       
-      os << id << " ||| " << yield << '\n';
+      //os << id << " ||| " << yield << '\n';
+      os << id << " ||| " << scorers[id]->score(yield)->encode() << '\n';
     }
   }
   
