@@ -648,8 +648,11 @@ struct OptimizeMarginBase
     features_reward  *= (1.0 / double(counts_reward.back()));
     features_penalty *= (1.0 / double(counts_penalty.back()));
     
-    features_reward.erase(feature_bleu);
-    features_penalty.erase(feature_bleu);
+    //features_reward.erase(feature_bleu);
+    //features_penalty.erase(feature_bleu);
+    
+    // bleu_score = features_reward[feature_bleu]
+    // bleu_score = features_penalty[feature_bleu]
     
     return true;
   }
@@ -689,6 +692,7 @@ struct OptimizeMIRA : public OptimizeMarginBase
   {
     if (base_type::operator()(seg)) {
       // compute difference and update!
+      // do we use the difference of score...? or simply use zero-one?
       
     }
   }
