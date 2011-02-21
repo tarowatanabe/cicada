@@ -5,6 +5,8 @@
 #include <cicada/operation/functional.hpp>
 #include <cicada/optimize/line_search.hpp>
 
+#include <cicada/prune.hpp>
+
 struct LineSearch
 {
   typedef cicada::eval::Scorer         scorer_type;
@@ -586,9 +588,13 @@ struct OptimizeMarginBase
   typedef std::vector<count_function::value_type, std::allocator<count_function::value_type> > count_set_type;
 
   OptimizeMarginBase(const hypergraph_set_type&           __graphs,
-		     const feature_function_ptr_set_type& __features)
+		     const feature_function_ptr_set_type& __features,
+		     const double __beam,
+		     const int __kbest)
     : graphs(__graphs),
-      features(__features)
+      features(__features),
+      beam(__beam),
+      kbest(__kbest)
   {
     // initialize weights and weights bleu...
     for (size_t i = 0; i != features.size(); ++ i)
@@ -607,12 +613,24 @@ struct OptimizeMarginBase
     model_type model;
     model.push_back(features[id]);
     
+    // we compute rewarded derivertive..
     weights[feature_bleu] = loss_scale;
     cicada::apply_cube_prune(model, graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
     
+    if (kbest > 0) 
+      cicada::prune_kbest(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), kbest);
+    else
+      cicada::prune_beam(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), beam);
+    
+    // we compute violated derivertive..
     weights[feature_bleu] = - loss_scale;
     cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
-
+    
+    if (kbest > 0)
+      cicada::prune_kbest(graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), kbest);
+    else
+      cicada::prune_beam(graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), beam);
+    
     weights[feature_bleu] = 0.0;
     
     count_set_type counts_reward(graph_reward.nodes.size());
@@ -632,11 +650,17 @@ struct OptimizeMarginBase
     
     features_reward.erase(feature_bleu);
     features_penalty.erase(feature_bleu);
+    
+    return true;
   }
   
   const hypergraph_set_type&           graphs;
   const feature_function_ptr_set_type& features;
 
+  const double beam;
+  const int kbest;
+
+  
   weight_set_type weights;
   weight_set_type weights_bleu;
   weight_set_type::feature_type feature_bleu;
