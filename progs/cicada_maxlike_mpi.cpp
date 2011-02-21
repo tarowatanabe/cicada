@@ -119,6 +119,10 @@ bool softmax_margin = false;
 
 bool learn_sgd = false;
 bool learn_lbfgs = false;
+bool learn_mira = false;
+
+double margin_beam = 1e-4;
+int margin_kbest = 1;
 
 bool mix_optimized = false;
 
@@ -169,9 +173,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,sgd}");
-    if (int(learn_lbfgs) + learn_sgd == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira > 1)
+      throw std::runtime_error("eitehr learn-{lbfgs,sgd, mira}");
+    if (int(learn_lbfgs) + learn_sgd + learn_mira == 0)
       learn_lbfgs = true;
     
     if (regularize_l1 && regularize_l2)
@@ -221,6 +225,10 @@ int main(int argc, char ** argv)
 	
 	objective = optimize_online(graphs, features, scorers, weights, optimizer, generator);
       }
+    } else if (learn_mira) {
+      OptimizerMIRA optimizer(graphs, features, margin_beam, margin_kbest);
+      
+      objective = optimize_online(graphs, features, scorers, weights, optimizer, generator);
     } else 
       objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
@@ -1340,6 +1348,7 @@ void options(int argc, char** argv)
 
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
+    ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
@@ -1349,6 +1358,9 @@ void options(int argc, char** argv)
     ("oracle-loss", po::bool_switch(&oracle_loss),  "loss from oracle translations")
     ("apply-exact", po::bool_switch(&apply_exact),  "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),     "cube-pruning size")
+
+    ("margin-beam",  po::value<double>(&margin_beam), "margin by beam")
+    ("margin-kbest", po::value<int>(&margin_kbest),   "margin by kbest")
 
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     ("mix-optimized",  po::bool_switch(& mix_optimized), "optimized weights mixing")

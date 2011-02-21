@@ -535,7 +535,7 @@ struct OptimizerSGDL1 : public OptimizerBase
 
 // we will implement MIRA/CP 
 // we have two options: compute oracle by hill-climbing, or use dynamically computed oracle...
-struct OptimizeMarginBase
+struct OptimizerMarginBase
 {
   struct Accumulated
   {
@@ -588,10 +588,10 @@ struct OptimizeMarginBase
   
   typedef std::vector<count_function::value_type, std::allocator<count_function::value_type> > count_set_type;
 
-  OptimizeMarginBase(const hypergraph_set_type&           __graphs,
-		     const feature_function_ptr_set_type& __features,
-		     const double __beam,
-		     const int __kbest)
+  OptimizerMarginBase(const hypergraph_set_type&           __graphs,
+		      const feature_function_ptr_set_type& __features,
+		      const double __beam,
+		      const int __kbest)
     : graphs(__graphs),
       features(__features),
       beam(__beam),
@@ -657,7 +657,6 @@ struct OptimizeMarginBase
 
   const double beam;
   const int kbest;
-
   
   weight_set_type weights;
   weight_set_type weights_bleu;
@@ -673,12 +672,20 @@ struct OptimizeMarginBase
 };
 
 
-struct OptimizeMIRA : public OptimizeMarginBase
+struct OptimizerMIRA : public OptimizerMarginBase
 {  
-  typedef OptimizeMarginBase base_type;
+  typedef OptimizerMarginBase base_type;
+
+  OptimizerMIRA(const hypergraph_set_type&           __graphs,
+	       const feature_function_ptr_set_type& __features,
+	       const double __beam,
+	       const int __kbest)
+    : OptimizerMarginBase(__graphs, __features, __beam, __kbest) {}
   
   void initialize()
   {
+    samples = 0;
+
     weights[feature_bleu] = 0.0;
     objective = 0.0;
   }
@@ -703,6 +710,8 @@ struct OptimizeMIRA : public OptimizeMarginBase
 	for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
 	  weights[fiter->first] += alpha * fiter->second;
       }
+
+      ++ samples;
     }
   }
   
@@ -710,17 +719,26 @@ struct OptimizeMIRA : public OptimizeMarginBase
   {
     
   }
-
-  const double C;
+  
+  size_t samples;
 };
 
 
-struct OptimizeAROW : public OptimizeMarginBase
+struct OptimizerAROW : public OptimizerMarginBase
 {  
-  typedef OptimizeMarginBase base_type;
+  typedef OptimizerMarginBase base_type;
+
+  OptimizerAROW(const hypergraph_set_type&           __graphs,
+		const feature_function_ptr_set_type& __features,
+		const double __beam,
+		const int __kbest)
+      : OptimizerMarginBase(__graphs, __features, __beam, __kbest) {}
+  
   
   void initialize()
   {
+    samples = 0;
+
     weights[feature_bleu] = 0.0;
     objective = 0.0;
   }
@@ -745,6 +763,8 @@ struct OptimizeAROW : public OptimizeMarginBase
 	for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
 	  weights[fiter->first] += alpha * fiter->second;
       }
+
+      ++ samples;
     }
   }
   
@@ -755,5 +775,5 @@ struct OptimizeAROW : public OptimizeMarginBase
   
   weight_set_type covariances;
   
-  const double C;
+  size_t samples;
 };
