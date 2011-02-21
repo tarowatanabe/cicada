@@ -100,6 +100,27 @@ namespace cicada
     {
       return __values.find(x);
     }
+
+    const_iterator lower_bound(const key_type& x) const
+    {
+      return __values.lower_bound(x);
+    }
+    
+    iterator lower_bound(const key_type& x)
+    {
+      return __values.lower_bound(x);
+    }
+
+    const_iterator upper_bound(const key_type& x) const
+    {
+      return __values.upper_bound(x);
+    }
+    
+    iterator upper_bound(const key_type& x)
+    {
+      return __values.upper_bound(x);
+    }
+    
     
     void erase(const key_type& x)
     {

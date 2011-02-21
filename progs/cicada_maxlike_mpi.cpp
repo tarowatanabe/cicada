@@ -145,6 +145,7 @@ double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
 		       weight_set_type& weights,
+		       Optimize& optimizer,
 		       Generator& generator);
 
 #include "cicada_maxlike_impl.hpp"
@@ -211,10 +212,15 @@ int main(int argc, char ** argv)
     double objective = 0.0;
 
     if (learn_sgd) {
-      if (regularize_l1)
-	objective = optimize_online<OptimizerSGDL1 >(graphs, features, scorers, weights, generator);
-      else
-	objective = optimize_online<OptimizerSGDL2 >(graphs, features, scorers, weights, generator);
+      if (regularize_l1) {
+	OptimizerSGDL1 optimizer(graphs, features);
+	
+	objective = optimize_online(graphs, features, scorers, weights, optimizer, generator);
+      } else {
+	OptimizerSGDL2 optimizer(graphs, features);
+	
+	objective = optimize_online(graphs, features, scorers, weights, optimizer, generator);
+      }
     } else 
       objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
@@ -650,6 +656,7 @@ double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
 		       weight_set_type& weights,
+		       Optimizer& optimizer,
 		       Generator& generator)
 {
   typedef std::vector<int, std::allocator<int> > id_set_type;
@@ -665,8 +672,6 @@ double optimize_online(const hypergraph_set_type& graphs,
 
     double objective = 0.0;
     
-    Optimizer optimizer(graphs, features);
-
     for (int iter = 0; iter < iteration; ++ iter) {
       
       for (int rank = 1; rank < mpi_size; ++ rank)
@@ -723,8 +728,6 @@ double optimize_online(const hypergraph_set_type& graphs,
     for (int i = 0; i < 2; ++ i)
       requests[i].Start();
 
-    Optimizer optimizer(graphs, features);
-    
     while (1) {
       if (MPI::Request::Waitany(2, requests))
 	break;

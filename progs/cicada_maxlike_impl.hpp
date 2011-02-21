@@ -6,6 +6,7 @@
 #include <cicada/optimize/line_search.hpp>
 
 #include <cicada/prune.hpp>
+#include <cicada/dot_product.hpp>
 
 struct LineSearch
 {
@@ -648,12 +649,6 @@ struct OptimizeMarginBase
     features_reward  *= (1.0 / double(counts_reward.back()));
     features_penalty *= (1.0 / double(counts_penalty.back()));
     
-    //features_reward.erase(feature_bleu);
-    //features_penalty.erase(feature_bleu);
-    
-    // bleu_score = features_reward[feature_bleu]
-    // bleu_score = features_penalty[feature_bleu]
-    
     return true;
   }
   
@@ -694,12 +689,71 @@ struct OptimizeMIRA : public OptimizeMarginBase
       // compute difference and update!
       // do we use the difference of score...? or simply use zero-one?
       
+      feature_set_type features(features_reward - features_penalty);
+      const double loss = loss_scale * features[feature_bleu];
+      features.erase(feature_bleu);
+      
+      const double margin = cicada::dot_product(weights, features);
+      const double variance = cicada::dot_product(features);
+      
+      const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+      
+      if (alpha > 1e-10) {
+	feature_set_type::const_iterator fiter_end = features.end();
+	for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	  weights[fiter->first] += alpha * fiter->second;
+      }
     }
   }
   
-
   void finalize()
   {
-
+    
   }
+
+  const double C;
+};
+
+
+struct OptimizeAROW : public OptimizeMarginBase
+{  
+  typedef OptimizeMarginBase base_type;
+  
+  void initialize()
+  {
+    weights[feature_bleu] = 0.0;
+    objective = 0.0;
+  }
+  
+  void operator()(const int seg)
+  {
+    if (base_type::operator()(seg)) {
+      // compute difference and update!
+      // do we use the difference of score...? or simply use zero-one?
+      
+      feature_set_type features(features_reward - features_penalty);
+      const double loss = loss_scale * features[feature_bleu];
+      features.erase(feature_bleu);
+      
+      const double margin = cicada::dot_product(weights, features);
+      const double variance = cicada::dot_product(features, features); // multiply covariances...
+      
+      const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+      
+      if (alpha > 1e-10) {
+	feature_set_type::const_iterator fiter_end = features.end();
+	for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	  weights[fiter->first] += alpha * fiter->second;
+      }
+    }
+  }
+  
+  void finalize()
+  {
+    
+  }
+  
+  weight_set_type covariances;
+  
+  const double C;
 };

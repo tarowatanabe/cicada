@@ -29,12 +29,33 @@ namespace cicada
     
     return sum;
   }
+
+  template <typename Tp, typename Alloc, typename BinaryOp>
+  inline
+  Tp dot_product(const FeatureVector<Tp, Alloc>& x, BinaryOp op)
+  {
+    typedef FeatureVector<Tp, Alloc> feature_vector_type;
+    
+    Tp sum = Tp();
+    typename feature_vector_type::const_iterator iter_end = x.end();
+    for (typename feature_vector_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+      sum += op(iter->second, iter->second);
+    
+    return sum;
+  }
   
   template <typename Tp, typename Alloc>
   inline
   Tp dot_product(const WeightVector<Tp, Alloc>& x)
   {
     return std::inner_product(x.begin(), x.end(), x.begin(), Tp());
+  }
+
+  template <typename Tp, typename Alloc, typename BinaryOp>
+  inline
+  Tp dot_product(const WeightVector<Tp, Alloc>& x, BinaryOp op)
+  {
+    return std::inner_product(x.begin(), x.end(), x.begin(), Tp(), std::plus<Tp>(), op);
   }
   
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
@@ -146,6 +167,85 @@ namespace cicada
       sum += op(iter1->second, Tp2());
     for (/**/; iter2 != iter2_end; ++ iter2)
       sum += op(Tp1(), iter2->second);
+    
+    return sum;
+  }
+
+  template <typename Tp, typename Alloc>
+  inline
+  Tp dot_product(const FeatureVector<Tp, Alloc>& x, const FeatureVector<Tp, Alloc>& y)
+  {
+    typedef FeatureVector<Tp, Alloc> feature_vector1_type;
+    typedef FeatureVector<Tp, Alloc> feature_vector2_type;
+    
+    if (x.empty() || y.empty()) return Tp();
+    
+    if (&x == &y)
+      return dot_product(x);
+    
+    typename feature_vector1_type::const_iterator iter1     = x.lower_bound(y.begin()->first);
+    typename feature_vector1_type::const_iterator iter1_end = x.end();
+    
+    typename feature_vector2_type::const_iterator iter2     = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+    typename feature_vector2_type::const_iterator iter2_end = y.end();
+    
+    Tp sum = Tp();
+    
+    while (iter1 != iter1_end && iter2 != iter2_end) {
+      if (iter1->first < iter2->first)
+	++ iter1;
+      else if (iter2->first < iter1->first)
+	++ iter2;
+      else {
+	sum += iter1->second * iter2->second;
+	
+	++ iter1;
+	++ iter2;
+      }
+    }
+    
+    return sum;
+  }
+  
+  template <typename Tp, typename Alloc, typename BinaryOp>
+  inline
+  Tp dot_product(const FeatureVector<Tp, Alloc>& x, const FeatureVector<Tp, Alloc>& y, BinaryOp op)
+  {
+    typedef FeatureVector<Tp, Alloc> feature_vector1_type;
+    typedef FeatureVector<Tp, Alloc> feature_vector2_type;
+    
+    if (x.empty() || y.empty()) return Tp();
+
+    if (&x == &y)
+      return dot_product(x, op);
+
+    typename feature_vector1_type::const_iterator iter1     = x.begin();
+    typename feature_vector1_type::const_iterator iter1_end = x.end();
+    
+    typename feature_vector2_type::const_iterator iter2     = y.begin();
+    typename feature_vector2_type::const_iterator iter2_end = y.end();
+    
+    Tp sum = Tp();
+      
+    while (iter1 != iter1_end && iter2 != iter2_end) {
+      if (iter1->first < iter2->first) {
+	sum += op(iter1->second, Tp());
+	++ iter1;
+      } else if (iter2->first < iter1->first) {
+	sum += op(Tp(), iter2->second);
+	++ iter2;
+      } else {
+	sum += op(iter1->second, iter2->second);
+	
+	++ iter1;
+	++ iter2;
+      }
+    }
+
+    for (/**/; iter1 != iter1_end; ++ iter1)
+      sum += op(iter1->second, Tp());
+    for (/**/; iter2 != iter2_end; ++ iter2)
+      sum += op(Tp(), iter2->second);
     
     return sum;
   }
