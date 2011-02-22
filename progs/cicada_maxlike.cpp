@@ -163,7 +163,7 @@ int main(int argc, char ** argv)
     options(argc, argv);
 
     if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,sgd}");
+      throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
     if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw == 0)
       learn_lbfgs = true;
     
