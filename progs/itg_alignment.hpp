@@ -175,9 +175,8 @@ namespace detail
 	      const double outside = (prefix(i - 1, right + 1) + suffix(j + 1, right + 1));
 	      outside_accumulated *= outside;
 	    
-	      const double merit_r = delta(right, R) * outside_accumulated;
-	      const double merit_m = delta(right, M) * outside_accumulated;
-	    
+	      //const double merit_r = delta(right, R) * outside_accumulated;
+	      //const double merit_m = delta(right, M) * outside_accumulated;
 	    
 	      //if (merit_r / merit_span < threshold_local) break;
 	      //if (merit_m / merit_span < threshold_local) continue;
@@ -410,8 +409,6 @@ namespace detail
     template <typename Costs, typename Iterator>
     void operator()(const Costs& costs, Iterator result)
     {
-      const double lowest = boost::numeric::bounds<double>::lowest();
-      
       initialize(costs);
       
       construct(costs, SpanBeam(costs));
@@ -422,8 +419,6 @@ namespace detail
     template <typename Costs, typename Iterator>
     void operator()(const Costs& costs, const span_set_type& spans_source, const span_set_type& spans_target, Iterator result)
     {
-      const double lowest = boost::numeric::bounds<double>::lowest();
-      
       initialize(costs);
       
       construct(costs, SpanPrune(costs, spans_source, spans_target));

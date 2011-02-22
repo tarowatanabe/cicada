@@ -115,8 +115,8 @@ int main(int argc, char** argv)
       if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
 	throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
       
-      const size_t source_size = source.size();
-      const size_t target_size = target.size();
+      const int source_size = source.size();
+      const int target_size = target.size();
       
       if (source_size == 0 || target_size == 0) continue;
       if (max_length > 0)

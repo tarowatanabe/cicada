@@ -402,7 +402,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   path_set_type mapped_files;
   for (size_t i = 0; i != counts_files.size(); ++ i)
-    if (i % mpi_size == mpi_rank)
+    if (static_cast<int>(i % mpi_size) == mpi_rank)
       mapped_files.push_back(counts_files[i]);
   
   ostream_ptr_set_type stream(mpi_size);
@@ -725,7 +725,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   
   path_set_type mapped_files;
   for (size_t i = 0; i != counts_files.size(); ++ i)
-    if (i % mpi_size == mpi_rank)
+    if (static_cast<int>(i % mpi_size) == mpi_rank)
       mapped_files.push_back(counts_files[i]);
   
   ostream_ptr_set_type stream(mpi_size);

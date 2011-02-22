@@ -1456,7 +1456,6 @@ struct ExtractGHKM
       
       hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = graph.edges[*eiter];
 	const range_type& edge_range = span_edges[*eiter];
 	
 	// copy range...
