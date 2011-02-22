@@ -27,9 +27,11 @@
 #include "utils/packed_device.hpp"
 #include "utils/packed_vector.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/piece.hpp"
+#include "utils/space_separator.hpp"
 
 #include <boost/lexical_cast.hpp>
-
+#include <boost/tokenizer.hpp>
 #include <boost/filesystem.hpp>
 
 #include <boost/iostreams/device/back_inserter.hpp>
@@ -87,7 +89,8 @@ namespace cicada
     
     typedef std::allocator<std::pair<id_type, mapped_type> > rule_alloc_type;
     
-    typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> >               rule_db_type;
+    typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > symbol_db_type;
+    typedef succinctdb::succinct_hash_mapped<byte_type, std::allocator<byte_type> > rule_db_type;
     
     typedef succinctdb::succinct_trie_db<word_type::id_type, id_type, std::allocator<std::pair<word_type::id_type, id_type> > > edge_db_type;
     typedef succinctdb::succinct_trie_database<id_type, mapped_type, rule_alloc_type > rule_pair_db_type;
@@ -165,6 +168,7 @@ namespace cicada
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
       : edge_db(x.edge_db), 
 	rule_db(x.rule_db),
+	symbol_db(x.symbol_db),
 	source_db(x.source_db),
 	target_db(x.target_db),
 	score_db(x.score_db),
@@ -179,6 +183,7 @@ namespace cicada
       
       edge_db       = x.edge_db;
       rule_db       = x.rule_db;
+      symbol_db     = x.symbol_db;
       source_db     = x.source_db;
       target_db     = x.target_db;
       score_db      = x.score_db;
@@ -194,6 +199,7 @@ namespace cicada
     {
       edge_db.clear();
       rule_db.clear();
+      symbol_db.clear();
       source_db.clear();
       target_db.clear();
       score_db.clear();
@@ -330,8 +336,29 @@ namespace cicada
       
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
       if (cache.pos != pos) {
+	std::vector<char, std::allocator<char> > buffer;
+	
+	utils::piece codes(db[pos].begin(), db[pos].end());
+	
+	utils::piece::const_iterator hiter = codes.begin();
+	utils::piece::const_iterator citer = codes.begin();
+	utils::piece::const_iterator citer_end = codes.end();
+
+	size_type code_pos = 0;
+	
+	while (citer != citer_end) {
+	  id_type pos;
+	  const size_type offset = utils::group_aligned_decode(pos, &(*hiter), code_pos);
+	  citer = hiter + offset;
+	  hiter += offset & (- size_type((code_pos & 0x03) == 0x03));
+	  ++ code_pos;
+	  
+	  buffer.insert(buffer.end(), symbol_db[pos].begin(), symbol_db[pos].end());
+	  buffer.push_back(' ');
+	}
+	
 	cache.pos = pos;
-	cache.rule = rule_type::create(rule_type(utils::piece(db[pos].begin(), db[pos].end())));
+	cache.rule = rule_type::create(rule_type(utils::piece(buffer.begin(), buffer.end())));
       }
       
       return cache.rule;
@@ -353,6 +380,7 @@ namespace cicada
   private:
     edge_db_type          edge_db;
     rule_pair_db_type     rule_db;
+    symbol_db_type        symbol_db;
     rule_db_type          source_db;
     rule_db_type          target_db;
     score_db_type         score_db;
@@ -536,6 +564,7 @@ namespace cicada
     
     edge_db.write(rep.path("edge"));
     rule_db.write(rep.path("rule"));
+    symbol_db.write(rep.path("symbol"));
     source_db.write(rep.path("source"));
     target_db.write(rep.path("target"));
     
@@ -582,6 +611,7 @@ namespace cicada
     
     edge_db.open(rep.path("edge"));
     rule_db.open(rep.path("rule"));
+    symbol_db.open(rep.path("symbol"));
     source_db.open(rep.path("source"));
     target_db.open(rep.path("target"));
     
@@ -663,15 +693,45 @@ namespace cicada
     path_type        path;
   };
 
+  template <typename SymbolDB, typename Buffer, typename Hasher>
   inline
-  void encode_rule(const TreeRule& rule, std::string& buffer)
+  void encode_rule(const TreeRule& rule, SymbolDB& symbol_map, Buffer& buffer, const Hasher& hasher)
   {
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+
     buffer.clear();
     
-    boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::back_inserter(buffer));
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::back_inserter(buffer));
+      
+      os << rule;
+    }
     
-    os << rule;
+    Buffer encoded(buffer.size() * 8 + 16, 0);
+
+    typename Buffer::iterator hiter = encoded.begin();
+    typename Buffer::iterator citer = encoded.end();
+    size_t pos = 0;
+    
+    utils::piece buffer_piece(buffer.begin(), buffer.end());
+    tokenizer_type tokenizer(buffer_piece);
+    
+    tokenizer_type::iterator titer_end = tokenizer.end();
+    for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
+      utils::piece piece(*titer);
+      
+      typename SymbolDB::pos_type id = symbol_map.insert(piece.begin(), piece.size(), hasher(piece.begin(), piece.end(), 0));
+      
+      const size_t offset = utils::group_aligned_encode(id, &(*hiter), pos);
+      citer = hiter + offset;
+      hiter += offset & (- size_t((pos & 0x03) == 0x03));
+      ++ pos;
+    }
+    
+    encoded.resize(citer - encoded.begin());
+    
+    buffer.swap(encoded);
   }
   
   template <typename Options, typename Codes, typename Id>
@@ -756,11 +816,14 @@ namespace cicada
   
   void TreeGrammarStaticImpl::read_text(const std::string& parameter)
   {
+    typedef std::vector<char, std::allocator<char> > buffer_type;
+
     typedef cicada::Parameter parameter_type;
     
     const parameter_type param(parameter);
     const path_type path = param.name();
     
+    typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > symbol_map_type;
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > rule_map_type;
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > edge_map_type;
     
@@ -784,6 +847,7 @@ namespace cicada
     
     const path_type path_edge   = utils::tempfile::directory_name(tmp_dir / "cicada.edge.XXXXXX");
     const path_type path_rule   = utils::tempfile::directory_name(tmp_dir / "cicada.rule.XXXXXX");
+    const path_type path_symbol = utils::tempfile::directory_name(tmp_dir / "cicada.symbol.XXXXXX");
     const path_type path_source = utils::tempfile::directory_name(tmp_dir / "cicada.source.XXXXXX");
     const path_type path_target = utils::tempfile::directory_name(tmp_dir / "cicada.target.XXXXXX");
     const path_type path_vocab  = utils::tempfile::directory_name(tmp_dir / "cicada.vocab.XXXXXX");
@@ -797,8 +861,9 @@ namespace cicada
     rule_db.open(path_rule, rule_pair_db_type::WRITE);
     edge_map_type edge_map(1024 * 1024 * 4);
     
-    rule_map_type source_map(1024 * 1024 * 4);
-    rule_map_type target_map(1024 * 1024 * 4);
+    symbol_map_type symbol_map(1024 * 1024 * 4);
+    rule_map_type  source_map(1024 * 1024 * 4);
+    rule_map_type  target_map(1024 * 1024 * 4);
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
@@ -814,8 +879,8 @@ namespace cicada
     scores_type scores;
     scores_type attrs;
     
-    std::string buffer_source;
-    std::string buffer_target;
+    buffer_type buffer_source;
+    buffer_type buffer_target;
     codes_type  buffer_options;
     index_type  buffer_index;
     hyperpath_type hyperpath;
@@ -855,9 +920,9 @@ namespace cicada
       if (source != source_prev) {
 	
 	if (! rule_options.empty()) {
-	  encode_rule(source_prev, buffer_source);
+	  encode_rule(source_prev, symbol_map, buffer_source, *this);
 	  
-	  const id_type id_source = source_map.insert(buffer_source.c_str(), buffer_source.size(),
+	  const id_type id_source = source_map.insert(&(*buffer_source.begin()), buffer_source.size(),
 						      hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
 	  
 	  encode_tree_options(rule_options, buffer_options, id_source);
@@ -911,18 +976,18 @@ namespace cicada
       for (int attribute = 0; attribute < attribute_size; ++ attribute)
 	attr_streams[attribute].ostream->write((char*) &attrs[attribute], sizeof(score_type));
       
-      encode_rule(target, buffer_target);
+      encode_rule(target, symbol_map, buffer_target, *this);
       
-      const id_type id_target = target_map.insert(buffer_target.c_str(), buffer_target.size(),
+      const id_type id_target = target_map.insert(&(*buffer_target.begin()), buffer_target.size(),
 						  hasher_type::operator()(buffer_target.begin(), buffer_target.end(), 0));
       
       rule_options.push_back(std::make_pair(id_rule ++, id_target));
     }
     
     if (! rule_options.empty()) {
-      encode_rule(source_prev, buffer_source);
+      encode_rule(source_prev, symbol_map, buffer_source, *this);
 	  
-      const id_type id_source = source_map.insert(buffer_source.c_str(), buffer_source.size(),
+      const id_type id_source = source_map.insert(&(*buffer_source.begin()), buffer_source.size(),
 						  hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
       
       encode_tree_options(rule_options, buffer_options, id_source);
@@ -933,6 +998,9 @@ namespace cicada
       
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
+
+    symbol_map.write(path_symbol);
+    symbol_map.clear();
     
     source_map.write(path_source);
     source_map.clear();
@@ -943,7 +1011,9 @@ namespace cicada
     rule_db.close();
     
     ::sync();
-    
+
+    while (! symbol_db_type::exists(path_symbol))
+      boost::thread::yield();
     while (! rule_db_type::exists(path_source))
       boost::thread::yield();
     while (! rule_db_type::exists(path_target))
@@ -951,6 +1021,7 @@ namespace cicada
     while (! rule_pair_db_type::exists(path_rule))
       boost::thread::yield();
     
+    symbol_db.open(path_symbol);
     source_db.open(path_source);
     target_db.open(path_target);
     rule_db.open(path_rule);
