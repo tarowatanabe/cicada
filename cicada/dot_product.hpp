@@ -250,6 +250,41 @@ namespace cicada
     return sum;
   }
 
+
+  template <typename Tp1, typename Alloc1, typename Tp, typename Alloc, typename Tp2, typename Alloc2>
+  inline
+  Tp1 dot_product(const FeatureVector<Tp1, Alloc1>& x, const WeightVector<Tp, Alloc>& w, const FeatureVector<Tp2, Alloc2>& y)
+  {
+    typedef FeatureVector<Tp1, Alloc1> feature_vector1_type;
+    typedef WeightVector<Tp, Alloc>    weight_vector_type;
+    typedef FeatureVector<Tp2, Alloc2> feature_vector2_type;
+    
+    if (x.empty() || y.empty()) return Tp1();
+
+    typename feature_vector1_type::const_iterator iter1     = x.lower_bound(y.begin()->first);
+    typename feature_vector1_type::const_iterator iter1_end = x.end();
+    
+    typename feature_vector2_type::const_iterator iter2     = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+    typename feature_vector2_type::const_iterator iter2_end = y.end();
+    
+    Tp1 sum = Tp1();
+      
+    while (iter1 != iter1_end && iter2 != iter2_end) {
+      if (iter1->first < iter2->first)
+	++ iter1;
+      else if (iter2->first < iter1->first)
+	++ iter2;
+      else {
+	sum += iter1->second * iter2->second * w[iter1->first];
+	
+	++ iter1;
+	++ iter2;
+      }
+    }
+    
+    return sum;
+  }
+
 };
 
 #endif

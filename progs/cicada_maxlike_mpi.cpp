@@ -120,6 +120,8 @@ bool softmax_margin = false;
 bool learn_sgd = false;
 bool learn_lbfgs = false;
 bool learn_mira = false;
+bool learn_arow = false;
+bool learn_cw = false;
 
 double margin_beam = 1e-4;
 int margin_kbest = 1;
@@ -173,9 +175,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd + learn_mira > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,sgd, mira}");
-    if (int(learn_lbfgs) + learn_sgd + learn_mira == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw > 1)
+      throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow}");
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw == 0)
       learn_lbfgs = true;
     
     if (regularize_l1 && regularize_l2)
@@ -227,6 +229,14 @@ int main(int argc, char ** argv)
       }
     } else if (learn_mira) {
       OptimizerMIRA optimizer(graphs, features, margin_beam, margin_kbest);
+      
+      objective = optimize_online(graphs, features, scorers, weights, optimizer, generator);
+    } else if (learn_arow) {
+      OptimizerAROW optimizer(graphs, features, margin_beam, margin_kbest);
+      
+      objective = optimize_online(graphs, features, scorers, weights, optimizer, generator);
+    } else if (learn_cw) {
+      OptimizerCW optimizer(graphs, features, margin_beam, margin_kbest);
       
       objective = optimize_online(graphs, features, scorers, weights, optimizer, generator);
     } else 
@@ -1349,6 +1359,8 @@ void options(int argc, char** argv)
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
     ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
+    ("learn-arow",   po::bool_switch(&learn_arow),   "online AROW algorithm")
+    ("learn-cw",     po::bool_switch(&learn_cw),     "online CW algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")

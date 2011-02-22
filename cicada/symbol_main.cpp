@@ -27,6 +27,9 @@ int main(int argc, char** argv)
   process("[x,3]", 2);
   process("[x,3]", 3);
   process("[x,4]", 3);
+  process("[x,100]", 5000);
   process("[x,5g]", 4);
+  process("[BAD,4]", 3);
+  process("[GOOD,5]", 3);
 
 }

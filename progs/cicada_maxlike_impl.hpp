@@ -2,6 +2,8 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <cmath>
+
 #include <cicada/operation/functional.hpp>
 #include <cicada/optimize/line_search.hpp>
 
@@ -610,29 +612,47 @@ struct OptimizerMarginBase
   bool operator()(const int id)
   {
     if (! graphs[id].is_valid()) return false;
-    
-    model_type model;
-    model.push_back(features[id]);
-    
-    // we compute rewarded derivertive..
-    weights[feature_bleu] = loss_scale;
-    cicada::apply_cube_prune(model, graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
-    
-    if (kbest > 0) 
-      cicada::prune_kbest(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), kbest);
-    else
-      cicada::prune_beam(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), beam);
-    
-    // we compute violated derivertive..
-    weights[feature_bleu] = - loss_scale;
-    cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
-    
-    if (kbest > 0)
-      cicada::prune_kbest(graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), kbest);
-    else
-      cicada::prune_beam(graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), beam);
-    
-    weights[feature_bleu] = 0.0;
+
+    if (apply_exact) {
+      weights[feature_bleu] = loss_scale;
+      
+      if (kbest > 0) 
+	cicada::prune_kbest(graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), kbest);
+      else
+	cicada::prune_beam(graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), beam);
+      
+      weights[feature_bleu] = - loss_scale;
+      
+      if (kbest > 0)
+	cicada::prune_kbest(graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), kbest);
+      else
+	cicada::prune_beam(graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), beam);
+      
+      weights[feature_bleu] = 0.0;
+    } else {
+      model_type model;
+      model.push_back(features[id]);
+      
+      // we compute rewarded derivertive..
+      weights[feature_bleu] = loss_scale;
+      cicada::apply_cube_prune(model, graphs[id], graph_reward, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
+      
+      if (kbest > 0) 
+	cicada::prune_kbest(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), kbest);
+      else
+	cicada::prune_beam(graph_reward, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights_bleu), beam);
+      
+      // we compute violated derivertive..
+      weights[feature_bleu] = - loss_scale;
+      cicada::apply_cube_prune(model, graphs[id], graph_penalty, cicada::operation::weight_function<cicada::semiring::Logprob<double> >(weights), cube_size);
+      
+      if (kbest > 0)
+	cicada::prune_kbest(graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), kbest);
+      else
+	cicada::prune_beam(graph_penalty, cicada::operation::weight_function<cicada::semiring::Tropical<double> >(weights), beam);
+      
+      weights[feature_bleu] = 0.0;
+    }
     
     count_set_type counts_reward(graph_reward.nodes.size());
     count_set_type counts_penalty(graph_penalty.nodes.size());
@@ -703,6 +723,8 @@ struct OptimizerMIRA : public OptimizerMarginBase
       const double margin = cicada::dot_product(weights, features);
       const double variance = cicada::dot_product(features);
       
+      objective += loss - margin;
+      
       const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
       
       if (alpha > 1e-10) {
@@ -749,21 +771,98 @@ struct OptimizerAROW : public OptimizerMarginBase
       // compute difference and update!
       // do we use the difference of score...? or simply use zero-one?
       
+      // allocate enough buffer for covariances...
+      covariances.allocate(1.0);
+      
       feature_set_type features(features_reward - features_penalty);
       const double loss = loss_scale * features[feature_bleu];
       features.erase(feature_bleu);
       
       const double margin = cicada::dot_product(weights, features);
-      const double variance = cicada::dot_product(features, features); // multiply covariances...
+      const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
       
-      const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+      objective += loss - margin;
+
+      const double beta = 1.0 / (variance + C);
+      const double alpha = std::max(0.0, (loss - margin) * beta);
       
       if (alpha > 1e-10) {
 	feature_set_type::const_iterator fiter_end = features.end();
-	for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
-	  weights[fiter->first] += alpha * fiter->second;
+	for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
+	  const double var = covariances[fiter->first];
+	  
+	  weights[fiter->first]     += alpha * fiter->second * var;
+	  covariances[fiter->first] -= beta * (var * var) * (fiter->second * fiter->second);
+	}
       }
 
+      ++ samples;
+    }
+  }
+  
+  void finalize()
+  {
+    
+  }
+  
+  weight_set_type covariances;
+  
+  size_t samples;
+};
+
+struct OptimizerCW : public OptimizerMarginBase
+{  
+  typedef OptimizerMarginBase base_type;
+  
+  OptimizerCW(const hypergraph_set_type&           __graphs,
+	      const feature_function_ptr_set_type& __features,
+	      const double __beam,
+	      const int __kbest)
+    : OptimizerMarginBase(__graphs, __features, __beam, __kbest) {}
+  
+  
+  void initialize()
+  {
+    samples = 0;
+    
+    weights[feature_bleu] = 0.0;
+    objective = 0.0;
+  }
+  
+  void operator()(const int seg)
+  {
+    if (base_type::operator()(seg)) {
+      // compute difference and update!
+      // do we use the difference of score...? or simply use zero-one?
+      
+      // allocate enough buffer for covariances...
+      covariances.allocate(1.0);
+      
+      feature_set_type features(features_reward - features_penalty);
+      const double loss = loss_scale * features[feature_bleu];
+      features.erase(feature_bleu);
+      
+      const double margin = cicada::dot_product(weights, features);
+      const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
+      
+      objective += loss - margin;
+
+      if (loss - margin > 0.0) {
+	const double theta = 1.0 + 2.0 * C * (margin - loss);
+	const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * C * (margin - loss - C * variance))) / (4.0 * C * variance));
+	const double beta  = (2.0 * alpha * C) / (1.0 + 2.0 * alpha * C * variance);
+	
+	if (alpha > 1e-10 && beta > 0.0) {
+	  feature_set_type::const_iterator fiter_end = features.end();
+	  for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
+	    const double var = covariances[fiter->first];
+	    
+	    weights[fiter->first]     += alpha * fiter->second * var;
+	    covariances[fiter->first] -= beta * (var * var) * (fiter->second * fiter->second);
+	  }
+	}
+      }
+      
       ++ samples;
     }
   }

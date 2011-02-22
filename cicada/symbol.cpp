@@ -77,7 +77,7 @@ namespace cicada
       return *this;
     
     piece_type stripped(static_cast<const std::string&>(non_terminal()));
-    
+
     return stripped.substr(1, stripped.size() - 2);
   }
 
@@ -165,7 +165,6 @@ namespace cicada
     namespace qi = boost::spirit::qi;
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
 
     if (! is_non_terminal())
       return *this;
@@ -205,20 +204,20 @@ namespace cicada
     if (maps[__id] == id_type(-1)) {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-      namespace phoenix = boost::phoenix;
 
       const symbol_type& word = symbol();
-      
+
       symbol_type::const_iterator iter = word.begin();
       symbol_type::const_iterator iter_end = word.end();
 
       maps[__id] = __id;
       
       std::string label;
+      int index;
       if (qi::parse(iter, iter_end,
 		    qi::lit('[')
-		    >> +(standard::char_ - ',' - ']') [ phoenix::ref(label) = qi::_1 ] >> -(',' >> qi::int_)
-		    >> qi::lit(']')))
+		    >> (+(standard::char_ - ',' - ']')) >> -(',' >> qi::int_)
+		    >> qi::lit(']'), label, index))
 	maps[__id] = Symbol('[' + label + ']').id();
     }
       
