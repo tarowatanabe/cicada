@@ -247,7 +247,7 @@ namespace cicada
       
       std::pair<cache_rule_set_type::iterator, bool> result = cache.find(node);
       if (! result.second) {
-	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
+	typedef utils::piece code_set_type;
 	
 	rule_pair_set_type& options = result.first->second;
 	options.clear();
@@ -351,7 +351,7 @@ namespace cicada
       cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
       if (cache.pos != pos || ! cache.rule || cache.rule->lhs != lhs) {
 	typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
-	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
+	typedef utils::piece code_set_type;
 	typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
 	
 	code_set_type codes(phrase_db[pos].begin(), phrase_db[pos].end());

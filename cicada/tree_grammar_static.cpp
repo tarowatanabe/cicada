@@ -252,7 +252,7 @@ namespace cicada
       
       std::pair<cache_rule_pair_set_type::iterator, bool> result = cache.find(node);
       if (! result.second) {
-	typedef std::vector<byte_type, std::allocator<byte_type> >  code_set_type;
+	typedef utils::piece  code_set_type;
 
 	rule_pair_set_type& options = result.first->second;
 	options.clear();
