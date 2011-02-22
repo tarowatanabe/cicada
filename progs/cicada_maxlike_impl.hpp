@@ -721,7 +721,7 @@ struct OptimizerMIRA : public OptimizerMarginBase
       features.erase(feature_bleu);
       
       const double margin = cicada::dot_product(weights, features);
-      const double variance = cicada::dot_product(features);
+      const double variance = cicada::dot_product(features, features);
       
       objective += loss - margin;
       
