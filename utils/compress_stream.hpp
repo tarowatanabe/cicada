@@ -47,7 +47,7 @@ namespace utils
       else
 	return COMPRESS_STREAM_UNKNOWN;
     }
-    inline compress_format_type compress_iformat(const boost::filesystem::path& path) { return compress_iformat(path.file_string()); }
+    inline compress_format_type compress_iformat(const boost::filesystem::path& path) { return compress_iformat(path.string()); }
     
     inline compress_format_type compress_oformat (const std::string& filename)
     {
@@ -58,7 +58,7 @@ namespace utils
       else
 	return COMPRESS_STREAM_UNKNOWN;
     }
-    inline compress_format_type compress_oformat(const boost::filesystem::path& path) { return compress_oformat(path.file_string()); }    
+    inline compress_format_type compress_oformat(const boost::filesystem::path& path) { return compress_oformat(path.string()); }
   };
 
 
@@ -68,7 +68,7 @@ namespace utils
 				const boost::filesystem::path& path,
 				size_t buffer_size = 4096)
   {
-    if (path.file_string() == "-")  {
+    if (path.string() == "-")  {
 #if BOOST_VERSION >= 104400
       os.push(boost::iostreams::file_descriptor_sink(::dup(STDOUT_FILENO), boost::iostreams::close_handle), buffer_size);
 #else
@@ -84,7 +84,7 @@ namespace utils
 	break;
       default: break;
       }
-      os.push(boost::iostreams::file_sink(path.file_string(), std::ios_base::out | std::ios_base::trunc), buffer_size);
+      os.push(boost::iostreams::file_sink(path.string(), std::ios_base::out | std::ios_base::trunc), buffer_size);
     }
     return os;
   }
@@ -95,7 +95,7 @@ namespace utils
 				const boost::filesystem::path& path,
 				size_t buffer_size = 4096)
   {
-    if (path.file_string() == "-")  {
+    if (path.string() == "-")  {
 #if BOOST_VERSION >= 104400
       is.push(boost::iostreams::file_descriptor_source(::dup(STDIN_FILENO), boost::iostreams::close_handle), buffer_size);
 #else
@@ -113,7 +113,7 @@ namespace utils
 	default: break;
 	}
       }
-      is.push(boost::iostreams::file_source(path.file_string()), buffer_size);
+      is.push(boost::iostreams::file_source(path.string()), buffer_size);
     }
     return is;
   }

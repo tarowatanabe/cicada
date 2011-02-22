@@ -152,7 +152,7 @@ namespace succinctdb
 	
 	__succinct_hash_stream.reset(new succinct_hash_stream_type(rep.path("index"), bin_size));
 	__data_stream.reset(new boost::iostreams::filtering_ostream());
-	__data_stream->push(boost::iostreams::file_sink(rep.path("data").file_string()), 1024 * 1024);
+	__data_stream->push(boost::iostreams::file_sink(rep.path("data").string()), 1024 * 1024);
 	__data_stream->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       } else {
 	// read-only open
@@ -230,7 +230,7 @@ namespace succinctdb
     void dump_file(const _Path& file, const _Data& data) const
     {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::file_sink(file.native_file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+      os.push(boost::iostreams::file_sink(file.string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
       
       const int64_t file_size = sizeof(typename _Data::value_type) * data.size();
       for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)

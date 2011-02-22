@@ -57,9 +57,16 @@ namespace utils
       filesize = static_cast<off_type>(boost::filesystem::file_size(file));
       modifiable = writable;
       
+#if BOOST_FILESYSTEM_VERSION == 2
       int fd = ::open(file.file_string().c_str(), (writable ? O_RDWR | O_NDELAY : O_RDONLY | O_NDELAY));
       if (fd < 0)
 	fd = ::open(file.file_string().c_str(), (writable ? O_RDWR : O_RDONLY));
+#else
+      int fd = ::open(file.string().c_str(), (writable ? O_RDWR | O_NDELAY : O_RDONLY | O_NDELAY));
+      if (fd < 0)
+	fd = ::open(file.string().c_str(), (writable ? O_RDWR : O_RDONLY));
+#endif
+
       if (fd < 0)
 	throw std::runtime_error("map_file::open() open()");
       

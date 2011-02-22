@@ -257,7 +257,7 @@ namespace cicada
       rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
       for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
 	if (siter->is_non_terminal()) {
-	  non_terminals.push_back('[' + siter->non_terminal_strip() + '_' + boost::lexical_cast<std::string>(non_terminal_pos) + ']');
+	  non_terminals.push_back(siter->non_terminal(non_terminal_pos + 1));
 	  ++ non_terminal_pos;
 	}
       

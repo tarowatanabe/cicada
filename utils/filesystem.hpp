@@ -40,8 +40,13 @@ namespace utils
       int outfile = 0;
       struct stat stat_from;
 
+#if BOOST_FILESYSTEM_VERSION == 2
       const std::string file_from = path_from.native_file_string();
       const std::string file_to = path_to.native_file_string();
+#else
+      const std::string file_from = path_from.string();
+      const std::string file_to = path_to.string();
+#endif
       
       if (:: stat(file_from.c_str(), &stat_from) != 0
           || (infile = ::open(file_from.c_str(), O_RDONLY)) < 0
@@ -113,11 +118,21 @@ namespace utils
     {
       if (path.empty()) return false;
       struct stat statbuf;
+#if BOOST_FILESYSTEM_VERSION == 2
       if (::lstat(path.file_string().c_str(), &statbuf) >= 0)
 	return true;
       else {
-	errno = 0; return false;
+	errno = 0;
+	return false;
       }
+#else
+      if (::lstat(path.string().c_str(), &statbuf) >= 0)
+	return true;
+      else {
+	errno = 0;
+	return false;
+      }
+#endif
     }
     
     inline
@@ -125,11 +140,21 @@ namespace utils
     {
       if (path.empty()) return false;
       struct stat statbuf;
+#if BOOST_FILESYSTEM_VERSION == 2
       if (::lstat(path.file_string().c_str(), &statbuf) >= 0)
 	return ! S_ISLNK(statbuf.st_mode) && S_ISDIR(statbuf.st_mode);
       else {
-	errno = 0; return false;
+	errno = 0;
+	return false;
       }
+#else
+      if (::lstat(path.string().c_str(), &statbuf) >= 0)
+	return ! S_ISLNK(statbuf.st_mode) && S_ISDIR(statbuf.st_mode);
+      else {
+	errno = 0;
+	return false;
+      }
+#endif
     }
     
     inline
@@ -138,7 +163,11 @@ namespace utils
       if (__is_directory(path)) {
 	std::vector<boost::filesystem::path> paths;
 	
+#if BOOST_FILESYSTEM_VERSION == 2
 	DIR* dirp = (path.empty() ? ::opendir(".") : ::opendir(path.directory_string().c_str()));
+#else
+	DIR* dirp = (path.empty() ? ::opendir(".") : ::opendir(path.string().c_str()));
+#endif
 	if (dirp) {
 	  struct dirent* dp;
 	  do {
@@ -153,8 +182,14 @@ namespace utils
 	}
 	std::for_each(paths.begin(), paths.end(), utils::filesystem::remove_all);
       }
+
+#if BOOST_FILESYSTEM_VERSION == 2
       if (__exists(path))
 	::remove(path.file_string().c_str());
+#else
+      if (__exists(path))
+	::remove(path.string().c_str());
+#endif
       errno = 0;
     }
   };

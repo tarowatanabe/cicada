@@ -201,7 +201,11 @@ namespace utils
     rep["type"] = "packed";
     
     os_data.reset(new boost::iostreams::filtering_ostream());
+#if BOOST_FILESYSTEM_VERSION == 2
     os_data->push(boost::iostreams::file_sink(rep.path("data").file_string()), 1024 * 1024);
+#else
+    os_data->push(boost::iostreams::file_sink(rep.path("data").string()), 1024 * 1024);
+#endif
     os_data->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
     
     index.clear();

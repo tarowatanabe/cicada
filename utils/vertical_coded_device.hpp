@@ -164,7 +164,11 @@ namespace utils
       
       repository_type rep(path, repository_type::read);
       os_off.reset(new boost::iostreams::filtering_ostream());
+#if BOOST_FILESYSTEM_VERSION == 2
       os_off->push(boost::iostreams::file_sink(rep.path("offsets").file_string()));
+#else
+      os_off->push(boost::iostreams::file_sink(rep.path("offsets").string()));
+#endif
       os_off->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       off_type off(0);
@@ -243,7 +247,11 @@ namespace utils
     rep["type"] = "vertical-coded";
     
     os_data.reset(new boost::iostreams::filtering_ostream());
+#if BOOST_FILESYSTEM_VERSION == 2
     os_data->push(boost::iostreams::file_sink(rep.path("data").file_string()), buffer_size);
+#else
+    os_data->push(boost::iostreams::file_sink(rep.path("data").string()), buffer_size);
+#endif
     os_data->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
     
     const size_type buffer_size_new = ((buffer_size + sizeof(value_type) - 1) / sizeof(value_type)) * sizeof(value_type);

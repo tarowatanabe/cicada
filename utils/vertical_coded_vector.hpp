@@ -581,7 +581,11 @@ namespace utils
     void dump_file(const _Path& file, const _Data& data) const
     {
       boost::iostreams::filtering_ostream os;
+#if BOOST_FILESYSTEM_VERSION == 2
       os.push(boost::iostreams::file_sink(file.native_file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+#else
+      os.push(boost::iostreams::file_sink(file.string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+#endif
       
       const int64_t file_size = sizeof(typename _Data::value_type) * data.size();
       for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)

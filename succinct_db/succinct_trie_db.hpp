@@ -101,12 +101,12 @@ namespace succinctdb
       utils::tempfile::insert(path_size);
       
       __os_key_data.reset(new boost::iostreams::filtering_ostream());
-      __os_key_data->push(boost::iostreams::file_sink(path_key_data.file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+      __os_key_data->push(boost::iostreams::file_sink(path_key_data.string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
       __os_key_data->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       __os_size.reset(new boost::iostreams::filtering_ostream());
       __os_size->push(boost::iostreams::zlib_compressor());
-      __os_size->push(boost::iostreams::file_sink(path_size.file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+      __os_size->push(boost::iostreams::file_sink(path_size.string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
       __os_size->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       __size = 0;
@@ -175,7 +175,7 @@ namespace succinctdb
 	  const char* iter = reinterpret_cast<const char*>(&(*map_key_data.begin()));
 	  boost::iostreams::filtering_istream is;
 	  is.push(boost::iostreams::zlib_decompressor());
-	  is.push(boost::iostreams::file_source(path_size.file_string()));
+	  is.push(boost::iostreams::file_source(path_size.string()));
 	  for (size_type i = 0; i < __size; ++ i) {
 	    size_type key_size = 0;
 	    is.read((char*) &key_size, sizeof(size_type));
