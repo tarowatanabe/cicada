@@ -110,6 +110,12 @@ bool softmax_margin = false;
 
 bool learn_lbfgs = false;
 bool learn_sgd = false;
+bool learn_mira = false;
+bool learn_arow = false;
+bool learn_cw = false;
+
+double margin_beam = 1e-4;
+int margin_kbest = 1;
 
 bool mix_optimized = false;
 
@@ -128,11 +134,12 @@ void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers);
 
-template <typename Optimizer, typename Generator>
+template <typename Optimizer, typename Opt, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
 		       weight_set_type& weights,
+		       Opt& optimizer,
 		       Generator& generator);
 template <typename Optimizer>
 double optimize_batch(const hypergraph_set_type& graphs,
@@ -155,9 +162,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
 
-    if (int(learn_lbfgs) + learn_sgd > 1)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw > 1)
       throw std::runtime_error("eitehr learn-{lbfgs,sgd}");
-    if (int(learn_lbfgs) + learn_sgd == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw == 0)
       learn_lbfgs = true;
     
     if (regularize_l1 && regularize_l2)
@@ -200,10 +207,27 @@ int main(int argc, char ** argv)
     double objective = 0.0;
 
     if (learn_sgd) {
-      if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(graphs, features, scorers, weights, generator);
-      else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs, features, scorers, weights, generator);
+      if (regularize_l1) {
+	OptimizerSGDL1 optimizer(graphs, features);
+	
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(graphs, features, scorers, weights, optimizer, generator);
+      } else {
+	OptimizerSGDL2 optimizer(graphs, features);
+	
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs, features, scorers, weights, optimizer, generator);
+      }
+    } else if (learn_mira) {
+      OptimizerMIRA optimizer(graphs, features, margin_beam, margin_kbest);
+      
+      objective = optimize_online<OptimizeOnline<OptimizerMIRA, boost::mt19937> >(graphs, features, scorers, weights, optimizer, generator);
+    } else if (learn_arow) {
+      OptimizerAROW optimizer(graphs, features, margin_beam, margin_kbest);
+      
+      objective = optimize_online<OptimizeOnline<OptimizerAROW, boost::mt19937> >(graphs, features, scorers, weights, optimizer, generator);
+    } else if (learn_cw) {
+      OptimizerCW optimizer(graphs, features, margin_beam, margin_kbest);
+      
+      objective = optimize_online<OptimizeOnline<OptimizerCW, boost::mt19937> >(graphs, features, scorers, weights, optimizer, generator);
     } else 
       objective = optimize_batch<OptimizeLBFGS>(graphs, features, scorers, weights);
     
@@ -635,11 +659,13 @@ struct OptimizeOnline
 		 const feature_function_ptr_set_type& __features,
 		 const scorer_document_type&          __scorers,
 		 weight_set_type&                     __weights,
+		 optimizer_type&                      __optimizer,
 		 generator_type&                      __generator)
     : graphs(__graphs),
       features(__features),
       scorers(__scorers),
       weights(__weights),
+      optimizer_base(__optimizer),
       generator(__generator) {}
   
   struct Task
@@ -677,7 +703,7 @@ struct OptimizeOnline
 
     typedef std::vector<int, std::allocator<int> > id_set_type;
     
-    optimizer_set_type optimizers(threads, optimizer_type(graphs, features));
+    optimizer_set_type optimizers(threads, optimizer_base);
     
     queue_type queue;
     
@@ -766,17 +792,20 @@ struct OptimizeOnline
   const feature_function_ptr_set_type& features;
   const scorer_document_type&          scorers;
   weight_set_type&                     weights;
+
+  optimizer_type&                      optimizer_base;
   generator_type&                      generator;
 };
 
-template <typename Optimizer, typename Generator>
+template <typename Optimizer, typename Opt, typename Generator>
 double optimize_online(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
 		       weight_set_type& weights,
+		       Opt& optimizer, 
 		       Generator& generator)
 {
-  return Optimizer(graphs, features, scorers,  weights, generator)();
+  return Optimizer(graphs, features, scorers,  weights, optimizer, generator)();
 }
 
 template <typename Optimizer>
@@ -1140,7 +1169,10 @@ void options(int argc, char** argv)
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
-
+    ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
+    ("learn-arow",   po::bool_switch(&learn_arow),   "online AROW algorithm")
+    ("learn-cw",     po::bool_switch(&learn_cw),     "online CW algorithm")
+    
     ("regularize-l1", po::bool_switch(&regularize_l1), "regularization via L1")
     ("regularize-l2", po::bool_switch(&regularize_l2), "regularization via L2")
     ("C"            , po::value<double>(&C),           "regularization constant")
@@ -1149,6 +1181,9 @@ void options(int argc, char** argv)
     ("oracle-loss", po::bool_switch(&oracle_loss),  "loss from oracle translations")
     ("apply-exact", po::bool_switch(&apply_exact),  "exact feature applicatin w/o pruning")
     ("cube-size",   po::value<int>(&cube_size),     "cube-pruning size")
+    
+    ("margin-beam",  po::value<double>(&margin_beam), "margin by beam")
+    ("margin-kbest", po::value<int>(&margin_kbest),   "margin by kbest")
 
     ("softmax-margin", po::bool_switch(&softmax_margin), "softmax-margin")
     ("mix-optimized",  po::bool_switch(& mix_optimized), "optimized weights mixing")
