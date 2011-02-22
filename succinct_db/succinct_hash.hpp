@@ -401,7 +401,11 @@ namespace succinctdb
       
       //os_nexts->push(boost::iostreams::file_sink(rep.path("nexts").file_string()), 1024 * 1024);
       os_nexts->push(utils::packed_sink<pos_type, pos_alloc_type>(rep.path("nexts")));
+#if BOOST_FILESYSTEM_VERSION == 2
+      os_keys->push(boost::iostreams::file_sink(rep.path("keys").file_string()), 1024 * 1024);
+#else
       os_keys->push(boost::iostreams::file_sink(rep.path("keys").string()), 1024 * 1024);
+#endif
       os_offs->push(utils::vertical_coded_sink<off_type, off_alloc_type>(rep.path("offs")));
       
       os_keys->exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
@@ -419,10 +423,17 @@ namespace succinctdb
       typedef typename Alloc::template rebind<value_type>::other value_alloc_type;
       
       std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
+#if BOOST_FILESYSTEM_VERSION == 2
       if (packed)
 	os->push(utils::packed_sink<value_type, value_alloc_type>(file));
       else
-	os->push(boost::iostreams::file_sink(file.string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+	os->push(boost::iostreams::file_sink(file.file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+#else
+      if (packed)
+	os->push(utils::packed_sink<value_type, value_alloc_type>(file));
+      else
+	os->push(boost::iostreams::file_sink(file.string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);	
+#endif
       
       const int64_t file_size = sizeof(typename _Data::value_type) * data.size();
       for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024)
@@ -577,10 +588,17 @@ namespace succinctdb
       typedef typename Alloc::template rebind<value_type>::other value_alloc_type;
       
       std::auto_ptr<boost::iostreams::filtering_ostream> os(new boost::iostreams::filtering_ostream());
+#if BOOST_FILESYSTEM_VERSION == 2
+      if (packed)
+	os->push(utils::packed_sink<value_type, value_alloc_type>(file));
+      else
+	os->push(boost::iostreams::file_sink(file.file_string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+#else
       if (packed)
 	os->push(utils::packed_sink<value_type, value_alloc_type>(file));
       else
 	os->push(boost::iostreams::file_sink(file.string(), std::ios_base::out | std::ios_base::trunc), 1024 * 1024);
+#endif
       
       const int64_t file_size = sizeof(typename _Data::value_type) * data.size();
       for (int64_t offset = 0; offset < file_size; offset += 1024 * 1024) {

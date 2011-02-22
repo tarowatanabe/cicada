@@ -188,7 +188,11 @@ namespace utils
       if ((repository_mode == write || modified) && ! repository_dir.empty() && boost::filesystem::exists(repository_dir) && boost::filesystem::is_directory(repository_dir)) {
 	
 	// here, dump contents of props at "prop.list"
+#if BOOST_FILESYSTEM_VERSION == 2
+	std::ofstream os((repository_dir / "prop.list").file_string().c_str());
+#else
 	std::ofstream os((repository_dir / "prop.list").string().c_str());
+#endif
 	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
 	props_type::const_iterator piter_end = props.end();
 	for (props_type::const_iterator piter = props.begin(); piter != piter_end; ++ piter)
@@ -254,7 +258,11 @@ namespace utils
       if (! boost::filesystem::exists(prop_path) || boost::filesystem::is_directory(prop_path))
 	throw std::runtime_error("invalid property list");
       
+#if BOOST_FILESYSTEM_VERSION == 2
+      std::ifstream is(prop_path.file_string().c_str());
+#else
       std::ifstream is(prop_path.string().c_str());
+#endif
       std::string line;
       
       while (std::getline(is, line)) {

@@ -71,7 +71,7 @@ namespace utils
     
 #if BOOST_FILESYSTEM_VERSION == 2
     static path_type file_name(const path_type& file) { return file_name(file.file_string()); }
-    static path_type directory_name(const path_type& file) { return directory_name(file.file_string()); }
+    static path_type directory_name(const path_type& file) { return directory_name(file.directory_string()); }
 #else
     static path_type file_name(const path_type& file) { return file_name(file.string()); }
     static path_type directory_name(const path_type& file) { return directory_name(file.string()); }

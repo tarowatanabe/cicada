@@ -845,7 +845,11 @@ namespace succinctdb
     void write(const path_type& path)  const
     {
       boost::iostreams::filtering_ostream os;
+#if BOOST_FILESYSTEM_VERSION == 2
+      os.push(boost::iostreams::file_sink(path.file_string()), 1024 * 1024);
+#else
       os.push(boost::iostreams::file_sink(path.string()), 1024 * 1024);
+#endif
       os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       const int64_t file_size = sizeof(Key) * __mapped.size();
@@ -926,7 +930,11 @@ namespace succinctdb
     void write(const path_type& path)  const
     {
       boost::iostreams::filtering_ostream os;
+#if BOOST_FILESYSTEM_VERSION == 2
+      os.push(boost::iostreams::file_sink(path.file_string()), 1024 * 1024);
+#else
       os.push(boost::iostreams::file_sink(path.string()), 1024 * 1024);
+#endif
       os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
       
       const int64_t file_size = sizeof(Data) * __mapped.size();
@@ -1239,8 +1247,13 @@ namespace succinctdb
       {
 	boost::iostreams::filtering_ostream os_index;
 	boost::iostreams::filtering_ostream os_mapped;
+#if BOOST_FILESYSTEM_VERSION == 2
+	os_index.push(typename index_set_type::sink_type(rep.path("index").file_string()), 1024 * 1024);
+	os_mapped.push(typename mapped_set_type::sink_type(rep.path("mapped").file_string()), 1024 * 1024);
+#else
 	os_index.push(typename index_set_type::sink_type(rep.path("index").string()), 1024 * 1024);
 	os_mapped.push(typename mapped_set_type::sink_type(rep.path("mapped").string()), 1024 * 1024);
+#endif
 	
 	__push_back_stream<key_type, boost::iostreams::filtering_ostream> __index(os_index);
 	__push_back_stream<data_type, boost::iostreams::filtering_ostream> __mapped(os_mapped);
@@ -1279,8 +1292,13 @@ namespace succinctdb
       {
 	boost::iostreams::filtering_ostream os_index;
 	boost::iostreams::filtering_ostream os_mapped;
+#if BOOST_FILESYSTEM_VERSION == 2
+	os_index.push(typename index_set_type::sink_type(rep.path("index").file_string()), 1024 * 1024);
+	os_mapped.push(typename mapped_set_type::sink_type(rep.path("mapped").file_string()), 1024 * 1024);
+#else
 	os_index.push(typename index_set_type::sink_type(rep.path("index").string()), 1024 * 1024);
 	os_mapped.push(typename mapped_set_type::sink_type(rep.path("mapped").string()), 1024 * 1024);
+#endif
 	
 	__push_back_stream<key_type, boost::iostreams::filtering_ostream> __index(os_index);
 	__push_back_stream<data_type, boost::iostreams::filtering_ostream> __mapped(os_mapped);

@@ -47,7 +47,11 @@ namespace utils
       else
 	return COMPRESS_STREAM_UNKNOWN;
     }
+#if BOOST_FILESYSTEM_VERSION == 2
+    inline compress_format_type compress_iformat(const boost::filesystem::path& path) { return compress_iformat(path.file_string()); }
+#else
     inline compress_format_type compress_iformat(const boost::filesystem::path& path) { return compress_iformat(path.string()); }
+#endif
     
     inline compress_format_type compress_oformat (const std::string& filename)
     {
@@ -58,7 +62,11 @@ namespace utils
       else
 	return COMPRESS_STREAM_UNKNOWN;
     }
+#if BOOST_FILESYSTEM_VERSION == 2
+    inline compress_format_type compress_oformat(const boost::filesystem::path& path) { return compress_oformat(path.file_string()); }
+#else
     inline compress_format_type compress_oformat(const boost::filesystem::path& path) { return compress_oformat(path.string()); }
+#endif
   };
 
 
@@ -68,7 +76,7 @@ namespace utils
 				const boost::filesystem::path& path,
 				size_t buffer_size = 4096)
   {
-    if (path.string() == "-")  {
+    if (path == "-")  {
 #if BOOST_VERSION >= 104400
       os.push(boost::iostreams::file_descriptor_sink(::dup(STDOUT_FILENO), boost::iostreams::close_handle), buffer_size);
 #else
@@ -84,7 +92,11 @@ namespace utils
 	break;
       default: break;
       }
+#if BOOST_FILESYSTEM_VERSION == 2
+      os.push(boost::iostreams::file_sink(path.file_string(), std::ios_base::out | std::ios_base::trunc), buffer_size);
+#else
       os.push(boost::iostreams::file_sink(path.string(), std::ios_base::out | std::ios_base::trunc), buffer_size);
+#endif
     }
     return os;
   }
@@ -95,7 +107,7 @@ namespace utils
 				const boost::filesystem::path& path,
 				size_t buffer_size = 4096)
   {
-    if (path.string() == "-")  {
+    if (path == "-")  {
 #if BOOST_VERSION >= 104400
       is.push(boost::iostreams::file_descriptor_source(::dup(STDIN_FILENO), boost::iostreams::close_handle), buffer_size);
 #else
@@ -113,7 +125,11 @@ namespace utils
 	default: break;
 	}
       }
+#if BOOST_FILESYSTEM_VERSION == 2
+      is.push(boost::iostreams::file_source(path.file_string()), buffer_size);
+#else
       is.push(boost::iostreams::file_source(path.string()), buffer_size);
+#endif
     }
     return is;
   }
