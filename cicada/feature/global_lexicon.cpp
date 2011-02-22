@@ -103,7 +103,7 @@ namespace cicada
       }
 
       if (path.empty())
-	throw std::runtime_error("no global lexicon file? " + path.file_string());
+	throw std::runtime_error("no global lexicon file? " + path.string());
       
       std::auto_ptr<impl_type> global_lexicon_impl(new impl_type(path));
       

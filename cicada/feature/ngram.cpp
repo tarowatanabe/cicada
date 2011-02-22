@@ -590,7 +590,7 @@ namespace cicada
       }
       
       if (path.empty())
-	throw std::runtime_error("no ngram file? " + path.file_string());
+	throw std::runtime_error("no ngram file? " + path.string());
       
       if (order <= 0)
 	throw std::runtime_error("invalid ngram order: " + utils::lexical_cast<std::string>(order));
@@ -598,14 +598,14 @@ namespace cicada
       if (coarse_order > order)
 	throw std::runtime_error("invalid coarse order: coarse-order <= order");
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
-	throw std::runtime_error("no coarse ngram language model? " + coarse_path.file_string());
+	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
       
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
-	  throw std::runtime_error("no cluster file: " + cluster_path.file_string());
+	  throw std::runtime_error("no cluster file: " + cluster_path.string());
 	
 	ngram_impl->cluster = &cicada::Cluster::create(cluster_path);
       }
@@ -628,7 +628,7 @@ namespace cicada
 	  
 	  if (! coarse_cluster_path.empty()) {
 	    if (! boost::filesystem::exists(coarse_cluster_path))
-	      throw std::runtime_error("no cluster file: " + coarse_cluster_path.file_string());
+	      throw std::runtime_error("no cluster file: " + coarse_cluster_path.string());
 	    
 	    ngram_impl->cluster = &cicada::Cluster::create(coarse_cluster_path);
 	  }

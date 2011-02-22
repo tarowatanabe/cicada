@@ -110,7 +110,7 @@ namespace cicada
       
       if (! path.empty()) {
 	if (! boost::filesystem::exists(path))
-	  throw std::runtime_error("no weight file? " + path.file_string());
+	  throw std::runtime_error("no weight file? " + path.string());
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	is >> permute->weights;

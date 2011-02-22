@@ -416,7 +416,7 @@ namespace cicada
       }
       
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
-	throw std::runtime_error("no refset file?: " + refset_file.file_string());
+	throw std::runtime_error("no refset file?: " + refset_file.string());
       
       std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, tokenizer));
       
