@@ -1049,7 +1049,7 @@ struct PhrasePairModifyMapper
     path_set_type::const_iterator piter_end = paths.end();
     for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
-	throw std::runtime_error("no file? " + piter->file_string());
+	throw std::runtime_error("no file? " + piter->string());
       
       istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
       
@@ -1280,7 +1280,7 @@ struct PhrasePairModifyReducer
       
       const path_type counts_file_tmp = utils::tempfile::file_name(tmp_dir / "cicada.extract.modified.XXXXXX");
       utils::tempfile::insert(counts_file_tmp);
-      const path_type counts_file = counts_file_tmp.file_string() + ".gz";
+      const path_type counts_file = counts_file_tmp.string() + ".gz";
       utils::tempfile::insert(counts_file);
       
       paths.push_back(counts_file);
@@ -1331,7 +1331,7 @@ struct PhrasePairModifyReducer
     const path_type tmp_dir = utils::tempfile::tmp_dir();
     const path_type counts_file_tmp = utils::tempfile::file_name(tmp_dir / "cicada.extract.modified.XXXXXX");
     utils::tempfile::insert(counts_file_tmp);
-    const path_type counts_file = counts_file_tmp.file_string() + ".gz";
+    const path_type counts_file = counts_file_tmp.string() + ".gz";
     utils::tempfile::insert(counts_file);
     
     paths.push_back(counts_file);
@@ -1603,7 +1603,7 @@ public:
 
     counts_size = size_type(-1);
     boost::iostreams::filtering_ostream os_counts;
-    os_counts.push(boost::iostreams::file_sink(path_counts.file_string()), 1024 * 1024);
+    os_counts.push(boost::iostreams::file_sink(path_counts.string()), 1024 * 1024);
     os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
 
     segment_map_type segment_map(1024 * 1024 * 4);
@@ -1615,7 +1615,7 @@ public:
     size_t pos = 0;
     for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
-	throw std::runtime_error("no file? " + piter->file_string());
+	throw std::runtime_error("no file? " + piter->string());
       
       istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
       
@@ -1897,7 +1897,7 @@ struct PhrasePairScoreMapper
     path_set_type::const_iterator piter_end = paths.end();
     for (path_set_type::const_iterator piter = paths.begin(); piter != piter_end; ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
-	throw std::runtime_error("no file? " + piter->file_string());
+	throw std::runtime_error("no file? " + piter->string());
       
       istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
       

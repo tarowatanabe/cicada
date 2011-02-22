@@ -201,7 +201,7 @@ int main(int argc, char** argv)
     
     if (! map_file.empty()) {
       if (! boost::filesystem::exists(map_file))
-	throw std::runtime_error("no map file: " + map_file.file_string());
+	throw std::runtime_error("no map file: " + map_file.string());
       
       ms.reset(new utils::compress_istream(map_file, 1024 * 1024));
     }

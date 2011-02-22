@@ -878,7 +878,7 @@ struct Task
     if (grammar_glue_straight || grammar_glue_inverted) {
       if (! symbol_fallback_file.empty()) {
 	if (symbol_fallback_file != "-" && ! boost::filesystem::exists(symbol_fallback_file))
-	  throw std::runtime_error("invalid fallback non-terminal file: " + symbol_fallback_file.file_string());
+	  throw std::runtime_error("invalid fallback non-terminal file: " + symbol_fallback_file.string());
 	
 	utils::compress_istream is(symbol_fallback_file, 1024 * 1024);
 	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,

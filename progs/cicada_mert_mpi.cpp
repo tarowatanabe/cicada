@@ -330,7 +330,7 @@ int main(int argc, char ** argv)
 	
 	for (path_set_type::const_iterator fiter = feature_weights_files.begin(); fiter != feature_weights_files.end(); ++ fiter) {
 	  if (*fiter != "-" && ! boost::filesystem::exists(*fiter))
-	    throw std::runtime_error("no file? " + fiter->file_string());
+	    throw std::runtime_error("no file? " + fiter->string());
 	  
 	  utils::compress_istream is(*fiter);
 	  
@@ -384,7 +384,7 @@ int main(int argc, char ** argv)
 	  for (feature_vector_type::const_iterator biter = bounds.begin(); biter != bounds.end(); ++ biter)
 	    bound_lower[biter->first] = biter->second;
 	} else
-	  throw std::runtime_error("no lower-bound file?" + bound_lower_file.file_string());
+	  throw std::runtime_error("no lower-bound file?" + bound_lower_file.string());
       }
       
       if (! bound_upper_file.empty()) {
@@ -399,7 +399,7 @@ int main(int argc, char ** argv)
 	    bound_upper[biter->first] = biter->second;
 	  
 	} else
-	  throw std::runtime_error("no upper-bound file?" + bound_upper_file.file_string());
+	  throw std::runtime_error("no upper-bound file?" + bound_upper_file.string());
       }
       
       cicada::optimize::LineSearch::initialize_bound(bound_lower, bound_upper);
@@ -1015,7 +1015,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-      throw std::runtime_error("no reference file: " + fiter->file_string());
+      throw std::runtime_error("no reference file: " + fiter->string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
     is.unsetf(std::ios::skipws);

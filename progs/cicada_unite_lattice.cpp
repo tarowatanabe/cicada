@@ -50,7 +50,7 @@ int main(int argc, char ** argv)
 
     if (! confidence_feature_file.empty()) {
       if (confidence_feature_file != "-" && ! boost::filesystem::exists(confidence_feature_file))
-	throw std::runtime_error("no confidence feature file? " + confidence_feature_file.file_string());
+	throw std::runtime_error("no confidence feature file? " + confidence_feature_file.string());
       
       utils::compress_istream is(confidence_feature_file);
       std::string feature;
@@ -60,7 +60,7 @@ int main(int argc, char ** argv)
     
     if (! count_feature_file.empty()) {
       if (count_feature_file != "-" && ! boost::filesystem::exists(count_feature_file))
-	throw std::runtime_error("no count feature file? " + count_feature_file.file_string());
+	throw std::runtime_error("no count feature file? " + count_feature_file.string());
       
       utils::compress_istream is(count_feature_file);
       std::string feature;

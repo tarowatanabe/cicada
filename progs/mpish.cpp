@@ -134,7 +134,7 @@ int main(int argc, char** argv)
       
       for (path_set_type::const_iterator piter = input_files.begin(); piter != input_files.end(); ++ piter) {
 	if (debug)
-	  std::cerr << "file: " << piter->file_string() << std::endl;
+	  std::cerr << "file: " << piter->string() << std::endl;
 	
 	utils::compress_istream is(*piter);
 	

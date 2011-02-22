@@ -83,11 +83,11 @@ int main(int argc, char** argv)
     options(argc, argv);
     
     if (source_file.empty() || (! boost::filesystem::exists(source_file) && source_file != "-"))
-      throw std::runtime_error("no source file? " + source_file.file_string());
+      throw std::runtime_error("no source file? " + source_file.string());
     if (target_file.empty() || (! boost::filesystem::exists(target_file) && target_file != "-"))
-      throw std::runtime_error("no target file? " + target_file.file_string());
+      throw std::runtime_error("no target file? " + target_file.string());
     if (alignment_file.empty() || (! boost::filesystem::exists(alignment_file) && alignment_file != "-"))
-      throw std::runtime_error("no alignment file? " + alignment_file.file_string());
+      throw std::runtime_error("no alignment file? " + alignment_file.string());
     if (output_file.empty())
       throw std::runtime_error("no output directory?");
     
@@ -266,7 +266,7 @@ int main(int argc, char** argv)
       task_type::path_set_type::const_iterator piter_end = task.paths.end();
       for (task_type::path_set_type::const_iterator piter = task.paths.begin(); piter != piter_end; ++ piter) {
 	utils::tempfile::erase(*piter);
-	os << piter->file_string() << '\n';
+	os << piter->string() << '\n';
       }
     }
   }

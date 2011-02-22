@@ -85,7 +85,7 @@ int main(int argc, char ** argv)
     if (grammar_glue_straight || grammar_glue_inverted) {
       if (! symbol_fallback_file.empty()) {
 	if (symbol_fallback_file != "-" && ! boost::filesystem::exists(symbol_fallback_file))
-	  throw std::runtime_error("invalid fallback non-terminal file: " + symbol_fallback_file.file_string());
+	  throw std::runtime_error("invalid fallback non-terminal file: " + symbol_fallback_file.string());
 	
 	utils::compress_istream is(symbol_fallback_file, 1024 * 1024);
 	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
@@ -249,7 +249,7 @@ void options(int argc, char** argv)
   if (variables.count("config")) {
     const path_type path_config = variables["config"].as<path_type>();
     if (! boost::filesystem::exists(path_config))
-      throw std::runtime_error("no config file: " + path_config.file_string());
+      throw std::runtime_error("no config file: " + path_config.string());
     
     utils::compress_istream is(path_config);
     po::store(po::parse_config_file(is, desc_config), variables);

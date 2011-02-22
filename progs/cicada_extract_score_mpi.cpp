@@ -111,15 +111,15 @@ int main(int argc, char** argv)
     if (output_file.empty())
       throw std::runtime_error("no output file?");
     if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
-      throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.file_string());
+      throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.string());
     if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
-      throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.file_string());
+      throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.string());
         
     if (int(score_phrase) + score_scfg + score_ghkm != 1)
       throw std::runtime_error("specify either one of --score-phrase|scfg|ghkm");
 
     if (! prog_name.empty() && ! boost::filesystem::exists(prog_name))
-      throw std::runtime_error(std::string("no binary? ") + prog_name.file_string());
+      throw std::runtime_error(std::string("no binary? ") + prog_name.string());
     
     if (MPI::Comm::Get_parent() != MPI::COMM_NULL) {
       utils::mpi_intercomm comm_parent(MPI::Comm::Get_parent());
@@ -207,7 +207,7 @@ int main(int argc, char** argv)
       // synchronize here...
       synchronize_reducer(comm_parent);
     } else {
-      const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.file_string() : std::string(argv[0]));
+      const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.string() : std::string(argv[0]));
       utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, MPI::INFO_NULL, 0));
       
       // sort input files by its size...
@@ -216,7 +216,7 @@ int main(int argc, char** argv)
 	  const path_type path = (boost::filesystem::is_directory(list_file) ? list_file / "files" : list_file);
 	  
 	  if (! boost::filesystem::exists(path) && path != "-")
-	    throw std::runtime_error("no file? " + path.file_string());
+	    throw std::runtime_error("no file? " + path.string());
 	  
 	  const path_type dirname = (path == "-" ? path_type() : path.parent_path());
 	  
@@ -244,7 +244,7 @@ int main(int argc, char** argv)
 	
 	path_set_type::const_iterator citer_end = counts_files.end();
 	for (path_set_type::const_iterator citer = counts_files.begin(); citer != citer_end; ++ citer)
-	  os << citer->file_string() << '\n';
+	  os << citer->string() << '\n';
       } else {
 	counts_files.clear();
 	
@@ -621,7 +621,7 @@ void index_counts(const path_set_type& modified_files,
     boost::iostreams::filtering_ostream os;
     os.push(utils::mpi_device_bcast_sink(0, 4096));
     
-    os << path_index.file_string() << '\n';
+    os << path_index.string() << '\n';
   } else {
     boost::iostreams::filtering_istream is;
     is.push(utils::mpi_device_bcast_source(0, 4096));
@@ -634,7 +634,7 @@ void index_counts(const path_set_type& modified_files,
   utils::tempfile::insert(path_index);
   
   if (path_index.empty())
-    throw std::runtime_error("no index path? " + path_index.file_string());
+    throw std::runtime_error("no index path? " + path_index.string());
 
   while (! repository_type::exists(path_index))
     boost::thread::yield();

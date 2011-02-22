@@ -51,11 +51,11 @@ int main(int argc, char** argv)
     options(argc, argv);
     
     if (source_file.empty() || (! boost::filesystem::exists(source_file) && source_file != "-"))
-      throw std::runtime_error("no source file? " + source_file.file_string());
+      throw std::runtime_error("no source file? " + source_file.string());
     if (target_file.empty() || (! boost::filesystem::exists(target_file) && target_file != "-"))
-      throw std::runtime_error("no target file? " + target_file.file_string());
+      throw std::runtime_error("no target file? " + target_file.string());
     if (alignment_file.empty() || (! boost::filesystem::exists(alignment_file) && alignment_file != "-"))
-      throw std::runtime_error("no alignment file? " + alignment_file.file_string());
+      throw std::runtime_error("no alignment file? " + alignment_file.string());
     if (output_file.empty())
       throw std::runtime_error("no output directory?");
 

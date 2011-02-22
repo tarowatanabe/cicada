@@ -89,9 +89,9 @@ int main(int argc, char** argv)
     if (output_file.empty())
       throw std::runtime_error("no output file?");
     if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
-      throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.file_string());
+      throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.string());
     if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
-      throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.file_string());
+      throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.string());
 
     if (int(score_phrase) + score_scfg + score_ghkm != 1)
       throw std::runtime_error("specify either one of --score-phrase|scfg|ghkm");
@@ -103,7 +103,7 @@ int main(int argc, char** argv)
       const path_type path = (boost::filesystem::is_directory(list_file) ? list_file / "files" : list_file);
       
       if (! boost::filesystem::exists(path) && path != "-")
-	throw std::runtime_error("no file? " + path.file_string());
+	throw std::runtime_error("no file? " + path.string());
 
       const path_type dirname = (path == "-" ? path_type() : path.parent_path());
       

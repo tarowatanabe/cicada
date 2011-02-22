@@ -310,7 +310,7 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-      throw std::runtime_error("no test file: " + fiter->file_string());
+      throw std::runtime_error("no test file: " + fiter->string());
     
     utils::compress_istream is(*fiter, 1024 * 1024);
     is.unsetf(std::ios::skipws);
@@ -357,7 +357,7 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-      throw std::runtime_error("no reference file: " + fiter->file_string());
+      throw std::runtime_error("no reference file: " + fiter->string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
     is.unsetf(std::ios::skipws);

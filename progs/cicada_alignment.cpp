@@ -170,7 +170,7 @@ int main(int argc, char ** argv)
       
       if (source_target_mode) {
 	if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
-	  throw std::runtime_error("no f2e file?" + source_target_file.file_string());
+	  throw std::runtime_error("no f2e file?" + source_target_file.string());
 	
 	utils::compress_istream is(source_target_file, 1024 * 1024);
 	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
@@ -178,7 +178,7 @@ int main(int argc, char ** argv)
 	process_giza(is, os);
       } else {
 	if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
-	  throw std::runtime_error("no e2f file?" + target_source_file.file_string());
+	  throw std::runtime_error("no e2f file?" + target_source_file.string());
 
 	utils::compress_istream is(target_source_file, 1024 * 1024);
 	utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
@@ -192,9 +192,9 @@ int main(int argc, char ** argv)
       process_alignment(is, os);
     } else {
       if (source_target_file != "-" && ! boost::filesystem::exists(source_target_file))
-	throw std::runtime_error("no f2e file?" + source_target_file.file_string());
+	throw std::runtime_error("no f2e file?" + source_target_file.string());
       if (target_source_file != "-" && ! boost::filesystem::exists(target_source_file))
-	throw std::runtime_error("no e2f file?" + target_source_file.file_string());
+	throw std::runtime_error("no e2f file?" + target_source_file.string());
       
       utils::compress_istream is_src_trg(source_target_file, 1024 * 1024);
       utils::compress_istream is_trg_src(target_source_file, 1024 * 1024);
@@ -202,11 +202,11 @@ int main(int argc, char ** argv)
 
       if (! span_source_file.empty())
 	if (span_source_file != "-" && ! boost::filesystem::exists(span_source_file))
-	  throw std::runtime_error("no spna source file: " + span_source_file.file_string());
+	  throw std::runtime_error("no spna source file: " + span_source_file.string());
       
       if (! span_target_file.empty())
 	if (span_target_file != "-" && ! boost::filesystem::exists(span_target_file))
-	  throw std::runtime_error("no spna target file: " + span_target_file.file_string());
+	  throw std::runtime_error("no spna target file: " + span_target_file.string());
       
       std::auto_ptr<std::istream> is_src(! span_source_file.empty() ? new utils::compress_istream(span_source_file, 1024 * 1024) : 0);
       std::auto_ptr<std::istream> is_trg(! span_target_file.empty() ? new utils::compress_istream(span_target_file, 1024 * 1024) : 0);

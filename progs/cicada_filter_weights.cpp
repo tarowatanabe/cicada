@@ -86,7 +86,7 @@ int main(int argc, char** argv)
     weight_set_type weights_input;
     for (path_set_type::const_iterator fiter = input_files.begin(); fiter != input_files.end(); ++ fiter) {
       if (*fiter != "-" && ! boost::filesystem::exists(*fiter))
-	throw std::runtime_error("no file: " + fiter->file_string());
+	throw std::runtime_error("no file: " + fiter->string());
 
       utils::compress_istream is(*fiter, 1024 * 1024);
       

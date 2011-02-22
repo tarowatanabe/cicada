@@ -837,7 +837,7 @@ void read_forest(const path_set_type& forest_path,
   for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
     
     if (mpi_rank == 0 && debug)
-      std::cerr << "reading forest: " << piter->file_string() << std::endl;
+      std::cerr << "reading forest: " << piter->string() << std::endl;
 
     for (size_t i = mpi_rank; /**/; i += mpi_size) {
       const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
@@ -853,17 +853,17 @@ void read_forest(const path_set_type& forest_path,
       std::string::const_iterator end = line.end();
       
       if (! parse_id(id_forest, iter, end))
-	throw std::runtime_error("invalid id input: " + path_forest.file_string());
+	throw std::runtime_error("invalid id input: " + path_forest.string());
       if (id_forest != i)
-	throw std::runtime_error("invalid id input: " + path_forest.file_string());
+	throw std::runtime_error("invalid id input: " + path_forest.string());
       
       if (id_forest >= graphs_forest.size())
 	graphs_forest.resize(id_forest + 1);
       
       if (! graph.assign(iter, end))
-	throw std::runtime_error("invalid graph format" + path_forest.file_string());
+	throw std::runtime_error("invalid graph format" + path_forest.string());
       if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format" + path_forest.file_string());
+	throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
       
       graphs_forest[id_forest].unite(graph);
     }
@@ -874,7 +874,7 @@ void read_forest(const path_set_type& forest_path,
   for (path_set_type::const_iterator piter = intersected_path.begin(); piter != intersected_path.end(); ++ piter) {
     
     if (mpi_rank == 0 && debug)
-      std::cerr << "reading intersected forest: " << piter->file_string() << std::endl;
+      std::cerr << "reading intersected forest: " << piter->string() << std::endl;
 
     for (size_t i = mpi_rank; i < graphs_intersected.size(); i += mpi_size) {
       const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
@@ -890,14 +890,14 @@ void read_forest(const path_set_type& forest_path,
       std::string::const_iterator end = line.end();
       
       if (! parse_id(id_intersected, iter, end))
-	throw std::runtime_error("invalid id input" + path_intersected.file_string());
+	throw std::runtime_error("invalid id input" + path_intersected.string());
       if (id_intersected != i)
-	throw std::runtime_error("invalid id input: " + path_intersected.file_string());
+	throw std::runtime_error("invalid id input: " + path_intersected.string());
       
       if (! graph.assign(iter, end))
-	throw std::runtime_error("invalid graph format" + path_intersected.file_string());
+	throw std::runtime_error("invalid graph format" + path_intersected.string());
       if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format" + path_intersected.file_string());
+	throw std::runtime_error("invalid id ||| graph format" + path_intersected.string());
       
       graphs_intersected[id_intersected].unite(graph);
     }

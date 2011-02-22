@@ -60,13 +60,13 @@ namespace cicada
     weight_map_type& weights_map = *operation_detail::__weights;
 #endif
     
-    weight_map_type::iterator iter = weights_map.find(path.file_string());
+    weight_map_type::iterator iter = weights_map.find(path.string());
     if (iter == weights_map.end()) {
-      iter = weights_map.insert(std::make_pair(path.file_string(), weight_set_type())).first;
+      iter = weights_map.insert(std::make_pair(path.string(), weight_set_type())).first;
       
       if (! path.empty()) {
 	if (path != "-" && ! boost::filesystem::exists(path))
-	  throw std::runtime_error("no feture weights? " + path.file_string());
+	  throw std::runtime_error("no feture weights? " + path.string());
 	
 	utils::compress_istream is(path);
 	is >> iter->second;

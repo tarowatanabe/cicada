@@ -131,7 +131,11 @@ namespace utils
 	::dup2(pout[1], STDOUT_FILENO);
 	::close(pout[1]);
 	
+#if BOOST_FILESYSTEM_VERSION == 2
 	::execlp(command.file_string().c_str(), command.file_string().c_str(), (char*) 0);
+#else
+	::execlp(command.string().c_str(), command.string().c_str(), (char*) 0);
+#endif
 	
 	::_exit(errno);  // not exit(errno)!
       } else {

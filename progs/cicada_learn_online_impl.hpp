@@ -254,7 +254,7 @@ void read_oracle(const path_set_type& files,
 	  
 	  if (is >> id >> sep >> hypergraph) {
 	    if (sep != "|||")
-	      throw std::runtime_error("format error?: " + fiter->file_string());
+	      throw std::runtime_error("format error?: " + fiter->string());
 	    
 	    if (id != i)
 	      throw std::runtime_error("invalid directory output format?");
@@ -276,7 +276,7 @@ void read_oracle(const path_set_type& files,
 	if (shard_size <= 0 || id % shard_size == shard_rank) {
 	  
 	  if (sep != "|||")
-	    throw std::runtime_error("format error?: " + fiter->file_string());
+	    throw std::runtime_error("format error?: " + fiter->string());
 
 	  if (id >= graphs.size())
 	    throw std::runtime_error("id exceeds graphs size");
@@ -324,10 +324,10 @@ void read_oracle(const path_set_type& files,
 	while (is >> id >> sep >> hypergraph) {
 	  
 	  if (sep != "|||")
-	    throw std::runtime_error("format error?: " + fiter->file_string());
+	    throw std::runtime_error("format error?: " + fiter->string());
 	  
 	  if (id >= graphs.size())
-	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + fiter->file_string());
+	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + fiter->string());
 	  
 	  graphs[id].unite(hypergraph);
 	}
@@ -342,10 +342,10 @@ void read_oracle(const path_set_type& files,
       while (is >> id >> sep >> hypergraph) {
 	
 	if (sep != "|||")
-	  throw std::runtime_error("format error?: " + fiter->file_string());
+	  throw std::runtime_error("format error?: " + fiter->string());
 	
 	if (id >= graphs.size())
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + fiter->file_string());
+	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + fiter->string());
 	
 	graphs[id].unite(hypergraph);
       }
@@ -385,7 +385,7 @@ void read_refset(const path_set_type& files,
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-      throw std::runtime_error("no reference file: " + fiter->file_string());
+      throw std::runtime_error("no reference file: " + fiter->string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
     is.unsetf(std::ios::skipws);
@@ -449,12 +449,12 @@ path_type add_suffix(const path_type& path, const std::string& suffix)
     has_suffix_bz2 = true;
   }
   
-  path_added = path_added.file_string() + suffix;
+  path_added = path_added.string() + suffix;
   
   if (has_suffix_gz)
-    path_added = path_added.file_string() + ".gz";
+    path_added = path_added.string() + ".gz";
   else if (has_suffix_bz2)
-    path_added = path_added.file_string() + ".bz2";
+    path_added = path_added.string() + ".bz2";
   
   return path_added;
 }

@@ -1158,7 +1158,7 @@ struct Task
     
     const path_type path_tmp = utils::tempfile::file_name(output / "counts-XXXXXX");
     utils::tempfile::insert(path_tmp);
-    const path_type path = path_tmp.file_string() + ".gz";
+    const path_type path = path_tmp.string() + ".gz";
     utils::tempfile::insert(path);
     
     utils::compress_ostream os(path, 1024 * 1024);

@@ -411,9 +411,9 @@ namespace cicada
       const path_type score_map_file = rep.path("score-map");
       
       if (! boost::filesystem::exists(score_map_file))
-	throw std::runtime_error(std::string("no map file? ") + score_map_file.file_string());
+	throw std::runtime_error(std::string("no map file? ") + score_map_file.string());
       
-      std::ifstream is(score_map_file.file_string().c_str());
+      std::ifstream is(score_map_file.string().c_str());
       is.read((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
     } else
       score.open(rep.path("score"));
@@ -430,7 +430,7 @@ namespace cicada
     if (quantized.is_open()) {
       quantized.write(rep.path("quantized"));
       
-      std::ofstream os(rep.path("score-map").file_string().c_str());
+      std::ofstream os(rep.path("score-map").string().c_str());
       os.write((char*) &(*maps.begin()), sizeof(score_type) * maps.size());
     } else
       score.write(rep.path("score"));
@@ -841,7 +841,7 @@ namespace cicada
     typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
     
     if (path != "-" && ! boost::filesystem::exists(path))
-      throw std::runtime_error(std::string("no file? ") + path.file_string());
+      throw std::runtime_error(std::string("no file? ") + path.string());
     
     const path_type tmp_dir = utils::tempfile::tmp_dir();
     

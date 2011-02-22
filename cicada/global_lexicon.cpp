@@ -98,7 +98,7 @@ namespace cicada
 	const path_type path = rep.path(std::string("lexicon.") + utils::lexical_cast<std::string>(node) + ".gz");
 	
 	if (! boost::filesystem::exists(path))
-	  throw std::runtime_error(std::string("no lexicon file: ") + path.file_string());
+	  throw std::runtime_error(std::string("no lexicon file: ") + path.string());
 	
 	utils::compress_istream is(path, 1024 * 1024);
 	is.unsetf(std::ios::skipws);

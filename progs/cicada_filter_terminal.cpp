@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     utils::compress_ostream os(output_file);
     
     if (map_file != "-" && ! boost::filesystem::exists(map_file))
-      throw std::runtime_error("no map file: " + map_file.file_string());
+      throw std::runtime_error("no map file: " + map_file.string());
     
     utils::compress_istream ms(map_file);
     

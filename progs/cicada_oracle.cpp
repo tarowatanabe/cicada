@@ -435,10 +435,10 @@ void read_tstset(const path_set_type& files,
 	while (is >> id >> sep >> hypergraph) {
 	
 	  if (sep != "|||")
-	    throw std::runtime_error("format error?: " + path.file_string());
+	    throw std::runtime_error("format error?: " + path.string());
 	
 	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.file_string());
+	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.string());
 	
 	  graphs[id].unite(hypergraph);
 	}
@@ -453,10 +453,10 @@ void read_tstset(const path_set_type& files,
       while (is >> id >> sep >> hypergraph) {
 	
 	if (sep != "|||")
-	  throw std::runtime_error("format error?: " + titer->file_string());
+	  throw std::runtime_error("format error?: " + titer->string());
 	
 	if (id >= static_cast<int>(graphs.size()))
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->file_string());
+	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->string());
 	
 	graphs[id].unite(hypergraph);
       }
@@ -508,7 +508,7 @@ void read_refset(const path_set_type& files,
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-      throw std::runtime_error("no reference file: " + fiter->file_string());
+      throw std::runtime_error("no reference file: " + fiter->string());
 
     utils::compress_istream is(*fiter, 1024 * 1024);
     is.unsetf(std::ios::skipws);

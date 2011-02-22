@@ -157,9 +157,9 @@ namespace cicada
     cluster_map_type& clusters_map = *__clusters;
 #endif
     
-    cluster_map_type::iterator iter = clusters_map.find(path.file_string());
+    cluster_map_type::iterator iter = clusters_map.find(path.string());
     if (iter == clusters_map.end())
-      iter = clusters_map.insert(std::make_pair(path.file_string(), Cluster(path))).first;
+      iter = clusters_map.insert(std::make_pair(path.string(), Cluster(path))).first;
     
     return iter->second;
   }

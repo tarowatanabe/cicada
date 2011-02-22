@@ -86,7 +86,7 @@ int main(int argc, char** argv)
       return 1;
 
     if (! prog_name.empty() && ! boost::filesystem::exists(prog_name))
-      throw std::runtime_error(std::string("no binary? ") + prog_name.file_string());
+      throw std::runtime_error(std::string("no binary? ") + prog_name.string());
 
     if (command_files.empty())
       command_files.push_back("-");
@@ -121,7 +121,7 @@ int main(int argc, char** argv)
       if (mpi_rank == 0)
 	for (path_set_type::const_iterator piter = command_files.begin(); piter != command_files.end(); ++ piter) {
 	  if (debug)
-	    std::cerr << "file: " << piter->file_string() << std::endl;
+	    std::cerr << "file: " << piter->string() << std::endl;
 	  
 	  utils::compress_istream is(*piter);
 	  
@@ -141,7 +141,7 @@ int main(int argc, char** argv)
       
       const int mpi_child_size = commands_size;
       
-      const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.file_string() : std::string(argv[0]));
+      const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.string() : std::string(argv[0]));
       utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_child_size, MPI::INFO_NULL, 0));
       
       if (mpi_rank == 0) {

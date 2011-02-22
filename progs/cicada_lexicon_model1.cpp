@@ -91,11 +91,11 @@ int main(int argc, char ** argv)
     
     if (! lexicon_source_target_file.empty())
       if (lexicon_source_target_file != "-" && ! boost::filesystem::exists(lexicon_source_target_file))
-	throw std::runtime_error("no file: " + lexicon_source_target_file.file_string());
+	throw std::runtime_error("no file: " + lexicon_source_target_file.string());
 
     if (! lexicon_target_source_file.empty())
       if (lexicon_target_source_file != "-" && ! boost::filesystem::exists(lexicon_target_source_file))
-	throw std::runtime_error("no file: " + lexicon_target_source_file.file_string());
+	throw std::runtime_error("no file: " + lexicon_target_source_file.string());
 
     boost::thread_group workers_read;
     

@@ -36,7 +36,7 @@ namespace cicada
 	
 	if (! boost::filesystem::exists(rep.path(stream_map_file.str()))) break;
 	
-	std::ifstream is(rep.path(stream_map_file.str()).file_string().c_str());
+	std::ifstream is(rep.path(stream_map_file.str()).string().c_str());
 	is.read((char*) &(*logprob_map.begin()), sizeof(logprob_type) * logprob_map.size());
 	maps.push_back(logprob_map);
       }
