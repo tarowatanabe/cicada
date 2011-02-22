@@ -708,7 +708,7 @@ namespace cicada
       os << rule;
     }
     
-    Buffer encoded(buffer.size() * 8 + 16, 0);
+    Buffer encoded(buffer.size() * 8, 0);
 
     typename Buffer::iterator hiter = encoded.begin();
     typename Buffer::iterator citer = encoded.end();
