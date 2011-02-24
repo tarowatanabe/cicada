@@ -14,7 +14,7 @@ namespace utils
   {
     template <typename Tp>
     inline
-    Tp branch(const bool& cond, const Tp& x, const Tp& y)
+    Tp branch(const bool cond, const Tp& x, const Tp& y)
     {
       const Tp mask = Tp(cond) - 1;
       return ((~mask) & x) | (mask & y);
