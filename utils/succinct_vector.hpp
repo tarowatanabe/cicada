@@ -221,11 +221,18 @@ namespace utils
 	  while (length > 0) {
 	    const size_type half = length >> 1;
 	    const size_type middle = first + half;
+	    
+	    const bool is_less = (middle - offset + 1) * ReverseScale - data[middle] < value;
+	    
+	    first  = utils::bithack::branch(is_less, middle + 1, first);
+	    length = utils::bithack::branch(is_less, length - half - 1, half);
+#if 0
 	    if ((middle - offset + 1) * ReverseScale - data[middle] < value) {
 	      first = middle + 1;
 	      length = length - half - 1;
 	    } else
 	      length = half;
+#endif
 	  }
 	  return first;
 	}
@@ -246,11 +253,19 @@ namespace utils
 	  while (length > 0) {
 	    const size_type half = length >> 1;
 	    const size_type middle = first + half;
+	    
+	    const bool is_less = data[middle] < value;
+	    
+	    first  = utils::bithack::branch(is_less, middle + 1, first);
+	    length = utils::bithack::branch(is_less, length - half - 1, half);
+	    
+#if 0
 	    if (data[middle] < value) {
 	      first = middle + 1;
 	      length = length - half - 1;
 	    } else
 	      length = half;
+#endif
 	  }
 	  return first;
 	}
