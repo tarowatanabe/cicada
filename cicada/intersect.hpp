@@ -37,11 +37,11 @@ namespace cicada
     typedef hypergraph_type::edge_type     edge_type;
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
-
+    
     typedef hypergraph_type::feature_set_type feature_set_type;
     
     typedef grammar_type::rule_pair_type rule_pair_type;
-        
+    
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > yield_type;
     
