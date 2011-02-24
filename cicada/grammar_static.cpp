@@ -340,6 +340,11 @@ namespace cicada
     }
 
   private:    
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
+    typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
+
+    sequence_type phrase_impl;
+    id_set_type   phrase_id_impl;
 
     const rule_ptr_type& read_phrase(const symbol_type& lhs,
 				     size_type pos,
@@ -350,9 +355,7 @@ namespace cicada
       
       cache_phrase_type& cache = const_cast<cache_phrase_type&>(cache_phrases[cache_pos]);
       if (cache.pos != pos || ! cache.rule || cache.rule->lhs != lhs) {
-	typedef std::vector<symbol_type, std::allocator<symbol_type> > sequence_type;
 	typedef utils::piece code_set_type;
-	typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > id_set_type;
 	
 	code_set_type codes(phrase_db[pos].begin(), phrase_db[pos].end());
 	
@@ -360,10 +363,11 @@ namespace cicada
 	code_set_type::const_iterator citer = codes.begin();
 	code_set_type::const_iterator citer_end = codes.end();
 	
-	id_set_type phrase_id;
-	word_type::id_type id;
+	id_set_type& phrase_id = const_cast<id_set_type&>(phrase_id_impl);
+	phrase_id.clear();
 	
 	for (size_type code_pos = 0; citer != citer_end; ++ code_pos) {
+	  word_type::id_type id;
 	  const size_type offset = utils::group_aligned_decode(id, &(*hiter), code_pos);
 	  
 	  citer = hiter + offset;
@@ -372,7 +376,9 @@ namespace cicada
 	  phrase_id.push_back(id);
 	}
 	
-	sequence_type phrase(phrase_id.size());
+	sequence_type& phrase = const_cast<sequence_type&>(phrase_impl);
+	phrase.resize(phrase_id.size());
+	
 	sequence_type::iterator piter = phrase.begin();
 	id_set_type::const_iterator iiter_end = phrase_id.end();
 	for (id_set_type::const_iterator iiter = phrase_id.begin(); iiter != iiter_end; ++ iiter, ++ piter)

@@ -327,6 +327,10 @@ namespace cicada
     }
 
   private:
+
+    typedef std::vector<char, std::allocator<char> > code_buffer_type;
+
+    code_buffer_type buffer_impl;
     
     const rule_ptr_type& read_rule(size_type pos,
 				   const cache_rule_set_type& caches,
@@ -336,13 +340,16 @@ namespace cicada
       
       cache_rule_type& cache = const_cast<cache_rule_type&>(caches[cache_pos]);
       if (cache.pos != pos) {
-	std::vector<char, std::allocator<char> > buffer;
+	typedef utils::piece code_set_type;
 	
-	utils::piece codes(db[pos].begin(), db[pos].end());
+	code_buffer_type& buffer = const_cast<code_buffer_type&>(buffer_impl);
+	buffer.clear();
 	
-	utils::piece::const_iterator hiter = codes.begin();
-	utils::piece::const_iterator citer = codes.begin();
-	utils::piece::const_iterator citer_end = codes.end();
+	code_set_type codes(db[pos].begin(), db[pos].end());
+	
+	code_set_type::const_iterator hiter = codes.begin();
+	code_set_type::const_iterator citer = codes.begin();
+	code_set_type::const_iterator citer_end = codes.end();
 
 	size_type code_pos = 0;
 	
