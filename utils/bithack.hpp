@@ -12,8 +12,16 @@ namespace utils
 {
   namespace bithack
   {
+    template <typename Tp>
+    inline
+    Tp branch(const bool& cond, const Tp& x, const Tp& y)
+    {
+      const Tp mask = Tp(cond) - 1;
+      return ((~mask) & x) | (mask & y);
+    }
     
     template <typename Tp>
+    inline
     Tp abs(Tp x)
     {
       const Tp mask = x >> (sizeof(Tp) * 8 - 1);
@@ -21,12 +29,14 @@ namespace utils
     }
 
     template <typename Tp>
+    inline
     Tp average(Tp x, Tp y)
     {
       return (x & y) + ((x ^ y) >> 1);
     }
 
     template <typename Tp>
+    inline
     Tp max(Tp x, Tp y)
     {
       // integral only max..
@@ -34,6 +44,7 @@ namespace utils
     }
 
     template <typename Tp>
+    inline
     Tp min(Tp x, Tp y)
     {
       // integral only min...
@@ -60,10 +71,6 @@ namespace utils
       static const bool result = ! (X & (X - 1));
       static const bool value = ! (X & (X - 1));
     };
-    
-    
-    
-
     
     // next-largest-power2
     template <size_t ByteSize>
@@ -273,7 +280,7 @@ namespace utils
       __bit_count_mask __mask;
     };
     
-  template <>
+    template <>
     struct struct_bit_count<2>
     {
       size_t operator()(uint16_t x) const

@@ -18,6 +18,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <utils/bithack.hpp>
+
 namespace cicada
 {
   struct Intersect
@@ -74,9 +76,14 @@ namespace cicada
 	  yield_type::iterator siter_end = yield.end();
 	  for (yield_type::iterator siter = yield.begin(); siter != siter_end; ++ siter)
 	    if (siter->is_non_terminal()) {
+	      const int __non_terminal_index = siter->non_terminal_index();
+	      const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0, pos, __non_terminal_index - 1);
+	      
+#if 0
 	      int non_terminal_index = siter->non_terminal_index() - 1;
 	      if (non_terminal_index < 0)
 		non_terminal_index = pos;
+#endif
 	      
 	      *siter = non_terminals[edge.tails[non_terminal_index]].non_terminal(pos + 1);
 	      ++ pos;
