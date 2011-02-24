@@ -50,4 +50,7 @@ int main(int argc, char** argv)
   std::cout << "log_2 16 " << utils::bithack::floor_log2(16) << std::endl;
   std::cout << "log_2 32 " << utils::bithack::floor_log2(32) << std::endl;
   std::cout << "log_2 64 " << utils::bithack::floor_log2(64) << std::endl;
+
+  std::cerr << "5 < 64 ? 0 : 5 = " << utils::bithack::branch(5 < 64, 0, 5) << std::endl;
+  std::cerr << "5 < 3 ? 0 : 5 = " << utils::bithack::branch(5 < 3, 0, 5) << std::endl;
 }
