@@ -77,8 +77,8 @@ namespace cicada
 	      int non_terminal_index = siter->non_terminal_index() - 1;
 	      if (non_terminal_index < 0)
 		non_terminal_index = pos;
-	    
-	      *siter = non_terminals[edge.tails[non_terminal_index]].non_terminal(pos);
+	      
+	      *siter = non_terminals[edge.tails[non_terminal_index]].non_terminal(pos + 1);
 	      ++ pos;
 	    }
 	}

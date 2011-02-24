@@ -14,8 +14,6 @@
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
 
-#include <boost/tuple/tuple.hpp>
-
 namespace cicada
 {
   namespace feature
