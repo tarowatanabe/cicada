@@ -150,9 +150,8 @@ namespace cicada
 	  int non_terminal_pos = 0;
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
 	    if (titer->is_non_terminal()) {
-	      int antecedent_index = titer->non_terminal_index() - 1;
-	      if (antecedent_index < 0)
-		antecedent_index = non_terminal_pos;
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	      ++ non_terminal_pos;
 	      
 	      const symbol_type* context = reinterpret_cast<const symbol_type*>(states[antecedent_index]);

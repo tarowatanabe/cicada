@@ -8,6 +8,7 @@
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
+#include "utils/bithack.hpp"
 
 #include "cicada/feature/bleu_expected.hpp"
 #include "cicada/parameter.hpp"
@@ -160,9 +161,8 @@ namespace cicada
 	  phrase_type::const_iterator titer_end = target.end();
 	  for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer) {
 	    if (titer->is_non_terminal()) {
-	      int antecedent_index = titer->non_terminal_index() - 1;
-	      if (antecedent_index < 0)
-	      antecedent_index = non_terminal_pos;
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	      ++ non_terminal_pos;
 
 	      const symbol_type* antecedent_first = reinterpret_cast<const symbol_type*>(states[antecedent_index]);

@@ -194,9 +194,8 @@ namespace cicada
 	    const phrase_span_type& span = *siter;
 	    
 	    // incase, we are working with non-synchronous parsing!
-	    int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
-	    if (antecedent_index < 0)
-	      antecedent_index = siter - (siter_begin + 1);
+	    const int __non_terminal_index = (span.first - 1)->non_terminal_index();
+	    const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, int(siter - (siter_begin + 1)), __non_terminal_index - 1);
 	    
 	    const id_type* antecedent_context = reinterpret_cast<const id_type*>(states[antecedent_index]);
 	    //const symbol_type* antecedent_root = reinterpret_cast<const symbol_type*>(antecedent_context + 2);

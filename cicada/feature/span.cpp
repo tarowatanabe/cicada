@@ -102,9 +102,8 @@ namespace cicada
 	phrase_type::const_iterator piter_end = edge.rule->rhs.end();
 	for (phrase_type::const_iterator piter = edge.rule->rhs.begin(); piter != piter_end; ++ piter)
 	  if (piter->is_non_terminal()) {
-	    int antecedent_index = piter->non_terminal_index() - 1;
-	    if (antecedent_index < 0)
-	      antecedent_index = pos_non_terminal;
+	    const int __non_terminal_index = piter->non_terminal_index();
+	    const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, pos_non_terminal, __non_terminal_index - 1);
 	    
 	    const int* antecedent_context = reinterpret_cast<const int*>(states[antecedent_index]);
 	    

@@ -81,7 +81,7 @@ namespace cicada
       if (xiter->is_non_terminal()) {
 	const int non_terminal_pos = xiter->non_terminal_index();
 	
-	index[non_terminal_pos == 0 ? pos : non_terminal_pos] = pos;
+	index[utils::bithack::branch(non_terminal_pos == 0, pos, non_terminal_pos)] = pos;
 	
 	*xiter = xiter->non_terminal(pos);
 	++ pos;

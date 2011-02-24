@@ -17,6 +17,8 @@
 #include <cicada/vocab.hpp>
 #include <cicada/symbol.hpp>
 
+#include <utils/bithack.hpp>
+
 namespace cicada
 {
   
@@ -76,9 +78,8 @@ namespace cicada
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
-	    int non_terminal_index = siter->non_terminal_index() - 1;
-	    if (non_terminal_index < 0)
-	      non_terminal_index = non_terminal_pos;
+	    const int __non_terminal_index = siter->non_terminal_index();
+	    const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	    
 	    spans_node[edge.tails[non_terminal_index]].first = span_pos;
 	    

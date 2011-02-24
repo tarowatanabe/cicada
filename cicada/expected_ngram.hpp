@@ -15,6 +15,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/simple_vector.hpp>
 #include <utils/sgi_hash_set.hpp>
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -221,10 +222,9 @@ namespace cicada
 	      collect_counts(biter, buffer.end(), weight, counts);
 	      biter = buffer.end();
 	    }
-	    
-	    int antecedent_index = citer->non_terminal_index() - 1;
-	    if (antecedent_index < 0)
-	      antecedent_index = non_terminal_pos;
+
+	    const int __non_terminal_index = citer->non_terminal_index();
+	    const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	    ++ non_terminal_pos;
 	    
 	    const context_pair_type& context_pair = contexts[tails[antecedent_index]];

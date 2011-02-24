@@ -33,6 +33,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/compact_trie.hpp>
 #include <utils/indexed_trie.hpp>
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -728,9 +729,8 @@ namespace cicada
 	rule_type::symbol_set_type::const_iterator siter_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator siter = edge.rule->rhs.begin(); siter != siter_end; ++ siter) {
 	  if (siter->is_non_terminal()) {
-	    int pos = siter->non_terminal_index() - 1;
-	    if (pos < 0)
-	      pos = tail_pos;
+	    const int __non_terminal_index = siter->non_terminal_index();
+	    const int pos = utils::bithack::branch(__non_terminal_index <= 0, tail_pos, __non_terminal_index - 1);
 	    ++ tail_pos;
 	    
 	    const symbol_type& non_terminal = non_terminals[edge.tails[pos]];

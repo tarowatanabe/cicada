@@ -20,6 +20,7 @@
 #include <utils/indexed_trie.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -387,10 +388,9 @@ namespace cicada
 #endif
 	      
 	      const rule_type::symbol_set_type& target = item->in_edge->rule->rhs;
-	      
-	      int antecedent_index = target[item->dot].non_terminal_index() - 1;
-	      if (antecedent_index < 0)
-		antecedent_index = item->dot_antecedent;
+
+	      const int __non_terminal_index = target[item->dot].non_terminal_index();
+	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, item->dot_antecedent, __non_terminal_index - 1);
 	      
 	      item->out_edge.tails[antecedent_index] = siter->second;
 	      

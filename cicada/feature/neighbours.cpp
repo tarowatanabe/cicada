@@ -221,9 +221,8 @@ namespace cicada
 	    const phrase_span_type& span = *siter;
 	    
 	    // incase, we are working with non-synchronous parsing!
-	    int antecedent_index = (span.first - 1)->non_terminal_index() - 1;
-	    if (antecedent_index < 0)
-	      antecedent_index = siter - (siter_begin + 1);
+	    const int __non_terminal_index = (span.first - 1)->non_terminal_index();
+	    const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, int(siter - (siter_begin + 1)), __non_terminal_index - 1);
 	    
 	    const id_type antecedent_id = *reinterpret_cast<const id_type*>(states[antecedent_index]);
 
@@ -246,10 +245,9 @@ namespace cicada
 	    } else if (siter + 1 != siter_end) {
 	      // we have no prefix for this span, but prefix from next antecedent node...
 	      //thus, use next antecedent's prefix as our suffix
-	      
-	      int antecedent_index_next = (span.second)->non_terminal_index() - 1;
-	      if (antecedent_index_next < 0)
-		antecedent_index_next = siter + 1 - (siter_begin + 1);
+
+	      const int __non_terminal_index = (span.second)->non_terminal_index();
+	      const int antecedent_index_next = utils::bithack::branch(__non_terminal_index <= 0, int(siter + 1 - (siter_begin + 1)), __non_terminal_index - 1);
 	      
 	      const id_type antecedent_id_next = *reinterpret_cast<const id_type*>(states[antecedent_index_next]);
 	      

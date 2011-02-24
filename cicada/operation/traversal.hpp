@@ -15,6 +15,7 @@
 #include <cicada/semiring.hpp>
 
 #include <utils/sgi_hash_set.hpp>
+#include <utils/bithack.hpp>
 
 #include <boost/tuple/tuple.hpp>
 
@@ -120,9 +121,8 @@ namespace cicada
 	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	  if (titer->is_non_terminal()) {
-	    int pos = titer->non_terminal_index() - 1;
-	    if (pos < 0)
-	      pos = non_terminal_pos;
+	    const int __non_terminal_index = titer->non_terminal_index();
+	    const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	    ++ non_terminal_pos;
 	    
 	    yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
@@ -172,9 +172,8 @@ namespace cicada
 	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	    if (titer->is_non_terminal()) {
-	      int pos = titer->non_terminal_index() - 1;
-	      if (pos < 0)
-		pos = non_terminal_pos;
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	      ++ non_terminal_pos;
 	      
 	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
@@ -185,9 +184,8 @@ namespace cicada
 	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	    if (titer->is_non_terminal()) {
-	      int pos = titer->non_terminal_index() - 1;
-	      if (pos < 0)
-		pos = non_terminal_pos;
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	      ++ non_terminal_pos;
 	      
 	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());

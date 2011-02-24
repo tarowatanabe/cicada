@@ -23,6 +23,7 @@
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_set.hpp>
+#include <utils/bithack.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -231,9 +232,8 @@ namespace cicada
 	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	  if (titer->is_non_terminal()) {
-	    int pos = titer->non_terminal_index() - 1;
-	    if (pos < 0)
-	      pos = non_terminal_pos;
+	    const int __non_terminal_index = titer->non_terminal_index();
+	    const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	    ++ non_terminal_pos;
 	    
 	    // combine buffer and tails...
@@ -538,9 +538,8 @@ namespace cicada
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
 	if (aiter->label.is_non_terminal()) {
 	  if (aiter->antecedents.empty()) {
-	    int non_terminal_index = aiter->label.non_terminal_index() - 1;
-	    if (non_terminal_index < 0)
-	      non_terminal_index = non_terminal_pos;
+	    const int __non_terminal_index = aiter->label.non_terminal_index();
+	    const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	    ++ non_terminal_pos;
 	    
 	    if (non_terminal_index >= static_cast<int>(frontiers.size()))

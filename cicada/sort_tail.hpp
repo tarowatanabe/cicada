@@ -10,6 +10,8 @@
 
 #include <cicada/hypergraph.hpp>
 
+#include <utils/bithack.hpp>
+
 namespace cicada
 {
   struct SortTail
@@ -58,7 +60,7 @@ namespace cicada
 	  if (riter->is_non_terminal()) {
 	    const int non_terminal_pos = riter->non_terminal_index();
 	    
-	    index[non_terminal_pos == 0 ? pos : non_terminal_pos - 1] = pos;
+	    index[utils::bithack::branch(non_terminal_pos == 0, pos, non_terminal_pos - 1)] = pos;
 	    
 	    *riter = riter->non_terminal(pos + 1);
 	    ++ pos;
