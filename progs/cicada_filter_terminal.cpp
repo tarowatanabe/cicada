@@ -28,6 +28,7 @@
 #include "utils/hashmurmur.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/bithack.hpp"
 
 typedef cicada::HyperGraph hypergraph_type;
 typedef cicada::Sentence   sentence_type;
@@ -96,9 +97,8 @@ int main(int argc, char** argv)
 	hypergraph_type::rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	for (hypergraph_type::rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
 	  if (riter->is_non_terminal()) {
-	    int non_terminal_pos = riter->non_terminal_index() - 1;
-	    if (non_terminal_pos < 0)
-	      non_terminal_pos = pos;
+	    const int __non_terminal_index = riter->non_terminal_index();
+	    const int non_terminal_pos = utils::bithack::branch(__non_terminal_index <= 0, pos, __non_terminal_index - 1);
 	    ++ pos;
 	    
 	    // compute span_pos from antecedent node...
