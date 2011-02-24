@@ -544,12 +544,11 @@ namespace cicada
 	    
 	    if (non_terminal_index >= static_cast<int>(frontiers.size()))
 	      throw std::runtime_error("non-terminal index exceeds frontier size");
-	     
+	    
 	    const hypergraph_type::id_type node = frontiers[non_terminal_index];
-
+	    
 	    std::pair<node_map_type::iterator, bool> result = node_map[node].insert(std::make_pair(aiter->label.non_terminal(), 0));
-	    if (result.second)
-	      result.first->second = graph_out.add_node().id;
+	    result.first->second = utils::bithack::branch(result.second, graph_out.add_node().id, result.first->second);
 	    
 	    tails.push_back(result.first->second);
 	  } else
