@@ -27,6 +27,7 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/spinlock.hpp>
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -216,12 +217,19 @@ namespace cicada
 	    while (length > 0) {
 	      const size_t half  = length >> 1;
 	      const size_t middle = first + half;
+
+	      const bool is_less = ids[middle - offset] < id;
 	      
+	      first  = utils::bithack::branch(is_less, middle + 1, first);
+	      length = utils::bithack::branch(is_less, length - half - 1, half);
+	      
+#if 0
 	      if (ids[middle - offset] < id) {
 		first = middle + 1;
 		length = length - half - 1;
 	      } else
 		length = half;
+#endif
 	    }
 	    return first;
 	  }
