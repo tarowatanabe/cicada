@@ -45,14 +45,16 @@ struct treebank_type
 
   std::string cat;
   antecedents_type antecedents;
+  bool removed;
   
-  treebank_type() {}
-  treebank_type(const std::string& __cat) : cat(__cat) {}
+  treebank_type() : removed(false) {}
+  treebank_type(const std::string& __cat) : cat(__cat), removed(false) {}
 
   void clear()
   {
     cat.clear();
     antecedents.clear();
+    removed = false;
   }
 };
 
@@ -106,14 +108,15 @@ void transform(const hypergraph_type::id_type node_id,
   std::string rule = "[" + treebank.cat + "] |||";
   
   node_set_type nodes;
-  for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
-    if (aiter->antecedents.empty())
-      rule += " " + aiter->cat;
-    else {
-      rule += " [" + aiter->cat + "]";
-      nodes.push_back(graph.add_node().id);
+  for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) 
+    if (! aiter->removed) {
+      if (aiter->antecedents.empty())
+	rule += " " + aiter->cat;
+      else {
+	rule += " [" + aiter->cat + "]";
+	nodes.push_back(graph.add_node().id);
+      }
     }
-  }
   
   hypergraph_type::edge_type& edge = graph.add_edge(nodes.begin(), nodes.end());
   edge.rule = rule_type::create(rule_type(rule));
@@ -121,7 +124,7 @@ void transform(const hypergraph_type::id_type node_id,
   
   node_set_type::const_iterator niter = nodes.begin();
   for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
-    if (! aiter->antecedents.empty()) {
+    if (! aiter->antecedents.empty() && ! aiter->removed) {
       transform(*niter, *aiter, graph);
       ++ niter;
     }
@@ -137,6 +140,8 @@ void transform(const treebank_type& treebank, hypergraph_type& graph)
 
 void transform(const treebank_type& treebank, sentence_type& sent) 
 {
+  if (treebank.removed) return;
+  
   if (treebank.antecedents.empty())
     sent.push_back(treebank.cat);
   else
@@ -146,6 +151,8 @@ void transform(const treebank_type& treebank, sentence_type& sent)
 
 void transform_normalize(treebank_type& treebank)
 {
+  if (treebank.removed) return;
+
   // no terminal...
   if (treebank.antecedents.empty()) return;
   
@@ -164,26 +171,21 @@ void transform_normalize(treebank_type& treebank)
 
 void transform_remove_none(treebank_type& treebank)
 {
-  // no terminal...
-  if (treebank.antecedents.empty()) return;
+  if (treebank.cat == "-NONE-")
+    treebank.removed = true;
   
-  treebank_type::antecedents_type antecedents;
   for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
-    if (aiter->cat != "-NONE-") {
-      transform_remove_none(*aiter);
-      antecedents.push_back(*aiter);
-    }
-  
-  treebank.antecedents.swap(antecedents);
+    transform_remove_none(*aiter);
 }
-
 
 void transform_map(treebank_type& treebank, sentence_type& sent)
 {
+  if (treebank.removed) return;
+  
   if (treebank.antecedents.empty()) {
     if (sent.empty())
       throw std::runtime_error("no words for mapping?");
-
+    
     treebank.cat = sent.back();
     sent.pop_back();
   } else
@@ -218,10 +220,11 @@ void transform_span(const treebank_type& treebank, span_set_type& spans, int& te
   } else {
     span_set_type spans_rule;
     
-    for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
-      transform_span(*aiter, spans, terminal, config, level + 1);
-      spans_rule.push_back(spans.back());
-    }
+    for (treebank_type::antecedents_type::const_iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+      if (! aiter->removed) {
+	transform_span(*aiter, spans, terminal, config, level + 1);
+	spans_rule.push_back(spans.back());
+      }
     
     if (spans_rule.size() >= 3 && config.binarize)  {
       typedef utils::chart<std::string, std::allocator<std::string> > chart_type;
@@ -366,7 +369,6 @@ int main(int argc, char** argv)
       
       if (normalize)
 	transform_normalize(parsed);
-      
 
       if (leaf) {
 	sent.clear();
