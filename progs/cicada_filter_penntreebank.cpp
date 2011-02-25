@@ -64,36 +64,6 @@ BOOST_FUSION_ADAPT_STRUCT(
 			  )
 
 
-template <typename Iterator>
-struct penntreebank_escaped_grammar : boost::spirit::qi::grammar<Iterator, treebank_type(), boost::spirit::standard::space_type>
-{
-  penntreebank_escaped_grammar() : penntreebank_escaped_grammar::base_type(treebank)
-  {
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    
-    escaped_char.add
-      ("\\/",   '/')
-      ("\\*",   '*');
-    
-    escaped_word.add
-      ("-LRB-", "(")
-      ("-RRB-", ")")
-      ("-LSB-", "[")
-      ("-RSB-", "]")
-      ("-LCB-", "{")
-      ("-RCB-", "}");
-    
-    cat %= qi::lexeme[escaped_word | +(escaped_char | (standard::char_ - standard::space - '(' - ')'))];
-    treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
-  }
-  
-  boost::spirit::qi::symbols<char, char>        escaped_char;
-  boost::spirit::qi::symbols<char, const char*> escaped_word;
-  
-  boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   cat;
-  boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> treebank;
-};
 
 template <typename Iterator>
 struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type(), boost::spirit::standard::space_type>
@@ -105,12 +75,12 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
     
     cat %= qi::lexeme[+(standard::char_ - standard::space - '(' - ')')];
     treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
-    root %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
+    root %= qi::hold['(' >> cat >> +treebank >> ')'] | qi::hold['(' >> qi::attr("ROOT") >> +treebank >> ')'] | cat;
   }
   
   boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   cat;
-  boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> root;
   boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> treebank;
+  boost::spirit::qi::rule<Iterator, treebank_type(), boost::spirit::standard::space_type> root;
 };
 
 typedef cicada::HyperGraph hypergraph_type;
@@ -191,6 +161,22 @@ void transform_normalize(treebank_type& treebank)
   for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
     transform_normalize(*aiter);
 }
+
+void transform_remove_none(treebank_type& treebank)
+{
+  // no terminal...
+  if (treebank.antecedents.empty()) return;
+  
+  treebank_type::antecedents_type antecedents;
+  for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+    if (aiter->cat != "-NONE-") {
+      transform_remove_none(*aiter);
+      antecedents.push_back(*aiter);
+    }
+  
+  treebank.antecedents.swap(antecedents);
+}
+
 
 void transform_map(treebank_type& treebank, sentence_type& sent)
 {
@@ -284,8 +270,8 @@ path_type input_file = "-";
 path_type output_file = "-";
 path_type map_file;
 
-bool escaped = false;
 bool normalize = false;
+bool remove_none = false;
 
 bool leaf = false;
 bool rule = false;
@@ -327,7 +313,6 @@ int main(int argc, char** argv)
     }
     
     penntreebank_grammar<iter_type>         grammar;
-    penntreebank_escaped_grammar<iter_type> grammar_escaped;
 
     treebank_type   parsed;
     hypergraph_type graph;
@@ -353,13 +338,8 @@ int main(int argc, char** argv)
       if (debug)
 	std::cerr << "parsing: " << num << std::endl;
       
-      if (escaped) {
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar_escaped, boost::spirit::standard::space, parsed))
-	  throw std::runtime_error("parsing failed");
-      } else {
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed))
-	  throw std::runtime_error("parsing failed");
-      }
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed))
+	throw std::runtime_error("parsing failed");
 
       ++ num;
 
@@ -380,9 +360,13 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("# of words do not match?");
 	}
       }
+
+      if (remove_none)
+	transform_remove_none(parsed);
       
       if (normalize)
 	transform_normalize(parsed);
+      
 
       if (leaf) {
 	sent.clear();
@@ -477,8 +461,8 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
-    ("escape",    po::bool_switch(&escaped),   "escape English penntreebank")
-    ("normalize", po::bool_switch(&normalize), "normalize category, such as [,] [.] etc.")
+    ("normalize",   po::bool_switch(&normalize), "normalize category, such as [,] [.] etc.")
+    ("remove-none", po::bool_switch(&remove_none), "remove -NONE-")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
