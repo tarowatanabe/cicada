@@ -57,7 +57,7 @@ namespace utils
       utils::piece::const_iterator iter = arg.begin();
       utils::piece::const_iterator iter_end = arg.end();
       
-      Target parsed;
+      Target parsed = Target();
       typename __lexical_cast_parser<Target, boost::is_float<Target>::value, boost::is_signed<Target>::value>::parser_type parser;
       
       if (! qi::phrase_parse(iter, iter_end, parser, standard::space, parsed) || iter != iter_end)
