@@ -187,21 +187,25 @@ namespace utils
 	for (/**/; first != last && (*iter) <= value; ++ first, ++ iter);
 	return first;
       } else {
-	typename Compressed::const_iterator __first = compressed.begin() + first;
-	typename Compressed::const_iterator __middle;
+	typename Compressed::const_iterator __data = compressed.begin();
 	
 	while (length > 0) {
 	  const size_type half = length >> 1;
 	  const size_type middle = first + half;
-	  __middle = __first + half;
+
+	  const bool is_less = value < __data[middle];
 	  
-	  if (value < *__middle)
+	  first  = utils::bithack::branch(is_less, first, middle + 1);
+	  length = utils::bithack::branch(is_less, half, length - half - 1);
+	  
+#if 0
+	  if (value < __data[middle])
 	    length = half;
 	  else {
 	    first = middle + 1;
-	    __first = __middle + 1;
 	    length = length - half - 1;
 	  }
+#endif
 	}
 	return first;
       }
