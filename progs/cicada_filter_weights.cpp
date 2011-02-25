@@ -176,8 +176,16 @@ void options(int argc, char** argv)
     
     ("help", "help message");
   
+  po::positional_options_description pos;
+  pos.add("input", -1); // all the files
+
+  po::command_line_parser parser(argc, argv);
+  parser.style(po::command_line_style::unix_style & (~po::command_line_style::allow_guessing));
+  parser.options(desc);
+  parser.positional(pos);
+  
   po::variables_map vm;
-  po::store(po::parse_command_line(argc, argv, desc, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), vm);
+  po::store(parser.run(), vm);
   po::notify(vm);
   
   if (vm.count("help")) {
