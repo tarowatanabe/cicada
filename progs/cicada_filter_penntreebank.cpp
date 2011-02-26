@@ -23,6 +23,8 @@
 #include <boost/fusion/include/adapt_struct.hpp>
 #include <boost/fusion/include/std_pair.hpp>
 
+#include <boost/xpressive/xpressive.hpp>
+
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tokenizer.hpp>
@@ -152,13 +154,22 @@ void transform_normalize(treebank_type& treebank)
   if (treebank.antecedents.empty()) return;
   
   // normalize treebank-category...
-  if (treebank.cat.size() == 1)
+  if (treebank.cat.size() == 1) {
     switch (treebank.cat[0]) {
     case '.' : treebank.cat = "PERIOD"; break;
     case ',' : treebank.cat = "COMMA"; break;
     case ':' : treebank.cat = "COLON"; break;
     case ';' : treebank.cat = "SEMICOLON"; break;
     }
+  } else {
+    namespace xpressive = boost::xpressive;
+
+    static xpressive::sregex re = (xpressive::s1= -+(~xpressive::_s)) >> (xpressive::as_xpr('-') | xpressive::as_xpr('=')) >> +(xpressive::_d);
+    
+    xpressive::smatch what;
+    if (xpressive::regex_match(treebank.cat, what, re))
+      treebank.cat = what[1];
+  }
   
   for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
     transform_normalize(*aiter);

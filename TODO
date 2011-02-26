@@ -57,6 +57,7 @@ Revise parent feature:
 MONOLINGUAL PARSING!
   It is possible to do parsing, given cky composer... (or, we may implement earley-composer...)
   But, the problem is: how to normalize penntreebank... 
+  Remove -NONE-, normalize non-terminal symbols, (remove -[0-9]+$,  =[0-9]+$ etc.)
 
 
 Cutting-plane learning under cicada_maxlike{,_mpi}...
