@@ -14,6 +14,7 @@
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/sgi_hash_map.hpp"
+#include "utils/mathop.hpp"
 
 typedef cicada::HyperGraph hypergraph_type;
 typedef cicada::Rule       rule_type;
@@ -59,7 +60,7 @@ typedef boost::filesystem::path path_type;
 path_type input_file = "-";
 path_type output_file = "-";
 
-double prior_terminal = 0.1;
+double prior = 0.01;
 bool score_mode = false;
 bool variational_bayes_mode = false;
 
@@ -106,34 +107,72 @@ int main(int argc, char** argv)
       
       process(is, Counts(counts));
       
-      symbol_count_type     lhs;
-      symbol_set_count_type rhs;
-      lhs_rhs_count_type lhs_rhs;
-      rhs_lhs_count_type rhs_lhs;
+      symbol_count_type     lhs_counts;
+      symbol_set_count_type rhs_counts;
+      lhs_rhs_count_type    lhs_rhs_counts;
+      rhs_lhs_count_type    rhs_lhs_counts;
       
       count_set_type::const_iterator iter_end = counts.end();
       for (count_set_type::const_iterator iter = counts.begin(); iter != iter_end; ++ iter) {
 	const rule_type& rule = iter->first;
 	const double& count = iter->second;
 	
-	lhs_rhs[rule.lhs][rule.rhs] += count;
-	rhs_lhs[rule.rhs][rule.lhs] += count;
-	lhs[rule.lhs] += count;
-	rhs[rule.rhs] += count;
+	lhs_rhs_counts[rule.lhs][rule.rhs] += count;
+	rhs_lhs_counts[rule.rhs][rule.lhs] += count;
+	lhs_counts[rule.lhs] += count;
+	rhs_counts[rule.rhs] += count;
       }
       
       utils::compress_ostream os(output_file);
       os.precision(20);
-      
-      for (count_set_type::const_iterator iter = counts.begin(); iter != iter_end; ++ iter) {
-	const rule_type& rule = iter->first;
-	const double& count = iter->second;
+
+      if (variational_bayes_mode) {
+	lhs_rhs_count_type::const_iterator liter_end = lhs_rhs_counts.end();
+	for (lhs_rhs_count_type::const_iterator liter = lhs_rhs_counts.begin(); liter != liter_end; ++ liter) {
+	  const symbol_type& lhs = liter->first;
 	
-	os << rule << " ||| ||| " << count << '\n';
+	  const double count_lhs = lhs_counts[lhs];
+	  const double observed_lhs = liter->second.size();
+	  const double factor_lhs = utils::mathop::digamma(count_lhs + observed_lhs * prior);
 	
+	  symbol_set_count_type::const_iterator riter_end = liter->second.end();
+	  for (symbol_set_count_type::const_iterator riter = liter->second.begin(); riter != riter_end; ++ riter) {
+	    const symbol_set_type& rhs = riter->first;
+	    const double& count = riter->second;
+	    
+	    const double count_rhs = rhs_counts[rhs];
+	    const double observed_rhs = rhs_lhs_counts[rhs].size();
+	    const double factor_rhs = utils::mathop::digamma(count_rhs + observed_rhs * prior);
+	  
+	    os << lhs << " ||| " << rhs << " ||| ||| "
+	       << utils::mathop::digamma(count + prior) - factor_lhs << ' '
+	       << utils::mathop::digamma(count + prior) - factor_rhs << '\n';
+	  }
+	}
+      } else {
+	lhs_rhs_count_type::const_iterator liter_end = lhs_rhs_counts.end();
+	for (lhs_rhs_count_type::const_iterator liter = lhs_rhs_counts.begin(); liter != liter_end; ++ liter) {
+	  const symbol_type& lhs = liter->first;
+	
+	  const double count_lhs = lhs_counts[lhs];
+	  const double observed_lhs = liter->second.size();
+	  const double factor_lhs = 1.0 / (count_lhs + observed_lhs * prior);
+	
+	  symbol_set_count_type::const_iterator riter_end = liter->second.end();
+	  for (symbol_set_count_type::const_iterator riter = liter->second.begin(); riter != riter_end; ++ riter) {
+	    const symbol_set_type& rhs = riter->first;
+	    const double& count = riter->second;
+	  
+	    const double count_rhs = rhs_counts[rhs];
+	    const double observed_rhs = rhs_lhs_counts[rhs].size();
+	    const double factor_rhs = 1.0 / (count_rhs + observed_rhs * prior);
+	    
+	    os << lhs << " ||| " << rhs << " ||| ||| "
+	       << utils::mathop::log((count + prior) * factor_lhs) << ' '
+	       << utils::mathop::log((count + prior) * factor_rhs) << '\n';
+	  }
+	}
       }
-      
-      
     } else {
       utils::compress_ostream os(output_file);
       os.precision(20);
@@ -200,9 +239,9 @@ void options(int argc, char** argv)
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     
-    ("score",          po::bool_switch(&score_mode),                                      "merge and estimate score(s)")
-    ("prior-terminal", po::value<double>(&prior_terminal)->default_value(prior_terminal), "prior for terminal")
-    ("variational",    po::bool_switch(&variational_bayes_mode),                          "variational Bayes estimates")
+    ("score",       po::bool_switch(&score_mode),                    "merge and estimate score(s)")
+    ("prior",       po::value<double>(&prior)->default_value(prior), "prior")
+    ("variational", po::bool_switch(&variational_bayes_mode),        "variational Bayes estimates")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
