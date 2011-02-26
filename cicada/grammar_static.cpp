@@ -40,7 +40,7 @@
 
 #include <boost/thread.hpp>
 
-#include <google/dense_hash_set>
+#include <google/dense_hash_map>
 
 namespace cicada
 {
@@ -152,10 +152,19 @@ namespace cicada
     
     typedef utils::array_power2<cache_rule_set_type, 1024 * 16, std::allocator<cache_rule_set_type> > cache_rule_map_type;
     typedef utils::array_power2<cache_phrase_type,   1024 *  8, std::allocator<cache_phrase_type> >   cache_phrase_set_type;
-            
+
+    typedef std::pair<word_type, size_type> word_node_type;
+
+    typedef google::dense_hash_map<word_node_type, size_type, utils::hashmurmur<size_t>, std::equal_to<word_node_type> > cache_node_type;
 
   public:
-    GrammarStaticImpl(const std::string& parameter) : max_span(15) { read(parameter); }
+    GrammarStaticImpl(const std::string& parameter)
+      : max_span(15),
+	caching(false)
+    {
+      cache_node.set_empty_key(word_node_type());
+      read(parameter);
+    }
 
     GrammarStaticImpl(const GrammarStaticImpl& x)
       : rule_db(x.rule_db),
@@ -166,7 +175,11 @@ namespace cicada
 	vocab(x.vocab),
 	feature_names(x.feature_names),
 	attribute_names(x.attribute_names),
-	max_span(x.max_span) {}
+	max_span(x.max_span),
+	caching(x.caching)
+    {
+      cache_node.set_empty_key(word_node_type());
+    }
 
     GrammarStaticImpl& operator=(const GrammarStaticImpl& x)
     {
@@ -181,6 +194,7 @@ namespace cicada
       feature_names   = x.feature_names;
       attribute_names = x.attribute_names;
       max_span        = x.max_span;
+      caching         = x.caching;
       
       return *this;
     }
@@ -202,7 +216,10 @@ namespace cicada
       cache_sources.clear();
       cache_targets.clear();
 
+      cache_node.clear();
+
       max_span = 15;
+      caching = false;
     }
     
     size_type find(const word_type& word) const
@@ -213,8 +230,19 @@ namespace cicada
     
     size_type find(const word_type& word, size_type node) const
     {
-      const word_type::id_type id = vocab[word];
-      return rule_db.find(&id, 1, node);
+      if (caching && word.is_non_terminal()) {
+	cache_node_type& __cache_node = const_cast<cache_node_type&>(cache_node);
+	
+	std::pair<cache_node_type::iterator, bool> result = __cache_node.insert(std::make_pair(std::make_pair(word, node), 0));
+	if (result.second) {
+	  const word_type::id_type id = vocab[word];
+	  result.first->second = rule_db.find(&id, 1, node);
+	}
+	return result.first->second;
+      } else {
+	const word_type::id_type id = vocab[word];
+	return rule_db.find(&id, 1, node);
+      }
     }
     
     template <typename Iterator>
@@ -425,8 +453,11 @@ namespace cicada
     cache_phrase_set_type cache_sources;
     cache_phrase_set_type cache_targets;
 
+    cache_node_type cache_node;
+
   public:
     int max_span;
+    bool caching;
   };
 
 
@@ -588,6 +619,10 @@ namespace cicada
     parameter_type::const_iterator siter = param.find("max-span");
     if (siter != param.end())
       max_span = utils::lexical_cast<int>(siter->second);
+
+    parameter_type::const_iterator citer = param.find("cache");
+    if (citer != param.end())
+      caching = utils::lexical_cast<bool>(citer->second);
   }
   
   void GrammarStaticImpl::write(const path_type& file) const
