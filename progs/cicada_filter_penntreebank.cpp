@@ -163,16 +163,68 @@ void transform_normalize(treebank_type& treebank)
     }
   } else {
     namespace xpressive = boost::xpressive;
-
-    static xpressive::sregex re = (xpressive::s1= -+(~xpressive::_s)) >> (xpressive::as_xpr('-') | xpressive::as_xpr('=')) >> +(xpressive::_d);
     
-    xpressive::smatch what;
-    if (xpressive::regex_match(treebank.cat, what, re))
+    typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+    typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+
+    static pregex re = (xpressive::s1= -+(~xpressive::_s)) >> (xpressive::as_xpr('-') | xpressive::as_xpr('=')) >> +(~xpressive::_s);
+    
+    pmatch what;
+    if (xpressive::regex_match(utils::piece(treebank.cat), what, re))
       treebank.cat = what[1];
   }
   
   for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
     transform_normalize(*aiter);
+}
+
+template <typename Iterator>
+struct terminal_parser : boost::spirit::qi::grammar<Iterator, std::string()>
+{
+  terminal_parser() : terminal_parser::base_type(terminal)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    escape_char.add
+      ("-LRB-", '(')
+      ("-RRB-", ')')
+      ("-LSB-", '[')
+      ("-RSB-", ']')
+      ("-LCB-", '{')
+      ("-RCB-", '}')
+      ("\\/", '/')
+      ("\\*", '*');
+    
+    terminal %= +(escape_char | standard::char_);
+  }
+  
+  boost::spirit::qi::symbols<char, char> escape_char;
+  boost::spirit::qi::rule<Iterator, std::string()> terminal;
+};
+
+void transform_unescape(treebank_type& treebank)
+{
+  if (treebank.antecedents.empty()) {
+    // terminal...
+    
+    namespace qi = boost::spirit::qi;
+    
+    static terminal_parser<std::string::const_iterator> parser;
+
+    std::string::const_iterator iter = treebank.cat.begin();
+    std::string::const_iterator iter_end = treebank.cat.end();
+
+    std::string terminal;
+    
+    if (! qi::parse(iter, iter_end, parser, terminal) || iter != iter_end)
+      throw std::runtime_error("terminal parsing failed?");
+    
+    treebank.cat.swap(terminal);
+    
+  } else
+    for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+      transform_unescape(*aiter);
 }
 
 void transform_remove_none(treebank_type& treebank)
@@ -291,6 +343,7 @@ path_type map_file;
 
 bool normalize = false;
 bool remove_none = false;
+bool unescape_terminal = false;
 
 bool leaf = false;
 bool rule = false;
@@ -390,6 +443,9 @@ int main(int argc, char** argv)
       
       if (normalize)
 	transform_normalize(parsed);
+      
+      if (unescape_terminal)
+	transform_unescape(parsed);
 
       if (leaf) {
 	sent.clear();
@@ -484,8 +540,9 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
-    ("normalize",   po::bool_switch(&normalize), "normalize category, such as [,] [.] etc.")
-    ("remove-none", po::bool_switch(&remove_none), "remove -NONE-")
+    ("unescape",    po::bool_switch(&unescape_terminal), "unescape terminal symbols, such as -LRB-, \\* etc.")
+    ("normalize",   po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
+    ("remove-none", po::bool_switch(&remove_none),       "remove -NONE-")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
