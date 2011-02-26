@@ -166,7 +166,7 @@ namespace cicada
 	attr_source_root("source-root")
     {  
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL,
-					      rule_type::symbol_set_type(1, goal.non_terminal(1))));
+					      rule_type::symbol_set_type(1, goal.non_terminal())));
     }
     
     void operator()(const hypergraph_type& graph_in, hypergraph_type& graph_out)

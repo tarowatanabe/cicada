@@ -51,7 +51,7 @@ namespace cicada
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
-      goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal(1))));
+      goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
       
       node_map.set_empty_key(symbol_index_type());
       closure.set_empty_key(symbol_type());

@@ -960,12 +960,14 @@ namespace cicada
 	  arity_source += siter->is_non_terminal();
       }
        
-      size_type arity_target = 0;
-      for (sequence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer)
-	arity_target += titer->is_non_terminal();
-       
-      if (arity_source != arity_target)
-	throw std::runtime_error("# of non-terminals do not match...");
+      if (! target.empty()) {
+	size_type arity_target = 0;
+	for (sequence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer)
+	  arity_target += titer->is_non_terminal();
+	
+	if (arity_source != arity_target)
+	  throw std::runtime_error("# of non-terminals do not match...");
+      }
        
 #if 0
       std::cerr << "lhs: " << lhs;
