@@ -346,8 +346,13 @@ int main(int argc, char** argv)
       if (debug)
 	std::cerr << "parsing: " << num << std::endl;
       
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed))
-	throw std::runtime_error("parsing failed");
+      if (! boost::spirit::qi::phrase_parse(iter, iter_end, grammar, boost::spirit::standard::space, parsed)) {
+	std::string buffer;
+	for (int i = 0; i != 64 && iter != iter_end; ++ i, ++iter)
+	  buffer += *iter;
+
+	throw std::runtime_error("parsing failed: " + buffer);
+      }
 
       ++ num;
 

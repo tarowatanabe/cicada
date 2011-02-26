@@ -30,6 +30,7 @@ bin_PROGRAMS = \
 	cicada_extract_ghkm_mpi \
 	cicada_extract_phrase \
 	cicada_extract_phrase_mpi \
+	cicada_extract_rule \
 	cicada_extract_scfg \
 	cicada_extract_scfg_mpi \
 	cicada_extract_score \
@@ -107,6 +108,9 @@ cicada_extract_phrase_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 cicada_extract_phrase_mpi_SOURCES  = cicada_extract_phrase_mpi.cpp cicada_extract_phrase_impl.hpp
 cicada_extract_phrase_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_extract_phrase_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_extract_rule_SOURCES = cicada_extract_rule.cpp
+cicada_extract_rule_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_extract_scfg_SOURCES = cicada_extract_scfg.cpp cicada_extract_scfg_impl.hpp
 cicada_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
