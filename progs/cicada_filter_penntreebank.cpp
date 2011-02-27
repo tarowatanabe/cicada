@@ -178,6 +178,18 @@ void transform_normalize(treebank_type& treebank)
     transform_normalize(*aiter);
 }
 
+void transform_collapse(treebank_type& treebank)
+{
+  // no terminal...
+  if (treebank.antecedents.empty()) return;
+  
+  for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+    transform_collapse(*aiter);
+
+  if (treebank.antecedents.size() == 1 && treebank.cat == treebank.antecedents.front().cat)
+    treebank.antecedents = treebank.antecedents.front().antecedents;
+}
+
 template <typename Iterator>
 struct terminal_parser : boost::spirit::qi::grammar<Iterator, std::string()>
 {
@@ -344,6 +356,7 @@ path_type map_file;
 bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
+bool collapse = false;
 
 bool leaf = false;
 bool rule = false;
@@ -443,6 +456,9 @@ int main(int argc, char** argv)
       
       if (normalize)
 	transform_normalize(parsed);
+
+      if (collapse)
+	transform_collapse(parsed);
       
       if (unescape_terminal)
 	transform_unescape(parsed);
@@ -543,6 +559,7 @@ void options(int argc, char** argv)
     ("unescape",    po::bool_switch(&unescape_terminal), "unescape terminal symbols, such as -LRB-, \\* etc.")
     ("normalize",   po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
     ("remove-none", po::bool_switch(&remove_none),       "remove -NONE-")
+    ("collapse",    po::bool_switch(&collapse),          "collapse unary rules")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
