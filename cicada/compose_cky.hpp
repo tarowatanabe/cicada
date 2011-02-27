@@ -320,7 +320,7 @@ namespace cicada
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
-	  //std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
+	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
 
 	  //std::cerr << "span: " << first << ".." << last << " passives: " << passives(first, last).size() << std::endl;
 	  
@@ -431,13 +431,20 @@ namespace cicada
       if (piter_begin != piter_end)
 	for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 	  if (transducer.has_next(aiter->node)) {
+	    symbol_type label;
+	    transducer_type::id_type node = transducer.root();
+
 	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
 	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
 	    
 	    for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	      const symbol_type& non_terminal = non_terminals[*piter];
 	      
-	      const transducer_type::id_type node = transducer.next(aiter->node, non_terminal);
+	      if (label != non_terminal) {
+		node = transducer.next(aiter->node, non_terminal);
+		label = non_terminal;
+	      }
+	      
 	      if (node == transducer.root()) continue;
 	      
 	      tails.back() = *piter;
