@@ -253,10 +253,10 @@ namespace cicada
 	      if (rules.empty()) continue;
 
 	      active_set_type::const_iterator iiter_begin = citer->second.begin();
-	      active_set_type::const_iterator iiter_end = citer->second.end();
+	      active_set_type::const_iterator iiter_end   = citer->second.end();
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
-	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
 	      
 	      for (active_set_type::const_iterator iiter = iiter_begin; iiter != iiter_end; ++ iiter)
 		for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter)
