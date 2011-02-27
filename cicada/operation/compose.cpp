@@ -194,6 +194,7 @@ namespace cicada
 	goal(__goal), non_terminal(__non_terminal), 
 	insertion(__insertion), deletion(__deletion),
 	yield_source(false),
+	treebank(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -213,7 +214,9 @@ namespace cicada
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
-	} else
+	} else if (utils::ipiece(piter->first) == "treebank")
+	  treebank = utils::lexical_cast<bool>(piter->second);
+	else
 	  std::cerr << "WARNING: unsupported parameter for CKY composer: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -244,7 +247,7 @@ namespace cicada
       if (deletion)
 	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
 	
-      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source);
+      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank);
     
       utils::resource end;
     

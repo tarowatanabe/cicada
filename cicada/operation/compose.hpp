@@ -92,6 +92,7 @@ namespace cicada
       bool deletion;
 
       bool yield_source;
+      bool treebank;
   
       int debug;
     };

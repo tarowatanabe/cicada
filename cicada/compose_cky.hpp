@@ -46,8 +46,8 @@ namespace cicada
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     
-    ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source=false)
-      : goal(__goal), grammar(__grammar), yield_source(__yield_source),
+    ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source=false, const bool __treebank=false)
+      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
@@ -117,6 +117,18 @@ namespace cicada
     typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
 
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
+
+    struct less_non_terminal
+    {
+      less_non_terminal(const non_terminal_set_type& __non_terminals) : non_terminals(__non_terminals) {}
+
+      bool operator()(const hypergraph_type::id_type& x, const hypergraph_type::id_type& y) const
+      {
+	return non_terminals[x] < non_terminals[y];
+      }
+      
+      const non_terminal_set_type& non_terminals;
+    };
     
     
     void operator()(const lattice_type& lattice,
@@ -168,32 +180,34 @@ namespace cicada
 		
 		extend_actives(transducer, active_arcs, passive_arcs, cell);
 	      }
-	      
-	      // then, advance by terminal(s) at lattice[last - 1];
-	      const active_set_type&  active_arcs  = actives[table](first, last - 1);
-	      const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
-	      
-	      active_set_type::const_iterator aiter_begin = active_arcs.begin();
-	      active_set_type::const_iterator aiter_end = active_arcs.end();
-	      
-	      if (aiter_begin != aiter_end) {
-		lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
-		for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-		  const symbol_type& terminal = piter->label;
-		  const int length = piter->distance;
-		  
-		  active_set_type& cell = actives[table](first, last - 1 + length);
-		  
-		  // handling of EPSILON rule...
-		  if (terminal == vocab_type::EPSILON) {
-		    for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-		      cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		  } else {
-		    for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		      const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		      if (node == transducer.root()) continue;
-		      
-		      cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+
+	      if (! treebank || length == 1) {
+		// then, advance by terminal(s) at lattice[last - 1];
+		const active_set_type&  active_arcs  = actives[table](first, last - 1);
+		const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
+		
+		active_set_type::const_iterator aiter_begin = active_arcs.begin();
+		active_set_type::const_iterator aiter_end = active_arcs.end();
+		
+		if (aiter_begin != aiter_end) {
+		  lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+		  for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+		    const symbol_type& terminal = piter->label;
+		    const int length = piter->distance;
+		    
+		    active_set_type& cell = actives[table](first, last - 1 + length);
+		    
+		    // handling of EPSILON rule...
+		    if (terminal == vocab_type::EPSILON) {
+		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		    } else {
+		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+			if (node == transducer.root()) continue;
+			
+			cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		      }
 		    }
 		  }
 		}
@@ -226,6 +240,8 @@ namespace cicada
 	  // actually, we need to loop-forever...
 
 	  if (! passives(first, last).empty()) {
+	    //std::cerr << "closure from passives: " << passives(first, last).size() << std::endl;
+
 	    passive_set_type& passive_arcs = passives(first, last);
 	    
 	    size_t passive_first = 0;
@@ -303,6 +319,11 @@ namespace cicada
 	    }
 	  }
 	  
+	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
+	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
+
+	  //std::cerr << "span: " << first << ".." << last << " passives: " << passives(first, last).size() << std::endl;
+	  
 	  // extend root with passive items at [first, last)
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
 	    const transducer_type& transducer = grammar[table];
@@ -354,6 +375,8 @@ namespace cicada
 		    const int level = 0,
 		    const bool is_goal = false)
     {
+      //std::cerr << "rule: " << *rule << std::endl;
+
       hypergraph_type::edge_type& edge = graph.add_edge(first, last);
       edge.rule = rule;
       edge.features = features;
@@ -366,10 +389,7 @@ namespace cicada
       if (is_goal) {
 	if (! graph.is_valid()) {
 	  graph.goal = graph.add_node().id;
-	  
-	  if (graph.goal >= non_terminals.size())
-	    non_terminals.resize(graph.goal + 1);
-	  non_terminals[graph.goal] = rule->lhs;
+	  non_terminals.push_back(rule->lhs);
 	}
 	
 	graph.connect_edge(edge.id, graph.goal);
@@ -377,13 +397,8 @@ namespace cicada
 	std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
 	if (result.second) {
 	  hypergraph_type::node_type& node = graph.add_node();
-	  
+	  non_terminals.push_back(rule->lhs);
 	  passives.push_back(node.id);
-	  
-	  if (node.id >= non_terminals.size())
-	    non_terminals.resize(node.id + 1);
-	  non_terminals[node.id] = rule->lhs;
-	  
 	  result.first->second = node.id;
 	}
 	
@@ -415,20 +430,30 @@ namespace cicada
       
       if (piter_begin != piter_end)
 	for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	  if (transducer.has_next(aiter->node))
+	  if (transducer.has_next(aiter->node)) {
+	    symbol_type label;
+	    transducer_type::id_type node = transducer.root();
+	    
+	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
+	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
+	    
 	    for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	      const symbol_type& non_terminal = non_terminals[*piter];
 	      
-	      const transducer_type::id_type node = transducer.next(aiter->node, non_terminal);
+	      if (label != non_terminal) {
+		node = transducer.next(aiter->node, non_terminal);
+		label = non_terminal;
+	      }
+	      
 	      if (node == transducer.root()) continue;
 	      
-	      hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1, *piter);
-	      std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
+	      tails.back() = *piter;
 	      
 	      cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
 	      
 	      found = true;
 	    }
+	  }
       
       return found;
     }
@@ -439,6 +464,7 @@ namespace cicada
     const symbol_type goal;
     const grammar_type& grammar;
     const bool yield_source;
+    const bool treebank;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
     
@@ -455,9 +481,9 @@ namespace cicada
   };
   
   inline
-  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false)
+  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false)
   {
-    ComposeCKY(goal, grammar, yield_source)(lattice, graph);
+    ComposeCKY(goal, grammar, yield_source, treebank)(lattice, graph);
   }
 };
 
