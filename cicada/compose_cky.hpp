@@ -20,6 +20,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/sgi_hash_map.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -64,41 +65,31 @@ namespace cicada
     
     struct ActiveItem
     {
-      ActiveItem(const transducer_type::id_type& __node,
-		 const hypergraph_type::edge_type::node_set_type __tails,
+      ActiveItem(const hypergraph_type::edge_type::node_set_type __tails,
 		 const feature_set_type& __features,
 		 const attribute_set_type& __attributes)
-	: node(__node),
-	  tails(__tails),
+	: tails(__tails),
 	  features(__features),
 	  attributes(__attributes) {}
-      ActiveItem(const transducer_type::id_type& __node,
-		 const feature_set_type& __features,
+      ActiveItem(const feature_set_type& __features,
 		 const attribute_set_type& __attributes)
-	: node(__node),
-	  tails(),
+	: tails(),
 	  features(__features),
 	  attributes(__attributes) {}
-      ActiveItem(const transducer_type::id_type& __node,
-		 const hypergraph_type::edge_type::node_set_type __tails,
+      ActiveItem(const hypergraph_type::edge_type::node_set_type __tails,
 		 const feature_set_type& __features)
-	: node(__node),
-	  tails(__tails),
+	: tails(__tails),
 	  features(__features),
 	  attributes() {}
-      ActiveItem(const transducer_type::id_type& __node,
-		 const feature_set_type& __features)
-	: node(__node),
-	  tails(),
+      ActiveItem(const feature_set_type& __features)
+	: tails(),
 	  features(__features),
 	  attributes() {}
-      ActiveItem(const transducer_type::id_type& __node)
-	: node(__node),
-	  tails(),
+      ActiveItem()
+	: tails(),
 	  features(),
 	  attributes() {}
       
-      transducer_type::id_type                  node;
       hypergraph_type::edge_type::node_set_type tails;
       feature_set_type                          features;
       attribute_set_type                        attributes;
@@ -106,7 +97,16 @@ namespace cicada
     
     typedef ActiveItem active_type;
     typedef utils::chunk_vector<active_type, 4096 / sizeof(active_type), std::allocator<active_type> > active_set_type;
-    typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
+    
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<transducer_type::id_type, active_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				    std::allocator<std::pair<const transducer_type::id_type, active_set_type> >  > active_map_type;
+#else
+    typedef sgi::hash_map<transducer_type::id_type, active_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+			  std::allocator<std::pair<const transducer_type::id_type, active_set_type> >  > active_map_type;
+#endif
+
+    typedef utils::chart<active_map_type, std::allocator<active_map_type> > active_chart_type;
     typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
 
     typedef hypergraph_type::id_type passive_type;
@@ -170,7 +170,7 @@ namespace cicada
 	
 	for (size_t pos = 0; pos != lattice.size(); ++ pos)
 	  if (grammar[table].valid_span(pos, pos, 0))
-	    actives[table](pos, pos).push_back(active_type(root));
+	    actives[table](pos, pos)[root].push_back(active_type());
       }
       
       for (size_t length = 1; length <= lattice.size(); ++ length)
@@ -189,9 +189,9 @@ namespace cicada
 	      // advance dots....
 	      
 	      // first, extend active items...
-	      active_set_type& cell = actives[table](first, last);
+	      active_map_type& cell = actives[table](first, last);
 	      for (size_t middle = first + 1; middle < last; ++ middle) {
-		const active_set_type&  active_arcs  = actives[table](first, middle);
+		const active_map_type&  active_arcs  = actives[table](first, middle);
 		const passive_set_type& passive_arcs = passives(middle, last);
 		
 		extend_actives(transducer, active_arcs, passive_arcs, cell);
@@ -199,30 +199,39 @@ namespace cicada
 
 	      if (! treebank || length == 1) {
 		// then, advance by terminal(s) at lattice[last - 1];
-		const active_set_type&  active_arcs  = actives[table](first, last - 1);
+		const active_map_type&  active_arcs  = actives[table](first, last - 1);
 		const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
 		
-		active_set_type::const_iterator aiter_begin = active_arcs.begin();
-		active_set_type::const_iterator aiter_end = active_arcs.end();
+		active_map_type::const_iterator aiter_begin = active_arcs.begin();
+		active_map_type::const_iterator aiter_end = active_arcs.end();
 		
 		if (aiter_begin != aiter_end) {
 		  lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
 		  for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
 		    const symbol_type& terminal = piter->label;
-		    const int length = piter->distance;
 		    
-		    active_set_type& cell = actives[table](first, last - 1 + length);
+		    active_map_type& cell = actives[table](first, last - 1 + piter->distance);
 		    
 		    // handling of EPSILON rule...
 		    if (terminal == vocab_type::EPSILON) {
-		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-			cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		    } else {
-		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-			const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-			if (node == transducer.root()) continue;
+		      for (active_map_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			
-			cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+			active_set_type& actives_new = cell[aiter->first];
+			
+			active_set_type::const_iterator iiter_end = aiter->second.end();
+			for (active_set_type::const_iterator iiter = aiter->second.begin(); iiter != iiter_end; ++ iiter)
+			  actives_new.push_back(active_type(iiter->tails, iiter->features + iiter->features, iiter->attributes));
+		      }
+		    } else {
+		      for (active_map_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			const transducer_type::id_type node = transducer.next(aiter->first, terminal);
+			if (node == transducer.root()) continue;
+
+			active_set_type& actives_new = cell[node];
+			
+			active_set_type::const_iterator iiter_end = aiter->second.end();
+			for (active_set_type::const_iterator iiter = aiter->second.begin(); iiter != iiter_end; ++ iiter)
+			  actives_new.push_back(active_type(iiter->tails, iiter->features + piter->features, iiter->attributes));
 		      }
 		    }
 		  }
@@ -234,20 +243,26 @@ namespace cicada
 	    // lattice structure...
 	    // apply rules on actives at [first, last)
 	    
-	    active_set_type&  cell         = actives[table](first, last);
+	    active_map_type&  cell         = actives[table](first, last);
 	    passive_set_type& passive_arcs = passives(first, last);
 	    
-	    active_set_type::const_iterator citer_end = cell.end();
-	    for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
+	    active_map_type::const_iterator citer_end = cell.end();
+	    for (active_map_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
+	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->first);
 	      
 	      if (rules.empty()) continue;
+
+	      active_set_type::const_iterator iiter_begin = citer->second.begin();
+	      active_set_type::const_iterator iiter_end = citer->second.end();
 	      
+	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
 	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features, riter->attributes + citer->attributes,
-			   citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
-			   first, last);
+	      
+	      for (active_set_type::const_iterator iiter = iiter_begin; iiter != iiter_end; ++ iiter)
+		for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter)
+		  apply_rule(yield_source ? riter->source : riter->target, riter->features + iiter->features, riter->attributes + iiter->attributes,
+			     iiter->tails.begin(), iiter->tails.end(), node_map, passive_arcs, graph,
+			     first, last);
 	    }
 	  }
 	  
@@ -336,10 +351,10 @@ namespace cicada
 	    
 	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
 	    
-	    const active_set_type&  active_arcs  = actives[table](first, first);
+	    const active_map_type&  active_arcs  = actives[table](first, first);
 	    const passive_set_type& passive_arcs = passives(first, last);
 	    
-	    active_set_type& cell = actives[table](first, last);
+	    active_map_type& cell = actives[table](first, last);
 	    
 	    extend_actives(transducer, active_arcs, passive_arcs, cell);
 	  }
@@ -422,12 +437,12 @@ namespace cicada
     }
     
     bool extend_actives(const transducer_type& transducer,
-			const active_set_type& actives, 
+			const active_map_type& actives, 
 			const passive_set_type& passives,
-			active_set_type& cell)
+			active_map_type& cell)
     {
-      active_set_type::const_iterator aiter_begin = actives.begin();
-      active_set_type::const_iterator aiter_end = actives.end();
+      active_map_type::const_iterator aiter_begin = actives.begin();
+      active_map_type::const_iterator aiter_end = actives.end();
       
       passive_set_type::const_iterator piter_begin = passives.begin();
       passive_set_type::const_iterator piter_end = passives.end();
@@ -435,29 +450,34 @@ namespace cicada
       bool found = false;
       
       if (piter_begin != piter_end)
-	for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	  if (transducer.has_next(aiter->node)) {
+	for (active_map_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	  if (transducer.has_next(aiter->first)) {
 	    symbol_type label;
 	    transducer_type::id_type node = transducer.root();
-
-	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
-	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
+	    
+	    active_set_type::const_iterator iiter_begin = aiter->second.begin();
+	    active_set_type::const_iterator iiter_end   = aiter->second.end();
 	    
 	    for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 	      const symbol_type& non_terminal = non_terminals[*piter];
 	      
 	      if (label != non_terminal) {
-		node = transducer.next(aiter->node, non_terminal);
+		node = transducer.next(aiter->first, non_terminal);
 		label = non_terminal;
 	      }
 	      
 	      if (node == transducer.root()) continue;
 	      
-	      tails.back() = *piter;
+	      active_set_type& actives_new = cell[node];
 	      
-	      cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
-	      
-	      found = true;
+	      for (active_set_type::const_iterator iiter = iiter_begin; iiter != iiter_end; ++ iiter) {
+		hypergraph_type::edge_type::node_set_type tails(iiter->tails.size() + 1, *piter);
+		std::copy(iiter->tails.begin(), iiter->tails.end(), tails.begin());
+		
+		actives_new.push_back(active_type(tails, iiter->features, iiter->attributes));
+		
+		found = true;
+	      }
 	    }
 	  }
       
