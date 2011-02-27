@@ -141,7 +141,7 @@ namespace cicada
 
       bool operator()(const hypergraph_type::id_type& x, const hypergraph_type::id_type& y) const
       {
-	return non_terminals[x] < non_terminals[y];
+	return non_terminals[x] < non_terminals[y] || (non_terminals[x] == non_terminals[y] && x < y);
       }
       
       const non_terminal_set_type& non_terminals;
@@ -442,10 +442,10 @@ namespace cicada
 			active_map_type& cell)
     {
       active_map_type::const_iterator aiter_begin = actives.begin();
-      active_map_type::const_iterator aiter_end = actives.end();
+      active_map_type::const_iterator aiter_end   = actives.end();
       
       passive_set_type::const_iterator piter_begin = passives.begin();
-      passive_set_type::const_iterator piter_end = passives.end();
+      passive_set_type::const_iterator piter_end   = passives.end();
 
       bool found = false;
       
