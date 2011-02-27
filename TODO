@@ -60,6 +60,7 @@ MONOLINGUAL PARSING!
   Remove -NONE-, normalize non-terminal symbols, (remove -[0-9]+$,  =[0-9]+$ etc.)
   Handle unary rules in an optimized manner:
       Perform caching in grammar class: re-use chain of non-terminals with ertain threshold (# of loops)
+  add parse-cky, bottom-up parser thresholded via beam
 
 
 Cutting-plane learning under cicada_maxlike{,_mpi}...

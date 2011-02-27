@@ -279,6 +279,7 @@ namespace cicada
 	    for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter)
 	      closure[non_terminals[*piter]] = 0;
 	    
+	    int unary_loop = 0;
 	    for (;;) {
 	      const size_t passive_size = passive_arcs.size();
 	      const size_t closure_size = closure.size();
@@ -336,7 +337,13 @@ namespace cicada
 	      for (closure_type::const_iterator titer = closure_tail.begin(); titer != titer_end; ++ titer)
 		++ closure[*titer];
 	      
-	      if (closure_size == closure.size()) break;
+	      if (closure_size != closure.size())
+		unary_loop = 0;
+	      else
+		++ unary_loop;
+	      
+	      // 4 iterations
+	      if (unary_loop == 4) break;
 	    }
 	  }
 	  
