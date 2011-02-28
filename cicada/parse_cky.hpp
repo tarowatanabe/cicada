@@ -385,8 +385,8 @@ namespace cicada
 	    
 	    // check unary rule, and see if this edge is already inserted!
 	    
-	    hypergraph_type::id_type node_passive = 0;
-
+	    std::pair<hypergraph_type::id_type, bool> node_passive;
+	    
 	    if (item->level > 0) {
 	      // check an edge consisting of:
 	      //
@@ -407,9 +407,10 @@ namespace cicada
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
 		
+		node_passive.first = niter->second;
+		node_passive.second = item->score > scores[niter->second];
+		
 		scores[niter->second] = std::max(scores[niter->second], item->score);
-
-		node_passive = niter->second;
 	      } else {
 		node_passive = apply_rule(item->score, item->edge.rule, item->edge.features, item->edge.attributes,
 					  item->edge.tails.begin(), item->edge.tails.end(), passive_arcs, graph,
@@ -423,8 +424,13 @@ namespace cicada
 					first, last, item->level);
 	    
 	    // apply unary rule
+	    //
+	    // we will apply unary rule, when: new node is inserted or better score was found...
+	    //
+
+	    if (! node_passive.second) continue;
 	    
-	    const symbol_type& non_terminal = non_terminals[node_passive];
+	    const symbol_type& non_terminal = non_terminals[node_passive.first];
 	    
 	    for (size_t table = 0; table != grammar.size(); ++ table) {
 	      const transducer_type& transducer = grammar[table];
@@ -445,14 +451,14 @@ namespace cicada
 		
 		candidate_type& cand = candidates.back();
 		
-		cand.edge.tails =  hypergraph_type::edge_type::node_set_type(1, node_passive);
+		cand.edge.tails =  hypergraph_type::edge_type::node_set_type(1, node_passive.first);
 		cand.edge.features   = riter->features;
 		cand.edge.attributes = riter->attributes;
 		cand.edge.rule = yield_source ? riter->source : riter->target;
 		
 		cand.unary = unary_rule_type(table, node, pos);
 		
-		cand.score = function(cand.edge.features) * scores[node_passive];
+		cand.score = function(cand.edge.features) * scores[node_passive.first];
 		cand.level = item->level + 1;
 		
 		heap.push(&cand);
@@ -503,18 +509,18 @@ namespace cicada
   private:
     
     template <typename Iterator>
-    hypergraph_type::id_type apply_rule(const score_type& score,
-					const rule_ptr_type& rule,
-					const feature_set_type& features,
-					const attribute_set_type& attributes,
-					Iterator first,
-					Iterator last,
-					passive_set_type& passives,
-					hypergraph_type& graph,
-					const int lattice_first,
-					const int lattice_last,
-					const int level = 0,
-					const bool is_goal = false)
+    std::pair<hypergraph_type::id_type, bool> apply_rule(const score_type& score,
+							 const rule_ptr_type& rule,
+							 const feature_set_type& features,
+							 const attribute_set_type& attributes,
+							 Iterator first,
+							 Iterator last,
+							 passive_set_type& passives,
+							 hypergraph_type& graph,
+							 const int lattice_first,
+							 const int lattice_last,
+							 const int level = 0,
+							 const bool is_goal = false)
     {
       //std::cerr << "rule: " << *rule << std::endl;
 
@@ -535,8 +541,10 @@ namespace cicada
 	
 	graph.connect_edge(edge.id, graph.goal);
 	
-	return graph.goal;
+	return std::make_pair(graph.goal, false);
       } else {
+	bool unary_next = false;
+
 	std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
 	if (result.second) {
 	  hypergraph_type::node_type& node = graph.add_node();
@@ -546,13 +554,16 @@ namespace cicada
 	  scores.push_back(score);
 	  
 	  result.first->second = node.id;
-	}
+	  
+	  unary_next = true;
+	} else if (score > scores[result.first->second])
+	  unary_next = true;
 	
 	scores[result.first->second] = std::max(scores[result.first->second], score);
 	
 	graph.connect_edge(edge.id, result.first->second);
-
-	return result.first->second;
+	
+	return std::make_pair(result.first->second, unary_next);
       }
     }
     
