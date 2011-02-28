@@ -499,7 +499,7 @@ namespace cicada
 	for (size_t p = 0; p != passive_arcs.size(); ++ p)
 	  if (non_terminals[passive_arcs[p]] == goal) {
 	    if (graph.is_valid())
-	      throw std::runtime_error("multiple goal?");
+	      throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(passive_arcs[p]));
 	    
 	    graph.goal = passive_arcs[p];
 	  }
