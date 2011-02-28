@@ -65,7 +65,7 @@ namespace cicada
     
     struct ActiveItem
     {
-      ActiveItem(const hypergraph_type::id_type& __node,
+      ActiveItem(const transducer_type::id_type& __node,
 		 const hypergraph_type::edge_type::node_set_type __tails,
 		 const feature_set_type& __features,
 		 const attribute_set_type& __attributes)
@@ -73,20 +73,20 @@ namespace cicada
 	  tails(__tails),
 	  features(__features),
 	  attributes(__attributes) {}
-      ActiveItem(const hypergraph_type::id_type& __node,
+      ActiveItem(const transducer_type::id_type& __node,
 		 const feature_set_type& __features,
 		 const attribute_set_type& __attributes)
 	: node(__node),
 	  tails(),
 	  features(__features),
 	  attributes(__attributes) {}
-      ActiveItem(const hypergraph_type::id_type& __node)
+      ActiveItem(const transducer_type::id_type& __node)
 	: node(__node),
 	  tails(),
 	  features(),
 	  attributes() {}
       
-      hypergraph_type::id_type                  node;
+      transducer_type::id_type                  node;
       hypergraph_type::edge_type::node_set_type tails;
       feature_set_type                          features;
       attribute_set_type                        attributes;
