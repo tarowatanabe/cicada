@@ -66,7 +66,7 @@ namespace cicada
     struct ActiveItem
     {
       ActiveItem(const transducer_type::id_type& __node,
-		 const hypergraph_type::edge_type::node_set_type __tails,
+		 const hypergraph_type::edge_type::node_set_type& __tails,
 		 const feature_set_type& __features,
 		 const attribute_set_type& __attributes)
 	: node(__node),

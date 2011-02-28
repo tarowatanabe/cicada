@@ -34,7 +34,7 @@ namespace cicada
   // queue them during rule-application, and grab the most promissing rules...
   // do cube-pruning with passive items?
   // TODO: how to handle unary chains?
-  // hash-based hypergraph structure...?
+  // hash-based hypergraph structure, then, finally convert into actual graph???
   // 
 
   template <typename Semiring, typename Function>
@@ -90,7 +90,7 @@ namespace cicada
     struct ActiveItem
     {
       ActiveItem(const transducer_type::id_type& __node,
-		 const hypergraph_type::edge_type::node_set_type __tails,
+		 const hypergraph_type::edge_type::node_set_type& __tails,
 		 const feature_set_type& __features,
 		 const attribute_set_type& __attributes)
 	: node(__node),
@@ -145,8 +145,7 @@ namespace cicada
 
   
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
-
-    
+    typedef std::vector<score_type,  std::allocator<score_type> >  score_set_type;
     
     struct less_non_terminal
     {
@@ -241,13 +240,26 @@ namespace cicada
 		}
 	      }
 	    }
-	    
-	    // complete active items if possible... The active items may be created from child span due to the
-	    // lattice structure...
-	    // apply rules on actives at [first, last)
+	  }
+	  
+	  // complete active items if possible... The active items may be created from child span due to the
+	  // lattice structure...
+	  // apply rules on actives at [first, last)
+	  
+	  //
+	  // we will try apply rules, queue them as "candidate"
+	  //
+	  // when candidate is popped, create graph
+	  // create new candidate with unary rule, but if it is already created, ignore!
+	  // 
+	  
+	  candidates.clear();
+	  heap.clear();
+	  
+	  for (size_t table = 0; table != grammar.size(); ++ table) {
+	    const transducer_type& transducer = grammar[table];
 	    
 	    active_set_type&  cell         = actives[table](first, last);
-	    passive_set_type& passive_arcs = passives(first, last);
 	    
 	    active_set_type::const_iterator citer_end = cell.end();
 	    for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
@@ -257,93 +269,40 @@ namespace cicada
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
 	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
+
+	      score_type score_antecedent = semiring::traits<score_type>::one();
+	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = citer->tails.end();
+	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
+		score_anteceden *= scores[*titer];
 	      
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter)
-		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features, riter->attributes + citer->attributes,
-			   citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
-			   first, last);
+	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
+		candidates.push_back(candidate_type());
+		
+		candidate_type& cand = candidates.back();
+		
+		cand.edge.tails = citer->tails;
+		cand.edge.features   = riter->features + citer->features;
+		cand.edge.attributes = riter->attributes + citer->attributes;
+		cand.edge.rule = yield_source ? riter->source : riter->target;
+		
+		cand.score = score_antecedent * function(cand.features);
+		
+		heap.push(&cand);
+	      }
 	    }
 	  }
 	  
-	  
-	  if (! passives(first, last).empty()) {
-	    //std::cerr << "closure from passives: " << passives(first, last).size() << std::endl;
-
-	    passive_set_type& passive_arcs = passives(first, last);
+	  for (int num_pos = 0; ! heap.empty() && num_pos != cube_size_max; ++ num_pop) {
+	    // pop-best...
+	    const candidate_type* item = cand.top();
+	    cand.pop();
 	    
-	    size_t passive_first = 0;
+	    // add into graph...
 	    
-	    closure.clear();
-	    passive_set_type::const_iterator piter_end = passive_arcs.end();
-	    for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter)
-	      closure[non_terminals[*piter]] = 0;
 	    
-	    int unary_loop = 0;
-	    for (;;) {
-	      const size_t passive_size = passive_arcs.size();
-	      const size_t closure_size = closure.size();
-	      
-	      closure_head.clear();
-	      closure_tail.clear();
-	      
-	      for (size_t table = 0; table != grammar.size(); ++ table) {
-		const transducer_type& transducer = grammar[table];
-		
-		if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
-		
-		for (size_t p = passive_first; p != passive_size; ++ p) {
-		  const symbol_type non_terminal = non_terminals[passive_arcs[p]];
-		  
-		  const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
-		  if (node == transducer.root()) continue;
-		  
-		  const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
-		  
-		  if (rules.empty()) continue;
-		  
-		  // passive_arcs "MAY" be modified!
-		  
-		  closure_tail.insert(non_terminal);
-		  
-		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-		    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
-		    const symbol_type& lhs = rule->lhs;
-		    
-		    closure_level_type::const_iterator citer = closure.find(lhs);
-		    const int level = (citer != closure.end() ? citer->second : 0);
-		    
-		    closure_head.insert(lhs);
-		    
-		    apply_rule(rule, riter->features, riter->attributes,
-			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
-			       first, last, level + 1);
-		  }
-		}
-	      }
-	      
-	      if (passive_size == passive_arcs.size()) break;
-	      
-	      passive_first = passive_size;
-	      
-	      // we use level-one, that is the label assigned for new-lhs!
-	      closure_type::const_iterator hiter_end = closure_head.end();
-	      for (closure_type::const_iterator hiter = closure_head.begin(); hiter != hiter_end; ++ hiter)
-		closure.insert(std::make_pair(*hiter, 1));
-	      
-	      // increment non-terminal level when used as tails...
-	      closure_type::const_iterator titer_end = closure_tail.end();
-	      for (closure_type::const_iterator titer = closure_tail.begin(); titer != titer_end; ++ titer)
-		++ closure[*titer];
-	      
-	      if (closure_size != closure.size())
-		unary_loop = 0;
-	      else
-		++ unary_loop;
-	      
-	      // 4 iterations
-	      if (unary_loop == 4) break;
-	    }
+	    // apply unary rule
+	    
+	    
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
