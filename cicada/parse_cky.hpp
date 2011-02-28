@@ -556,8 +556,8 @@ namespace cicada
 	  result.first->second = node.id;
 	  
 	  unary_next = true;
-	} else if (score > scores[result.first->second])
-	  unary_next = true;
+	} else
+	  unary_next = score > scores[result.first->second];
 	
 	scores[result.first->second] = std::max(scores[result.first->second], score);
 	
