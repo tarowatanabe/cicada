@@ -22,12 +22,12 @@ namespace cicada
   {
 
     ParseCKY::ParseCKY(const std::string& parameter,
-			   const grammar_type& __grammar,
-			   const std::string& __goal,
-			   const std::string& __non_terminal,
-			   const bool __insertion,
-			   const bool __deletion,
-			   const int __debug)
+		       const grammar_type& __grammar,
+		       const std::string& __goal,
+		       const std::string& __non_terminal,
+		       const bool __insertion,
+		       const bool __deletion,
+		       const int __debug)
       : grammar(__grammar),
 	goal(__goal), non_terminal(__non_terminal), 
 	insertion(__insertion), deletion(__deletion),
@@ -83,6 +83,8 @@ namespace cicada
 
     void ParseCKY::operator()(data_type& data) const
     {
+      typedef cicada::semiring::Logprob<double> weight_type;
+
       const lattice_type& lattice = data.lattice;
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type parsed;
