@@ -21,6 +21,8 @@
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_map.hpp>
+#include <utils/b_heap.hpp>
+#include <utils/std_heap.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -82,9 +84,6 @@ namespace cicada
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
       
       node_map.set_empty_key(symbol_level_type());
-      closure.set_empty_key(symbol_type());
-      closure_head.set_empty_key(symbol_type());
-      closure_tail.set_empty_key(symbol_type());
     }
     
     struct ActiveItem
@@ -122,10 +121,66 @@ namespace cicada
     typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
     typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
 
+    
+    struct UnaryRule
+    {
+      size_type                 table;
+      transducuer_type::id_type node;
+      size_type                 pos;
+      
+      UnaryRule() : table(0), node(0), pos(0) {}
+      UnaryRyle(const size_type& __table, const transducer_type::id_type& __node, const size_type& __pos)
+	: table(__table), node(__node), pos(__pos) {}
+      
+      friend
+      size_t hash_value(UnaryRule const& x)
+      {
+	utils::hashmurmur<size_t>()(x);
+      }
+      
+      friend
+      bool operator==(const UnaryRule& x, const UnaryRule& y)
+      {
+	return x.table == y.table && x.node == y.node && x.pos == y.pos;
+      }
+      
+      friend
+      bool operator<(const UnaryRule& x, const UnaryRule& y)
+      {
+	return (x.table < y.table || (x.table == y.table && (x.node < y.node || (x.node == y.node && x.pos < y.pos))));
+      }
+    };
+
+    typedef UnaryRule unary_rule_type;
+    
+    struct Candidate
+    {
+      Candidate() : edge(), unary(), score(), leval(0) {}
+      
+      hypergraph_type::edge_type edge;
+      unary_rule_type uanry;
+      score_type score;
+      int level;
+    };
+    typedef Candidate candidate_type;
+    typedef utils::chunk_vector<candidate_type, 1024 * 8 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
+
+    struct compare_heap_type
+    {
+      // we use less, so that when popped from heap, we will grab "greater" in back...
+      bool operator()(const candidate_type* x, const candidate_type* y) const
+      {
+	return x->score < y->score;
+      }
+    };
+    
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
+    typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
+    
     typedef hypergraph_type::id_type passive_type;
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
-
+    
     typedef std::pair<symbol_type, int> symbol_level_type;
     
     struct symbol_level_hash : public utils::hashmurmur<size_t>
@@ -137,13 +192,9 @@ namespace cicada
 	return hasher_type::operator()(x.first, x.second);
       }
     };
-
+    
     typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
     
-    typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
-    typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
-
-  
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     typedef std::vector<score_type,  std::allocator<score_type> >  score_set_type;
     
@@ -542,10 +593,11 @@ namespace cicada
     passive_chart_type     passives;
 
     node_map_type         node_map;
-    closure_level_type    closure;
-    closure_type          closure_head;
-    closure_type          closure_tail;
+    candidate_set_type    candidates;
+    candidate_heap_type   heap;
+    
     non_terminal_set_type non_terminals;
+    score_set_type        scores;
   };
 
   
