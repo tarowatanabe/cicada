@@ -25,6 +25,7 @@
 #include <utils/sgi_hash_set.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
+#include <utils/bithack.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -461,10 +462,7 @@ namespace cicada
 		cand.unary = unary_rule_type(table, node, pos);
 		
 		cand.score = function(cand.edge.features) * scores[node_passive.first];
-		cand.level = item->level + 1;
-		
-		if (unique_goal && cand.edge.rule->lhs == goal)
-		  cand.level = 0;
+		cand.level = utils::bithack::branch(unique_goal && cand.edge.rule->lhs == goal, 0, item->level + 1);
 		
 		heap.push(&cand);
 	      }
