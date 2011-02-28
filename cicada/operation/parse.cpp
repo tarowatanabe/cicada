@@ -111,7 +111,7 @@ namespace cicada
 	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
 	
       if (weights_one)
-	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, unqiue_goal);
+	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, unique_goal);
       else
 	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, unique_goal);
       
