@@ -463,6 +463,9 @@ namespace cicada
 		cand.score = function(cand.edge.features) * scores[node_passive.first];
 		cand.level = item->level + 1;
 		
+		if (unique_goal && cand.edge.rule->lhs == goal)
+		  cand.level = 0;
+		
 		heap.push(&cand);
 	      }
 	    }
