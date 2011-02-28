@@ -236,7 +236,7 @@ namespace cicada
 	      
 	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter)
 		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features, riter->attributes + citer->attributes,
-			   citer->tails.begin(), citer->tails.end(), node_map, passive_arcs, graph,
+			   citer->tails.begin(), citer->tails.end(), passive_arcs, graph,
 			   first, last);
 	    }
 	  }
@@ -292,7 +292,7 @@ namespace cicada
 		    closure_head.insert(lhs);
 		    
 		    apply_rule(rule, riter->features, riter->attributes,
-			       &passive_arcs[p], (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+			       &passive_arcs[p], (&passive_arcs[p]) + 1, passive_arcs, graph,
 			       first, last, level + 1);
 		  }
 		}
@@ -353,7 +353,7 @@ namespace cicada
 	if (non_terminals[passive_arcs[p]] == goal) {
 	  //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
 	  
-	  apply_rule(goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+	  apply_rule(goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, passive_arcs, graph,
 		     0, lattice.size(),
 		     0, true);
 	}
@@ -370,7 +370,6 @@ namespace cicada
 		    const attribute_set_type& attributes,
 		    Iterator first,
 		    Iterator last,
-		    node_map_type& node_map,
 		    passive_set_type& passives,
 		    hypergraph_type& graph,
 		    const int lattice_first,

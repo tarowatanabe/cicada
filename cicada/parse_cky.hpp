@@ -188,9 +188,7 @@ namespace cicada
       for (size_t length = 1; length <= lattice.size(); ++ length)
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
-	  
-	  node_map.clear();
-	  
+	  	  
 	  //std::cerr << "span: " << first << ".." << last << " distance: " << lattice.shortest_distance(first, last) << std::endl;
 	  
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -208,22 +206,22 @@ namespace cicada
 		
 		extend_actives(transducer, active_arcs, passive_arcs, cell);
 	      }
-
+	      
 	      if (! treebank || length == 1) {
 		// then, advance by terminal(s) at lattice[last - 1];
 		const active_set_type&  active_arcs  = actives[table](first, last - 1);
 		const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
-		
+	      
 		active_set_type::const_iterator aiter_begin = active_arcs.begin();
 		active_set_type::const_iterator aiter_end = active_arcs.end();
-		
+	      
 		if (aiter_begin != aiter_end) {
 		  lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
 		  for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
 		    const symbol_type& terminal = piter->label;
-		    
+		  
 		    active_set_type& cell = actives[table](first, last - 1 + piter->distance);
-		    
+		  
 		    // handling of EPSILON rule...
 		    if (terminal == vocab_type::EPSILON) {
 		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
@@ -253,6 +251,7 @@ namespace cicada
 	  // create new candidate with unary rule, but if it is already created, ignore!
 	  // 
 	  
+	  node_map.clear();
 	  candidates.clear();
 	  heap.clear();
 	  
@@ -269,13 +268,15 @@ namespace cicada
 	      
 	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
 	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
-
+	      
 	      score_type score_antecedent = semiring::traits<score_type>::one();
+	      
 	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = citer->tails.end();
 	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
-		score_anteceden *= scores[*titer];
+		score_antecedent *= scores[*titer];
 	      
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
+	      size_type pos = 0;
+	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter, ++ pos) {
 		candidates.push_back(candidate_type());
 		
 		candidate_type& cand = candidates.back();
@@ -285,12 +286,17 @@ namespace cicada
 		cand.edge.attributes = riter->attributes + citer->attributes;
 		cand.edge.rule = yield_source ? riter->source : riter->target;
 		
-		cand.score = score_antecedent * function(cand.features);
+		cand.unary = unary_rule(table, node, pos);
+		
+		cand.score = score_antecedent * function(cand.edge.features);
+		cand.level = 0;
 		
 		heap.push(&cand);
 	      }
 	    }
 	  }
+
+	  passive_set_type& passive_arcs = passives(first, last);
 	  
 	  for (int num_pos = 0; ! heap.empty() && num_pos != cube_size_max; ++ num_pop) {
 	    // pop-best...
@@ -299,10 +305,85 @@ namespace cicada
 	    
 	    // add into graph...
 	    
+	    //
+	    // we will always expand into unary rules, in order to find out better unary chain!
+	    //
+	    
+	    // check unary rule, and see if this edge is already inserted!
+	    
+	    hypergraph_type::id_type node_passive = 0;
+
+	    if (item->level > 0) {
+	      // check an edge consisting of:
+	      //
+	      // non_terminals[item->edge.tails.front()] (item->level - 1)
+	      // item->rule->lhs (item->level)
+	      // with item->table, item->node, item->pos
+	      //
+	      
+	      // if already inserted, check node-map and update scores!
+
+	      const symbol_type label_prev = non_terminals[item->edge.tails.front()];
+	      const symbol_type label_lext = item->rule->lhs;
+	      
+	      unary_rule_set_type& unaries = unary_map[std::make_pair(label_prev, item->level - 1)][std::make_pair(label_next, item->level)];
+	      
+	      if (unaries.find(item->unary) != unaries.end()) {
+		node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
+		if (niter == node_map.end())
+		  throw std::runtime_error("no node-map?");
+		
+		scores[niter->second] = std::max(scores[niter->second], score);
+
+		node_passive = niter->second;
+	      } else {
+		node_passive = apply_rule(item->score, item->edge.rule, item->edge.features, item->edge.attributes,
+					  item->edge.tails.begin(), item->edge.tails.end(), passive_arcs, graph,
+					  first, last, item->level);
+		
+		unaries.insert(item->unary);
+	      }
+	    } else
+	      node_passive = apply_rule(item->score, item->edge.rule, item->edge.features, item->edge.attributes,
+					item->edge.tails.begin(), item->edge.tails.end(), passive_arcs, graph,
+					first, last, item->level);
 	    
 	    // apply unary rule
 	    
+	    const symbol_type& non_terminal = non_terminals[node_passive];
 	    
+	    for (size_t table = 0; table != grammar.size(); ++ table) {
+	      const transducer_type& transducer = grammar[table];
+	      
+	      if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+	      
+	      const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
+	      if (node == transducer.root()) continue;
+	      
+	      const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+	      
+	      if (rules.empty()) continue;
+	      
+	      size_type pos = 0;
+	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter, ++ pos) {
+		candidates.push_back(candidate_type());
+		
+		candidate_type& cand = candidates.back();
+		
+		cand.edge.tails =  hypergraph_type::edge_type::node_set_type(1, node_passive);
+		cand.edge.features   = riter->features;
+		cand.edge.attributes = riter->attributes;
+		cand.edge.rule = yield_source ? riter->source : riter->target;
+		
+		cand.unary = unary_rule(table, node, pos);
+		
+		cand.score = function(cand.edge.features) * scores[node_passive];
+		cand.level = item->level + 1;
+		
+		heap.push(&cand);
+	      }
+	    }
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
@@ -336,7 +417,7 @@ namespace cicada
 	if (non_terminals[passive_arcs[p]] == goal) {
 	  //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
 	  
-	  apply_rule(goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, node_map, passive_arcs, graph,
+	  apply_rule(score_type(), goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, passive_arcs, graph,
 		     0, lattice.size(),
 		     0, true);
 	}
@@ -348,18 +429,18 @@ namespace cicada
   private:
     
     template <typename Iterator>
-    void apply_rule(const rule_ptr_type& rule,
-		    const feature_set_type& features,
-		    const attribute_set_type& attributes,
-		    Iterator first,
-		    Iterator last,
-		    node_map_type& node_map,
-		    passive_set_type& passives,
-		    hypergraph_type& graph,
-		    const int lattice_first,
-		    const int lattice_last,
-		    const int level = 0,
-		    const bool is_goal = false)
+    hypergraph_type::id_type apply_rule(const score_tyep& score,
+					const rule_ptr_type& rule,
+					const feature_set_type& features,
+					const attribute_set_type& attributes,
+					Iterator first,
+					Iterator last,
+					passive_set_type& passives,
+					hypergraph_type& graph,
+					const int lattice_first,
+					const int lattice_last,
+					const int level = 0,
+					const bool is_goal = false)
     {
       //std::cerr << "rule: " << *rule << std::endl;
 
@@ -379,26 +460,26 @@ namespace cicada
 	}
 	
 	graph.connect_edge(edge.id, graph.goal);
+	
+	return graph.goal;
       } else {
 	std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
 	if (result.second) {
 	  hypergraph_type::node_type& node = graph.add_node();
+	  
 	  non_terminals.push_back(rule->lhs);
 	  passives.push_back(node.id);
+	  scores.push_back(score);
+	  
 	  result.first->second = node.id;
 	}
 	
+	scores[result.first->second] = std::max(scores[result.first->second], score);
+	
 	graph.connect_edge(edge.id, result.first->second);
-      }
 
-#if 0
-      std::cerr << "new rule: " << *(edge.rule)
-		<< " head: " << edge.head
-		<< ' ';
-      std::copy(edge.tails.begin(), edge.tails.end(), std::ostream_iterator<int>(std::cerr, " "));
-      std::cerr << std::endl;
-#endif
-      
+	return result.first->second;
+      }
     }
     
     bool extend_actives(const transducer_type& transducer,
