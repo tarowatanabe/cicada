@@ -137,7 +137,7 @@ namespace cicada
       friend
       size_t hash_value(UnaryRule const& x)
       {
-	utils::hashmurmur<size_t>()(x);
+	return utils::hashmurmur<size_t>()(x);
       }
       
       friend
