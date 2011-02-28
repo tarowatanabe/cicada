@@ -360,7 +360,7 @@ namespace cicada
 		cand.edge.attributes = riter->attributes + citer->attributes;
 		cand.edge.rule = yield_source ? riter->source : riter->target;
 		
-		cand.unary = unary_rule(table, citer->node, pos);
+		cand.unary = unary_rule_type(table, citer->node, pos);
 		
 		cand.score = score_antecedent * function(cand.edge.features);
 		cand.level = 0;
@@ -398,7 +398,7 @@ namespace cicada
 	      // if already inserted, check node-map and update scores!
 	      
 	      const symbol_type label_prev = non_terminals[item->edge.tails.front()];
-	      const symbol_type label_next = item->rule->lhs;
+	      const symbol_type label_next = item->edge.rule->lhs;
 	      
 	      unary_rule_set_type& unaries = unary_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 	      
