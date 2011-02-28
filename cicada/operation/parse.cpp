@@ -36,6 +36,7 @@ namespace cicada
 	weights_one(false),
 	yield_source(false),
 	treebank(false),
+	unique_goal(false),
 	debug(__debug)
     { 
       typedef cicada::Parameter param_type;
@@ -63,6 +64,8 @@ namespace cicada
 	    throw std::runtime_error("unknown yield: " + piter->second);
 	} else if (utils::ipiece(piter->first) == "treebank")
 	  treebank = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
+	  unique_goal = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for CKY parser: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -108,9 +111,9 @@ namespace cicada
 	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
 	
       if (weights_one)
-	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank);
+	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, unqiue_goal);
       else
-	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank);
+	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, unique_goal);
       
       utils::resource end;
     

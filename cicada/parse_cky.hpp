@@ -73,13 +73,15 @@ namespace cicada
 	     const function_type& __function,
 	     const int __beam_size,
 	     const bool __yield_source=false,
-	     const bool __treebank=false)
+	     const bool __treebank=false,
+	     const bool __unique_goal=false)
       : goal(__goal),
 	grammar(__grammar),
 	function(__function),
 	beam_size(__beam_size),
 	yield_source(__yield_source),
 	treebank(__treebank),
+	unique_goal(__unique_goal),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
@@ -491,16 +493,27 @@ namespace cicada
       
       // we will clear node map so that we will always create new node..
       node_map.clear();
-      
-      passive_set_type& passive_arcs = passives(0, lattice.size());
-      for (size_t p = 0; p != passive_arcs.size(); ++ p)
-	if (non_terminals[passive_arcs[p]] == goal) {
-	  //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
-	  
-	  apply_rule(score_type(), goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, passive_arcs, graph,
-		     0, lattice.size(),
-		     0, true);
-	}
+
+      if (unique_goal) {
+	passive_set_type& passive_arcs = passives(0, lattice.size());
+	for (size_t p = 0; p != passive_arcs.size(); ++ p)
+	  if (non_terminals[passive_arcs[p]] == goal) {
+	    if (graph.is_valid())
+	      throw std::runtime_error("multiple goal?");
+	    
+	    graph.goal = passive_arcs[p];
+	  }
+      } else {
+	passive_set_type& passive_arcs = passives(0, lattice.size());
+	for (size_t p = 0; p != passive_arcs.size(); ++ p)
+	  if (non_terminals[passive_arcs[p]] == goal) {
+	    //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
+	    
+	    apply_rule(score_type(), goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, passive_arcs, graph,
+		       0, lattice.size(),
+		       0, true);
+	  }
+      }
       
       // we will sort to remove unreachable nodes......
       graph.topologically_sort();
@@ -618,6 +631,7 @@ namespace cicada
 
     const bool yield_source;
     const bool treebank;
+    const bool unique_goal;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
     
@@ -637,9 +651,9 @@ namespace cicada
   
   template <typename Function>
   inline
-  void parse_cky(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false)
+  void parse_cky(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false, const bool unique_goal=false)
   {
-    ParseCKY<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank)(lattice, graph);
+    ParseCKY<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank, unique_goal)(lattice, graph);
   }
   
 };

@@ -43,6 +43,7 @@ namespace cicada
       
       bool yield_source;
       bool treebank;
+      bool unique_goal;
       
       int debug;
     };
