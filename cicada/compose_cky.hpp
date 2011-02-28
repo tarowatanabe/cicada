@@ -203,9 +203,8 @@ namespace cicada
 		    
 		    // handling of EPSILON rule...
 		    if (terminal == vocab_type::EPSILON) {
-		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-			cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + aiter->features, aiter->attributes));
-		      }
+		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
 		    } else {
 		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			const transducer_type::id_type node = transducer.next(aiter->node, terminal);

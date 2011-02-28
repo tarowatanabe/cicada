@@ -61,6 +61,8 @@ MONOLINGUAL PARSING!
   Handle unary rules in an optimized manner:
       Perform caching in grammar class: re-use chain of non-terminals with ertain threshold (# of loops)
   add parse-cky, bottom-up parser thresholded via beam
+      It is basically the same as compose-cky, but differ in that when 
+      apply rules, we will use beam to select the top-most rules...
 
 
 Cutting-plane learning under cicada_maxlike{,_mpi}...
