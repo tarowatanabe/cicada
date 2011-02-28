@@ -16,11 +16,13 @@
 #include <cicada/grammar.hpp>
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
+#include <cicada/semiring.hpp>
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_map.hpp>
+#include <utils/sgi_hash_set.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 
@@ -124,12 +126,12 @@ namespace cicada
     
     struct UnaryRule
     {
-      size_type                 table;
-      transducuer_type::id_type node;
-      size_type                 pos;
+      size_type                table;
+      transducer_type::id_type node;
+      size_type                pos;
       
       UnaryRule() : table(0), node(0), pos(0) {}
-      UnaryRyle(const size_type& __table, const transducer_type::id_type& __node, const size_type& __pos)
+      UnaryRule(const size_type& __table, const transducer_type::id_type& __node, const size_type& __pos)
 	: table(__table), node(__node), pos(__pos) {}
       
       friend
@@ -152,13 +154,47 @@ namespace cicada
     };
 
     typedef UnaryRule unary_rule_type;
+
+#ifdef HAVE_TR1_UNORDERED_SET
+    typedef std::tr1::unordered_set<unary_rule_type, boost::hash<unary_rule_type>, std::equal_to<unary_rule_type>,
+				    std::allocator<unary_rule_type> > unary_rule_set_type;
+#else
+    typedef sgi::hash_set<unary_rule_type, boost::hash<unary_rule_type>, std::equal_to<unary_rule_type>,
+			  std::allocator<unary_rule_type> > unary_rule_set_type;
+#endif
+
+    typedef std::pair<symbol_type, int> symbol_level_type;
+    
+    struct symbol_level_hash : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const symbol_level_type& x) const
+      {
+	return hasher_type::operator()(x.first, x.second);
+      }
+    };
+    
+    typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
+
+    typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
+    
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
+				    std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
+#else
+    typedef sgi::hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
+			  std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
+    
+#endif
     
     struct Candidate
     {
-      Candidate() : edge(), unary(), score(), leval(0) {}
+      Candidate() : edge(), unary(), score(), level(0) {}
       
       hypergraph_type::edge_type edge;
-      unary_rule_type uanry;
+      unary_rule_type unary;
       score_type score;
       int level;
     };
@@ -180,21 +216,7 @@ namespace cicada
     typedef hypergraph_type::id_type passive_type;
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
-    
-    typedef std::pair<symbol_type, int> symbol_level_type;
-    
-    struct symbol_level_hash : public utils::hashmurmur<size_t>
-    {
-      typedef utils::hashmurmur<size_t> hasher_type;
-      
-      size_t operator()(const symbol_level_type& x) const
-      {
-	return hasher_type::operator()(x.first, x.second);
-      }
-    };
-    
-    typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
-    
+        
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     typedef std::vector<score_type,  std::allocator<score_type> >  score_set_type;
     
@@ -263,8 +285,8 @@ namespace cicada
 		const active_set_type&  active_arcs  = actives[table](first, last - 1);
 		const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
 	      
-		active_set_type::const_iterator aiter_begin = active_arcs.begin();
-		active_set_type::const_iterator aiter_end = active_arcs.end();
+		typename active_set_type::const_iterator aiter_begin = active_arcs.begin();
+		typename active_set_type::const_iterator aiter_end = active_arcs.end();
 	      
 		if (aiter_begin != aiter_end) {
 		  lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
@@ -275,10 +297,10 @@ namespace cicada
 		  
 		    // handling of EPSILON rule...
 		    if (terminal == vocab_type::EPSILON) {
-		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+		      for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 			cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
 		    } else {
-		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+		      for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 			if (node == transducer.root()) continue;
 			
@@ -302,6 +324,7 @@ namespace cicada
 	  // create new candidate with unary rule, but if it is already created, ignore!
 	  // 
 	  
+	  unary_map.clear();
 	  node_map.clear();
 	  candidates.clear();
 	  heap.clear();
@@ -311,8 +334,8 @@ namespace cicada
 	    
 	    active_set_type&  cell         = actives[table](first, last);
 	    
-	    active_set_type::const_iterator citer_end = cell.end();
-	    for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
+	    typename active_set_type::const_iterator citer_end = cell.end();
+	    for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
 	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
 	      
 	      if (rules.empty()) continue;
@@ -337,7 +360,7 @@ namespace cicada
 		cand.edge.attributes = riter->attributes + citer->attributes;
 		cand.edge.rule = yield_source ? riter->source : riter->target;
 		
-		cand.unary = unary_rule(table, node, pos);
+		cand.unary = unary_rule(table, citer->node, pos);
 		
 		cand.score = score_antecedent * function(cand.edge.features);
 		cand.level = 0;
@@ -349,10 +372,10 @@ namespace cicada
 
 	  passive_set_type& passive_arcs = passives(first, last);
 	  
-	  for (int num_pos = 0; ! heap.empty() && num_pos != cube_size_max; ++ num_pop) {
+	  for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; ++ num_pop) {
 	    // pop-best...
-	    const candidate_type* item = cand.top();
-	    cand.pop();
+	    const candidate_type* item = heap.top();
+	    heap.pop();
 	    
 	    // add into graph...
 	    
@@ -373,18 +396,18 @@ namespace cicada
 	      //
 	      
 	      // if already inserted, check node-map and update scores!
-
-	      const symbol_type label_prev = non_terminals[item->edge.tails.front()];
-	      const symbol_type label_lext = item->rule->lhs;
 	      
-	      unary_rule_set_type& unaries = unary_map[std::make_pair(label_prev, item->level - 1)][std::make_pair(label_next, item->level)];
+	      const symbol_type label_prev = non_terminals[item->edge.tails.front()];
+	      const symbol_type label_next = item->rule->lhs;
+	      
+	      unary_rule_set_type& unaries = unary_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 	      
 	      if (unaries.find(item->unary) != unaries.end()) {
-		node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
+		typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
 		
-		scores[niter->second] = std::max(scores[niter->second], score);
+		scores[niter->second] = std::max(scores[niter->second], item->score);
 
 		node_passive = niter->second;
 	      } else {
@@ -427,7 +450,7 @@ namespace cicada
 		cand.edge.attributes = riter->attributes;
 		cand.edge.rule = yield_source ? riter->source : riter->target;
 		
-		cand.unary = unary_rule(table, node, pos);
+		cand.unary = unary_rule_type(table, node, pos);
 		
 		cand.score = function(cand.edge.features) * scores[node_passive];
 		cand.level = item->level + 1;
@@ -480,7 +503,7 @@ namespace cicada
   private:
     
     template <typename Iterator>
-    hypergraph_type::id_type apply_rule(const score_tyep& score,
+    hypergraph_type::id_type apply_rule(const score_type& score,
 					const rule_ptr_type& rule,
 					const feature_set_type& features,
 					const attribute_set_type& attributes,
@@ -514,7 +537,7 @@ namespace cicada
 	
 	return graph.goal;
       } else {
-	std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
+	std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
 	if (result.second) {
 	  hypergraph_type::node_type& node = graph.add_node();
 	  
@@ -538,8 +561,8 @@ namespace cicada
 			const passive_set_type& passives,
 			active_set_type& cell)
     {
-      active_set_type::const_iterator aiter_begin = actives.begin();
-      active_set_type::const_iterator aiter_end   = actives.end();
+      typename active_set_type::const_iterator aiter_begin = actives.begin();
+      typename active_set_type::const_iterator aiter_end   = actives.end();
       
       passive_set_type::const_iterator piter_begin = passives.begin();
       passive_set_type::const_iterator piter_end   = passives.end();
@@ -547,7 +570,7 @@ namespace cicada
       bool found = false;
       
       if (piter_begin != piter_end)
-	for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 	  if (transducer.has_next(aiter->node)) {
 	    symbol_type label;
 	    transducer_type::id_type node = transducer.root();
@@ -592,6 +615,7 @@ namespace cicada
     active_chart_set_type  actives;
     passive_chart_type     passives;
 
+    unary_rule_map_type   unary_map;
     node_map_type         node_map;
     candidate_set_type    candidates;
     candidate_heap_type   heap;
@@ -599,7 +623,13 @@ namespace cicada
     non_terminal_set_type non_terminals;
     score_set_type        scores;
   };
-
+  
+  template <typename Function>
+  inline
+  void parse_cky(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false)
+  {
+    ParseCKY<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank)(lattice, graph);
+  }
   
 };
 

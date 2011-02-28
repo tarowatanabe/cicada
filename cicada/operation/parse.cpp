@@ -6,11 +6,11 @@
 
 #include <cicada/operation.hpp>
 #include <cicada/parameter.hpp>
-#include <cicada/parser.hpp>
+#include <cicada/parse.hpp>
 #include <cicada/grammar_simple.hpp>
 
 #include <cicada/operation/functional.hpp>
-#include <cicada/operation/parser.hpp>
+#include <cicada/operation/parse.hpp>
 
 #include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
@@ -31,7 +31,7 @@ namespace cicada
       : grammar(__grammar),
 	goal(__goal), non_terminal(__non_terminal), 
 	insertion(__insertion), deletion(__deletion),
-	weights(0)
+	weights(0),
 	size(200),
 	weights_one(false),
 	yield_source(false),
@@ -71,6 +71,9 @@ namespace cicada
 	throw std::runtime_error("CKY parser can work either source or target yield");
 	
       yield_source = source;
+
+      if (weights && weights_one)
+	throw std::runtime_error("you have weights, but specified all-one parameter");
     }
 
     void ParseCKY::assign(const weight_set_type& __weights)
@@ -103,9 +106,9 @@ namespace cicada
 	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
 	
       if (weights_one)
-	cicada::parse_cky(goal, grammar_parse, lattice, parsed, yield_source, treebank);
+	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank);
       else
-	cicada::parse_cky(goal, grammar_parse, lattice, parsed, yield_source, treebank);
+	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank);
       
       utils::resource end;
     

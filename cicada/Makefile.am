@@ -176,6 +176,7 @@ operation/generate.hpp \
 operation/intersect.hpp \
 operation/normalize.hpp \
 operation/output.hpp \
+operation/parse.hpp \
 operation/permute.hpp \
 operation/prune.hpp \
 operation/remove_epsilon.hpp \
@@ -193,6 +194,7 @@ operation/intersect.cpp \
 operation/generate.cpp \
 operation/normalize.cpp \
 operation/output.cpp \
+operation/parse.cpp \
 operation/permute.cpp \
 operation/prune.cpp \
 operation/remove_epsilon.cpp \
@@ -256,6 +258,8 @@ operation.hpp \
 operation_set.hpp \
 optimize.hpp \
 parameter.hpp \
+parse.hpp \
+parse_cky.hpp \
 permute.hpp \
 prune.hpp \
 prune_beam.hpp \
