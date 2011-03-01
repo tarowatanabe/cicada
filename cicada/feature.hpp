@@ -75,7 +75,7 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex_data);
+	lock_type lock(__mutex);
 	maps[__id] = &(__features()[__id]);
       }
       
@@ -126,7 +126,7 @@ namespace cicada
   public:
     static bool exists(const piece_type& x)
     {
-      lock_type lock(__mutex_index);
+      lock_type lock(__mutex);
       
       const feature_index_type& index = __index();
       
@@ -135,13 +135,12 @@ namespace cicada
     
     static size_t allocated()
     {
-      lock_type lock(__mutex_data);
+      lock_type lock(__mutex);
       return __features().size();
     }
     
   private:
-    static mutex_type    __mutex_index;
-    static mutex_type    __mutex_data;
+    static mutex_type    __mutex;
     
     static feature_map_type& __feature_maps();
     
@@ -165,17 +164,15 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      lock_type lock(__mutex_index);
+      lock_type lock(__mutex);
       
       feature_index_type& index = __index();
       
       std::pair<feature_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
-	lock_type lock(__mutex_data);
-
 	feature_set_type& features = __features();
-	features.resize(features.size() + 1, x);
+	features.push_back(x);
 	const_cast<piece_type&>(*result.first) = features.back();
       }
       
