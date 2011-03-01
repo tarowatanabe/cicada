@@ -175,7 +175,7 @@ namespace cicada
 	lock_type lock(__mutex_data);
 
 	attribute_set_type& attributes = __attributes();
-	attributes.push_back(x);
+	attributes.push_back(static_cast<attribute_type>(x));
 	const_cast<piece_type&>(*result.first) = attributes.back();	
       }
       

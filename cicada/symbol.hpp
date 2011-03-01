@@ -193,7 +193,7 @@ namespace cicada
 	lock_type lock(__mutex_data);
 
 	symbol_set_type& symbols = __symbols();
-	symbols.push_back(x);
+	symbols.push_back(static_cast<symbol_type>(x));
 	const_cast<piece_type&>(*result.first) = symbols.back();
       }
       

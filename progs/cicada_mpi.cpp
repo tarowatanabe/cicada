@@ -105,10 +105,15 @@ int main(int argc, char ** argv)
 	  throw std::runtime_error("invalid fallback non-terminal file: " + symbol_fallback_file.string());
 	
 	utils::compress_istream is(symbol_fallback_file, 1024 * 1024);
+	sentence_type non_terminals;
+	symbol_type symbol;
+	while (is >> symbol)
+	  non_terminals.push_back(symbol);
+	
 	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
 										    symbol_non_terminal,
-										    std::istream_iterator<std::string>(is),
-										    std::istream_iterator<std::string>(),
+										    non_terminals.begin(),
+										    non_terminals.end(),
 										    grammar_glue_straight,
 										    grammar_glue_inverted)));
       } else
