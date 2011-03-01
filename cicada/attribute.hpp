@@ -173,7 +173,7 @@ namespace cicada
       
       if (result.second) {
 	lock_type lock(__mutex_data);
-
+	
 	attribute_set_type& attributes = __attributes();
 	attributes.push_back(attribute_type(x.begin(), x.end()));
 	const_cast<piece_type&>(*result.first) = attributes.back();	
