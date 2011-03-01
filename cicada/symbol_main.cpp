@@ -40,6 +40,9 @@ int main(int argc, char** argv)
 
   srandom(time(0) * getpid());
 
-  for (int i = 0; i != 1024 * 4; ++ i)
-    symbol_type symbol(boost::lexical_cast<std::string>(random()));
+  for (int i = 0; i != 1024 * 4; ++ i) {
+    const std::string rnd = boost::lexical_cast<std::string>(random());
+    
+    symbol_type symbol(rnd);
+  }
 }

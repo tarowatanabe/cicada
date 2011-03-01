@@ -92,7 +92,7 @@ int main(int argc, char ** argv)
 	std::string symbol;
 	while (is >> symbol)
 	  non_terminals.push_back(symbol);
-
+	
 	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
 										    symbol_non_terminal,
 										    non_terminals.begin(),
