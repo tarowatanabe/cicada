@@ -81,7 +81,7 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex);
+	lock_type lock(__mutex_data);
 	maps[__id] = &(__symbols()[__id]);
       }
       
@@ -139,13 +139,11 @@ namespace cicada
     typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > symbol_index_type;
     typedef utils::chunk_vector<symbol_type, 4096 / sizeof(symbol_type), std::allocator<symbol_type> > symbol_set_type;
     typedef std::vector<const symbol_type*, std::allocator<const symbol_type*> > symbol_map_type;
-
-    typedef std::pair<symbol_index_type, symbol_set_type> symbol_data_type;
     
   public:
     static bool exists(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
       
       const symbol_index_type& index = __index();
       
@@ -153,33 +151,30 @@ namespace cicada
     }
     static size_t allocated()
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_data);
       
       return __symbols().size();
     }
     static void write(const path_type& path);
     
   private:
-    static mutex_type    __mutex;
+    static mutex_type    __mutex_index;
+    static mutex_type    __mutex_data;
     
     static symbol_map_type& __symbol_maps();
-
-    static symbol_data_type& __symbol_data()
+    
+    static symbol_set_type& __symbols()
     {
-      static symbol_data_type __data;
-      return __data;
+      static symbol_set_type syms;
+      return syms;
     }
     
     static symbol_index_type& __index()
     {
-      return __symbol_data().first;
+      static symbol_index_type index;
+      return index;
     }
     
-    static symbol_set_type& __symbols()
-    {
-      return __symbol_data().second;
-    }
-        
     static const id_type& __allocate_empty()
     {
       static const id_type __id = __allocate("");
@@ -188,13 +183,15 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
 
       symbol_index_type& index = __index();
       
       std::pair<symbol_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
+	lock_type lock(__mutex_data);
+
 	symbol_set_type& symbols = __symbols();
 	symbols.push_back(x);
 	const_cast<piece_type&>(*result.first) = symbols.back();

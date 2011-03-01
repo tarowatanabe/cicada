@@ -75,7 +75,7 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex);
+	lock_type lock(__mutex_data);
 	maps[__id] = &(__attributes()[__id]);
       }
       
@@ -122,13 +122,11 @@ namespace cicada
     typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > attribute_index_type;
     typedef utils::chunk_vector<attribute_type, 4096 / sizeof(attribute_type), std::allocator<attribute_type> > attribute_set_type;
     typedef std::vector<const attribute_type*, std::allocator<const attribute_type*> > attribute_map_type;
-
-    typedef std::pair<attribute_index_type, attribute_set_type> attribute_data_type;
     
   public:
     static bool exists(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
       
       const attribute_index_type& index = __index();
       
@@ -137,31 +135,28 @@ namespace cicada
     
     static size_t allocated()
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_data);
       return __attributes().size();
     }
     
   private:
-    static mutex_type    __mutex;
+    static mutex_type    __mutex_index;
+    static mutex_type    __mutex_data;
     
     static attribute_map_type& __attribute_maps();
-
-    static attribute_data_type& __attribute_data()
+    
+    static attribute_set_type& __attributes()
     {
-      static attribute_data_type __data;
-      return __data;
+      static attribute_set_type feats;
+      return feats;
     }
     
     static attribute_index_type& __index()
     {
-      return __attribute_data().first;
+      static attribute_index_type index;
+      return index;
     }
     
-    static attribute_set_type& __attributes()
-    {
-      return __attribute_data().second;
-    }
-        
     static const id_type& __allocate_empty()
     {
       static const id_type __id = __allocate("");
@@ -170,13 +165,15 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
       
       attribute_index_type& index = __index();
       
       std::pair<attribute_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
+	lock_type lock(__mutex_data);
+
 	attribute_set_type& attributes = __attributes();
 	attributes.push_back(x);
 	const_cast<piece_type&>(*result.first) = attributes.back();	

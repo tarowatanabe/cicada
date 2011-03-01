@@ -75,7 +75,7 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex);
+	lock_type lock(__mutex_data);
 	maps[__id] = &(__features()[__id]);
       }
       
@@ -123,12 +123,10 @@ namespace cicada
     typedef utils::chunk_vector<feature_type, 4096 / sizeof(feature_type), std::allocator<feature_type> > feature_set_type;
     typedef std::vector<const feature_type*, std::allocator<const feature_type*> > feature_map_type;
     
-    typedef std::pair<feature_index_type, feature_set_type> feature_data_type;
-
   public:
     static bool exists(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
       
       const feature_index_type& index = __index();
       
@@ -137,32 +135,28 @@ namespace cicada
     
     static size_t allocated()
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_data);
       return __features().size();
     }
     
   private:
-    static mutex_type    __mutex;
+    static mutex_type    __mutex_index;
+    static mutex_type    __mutex_data;
     
     static feature_map_type& __feature_maps();
     
-    
-    static feature_data_type& __feature_data()
+    static feature_set_type& __features()
     {
-      static feature_data_type __data;
-      return __data;
+      static feature_set_type feats;
+      return feats;
     }
     
     static feature_index_type& __index()
     {
-      return __feature_data().first;
+      static feature_index_type index;
+      return index;
     }
-
-    static feature_set_type& __features()
-    {
-      return __feature_data().second;
-    }
-        
+    
     static const id_type& __allocate_empty()
     {
       static const id_type __id = __allocate("");
@@ -171,13 +165,15 @@ namespace cicada
     
     static id_type __allocate(const piece_type& x)
     {
-      lock_type lock(__mutex);
+      lock_type lock(__mutex_index);
       
       feature_index_type& index = __index();
       
       std::pair<feature_index_type::iterator, bool> result = index.insert(x);
       
       if (result.second) {
+	lock_type lock(__mutex_data);
+
 	feature_set_type& features = __features();
 	features.push_back(x);
 	const_cast<piece_type&>(*result.first) = features.back();
