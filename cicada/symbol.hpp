@@ -191,9 +191,9 @@ namespace cicada
       
       if (result.second) {
 	lock_type lock(__mutex_data);
-
+	
 	symbol_set_type& symbols = __symbols();
-	symbols.push_back(static_cast<symbol_type>(x));
+	symbols.push_back(symbol_type(x.begin(), x.end()));
 	const_cast<piece_type&>(*result.first) = symbols.back();
       }
       

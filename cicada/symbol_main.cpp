@@ -2,7 +2,13 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
+
 #include <iostream>
+
+#include <boost/lexical_cast.hpp>
 
 #include "symbol.hpp"
 
@@ -32,4 +38,8 @@ int main(int argc, char** argv)
   process("[BAD,4]", 3);
   process("[GOOD,5]", 3);
 
+  srandom(time(0) * getpid());
+
+  for (int i = 0; i != 1024 * 4; ++ i)
+    symbol_type symbol(boost::lexical_cast<std::string>(random()));
 }
