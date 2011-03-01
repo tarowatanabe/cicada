@@ -139,6 +139,8 @@ namespace cicada
     typedef utils::indexed_set<piece_type, boost::hash<piece_type>, std::equal_to<piece_type>, std::allocator<piece_type> > symbol_index_type;
     typedef utils::chunk_vector<symbol_type, 4096 / sizeof(symbol_type), std::allocator<symbol_type> > symbol_set_type;
     typedef std::vector<const symbol_type*, std::allocator<const symbol_type*> > symbol_map_type;
+
+    typedef std::pair<symbol_index_type, symbol_set_type> symbol_data_type;
     
   public:
     static bool exists(const piece_type& x)
@@ -161,19 +163,23 @@ namespace cicada
     static mutex_type    __mutex;
     
     static symbol_map_type& __symbol_maps();
-    
-    static symbol_set_type& __symbols()
+
+    static symbol_data_type& __symbol_data()
     {
-      static symbol_set_type syms;
-      return syms;
+      static symbol_data_type __data;
+      return __data;
     }
     
     static symbol_index_type& __index()
     {
-      static symbol_index_type index;
-      return index;
+      return __symbol_data().first;
     }
     
+    static symbol_set_type& __symbols()
+    {
+      return __symbol_data().second;
+    }
+        
     static const id_type& __allocate_empty()
     {
       static const id_type __id = __allocate("");

@@ -123,6 +123,8 @@ namespace cicada
     typedef utils::chunk_vector<feature_type, 4096 / sizeof(feature_type), std::allocator<feature_type> > feature_set_type;
     typedef std::vector<const feature_type*, std::allocator<const feature_type*> > feature_map_type;
     
+    typedef std::pair<feature_index_type, feature_set_type> feature_data_type;
+
   public:
     static bool exists(const piece_type& x)
     {
@@ -144,18 +146,23 @@ namespace cicada
     
     static feature_map_type& __feature_maps();
     
-    static feature_set_type& __features()
+    
+    static feature_data_type& __feature_data()
     {
-      static feature_set_type feats;
-      return feats;
+      static feature_data_type __data;
+      return __data;
     }
     
     static feature_index_type& __index()
     {
-      static feature_index_type index;
-      return index;
+      return __feature_data().first;
     }
-    
+
+    static feature_set_type& __features()
+    {
+      return __feature_data().second;
+    }
+        
     static const id_type& __allocate_empty()
     {
       static const id_type __id = __allocate("");
