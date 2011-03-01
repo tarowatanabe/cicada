@@ -111,7 +111,6 @@ int main(int argc, char ** argv)
 										    std::istream_iterator<std::string>(),
 										    grammar_glue_straight,
 										    grammar_glue_inverted)));
-	
       } else
 	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
 										    symbol_non_terminal,
@@ -126,11 +125,11 @@ int main(int argc, char ** argv)
     const size_t tree_grammar_static_size  = load_grammar<cicada::TreeGrammarStatic>(tree_grammar, tree_grammar_static_files);
     const size_t tree_grammar_mutable_size = load_grammar<cicada::TreeGrammarMutable>(tree_grammar, tree_grammar_mutable_files);
     
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "loaded static tree grammar: " << tree_grammar_static_size << std::endl
 		<< "loaded mutable tree grammar: " << tree_grammar_mutable_size << std::endl;
     
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "tree grammar: " << tree_grammar.size() << std::endl;
     
     // read features...
