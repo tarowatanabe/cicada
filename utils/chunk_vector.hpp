@@ -279,9 +279,9 @@ namespace utils
     static const size_t __next_power2 = size_t(utils::bithack::static_next_largest_power2<_ChunkSize>::result);
     static const size_t chunk_size = (_ChunkSize == 0 ? size_t(1) : (__is_power2 ? _ChunkSize : __next_power2));
     
-    typedef utils::static_allocator<_Tp, chunk_size, _Alloc>   node_alloc_type;
+    //typedef utils::static_allocator<_Tp, chunk_size, _Alloc>   node_alloc_type;
     // use raw allocator for debug purpose...
-    // typedef _Alloc   node_alloc_type;
+    typedef _Alloc   node_alloc_type;
     typedef typename _Alloc::template rebind<_Tp*>::other map_alloc_type;
   };
   
