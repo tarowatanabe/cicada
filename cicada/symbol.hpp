@@ -81,7 +81,7 @@ namespace cicada
       if (__id >= maps.size())
 	maps.resize(__id + 1, 0);
       if (! maps[__id]) {
-	lock_type lock(__mutex_data);
+	lock_type lock(__mutex);
 	maps[__id] = &(__symbols()[__id]);
       }
       
