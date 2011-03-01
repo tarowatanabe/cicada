@@ -89,7 +89,7 @@ int main(int argc, char ** argv)
 	
 	utils::compress_istream is(symbol_fallback_file, 1024 * 1024);
 	sentence_type non_terminals;
-	symbol_type symbol;
+	std::string symbol;
 	while (is >> symbol)
 	  non_terminals.push_back(symbol);
 
