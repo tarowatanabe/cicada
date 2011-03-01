@@ -1,6 +1,6 @@
 // -*- mode: c++ -*-
 //
-//  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
 #ifndef __CICADA__PARSE_CKY__HPP__

@@ -26,6 +26,7 @@
 
 #include "cicada/hypergraph.hpp"
 #include "cicada/vocab.hpp"
+#include "cicada/sort.hpp"
 
 #include "utils/hashmurmur.hpp"
 #include "utils/program_options.hpp"
@@ -175,12 +176,27 @@ typedef cicada::Vocab  vocab_type;
 typedef cicada::Symbol word_type;
 typedef std::vector<word_type, std::allocator<word_type> > phrase_type;
 
+struct filter_edge
+{
+  typedef std::vector<bool, std::allocator<bool> > removed_type;
+  
+  filter_edge(const removed_type& __removed) : removed(__removed) {}
+  
+  bool operator()(const hypergraph_type::edge_type& edge) const
+  {
+    return removed[edge.id];
+  }
+
+  const removed_type& removed;
+};
+
 path_type input_file = "-";
 path_type output_file = "-";
 path_type map_file;
 
 std::string root;
 bool normalize = false;
+bool collapse = false;
 
 int debug = 0;
 
@@ -340,9 +356,57 @@ int main(int argc, char** argv)
       if (node_last != hypergraph_type::invalid) {
 	hypergraph.goal = node_last;
 	
+	if (collapse) {
+	  // collapse root label...
+	  
+	  bool found = false;
+	  filter_edge::removed_type removed;
+	  
+	  do {
+	    found = false;
+	    removed.clear();
+	    removed.resize(hypergraph.edges.size(), false);
+	    
+	    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = hypergraph.nodes[hypergraph.goal].edges.end();
+	    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = hypergraph.nodes[hypergraph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
+	      const hypergraph_type::edge_type& edge = hypergraph.edges[*eiter];
+	      
+	      if (edge.tails.size() != 1 || edge.rule->rhs.size() != 1 || edge.rule->rhs.front() != edge.rule->lhs) continue;
+	      
+	      // we will collapse this edge...
+	      
+	      found = true;
+	      removed[*eiter] = true;
+	      
+	      hypergraph_type::node_type::edge_set_type::const_iterator aiter_end = hypergraph.nodes[edge.tails.front()].edges.end();
+	      for (hypergraph_type::node_type::edge_set_type::const_iterator aiter = hypergraph.nodes[edge.tails.front()].edges.begin(); aiter != aiter_end; ++ aiter) {
+		const hypergraph_type::edge_type& edge_antecedent = hypergraph.edges[*aiter];
+		
+		removed[*aiter] = true;
+		
+		hypergraph_type::edge_type& edge_new = hypergraph.add_edge(edge_antecedent);
+		edge_new.features += edge.features;
+		
+		hypergraph.connect_edge(edge_new.id, hypergraph.goal);
+	      }
+	    }
+	    
+	    // resize again...
+	    removed.resize(hypergraph.edges.size(), false);
+	    
+	    // topologically sort...
+	    if (found) {
+	      hypergraph_type sorted;
+	      topologically_sort(hypergraph, sorted, filter_edge(removed), true);
+	      hypergraph.swap(sorted);
+	    }
+	    
+	  } while (found);
+	}
+	
 	if (! root_label.empty()) {
-	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = hypergraph.nodes[node_last].edges.end();
-	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = hypergraph.nodes[node_last].edges.begin(); eiter != eiter_end; ++ eiter) {
+	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = hypergraph.nodes[hypergraph.goal].edges.end();
+	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = hypergraph.nodes[hypergraph.goal].edges.begin(); eiter != eiter_end; ++ eiter) {
 	    hypergraph_type::edge_type& edge = hypergraph.edges[*eiter];
 	    
 	    edge.rule = hypergraph_type::rule_type::create(hypergraph_type::rule_type(root_label, edge.rule->rhs));
@@ -375,6 +439,7 @@ void options(int argc, char** argv)
     ("root",      po::value<std::string>(&root), "root label")
     
     ("normalize", po::bool_switch(&normalize), "normalize category, such as [,] [.] etc.")
+    ("collapse",  po::bool_switch(&collapse),  "collapse root labels")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
