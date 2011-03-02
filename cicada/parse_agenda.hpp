@@ -133,14 +133,11 @@ namespace cicada
       const edge_type* active;
       const edge_type* passive;
       
-      // active edge
-      dot_type                                  dot;
-      const rule_candidate_type*                rule;
-      hypergraph_type::edge_type::node_set_type tails;
-      feature_set_type                          features;
-      attribute_set_type                        attributes;
+      dot_type                   dot;
+      const rule_candidate_type* rule;
+      feature_set_type           features;
+      attribute_set_type         attributes;
       
-      // passive edge
       symbol_type lhs;
       span_type   span;
       int         level;
@@ -150,7 +147,7 @@ namespace cicada
       bool is_active() const { return ! rule; }
       
       bool is_scanned() const { return active && ! passive; }
-      bool is_predicted() const { return span.first == span.last; }
+      bool is_predicted() const { return ! active && passive; }
       bool is_completed() const { return active && passive; }
     };
     
@@ -188,8 +185,15 @@ namespace cicada
       
       if (lattice.empty()) return;
       
-      // initialize..
-      
+      // initialize by empty word... we do not support epsilon insertion as in the "Parsing and Hypergraphs"
+      for (size_type table = 0; table != grammar.size(); ++ table) {
+	const transducer_type& transducer = grammar[table];
+	
+	for (size_type i = 0; i != lattice.size(); ++ i)
+	  if (! lattice[i].empty() && transducer.valid_span(i, i, 0))
+	    insert_edge(edge_type(dot_type(table, transducer.root()), span_type(i, i)));
+      }
+	
       // main loop...
       while (! agenda_finishing.empty()) {
 	// explore traversals
@@ -206,7 +210,9 @@ namespace cicada
 	const edge_type* edge = agenda_finishing.top();
 	agenda_finishing.pop();
 	
+	//
 	// insert into graph... HOW?
+	//
 	
 	if (edge->is_active()) {
 	  scan(*edge);
@@ -231,19 +237,19 @@ namespace cicada
       for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
 	const symbol_type& terminal = piter->label;
 	
-	// new span: [active.span.first, active.span.last + piter->distance)
+	const span_type span_next(active.span.first, active.span.last + piter->distance);
 	
 	// handling of EPSILON rule...
 	if (terminal == vocab_type::EPSILON) {
 	  const rule_candidate_ptr_set_type& rules = cands(active.dot.table, active.dot.node);
-
+	  
 	  // add passive edge... level is zero..
 	  rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	  for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	    
-	  }
+	  for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	    insert_edge(edge_type(active, dot_type(active.dot.table, active.dot.node), *riter, active.features + piter->features, active.attributes, span_next));
 	  
 	  // add active edge
+	  insert_edge(edge_type(active, dot_type(active.dot.table, active.dot.node), active.features + piter->features, active.attributes, span_next));
 	  
 	} else {
 	  const transducer_type::id_type node = transducer.next(active.dot.node, terminal);
@@ -253,14 +259,12 @@ namespace cicada
 	  
 	  // add passive edge.. level is zero..
 	  rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	  for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	    
-	  }
+	  for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	    insert_edge(edge_type(active, dot_type(active.dot.table, node), *riter, active.features + piter->features, active.attributes, span_next));
 	  
 	  // add active edge
-	  if (transducer.has_next(node)) {
-	    
-	  }
+	  if (transducer.has_next(node))
+	    insert_edge(edge_type(active, dot_type(active.dot.table, node), active.features + piter->featuers, active.attributes, span_next));
 	}
       }
     }
@@ -279,20 +283,18 @@ namespace cicada
 	const transducer_type::id_type node = transducer.next(transducer.root(), passive.lhs);
 	if (node == transducer.root()) continue;
 	
-	// new span is [passive.span.first, passive.span.last)
+	const span_type& span = passive.span;
 	
 	const rule_candidate_ptr_set_type& rules = cands(active.dot.table, node);
 	
 	// add passive edge... this is definitedly unary-rule, thus level must be passive.level + 1!
 	rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	  
-	}
+	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	  insert_edge(edge_type(passive, dot_type(table, node), *riter, span, passive.level + 1));
 	
 	// add active edge
-	if (transducer.has_next(node)) {
-	  
-	}
+	if (transducer.has_next(node))
+	  insert_edge(edge_type(passive, dot_type(table, node), span));
       }
     }
     
@@ -312,18 +314,16 @@ namespace cicada
 	
 	const rule_candidate_ptr_set_type& rules = cands(active.dot.table, node);
 
-	// new span is [active.span.first, passive.span.last)
+	const span_type span_next(active.span.first, passive.span.last);
 	
 	// add passive edge.. level is zero
 	rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	  
-	}
+	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	  insert_edge(edge_type(active, passive, dot_type(active.dot.table, node), *riter, active.features, active.attributes, span_next));
 	
 	// add active edge
-	if (transducer.has_next(node)) {
-	  
-	}
+	if (transducer.has_next(node))
+	  insert_edge(edge_type(active, passive, dot_type(active.dot.table, node), active.features, active.attributes, span_next));
       }
     }
     
@@ -342,19 +342,23 @@ namespace cicada
 	
 	const rule_candidate_ptr_set_type& rules = cands(active.dot.table, node);
 	
-	// new span is [active.span.first, passive.span.last)
+	const span_type span_next(active.span.first, passive.span.last);
 	
 	// add passive edge.. level is zero.
 	rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	  
-	}
+	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	  insert_edge(edge_type(active, passive, dot_type(active.dot.table, node), *riter, active.features, active.attributes, span_next));
 	
 	// add active edge
-	if (transducer.has_next(node)) {
-	  
-	}
+	if (transducer.has_next(node))
+	  insert_edge(edge_type(active, passive, dot_type(active.dot.table, node), active.features, active.attributes, span_next));
       }
+    }
+
+    void insert_edge(const edge_type& edge)
+    {
+      
+      
     }
     
     
