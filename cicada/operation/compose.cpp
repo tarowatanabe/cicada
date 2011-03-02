@@ -274,6 +274,7 @@ namespace cicada
 				   const bool __deletion,
 				   const int __debug)
       : grammar(__grammar),
+	goal(__goal), non_terminal(__non_terminal), 
 	insertion(__insertion), deletion(__deletion),
 	yield_source(false),
 	debug(__debug)
@@ -321,9 +322,9 @@ namespace cicada
       grammar_type grammar_compose(grammar);
     
       if (insertion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
+	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(hypergraph, non_terminal)));
       if (deletion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
+	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(hypergraph, non_terminal)));
 
     
       cicada::compose_grammar(grammar_compose, hypergraph, composed, yield_source);

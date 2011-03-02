@@ -25,7 +25,7 @@
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
 
-namespace cicaad
+namespace cicada
 {
   //
   // compose hypergraph with grammar, yielding another hypergraph!
@@ -82,17 +82,19 @@ namespace cicaad
       
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_tyep& edge = *eiter;
+	const hypergraph_type::edge_type& edge = *eiter;
 	
 	for (size_type table = 0; table != grammar.size(); ++ table) {
-	  const transducer_tyep& transducer = grammar[table];
+	  const transducer_type& transducer = grammar[table];
 
 	  transducer_type::id_type node = transducer.root();
-	
-	  rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
-	  for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
-	    node = transducer.next(node, *riter);
-	    if (node == transducer.root()) break;
+	  
+	  {
+	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
+	      node = transducer.next(node, *riter);
+	      if (node == transducer.root()) break;
+	    }
 	  }
 	  
 	  if (node == transducer.root()) continue;
