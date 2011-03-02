@@ -130,6 +130,8 @@ namespace cicada
     {
       typedef Edge edge_type;
       
+      score_type  score;
+      
       const edge_type* active;
       const edge_type* passive;
       
@@ -138,7 +140,6 @@ namespace cicada
       feature_set_type           features;
       attribute_set_type         attributes;
       
-      symbol_type lhs;
       span_type   span;
       int         level;
       
@@ -280,7 +281,7 @@ namespace cicada
 	if (! transducer.valid_span(passive.span.first, passive.span.last, lattice.shortest_distance(passive.span.first, passive.span.last))) continue;
 	if (! transducer.valid_span(passive.span.first, passive.span.first, 0)) continue;
 	
-	const transducer_type::id_type node = transducer.next(transducer.root(), passive.lhs);
+	const transducer_type::id_type node = transducer.next(transducer.root(), passive.rule->rule->lhs);
 	if (node == transducer.root()) continue;
 	
 	const span_type& span = passive.span;
