@@ -350,7 +350,6 @@ namespace cicada
 	    
 	    typename active_set_type::const_iterator citer_end = cell.end();
 	    for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      
 	      const rule_candidate_ptr_set_type& rules = cands(table, citer->node);
 	      
 	      if (rules.empty()) continue;
@@ -366,7 +365,7 @@ namespace cicada
 	      
 	      cand.active = &(*citer);
 	      cand.first = rules.begin();
-	      cand.last = rules.end();
+	      cand.last  = rules.end();
 	      
 	      cand.score = score_antecedent;
 	      cand.level = 0;
@@ -416,15 +415,11 @@ namespace cicada
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
 		
-		//std::cerr << "already inserted unary: " << *(rule.rule) << std::endl;
-		
 		node_passive.first = niter->second;
 		node_passive.second = score > scores[niter->second];
 		
 		scores[niter->second] = std::max(scores[niter->second], score);
 	      } else {
-		//std::cerr << "apply unary rule!: " << *rule.rule << " level: " << item->level << std::endl;
-		
 		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
 					  active.tails.begin(), active.tails.end(), passive_arcs, graph,
 					  first, last, utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level));
@@ -435,7 +430,6 @@ namespace cicada
 	      node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
 					active.tails.begin(), active.tails.end(), passive_arcs, graph,
 					first, last, item->level);
-	    
 	    
 	    // next queue!
 	    ++ const_cast<candidate_type*>(item)->first;
@@ -475,7 +469,7 @@ namespace cicada
 	      
 	      cand.active = &(actives_unary.back());
 	      cand.first = rules.begin();
-	      cand.last = rules.end();
+	      cand.last  = rules.end();
 	      
 	      cand.score = score_antecedent;
 	      cand.level = item->level + 1;
