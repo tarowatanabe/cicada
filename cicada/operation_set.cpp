@@ -55,6 +55,8 @@ compose-earley: composition from tree with grammar\n\
 compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
+compose-grammar: composition from tree with grammar\n\
+\tyield=[source|target] use source or target yield for rule\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
 \tdistortion=[distortion limit] default: 0 (== monotone)\n\
 \tyield=[source|target] use source or target yield for rule\n\
@@ -179,6 +181,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param_name == "compose-cky" || param_name == "compose-cyk")
 	operations.push_back(operation_ptr_type(new operation::ComposeCKY(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+      else if (param_name == "compose-grammar")
+	operations.push_back(operation_ptr_type(new operation::ComposeGrammar(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param_name == "compose-phrase")
 	operations.push_back(operation_ptr_type(new operation::ComposePhrase(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param_name == "compose-alignment")

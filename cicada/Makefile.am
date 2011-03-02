@@ -226,6 +226,7 @@ compose.hpp \
 compose_alignment.hpp \
 compose_cky.hpp \
 compose_earley.hpp \
+compose_grammar.hpp \
 compose_phrase.hpp \
 compose_tree.hpp \
 dot_product.hpp \

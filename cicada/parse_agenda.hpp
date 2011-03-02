@@ -188,13 +188,11 @@ namespace cicada
       
       if (lattice.empty()) return;
       
-      
       // initialize..
       
       // main loop...
-
-      while (1) {
-	// connect all the newly created items at previous step.
+      while (! agenda_finishing.empty()) {
+	// explore traversals
 	agenda_type::const_iterator aiter_end = agenda_exploration.end();
 	for (agenda_type::const_iterator aiter = agenda_exploration.begin(); aiter != aiter_end; ++ aiter)
 	  explore_traversal(*(*aiter), source, target);
@@ -208,13 +206,17 @@ namespace cicada
 	const edge_type* edge = agenda_finishing.top();
 	agenda_finishing.pop();
 	
+	// insert into graph... HOW?
 	
+	if (edge->is_active()) {
+	  scan(*edge);
+	  complete_active(*edge);
+	  predict(*edge);
+	} else
+	  complete_passive(*edge);
       }
-
     }
-      
-
-
+    
   private:
     void scan(const edge_tyep& active)
     {

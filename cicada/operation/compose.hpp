@@ -97,6 +97,29 @@ namespace cicada
       int debug;
     };
 
+    class ComposeGrammar : public Operation
+    {
+    public:
+      ComposeGrammar(const std::string& parameter,
+		     const grammar_type& __grammar,
+		     const std::string& __goal,
+		     const std::string& __non_terminal,
+		     const bool __insertion,
+		     const bool __deletion,
+		     const int __debug);
+  
+      void operator()(data_type& data) const;
+  
+      const grammar_type& grammar;
+
+      bool insertion;
+      bool deletion;
+
+      bool yield_source;
+      
+      int debug;
+    };
+
 
     class ComposePhrase : public Operation
     {

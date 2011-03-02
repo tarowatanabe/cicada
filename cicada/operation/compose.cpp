@@ -266,6 +266,86 @@ namespace cicada
       hypergraph.swap(composed);
     }
     
+    ComposeGrammar::ComposeGrammar(const std::string& parameter,
+				   const grammar_type& __grammar,
+				   const std::string& __goal,
+				   const std::string& __non_terminal,
+				   const bool __insertion,
+				   const bool __deletion,
+				   const int __debug)
+      : grammar(__grammar),
+	insertion(__insertion), deletion(__deletion),
+	yield_source(false),
+	debug(__debug)
+    {
+     
+      typedef cicada::Parameter param_type;
+    
+      param_type param(parameter);
+      if (utils::ipiece(param.name()) != "compose-grammar")
+	throw std::runtime_error("this is not a grammar matching composer");
+
+      bool source = false;
+      bool target = false;
+	
+      for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
+	    source = true;
+	  else if (utils::ipiece(piter->second) == "target")
+	    target = true;
+	  else
+	    throw std::runtime_error("unknown yield: " + piter->second);
+	} else
+	  std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
+      }
+	
+      if (source && target)
+	throw std::runtime_error("Phrase composer can work either source or target yield");
+	
+      yield_source = source;
+    }
+
+    void ComposeGrammar::operator()(data_type& data) const
+    {
+      hypergraph_type& hypergraph = data.hypergraph;
+      hypergraph_type composed;
+
+      if (! hypergraph.is_valid()) return;
+      
+      if (debug)
+	std::cerr << "compose grammar: " << data.id << std::endl;
+
+      utils::resource start;
+
+      grammar_type grammar_compose(grammar);
+    
+      if (insertion)
+	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
+      if (deletion)
+	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
+
+    
+      cicada::compose_grammar(grammar_compose, hypergraph, composed, yield_source);
+    
+      utils::resource end;
+    
+      if (debug)
+	std::cerr << "compose cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
+		  << std::endl;
+    
+      if (debug)
+	std::cerr << "compose: " << data.id
+		  << " # of nodes: " << composed.nodes.size()
+		  << " # of edges: " << composed.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
+		  << std::endl;
+    
+      hypergraph.swap(composed);
+    }
+
+    
     ComposePhrase::ComposePhrase(const std::string& parameter,
 				 const grammar_type& __grammar,
 				 const std::string& __goal,
