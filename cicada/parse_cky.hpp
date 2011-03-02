@@ -114,6 +114,12 @@ namespace cicada
 	  features(),
 	  attributes() {}
       
+      ActiveItem()
+	: node(),
+	  tails(),
+	  features(),
+	  attributes() {}
+      
       transducer_type::id_type                  node;
       hypergraph_type::edge_type::node_set_type tails;
       feature_set_type                          features;
@@ -126,46 +132,42 @@ namespace cicada
     typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
     typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
 
-    
-    struct UnaryRule
+    struct RuleCandidate
     {
-      size_type                table;
-      transducer_type::id_type node;
-      size_type                pos;
+      score_type    score;
       
-      UnaryRule() : table(0), node(0), pos(0) {}
-      UnaryRule(const size_type& __table, const transducer_type::id_type& __node, const size_type& __pos)
-	: table(__table), node(__node), pos(__pos) {}
+      rule_ptr_type rule;
       
-      friend
-      size_t hash_value(UnaryRule const& x)
-      {
-	return utils::hashmurmur<size_t>()(x);
-      }
+      feature_set_type   features;
+      attribute_set_type attributes;
       
-      friend
-      bool operator==(const UnaryRule& x, const UnaryRule& y)
-      {
-	return x.table == y.table && x.node == y.node && x.pos == y.pos;
-      }
-      
-      friend
-      bool operator<(const UnaryRule& x, const UnaryRule& y)
-      {
-	return (x.table < y.table || (x.table == y.table && (x.node < y.node || (x.node == y.node && x.pos < y.pos))));
-      }
+      RuleCandidate() : score(), rule(), features(), attributes() {}
+      RuleCandidate(const score_type& __score, const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
+	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
     };
+    typedef RuleCandidate rule_candidate_type;
+    typedef utils::chunk_vector<rule_candidate_type, 4096 / sizeof(rule_candidate_type), std::allocator<rule_candidate_type> > rule_candidate_set_type;
 
-    typedef UnaryRule unary_rule_type;
-
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<unary_rule_type, boost::hash<unary_rule_type>, std::equal_to<unary_rule_type>,
-				    std::allocator<unary_rule_type> > unary_rule_set_type;
+    typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
 #else
-    typedef sgi::hash_set<unary_rule_type, boost::hash<unary_rule_type>, std::equal_to<unary_rule_type>,
-			  std::allocator<unary_rule_type> > unary_rule_set_type;
+    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
 #endif
-
+    typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
+    
+    
+#ifdef HAVE_TR1_UNORDERED_SET
+    typedef std::tr1::unordered_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
+				    std::allocator<const rule_candidate_type*> > unary_rule_set_type;
+#else
+    typedef sgi::hash_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
+			  std::allocator<const rule_candidate_type*> > unary_rule_set_type;
+    
+#endif
+    
     typedef std::pair<symbol_type, int> symbol_level_type;
     
     struct symbol_level_hash : public utils::hashmurmur<size_t>
@@ -179,37 +181,39 @@ namespace cicada
     };
     
     typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
-
+    
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
     
-
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
 				    std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
 #else
     typedef sgi::hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
 			  std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
-    
+  
 #endif
     
     struct Candidate
     {
-      Candidate() : edge(), unary(), score(), level(0) {}
+      Candidate() : active(), first(), last(), score(), level(0) {}
       
-      hypergraph_type::edge_type edge;
-      unary_rule_type unary;
+      const active_type* active;
+      
+      typename rule_candidate_ptr_set_type::const_iterator first;
+      typename rule_candidate_ptr_set_type::const_iterator last;
+      
       score_type score;
       int level;
     };
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 1024 * 8 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
-
+    
     struct compare_heap_type
     {
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score < y->score;
+	return x->score * (*(x->first))->score < y->score * (*(y->first))->score;
       }
     };
     
@@ -219,7 +223,7 @@ namespace cicada
     typedef hypergraph_type::id_type passive_type;
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
-        
+    
     typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     typedef std::vector<score_type,  std::allocator<score_type> >  score_set_type;
     
@@ -248,10 +252,16 @@ namespace cicada
       actives.clear();
       passives.clear();
       non_terminals.clear();
-      
+      scores.clear();
+    
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
-      
+    
+      rule_candidates.clear();
+      rule_tables.clear();
+      rule_tables.reserve(grammar.size());
+      rule_tables.resize(grammar.size());
+    
       // initialize active chart
       for (size_t table = 0; table != grammar.size(); ++ table) {
 	const transducer_type::id_type root = grammar[table].root();
@@ -327,6 +337,7 @@ namespace cicada
 	  // create new candidate with unary rule, but if it is already created, ignore!
 	  // 
 	  
+	  actives_unary.clear();
 	  unary_map.clear();
 	  node_map.clear();
 	  candidates.clear();
@@ -339,12 +350,10 @@ namespace cicada
 	    
 	    typename active_set_type::const_iterator citer_end = cell.end();
 	    for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
+	      
+	      const rule_candidate_ptr_set_type& rules = cands(table, citer->node);
 	      
 	      if (rules.empty()) continue;
-	      
-	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
-	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
 	      
 	      score_type score_antecedent = semiring::traits<score_type>::one();
 	      
@@ -352,24 +361,17 @@ namespace cicada
 	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
 		score_antecedent *= scores[*titer];
 	      
-	      size_type pos = 0;
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter, ++ pos) {
-		candidates.push_back(candidate_type());
-		
-		candidate_type& cand = candidates.back();
-		
-		cand.edge.tails = citer->tails;
-		cand.edge.features   = riter->features + citer->features;
-		cand.edge.attributes = riter->attributes + citer->attributes;
-		cand.edge.rule = yield_source ? riter->source : riter->target;
-		
-		cand.unary = unary_rule_type(table, citer->node, pos);
-		
-		cand.score = score_antecedent * function(cand.edge.features);
-		cand.level = 0;
-		
-		heap.push(&cand);
-	      }
+	      candidates.push_back(candidate_type());
+	      candidate_type& cand = candidates.back();
+	      
+	      cand.active = &(*citer);
+	      cand.first = rules.begin();
+	      cand.last = rules.end();
+	      
+	      cand.score = score_antecedent;
+	      cand.level = 0;
+	      
+	      heap.push(&cand);
 	    }
 	  }
 
@@ -388,6 +390,12 @@ namespace cicada
 	    
 	    // check unary rule, and see if this edge is already inserted!
 	    
+	    const active_type& active = *(item->active);
+	    const rule_candidate_type& rule = *(*(item->first));
+	    const score_type score = item->score * rule.score;
+	    
+	    const int level_next = utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level + 1);
+	    
 	    std::pair<hypergraph_type::id_type, bool> node_passive;
 	    
 	    if (item->level > 0) {
@@ -400,31 +408,37 @@ namespace cicada
 	      
 	      // if already inserted, check node-map and update scores!
 	      
-	      const symbol_type label_prev = non_terminals[item->edge.tails.front()];
-	      const symbol_type label_next = item->edge.rule->lhs;
+	      const symbol_type label_prev = non_terminals[active.tails.front()];
+	      const symbol_type label_next = rule.rule->lhs;
 	      
 	      unary_rule_set_type& unaries = unary_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 	      
-	      if (unaries.find(item->unary) != unaries.end()) {
+	      if (unaries.find(&rule) != unaries.end()) {
 		typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
 		
 		node_passive.first = niter->second;
-		node_passive.second = item->score > scores[niter->second];
+		node_passive.second = score > scores[niter->second];
 		
-		scores[niter->second] = std::max(scores[niter->second], item->score);
+		scores[niter->second] = std::max(scores[niter->second], score);
 	      } else {
-		node_passive = apply_rule(item->score, item->edge.rule, item->edge.features, item->edge.attributes,
-					  item->edge.tails.begin(), item->edge.tails.end(), passive_arcs, graph,
+		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
+					  active.tails.begin(), active.tails.end(), passive_arcs, graph,
 					  first, last, item->level);
 		
-		unaries.insert(item->unary);
+		unaries.insert(&rule);
 	      }
 	    } else
-	      node_passive = apply_rule(item->score, item->edge.rule, item->edge.features, item->edge.attributes,
-					item->edge.tails.begin(), item->edge.tails.end(), passive_arcs, graph,
+	      node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
+					active.tails.begin(), active.tails.end(), passive_arcs, graph,
 					first, last, item->level);
+	    
+	    
+	    // next queue!
+	    ++ const_cast<candidate_type*>(item)->first;
+	    if (item->first != item->last)
+	      heap.push(item);
 	    
 	    // apply unary rule
 	    //
@@ -443,29 +457,26 @@ namespace cicada
 	      const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
 	      if (node == transducer.root()) continue;
 	      
-	      const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+	      const rule_candidate_ptr_set_type& rules = cands(table, node);
 	      
 	      if (rules.empty()) continue;
 	      
-	      size_type pos = 0;
-	      transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter, ++ pos) {
-		candidates.push_back(candidate_type());
-		
-		candidate_type& cand = candidates.back();
-		
-		cand.edge.tails =  hypergraph_type::edge_type::node_set_type(1, node_passive.first);
-		cand.edge.features   = riter->features;
-		cand.edge.attributes = riter->attributes;
-		cand.edge.rule = yield_source ? riter->source : riter->target;
-		
-		cand.unary = unary_rule_type(table, node, pos);
-		
-		cand.score = function(cand.edge.features) * scores[node_passive.first];
-		cand.level = utils::bithack::branch(unique_goal && cand.edge.rule->lhs == goal, 0, item->level + 1);
-		
-		heap.push(&cand);
-	      }
+	      const score_type score_antecedent = scores[node_passive.first];
+	      
+	      actives_unary.push_back(active_type());
+	      actives_unary.back().tails = hypergraph_type::edge_type::node_set_type(1, node_passive.first);
+	      
+	      candidates.push_back(candidate_type());
+	      candidate_type& cand = candidates.back();
+	      
+	      cand.active = &(actives_unary.back());
+	      cand.first = rules.begin();
+	      cand.last = rules.end();
+	      
+	      cand.score = score_antecedent;
+	      cand.level = level_next;
+	      
+	      heap.push(&cand);
 	    }
 	  }
 	  
@@ -621,7 +632,41 @@ namespace cicada
       
       return found;
     }
+    
+    template <typename Tp>
+    struct greater_ptr_score
+    {
+      bool operator()(const Tp* x, const Tp* y) const
+      {
+	return x->score > y->score;
+      }
+    };
 
+    const rule_candidate_ptr_set_type& cands(const size_type& table, const transducer_type::id_type& node)
+    {
+      typename rule_candidate_map_type::iterator riter = rule_tables[table].find(node);
+      if (riter == rule_tables[table].end()) {
+	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_ptr_set_type())).first;
+	
+	const transducer_type::rule_pair_set_type& rules = grammar[table].rules(node);
+	
+	riter->second.reserve(rules.size());
+	
+	transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
+	  rule_candidates.push_back(rule_candidate_type(function(iter->features),
+							yield_source ? iter->source : iter->target,
+							iter->features,
+							iter->attributes));
+	  
+	  riter->second.push_back(&(rule_candidates.back()));
+	}
+	
+	std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
+      }
+      return riter->second;
+    }
     
   private:
     const symbol_type goal;
@@ -640,11 +685,15 @@ namespace cicada
 
     active_chart_set_type  actives;
     passive_chart_type     passives;
+    active_set_type        actives_unary;
 
     unary_rule_map_type   unary_map;
     node_map_type         node_map;
     candidate_set_type    candidates;
     candidate_heap_type   heap;
+
+    rule_candidate_set_type   rule_candidates;
+    rule_candidate_table_type rule_tables;
     
     non_terminal_set_type non_terminals;
     score_set_type        scores;
