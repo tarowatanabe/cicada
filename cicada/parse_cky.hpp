@@ -160,10 +160,10 @@ namespace cicada
     
     
 #ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
+    typedef std::tr1::unordered_set<const rule_candidate_type*, boost::hash<const rule_candidate_type*>, std::equal_to<const rule_candidate_type*>,
 				    std::allocator<const rule_candidate_type*> > unary_rule_set_type;
 #else
-    typedef sgi::hash_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
+    typedef sgi::hash_set<const rule_candidate_type*, boost::hash<const rule_candidate_type*>, std::equal_to<const rule_candidate_type*>,
 			  std::allocator<const rule_candidate_type*> > unary_rule_set_type;
     
 #endif
@@ -393,9 +393,7 @@ namespace cicada
 	    const active_type& active = *(item->active);
 	    const rule_candidate_type& rule = *(*(item->first));
 	    const score_type score = item->score * rule.score;
-	    
-	    const int level_next = utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level + 1);
-	    
+	    	    
 	    std::pair<hypergraph_type::id_type, bool> node_passive;
 	    
 	    if (item->level > 0) {
@@ -413,21 +411,25 @@ namespace cicada
 	      
 	      unary_rule_set_type& unaries = unary_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 	      
-	      if (unaries.find(&rule) != unaries.end()) {
+	      if (unaries.find(*(item->first)) != unaries.end()) {
 		typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
+		
+		//std::cerr << "already inserted unary: " << *(rule.rule) << std::endl;
 		
 		node_passive.first = niter->second;
 		node_passive.second = score > scores[niter->second];
 		
 		scores[niter->second] = std::max(scores[niter->second], score);
 	      } else {
+		//std::cerr << "apply unary rule!: " << *rule.rule << " level: " << item->level << std::endl;
+		
 		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
 					  active.tails.begin(), active.tails.end(), passive_arcs, graph,
-					  first, last, item->level);
+					  first, last, utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level));
 		
-		unaries.insert(&rule);
+		unaries.insert(*(item->first));
 	      }
 	    } else
 	      node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
@@ -461,6 +463,8 @@ namespace cicada
 	      
 	      if (rules.empty()) continue;
 	      
+	      //std::cerr << "unary rule: " << non_terminal << " size: " << rules.size() << std::endl;
+	      
 	      const score_type score_antecedent = scores[node_passive.first];
 	      
 	      actives_unary.push_back(active_type());
@@ -474,7 +478,7 @@ namespace cicada
 	      cand.last = rules.end();
 	      
 	      cand.score = score_antecedent;
-	      cand.level = level_next;
+	      cand.level = item->level + 1;
 	      
 	      heap.push(&cand);
 	    }
