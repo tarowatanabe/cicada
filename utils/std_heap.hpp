@@ -63,6 +63,11 @@ namespace utils
       c.pop_back();
     }
     
+    void make_heap()
+    {
+      std::make_heap(c.begin(), c.end(), static_cast<_Compare&>(*this));
+    }
+    
     
     const_iterator begin() const { return c.begin(); }
     const_iterator end() const { return c.end(); }
