@@ -112,6 +112,9 @@ namespace cicada
   
       const grammar_type& grammar;
 
+      std::string goal;
+      std::string non_terminal;
+
       bool insertion;
       bool deletion;
 
