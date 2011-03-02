@@ -327,6 +327,8 @@ namespace succinctdb
     typedef typename succinct_trie_type::reverse_iterator       reverse_iterator;
     typedef typename succinct_trie_type::const_cursor           const_cursor;
     typedef typename succinct_trie_type::cursor                 cursor;
+    typedef typename succinct_trie_type::const_index_iterator   const_index_iterator;
+    typedef typename succinct_trie_type::index_iterator         index_iterator;
     
   public:
     // operations supported by read-mode
@@ -349,6 +351,9 @@ namespace succinctdb
 							    : __succinct_trie->cend()); }
     const_cursor cbegin() const { return __succinct_trie->cbegin(); }
     const_cursor cend()   const { return __succinct_trie->cend(); }
+
+    const_index_iterator ibegin(size_type node_pos) const { return __succinct_trie->ibegin(node_pos); }
+    const_index_iterator iend(size_type node_pos)   const { return __succinct_trie->iend(node_pos); }
 
     size_type find(const key_type* key_buf, size_type key_size, size_type node_pos) const
     {
