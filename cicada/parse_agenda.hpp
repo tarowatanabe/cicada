@@ -111,6 +111,12 @@ namespace cicada
       Dot() : table(size_type(-1)), node() {}
       Dot(const size_type& __table, const transducer_type::id_type& __node)
 	: table(__table), node(__node) {}
+
+      friend
+      bool operator(const Dot& x, const Dot& y)
+      {
+	return x.table == y.table && x.node == y.node;
+      }
     };
     
     typedef Dot dot_type;
@@ -119,9 +125,17 @@ namespace cicada
     {
       int first;
       int last;
+      int level;
       
-      Span() : first(0), last(0) {}
-      Span(const int& __first, const int& __last) : first(__first), last(__last) {}
+      Span() : first(0), last(0), level(0) {}
+      Span(const int& __first, const int& __last) : first(__first), last(__last), level(0) {}
+      Span(const int& __first, const int& __last, const int& __level) : first(__first), last(__last), level(__level) {}
+
+      friend
+      bool operator==(const Span& x, const Span& y)
+      {
+	return x.first == y.first && x.last == y.last && x.level == y.level;
+      }
     };
 
     typedef Span span_type;
@@ -135,13 +149,12 @@ namespace cicada
       const edge_type* active;
       const edge_type* passive;
       
-      dot_type                   dot;
+      dot_type    dot;
+      span_type   span;
+      
       const rule_candidate_type* rule;
       feature_set_type           features;
       attribute_set_type         attributes;
-      
-      span_type   span;
-      int         level;
       
     public:
       bool is_passive() const { return rule; }
@@ -153,6 +166,19 @@ namespace cicada
     };
     
     typedef Edge edge_type;
+    typedef utils::chunk_vector<edge_type, 1024 * 16 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
+    typedef std::deque<const edge_type*, std::allocator<const edge_type*> > agenda_exploration_type;
+    
+    struct edge_heap_type
+    {
+      bool operator()(const edge_type* x, const edge_type* y) const
+      {
+	return x->score < y->score;
+      }
+    };
+    
+    typedef std::vector<const edge_type*, std::allocator<const edge_type*> > agenda_finishing_base_type;
+    typedef utils::std_deque<const edge_type, agenda_finishing_base_type, edge_heap_type> agenda_finishing_type;
     
     struct Traversal
     {
@@ -177,7 +203,73 @@ namespace cicada
     };
     
     typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
+    
+    // edge comparison
+    struct edge_active_hash_type : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const edge_type* x) const
+      {
+	if (! x)
+	  return 0;
+	else
+	  return hasher_type::operator()(x.dot, hasher_type::operator()(x->span));
+      }
+    };
 
+    struct edge_active_equal_type
+    {
+      bool operator()(const edge_type* x, const edge_type* y) const
+      {
+	return ((x == y) || (x && y && x->span == y->span && x.dot == y.dot));
+      }
+    };
+    
+    typedef google::dense_hash_set<const edge_type*, edge_active_hash_type, edge_active_equal_type > edge_set_active_unique_type;
+    
+    typedef std::vector<const edge_type*, std::allocator<const edge_type*> >   edge_ptr_set_type;
+    typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
+    typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_passive_type;
+
+    typedef std::pair<symbol_type, int> symbol_level_type;
+    
+    struct Discovered
+    {
+    private:
+      typedef google::dense_hash_set<symbol_level_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_type> > discovered_type;
+    public:
+      typedef discovered_type::iterator       iterator;
+      typedef discovered_type::const_iterator const_iterator;
+      
+      Discovered() : data() { data.set_empty_key(symbol_level_type()); }
+
+      inline const_iterator find(const symbol_level_type& x) const { return data.find(x); }
+      inline       iterator find(const symbol_level_type& x)       { return data.find(x); }
+      
+      inline const_iterator begin() const { return data.begin(); }
+      inline       iterator begin()       { return data.begin(); }
+      inline const_iterator end() const { return data.end(); }
+      inline       iterator end()       { return data.end(); }
+      
+    private:
+      discovered_type data;
+    };
+    
+    typedef Discovered discovered_type;
+    typedef utils::chart<discovered_type, std::allocator<discovered_type> > discovered_chart_type;
+    
+    struct head_edge_set_type
+    {
+      hypergraph_type::id_type head;
+      edge_ptr_set_type        edges;
+      
+      head_edge_set_type() : head(hypergraph_type::invalid), edges() {}
+    };
+    
+    typedef google::dense_hash_map<const edge_type*, head_edge_set_type, utils::hashmurmur<size_t>, std::equal_to<const edge_type*> > graph_node_set_type;
+    
+    
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
@@ -302,7 +394,6 @@ namespace cicada
 	const transducer_type::id_type node = transducer.next(transducer.root(), passive.rule->rule->lhs);
 	if (node == transducer.root()) continue;
 	
-	const span_type& span = passive.span;
 	const dot_type dot_next(table, node);
 	
 	const rule_candidate_ptr_set_type& rules = cands(active.dot.table, node);
@@ -312,12 +403,14 @@ namespace cicada
 	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	  const symbol_type& lhs = (*riter)->rule->lhs;
 	  
-	  insert_edge(edge_type(passive.score * function((*riter)->features), passive, dot_next, span, *riter, utils::bithack::branch(lhs == goal, 0, passive.level + 1)));
+	  const span_type span(passive.span.first, passive.span.last, utils::bithack::branch(lhs == goal, 0, passive.span.level + 1));
+	  
+	  insert_edge(edge_type(passive.score * function((*riter)->features), passive, dot_next, span, *riter));
 	}
 	
 	// add active edge
 	if (transducer.has_next(node))
-	  insert_edge(edge_type(semiring::traits<score_type>::one(), passive, dot_next, span));
+	  insert_edge(edge_type(passive.score, passive, dot_next, passive.span));
       }
     }
     
@@ -327,11 +420,9 @@ namespace cicada
       if (passive.first == passive.last) return;
 
       const transducer_type& transducer = grammar[active.dot.table];
-
-      const edge_type query(active.span.last, active.span.last);
       
-      std::pair<edge_set_passive_type::const_iterator, edge_set_passive_type::const_iterator> result = edges_passive.equal_range(&query);
-      for (edge_set_passive_type::const_iterator piter = result.first; piter != result.second; ++ piter) {
+      edge_ptr_set_type::const_iterator piter_end = edges_passive[active.span.last].end();
+      for (edge_ptr_set_type::const_iterator piter = edges_passive[active.span.last].begin(); piter != piter_end; ++ piter) {
 	const edge_type& passive = *(*piter);
 	
 	const transducer_type::id_type node = transducer.next(active.dot.node, non_terminal);
@@ -357,11 +448,9 @@ namespace cicada
     void complete_passive(const edge_type& passive)
     {
       if (passive.first == passive.last) return;
-
-      const edge_type query(passive.span.first, passive.span.first);
       
-      std::pair<edge_set_active_type::const_iterator, edge_set_active_type::const_iterator> result = edges_active.equal_range(&query);
-      for (edge_set_active_type::const_iterator aiter = result.first; aiter != result.second; ++ aiter) {
+      edge_ptr_set_type::const_iterator aiter_end = edges_passive[passive.span.first].end();
+      for (edge_ptr_set_type::const_iterator aiter = edges_passive[passive.span.first].begin(); aiter != aiter_end; ++ aiter) {
 	const edge_type& active = *(*aiter);
 	
 	const transducer_type& transducer = grammar[active.dot.table];
@@ -403,13 +492,15 @@ namespace cicada
     void explore_traversal(const edge_type& edge)
     {
       if (edge.is_passive()) {
-	discovered_type::const_iterator diter = discovered(edge.span.first, edges.span.last).find(symbol_level_type(edge.rule->rule->lhs, edge.level));
+	discovered_type& discovered = discovered_chart(edge.span.first, edges.span.last);
+	
+	discovered_type::const_iterator diter = discovered.find(symbol_level_type(edge.rule->rule->lhs, edge.span.level));
 	
 	if (diter == discovered.end()) {
 	  // newly discovered edge!
 	  agenda_finishing.push_back(&edges.back());
 	  
-	  discovered(edge.span.first, edges.span.last).insert(symbol_level_type(edge.rule->rule->lhs, edge.level));
+	  discovered.insert(symbol_level_type(edge.rule->rule->lhs, edge.span.level));
 	  
 	  // add into hypergraph
 	  graph_nodes[&edge].edges.push_back(&edge);
@@ -475,22 +566,13 @@ namespace cicada
 	
 	hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	edge_new.rule = edge_antecedent.rule->rule;
-	edge_new.featuers   = edge_antecedent.features;
-	edge_new.attributes = edge_antecedent.attributes;
+	edge_new.featuers   = edge_antecedent.features   + edge_antecedent.rule->features;
+	edge_new.attributes = edge_antecedent.attributes + edge_antecedent.rule->attributes;
 	
 	graph.connect_edge(edge_new.id, head_id);
       }
     }
     
-    template <typename Tp>
-    struct greater_ptr_score
-    {
-      bool operator()(const Tp* x, const Tp* y) const
-      {
-	return x->score > y->score;
-      }
-    };
-
     const rule_candidate_ptr_set_type& cands(const size_type& table, const transducer_type::id_type& node)
     {
       typename rule_candidate_map_type::iterator riter = rule_tables[table].find(node);
@@ -511,8 +593,6 @@ namespace cicada
 	  
 	  riter->second.push_back(&(rule_candidates.back()));
 	}
-	
-	std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
       }
       return riter->second;
     }
