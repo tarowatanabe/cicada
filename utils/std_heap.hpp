@@ -63,7 +63,7 @@ namespace utils
       c.pop_back();
     }
 
-    void push_back(const value_tyep& x)
+    void push_back(const value_type& x)
     {
       c.push_back(x);
     }
