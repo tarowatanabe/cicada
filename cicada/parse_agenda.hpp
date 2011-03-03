@@ -288,7 +288,10 @@ namespace cicada
     
     typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
     
-    // edge comparison
+    typedef std::vector<const edge_type*, std::allocator<const edge_type*> >   edge_ptr_set_type;
+    typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
+    typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_passive_type;
+    
     struct edge_active_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
@@ -310,13 +313,7 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<const edge_type*, edge_active_hash_type, edge_active_equal_type > edge_set_active_unique_type;
-    
-    typedef std::vector<const edge_type*, std::allocator<const edge_type*> >   edge_ptr_set_type;
-    typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_active_type;
-    typedef std::vector<edge_ptr_set_type, std::allocator<edge_ptr_set_type> > edge_set_passive_type;
-    
-    struct discovered_hash_type : public utils::hashmurmur<size_t>
+    struct edge_passive_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
@@ -328,7 +325,7 @@ namespace cicada
 	  return hasher_type::operator()(x->span, x->rule->rule->lhs.id());
       }
     };
-    struct discovered_equal_type
+    struct edge_passive_equal_type
     {
       bool operator()(const edge_type* x, const edge_type* y) const
       {
@@ -346,8 +343,9 @@ namespace cicada
       head_edge_set_type(const score_type& __score) : score(__score), head(hypergraph_type::invalid), edges() {}
     };
     
-    typedef google::dense_hash_map<const edge_type*, head_edge_set_type, discovered_hash_type, discovered_equal_type > discovered_type;
-
+    typedef google::dense_hash_set<const edge_type*, edge_active_hash_type, edge_active_equal_type > discovered_active_type;
+    typedef google::dense_hash_map<const edge_type*, head_edge_set_type, edge_passive_hash_type, edge_passive_equal_type > discovered_passive_type;
+    
     
     ParseAgenda(const symbol_type& __goal,
 		const grammar_type& __grammar,
@@ -363,8 +361,8 @@ namespace cicada
 	attr_span_last("span-last")
     {
       traversals.set_empty_key(traversal_type());
-      edges_unique.set_empty_key(0);
-      discovered.set_empty_key(0);
+      discovered_active.set_empty_key(0);
+      discovered_passive.set_empty_key(0);
     }    
     
     void operator()(const lattice_type& lattice,
@@ -380,8 +378,9 @@ namespace cicada
       
       traversals.clear();
       
-      discovered.clear();
-      edges_unique.clear();
+      discovered_active.clear();
+      discovered_passive.clear();
+      
       edges_active.clear();
       edges_passive.clear();
 
@@ -608,21 +607,26 @@ namespace cicada
     void explore_traversal(const edge_type& edge)
     {
       if (edge.is_passive()) {
-	typename discovered_type::iterator diter = discovered.find(&edge);
-	if (diter == discovered.end()) {
+	typename discovered_passive_type::iterator diter = discovered_passive.find(&edge);
+	if (diter == discovered_passive.end()) {
 	  // newly discovered edge!
 	  
-	  agenda_finishing.push_back(&edges.back());
+	  // passive edge...
+	  agenda_finishing.push_back(&edge);
 	  
-	  diter = discovered.insert(std::make_pair(&edge, head_edge_set_type(edge.score))).first;
+	  diter = discovered_passive.insert(std::make_pair(&edge, head_edge_set_type(edge.score))).first;
 	}
 	
 	diter->second.score = std::max(diter->second.score, edge.score);
 	diter->second.edges.push_back(&edge);
 	
       } else {
-	if (edges_unique.insert(&edge).second)
+	if (discovered_active.insert(&edge).second) {
 	  edges_active[edge.span.last].push_back(&edge);
+	  
+	  // active edge...
+	  agenda_finishing.push_back(&edge);
+	}
       }
     }
     
@@ -630,11 +634,13 @@ namespace cicada
     {
       // do not handle the special edge...
       if (edge.span.first == edge.span.last) return;
+
+      if (! edge.is_passive()) return;
       
       edges_passive[edge.span.first].push_back(&edge);
       
-      typename discovered_type::iterator diter = discovered.find(&edge);
-      if (diter == discovered.end()) return;
+      typename discovered_passive_type::iterator diter = discovered_passive.find(&edge);
+      if (diter == discovered_passive.end()) return;
       
       hypergraph_type::id_type head_id;
       if (edge.span.first == 0 && edge.span.last == lattice.size() && edge.rule->rule->lhs == goal) {
@@ -657,8 +663,8 @@ namespace cicada
 	const edge_type* curr = &edge_antecedent;
 	while (curr && ! curr->is_predicted()) {
 	  if (curr->passive) {
-	    typename discovered_type::iterator diter = discovered.find(curr->passive);
-	    if (diter == discovered.end())
+	    typename discovered_passive_type::iterator diter = discovered_passive.find(curr->passive);
+	    if (diter == discovered_passive.end())
 	      throw std::runtime_error("no node?");
 	    
 	    tails.push_back(diter->second.head);
@@ -719,10 +725,11 @@ namespace cicada
     
     traversal_set_type traversals;
     
-    discovered_type discovered;
-    edge_set_active_unique_type edges_unique;
-    edge_set_active_type        edges_active;
-    edge_set_passive_type       edges_passive;
+    discovered_active_type  discovered_active;
+    discovered_passive_type discovered_passive;
+    
+    edge_set_active_type    edges_active;
+    edge_set_passive_type   edges_passive;
     
     rule_candidate_set_type   rule_candidates;
     rule_candidate_table_type rule_tables;
