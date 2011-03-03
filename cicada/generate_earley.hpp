@@ -297,6 +297,11 @@ namespace cicada
     
     typedef google::dense_hash_set<const item_type*, item_unique_hash_type, item_unique_equal_type > item_set_unique_type;
 
+    typedef std::vector<const item_type*, std::allocator<const item_type*> > item_ptr_set_type;
+    typedef std::vector<item_ptr_set_type, std::allocator<item_ptr_set_type> > item_set_active_type;
+    typedef std::vector<item_ptr_set_type, std::allocator<item_ptr_set_type> > item_set_passive_type;
+
+#if 0
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_multiset<const item_type*, item_active_hash_type, item_active_equal_type,
 					 std::allocator<const item_type*> > item_set_active_type;
@@ -307,6 +312,7 @@ namespace cicada
 			       std::allocator<const item_type*> > item_set_active_type;
     typedef sgi::hash_multiset<const item_type*, item_passive_hash_type, item_passive_equal_type,
 			       std::allocator<const item_type*> > item_set_passive_type;
+#endif
 #endif
 
     
@@ -420,11 +426,9 @@ namespace cicada
     {
       // we will try find actives whose last match with passive's first
       // do we group by passive's lhs?
-
-      const item_type query(passive.depth - 1);
       
-      std::pair<item_set_active_type::const_iterator, item_set_active_type::const_iterator> result = items_active.equal_range(&query);
-      for (item_set_active_type::const_iterator aiter = result.first; aiter != result.second; ++ aiter) {
+      item_ptr_set_type::const_iterator aiter_end = items_active[passive.depth - 1].end();
+      for (item_ptr_set_type::const_iterator aiter = items_active[passive.depth - 1].begin(); aiter != aiter_end; ++ aiter) {
 	const item_type& active = *(*aiter);
 	
 	const grammar_node_type& dot = *(active.dot);
@@ -449,10 +453,9 @@ namespace cicada
       const grammar_node_type& dot = *(active.dot);
       
       // find passives whose first match with active's last
-      const item_type query(active.depth + 1);
       
-      std::pair<item_set_passive_type::const_iterator, item_set_passive_type::const_iterator> result = items_passive.equal_range(&query);
-      for (item_set_passive_type::const_iterator piter = result.first; piter != result.second; ++ piter) {
+      item_ptr_set_type::const_iterator piter_end = items_passive[active.depth + 1].end();
+      for (item_ptr_set_type::const_iterator piter = items_passive[active.depth + 1].begin(); piter != piter_end; ++ piter) {
 	const item_type& passive = *(*piter);
 	
 	id_map_type::const_iterator niter = dot.non_terminals.find(passive.lhs);
@@ -490,9 +493,9 @@ namespace cicada
 	items_unique.insert(&item);
 	
 	if (item.is_passive())
-	  items_passive.insert(&item);
+	  items_passive[item.depth].push_back(&item);
 	else
-	  items_active.insert(&item);
+	  items_active[item.depth].push_back(&item);
 	
 	agenda_finishing.push_back(&item);
       }
@@ -588,9 +591,6 @@ namespace cicada
       agenda_finishing.clear();
       agenda_exploration.clear();
       
-      items_unique.clear();
-      items_active.clear();
-      items_passive.clear();
 
       int sentence_length = 0;
       {
@@ -763,6 +763,16 @@ namespace cicada
 	} else
 	  grammar_nodes[niter->second].features += edge.features;
       }
+
+      items_unique.clear();
+      items_active.clear();
+      items_passive.clear();
+
+      items_active.reserve(max_tree_depth + 1);
+      items_passive.reserve(max_tree_depth + 1);
+
+      items_active.resize(max_tree_depth + 1);
+      items_passive.resize(max_tree_depth + 1);
     }
 
     
