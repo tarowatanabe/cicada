@@ -168,10 +168,7 @@ namespace cicada
 	  depth(__depth), 
 	  active(&__active), passive(&__passive),
 	  edge(hypergraph_type::invalid) {}
-      
-      // for query...
-      Item(const int& __depth) : depth(__depth) {}
-      
+            
     public:
       bool is_passive() const { return edge != hypergraph_type::invalid; }
       bool is_active() const { return edge == hypergraph_type::invalid; }
