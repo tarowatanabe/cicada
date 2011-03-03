@@ -65,6 +65,11 @@ compose-alignment: composition from lattice (or forest) with target\n\
 \tforest=[true|false] forest composition\n\
 compose-tree: composition from tree with tree grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+parse-agenda: parsing via agenda\n\
+\tyield=[source|target] use source or target yield for rule\n\
+\ttreebank=[true|false] assume treebank-style grammar\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialized weight\n\
 parse-cky|cyk: parsing via CKY\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
@@ -187,6 +192,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::ComposePhrase(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param_name == "compose-alignment")
 	operations.push_back(operation_ptr_type(new operation::ComposeAlignment(*piter, grammar, goal, non_terminal, debug)));
+      else if (param_name == "parse-agenda")
+	operations.push_back(operation_ptr_type(new operation::ParseAgenda(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param_name == "parse-cky" || param_name == "parse-cyk")
 	operations.push_back(operation_ptr_type(new operation::ParseCKY(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
       else if (param_name == "generate-earley")
