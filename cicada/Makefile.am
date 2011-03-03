@@ -260,6 +260,7 @@ operation_set.hpp \
 optimize.hpp \
 parameter.hpp \
 parse.hpp \
+parse_agenda.hpp \
 parse_cky.hpp \
 permute.hpp \
 prune.hpp \
