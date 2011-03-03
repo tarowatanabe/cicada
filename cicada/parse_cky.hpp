@@ -160,10 +160,10 @@ namespace cicada
     
     
 #ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_set<const rule_candidate_type*, boost::hash<const rule_candidate_type*>, std::equal_to<const rule_candidate_type*>,
+    typedef std::tr1::unordered_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
 				    std::allocator<const rule_candidate_type*> > unary_rule_set_type;
 #else
-    typedef sgi::hash_set<const rule_candidate_type*, boost::hash<const rule_candidate_type*>, std::equal_to<const rule_candidate_type*>,
+    typedef sgi::hash_set<const rule_candidate_type*, utils::hashmurmur<size_t>, std::equal_to<const rule_candidate_type*>,
 			  std::allocator<const rule_candidate_type*> > unary_rule_set_type;
     
 #endif

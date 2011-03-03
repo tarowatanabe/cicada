@@ -50,7 +50,7 @@ namespace utils
     {
       return c.front();
     }
-    
+
     void push(const value_type& x)
     {
       c.push_back(x);
@@ -61,6 +61,11 @@ namespace utils
     {
       std::pop_heap(c.begin(), c.end(), static_cast<_Compare&>(*this));
       c.pop_back();
+    }
+
+    void push_back(const value_tyep& x)
+    {
+      c.push_back(x);
     }
     
     void make_heap()
