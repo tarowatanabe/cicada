@@ -268,8 +268,25 @@ namespace cicada
     };
     
     typedef google::dense_hash_map<const edge_type*, head_edge_set_type, utils::hashmurmur<size_t>, std::equal_to<const edge_type*> > graph_node_set_type;
+
     
-    
+    ParseAgenda(const symbol_type& __goal,
+		const grammar_type& __grammar,
+		const function_type& __function,
+		const bool __yield_source=false,
+		const bool __treebank=false)
+      : goal(__goal),
+	grammar(__grammar),
+	function(__function),
+	yield_source(__yield_source),
+	treebank(__treebank),
+	attr_span_first("span-first"),
+	attr_span_last("span-last")
+    {
+      goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
+      
+      traversals.set_empty_key(traversal_type());
+    }    
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
@@ -477,12 +494,9 @@ namespace cicada
     
     void insert_edge(const edge_type& edge)
     {
-      if (edge.passive && edge.active) {
-	if (traversals.find(traversal_type(edge.active, edge.passive, edge.is_active())) != traversals.end())
+      if (edge.passive && edge.active)
+	if (! traversals.insert(traversal_type(edge.active, edge.passive, edge.is_active())).second)
 	  return;
-	else
-	  traversals.insert(traversal_type(edge.active, edge.passive, edge.is_active()));
-      }
       
       edges.push_back(edge);
       

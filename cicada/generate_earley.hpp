@@ -472,12 +472,9 @@ namespace cicada
     
     void insert_item(const item_type& item)
     {
-      if (item.passive && item.active) {
-	if (traversals.find(traversal_type(item.active, item.passive, item.is_active())) != traversals.end())
+      if (item.passive && item.active)
+	if (! traversals.insert(traversal_type(item.active, item.passive, item.is_active())).second)
 	  return;
-	else
-	  traversals.insert(traversal_type(item.active, item.passive, item.is_active()));
-      }
       
       items.push_back(item);
       
