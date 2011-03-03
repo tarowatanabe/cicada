@@ -225,6 +225,8 @@ namespace cicada
     }
     
   private:
+    // TODO: scoring from passive edges should be accumulated...
+
     void scan(const edge_tyep& active)
     {
       if (active.span.last >= lattice.size()) return;
@@ -272,6 +274,8 @@ namespace cicada
     
     void predict(const edge_type& passive)
     {
+      if (passive.first == passive.last) return;
+
       // from passive items, generate new actives...
       
       // extend root with passive items at [first, last)
@@ -290,8 +294,11 @@ namespace cicada
 	
 	// add passive edge... this is definitedly unary-rule, thus level must be passive.level + 1!
 	rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-	  insert_edge(edge_type(passive, dot_type(table, node), *riter, span, passive.level + 1));
+	for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	  const symbol_type& lhs = (*riter)->rule->lhs;
+	  
+	  insert_edge(edge_type(passive, dot_type(table, node), *riter, span, utils::bithack::branch(unique_goal && lhs == goal, 0, passive.level + 1)));
+	}
 	
 	// add active edge
 	if (transducer.has_next(node))
@@ -302,6 +309,8 @@ namespace cicada
     
     void complete_active(const edge_type& active)
     {
+      if (passive.first == passive.last) return;
+
       const transducer_type& transducer = grammar[active.dot.table];
 
       const edge_type query(active.span.last, active.span.last);
@@ -330,6 +339,8 @@ namespace cicada
     
     void complete_passive(const edge_type& passive)
     {
+      if (passive.first == passive.last) return;
+
       const edge_type query(passive.span.first, passive.span.first);
       
       std::pair<edge_set_active_type::const_iterator, edge_set_active_type::const_iterator> result = edges_active.equal_range(&query);
@@ -355,9 +366,20 @@ namespace cicada
 	  insert_edge(edge_type(active, passive, dot_type(active.dot.table, node), active.features, active.attributes, span_next));
       }
     }
-
+    
     void insert_edge(const edge_type& edge)
     {
+      if (edge.passive && edge.active) {
+	if (traversals.find(traversal_type(edge.active, edge.passive, edge.is_active())) != traversals.end())
+	  return;
+	else
+	  traversals.insert(traversal_type(edge.active, edge.passive, edge.is_active()));
+      }
+      
+      edges.push_back(edge);
+      
+      agenda_exploration.push_back(&edges.back());
+
       
       
     }
