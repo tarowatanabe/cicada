@@ -56,6 +56,7 @@ compose-earley: composition from tree with grammar\n\
 compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
+\tunique-goal=[true|false] unique goal\n\
 compose-grammar: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\

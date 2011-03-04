@@ -50,8 +50,9 @@ namespace cicada
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     
-    ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source=false, const bool __treebank=false)
-      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank),
+    ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source=false, const bool __treebank=false,
+	       const bool __unique_goal=false)
+      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank), unique_goal(__unique_goal),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
@@ -347,16 +348,27 @@ namespace cicada
       
       // we will clear node map so that we will always create new node..
       node_map.clear();
-      
-      passive_set_type& passive_arcs = passives(0, lattice.size());
-      for (size_t p = 0; p != passive_arcs.size(); ++ p)
-	if (non_terminals[passive_arcs[p]] == goal) {
-	  //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
-	  
-	  apply_rule(goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, passive_arcs, graph,
-		     0, lattice.size(),
-		     0, true);
-	}
+
+      if (unique_goal) {
+	passive_set_type& passive_arcs = passives(0, lattice.size());
+	for (size_t p = 0; p != passive_arcs.size(); ++ p)
+	  if (non_terminals[passive_arcs[p]] == goal) {
+	    if (graph.is_valid())
+	      throw std::runtime_error("multiple goal? " + boost::lexical_cast<std::string>(graph.goal) + " " + boost::lexical_cast<std::string>(passive_arcs[p]));
+	    
+	    graph.goal = passive_arcs[p];
+	  }
+      } else {
+	passive_set_type& passive_arcs = passives(0, lattice.size());
+	for (size_t p = 0; p != passive_arcs.size(); ++ p)
+	  if (non_terminals[passive_arcs[p]] == goal) {
+	    //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
+	    
+	    apply_rule(goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, passive_arcs, graph,
+		       0, lattice.size(),
+		       0, true);
+	  }
+      }
       
       // we will sort to remove unreachable nodes......
       graph.topologically_sort();
@@ -396,7 +408,9 @@ namespace cicada
 	
 	graph.connect_edge(edge.id, graph.goal);
       } else {
-	std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
+	const int cat_level = utils::bithack::branch(unique_goal && rule->lhs == goal, 0, level);
+	
+	std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, cat_level), 0));
 	if (result.second) {
 	  hypergraph_type::node_type& node = graph.add_node();
 	  non_terminals.push_back(rule->lhs);
@@ -464,6 +478,7 @@ namespace cicada
     const grammar_type& grammar;
     const bool yield_source;
     const bool treebank;
+    const bool unique_goal;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
     
@@ -480,9 +495,9 @@ namespace cicada
   };
   
   inline
-  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false)
+  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false, const bool unique_goal=false)
   {
-    ComposeCKY(goal, grammar, yield_source, treebank)(lattice, graph);
+    ComposeCKY(goal, grammar, yield_source, treebank, unique_goal)(lattice, graph);
   }
 };
 
