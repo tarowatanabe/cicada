@@ -10,6 +10,8 @@
 #include <cicada/kbest.hpp>
 #include <cicada/graphviz.hpp>
 #include <cicada/inside_outside.hpp>
+#include <cicada/span_node.hpp>
+#include <cicada/span_vector.hpp>
 
 #include <cicada/operation/output.hpp>
 #include <cicada/operation/functional.hpp>
@@ -36,7 +38,8 @@ namespace cicada
 			   const Function& function,
 			   const Filter& filter,
 			   const bool no_id,
-			   const bool graphviz_mode)
+			   const bool graphviz_mode,
+			   const bool span_mode)
     {
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
@@ -47,12 +50,13 @@ namespace cicada
 	  os << id << " ||| ";
 	if (graphviz_mode)
 	  cicada::graphviz(os, graph_empty) << '\n';
+	else if (span_mode)
+	  os << " ||| ||| 0" << '\n';
 	else
 	  os << graph_empty << " ||| ||| 0" << '\n';
 	return;
       }
-
-
+      
       cicada::KBest<kbest_traversal_edges, Function, Filter> derivations(graph, kbest_size, kbest_traversal_edges(), function, filter);
       
       typedef kbest_traversal_edges::value_type    derivation_type;
@@ -123,7 +127,25 @@ namespace cicada
 	
 	if (graphviz_mode)
 	  os << cicada::graphviz(os, graph_kbest) << '\n';
-	else {
+	else if (span_mode) {
+	  typedef std::pair<int, int> span_type;
+	  typedef cicada::SpanVector span_set_type;
+	  
+	  std::vector<span_type, std::allocator<span_type> > spans(graph_kbest.nodes.size());
+	  cicada::span_node(graph_kbest, spans);
+
+	  typename hypergraph_type::edge_set_type::const_iterator eiter_end = graph_kbest.edges.end();
+	  for (typename hypergraph_type::edge_set_type::const_iterator eiter = graph_kbest.edges.begin(); eiter != eiter_end; ++ eiter)
+	    os << span_set_type::span_type(spans[eiter->head], eiter->rule->lhs) << ' ';
+	  os << "|||";
+	    
+	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
+	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
+	    os << ' ' << fiter->first << '=' << fiter->second;
+	  os << " ||| ";
+	  os << weight;
+	  os << '\n';
+	} else {
 	  os << graph_kbest << " |||";
 	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
 	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
@@ -187,6 +209,7 @@ namespace cicada
 	yield_tree(false),
 	yield_graphviz(false),
 	yield_alignment(false),
+	yield_span(false),
 	graphviz(false),
 	statistics(false),
 	lattice_mode(false),
@@ -236,6 +259,8 @@ namespace cicada
 	    yield_graphviz = true;
 	  else if (value == "alignment" || value == "align")
 	    yield_alignment = true;
+	  else if (value == "span")
+	    yield_span = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
 	} else
@@ -253,10 +278,10 @@ namespace cicada
       if (! directory.empty() && ! file.empty())
 	throw std::runtime_error("you cannot output both in directory and file");
 	
-      if (int(yield_string) + yield_tree + yield_graphviz + yield_alignment > 1)
+      if (int(yield_string) + yield_tree + yield_graphviz + yield_alignment + yield_span > 1)
 	throw std::runtime_error("only string, tree or alignment yield for kbest");
 	
-      if (int(yield_string) + yield_tree + yield_graphviz + yield_alignment == 0)
+      if (int(yield_string) + yield_tree + yield_graphviz + yield_alignment + yield_span == 0)
 	yield_string = true;
 	
       if (graphviz && statistics)
@@ -398,7 +423,8 @@ namespace cicada
 				weight_function_one<weight_type>(),
 				kbest_filter(),
 				no_id,
-				yield_graphviz);
+				yield_graphviz,
+				yield_span);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -417,7 +443,8 @@ namespace cicada
 				weight_function_one<weight_type>(),
 				kbest_filter(),
 				no_id,
-				yield_graphviz);
+				yield_graphviz,
+				yield_span);
 	  }
 	} else {
 	  if (kbest_unique) {
@@ -438,7 +465,8 @@ namespace cicada
 				weight_function<weight_type>(*weights_kbest),
 				kbest_filter(),
 				no_id,
-				yield_graphviz);
+				yield_graphviz,
+				yield_span);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -457,7 +485,8 @@ namespace cicada
 				weight_function<weight_type>(*weights_kbest),
 				kbest_filter(),
 				no_id,
-				yield_graphviz);
+				yield_graphviz,
+				yield_span);
 	  }
 	}
       }
