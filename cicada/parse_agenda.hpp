@@ -355,7 +355,6 @@ namespace cicada
       edge_ptr_set_type        edges;
       
       head_edge_set_type() : score(), head(hypergraph_type::invalid), edges() {}
-      head_edge_set_type(const score_type& __score) : score(__score), head(hypergraph_type::invalid), edges() {}
     };
     
     typedef google::dense_hash_set<const edge_type*, edge_active_hash_type, edge_active_equal_type > discovered_active_type;
@@ -438,7 +437,7 @@ namespace cicada
 	    // explore traversals
 	    typename agenda_exploration_type::const_iterator aiter_end = agenda_exploration.end();
 	    for (typename agenda_exploration_type::const_iterator aiter = agenda_exploration.begin(); aiter != aiter_end; ++ aiter)
-	      explore_traversal(*(*aiter));
+	      explore_traversal(*(*aiter), graph);
 	    agenda_exploration.clear();
 	    
 	    if (agenda_finishing[i].empty()) break;
@@ -681,7 +680,7 @@ namespace cicada
       agenda_exploration.push_back(&edges.back());
     }
     
-    void explore_traversal(const edge_type& edge)
+    void explore_traversal(const edge_type& edge, hypergraph_type& graph)
     {
       if (edge.is_passive()) {
 	typename discovered_passive_type::iterator diter = discovered_passive.find(&edge);
@@ -691,12 +690,18 @@ namespace cicada
 	  // passive edge...
 	  agenda_finishing[edge.span.size()].push_back(&edge);
 	  
-	  diter = discovered_passive.insert(std::make_pair(&edge, head_edge_set_type(edge.score))).first;
+	  diter = discovered_passive.insert(std::make_pair(&edge, head_edge_set_type())).first;
+	  diter->second.score = edge.score;
+	  diter->second.edges.push_back(&edge);
+	} else {
+	  if (diter->second.head == hypergraph_type::invalid) {
+	    diter->second.score = std::max(diter->second.score, edge.score);
+	    diter->second.edges.push_back(&edge);
+	  } else {
+	    // this will happen since we have already ignored potentially good edge!
+	    insert_hypergraph(diter->second.head, edge, graph);
+	  }
 	}
-	
-	diter->second.score = std::max(diter->second.score, edge.score);
-	diter->second.edges.push_back(&edge);
-	
       } else {
 	if (discovered_active.insert(&edge).second) {
 	  edges_active[edge.span.last].push_back(&edge);
@@ -737,40 +742,42 @@ namespace cicada
 	head_id = diter->second.head;
       }
       
+      typename edge_ptr_set_type::const_iterator eiter_end = diter->second.edges.end();
+      for (typename edge_ptr_set_type::const_iterator eiter = diter->second.edges.begin(); eiter != eiter_end; ++ eiter)
+	insert_hypergraph(head_id, *(*eiter), graph);
+      
+      const_cast<edge_ptr_set_type&>(diter->second.edges).clear();
+    }
+
+    void insert_hypergraph(const hypergraph_type::id_type& head_id, const edge_type& edge, hypergraph_type& graph)
+    {
       std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails;
       
-      typename edge_ptr_set_type::const_iterator eiter_end = diter->second.edges.end();
-      for (typename edge_ptr_set_type::const_iterator eiter = diter->second.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const edge_type& edge_antecedent = *(*eiter);
-	
-	tails.clear();
-	
-	const edge_type* curr = &edge_antecedent;
-	while (curr && grammar[curr->dot.table].root() != curr->dot.node) {
-	  if (curr->passive) {
-	    typename discovered_passive_type::iterator diter = discovered_passive.find(curr->passive);
-	    if (diter == discovered_passive.end())
-	      throw std::runtime_error("no node?");
+      const edge_type* curr = &edge;
+      while (curr && grammar[curr->dot.table].root() != curr->dot.node) {
+	if (curr->passive) {
+	  typename discovered_passive_type::iterator diter = discovered_passive.find(curr->passive);
+	  if (diter == discovered_passive.end())
+	    throw std::runtime_error("no node?");
 	    
-	    tails.push_back(diter->second.head);
-	  }
-	  curr = curr->active;
+	  tails.push_back(diter->second.head);
 	}
-	
-	std::reverse(tails.begin(), tails.end());
-	
-	hypergraph_type::edge_type& edge_new = graph.add_edge(tails.begin(), tails.end());
-	edge_new.rule = edge_antecedent.rule->rule;
-	edge_new.features   = edge_antecedent.features   + edge_antecedent.rule->features;
-	edge_new.attributes = edge_antecedent.attributes + edge_antecedent.rule->attributes;
-	
-	// assign metadata...
-	edge_new.attributes[attr_span_first] = attribute_set_type::int_type(edge_antecedent.span.first);
-	edge_new.attributes[attr_span_last]  = attribute_set_type::int_type(edge_antecedent.span.last);
-	
-	graph.connect_edge(edge_new.id, head_id);
+	curr = curr->active;
       }
-    }
+	
+      std::reverse(tails.begin(), tails.end());
+	
+      hypergraph_type::edge_type& edge_new = graph.add_edge(tails.begin(), tails.end());
+      edge_new.rule = edge.rule->rule;
+      edge_new.features   = edge.features   + edge.rule->features;
+      edge_new.attributes = edge.attributes + edge.rule->attributes;
+      
+      // assign metadata...
+      edge_new.attributes[attr_span_first] = attribute_set_type::int_type(edge.span.first);
+      edge_new.attributes[attr_span_last]  = attribute_set_type::int_type(edge.span.last);
+      
+      graph.connect_edge(edge_new.id, head_id);
+    };
     
     const rule_candidate_ptr_set_type& cands(const size_type& table, const transducer_type::id_type& node)
     {
