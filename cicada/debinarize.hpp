@@ -116,11 +116,9 @@ namespace cicada
 	  
 	  removed[edge.id] = true;
 	  
-	  //std::cerr << "start debinarize" << std::endl;
+	  // TODO: we do not care index in categories...
 	  
 	  for (;;) {
-
-	    // Here, we do not care its index!
 	    tails.clear();
 	    rhs.clear();
 	    
@@ -137,7 +135,6 @@ namespace cicada
 		  
 		  features += edge_antecedent.features;
 		  
-		  // something wrong...
 		  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge_antecedent.tails.end();
 		  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge_antecedent.tails.begin(); titer != titer_end; ++ titer) {
 		    invalid |= binarized[*titer];
