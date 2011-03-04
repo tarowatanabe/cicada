@@ -42,6 +42,7 @@ namespace cicada
       bool yield_string;
       bool yield_tree;
       bool yield_graphviz;
+      bool yield_treebank;
       bool yield_alignment;
       bool yield_span;
 

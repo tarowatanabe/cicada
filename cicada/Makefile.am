@@ -287,6 +287,7 @@ span_forest.hpp \
 span_vector.hpp \
 stemmer.hpp \
 tokenizer.hpp \
+treebank.hpp \
 symbol.hpp \
 symbol_vector.hpp \
 transducer.hpp \
@@ -328,6 +329,7 @@ sentence_vector.cpp \
 span_vector.cpp \
 stemmer.cpp \
 tokenizer.cpp \
+treebank.cpp \
 symbol.cpp \
 symbol_vector.cpp \
 tree_grammar_mutable.cpp \
