@@ -693,15 +693,13 @@ namespace cicada
 	  diter = discovered_passive.insert(std::make_pair(&edge, head_edge_set_type())).first;
 	  diter->second.score = edge.score;
 	  diter->second.edges.push_back(&edge);
+	} else if (diter->second.head == hypergraph_type::invalid) {
+	  diter->second.score = std::max(diter->second.score, edge.score);
+	  diter->second.edges.push_back(&edge);
 	} else {
-	  if (diter->second.head == hypergraph_type::invalid) {
-	    diter->second.score = std::max(diter->second.score, edge.score);
-	    diter->second.edges.push_back(&edge);
-	  } else {
-	    // this will happen since we have already ignored potentially good edge!
-	    diter->second.score = std::max(diter->second.score, edge.score);
-	    insert_hypergraph(diter->second.head, edge, graph);
-	  }
+	  // this will happen since we have already ignored potentially good edge!
+	  diter->second.score = std::max(diter->second.score, edge.score);
+	  insert_hypergraph(diter->second.head, edge, graph);
 	}
       } else {
 	if (discovered_active.insert(&edge).second) {
