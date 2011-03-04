@@ -229,6 +229,7 @@ compose_earley.hpp \
 compose_grammar.hpp \
 compose_phrase.hpp \
 compose_tree.hpp \
+debinarize.hpp \
 dot_product.hpp \
 edit_distance_forest.hpp \
 eval.hpp \
