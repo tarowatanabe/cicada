@@ -122,6 +122,7 @@ output: kbest or hypergraph output\n\
 \tweights-one=[true|false] one initialize weight\n\
 \tyield=[sentence|string|derivation|tree|treebank|graphviz|alignment|span] yield for kbest\n\
 \tgraphviz=[true|false] dump in graphviz format\n\
+\tdebinarize=[trie|false] debinarize k-best trees\n\
 \tstatistics=[true|false] dump various statistics (size etc.)\n\
 \tlattice=[true|false] dump lattice\n\
 \tforest=[true|false] dump forest\n\

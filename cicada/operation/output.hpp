@@ -46,6 +46,7 @@ namespace cicada
       bool yield_alignment;
       bool yield_span;
 
+      bool debinarize;
       bool graphviz;
       bool statistics;
       bool lattice_mode;

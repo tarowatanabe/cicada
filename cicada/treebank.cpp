@@ -93,13 +93,16 @@ namespace cicada
     
     void operator()(const hypergraph_type& graph) const
     {
-      traverse(graph, graph.goal);
+      if (graph.is_valid())
+	traverse(graph, graph.goal);
+      else
+	os << "(())";
     }
     
     void traverse(const hypergraph_type& graph, const hypergraph_type::id_type& id) const
     {
       namespace karma = boost::spirit::karma;
-
+      
       const hypergraph_type::node_type& node = graph.nodes[id];
       
       if (node.edges.empty()) return;

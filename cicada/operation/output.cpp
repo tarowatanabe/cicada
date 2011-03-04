@@ -13,6 +13,7 @@
 #include <cicada/inside_outside.hpp>
 #include <cicada/span_node.hpp>
 #include <cicada/span_vector.hpp>
+#include <cicada/debinarize.hpp>
 
 #include <cicada/operation/output.hpp>
 #include <cicada/operation/functional.hpp>
@@ -41,7 +42,8 @@ namespace cicada
 			   const bool no_id,
 			   const bool graphviz_mode,
 			   const bool treebank_mode,
-			   const bool span_mode)
+			   const bool span_mode,
+			   const bool debinarize)
     {
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
@@ -125,6 +127,10 @@ namespace cicada
 	graph_kbest.goal = niter->second;
 
 	graph_kbest.topologically_sort();
+
+
+	if (debinarize)
+	  cicada::debinarize(graph_kbest);
 	
 	if (! no_id)
 	  os << id << " ||| ";
@@ -225,6 +231,8 @@ namespace cicada
 	yield_treebank(false),
 	yield_alignment(false),
 	yield_span(false),
+	
+	debinarize(false),
 	graphviz(false),
 	statistics(false),
 	lattice_mode(false),
@@ -247,6 +255,8 @@ namespace cicada
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "debinarize")
+	  debinarize = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "graphviz")
 	  graphviz = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "statistics")
@@ -442,7 +452,8 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span);
+				yield_span,
+				debinarize);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -463,7 +474,8 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span);
+				yield_span,
+				debinarize);
 	  }
 	} else {
 	  if (kbest_unique) {
@@ -486,7 +498,8 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span);
+				yield_span,
+				debinarize);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -507,7 +520,8 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span);
+				yield_span,
+				debinarize);
 	  }
 	}
       }
