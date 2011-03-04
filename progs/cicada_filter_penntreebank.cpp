@@ -79,7 +79,10 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
     
     cat %= qi::lexeme[+(standard::char_ - standard::space - '(' - ')')];
     treebank %= qi::hold['(' >> cat >> +treebank >> ')'] | cat;
-    root %= qi::hold['(' >> cat >> +treebank >> ')'] | qi::hold['(' >> qi::attr("ROOT") >> +treebank >> ')'] | cat;
+    root %= (qi::hold['(' >> cat >> +treebank >> ')']
+	     | qi::hold['(' >> qi::attr("ROOT") >> +treebank >> ')']
+	     | qi::hold[qi::lit('(') >> qi::attr("ROOT") >> qi::lit('(') >> qi::lit(')') >> qi::lit(')')]
+	     | cat);
   }
   
   boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   cat;
