@@ -86,15 +86,15 @@ namespace cicada
       
       for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
-	
-	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const hypergraph_type::edge_type& edge = target.edges[*eiter];
+
+	const size_type edges_size = node.edges.size();
+	for (size_type e = 0; e != edges_size; ++ e) {
+	  const hypergraph_type::edge_type& edge = target.edges[e];
 	  
 	  // search for antecedent nodes, and seek the binarized label..
 	  // if found, try merge! 
 	  // it is like apply-exact to form new edges....
-
+	  
 	  index_set_type j_ends(edge.tails.size(), 0);
 	  index_set_type j(edge.tails.size(), 0);
 	  
@@ -107,8 +107,6 @@ namespace cicada
 	  
 	  if (! found_binarized) continue;
 	  
-	  removed[*eiter] = true;
-	  
 	  for (;;) {
 
 	    // Here, we do not care its index!
@@ -120,20 +118,19 @@ namespace cicada
 	    bool valid = true;
 	    size_type i = 0;
 	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
-	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end && valid; ++ riter)
 	      if (riter->is_non_terminal()) {
 		if (j_ends[i] > 0) {
 		  const hypergraph_type::node_type& node_antecedent = target.nodes[edge.tails[i]];
 		  const hypergraph_type::edge_type& edge_antecedent = target.edges[node_antecedent.edges[j[i]]];
 		  
-		  if (edge_antecedent.id < removed.size() && removed[edge_antecedent.id]) {
-		    valid = false;
-		    break;
-		  }
-
 		  features += edge_antecedent.features;
 		  
-		  tails.insert(tails.end(), edge_antecedent.tails.begin(), edge_antecedent.tails.end());
+		  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge_antecedent.tails.end();
+		  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge_antecedent.tails.begin(); titer != titer_end; ++ titer) {
+		    valid |= binarized[*titer];
+		    tails.push_back(*titer);
+		  }
 		  
 		  rule_type::symbol_set_type::const_iterator aiter_end = edge_antecedent.rule->rhs.end();
 		  for (rule_type::symbol_set_type::const_iterator aiter = edge_antecedent.rule->rhs.begin(); aiter != aiter_end; ++ aiter)
@@ -170,6 +167,21 @@ namespace cicada
 	  }
 	}
       }
+
+      removed.resize(target.edges.size(), false);
+      
+      hypergraph_type::edge_set_type::const_iterator eiter_end = target.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = target.edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = *eiter;
+	
+	if (binarized[edge.head])
+	  removed[edge.head] = true;
+      }
+      
+      hypergraph_type sorted;
+      topologically_sort(target, sorted, filter_edge(removed), true);
+      target.swap(sorted);
+      
     }
     
   };
