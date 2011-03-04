@@ -749,9 +749,11 @@ namespace cicada
       const_cast<edge_ptr_set_type&>(diter->second.edges).clear();
     }
 
+    std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails;
+
     void insert_hypergraph(const hypergraph_type::id_type& head_id, const edge_type& edge, hypergraph_type& graph)
     {
-      std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails;
+      tails.clear();
       
       const edge_type* curr = &edge;
       while (curr && grammar[curr->dot.table].root() != curr->dot.node) {
