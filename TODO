@@ -63,6 +63,8 @@ MONOLINGUAL PARSING!
 
   Add variant of parsing algorithms. We have already implemented parse-cky, which does simple bottom-up
   parsing with beam pruning. Other variants includes: Earlay and shift-reduce with agenda-based pruning.
+  Add BOW F-measure, to score parse result
+  Add yield-span for dumping labeled span
 
 Cutting-plane learning under cicada_maxlike{,_mpi}...
 	We need to merge feature vector...
