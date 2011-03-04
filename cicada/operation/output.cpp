@@ -35,7 +35,8 @@ namespace cicada
 			   const int kbest_size,
 			   const Function& function,
 			   const Filter& filter,
-			   const bool no_id)
+			   const bool no_id,
+			   const bool graphviz_mode)
     {
       typedef Hypergraph hypergraph_type;
       typedef typename hypergraph_type::rule_type rule_type;
@@ -44,7 +45,10 @@ namespace cicada
 	hypergraph_type graph_empty;
 	if (! no_id)
 	  os << id << " ||| ";
-	os << graph_empty << " ||| ||| 0" << '\n';
+	if (graphviz_mode)
+	  cicada::graphviz(os, graph_empty) << '\n';
+	else
+	  os << graph_empty << " ||| ||| 0" << '\n';
 	return;
       }
 
@@ -116,13 +120,18 @@ namespace cicada
 	
 	if (! no_id)
 	  os << id << " ||| ";
-	os << graph_kbest << " |||";
-	typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
-	  os << ' ' << fiter->first << '=' << fiter->second;
-	os << " ||| ";
-	os << weight;
-	os << '\n';
+	
+	if (graphviz_mode)
+	  os << cicada::graphviz(os, graph_kbest) << '\n';
+	else {
+	  os << graph_kbest << " |||";
+	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
+	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
+	    os << ' ' << fiter->first << '=' << fiter->second;
+	  os << " ||| ";
+	  os << weight;
+	  os << '\n';
+	}
       }
     }
 
@@ -176,6 +185,7 @@ namespace cicada
 	insertion_prefix(),
 	yield_string(false),
 	yield_tree(false),
+	yield_graphviz(false),
 	yield_alignment(false),
 	graphviz(false),
 	statistics(false),
@@ -222,6 +232,8 @@ namespace cicada
 	    yield_string = true;
 	  else if (value == "derivation" || value == "tree")
 	    yield_tree = true;
+	  else if (value == "graphviz")
+	    yield_graphviz = true;
 	  else if (value == "alignment" || value == "align")
 	    yield_alignment = true;
 	  else
@@ -241,14 +253,17 @@ namespace cicada
       if (! directory.empty() && ! file.empty())
 	throw std::runtime_error("you cannot output both in directory and file");
 	
-      if (int(yield_string) + yield_tree + yield_alignment > 1)
+      if (int(yield_string) + yield_tree + yield_graphviz + yield_alignment > 1)
 	throw std::runtime_error("only string, tree or alignment yield for kbest");
 	
-      if (int(yield_string) + yield_tree + yield_alignment == 0)
+      if (int(yield_string) + yield_tree + yield_graphviz + yield_alignment == 0)
 	yield_string = true;
 	
       if (graphviz && statistics)
 	throw std::runtime_error("only one of graphviz or statistics can be specified...");
+
+      if (graphviz || yield_graphviz)
+	no_id = true;
       
       if (lattice_mode && forest_mode)
 	throw std::runtime_error("only one of lattice or forest can be dumped");
@@ -382,7 +397,8 @@ namespace cicada
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function_one<weight_type>(),
 				kbest_filter(),
-				no_id);
+				no_id,
+				yield_graphviz);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -400,7 +416,8 @@ namespace cicada
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function_one<weight_type>(),
 				kbest_filter(),
-				no_id);
+				no_id,
+				yield_graphviz);
 	  }
 	} else {
 	  if (kbest_unique) {
@@ -420,7 +437,8 @@ namespace cicada
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function<weight_type>(*weights_kbest),
 				kbest_filter(),
-				no_id);
+				no_id,
+				yield_graphviz);
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -438,7 +456,8 @@ namespace cicada
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function<weight_type>(*weights_kbest),
 				kbest_filter(),
-				no_id);
+				no_id,
+				yield_graphviz);
 	  }
 	}
       }

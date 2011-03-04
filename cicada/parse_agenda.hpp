@@ -764,6 +764,10 @@ namespace cicada
 	edge_new.features   = edge_antecedent.features   + edge_antecedent.rule->features;
 	edge_new.attributes = edge_antecedent.attributes + edge_antecedent.rule->attributes;
 	
+	// assign metadata...
+	edge_new.attributes[attr_span_first] = attribute_set_type::int_type(edge_antecedent.span.first);
+	edge_new.attributes[attr_span_last]  = attribute_set_type::int_type(edge_antecedent.span.last);
+	
 	graph.connect_edge(edge_new.id, head_id);
       }
     }
