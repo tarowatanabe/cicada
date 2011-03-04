@@ -22,6 +22,7 @@
 #include "operation/compose.hpp"
 #include "operation/generate.hpp"
 #include "operation/apply.hpp"
+#include "operation/debinarize.hpp"
 #include "operation/expected_ngram.hpp"
 #include "operation/parse.hpp"
 #include "operation/prune.hpp"
@@ -112,6 +113,7 @@ normalize: feature value normalizer\n\
 remove-epsilon: remove epsilon for lattice\n\
 span-forest: annotate terminal span\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
+debinarize: de-binarize forest\n\
 output: kbest or hypergraph output\n\
 \tkbest=<kbest size> zero for hypergraph output (default)\n\
 \tinsertion-prefix=<prefix attatched to inserted word>\n\
@@ -213,6 +215,8 @@ output: kbest or hypergraph output\n\
 	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
       else if (param_name == "remove-epsilon")
 	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
+      else if (param_name == "debinarize")
+	operations.push_back(operation_ptr_type(new operation::Debinarize(*piter, debug)));
       else if (param_name == "expected-ngram")
 	operations.push_back(operation_ptr_type(new operation::ExpectedNGram(*piter, debug)));
       else if (param_name == "output") {

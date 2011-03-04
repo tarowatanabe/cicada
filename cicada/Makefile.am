@@ -170,6 +170,7 @@ operation/apply.hpp \
 operation/binarize.hpp \
 operation/clear.hpp \
 operation/compose.hpp \
+operation/debinarize.hpp \
 operation/expected_ngram.hpp \
 operation/functional.hpp \
 operation/generate.hpp \
@@ -189,6 +190,7 @@ operation/apply.cpp \
 operation/binarize.cpp \
 operation/clear.cpp \
 operation/compose.cpp \
+operation/debinarize.cpp \
 operation/expected_ngram.cpp \
 operation/intersect.cpp \
 operation/generate.cpp \

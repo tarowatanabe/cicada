@@ -68,7 +68,7 @@ namespace cicada
       
       // first, check whether it is binarized!
       hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
-      for (hypergraph_type::node_set_type::conts_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
+      for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
 	
 	// this should not happen, though..
@@ -81,10 +81,10 @@ namespace cicada
 	  binarized[node.id] = true;
       }
 
-      tails_set_type tails;
-      rhs_type       rhs;
+      tail_set_type tails;
+      rhs_type      rhs;
       
-      for (hypergraph_type::node_set_type::conts_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
+      for (hypergraph_type::node_set_type::const_iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
 	
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -101,8 +101,8 @@ namespace cicada
 	  bool found_binarized = false;
 	  
 	  for (size_type i = 0; i != edge.tails.size(); ++ i) {
-	    found_binarized |= binarized[*titer];
-	    j_ends[i] = utils::bithack::branch(binarized[*titer], graph.nodes[*titer].edges.size(), size_type(0));
+	    found_binarized |= binarized[edge.tails[i]];
+	    j_ends[i] = utils::bithack::branch(binarized[edge.tails[i]], target.nodes[edge.tails[i]].edges.size(), size_type(0));
 	  }
 	  
 	  if (! found_binarized) continue;
@@ -148,9 +148,10 @@ namespace cicada
 		rhs.push_back(*riter);
 	    
 	    if (valid) {
-	      hypergraph_type::edge_type& edge_new = target.edge(tails.begin(), tails.end());
+	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	      edge_new.rule = rule_type::create(rule_type(edge.rule->lhs, rhs.begin(), rhs.end()));
 	      edge_new.features = features;
+	      edge_new.attributes = edge.attributes;
 	      
 	      target.connect_edge(edge_new.id, edge.head);
 	    }
@@ -172,6 +173,25 @@ namespace cicada
     }
     
   };
+
+
+  
+  inline
+  void debinarize(const HyperGraph& source, HyperGraph& target)
+  {
+    Debinarize debinarizer;
+    
+    debinarizer(source, target);
+  }
+  
+  inline
+  void debinarize(HyperGraph& source)
+  {
+    HyperGraph target;
+    debinarize(source, target);
+    source.swap(target);
+  }
+
 };
 
 #endif
