@@ -699,6 +699,7 @@ namespace cicada
 	    diter->second.edges.push_back(&edge);
 	  } else {
 	    // this will happen since we have already ignored potentially good edge!
+	    diter->second.score = std::max(diter->second.score, edge.score);
 	    insert_hypergraph(diter->second.head, edge, graph);
 	  }
 	}
