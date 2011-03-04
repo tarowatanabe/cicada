@@ -82,7 +82,7 @@ namespace cicada
 	  
 	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
-	    removed[*eiter];
+	    removed[*eiter] = true;
 	}
       }
 
