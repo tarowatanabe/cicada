@@ -68,6 +68,7 @@ compose-tree: composition from tree with tree grammar\n\
 parse-agenda: parsing via agenda\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
+\tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 parse-cky|cyk: parsing via CKY\n\

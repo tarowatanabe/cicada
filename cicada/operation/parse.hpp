@@ -72,6 +72,7 @@ namespace cicada
       bool deletion;
 
       const weight_set_type* weights;
+      int size;
       bool weights_one;
       
       bool yield_source;

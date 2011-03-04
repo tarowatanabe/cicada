@@ -344,8 +344,6 @@ namespace cicada
 	  heap.clear();
 	  
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
-	    const transducer_type& transducer = grammar[table];
-	    
 	    active_set_type&  cell         = actives[table](first, last);
 	    
 	    typename active_set_type::const_iterator citer_end = cell.end();

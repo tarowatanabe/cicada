@@ -143,6 +143,7 @@ namespace cicada
 	goal(__goal), non_terminal(__non_terminal), 
 	insertion(__insertion), deletion(__deletion),
 	weights(0),
+	size(200),
 	weights_one(false),
 	yield_source(false),
 	treebank(false),
@@ -158,7 +159,9 @@ namespace cicada
       bool target = false;
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "weights")
+	if (utils::ipiece(piter->first) == "size")
+	  size = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
@@ -216,9 +219,9 @@ namespace cicada
 	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
       
       if (weights_one)
-	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, yield_source, treebank);
+	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank);
       else
-	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, yield_source, treebank);
+	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank);
       
       utils::resource end;
     
