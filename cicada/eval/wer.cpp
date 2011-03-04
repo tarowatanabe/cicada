@@ -21,7 +21,7 @@ namespace cicada
     {
       std::ostringstream stream;
       stream << "wer: " << score()
-	     << " " << insertion << '|' << deletion << '|' << substitution
+	     << ' ' << insertion << '|' << deletion << '|' << substitution
 	     << " length: " << references;
       
       return stream.str();

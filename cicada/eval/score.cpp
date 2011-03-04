@@ -13,6 +13,7 @@
 #include "eval/bleu.hpp"
 #include "eval/wlcs.hpp"
 #include "eval/combined.hpp"
+#include "eval/parseval.hpp"
 
 #include "stemmer.hpp"
 #include "parameter.hpp"
@@ -68,6 +69,8 @@ namespace cicada
 	return WLCS::decode(iter, end);
       else if (scorer.second == "combined")
 	return Combined::decode(iter, end);
+      else if (scorer.second == "parseval")
+	return Parseval::decode(iter, end);
       else
 	return score_ptr_type();
     }
@@ -117,6 +120,9 @@ wlcs: weighted longest common subsequence\n\
 \ttokenizer=[tokenizer spec]\n\
 sb: skip bigram\n\
 \twindow=window size (default 4, < 0 for infinity, == 0 for non-skip bigram)\n\
+\ttokenizer=[tokenizer spec]\n\
+parseval: parse evaluation\n\
+\tignore=[category] ignored category\n\
 \ttokenizer=[tokenizer spec]\n\
 ";
 
@@ -324,6 +330,22 @@ sb: skip bigram\n\
 	}
 	
 	scorer = scorer_ptr_type(new SBScorer(window));
+	scorer->tokenizer = tokenizer;
+      } else if (utils::ipiece(param.name()) == "parseval") {
+	std::vector<word_type, std::allocator<word_type> > ignored;
+	
+	const tokenizer_type* tokenizer = 0;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "tokenizer")
+	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "ignored")
+	    ignored.push_back(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for parseval: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	scorer = scorer_ptr_type(new ParsevalScorer(ignored.begin(), ignored.end()));
 	scorer->tokenizer = tokenizer;
       } else
 	throw std::runtime_error("unknown scorer" + param.name());

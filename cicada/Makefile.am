@@ -42,6 +42,7 @@ dist_eval_HEADERS = \
 eval/combined.hpp \
 eval/f.hpp \
 eval/bleu.hpp \
+eval/parseval.hpp \
 eval/per.hpp \
 eval/score.hpp \
 eval/sb.hpp \
@@ -56,6 +57,7 @@ eval/combined.cpp \
 eval/decode.hpp \
 eval/encode.hpp \
 eval/f.cpp \
+eval/parseval.cpp \
 eval/per.cpp \
 eval/score.cpp \
 eval/sb.cpp \

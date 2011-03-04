@@ -42,5 +42,6 @@ int main(int argc, char** argv)
   process("sk", refset, tstset);
   process("sb", refset, tstset);
   process("wlcs", refset, tstset);
+  process("parseval", refset, tstset);
   process("combined:reward=true,metric=bleu,weight=0.5,metric=ter,weight=-0.5", refset, tstset);
 }
