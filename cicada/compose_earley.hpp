@@ -52,7 +52,8 @@ namespace cicada
       : grammar(__grammar), yield_source(__yield_source)
 
     {
-      items_unique.set_empty_key(0);
+      items_unique_active.set_empty_key(0);
+      items_unique_passive.set_empty_key(0);
 
       traversals.set_empty_key(traversal_type());
 
@@ -219,36 +220,45 @@ namespace cicada
     
     // item hash/comparison
     
-    struct item_unique_hash_type : public utils::hashmurmur<size_t>
+    struct item_unique_active_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
       size_t operator()(const item_type* x) const
       {
 	// passive item do not care about what dot we have consumed...
-	if (! x)
-	  return 0;
-	else if (x->is_active())
-	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id())));
-	else
-	  return hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id()));
+	return (x ? hasher_type::operator()(x->dot, hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id()))) : size_t(0));
       }
     };
     
-    struct item_unique_equal_type
+    struct item_unique_passive_hash_type : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const item_type* x) const
+      {
+	// passive item do not care about what dot we have consumed...
+	return (x ? hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id())) : size_t(0));
+      }
+    };
+    
+    struct item_unique_active_equal_type
     {
       bool operator()(const item_type* x, const item_type* y) const
       {
 	// passive item do not care dot...
-	return ((x == y) 
-		|| (x && y
-		    && x->is_active() == y->is_active()
-		    && x->lhs == y->lhs
-		    && x->first == y->first
-		    && x->last == y->last
-		    && (x->is_passive() || x->dot == y->dot)));
+	return ((x == y) || (x && y && x->lhs == y->lhs && x->first == y->first && x->last == y->last && x->dot == y->dot));
       }
     };
+    struct item_unique_passive_equal_type
+    {
+      bool operator()(const item_type* x, const item_type* y) const
+      {
+	// passive item do not care dot...
+	return ((x == y) || (x && y && x->lhs == y->lhs && x->first == y->first && x->last == y->last));
+      }
+    };
+
     
     struct item_active_hash_type : public utils::hashmurmur<size_t>
     {
@@ -282,7 +292,8 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<const item_type*, item_unique_hash_type, item_unique_equal_type > item_set_unique_type;
+    typedef google::dense_hash_set<const item_type*, item_unique_active_hash_type, item_unique_active_equal_type >   item_set_unique_active_type;
+    typedef google::dense_hash_set<const item_type*, item_unique_passive_hash_type, item_unique_passive_equal_type > item_set_unique_passive_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
     typedef std::tr1::unordered_multiset<const item_type*, item_active_hash_type, item_active_equal_type,
@@ -531,15 +542,16 @@ namespace cicada
     
     void connect_item(const item_type& item, const hypergraph_type& source, hypergraph_type& target)
     {
-      if (items_unique.find(&item) == items_unique.end()) {
-	items_unique.insert(&item);
-	
-	if (item.is_passive())
+      if (items.is_passive()) {
+	if (items_unique_passive.insert(&item).second) {
 	  items_passive.insert(&item);
-	else
+	  agenda_finishing.push_back(&item);
+	}
+      } else {
+	if (items_unique_active.insert(&item).second) {
 	  items_active.insert(&item);
-	
-	agenda_finishing.push_back(&item);
+	  agenda_finishing.push_back(&item);
+	}
       }
       
       // add into hypergraph...
@@ -649,7 +661,8 @@ namespace cicada
       agenda_finishing.clear();
       agenda_exploration.clear();
 
-      items_unique.clear();
+      items_unique_active.clear();
+      items_unique_passive.clear();
       items_active.clear();
       items_passive.clear();
 
@@ -877,7 +890,8 @@ namespace cicada
     agenda_type agenda_finishing;
     agenda_type agenda_exploration;
     
-    item_set_unique_type  items_unique;
+    item_set_unique_active_type  items_unique_active;
+    item_set_unique_passive_type items_unique_passive;
     item_set_active_type  items_active;
     item_set_passive_type items_passive;
 
