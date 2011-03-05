@@ -219,6 +219,35 @@ namespace cicada
     typedef google::dense_hash_set<traversal_type, traversal_hash_type, traversal_equal_type > traversal_set_type;
     
     // item hash/comparison
+   struct item_unique_hash_type : public utils::hashmurmur<size_t>
+   {
+     typedef utils::hashmurmur<size_t> hasher_type;
+     
+     size_t operator()(const item_type* x) const
+     {
+       if (! x)
+         return 0;
+       else if (x->is_active())
+         return hasher_type::operator()(x->dot, hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id())));
+       else
+         return hasher_type::operator()(x->first, hasher_type::operator()(x->last, x->lhs.id()));
+     }
+   };
+    
+    struct item_unique_equal_type
+    {
+      bool operator()(const item_type* x, const item_type* y) const
+      {
+        // passive item do not care dot...
+	return ((x == y) 
+		|| (x && y
+		    && x->is_active() == y->is_active()
+		    && x->lhs == y->lhs
+		    && x->first == y->first
+		    && x->last == y->last
+		    && (x->is_passive() || x->dot == y->dot)));
+      }
+    };
     
     struct item_unique_active_hash_type : public utils::hashmurmur<size_t>
     {
@@ -542,7 +571,7 @@ namespace cicada
     
     void connect_item(const item_type& item, const hypergraph_type& source, hypergraph_type& target)
     {
-      if (items.is_passive()) {
+      if (item.is_passive()) {
 	if (items_unique_passive.insert(&item).second) {
 	  items_passive.insert(&item);
 	  agenda_finishing.push_back(&item);
