@@ -51,20 +51,10 @@ Reimplement cicada-learn-online:
 
 Added binarization to cicada-extract, or use cicada tool for binarization?
 
-Revise parent feature:
-  we do not trust the label from rule, but use state propagated root label...
-
 MONOLINGUAL PARSING!
   It is possible to do parsing, given cky composer... (or, we may implement earley-composer...)
   But, the problem is: how to normalize penntreebank... 
   Remove -NONE-, normalize non-terminal symbols, (remove -[0-9]+$,  =[0-9]+$ etc.)
-  Handle unary rules in an optimized manner:
-      Perform caching in grammar class: re-use chain of non-terminals with ertain threshold (# of loops)
-
-  Add variant of parsing algorithms. We have already implemented parse-cky, which does simple bottom-up
-  parsing with beam pruning. Other variants includes: Earlay and shift-reduce with agenda-based pruning.
-  Add BOW F-measure, to score parse result
-  Add yield-span for dumping labeled span
 
 Cutting-plane learning under cicada_maxlike{,_mpi}...
 	We need to merge feature vector...

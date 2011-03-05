@@ -5,6 +5,7 @@ Based on the generic framework, we can
    - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree), word alignment
    - translate sentence, lattice and/or parse tree
    - align between {hypergraph,lattice}-to-lattice (currently, we assume penn-treebank style hypergraph and sentence-like lattice)
+   - parse lattices (or sentences)
    - analyze forest/tree/lattice
 
 Remark: cicada is 蝉(CJK UNIFIED IDEOGRAPH-8749), (or セミ) in Japanese, pronounced "SEMI"
@@ -15,8 +16,8 @@ Basically, we have four distinct structures:
    - tree-grammar: a collectin of WFSTT (tree-transducer) implemented as a (nested) trie structure.
    - hypergraph: a compact representation of set of trees (or forest).
 
-Translation can be carried out by:
-   - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2].
+Translation/parsing can be carried out by:
+   - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2,24].
    - A lattice (or sentence) is composed with a phrasal grammar, generating a phrasal hypergraph [4].
    - A hypergraph/forest (or parse-tree) is composed with a phrasal grammar, generating another hypergraph [3].
    - A hypergraph/forest (or parse-tree) is composed with a tree grammar, generating another hypergraph [4]. (experimental)
@@ -368,4 +369,14 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {986--993},
   url       = {http://www.aclweb.org/anthology/P/P08/P08-1112}
+}
+
+[24]
+@INPROCEEDINGS{Klein01parsingand,
+    author = {Dan Klein and Christopher D. Manning},
+    title = {Parsing and Hypergraphs},
+    booktitle = {IN IWPT},
+    year = {2001},
+    pages = {123--134},
+    publisher = {}
 }
