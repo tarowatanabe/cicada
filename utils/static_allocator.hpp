@@ -9,8 +9,8 @@
 #include <stdexcept>
 #include <climits>
 
-
 #include <utils/config.hpp>
+#include <utils/thread_specific_ptr.hpp>
 #include <boost/thread.hpp>
 
 namespace utils
@@ -103,7 +103,7 @@ namespace utils
       }
       return *local_pool;
 #else
-      static boost::thread_specific_ptr<pool_type> local_pool;
+      static utils::thread_specific_ptr<pool_type> local_pool;
       if (! local_pool.get())
 	local_pool.reset(new pool_type());
       return *local_pool;

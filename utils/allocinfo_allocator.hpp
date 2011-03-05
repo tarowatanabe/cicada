@@ -11,6 +11,7 @@
 #include <boost/thread.hpp>
 
 #include <utils/config.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 namespace utils
 {
@@ -26,7 +27,7 @@ namespace utils
       static __thread allocated_type __allocated = 0;
       return __allocated;
 #else
-      static boost::thread_specific_ptr<allocated_type> __allocated;
+      static utils::thread_specific_ptr<allocated_type> __allocated;
       
       if (! __allocated.get())
 	__allocated.reset(new allocated_type(0));

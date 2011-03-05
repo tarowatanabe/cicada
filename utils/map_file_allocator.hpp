@@ -39,6 +39,7 @@
 #include <utils/config.hpp>
 #include <utils/spinlock.hpp>
 #include <utils/sgi_hash_map.hpp>
+#include <utils/thread_specific_ptr.hpp>
 
 namespace utils
 {
@@ -266,7 +267,7 @@ namespace utils
 #ifdef HAVE_TLS
     static __thread map_alloc_type* local_alloc_thread;
 #endif
-    static boost::thread_specific_ptr<map_alloc_type> local_alloc;
+    static utils::thread_specific_ptr<map_alloc_type> local_alloc;
     
     map_alloc_type& map_alloc()
     {

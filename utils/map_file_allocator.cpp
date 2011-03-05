@@ -14,6 +14,6 @@ namespace utils
 #ifdef HAVE_TLS
   __thread __map_file_allocator_base::map_alloc_type* __map_file_allocator_base::local_alloc_thread = 0;
 #endif
-  boost::thread_specific_ptr<__map_file_allocator_base::map_alloc_type> __map_file_allocator_base::local_alloc;
+  utils::thread_specific_ptr<__map_file_allocator_base::map_alloc_type> __map_file_allocator_base::local_alloc;
   
 };
