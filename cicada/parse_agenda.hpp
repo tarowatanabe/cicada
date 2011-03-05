@@ -313,10 +313,7 @@ namespace cicada
       
       size_t operator()(const edge_type* x) const
       {
-	if (! x)
-	  return 0;
-	else
-	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->span));
+	return (x ? hasher_type::operator()(x->dot, hasher_type::operator()(x->span)) : size_t(0));
       }
     };
 
@@ -334,10 +331,7 @@ namespace cicada
       
       size_t operator()(const edge_type* x) const
       {
-	if (! x)
-	  return 0;
-	else
-	  return hasher_type::operator()(x->span, x->rule->rule->lhs.id());
+	return (x ? hasher_type::operator()(x->span, x->rule->rule->lhs.id()) : size_t(0));
       }
     };
     struct edge_passive_equal_type
