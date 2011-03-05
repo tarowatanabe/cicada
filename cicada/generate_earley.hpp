@@ -60,7 +60,8 @@ namespace cicada
     GenerateEarley(const int __depth, const int __width)
       : depth(__depth), width(__width)
     {
-      items_unique.set_empty_key(0);
+      items_unique_active.set_empty_key(0);
+      items_unique_passive.set_empty_key(0);
 
       traversals.set_empty_key(traversal_type());
 
@@ -210,68 +211,47 @@ namespace cicada
     
     // item hash/comparison
     
-    struct item_unique_hash_type : public utils::hashmurmur<size_t>
+    struct item_unique_active_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
       
       size_t operator()(const item_type* x) const
       {
 	// passive item do not care about what dot we have consumed...
-	if (! x)
-	  return 0;
-	else if (x->is_active())
-	  return hasher_type::operator()(x->dot, hasher_type::operator()(x->depth, x->lhs.id()));
-	else
-	  return hasher_type::operator()(x->depth, x->lhs.id());
+	return (x ? hasher_type::operator()(x->dot, hasher_type::operator()(x->depth, x->lhs.id())) : size_t(0));
       }
     };
     
-    struct item_unique_equal_type
+    struct item_unique_passive_hash_type : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const item_type* x) const
+      {
+	// passive item do not care about what dot we have consumed...
+	return (x ? hasher_type::operator()(x->depth, x->lhs.id()) : size_t(0));
+      }
+    };
+    
+    struct item_unique_active_equal_type
     {
       bool operator()(const item_type* x, const item_type* y) const
       {
 	// passive item do not care dot...
-	return ((x == y) 
-		|| (x && y
-		    && x->is_active() == y->is_active()
-		    && x->lhs == y->lhs
-		    && x->depth == y->depth
-		    && (x->is_passive() || x->dot == y->dot)));
+	return ((x == y) || (x && y && x->lhs == y->lhs && x->depth == y->depth && x->dot == y->dot));
       }
     };
     
-    struct item_active_hash_type : public utils::hashmurmur<size_t>
-    {
-      size_t operator()(const item_type* x) const
-      {
-	return utils::hashmurmur<size_t>::operator()(x->depth);
-      }
-    };
-    
-    struct item_active_equal_type
+    struct item_unique_passive_equal_type
     {
       bool operator()(const item_type* x, const item_type* y) const
       {
-	return x->depth == y->depth;
-      }
-    };
-
-    struct item_passive_hash_type : public utils::hashmurmur<size_t>
-    {
-      size_t operator()(const item_type* x) const
-      {
-	return utils::hashmurmur<size_t>::operator()(x->depth);
+	// passive item do not care dot...
+	return ((x == y) || (x && y && x->lhs == y->lhs && x->depth == y->depth));
       }
     };
     
-    struct item_passive_equal_type
-    {
-      bool operator()(const item_type* x, const item_type* y) const
-      {
-	return x->depth == y->depth;
-      }
-    };
-
+    
     struct item_node_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
@@ -292,25 +272,13 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_set<const item_type*, item_unique_hash_type, item_unique_equal_type > item_set_unique_type;
+    typedef google::dense_hash_set<const item_type*, item_unique_active_hash_type, item_unique_active_equal_type >   item_set_unique_active_type;
+    typedef google::dense_hash_set<const item_type*, item_unique_passive_hash_type, item_unique_passive_equal_type > item_set_unique_passive_type;
 
     typedef std::vector<const item_type*, std::allocator<const item_type*> > item_ptr_set_type;
     typedef std::vector<item_ptr_set_type, std::allocator<item_ptr_set_type> > item_set_active_type;
     typedef std::vector<item_ptr_set_type, std::allocator<item_ptr_set_type> > item_set_passive_type;
 
-#if 0
-#ifdef HAVE_TR1_UNORDERED_SET
-    typedef std::tr1::unordered_multiset<const item_type*, item_active_hash_type, item_active_equal_type,
-					 std::allocator<const item_type*> > item_set_active_type;
-    typedef std::tr1::unordered_multiset<const item_type*, item_passive_hash_type, item_passive_equal_type,
-					 std::allocator<const item_type*> > item_set_passive_type;
-#else
-    typedef sgi::hash_multiset<const item_type*, item_active_hash_type, item_active_equal_type,
-			       std::allocator<const item_type*> > item_set_active_type;
-    typedef sgi::hash_multiset<const item_type*, item_passive_hash_type, item_passive_equal_type,
-			       std::allocator<const item_type*> > item_set_passive_type;
-#endif
-#endif
 
     
     // item to traversal graph mappings...
@@ -483,15 +451,16 @@ namespace cicada
     
     void connect_item(const item_type& item, const hypergraph_type& source, hypergraph_type& target)
     {
-      if (items_unique.find(&item) == items_unique.end()) {
-	items_unique.insert(&item);
-	
-	if (item.is_passive())
+      if (item.is_passive()) {
+	if (items_unique_passive.insert(&item).second) {
 	  items_passive[item.depth].push_back(&item);
-	else
+	  agenda_finishing.push_back(&item);
+	}
+      } else {
+	if (items_unique_active.insert(&item).second) {
 	  items_active[item.depth].push_back(&item);
-	
-	agenda_finishing.push_back(&item);
+	  agenda_finishing.push_back(&item);
+	}
       }
       
       if (! item.is_passive()) return;
@@ -758,7 +727,8 @@ namespace cicada
 	  grammar_nodes[niter->second].features += edge.features;
       }
 
-      items_unique.clear();
+      items_unique_active.clear();
+      items_unique_passive.clear();
       items_active.clear();
       items_passive.clear();
 
@@ -788,7 +758,8 @@ namespace cicada
     agenda_type agenda_finishing;
     agenda_type agenda_exploration;
     
-    item_set_unique_type  items_unique;
+    item_set_unique_active_type  items_unique_active;
+    item_set_unique_passive_type items_unique_passive;
     item_set_active_type  items_active;
     item_set_passive_type items_passive;
   };
