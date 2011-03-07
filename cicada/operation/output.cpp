@@ -153,10 +153,18 @@ namespace cicada
 	  
 	  std::vector<span_type, std::allocator<span_type> > spans(graph_kbest.nodes.size());
 	  cicada::span_node(graph_kbest, spans);
-
+	  
 	  typename hypergraph_type::edge_set_type::const_iterator eiter_end = graph_kbest.edges.end();
-	  for (typename hypergraph_type::edge_set_type::const_iterator eiter = graph_kbest.edges.begin(); eiter != eiter_end; ++ eiter)
-	    os << span_set_type::span_type(spans[eiter->head], eiter->rule->lhs) << ' ';
+	  for (typename hypergraph_type::edge_set_type::const_iterator eiter = graph_kbest.edges.begin(); eiter != eiter_end; ++ eiter) {
+	    
+	    bool has_non_terminal = false;
+	    typename rule_type::symbol_set_type::const_iterator riter_end = eiter->rule->rhs.end();
+	    for (typename rule_type::symbol_set_type::const_iterator riter = eiter->rule->rhs.begin(); riter != riter_end; ++ riter)
+	      has_non_temrinal |= riter->is_non_terminal();
+	    
+	    if (has_non_terminal)
+	      os << span_set_type::span_type(spans[eiter->head], eiter->rule->lhs) << ' ';
+	  }
 	  os << "|||";
 	    
 	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
