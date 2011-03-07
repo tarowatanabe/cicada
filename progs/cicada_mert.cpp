@@ -81,11 +81,14 @@ path_type bound_upper_file;
 double value_lower = -100;
 double value_upper =  100;
 
-
 path_set_type feature_weights_files;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
+
+bool yield_sentence = false;
+bool yield_alignment = false;
+bool yield_span = false;
 
 int iteration = 10;
 int samples_restarts   = 4;
@@ -222,6 +225,12 @@ int main(int argc, char ** argv)
       std::cout << cicada::eval::Scorer::lists();
       return 0;
     }
+    
+    if (int(yield_sentence) + yield_alignment + yield_span > 1)
+      throw std::runtime_error("specify either sentence|alignment|span yield");
+    if (int(yield_sentence) + yield_alignment + yield_span == 0)
+      yield_sentence = true;
+    
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
@@ -819,6 +828,10 @@ void options(int argc, char** argv)
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
+
+    ("yield-sentence",  po::bool_switch(&yield_sentence),  "optimize wrt sentence yield")
+    ("yield-alignment", po::bool_switch(&yield_alignment), "optimize wrt alignment yield")
+    ("yield-span",      po::bool_switch(&yield_span),      "optimize wrt span yield")
     
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
     ("samples-restarts",   po::value<int>(&samples_restarts),   "# of random sampling for initial starting point")
