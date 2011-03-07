@@ -246,6 +246,7 @@ generate_earley.hpp \
 global_lexicon.hpp \
 grammar.hpp \
 grammar_mutable.hpp \
+grammar_pos.hpp \
 grammar_simple.hpp \
 grammar_static.hpp \
 graphviz.hpp \
