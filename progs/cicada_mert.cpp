@@ -550,7 +550,7 @@ struct EnvelopeTask
       for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	const envelope_type::line_ptr_type& line = *eiter;
 	
-	const sentence_type yield = line->yield(cicada::operation::kbest_sentence_traversal());
+	const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
 	
 	scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	
@@ -632,7 +632,7 @@ struct ViterbiTask
       
       reduced.first = mapped.first;
       
-      viterbi(*mapped.second, reduced.second, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
+      viterbi(*mapped.second, reduced.second, weight, cicada::operation::sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
       
       queue_reducer.push(reduced);
     }

@@ -921,7 +921,7 @@ struct TaskOracle
       
       weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor));
       
       score_ptr_type score_sample = scorers[id]->score(sentence);
       if (score_curr)

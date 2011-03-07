@@ -69,7 +69,7 @@ struct LineSearch
 	for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	  const envelope_type::line_ptr_type& line = *eiter;
 	  
-	  const sentence_type yield = line->yield(cicada::operation::kbest_sentence_traversal());
+	  const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
 	  
 	  scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	  

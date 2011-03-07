@@ -331,7 +331,7 @@ struct TaskOracle
       // compute viterbi...
       weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_bleu, score_factor));
       
       // compute pruned forest
       hypergraph_type forest;

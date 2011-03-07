@@ -60,10 +60,10 @@ namespace cicada
 	return;
       }
       
-      cicada::KBest<kbest_traversal_edges, Function, Filter> derivations(graph, kbest_size, kbest_traversal_edges(), function, filter);
+      cicada::KBest<edge_feature_traversal, Function, Filter> derivations(graph, kbest_size, edge_feature_traversal(), function, filter);
       
-      typedef kbest_traversal_edges::value_type    derivation_type;
-      typedef kbest_traversal_edges::edge_set_type edge_set_type;
+      typedef edge_feature_traversal::value_type    derivation_type;
+      typedef edge_feature_traversal::edge_set_type edge_set_type;
   
       typedef typename hypergraph_type::id_type id_type;
 
@@ -413,26 +413,26 @@ namespace cicada
 	  if (kbest_unique) {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_alignment_traversal(),
+				alignment_feature_traversal(),
 				weight_function_one<weight_type>(),
 				kbest_alignment_filter_unique(hypergraph),
 				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_span_traversal(),
+				span_feature_traversal(),
 				weight_function_one<weight_type>(),
 				kbest_span_filter_unique(hypergraph),
 				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_traversal(insertion_prefix),
+				sentence_feature_traversal(insertion_prefix),
 				weight_function_one<weight_type>(),
-				kbest_filter_unique(hypergraph),
+				kbest_sentence_filter_unique(hypergraph),
 				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function_one<weight_type>(),
-				kbest_filter(),
+				kbest_sentence_filter(),
 				no_id,
 				yield_graphviz,
 				yield_treebank,
@@ -440,26 +440,26 @@ namespace cicada
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_alignment_traversal(),
+				alignment_feature_traversal(),
 				weight_function_one<weight_type>(),
 				kbest_alignment_filter(),
 				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_span_traversal(),
+				span_feature_traversal(),
 				weight_function_one<weight_type>(),
 				kbest_span_filter(),
 				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_traversal(insertion_prefix),
+				sentence_feature_traversal(insertion_prefix),
 				weight_function_one<weight_type>(),
-				kbest_filter(),
+				kbest_sentence_filter(),
 				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function_one<weight_type>(),
-				kbest_filter(),
+				kbest_sentence_filter(),
 				no_id,
 				yield_graphviz,
 				yield_treebank,
@@ -469,26 +469,26 @@ namespace cicada
 	  if (kbest_unique) {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_alignment_traversal(),
+				alignment_feature_traversal(),
 				weight_function<weight_type>(*weights_kbest),
 				kbest_alignment_filter_unique(hypergraph),
 				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_span_traversal(),
+				span_feature_traversal(),
 				weight_function<weight_type>(*weights_kbest),
 				kbest_span_filter_unique(hypergraph),
 				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_traversal(insertion_prefix),
+				sentence_feature_traversal(insertion_prefix),
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter_unique(hypergraph),
+				kbest_sentence_filter_unique(hypergraph),
 				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter(),
+				kbest_sentence_filter(),
 				no_id,
 				yield_graphviz,
 				yield_treebank,
@@ -496,26 +496,26 @@ namespace cicada
 	  } else {
 	    if (yield_alignment)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_alignment_traversal(),
+				alignment_feature_traversal(),
 				weight_function<weight_type>(*weights_kbest),
 				kbest_alignment_filter(),
 				no_id);
 	    else if (yield_span)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_span_traversal(),
+				span_feature_traversal(),
 				weight_function<weight_type>(*weights_kbest),
 				kbest_span_filter(),
 				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
-				kbest_traversal(insertion_prefix),
+				sentence_feature_traversal(insertion_prefix),
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter(),
+				kbest_sentence_filter(),
 				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function<weight_type>(*weights_kbest),
-				kbest_filter(),
+				kbest_sentence_filter(),
 				no_id,
 				yield_graphviz,
 				yield_treebank,

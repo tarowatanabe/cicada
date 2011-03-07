@@ -359,7 +359,7 @@ struct Task
     
     weight_type weight;
     
-    cicada::viterbi(modified, yield, weight, cicada::operation::kbest_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, invert ? - 1.0 : 1.0));
+    cicada::viterbi(modified, yield, weight, cicada::operation::sentence_feature_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, invert ? - 1.0 : 1.0));
   }
 
   void add_support_vectors_regression(const size_t& id,
@@ -690,7 +690,7 @@ struct Task
 	std::cerr << "id: " << id << std::endl;
       
       // collect max-feature from hypergraph
-      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::kbest_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, 1.0));
+      cicada::viterbi(hypergraph, yield_viterbi, weight_viterbi, cicada::operation::sentence_feature_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, 1.0));
       
       if (id >= scorers.size())
 	throw std::runtime_error("id exceed scorer size");
@@ -763,7 +763,7 @@ struct Task
 	    hypergraph_reward.swap(hypergraph_oracle);
 	    
 	    weight_type weight;
-	    cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::kbest_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, 1.0));
+	    cicada::viterbi(hypergraph_reward, yield_reward, weight, cicada::operation::sentence_feature_traversal(), cicada::operation::weight_scaled_function<weight_type>(weights, 1.0));
 	  }
 	}
       }

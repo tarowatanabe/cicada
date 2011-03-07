@@ -110,7 +110,7 @@ struct TaskOracle
       
       bleu_weight_type weight;
       sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::single_scaled_function<bleu_weight_type>(feature_bleu, score_factor));
+      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<bleu_weight_type>(feature_bleu, score_factor));
       
       score_ptr_type score_sample = scorers[id]->score(sentence);
       if (score_curr)
@@ -615,7 +615,7 @@ struct LineSearch
 	for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	  const envelope_type::line_ptr_type& line = *eiter;
 	  
-	  const sentence_type yield = line->yield(cicada::operation::kbest_sentence_traversal());
+	  const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
 	  scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	  
 	  segments[seg].push_back(std::make_pair(line->x, score));

@@ -768,7 +768,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	const envelope_type::line_ptr_type& line = *eiter;
 	
-	const sentence_type yield = line->yield(cicada::operation::kbest_sentence_traversal());
+	const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
 	
 	os << id << " ||| ";
 	utils::encode_base64(line->x, std::ostream_iterator<char>(os));
@@ -884,7 +884,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       weight_type weight;
       
-      cicada::viterbi(graphs[mpi_id], yield, weight, cicada::operation::kbest_sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
+      cicada::viterbi(graphs[mpi_id], yield, weight, cicada::operation::sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
       
       os << id << " ||| " << scorers[id]->score(yield)->encode() << '\n';
     }
