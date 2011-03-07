@@ -59,7 +59,9 @@ MONOLINGUAL PARSING!
 Cutting-plane learning under cicada_maxlike{,_mpi}...
 	We need to merge feature vector...
 
-
-
 Revise grammar API:
   It is very hard to come-up with new API w/o breaking existing code...
+
+
+Flexible MERT:
+  Allow arbitrary yield function to envelope semiring
