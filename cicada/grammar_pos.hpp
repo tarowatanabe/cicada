@@ -17,7 +17,6 @@
 
 #include <google/dense_hash_set>
 
-
 namespace cicada
 {
   class GrammarPOS : public GrammarPOS
