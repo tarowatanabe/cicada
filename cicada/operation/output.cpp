@@ -161,8 +161,11 @@ namespace cicada
 	    typename rule_type::symbol_set_type::const_iterator riter_end = eiter->rule->rhs.end();
 	    for (typename rule_type::symbol_set_type::const_iterator riter = eiter->rule->rhs.begin(); riter != riter_end; ++ riter)
 	      has_non_terminal |= riter->is_non_terminal();
+
+	    const typename rule_type::symbol_type& lhs = eiter->rule->lhs;
 	    
-	    if (has_non_terminal)
+	    // if we have non-terminal at rhs, and lhs is not a binarized label...
+	    if (has_non_terminal && lhs.non_terminal_strip().find('^') != rule_type::symbol_type::piece_type::npos())
 	      os << span_set_type::span_type(spans[eiter->head], eiter->rule->lhs) << ' ';
 	  }
 	  os << "|||";
