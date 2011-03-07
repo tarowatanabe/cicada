@@ -261,11 +261,11 @@ namespace cicada
       typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
       typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
       
-      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> (xpressive::set= '|', '/') >> (xpressive::s2= '[' >> -+(~(xpressive::set= ']')) >> ']');
+      static pregex re = (+(~xpressive::_s)) >> (xpressive::set= '|', '/') >> (xpressive::s1= '[' >> -+(~(xpressive::set= ']')) >> ']');
       
       pmatch what;
       if (xpressive::regex_match(utils::piece(symbol()), what, re))
-	maps[__id] = Symbol(what[2]).id();
+	maps[__id] = Symbol(what[1]).id();
       else
 	maps[__id] = Symbol().id();
     }
@@ -299,7 +299,7 @@ namespace cicada
       typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
       typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
       
-      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> (xpressive::set= '|', '/') >> (xpressive::s2= '[' >> -+(~(xpressive::set= ']')) >> ']');
+      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> (xpressive::set= '|', '/') >> ('[' >> -+(~(xpressive::set= ']')) >> ']');
       
       pmatch what;
       if (xpressive::regex_match(utils::piece(symbol()), what, re))
