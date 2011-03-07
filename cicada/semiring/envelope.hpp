@@ -19,6 +19,7 @@
 //   }
 
 #include <limits>
+#include <vector>
 
 #include <cicada/semiring/traits.hpp>
 
@@ -67,6 +68,28 @@ namespace cicada
 	
 	line_ptr_type parent;
 	line_ptr_type antecedent;
+
+	template <typename Traversal>
+	typename Traversal::value_type yield(const Traversal traversal) const
+	{
+	  typedef typename Traversal::value_type yield_type;
+	  typedef std::vector<yield_type, std::allocator<yield_type> > yield_set_type;
+	  
+	  yield_set_type yields;
+	  
+	  const Line* curr = this;
+	  while (! curr->edge) {
+	    yields.push_back(curr->antecedent->yield(traversal));
+	    
+	    curr = curr->parent.get();
+	  }
+	  
+	  yield_type __yield;
+	  
+	  traversal(*(curr->edge), __yield, yields.rbegin(), yields.rend());
+
+	  return __yield;
+	}
 	
 	void yield(sentence_type& sentence) const;
 	void yield(span_set_type& spans) const;
