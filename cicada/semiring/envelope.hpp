@@ -24,6 +24,7 @@
 
 #include <cicada/hypergraph.hpp>
 #include <cicada/sentence.hpp>
+#include <cicada/span_vector.hpp>
 #include <cicada/feature_vector.hpp>
 
 #include <utils/simple_vector.hpp>
@@ -39,9 +40,9 @@ namespace cicada
     {
     public:
       typedef cicada::HyperGraph hypergraph_type;
-      typedef cicada::Sentence sentence_type;
+      typedef cicada::Sentence   sentence_type;
+      typedef cicada::SpanVector span_set_type;
       
-
     public:
       struct Line
       {
@@ -68,6 +69,7 @@ namespace cicada
 	line_ptr_type antecedent;
 	
 	void yield(sentence_type& sentence) const;
+	void yield(span_set_type& spans) const;
       };
       
       typedef Line line_type;

@@ -165,7 +165,7 @@ namespace cicada
 	    const typename rule_type::symbol_type& lhs = eiter->rule->lhs;
 	    
 	    // if we have non-terminal at rhs, and lhs is not a binarized label...
-	    if (has_non_terminal && lhs.non_terminal_strip().find('^') != rule_type::symbol_type::piece_type::npos())
+	    if (has_non_terminal && lhs.non_terminal_strip().find('^') == rule_type::symbol_type::piece_type::npos())
 	      os << span_set_type::span_type(spans[eiter->head], eiter->rule->lhs) << ' ';
 	  }
 	  os << "|||";

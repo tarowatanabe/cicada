@@ -162,6 +162,60 @@ namespace cicada
 
       is_sorted = true;
     }
+    
+    typedef HyperGraph::attribute_set_type     attribute_set_type;
+    typedef attribute_set_type::attribute_type attribute_type;
+    
+    struct __rule_span : public boost::static_visitor<int>
+    {
+      int operator()(const attribute_set_type::int_type& x) const { return x; }
+      template <typename Tp>
+      int operator()(const Tp& x) const { throw std::runtime_error("no phrasal span with integer?"); }
+    };
+    
+    static int rule_span(const attribute_set_type& attrs, const attribute_type& attr)
+    {
+      attribute_set_type::const_iterator iter = attrs.find(attr);
+      if (iter == attrs.end())
+	throw std::runtime_error("no rule span attribute?");
+      
+      return boost::apply_visitor(__rule_span(), iter->second);
+    }
+
+
+    void Envelope::Line::yield(span_set_type& spans) const
+    {
+      typedef hypergraph_type::rule_type rule_type;
+      
+      spans.clear();
+      
+      const Line* curr = this;
+      while (! curr->edge) {
+	span_set_type spans_local;
+	curr->antecedent->yield(spans_local);
+	
+	spans.insert(spans.end(), spans_local.begin(), spans_local.end());
+	
+	curr = curr->parent.get();
+      }
+      
+      const rule_type& rule =*(curr->edge->rule);
+      
+      const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != rule_type::symbol_type::piece_type::npos();
+      bool has_non_terminal = false;
+      rule_type::symbol_set_type::const_iterator titer_end = rule.rhs.end();
+      for (rule_type::symbol_set_type::const_iterator titer = rule.rhs.begin(); titer != titer_end; ++ titer)
+	has_non_terminal |= titer->is_non_terminal();
+      
+      if (has_non_terminal && ! is_binarized) {
+	// push-back new span, but there is no good way to efficiently compute span, besides span information assigned in the forest..
+
+	static const attribute_set_type::attribute_type attr_span_first("span-first");
+	static const attribute_set_type::attribute_type attr_span_last("span-last");
+	
+	spans.push_back(span_set_type::span_type(rule_span(edge->attributes, attr_span_first), rule_span(edge->attributes, attr_span_last), rule.lhs));
+      }
+    }
 
     void Envelope::Line::yield(sentence_type& sentence) const
     {
