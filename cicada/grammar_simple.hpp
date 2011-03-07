@@ -127,14 +127,12 @@ namespace cicada
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
 	    if (*siter != vocab_type::EPSILON && siter->is_terminal()) {
 	      
-	      if (symbols.find(std::make_pair(*siter, vocab_type::EPSILON)) == symbols.end()) {
+	      if (symbols.insert(std::make_pair(*siter, vocab_type::EPSILON)).second) {
 		rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 		rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
 		
 		// inverted!
 		insert(rule_target, rule_source, features, attributes);
-		
-		symbols.insert(std::make_pair(*siter, vocab_type::EPSILON));
 	      }
 
 	      for (size_t trg = 0; trg != target.size(); ++ trg) {
@@ -142,14 +140,12 @@ namespace cicada
 		
 		lattice_type::arc_set_type::const_iterator titer_end = arcs_target.end();
 		for (lattice_type::arc_set_type::const_iterator titer = arcs_target.begin(); titer != titer_end; ++ titer)
-		  if (titer->label != vocab_type::EPSILON && symbols.find(std::make_pair(*siter, titer->label)) == symbols.end()) {
+		  if (titer->label != vocab_type::EPSILON && symbols.insert(std::make_pair(*siter, titer->label)).second) {
 		    rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 		    rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, titer->label))));
 		    
 		    // inverted!
 		    insert(rule_target, rule_source, features, attributes);
-		    
-		    symbols.insert(std::make_pair(*siter, titer->label));
 		  }
 	      }
 	    }
@@ -177,36 +173,72 @@ namespace cicada
 	for (lattice_type::arc_set_type::const_iterator siter = arcs_source.begin(); siter != siter_end; ++ siter)
 	  if (siter->label != vocab_type::EPSILON) {
 	    
-	    if (symbols.find(std::make_pair(siter->label, vocab_type::EPSILON)) == symbols.end()) {
+	    if (symbols.insert(std::make_pair(siter->label, vocab_type::EPSILON)).second) {
 	      rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, siter->label))));
 	      rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
 	      
 	      // inverted!
 	      insert(rule_target, rule_source, features, attributes);
-	      
-	      symbols.insert(std::make_pair(siter->label, vocab_type::EPSILON));
 	    }
-
 	    
 	    for (size_t trg = 0; trg != target.size(); ++ trg) {
 	      const lattice_type::arc_set_type& arcs_target = target[trg];
 	      
 	      lattice_type::arc_set_type::const_iterator titer_end = arcs_target.end();
 	      for (lattice_type::arc_set_type::const_iterator titer = arcs_target.begin(); titer != titer_end; ++ titer)
-		if (titer->label != vocab_type::EPSILON && symbols.find(std::make_pair(siter->label, titer->label)) == symbols.end()) {
+		if (titer->label != vocab_type::EPSILON && symbols.insert(std::make_pair(siter->label, titer->label)).second) {
 		  rule_ptr_type rule_source(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, siter->label))));
 		  rule_ptr_type rule_target(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, titer->label))));
 		  
 		  // inverted!
 		  insert(rule_target, rule_source, features, attributes);
-		  
-		  symbols.insert(std::make_pair(siter->label, titer->label));
 		}
 	    }
 	  }
       }
     }
   };
+
+  class GrammarPOS : public GrammarMutable
+  {
+  public:
+    typedef Lattice    lattice_type;
+    
+  public:
+    GrammarPOS(const lattice_type& lattice)
+      : GrammarMutable(1)
+    {
+      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+      
+      symbol_set_type symbols;
+      symbols.set_empty_key(symbol_type());
+      
+      feature_set_type features;
+      features["pos"] = - 1.0;
+      
+      attribute_set_type attributes;
+      attributes["pos"] = attribute_set_type::int_type(1);
+      
+      for (size_t first = 0; first != lattice.size(); ++ first) {
+	const lattice_type::arc_set_type& arcs = lattice[first];
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
+	  if (aiter->label != vocab_type::EPSILON && symbols.insert(aiter->label).second) {
+	    const symbol_type terminal = aiter->label.terminal();
+	    const symbol_type pos = aiter->label.pos();
+	    
+	    if (pos == symbol_type())
+	      throw std::runtime_error("no pos? " + static_cast<const std::string&>(aiter->label));
+	    
+	    rule_ptr_type rule(rule_type::create(rule_type(pos, rule_type::symbol_set_type(1, terminal))));
+	    
+	    insert(rule, rule, features, attributes);
+	  }
+      }
+    }
+  };
+
 
   class GrammarInsertion : public GrammarMutable
   {
@@ -236,12 +268,10 @@ namespace cicada
 	  
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
-	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
+	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.insert(*siter).second) {
 	      rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
 	      insert(rule, rule, features, attributes);
-	      
-	      symbols.insert(*siter);
 	    }
 	}
     }
@@ -265,12 +295,10 @@ namespace cicada
 	
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
-	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
+	  if (aiter->label != vocab_type::EPSILON && symbols.insert(aiter->label).second) {
 	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
 	    
 	    insert(rule, rule, features, attributes);
-	    
-	    symbols.insert(aiter->label);
 	  }
       }
     }
@@ -307,12 +335,10 @@ namespace cicada
 	  
 	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
-	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.find(*siter) == symbols.end()) {
+	    if (*siter != vocab_type::EPSILON && siter->is_terminal() && symbols.insert(*siter).second) {
 	      rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, *siter))));
 	      
 	      insert(rule, rule_epsilon, features, attributes);
-	      
-	      symbols.insert(*siter);
 	    }
 	}
     }
@@ -329,7 +355,7 @@ namespace cicada
       features["deletion-penalty"] = - 1.0;
       
       attribute_set_type attributes;
-      attributes["insertion"] = attribute_set_type::int_type(1);
+      attributes["deletion"] = attribute_set_type::int_type(1);
 
       rule_ptr_type rule_epsilon(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, vocab_type::EPSILON))));
       
@@ -338,12 +364,10 @@ namespace cicada
 
 	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
 	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
-	  if (aiter->label != vocab_type::EPSILON && symbols.find(aiter->label) == symbols.end()) {
+	  if (aiter->label != vocab_type::EPSILON && symbols.insert(aiter->label).second) {
 	    rule_ptr_type rule(rule_type::create(rule_type(non_terminal, rule_type::symbol_set_type(1, aiter->label))));
 	    
 	    insert(rule, rule_epsilon, features, attributes);
-	    
-	    symbols.insert(aiter->label);
 	  }
       }
     }
