@@ -492,6 +492,8 @@ namespace cicada
       // scanning lattice...
       const transducer_type& transducer = grammar[active.dot.table];
       
+      if (treebank && transducer.root() != active.dot.node) return;
+      
       const lattice_type::arc_set_type& passive_arcs = lattice[active.span.last];
       
       const score_type score_prev = active.score / function(active.features);
