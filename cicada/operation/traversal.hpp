@@ -13,6 +13,7 @@
 #include <cicada/rule.hpp>
 #include <cicada/vocab.hpp>
 #include <cicada/semiring.hpp>
+#include <cicada/span_vector.hpp>
 
 #include <utils/sgi_hash_set.hpp>
 #include <utils/bithack.hpp>
@@ -42,6 +43,70 @@ namespace cicada
 	boost::get<1>(yield) = edge.features;
     
 	// collect edge and features
+	for (/**/; first != last; ++ first) {
+	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*first).begin(), boost::get<0>(*first).end());
+	  boost::get<1>(yield) += boost::get<1>(*first);
+	}
+      }
+    };
+
+    struct kbest_span_traversal
+    {
+      typedef cicada::HyperGraph hypergraph_type;
+      typedef cicada::Rule       rule_type;
+      typedef cicada::SpanVector span_set_type;
+      typedef cicada::Vocab      vocab_type;
+      typedef cicada::Symbol     symbol_type;
+      
+      typedef hypergraph_type::feature_set_type   feature_set_type;
+      typedef hypergraph_type::attribute_set_type attribute_set_type;
+      
+      typedef attribute_set_type::attribute_type attribute_type;
+      
+      typedef boost::tuple<span_set_type, feature_set_type> value_type;
+      
+      kbest_span_traversal() 
+	: attr_span_first("span-first"),
+	  attr_span_last("span-last") {}
+      
+      attribute_type attr_span_first;
+      attribute_type attr_span_last;
+      
+      struct __point : public boost::static_visitor<int>
+      {
+	int operator()(const attribute_set_type::int_type& x) const { return x; }
+	int operator()(const attribute_set_type::float_type& x) const { return -1; }
+	int operator()(const attribute_set_type::string_type& x) const { return -1; }
+      };
+      
+      template <typename Edge, typename Iterator>
+      void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+      {
+	boost::get<0>(yield).clear();
+	boost::get<1>(yield) = edge.features;
+	
+	attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
+	attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
+
+	if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
+	  const int span_first = boost::apply_visitor(__point(), fiter->second);
+	  const int span_last = boost::apply_visitor(__point(), liter->second);
+
+	  if (span_first >= 0 && span_last >= 0) {
+	    const rule_type& rule = *edge.rule;
+	    
+	    const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos();
+	    bool has_non_terminal = false;
+	    rule_type::symbol_set_type::const_iterator riter_end = rule.rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator riter = rule.rhs.begin(); riter != riter_end; ++ riter)
+	      has_non_terminal |= riter->is_non_terminal();
+	    
+	    if (! is_binarized && has_non_terminal)
+	      boost::get<0>(yield).push_back(span_set_type::span_type(span_first, span_last, rule.lhs));
+	  }
+	}
+	
+	// collect features...
 	for (/**/; first != last; ++ first) {
 	  boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*first).begin(), boost::get<0>(*first).end());
 	  boost::get<1>(yield) += boost::get<1>(*first);
@@ -201,6 +266,15 @@ namespace cicada
       std::string insertion_prefix;
     };
 
+    struct kbest_span_filter
+    {
+      template <typename Node, typename Yield>
+      bool operator()(const Node& node, const Yield& yield) const
+      {
+	return false;
+      }
+    };
+
     struct kbest_alignment_filter
     {
       template <typename Node, typename Yield>
@@ -218,6 +292,36 @@ namespace cicada
       {
 	return false;
       }
+    };
+
+    struct kbest_span_filter_unique
+    {
+      typedef cicada::HyperGraph hypergraph_type;
+      typedef cicada::SpanVector span_set_type;
+      
+#ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<span_set_type, boost::hash<span_set_type>, std::equal_to<span_set_type>, std::allocator<span_set_type> > unique_type;
+#else
+      typedef sgi::hash_set<span_set_type, boost::hash<span_set_type>, std::equal_to<span_set_type>, std::allocator<span_set_type> > unique_type;
+#endif
+      typedef std::vector<unique_type, std::allocator<unique_type> > unique_set_type;
+ 
+
+      kbest_span_filter_unique(const hypergraph_type& graph) : uniques(graph.nodes.size()) {}
+  
+      template <typename Node, typename Yield>
+      bool operator()(const Node& node, const Yield& yield) const
+      {
+	unique_set_type& aligns = const_cast<unique_set_type&>(uniques);
+	unique_type::iterator iter = aligns[node.id].find(boost::get<0>(yield));
+	if (iter == aligns[node.id].end()) {
+	  aligns[node.id].insert(boost::get<0>(yield));
+	  return false;
+	} else
+	  return true;
+      }
+
+      unique_set_type uniques;
     };
 
     struct kbest_alignment_filter_unique

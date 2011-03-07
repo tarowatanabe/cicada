@@ -42,7 +42,6 @@ namespace cicada
 			   const bool no_id,
 			   const bool graphviz_mode,
 			   const bool treebank_mode,
-			   const bool span_mode,
 			   const bool debinarize)
     {
       typedef Hypergraph hypergraph_type;
@@ -54,10 +53,8 @@ namespace cicada
 	  os << id << " ||| ";
 	if (graphviz_mode)
 	  cicada::graphviz(os, graph_empty) << '\n';
-	else if (treebank_mode) {
+	else if (treebank_mode)
 	  cicada::treebank(os, graph_empty) << " ||| ||| 0" << '\n';
-	} else if (span_mode)
-	  os << " ||| ||| 0" << '\n';
 	else
 	  os << graph_empty << " ||| ||| 0" << '\n';
 	return;
@@ -140,36 +137,6 @@ namespace cicada
 	else if (treebank_mode) {
 	  cicada::treebank(os, graph_kbest);
 	  os << " |||";
-	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
-	    os << ' ' << fiter->first << '=' << fiter->second;
-	  os << " ||| ";
-	  os << weight;
-	  os << '\n';
-	  
-	} else if (span_mode) {
-	  typedef std::pair<int, int> span_type;
-	  typedef cicada::SpanVector span_set_type;
-	  
-	  std::vector<span_type, std::allocator<span_type> > spans(graph_kbest.nodes.size());
-	  cicada::span_node(graph_kbest, spans);
-	  
-	  typename hypergraph_type::edge_set_type::const_iterator eiter_end = graph_kbest.edges.end();
-	  for (typename hypergraph_type::edge_set_type::const_iterator eiter = graph_kbest.edges.begin(); eiter != eiter_end; ++ eiter) {
-	    
-	    bool has_non_terminal = false;
-	    typename rule_type::symbol_set_type::const_iterator riter_end = eiter->rule->rhs.end();
-	    for (typename rule_type::symbol_set_type::const_iterator riter = eiter->rule->rhs.begin(); riter != riter_end; ++ riter)
-	      has_non_terminal |= riter->is_non_terminal();
-
-	    const typename rule_type::symbol_type& lhs = eiter->rule->lhs;
-	    
-	    // if we have non-terminal at rhs, and lhs is not a binarized label...
-	    if (has_non_terminal && lhs.non_terminal_strip().find('^') == rule_type::symbol_type::piece_type::npos())
-	      os << span_set_type::span_type(spans[eiter->head], eiter->rule->lhs) << ' ';
-	  }
-	  os << "|||";
-	    
 	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
 	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
 	    os << ' ' << fiter->first << '=' << fiter->second;
@@ -450,6 +417,12 @@ namespace cicada
 				weight_function_one<weight_type>(),
 				kbest_alignment_filter_unique(hypergraph),
 				no_id);
+	    else if (yield_span)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				kbest_span_traversal(),
+				weight_function_one<weight_type>(),
+				kbest_span_filter_unique(hypergraph),
+				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_traversal(insertion_prefix),
@@ -463,7 +436,6 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span,
 				debinarize);
 	  } else {
 	    if (yield_alignment)
@@ -471,6 +443,12 @@ namespace cicada
 				kbest_alignment_traversal(),
 				weight_function_one<weight_type>(),
 				kbest_alignment_filter(),
+				no_id);
+	    else if (yield_span)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				kbest_span_traversal(),
+				weight_function_one<weight_type>(),
+				kbest_span_filter(),
 				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -485,7 +463,6 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span,
 				debinarize);
 	  }
 	} else {
@@ -496,6 +473,12 @@ namespace cicada
 				weight_function<weight_type>(*weights_kbest),
 				kbest_alignment_filter_unique(hypergraph),
 				no_id);
+	    else if (yield_span)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				kbest_span_traversal(),
+				weight_function<weight_type>(*weights_kbest),
+				kbest_span_filter_unique(hypergraph),
+				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				kbest_traversal(insertion_prefix),
@@ -509,7 +492,6 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span,
 				debinarize);
 	  } else {
 	    if (yield_alignment)
@@ -517,6 +499,12 @@ namespace cicada
 				kbest_alignment_traversal(),
 				weight_function<weight_type>(*weights_kbest),
 				kbest_alignment_filter(),
+				no_id);
+	    else if (yield_span)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				kbest_span_traversal(),
+				weight_function<weight_type>(*weights_kbest),
+				kbest_span_filter(),
 				no_id);
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
@@ -531,7 +519,6 @@ namespace cicada
 				no_id,
 				yield_graphviz,
 				yield_treebank,
-				yield_span,
 				debinarize);
 	  }
 	}
