@@ -160,7 +160,7 @@ namespace cicada
 	    bool has_non_terminal = false;
 	    typename rule_type::symbol_set_type::const_iterator riter_end = eiter->rule->rhs.end();
 	    for (typename rule_type::symbol_set_type::const_iterator riter = eiter->rule->rhs.begin(); riter != riter_end; ++ riter)
-	      has_non_temrinal |= riter->is_non_terminal();
+	      has_non_terminal |= riter->is_non_terminal();
 	    
 	    if (has_non_terminal)
 	      os << span_set_type::span_type(spans[eiter->head], eiter->rule->lhs) << ' ';
