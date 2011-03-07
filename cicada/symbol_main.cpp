@@ -38,6 +38,9 @@ int main(int argc, char** argv)
   process("[BAD,4]", 3);
   process("[GOOD,5]", 3);
 
+  std::cerr << "pos: " << symbol_type("Good/[ADJ]").pos() << " terminal: " << symbol_type("Good/[ADJ]").terminal() << std::endl;
+  std::cerr << "pos: " << symbol_type("Good|[ADJ]").pos() << " terminal: " << symbol_type("Good|[ADJ]").terminal() << std::endl;
+
   srandom(time(0) * getpid());
 
   for (int i = 0; i != 1024 * 4; ++ i) {

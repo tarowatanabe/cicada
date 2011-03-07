@@ -10,6 +10,8 @@
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix.hpp>
 
+#include <boost/xpressive/xpressive.hpp>
+
 #include <utils/config.hpp>
 #include <utils/thread_specific_ptr.hpp>
 
@@ -27,6 +29,8 @@ namespace cicada
     typedef std::vector<int, std::allocator<int> >   index_map_type;
     typedef std::vector<bool, std::allocator<bool> > non_terminal_map_type;
     typedef std::vector<Symbol::id_type, std::allocator<Symbol::id_type> > non_terminal_symbol_map_type;
+    typedef std::vector<Symbol::id_type, std::allocator<Symbol::id_type> > pos_symbol_map_type;
+    typedef std::vector<Symbol::id_type, std::allocator<Symbol::id_type> > terminal_symbol_map_type;
   };
   
   Symbol::mutex_type    Symbol::__mutex_index;
@@ -38,16 +42,22 @@ namespace cicada
   static __thread SymbolImpl::index_map_type*               index_maps_tls = 0;
   static __thread SymbolImpl::non_terminal_map_type*        non_terminal_maps_tls = 0;
   static __thread SymbolImpl::non_terminal_symbol_map_type* non_terminal_symbol_maps_tls = 0;
+  static __thread SymbolImpl::pos_symbol_map_type*          pos_symbol_maps_tls = 0;
+  static __thread SymbolImpl::terminal_symbol_map_type*     terminal_symbol_maps_tls = 0;
 
   static boost::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
   static boost::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
   static boost::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
   static boost::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
+  static boost::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
+  static boost::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
 #else
   static utils::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
   static utils::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
   static utils::thread_specific_ptr<SymbolImpl::non_terminal_map_type>        non_terminal_maps;
   static utils::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
 #endif
 
 
@@ -221,6 +231,82 @@ namespace cicada
 	maps[__id] = Symbol('[' + label + ']').id();
     }
       
+    return maps[__id];
+  }
+
+  Symbol Symbol::pos() const
+  {
+    if (! is_terminal()) return Symbol();
+    
+#ifdef HAVE_TLS
+    if (! pos_symbol_maps_tls) {
+      pos_symbol_maps.reset(new SymbolImpl::pos_symbol_map_type());
+      pos_symbol_maps_tls = pos_symbol_maps.get();
+    }
+    
+    SymbolImpl::pos_symbol_map_type& maps = *pos_symbol_maps_tls;
+#else
+    if (! pos_symbol_maps.get())
+      pos_symbol_maps.reset(new SymbolImpl::pos_symbol_map_type());
+    
+    SymbolImpl::pos_symbol_map_type& maps = *pos_symbol_maps;
+#endif
+
+    if (__id >= maps.size())
+      maps.resize(__id + 1, id_type(-1));
+    
+    if (maps[__id] == id_type(-1)) {
+      namespace xpressive = boost::xpressive;
+      
+      typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+      typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+      
+      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> (xpressive::set= '|', '/') >> (xpressive::s2= '[' >> -+(~(xpressive::set= ']')) >> ']');
+      
+      pmatch what;
+      if (xpressive::regex_match(utils::piece(symbol()), what, re))
+	maps[__id] = Symbol(what[2]).id();
+      else
+	maps[__id] = Symbol().id();
+    }
+    return maps[__id];
+  }
+  
+  Symbol Symbol::terminal() const
+  {
+    if (! is_terminal()) return *this;
+    
+#ifdef HAVE_TLS
+    if (! terminal_symbol_maps_tls) {
+      terminal_symbol_maps.reset(new SymbolImpl::terminal_symbol_map_type());
+      terminal_symbol_maps_tls = terminal_symbol_maps.get();
+    }
+    
+    SymbolImpl::terminal_symbol_map_type& maps = *terminal_symbol_maps_tls;
+#else
+    if (! terminal_symbol_maps.get())
+      terminal_symbol_maps.reset(new SymbolImpl::terminal_symbol_map_type());
+    
+    SymbolImpl::terminal_symbol_map_type& maps = *terminal_symbol_maps;
+#endif
+    
+    if (__id >= maps.size())
+      maps.resize(__id + 1, id_type(-1));
+
+    if (maps[__id] == id_type(-1)) {
+      namespace xpressive = boost::xpressive;
+      
+      typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+      typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+      
+      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> (xpressive::set= '|', '/') >> (xpressive::s2= '[' >> -+(~(xpressive::set= ']')) >> ']');
+      
+      pmatch what;
+      if (xpressive::regex_match(utils::piece(symbol()), what, re))
+	maps[__id] = Symbol(what[1]).id();
+      else
+	maps[__id] = __id;
+    }
     return maps[__id];
   }
 

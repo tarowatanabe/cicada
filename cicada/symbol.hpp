@@ -99,15 +99,18 @@ namespace cicada
     size_type size() const { return symbol().size(); }
     bool empty() const { return symbol().empty(); }
     
-    
     bool is_terminal() const { return ! is_non_terminal(); }
     bool is_non_terminal() const;
-    
     
     piece_type non_terminal_strip() const;
     int non_terminal_index() const;
     Symbol non_terminal() const;
     Symbol non_terminal(const int index) const;
+    
+    // for splitting pos and terminal
+    // the pos-assigned terminal takes the form of: word|[pos] or word/[pos]
+    Symbol pos() const;
+    Symbol terminal() const;
     
   public:
     // boost hash
