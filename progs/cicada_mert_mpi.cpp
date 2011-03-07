@@ -748,7 +748,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     bcast_weights(0, direction);
 
     envelope_set_type envelopes;
-    sentence_type     yield;
     
     ostream_type os;
     os.push(odevice_type(0, envelope_tag, 1024 * 1024));
@@ -769,7 +768,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	const envelope_type::line_ptr_type& line = *eiter;
 	
-	line->yield(yield);
+	const sentence_type yield = line->yield(cicada::operation::kbest_sentence_traversal());
 	
 	os << id << " ||| ";
 	utils::encode_base64(line->x, std::ostream_iterator<char>(os));

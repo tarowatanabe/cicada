@@ -587,7 +587,6 @@ struct LineSearch
 
   segment_document_type segments;
   envelope_set_type     envelopes;
-  sentence_type         yield;
   
   line_search_type line_search;
   int debug;
@@ -616,8 +615,7 @@ struct LineSearch
 	for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
 	  const envelope_type::line_ptr_type& line = *eiter;
 	  
-	  line->yield(yield);
-	  
+	  const sentence_type yield = line->yield(cicada::operation::kbest_sentence_traversal());
 	  scorer_type::score_ptr_type score = scorers[seg]->score(yield);
 	  
 	  segments[seg].push_back(std::make_pair(line->x, score));
