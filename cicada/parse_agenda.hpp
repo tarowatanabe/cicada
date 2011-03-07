@@ -360,20 +360,38 @@ namespace cicada
 		const function_type& __function,
 		const int __beam_size,
 		const bool __yield_source=false,
-		const bool __treebank=false)
+		const bool __treebank=false,
+		const bool __pos_mode=false)
       : goal(__goal),
 	grammar(__grammar),
 	function(__function),
 	beam_size(__beam_size),
 	yield_source(__yield_source),
 	treebank(__treebank),
+	pos_mode(__pos_mode),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
       traversals.set_empty_key(traversal_type());
       discovered_active.set_empty_key(0);
       discovered_passive.set_empty_key(0);
-    }    
+    }
+
+    struct __extract
+    {
+      const symbol_type& operator()(const symbol_type& x) const
+      {
+	return x;
+      }
+    };
+
+    struct __extract_terminal
+    {
+      symbol_type operator()(const symbol_type& x) const
+      {
+	return x.terminal();
+      }
+    };
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
@@ -463,7 +481,11 @@ namespace cicada
 #endif
 	    
 	    if (edge->is_active()) {
-	      scan(*edge, lattice);
+
+	      if (pos_mode)
+		scan(*edge, lattice, __extract_terminal());
+	      else
+		scan(*edge, lattice, __extract());
 	      complete_active(*edge);
 	    } else {
 	      complete_passive(*edge);
@@ -483,7 +505,8 @@ namespace cicada
   private:
     // TODO: scoring from passive edges should be accumulated...
 
-    void scan(const edge_type& active, const lattice_type& lattice)
+    template <typename Extract>
+    void scan(const edge_type& active, const lattice_type& lattice, Extract extractor)
     {
       if (active.span.last >= static_cast<int>(lattice.size())) return;
 
@@ -500,7 +523,7 @@ namespace cicada
       
       lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
       for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-	const symbol_type& terminal = piter->label;
+	const symbol_type terminal = extractor(piter->label);
 
 	//std::cerr << "terminal: " << terminal << std::endl;
 	
@@ -809,6 +832,7 @@ namespace cicada
     const size_type  beam_size;
     const bool yield_source;
     const bool treebank;
+    const bool pos_mode;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
     
@@ -832,9 +856,9 @@ namespace cicada
   
   template <typename Function>
   inline
-  void parse_agenda(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false)
+  void parse_agenda(const Symbol& goal, const Grammar& grammar, const Function& function, const Lattice& lattice, HyperGraph& graph, const int size, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false)
   {
-    ParseAgenda<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank)(lattice, graph);
+    ParseAgenda<typename Function::value_type, Function>(goal, grammar, function, size, yield_source, treebank, pos_mode)(lattice, graph);
   }
 
 };

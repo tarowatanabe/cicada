@@ -195,6 +195,7 @@ namespace cicada
 	insertion(__insertion), deletion(__deletion),
 	yield_source(false),
 	treebank(false),
+	pos_mode(false),
 	unique_goal(false),
 	debug(__debug)
     { 
@@ -217,6 +218,8 @@ namespace cicada
 	    throw std::runtime_error("unknown yield: " + piter->second);
 	} else if (utils::ipiece(piter->first) == "treebank")
 	  treebank = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "pos")
+	  pos_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
 	else
@@ -249,8 +252,10 @@ namespace cicada
 	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
       if (deletion)
 	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
+      if (pos_mode)
+	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPOS(lattice)));
 	
-      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, unique_goal);
+      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, pos_mode, unique_goal);
     
       utils::resource end;
     

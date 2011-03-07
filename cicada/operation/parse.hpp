@@ -43,6 +43,7 @@ namespace cicada
       
       bool yield_source;
       bool treebank;
+      bool pos_mode;
       bool unique_goal;
       
       int debug;
@@ -77,6 +78,7 @@ namespace cicada
       
       bool yield_source;
       bool treebank;
+      bool pos_mode;
       
       int debug;
     };

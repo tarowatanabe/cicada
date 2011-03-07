@@ -56,6 +56,7 @@ compose-earley: composition from tree with grammar\n\
 compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
+\tpos=[true|false] pos-annotated input\n\
 \tunique-goal=[true|false] unique goal\n\
 compose-grammar: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
@@ -70,12 +71,14 @@ compose-tree: composition from tree with tree grammar\n\
 parse-agenda: parsing via agenda\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
+\tpos=[true|false] pos-annotated input\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 parse-cky|cyk: parsing via CKY\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
+\tpos=[true|false] pos-annotated input\n\
 \tunique-goal=[true|false] unique goal\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\

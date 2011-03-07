@@ -50,9 +50,13 @@ namespace cicada
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
     
-    ComposeCKY(const symbol_type& __goal, const grammar_type& __grammar, const bool __yield_source=false, const bool __treebank=false,
+    ComposeCKY(const symbol_type& __goal,
+	       const grammar_type& __grammar,
+	       const bool __yield_source=false,
+	       const bool __treebank=false,
+	       const bool __pos_mode=false,
 	       const bool __unique_goal=false)
-      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank), unique_goal(__unique_goal),
+      : goal(__goal), grammar(__grammar), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode), unique_goal(__unique_goal),
 	attr_span_first("span-first"),
 	attr_span_last("span-last")
     {
@@ -196,22 +200,44 @@ namespace cicada
 		active_set_type::const_iterator aiter_end = active_arcs.end();
 		
 		if (aiter_begin != aiter_end) {
-		  lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
-		  for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-		    const symbol_type& terminal = piter->label;
-		    
-		    active_set_type& cell = actives[table](first, last - 1 + piter->distance);
-		    
-		    // handling of EPSILON rule...
-		    if (terminal == vocab_type::EPSILON) {
-		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-			cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		    } else {
-		      for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-			const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-			if (node == transducer.root()) continue;
-			
-			cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		  if (pos_mode) {
+		    lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+		    for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+		      const symbol_type terminal = piter->label.terminal();
+		      
+		      active_set_type& cell = actives[table](first, last - 1 + piter->distance);
+		      
+		      // handling of EPSILON rule...
+		      if (terminal == vocab_type::EPSILON) {
+			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			  cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		      } else {
+			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+			  if (node == transducer.root()) continue;
+			  
+			  cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+			}
+		      }
+		    }
+		  } else {
+		    lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+		    for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+		      const symbol_type& terminal = piter->label;
+		      
+		      active_set_type& cell = actives[table](first, last - 1 + piter->distance);
+		      
+		      // handling of EPSILON rule...
+		      if (terminal == vocab_type::EPSILON) {
+			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			  cell.push_back(active_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+		      } else {
+			for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+			  if (node == transducer.root()) continue;
+			  
+			  cell.push_back(active_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+			}
 		      }
 		    }
 		  }
@@ -478,6 +504,7 @@ namespace cicada
     const grammar_type& grammar;
     const bool yield_source;
     const bool treebank;
+    const bool pos_mode;
     const bool unique_goal;
     const attribute_type attr_span_first;
     const attribute_type attr_span_last;
@@ -495,9 +522,9 @@ namespace cicada
   };
   
   inline
-  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false, const bool unique_goal=false)
+  void compose_cky(const Symbol& goal, const Grammar& grammar, const Lattice& lattice, HyperGraph& graph, const bool yield_source=false, const bool treebank=false, const bool pos_mode=false, const bool unique_goal=false)
   {
-    ComposeCKY(goal, grammar, yield_source, treebank, unique_goal)(lattice, graph);
+    ComposeCKY(goal, grammar, yield_source, treebank, pos_mode, unique_goal)(lattice, graph);
   }
 };
 
