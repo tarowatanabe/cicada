@@ -308,9 +308,11 @@ namespace cicada
       
       typedef hypergraph_type::feature_set_type   feature_set_type;
       typedef hypergraph_type::attribute_set_type attribute_set_type;
+      
+      typedef attribute_set_type::attribute_type attribute_type;
 
-      sentence_traversal() {}
-      sentence_traversal(const std::string& __insertion_prefix) : insertion_prefix(__insertion_prefix) {}
+      sentence_traversal() : attr_insertion() {}
+      sentence_traversal(const std::string& __insertion_prefix) : insertion_prefix(__insertion_prefix), attr_insertion(__insertion_prefix.empty() ? "" : "insertion") {}
 
       struct __inserted : public boost::static_visitor<bool>
       {
@@ -328,7 +330,7 @@ namespace cicada
 	
 	bool is_insertion = false;
 	if (! insertion_prefix.empty()) {
-	  attribute_set_type::const_iterator aiter = edge.attributes.find("insertion");
+	  attribute_set_type::const_iterator aiter = edge.attributes.find(attr_insertion);
 	  if (aiter != edge.attributes.end())
 	    is_insertion = boost::apply_visitor(__inserted(), aiter->second);
 	}
@@ -360,7 +362,8 @@ namespace cicada
 	}
       }
       
-      std::string insertion_prefix;
+      std::string    insertion_prefix;
+      attribute_type attr_insertion;
     };
 
 
@@ -373,11 +376,13 @@ namespace cicada
       
       typedef hypergraph_type::feature_set_type   feature_set_type;
       typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+      typedef attribute_set_type::attribute_type attribute_type;
   
       typedef boost::tuple<sentence_type, feature_set_type> value_type;
 
-      sentence_feature_traversal() {}
-      sentence_feature_traversal(const std::string& __insertion_prefix) : insertion_prefix(__insertion_prefix) {}
+      sentence_feature_traversal() : attr_insertion() {}
+      sentence_feature_traversal(const std::string& __insertion_prefix) : insertion_prefix(__insertion_prefix), attr_insertion(__insertion_prefix.empty() ? "" : "insertion") {}
       
       struct __inserted : public boost::static_visitor<bool>
       {
@@ -394,7 +399,7 @@ namespace cicada
 	
 	bool is_insertion = false;
 	if (! insertion_prefix.empty()) {
-	  attribute_set_type::const_iterator aiter = edge.attributes.find("insertion");
+	  attribute_set_type::const_iterator aiter = edge.attributes.find(attr_insertion);
 	  if (aiter != edge.attributes.end())
 	    is_insertion = boost::apply_visitor(__inserted(), aiter->second);
 	}
@@ -430,7 +435,8 @@ namespace cicada
 	  boost::get<1>(yield) += boost::get<1>(*first);
       }
 
-      std::string insertion_prefix;
+      std::string    insertion_prefix;
+      attribute_type attr_insertion;
     };
 
     struct kbest_span_filter
