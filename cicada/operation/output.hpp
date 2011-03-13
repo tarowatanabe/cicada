@@ -40,6 +40,7 @@ namespace cicada
       std::string insertion_prefix;
 
       bool yield_string;
+      bool yield_terminal_pos;
       bool yield_tree;
       bool yield_graphviz;
       bool yield_treebank;

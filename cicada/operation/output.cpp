@@ -256,6 +256,8 @@ namespace cicada
 	
 	  if (value == "sentence" || value == "string")
 	    yield_string = true;
+	  if (value == "sentence-pos" || value == "terminal-pos")
+	    yield_terminal_pos = true;
 	  else if (value == "derivation" || value == "tree")
 	    yield_tree = true;
 	  else if (value == "graphviz")
@@ -283,10 +285,10 @@ namespace cicada
       if (! directory.empty() && ! file.empty())
 	throw std::runtime_error("you cannot output both in directory and file");
 	
-      if (int(yield_string) + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_span > 1)
+      if (int(yield_string) + yield_terminal_pos + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_span > 1)
 	throw std::runtime_error("only string, tree or alignment yield for kbest");
 	
-      if (int(yield_string) + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_span == 0)
+      if (int(yield_string) + yield_terminal_pos + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_span == 0)
 	yield_string = true;
 	
       if (graphviz && statistics)
@@ -429,6 +431,12 @@ namespace cicada
 				weight_function_one<weight_type>(),
 				kbest_sentence_filter_unique(hypergraph),
 				no_id);
+	    else if (yield_terminal_pos)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				sentence_pos_feature_traversal(insertion_prefix),
+				weight_function_one<weight_type>(),
+				kbest_sentence_filter_unique(hypergraph),
+				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function_one<weight_type>(),
@@ -453,6 +461,12 @@ namespace cicada
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				sentence_feature_traversal(insertion_prefix),
+				weight_function_one<weight_type>(),
+				kbest_sentence_filter(),
+				no_id);
+	    else if (yield_terminal_pos)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				sentence_pos_feature_traversal(insertion_prefix),
 				weight_function_one<weight_type>(),
 				kbest_sentence_filter(),
 				no_id);
@@ -485,6 +499,12 @@ namespace cicada
 				weight_function<weight_type>(*weights_kbest),
 				kbest_sentence_filter_unique(hypergraph),
 				no_id);
+	    else if (yield_terminal_pos)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				sentence_pos_feature_traversal(insertion_prefix),
+				weight_function<weight_type>(*weights_kbest),
+				kbest_sentence_filter_unique(hypergraph),
+				no_id);
 	    else
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				weight_function<weight_type>(*weights_kbest),
@@ -509,6 +529,12 @@ namespace cicada
 	    else if (yield_string)
 	      kbest_derivations(os, id, hypergraph, kbest_size,
 				sentence_feature_traversal(insertion_prefix),
+				weight_function<weight_type>(*weights_kbest),
+				kbest_sentence_filter(),
+				no_id);
+	    else if (yield_terminal_pos)
+	      kbest_derivations(os, id, hypergraph, kbest_size,
+				sentence_pos_feature_traversal(insertion_prefix),
 				weight_function<weight_type>(*weights_kbest),
 				kbest_sentence_filter(),
 				no_id);

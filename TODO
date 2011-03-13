@@ -62,7 +62,6 @@ Cutting-plane learning under cicada_maxlike{,_mpi}...
 Revise grammar API:
   It is very hard to come-up with new API w/o breaking existing code...
 
-
 Flexible MERT:
   Allow arbitrary yield function to envelope semiring
 
@@ -70,3 +69,16 @@ Support for POS assignment for OOV:
   1. use external pos tagger (Easiest!)
   2. use Stanford parser style unknown word estimator...
 	Sounds like maximum-likelihood estimate or maxent estimates?
+	Automatically learn parameters from treebanks?
+
+Implement scalable training by L1 regularized feature selection:
+  1. Collect features.. it is the hardest part...
+     Decode-and-extract features
+     or use simple featueres (word-pairs etc) from bitext?
+  2. Compute importance
+  3. Learn w/o introducing "new features": modify not to introduce new features
+
+  Remarks: what kind of features?
+     features easily collectable from bilingual data (with monolingual data), (pairs, ngrams etc.)
+     or, 
+     features requing complex hidden variables...?

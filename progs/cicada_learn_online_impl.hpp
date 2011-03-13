@@ -172,7 +172,7 @@ void read_sample(const path_type& input_path,
 	
 	if (! boost::filesystem::exists(path)) break;
 
-	if (i >= samples.size())
+	if (i >= static_cast<int>(samples.size()))
 	  throw std::runtime_error("id exceeds sample size");
 	
 	utils::compress_istream is(path, 1024 * 1024);
@@ -185,7 +185,7 @@ void read_sample(const path_type& input_path,
 	  boost::iostreams::filtering_istream stream;
 	  stream.push(boost::iostreams::array_source(samples[i].c_str(), samples[i].size()));
 	  
-	  size_t id = 0;
+	  int id = 0;
 	  stream >> id;
 	  
 	  if (id != i)
@@ -195,7 +195,7 @@ void read_sample(const path_type& input_path,
   } else if (id_mode) {
     utils::compress_istream is(input_path, 1024 * 1024);
     
-    size_t id = 0;
+    int id = 0;
     std::string line;
     while (std::getline(is, line)) 
       if (! line.empty()) {
@@ -205,7 +205,7 @@ void read_sample(const path_type& input_path,
 	stream >> id;
 	
 	if (shard_size <= 0 || id % shard_size == shard_rank) {
-	  if (id >= samples.size())
+	  if (id >= static_cast<int>(samples.size()))
 	    throw std::runtime_error("id exceeds sample size");
 	  
 	  samples[id].swap(line);
@@ -216,9 +216,9 @@ void read_sample(const path_type& input_path,
     utils::compress_istream is(input_path, 1024 * 1024);
     
     std::string line;
-    for (size_t id = 0; std::getline(is, line); ++ id)
+    for (int id = 0; std::getline(is, line); ++ id)
       if (shard_size <= 0 || id % shard_size == shard_rank) {
-	if (id >= samples.size())
+	if (id >= static_cast<int>(samples.size()))
 	  throw std::runtime_error("id exceeds sample size");
 	
 	if (! line.empty())
@@ -248,7 +248,7 @@ void read_oracle(const path_set_type& files,
 	  
 	  utils::compress_istream is(path, 1024 * 1024);
 	  
-	  size_t id;
+	  int id;
 	  std::string sep;
 	  hypergraph_type hypergraph;
 	  
@@ -259,7 +259,7 @@ void read_oracle(const path_set_type& files,
 	    if (id != i)
 	      throw std::runtime_error("invalid directory output format?");
 	    
-	    if (id >= graphs.size())
+	    if (id >= static_cast<int>(graphs.size()))
 	      throw std::runtime_error("id exceeds graphs size");
 	    
 	    graphs[id].unite(hypergraph);
@@ -268,7 +268,7 @@ void read_oracle(const path_set_type& files,
     } else {
       utils::compress_istream is(*fiter, 1024 * 1024);
       
-      size_t id;
+      int id;
       std::string sep;
       hypergraph_type hypergraph;
       
@@ -278,7 +278,7 @@ void read_oracle(const path_set_type& files,
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?: " + fiter->string());
 
-	  if (id >= graphs.size())
+	  if (id >= static_cast<int>(graphs.size()))
 	    throw std::runtime_error("id exceeds graphs size");
 	  
 	  graphs[id].unite(hypergraph);

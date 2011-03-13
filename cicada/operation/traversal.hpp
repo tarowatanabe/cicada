@@ -296,8 +296,147 @@ namespace cicada
 	}
       }
     };
-    
 
+    struct sentence_pos_traversal
+    {
+      typedef cicada::HyperGraph hypergraph_type;
+      
+      typedef cicada::Sentence value_type;
+      typedef cicada::Rule  rule_type;
+      typedef cicada::Vocab vocab_type;
+      
+      typedef hypergraph_type::feature_set_type   feature_set_type;
+      typedef hypergraph_type::attribute_set_type attribute_set_type;
+      
+      typedef attribute_set_type::attribute_type attribute_type;
+
+      sentence_pos_traversal() : attr_insertion() {}
+      sentence_pos_traversal(const std::string& __insertion_prefix) : insertion_prefix(__insertion_prefix), attr_insertion(__insertion_prefix.empty() ? "" : "insertion") {}
+
+      struct __inserted : public boost::static_visitor<bool>
+      {
+	bool operator()(const attribute_set_type::int_type& x) const { return x; }
+	bool operator()(const attribute_set_type::float_type& x) const { return false; }
+	bool operator()(const attribute_set_type::string_type& x) const { return false; }
+      };
+      
+      template <typename Edge, typename Iterator>
+      void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+      {
+	// extract target-yield, features
+	
+	yield.clear();
+	
+	bool is_insertion = false;
+	if (! insertion_prefix.empty()) {
+	  attribute_set_type::const_iterator aiter = edge.attributes.find(attr_insertion);
+	  if (aiter != edge.attributes.end())
+	    is_insertion = boost::apply_visitor(__inserted(), aiter->second);
+	}
+	
+	if (! is_insertion) {
+	  int non_terminal_pos = 0;
+	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	    if (titer->is_non_terminal()) {
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+	      ++ non_terminal_pos;
+	      
+	      yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
+	    } else if (*titer != vocab_type::EPSILON)
+	      yield.push_back(static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	} else {
+	  int non_terminal_pos = 0;
+	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	    if (titer->is_non_terminal()) {
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+	      ++ non_terminal_pos;
+	      
+	      yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
+	    } else if (*titer != vocab_type::EPSILON)
+	      yield.push_back(insertion_prefix + static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	}
+      }
+      
+      std::string    insertion_prefix;
+      attribute_type attr_insertion;
+    };
+
+    struct sentence_pos_feature_traversal
+    {
+      typedef cicada::HyperGraph hypergraph_type;
+      typedef cicada::Rule       rule_type;
+      typedef cicada::Sentence   sentence_type;
+      typedef cicada::Vocab      vocab_type;
+      
+      typedef hypergraph_type::feature_set_type   feature_set_type;
+      typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+      typedef attribute_set_type::attribute_type attribute_type;
+  
+      typedef boost::tuple<sentence_type, feature_set_type> value_type;
+
+      sentence_pos_feature_traversal() : attr_insertion() {}
+      sentence_pos_feature_traversal(const std::string& __insertion_prefix) : insertion_prefix(__insertion_prefix), attr_insertion(__insertion_prefix.empty() ? "" : "insertion") {}
+      
+      struct __inserted : public boost::static_visitor<bool>
+      {
+	bool operator()(const attribute_set_type::int_type& x) const { return x; }
+	bool operator()(const attribute_set_type::float_type& x) const { return false; }
+	bool operator()(const attribute_set_type::string_type& x) const { return false; }
+      };
+
+      template <typename Edge, typename Iterator>
+      void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
+      {
+	boost::get<0>(yield).clear();
+	boost::get<1>(yield) = edge.features;
+	
+	bool is_insertion = false;
+	if (! insertion_prefix.empty()) {
+	  attribute_set_type::const_iterator aiter = edge.attributes.find(attr_insertion);
+	  if (aiter != edge.attributes.end())
+	    is_insertion = boost::apply_visitor(__inserted(), aiter->second);
+	}
+
+	if (! is_insertion) {
+	  int non_terminal_pos = 0;
+	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	    if (titer->is_non_terminal()) {
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+	      ++ non_terminal_pos;
+	      
+	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
+	    } else if (*titer != vocab_type::EPSILON)
+	      boost::get<0>(yield).push_back(static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	} else {
+	  int non_terminal_pos = 0;
+	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	    if (titer->is_non_terminal()) {
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+	      ++ non_terminal_pos;
+	      
+	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
+	    } else if (*titer != vocab_type::EPSILON)
+	      boost::get<0>(yield).push_back(insertion_prefix + static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	}
+    
+	// collect features...
+	for (/**/; first != last; ++ first)
+	  boost::get<1>(yield) += boost::get<1>(*first);
+      }
+
+      std::string    insertion_prefix;
+      attribute_type attr_insertion;
+    };
+    
     struct sentence_traversal
     {
       typedef cicada::HyperGraph hypergraph_type;

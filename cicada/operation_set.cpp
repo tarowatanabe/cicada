@@ -124,7 +124,7 @@ output: kbest or hypergraph output\n\
 \tunique=[true|false] unique translation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialize weight\n\
-\tyield=[sentence|string|derivation|tree|treebank|graphviz|alignment|span] yield for kbest\n\
+\tyield=[sentence|string|terminal-pos|derivation|tree|treebank|graphviz|alignment|span] yield for kbest\n\
 \tgraphviz=[true|false] dump in graphviz format\n\
 \tdebinarize=[trie|false] debinarize k-best trees\n\
 \tstatistics=[true|false] dump various statistics (size etc.)\n\
