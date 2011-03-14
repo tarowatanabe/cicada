@@ -106,19 +106,17 @@ namespace cicada
 	yield.clear();
 
 	if (! edge.tails.empty()) {
-	  attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
-	  attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
+	  const rule_type& rule = *edge.rule;
 	  
-	  if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
-	    const int span_first = boost::apply_visitor(__point(), fiter->second);
-	    const int span_last  = boost::apply_visitor(__point(), liter->second);
+	  if (rule.lhs.non_terminal_strip().find('^') == symbol_type::piece_type::npos()) {
+	    attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
+	    attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
 	    
-	    if (span_first >= 0 && span_last >= 0) {
-	      const rule_type& rule = *edge.rule;
+	    if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
+	      const int span_first = boost::apply_visitor(__point(), fiter->second);
+	      const int span_last  = boost::apply_visitor(__point(), liter->second);
 	      
-	      const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos();
-	      
-	      if (! is_binarized)
+	      if (span_first >= 0 && span_last >= 0)
 		yield.push_back(span_set_type::span_type(span_first, span_last, rule.lhs));
 	    }
 	  }
@@ -165,19 +163,17 @@ namespace cicada
 	boost::get<1>(yield) = edge.features;
 
 	if (! edge.tails.empty()) {
-	  attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
-	  attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
+	  const rule_type& rule = *edge.rule;
 	  
-	  if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
-	    const int span_first = boost::apply_visitor(__point(), fiter->second);
-	    const int span_last  = boost::apply_visitor(__point(), liter->second);
+	  if (rule.lhs.non_terminal_strip().find('^') == symbol_type::piece_type::npos()) {
+	    attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
+	    attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
 	    
-	    if (span_first >= 0 && span_last >= 0) {
-	      const rule_type& rule = *edge.rule;
+	    if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
+	      const int span_first = boost::apply_visitor(__point(), fiter->second);
+	      const int span_last  = boost::apply_visitor(__point(), liter->second);
 	      
-	      const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos();
-	      
-	      if (! is_binarized)
+	      if (span_first >= 0 && span_last >= 0)
 		boost::get<0>(yield).push_back(span_set_type::span_type(span_first, span_last, rule.lhs));
 	    }
 	  }
