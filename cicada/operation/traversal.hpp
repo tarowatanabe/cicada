@@ -104,25 +104,23 @@ namespace cicada
       void operator()(const Edge& edge, value_type& yield, Iterator first, Iterator last) const
       {
 	yield.clear();
-	
-	attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
-	attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
 
-	if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
-	  const int span_first = boost::apply_visitor(__point(), fiter->second);
-	  const int span_last  = boost::apply_visitor(__point(), liter->second);
-
-	  if (span_first >= 0 && span_last >= 0) {
-	    const rule_type& rule = *edge.rule;
+	if (! edge.tails.empty()) {
+	  attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
+	  attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
+	  
+	  if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
+	    const int span_first = boost::apply_visitor(__point(), fiter->second);
+	    const int span_last  = boost::apply_visitor(__point(), liter->second);
 	    
-	    const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos();
-	    bool has_non_terminal = false;
-	    rule_type::symbol_set_type::const_iterator riter_end = rule.rhs.end();
-	    for (rule_type::symbol_set_type::const_iterator riter = rule.rhs.begin(); riter != riter_end; ++ riter)
-	      has_non_terminal |= riter->is_non_terminal();
-	    
-	    if (! is_binarized && has_non_terminal)
-	      yield.push_back(span_set_type::span_type(span_first, span_last, rule.lhs));
+	    if (span_first >= 0 && span_last >= 0) {
+	      const rule_type& rule = *edge.rule;
+	      
+	      const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos();
+	      
+	      if (! is_binarized)
+		yield.push_back(span_set_type::span_type(span_first, span_last, rule.lhs));
+	    }
 	  }
 	}
 	
@@ -165,25 +163,23 @@ namespace cicada
       {
 	boost::get<0>(yield).clear();
 	boost::get<1>(yield) = edge.features;
-	
-	attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
-	attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
 
-	if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
-	  const int span_first = boost::apply_visitor(__point(), fiter->second);
-	  const int span_last  = boost::apply_visitor(__point(), liter->second);
-
-	  if (span_first >= 0 && span_last >= 0) {
-	    const rule_type& rule = *edge.rule;
+	if (! edge.tails.empty()) {
+	  attribute_set_type::const_iterator fiter = edge.attributes.find(attr_span_first);
+	  attribute_set_type::const_iterator liter = edge.attributes.find(attr_span_last);
+	  
+	  if (fiter != edge.attributes.end() && liter != edge.attributes.end()) {
+	    const int span_first = boost::apply_visitor(__point(), fiter->second);
+	    const int span_last  = boost::apply_visitor(__point(), liter->second);
 	    
-	    const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos();
-	    bool has_non_terminal = false;
-	    rule_type::symbol_set_type::const_iterator riter_end = rule.rhs.end();
-	    for (rule_type::symbol_set_type::const_iterator riter = rule.rhs.begin(); riter != riter_end; ++ riter)
-	      has_non_terminal |= riter->is_non_terminal();
-	    
-	    if (! is_binarized && has_non_terminal)
-	      boost::get<0>(yield).push_back(span_set_type::span_type(span_first, span_last, rule.lhs));
+	    if (span_first >= 0 && span_last >= 0) {
+	      const rule_type& rule = *edge.rule;
+	      
+	      const bool is_binarized = rule.lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos();
+	      
+	      if (! is_binarized)
+		boost::get<0>(yield).push_back(span_set_type::span_type(span_first, span_last, rule.lhs));
+	    }
 	  }
 	}
 	
