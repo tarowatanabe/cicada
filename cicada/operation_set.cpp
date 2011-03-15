@@ -57,6 +57,13 @@ apply: feature application\n\
 binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right|all|terminal|cyk|cky] binarization direction\n\
 \torder=binarization order (default: -1 == all context)\n\
+clear: clear data structure\n\
+\tforest=[true|false] clear forest\n\
+\tlattice=[true|false] clear lattice\n\
+\tspan=[true|false] clear spans\n\
+\talignment=[true|false] clear alignment\n\
+\ttargets=[true|false] clear targets\n\
+\tcounts=[true|false] clear ngram counts\n\
 compose-earley: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 compose-cky|cyk: composition from lattice (or sentence) with grammar\n\

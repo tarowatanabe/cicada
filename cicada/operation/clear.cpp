@@ -34,7 +34,7 @@ namespace cicada
 	throw std::runtime_error("this is not data clearer");
 	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "hypergraph")
+	if (utils::ipiece(piter->first) == "hypergraph" || utils::ipiece(piter->first) == "forest")
 	  clear_hypergraph = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "lattice")
 	  clear_lattice = utils::lexical_cast<bool>(piter->second);

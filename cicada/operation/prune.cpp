@@ -84,11 +84,10 @@ namespace cicada
       hypergraph_type& hypergraph = data.hypergraph;
       hypergraph_type pruned;
 
-      weight_set_type __weights;
       if (weights_one)
-	weights_assigned_one.allocate(1.0);
+	const_cast<weight_set_type&>(weights_assigned_one).allocate(1.0);
       
-      const weight_set_type* weights_prune = (weights_one ? &weights_assinged_one : (weights_assigned ? weights_assigned : &(weights->weights)));
+      const weight_set_type* weights_prune = (weights_one ? &weights_assigned_one : (weights_assigned ? weights_assigned : &(weights->weights)));
       
       const bool beam_mode = beam >= 0.0;
       const bool density_mode = density >= 1.0;

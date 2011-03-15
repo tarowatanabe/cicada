@@ -74,7 +74,7 @@ namespace cicada
 	if (path != "-" && ! boost::filesystem::exists(path))
 	  throw std::runtime_error("no feture weights? " + path.string());
 	
-	utils::compress_istream is(path);
+	utils::compress_istream is(path, 1024 * 1024);
 	is >> iter->second.weights;
       }
     }
