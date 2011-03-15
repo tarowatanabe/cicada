@@ -325,11 +325,13 @@ namespace cicada
 	  if (aiter != edge.attributes.end())
 	    is_insertion = boost::apply_visitor(__inserted(), aiter->second);
 	}
+
+	const rule_type& rule = *edge.rule;
 	
 	if (! is_insertion) {
 	  int non_terminal_pos = 0;
-	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	  rule_type::symbol_set_type::const_iterator titer_end = rule.rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = rule.rhs.begin(); titer != titer_end; ++ titer)
 	    if (titer->is_non_terminal()) {
 	      const int __non_terminal_index = titer->non_terminal_index();
 	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
@@ -337,11 +339,11 @@ namespace cicada
 	      
 	      yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
 	    } else if (*titer != vocab_type::EPSILON)
-	      yield.push_back(static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	      yield.push_back(static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(rule.lhs));
 	} else {
 	  int non_terminal_pos = 0;
-	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	  rule_type::symbol_set_type::const_iterator titer_end = rule.rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = rule.rhs.begin(); titer != titer_end; ++ titer)
 	    if (titer->is_non_terminal()) {
 	      const int __non_terminal_index = titer->non_terminal_index();
 	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
@@ -349,7 +351,7 @@ namespace cicada
 	      
 	      yield.insert(yield.end(), (first + pos)->begin(), (first + pos)->end());
 	    } else if (*titer != vocab_type::EPSILON)
-	      yield.push_back(insertion_prefix + static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	      yield.push_back(insertion_prefix + static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(rule.lhs));
 	}
       }
       
@@ -394,10 +396,12 @@ namespace cicada
 	    is_insertion = boost::apply_visitor(__inserted(), aiter->second);
 	}
 
+	const rule_type& rule = *edge.rule;
+
 	if (! is_insertion) {
 	  int non_terminal_pos = 0;
-	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	  rule_type::symbol_set_type::const_iterator titer_end = rule.rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = rule.rhs.begin(); titer != titer_end; ++ titer)
 	    if (titer->is_non_terminal()) {
 	      const int __non_terminal_index = titer->non_terminal_index();
 	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
@@ -405,11 +409,11 @@ namespace cicada
 	      
 	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
 	    } else if (*titer != vocab_type::EPSILON)
-	      boost::get<0>(yield).push_back(static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	      boost::get<0>(yield).push_back(static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(rule.lhs));
 	} else {
 	  int non_terminal_pos = 0;
-	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
-	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
+	  rule_type::symbol_set_type::const_iterator titer_end = rule.rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = rule.rhs.begin(); titer != titer_end; ++ titer)
 	    if (titer->is_non_terminal()) {
 	      const int __non_terminal_index = titer->non_terminal_index();
 	      const int pos = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
@@ -417,7 +421,7 @@ namespace cicada
 	      
 	      boost::get<0>(yield).insert(boost::get<0>(yield).end(), boost::get<0>(*(first + pos)).begin(), boost::get<0>(*(first + pos)).end());
 	    } else if (*titer != vocab_type::EPSILON)
-	      boost::get<0>(yield).push_back(insertion_prefix + static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(edge.rule->lhs));
+	      boost::get<0>(yield).push_back(insertion_prefix + static_cast<const std::string&>(*titer) + '|' + static_cast<const std::string&>(rule.lhs));
 	}
     
 	// collect features...
