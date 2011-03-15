@@ -32,7 +32,8 @@ namespace cicada
       path_type file;
       path_type directory;
   
-      const weight_set_type* weights;
+      const weights_path_type* weights;
+      const weight_set_type*   weights_assigned;
       bool weights_one;
       int  kbest_size;
       bool kbest_unique;

@@ -27,7 +27,8 @@ namespace cicada
       model_type model_local;
 
       const model_type& model;
-      const weight_set_type* weights;
+      const weights_path_type* weights;
+      const weight_set_type*   weights_assigned;
       int size;
       bool weights_one;
   

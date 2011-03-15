@@ -58,6 +58,15 @@ namespace cicada
     typedef boost::filesystem::path path_type;    
     
     typedef Operation base_type;
+
+    struct weights_path_type
+    {
+      weight_set_type weights;
+      path_type       path;
+      
+      weights_path_type() : weights(), path() {}
+      weights_path_type(const path_type& __path) : weights(), path(__path) {}
+    };
     
     struct Data
     {
@@ -92,7 +101,8 @@ namespace cicada
     virtual void assign(const weight_set_type& weights) {}
     virtual void clear() {};
     
-    static const weight_set_type& weights(const path_type& path);
+    static const weights_path_type& weights();
+    static const weights_path_type& weights(const path_type& path);
   };
 };
 

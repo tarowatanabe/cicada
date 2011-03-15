@@ -37,7 +37,8 @@ namespace cicada
       bool insertion;
       bool deletion;
       
-      const weight_set_type* weights;
+      const weights_path_type* weights;
+      const weight_set_type*   weights_assigned;
       int size;
       bool weights_one;
       
@@ -72,7 +73,8 @@ namespace cicada
       bool insertion;
       bool deletion;
 
-      const weight_set_type* weights;
+      const weights_path_type* weights;
+      const weight_set_type*   weights_assigned;
       int size;
       bool weights_one;
       

@@ -200,7 +200,7 @@ namespace cicada
     }
 
     Output::Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
-      : output_data(__output_data), file(), directory(), weights(0), weights_one(false),
+      : output_data(__output_data), file(), directory(), weights(0), weights_assigned(0), weights_one(false),
 	kbest_size(0), kbest_unique(false),
 	insertion_prefix(),
 	yield_string(false),
@@ -278,7 +278,9 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
-    
+      if (! weights)
+	weights = &base_type::weights();
+      
       // default to stdout
       if (directory.empty() && file.empty())
 	file = "-";
@@ -306,7 +308,7 @@ namespace cicada
 
     void Output::assign(const weight_set_type& __weights)
     {
-      weights = &__weights;
+      weights_assigned = &__weights;
     }
 
     void Output::clear()
@@ -409,8 +411,7 @@ namespace cicada
 	else
 	  os << hypergraph << '\n';
       } else {
-	weight_set_type weights_zero;
-	const weight_set_type* weights_kbest = (weights ? weights : &weights_zero);
+	const weight_set_type* weights_kbest = (weights_assigned ? weights_assigned : &(weights->weights));
 	
 	if (weights_one) {
 	  if (kbest_unique) {

@@ -22,7 +22,7 @@ namespace cicada
     Apply::Apply(const std::string& parameter,
 		 const model_type& __model,
 		 const int __debug)
-      : model(__model), weights(0), size(200), weights_one(false), exact(false), prune(false), grow(false), incremental(false), forced(false), debug(__debug)
+      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), exact(false), prune(false), grow(false), incremental(false), forced(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -63,8 +63,10 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      if (! weights)
+	weights = &base_type::weights();
     }
-
+    
     void Apply::operator()(data_type& data) const
     {
       if (! data.hypergraph.is_valid()) return;
@@ -75,15 +77,14 @@ namespace cicada
       hypergraph_type applied;
 
       model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
-    
+      
       // assignment...
       __model.assign(data.id, data.hypergraph, data.lattice, data.spans, data.targets, data.ngram_counts);
       
       if (forced)
 	__model.apply_feature(true);
       
-      weight_set_type weights_zero;
-      const weight_set_type* weights_apply = (weights ? weights : &weights_zero);
+      const weight_set_type* weights_apply = (weights_assigned ? weights_assigned : &(weights->weights));
       
       if (debug)
 	std::cerr << "apply "
@@ -134,7 +135,7 @@ namespace cicada
 
     void Apply::assign(const weight_set_type& __weights)
     {
-      weights = &__weights;
+      weights_assigned = &__weights;
     }
   };
 };

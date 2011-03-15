@@ -16,7 +16,8 @@ namespace cicada
 
   namespace operation_detail {
     
-    typedef Operation::weight_set_type weight_set_type;
+    typedef Operation::weight_set_type   weight_set_type;
+    typedef Operation::weights_path_type weights_path_type;
     
     struct hash_string : public utils::hashmurmur<size_t>
     {
@@ -27,11 +28,11 @@ namespace cicada
     };
     
 #ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<std::string, weight_set_type, hash_string, std::equal_to<std::string>,
-				    std::allocator<std::pair<const std::string, weight_set_type> > > weight_map_type;
+    typedef std::tr1::unordered_map<std::string, weights_path_type, hash_string, std::equal_to<std::string>,
+				    std::allocator<std::pair<const std::string, weights_path_type> > > weight_map_type;
 #else
-    typedef sgi::hash_map<std::string, weight_set_type, hash_string, std::equal_to<std::string>,
-			  std::allocator<std::pair<const std::string, weight_set_type> > > weight_map_type;
+    typedef sgi::hash_map<std::string, weights_path_type, hash_string, std::equal_to<std::string>,
+			  std::allocator<std::pair<const std::string, weights_path_type> > > weight_map_type;
 #endif
 
 #ifdef HAVE_TLS
@@ -42,8 +43,13 @@ namespace cicada
 #endif
 
   };
+  
+  const Operation::weights_path_type& Operation::weights()
+  {
+    return weights(path_type());
+  }
 
-  const Operation::weight_set_type& Operation::weights(const path_type& path)
+  const Operation::weights_path_type& Operation::weights(const path_type& path)
   {
     typedef operation_detail::weight_map_type weight_map_type;
     
@@ -62,14 +68,14 @@ namespace cicada
     
     weight_map_type::iterator iter = weights_map.find(path.string());
     if (iter == weights_map.end()) {
-      iter = weights_map.insert(std::make_pair(path.string(), weight_set_type())).first;
+      iter = weights_map.insert(std::make_pair(path.string(), weights_path_type(path))).first;
       
       if (! path.empty()) {
 	if (path != "-" && ! boost::filesystem::exists(path))
 	  throw std::runtime_error("no feture weights? " + path.string());
 	
 	utils::compress_istream is(path);
-	is >> iter->second;
+	is >> iter->second.weights;
       }
     }
     return iter->second;

@@ -25,8 +25,9 @@ namespace cicada
   
       int order;
       bool bos_eos;
-  
-      const weight_set_type* weights;
+      
+      const weights_path_type* weights;
+      const weight_set_type*   weights_assigned;
       bool weights_one;
       
       double scale;

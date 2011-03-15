@@ -19,7 +19,7 @@ namespace cicada
   namespace operation
   {
     Prune::Prune(const std::string& parameter, const int __debug)
-      : weights(0), kbest(0), beam(-1), density(0.0), scale(1.0), weights_one(false), 
+      : weights(0), weights_assigned(0), kbest(0), beam(-1), density(0.0), scale(1.0), weights_one(false), 
 	semiring_tropical(false), semiring_logprob(false), semiring_log(false),
 	debug(__debug)
     {
@@ -73,80 +73,78 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      if (! weights)
+	weights = &base_type::weights();
     }
     
     void Prune::operator()(data_type& data) const
-      {
-	if (! data.hypergraph.is_valid()) return;
+    {
+      if (! data.hypergraph.is_valid()) return;
 	
-	hypergraph_type& hypergraph = data.hypergraph;
-	hypergraph_type pruned;
+      hypergraph_type& hypergraph = data.hypergraph;
+      hypergraph_type pruned;
 
-	weight_set_type __weights;
-	if (weights_one) {
-	  __weights.allocate();
-	  for (weight_set_type::feature_type::id_type id = 0; id != __weights.size(); ++ id)
-	    if (! weight_set_type::feature_type(id).empty())
-	      __weights[weight_set_type::feature_type(id)] = 1.0;
-	}
-    
-	const weight_set_type* weights_prune = (weights ? weights : &__weights);
-
-	const bool beam_mode = beam >= 0.0;
-	const bool density_mode = density >= 1.0;
-	const bool kbest_mode = kbest > 0;
+      weight_set_type __weights;
+      if (weights_one)
+	weights_assigned_one.allocate(1.0);
+      
+      const weight_set_type* weights_prune = (weights_one ? &weights_assinged_one : (weights_assigned ? weights_assigned : &(weights->weights)));
+      
+      const bool beam_mode = beam >= 0.0;
+      const bool density_mode = density >= 1.0;
+      const bool kbest_mode = kbest > 0;
 	
-	if (debug)
-	  std::cerr << "prune " << (kbest_mode ? "kbest" : (beam_mode ? "beam" : "density")) << ": " << data.id << std::endl;
+      if (debug)
+	std::cerr << "prune " << (kbest_mode ? "kbest" : (beam_mode ? "beam" : "density")) << ": " << data.id << std::endl;
 	
-	utils::resource prune_start;
+      utils::resource prune_start;
 
-	if (kbest_mode) {
-	  if (semiring_tropical)
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), kbest);
-	  else if (semiring_logprob)
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), kbest);
-	  else
-	    cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), kbest);
-	} else if (beam_mode) {
-	  if (semiring_tropical)
-	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
-	  else if (semiring_logprob)
-	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
-	  else
-	    cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
-	} else if (density_mode) {
-	  if (semiring_tropical)
-	    cicada::prune_density(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), density);
-	  else if (semiring_logprob)
-	    cicada::prune_density(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), density);
-	  else
-	    cicada::prune_density(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), density);
-	} else
-	  throw std::runtime_error("what pruning?");
+      if (kbest_mode) {
+	if (semiring_tropical)
+	  cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), kbest);
+	else if (semiring_logprob)
+	  cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), kbest);
+	else
+	  cicada::prune_kbest(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), kbest);
+      } else if (beam_mode) {
+	if (semiring_tropical)
+	  cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), beam);
+	else if (semiring_logprob)
+	  cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), beam);
+	else
+	  cicada::prune_beam(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), beam);
+      } else if (density_mode) {
+	if (semiring_tropical)
+	  cicada::prune_density(hypergraph, pruned, weight_scaled_function<cicada::semiring::Tropical<double> >(*weights_prune, scale), density);
+	else if (semiring_logprob)
+	  cicada::prune_density(hypergraph, pruned, weight_scaled_function<cicada::semiring::Logprob<double> >(*weights_prune, scale), density);
+	else
+	  cicada::prune_density(hypergraph, pruned, weight_scaled_function<cicada::semiring::Log<double> >(*weights_prune, scale), density);
+      } else
+	throw std::runtime_error("what pruning?");
     
 	
-	utils::resource prune_end;
+      utils::resource prune_end;
     
-	if (debug)
-	  std::cerr << "prune cpu time: " << (prune_end.cpu_time() - prune_start.cpu_time())
-		    << " user time: " << (prune_end.user_time() - prune_start.user_time())
-		    << std::endl;
+      if (debug)
+	std::cerr << "prune cpu time: " << (prune_end.cpu_time() - prune_start.cpu_time())
+		  << " user time: " << (prune_end.user_time() - prune_start.user_time())
+		  << std::endl;
     
-	if (debug)
-	  std::cerr << "prune: " << data.id
-		    << " # of nodes: " << pruned.nodes.size()
-		    << " # of edges: " << pruned.edges.size()
-		    << " valid? " << utils::lexical_cast<std::string>(pruned.is_valid())
-		    << std::endl;
+      if (debug)
+	std::cerr << "prune: " << data.id
+		  << " # of nodes: " << pruned.nodes.size()
+		  << " # of edges: " << pruned.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(pruned.is_valid())
+		  << std::endl;
     
-	hypergraph.swap(pruned);
+      hypergraph.swap(pruned);
 
-      }
+    }
     
     void Prune::assign(const weight_set_type& __weights)
     {
-      weights = &__weights;
+      weights_assigned = &__weights;
     }
   };
 };

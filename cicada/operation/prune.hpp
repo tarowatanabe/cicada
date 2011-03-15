@@ -22,7 +22,9 @@ namespace cicada
       
       void assign(const weight_set_type& __weights);
 
-      const weight_set_type* weights;
+      const weights_path_type* weights;
+      const weight_set_type*   weights_assigned;
+      weight_set_type          weights_assigned_one;
   
       size_t kbest;
       double beam;

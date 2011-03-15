@@ -32,6 +32,7 @@ namespace cicada
 	goal(__goal), non_terminal(__non_terminal), 
 	insertion(__insertion), deletion(__deletion),
 	weights(0),
+	weights_assigned(0),
 	size(200),
 	weights_one(false),
 	yield_source(false),
@@ -80,11 +81,13 @@ namespace cicada
 
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      if (! weights)
+	weights = &base_type::weights();
     }
 
     void ParseCKY::assign(const weight_set_type& __weights)
     {
-      weights = &__weights;
+      weights_assigned = &__weights;
     }
 
     void ParseCKY::operator()(data_type& data) const
@@ -101,8 +104,7 @@ namespace cicada
       if (debug)
 	std::cerr << "parse cky: " << data.id << std::endl;
 
-      weight_set_type weights_zero;
-      const weight_set_type* weights_parse = (weights ? weights : &weights_zero);
+      const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
 
       utils::resource start;
 
@@ -148,6 +150,7 @@ namespace cicada
 	goal(__goal), non_terminal(__non_terminal), 
 	insertion(__insertion), deletion(__deletion),
 	weights(0),
+	weights_assigned(0),
 	size(200),
 	weights_one(false),
 	yield_source(false),
@@ -193,11 +196,13 @@ namespace cicada
 
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      if (! weights)
+	weights = &base_type::weights();
     }
 
     void ParseAgenda::assign(const weight_set_type& __weights)
     {
-      weights = &__weights;
+      weights_assigned = &__weights;
     }
 
     void ParseAgenda::operator()(data_type& data) const
@@ -213,9 +218,8 @@ namespace cicada
     
       if (debug)
 	std::cerr << "parse agenda: " << data.id << std::endl;
-
-      weight_set_type weights_zero;
-      const weight_set_type* weights_parse = (weights ? weights : &weights_zero);
+      
+      const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
 
       utils::resource start;
 
