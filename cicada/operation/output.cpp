@@ -204,6 +204,7 @@ namespace cicada
 	kbest_size(0), kbest_unique(false),
 	insertion_prefix(),
 	yield_string(false),
+	yield_terminal_pos(false),
 	yield_tree(false),
 	yield_graphviz(false),
 	yield_treebank(false),
