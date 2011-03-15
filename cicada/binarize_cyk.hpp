@@ -232,13 +232,17 @@ namespace cicada
     {
       if (categories[id].empty()) {
 	if (! labels[id].empty()) {
-	  std::ostringstream stream;
-	  stream << '[';
-	  std::copy(labels[id].begin(), labels[id].end() - 1, std::ostream_iterator<std::string>(stream, "+"));
-	  stream << labels[id].back();
-	  stream << ']';
-	  
-	  categories[id] = stream.str();
+
+	  if (labels[id].size() == 1)
+	    categories[id] = '[' + labels[id].front() + ']';
+	  else {
+	    std::ostringstream stream;
+	    stream << '[';
+	    std::copy(labels[id].begin(), labels[id].end() - 1, std::ostream_iterator<std::string>(stream, "+"));
+	    stream << labels[id].back() << '^'; // add indicator for binarization
+	    stream << ']';
+	    categories[id] = stream.str();
+	  }
 	} else
 	  categories[id] = "[x]"; // this should not happen...
       }
