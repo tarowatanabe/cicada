@@ -1,3 +1,7 @@
+2011-3-XX
+Added parser component. Currently, we support CKY and bottom-up agenda-based search with pruning.
+Added parseval evaluator.
+
 2011-2-14
 Better vocabulary management by eliminating temporary buffer
 Use boost.spirit for parsing/generating numerics
