@@ -45,12 +45,18 @@ namespace cicada
   const char* OperationSet::lists()
   {
     static const char* desc = "\
+apply: feature application\n\
+\tsize=<cube size>\n\
+\texact=[true|false]  no pruning feature application\n\
+\tprune=[true|false]  cube-pruning for feature application\n\
+\tgrow=[true|false]   cube-growing for feature application\n\
+\tforced=[true|false] forced feature application\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialized weight\n\
+\tfeature=feature function\n\
 binarize: perform binarization (monolingual tree)\n\
 \tdirection=[left|right|all|terminal|cyk|cky] binarization direction\n\
 \torder=binarization order (default: -1 == all context)\n\
-permute: permute tree (monolingual tree only)\n\
-\tsize=permute size\n\
-\texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 compose-earley: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
@@ -68,6 +74,33 @@ compose-alignment: composition from lattice (or forest) with target\n\
 \tforest=[true|false] forest composition\n\
 compose-tree: composition from tree with tree grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+debinarize: de-binarize forest\n\
+expected-ngram: expected ngram computation\n\
+\torder=<ngram order>\n\
+\tbos-eos=[true|false] include <s> and </s> in ngrams\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialized weight\n\
+\tscale=scaling for score\n\
+generate-earley: re-generation from tree\n\
+\tdepth: depth of rule pattern \n\
+\twidth: width of rule pattern \n\
+normalize: feature value normalizer\n\
+\tprefix=feature name prefix\n\
+output: kbest or hypergraph output\n\
+\tkbest=<kbest size> zero for hypergraph output (default)\n\
+\tinsertion-prefix=<prefix attatched to inserted word>\n\
+\tunique=[true|false] unique translation\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialize weight\n\
+\tyield=[sentence|string|terminal-pos|derivation|tree|treebank|graphviz|alignment|span] yield for kbest\n\
+\tgraphviz=[true|false] dump in graphviz format\n\
+\tdebinarize=[true|false] debinarize k-best trees\n\
+\tstatistics=[true|false] dump various statistics (size etc.)\n\
+\tlattice=[true|false] dump lattice\n\
+\tforest=[true|false] dump forest\n\
+\tno-id=[true|false] do not output id\n\
+\tdirectory=directory for output\n\
+\tfile=file for output\n\
 parse-agenda: parsing via agenda\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
@@ -83,24 +116,9 @@ parse-cky|cyk: parsing via CKY\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
-generate-earley: re-generation from tree\n\
-\tdepth: depth of rule pattern \n\
-\twidth: width of rule pattern \n\
-apply: feature application\n\
-\tsize=<cube size>\n\
-\texact=[true|false]  no pruning feature application\n\
-\tprune=[true|false]  cube-pruning for feature application\n\
-\tgrow=[true|false]   cube-growing for feature application\n\
-\tforced=[true|false] forced feature application\n\
-\tweights=weight file for feature\n\
-\tweights-one=[true|false] one initialized weight\n\
-\tfeature=feature function\n\
-expected-ngram: expected ngram computation\n\
-\torder=<ngram order>\n\
-\tbos-eos=[true|false] include <s> and </s> in ngrams\n\
-\tweights=weight file for feature\n\
-\tweights-one=[true|false] one initialized weight\n\
-\tscale=scaling for score\n\
+permute: permute tree (monolingual tree only)\n\
+\tsize=permute size\n\
+\texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
@@ -112,27 +130,9 @@ prune: pruning\n\
 intersect: compute intersection\n\
 \tlattice=[true|false] intersect with lattice\n\
 \ttarget=[true|false] intersect with one of target\n\
-normalize: feature value normalizer\n\
-\tprefix=feature name prefix\n\
 remove-epsilon: remove epsilon for lattice\n\
-span-forest: annotate terminal span\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
-debinarize: de-binarize forest\n\
-output: kbest or hypergraph output\n\
-\tkbest=<kbest size> zero for hypergraph output (default)\n\
-\tinsertion-prefix=<prefix attatched to inserted word>\n\
-\tunique=[true|false] unique translation\n\
-\tweights=weight file for feature\n\
-\tweights-one=[true|false] one initialize weight\n\
-\tyield=[sentence|string|terminal-pos|derivation|tree|treebank|graphviz|alignment|span] yield for kbest\n\
-\tgraphviz=[true|false] dump in graphviz format\n\
-\tdebinarize=[trie|false] debinarize k-best trees\n\
-\tstatistics=[true|false] dump various statistics (size etc.)\n\
-\tlattice=[true|false] dump lattice\n\
-\tforest=[true|false] dump forest\n\
-\tno-id=[true|false] do not output id\n\
-\tdirectory=directory for output\n\
-\tfile=file for output\n\
+span-forest: annotate terminal span\n\
 ";
     return desc;
   }

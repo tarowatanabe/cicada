@@ -40,6 +40,8 @@ Support word alignment training!
       We can potentially share by modifying "intersection"
   How to encode lexical feature...?
     use grammar! (source target word mapping with features!)
+  Intersection with the supplied alignment: supervised training!
+    Can we do this, given that word alignment space is rather constrained...
 
 Reimplement cicada-learn-online:
   Distribute sentences and oracle translations first, then, run online learning
