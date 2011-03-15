@@ -1,5 +1,5 @@
 2011-3-XX
-Added parser component. Currently, we support CKY and bottom-up agenda-based search with pruning.
+Added parser component. Currently, we support tabular-CKY and bottom-up agenda-based best-first search with pruning.
 Added parseval evaluator.
 
 2011-2-14
