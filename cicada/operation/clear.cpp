@@ -22,6 +22,7 @@ namespace cicada
       : clear_hypergraph(false),
 	clear_lattice(false),
 	clear_spans(false),
+	clear_alignment(false),
 	clear_targets(false),
 	clear_counts(false),
 	debug(__debug)
@@ -39,6 +40,8 @@ namespace cicada
 	  clear_lattice = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "spans" || utils::ipiece(piter->first) == "span")
 	  clear_spans = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "alignment")
+	  clear_alignment = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "targets" || utils::ipiece(piter->first) == "bitext")
 	  clear_targets = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "counts" || utils::ipiece(piter->first) == "ngram-counts")
@@ -59,6 +62,8 @@ namespace cicada
 	data.lattice.clear();
       if (clear_spans)
 	data.spans.clear();
+      if (clear_alignment)
+	data.alignment.clear();
       if (clear_targets)
 	data.targets.clear();
       if (clear_counts)

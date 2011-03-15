@@ -32,6 +32,7 @@ namespace cicada
     typedef operation_type::hypergraph_type      hypergraph_type;
     typedef operation_type::lattice_type         lattice_type;
     typedef operation_type::span_set_type        span_set_type;
+    typedef operation_type::alignment_type       alignment_type;
     typedef operation_type::sentence_type        sentence_type;
     typedef operation_type::sentence_set_type    sentence_set_type;
     typedef operation_type::ngram_count_set_type ngram_count_set_type;
@@ -59,12 +60,13 @@ namespace cicada
 		 const bool __input_lattice,
 		 const bool __input_forest,
 		 const bool __input_span,
+		 const bool __input_alignment,
 		 const bool __input_bitext,
 		 const bool __input_mpi,
 		 const int debug)
     {
       initialize(parameter_set_type(first, last), model, grammar, tree_grammar, goal, non_terminal, insertion, deletion, fallback,
-		 __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
+		 __input_id, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
 		 debug);
     }
     
@@ -81,12 +83,13 @@ namespace cicada
 		 const bool __input_lattice,
 		 const bool __input_forest,
 		 const bool __input_span,
+		 const bool __input_alignment,
 		 const bool __input_bitext,
 		 const bool __input_mpi,
 		 const int debug)
     {
       initialize(parameters, model, grammar, tree_grammar, goal, non_terminal, insertion, deletion, fallback,
-		 __input_id, __input_lattice, __input_forest, __input_span, __input_bitext, __input_mpi,
+		 __input_id, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
 		 debug);
     }
     
@@ -113,6 +116,7 @@ namespace cicada
 		    const bool __input_lattice,
 		    const bool __input_forest,
 		    const bool __input_span,
+		    const bool __input_alignment,
 		    const bool __input_bitext,
 		    const bool __input_mpi,
 		    const int debug);
@@ -123,6 +127,7 @@ namespace cicada
     bool input_lattice;
     bool input_forest;
     bool input_span;
+    bool input_alignment;
     bool input_bitext;
     bool input_mpi;
     

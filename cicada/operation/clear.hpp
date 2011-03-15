@@ -25,6 +25,7 @@ namespace cicada
       bool clear_hypergraph;
       bool clear_lattice;
       bool clear_spans;
+      bool clear_alignment;
       bool clear_targets;
       bool clear_counts;
       

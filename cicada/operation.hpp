@@ -13,7 +13,7 @@
 #include <cicada/lattice.hpp>
 #include <cicada/sentence.hpp>
 #include <cicada/sentence_vector.hpp>
-#include <cicada/vocab.hpp>
+#include <cicada/alignment.hpp>
 #include <cicada/span_vector.hpp>
 #include <cicada/ngram_count_set.hpp>
 #include <cicada/span_vector.hpp>
@@ -21,6 +21,7 @@
 #include <cicada/grammar.hpp>
 #include <cicada/tree_grammar.hpp>
 #include <cicada/model.hpp>
+#include <cicada/vocab.hpp>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/shared_ptr.hpp>
@@ -38,6 +39,7 @@ namespace cicada
     typedef cicada::HyperGraph     hypergraph_type;
     typedef cicada::Lattice        lattice_type;
     typedef cicada::SpanVector     span_set_type;
+    typedef cicada::Alignment      alignment_type;
     typedef cicada::Sentence       sentence_type;
     typedef cicada::SentenceVector sentence_set_type;
     typedef cicada::NGramCountSet  ngram_count_set_type;
@@ -64,6 +66,7 @@ namespace cicada
       hypergraph_type      hypergraph;
       lattice_type         lattice;
       span_set_type        spans;
+      alignment_type       alignment;
       sentence_set_type    targets;
       ngram_count_set_type ngram_counts;
     };

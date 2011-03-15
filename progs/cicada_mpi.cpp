@@ -32,6 +32,7 @@ bool input_bitext_mode = false;
 bool input_lattice_mode = false;
 bool input_forest_mode = false;
 bool input_span_mode = false;
+bool input_alignment_mode = false;
 bool input_directory_mode = false;
 
 std::string symbol_goal         = vocab_type::S;
@@ -155,6 +156,7 @@ int main(int argc, char ** argv)
 				  input_lattice_mode,
 				  input_forest_mode,
 				  input_span_mode,
+				  input_alignment_mode,
 				  input_bitext_mode,
 				  true,
 				  debug);
@@ -758,6 +760,7 @@ void options(int argc, char** argv)
     ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")
     ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
     ("input-span",       po::bool_switch(&input_span_mode),       "span input")
+    ("input-alignment",  po::bool_switch(&input_alignment_mode),  "alignment input")
     ("input-directory",  po::bool_switch(&input_directory_mode),  "input in directory")
     
     // grammar

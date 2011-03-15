@@ -151,6 +151,7 @@ output: kbest or hypergraph output\n\
 				const bool __input_lattice,
 				const bool __input_forest,
 				const bool __input_span,
+				const bool __input_alignment,
 				const bool __input_bitext,
 				const bool __input_mpi,
 				const int debug)
@@ -161,12 +162,13 @@ output: kbest or hypergraph output\n\
 
     // initialize...
     
-    input_id      = __input_id;
-    input_lattice = __input_lattice;
-    input_forest  = __input_forest;
-    input_span    = __input_span;
-    input_bitext  = __input_bitext;
-    input_mpi     = __input_mpi;
+    input_id        = __input_id;
+    input_lattice   = __input_lattice;
+    input_forest    = __input_forest;
+    input_span      = __input_span;
+    input_alignment = __input_alignment;
+    input_bitext    = __input_bitext;
+    input_mpi       = __input_mpi;
     
     // default to lattice input...
     if (! input_lattice && ! input_forest)
@@ -306,6 +308,7 @@ output: kbest or hypergraph output\n\
     data.hypergraph.clear();
     data.lattice.clear();
     data.spans.clear();
+    data.alignment.clear();
     data.targets.clear();
     data.ngram_counts.clear();
     
@@ -339,6 +342,14 @@ output: kbest or hypergraph output\n\
       
       if (! data.spans.assign(iter, end))
 	throw std::runtime_error("invalid span format");
+    }
+    
+    if (input_alignment) {
+      if (! parse_separator(iter, end))
+	throw std::runtime_error("invalid alignment format (separator)");
+      
+      if (! data.alignment.assign(iter, end))
+	throw std::runtime_error("invalid alignment format");
     }
     
     if (input_bitext) {
