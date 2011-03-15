@@ -84,6 +84,9 @@ expected-ngram: expected ngram computation\n\
 generate-earley: re-generation from tree\n\
 \tdepth: depth of rule pattern \n\
 \twidth: width of rule pattern \n\
+intersect: compute intersection\n\
+\tlattice=[true|false] intersect with lattice\n\
+\ttarget=[true|false] intersect with one of target\n\
 normalize: feature value normalizer\n\
 \tprefix=feature name prefix\n\
 output: kbest or hypergraph output\n\
@@ -127,9 +130,6 @@ prune: pruning\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
-intersect: compute intersection\n\
-\tlattice=[true|false] intersect with lattice\n\
-\ttarget=[true|false] intersect with one of target\n\
 remove-epsilon: remove epsilon for lattice\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 span-forest: annotate terminal span\n\
