@@ -33,38 +33,6 @@ namespace cicada
   template <typename Iterator>
   struct attribute_vector_parser : boost::spirit::qi::grammar<Iterator, attribute_set_parsed_type(), boost::spirit::standard::space_type>
   {
-    class escaped_utf8
-    {
-    public:
-      escaped_utf8() : value(0) {}
-      escaped_utf8(const uint16_t __value) : value(__value) {}
-      
-      operator uint16_t&() { return value; }
-      operator const uint16_t&() const { return value; }
-      operator const char*() const
-      {
-	// construct utf8 string...
-	// given the json specification, we can uncover at most 2 bytes
-	if (value <= 0x007f) {
-	  buffer[0] = value;
-	  buffer[1] = 0;
-	} else if (value <= 0x07ff) {
-	  buffer[0] = 0xc0 | ((value >> 6) & 0x1f);
-	  buffer[1] = 0x80 | (value & 0x3f);
-	  buffer[2] = 0;
-	} else {
-	  buffer[0] = 0xe0 | ((value >> 12) & 0x0f);
-	  buffer[1] = 0x80 | ((value >> 6) & 0x3f);
-	  buffer[2] = 0x80 | (value & 0x3f);
-	  buffer[3] = 0;
-	}
-	
-	return buffer;
-      }
-      
-      char buffer[4];
-      uint16_t value;
-    };
 
     attribute_vector_parser() : attribute_vector_parser::base_type(attributes)
     {
@@ -81,9 +49,6 @@ namespace cicada
 	("\\r",  '\r')
 	("\\t",  '\t')
 	("\\u0020", ' ');
-
-      escaped_utf8_rule %= "\\u" >> uint16_;
-      escaped_utf8_converted %= escaped_utf8_rule;
       
       key %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"' - standard::space))] >> '\"');
       data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
@@ -97,10 +62,6 @@ namespace cicada
     
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
-
-    boost::spirit::qi::uint_parser<uint16_t, 16, 4, 4> uint16_;
-    boost::spirit::qi::rule<Iterator, escaped_utf8(), space_type>  escaped_utf8_rule;
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>   escaped_utf8_converted;
     
     boost::spirit::qi::symbols<char, char> escape_char;
     
