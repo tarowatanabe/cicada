@@ -134,17 +134,13 @@ namespace cicada
 	
 	if (graphviz_mode)
 	  os << cicada::graphviz(os, graph_kbest) << '\n';
-	else if (treebank_mode) {
-	  cicada::treebank(os, graph_kbest);
+	else {
+	  if (treebank_mode)
+	    cicada::treebank(os, graph_kbest);
+	  else
+	    os << graph_kbest;
 	  os << " |||";
-	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
-	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
-	    os << ' ' << fiter->first << '=' << fiter->second;
-	  os << " ||| ";
-	  os << weight;
-	  os << '\n';
-	} else {
-	  os << graph_kbest << " |||";
+	  
 	  typename hypergraph_type::feature_set_type::const_iterator fiter_end = boost::get<1>(derivation).end();
 	  for (typename hypergraph_type::feature_set_type::const_iterator fiter = boost::get<1>(derivation).begin(); fiter != fiter_end; ++ fiter)
 	    os << ' ' << fiter->first << '=' << fiter->second;
