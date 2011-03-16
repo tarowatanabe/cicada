@@ -104,6 +104,7 @@ symbol_sequence.hpp \
 symbol_tree.hpp \
 tempfile.hpp \
 thread_specific_ptr.hpp \
+utf8_string_parser.hpp \
 vector2.hpp \
 vector3.hpp \
 vector2_aligned.hpp \
@@ -140,6 +141,7 @@ sample_static_allocator \
 sample_subprocess \
 sample_succinct_vector \
 sample_tempfile \
+sample_utf8_string_parser \
 sample_vector2 \
 sample_vertical_coded_vector
 
@@ -266,6 +268,8 @@ sample_succinct_vector_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_IOSTREAMS_LIBS) 
 sample_tempfile_SOURCES = sample_tempfile.cpp
 sample_tempfile_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 sample_tempfile_LDADD = $(BOOST_FILESYSTEM_LIBS) $(BOOST_THREAD_LIBS) $(BOOST_SYSTEM_LIBS) $(LIBUTILS)
+
+sample_utf8_string_parser_SOURCES = sample_utf8_string_parser.cpp
 
 sample_vector2_SOURCES = sample_vector2.cpp
 

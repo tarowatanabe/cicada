@@ -33,7 +33,7 @@ namespace cicada
   template <typename Iterator>
   struct attribute_vector_parser : boost::spirit::qi::grammar<Iterator, attribute_set_parsed_type(), boost::spirit::standard::space_type>
   {
-
+    
     attribute_vector_parser() : attribute_vector_parser::base_type(attributes)
     {
       namespace qi = boost::spirit::qi;
