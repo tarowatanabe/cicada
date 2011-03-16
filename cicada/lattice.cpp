@@ -22,6 +22,7 @@
 
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/utf8_string_parser.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Lattice::arc_type,
@@ -122,7 +123,7 @@ namespace cicada
 	("\\t", '\t')
 	("\\v", '\v');
       
-      jlf_label_double_quote %= '"' >> qi::lexeme[*(jlf_escape_char | ~standard::char_('"'))] >> '"';
+      //jlf_label_double_quote %= '"' >> qi::lexeme[*(jlf_escape_char | ~standard::char_('"'))] >> '"';
       plf_label_double_quote %= '"' >> qi::lexeme[*(plf_escape_char | ~standard::char_('"'))] >> '"';
       plf_label_single_quote %= '\'' >> qi::lexeme[*(plf_escape_char | ~standard::char_('\''))] >> '\'';
       
@@ -142,7 +143,8 @@ namespace cicada
 
     boost::spirit::qi::symbols<char, char> jlf_escape_char;
     
-    boost::spirit::qi::rule<Iterator, std::string(), space_type> jlf_label_double_quote;
+    //boost::spirit::qi::rule<Iterator, std::string(), space_type> jlf_label_double_quote;
+    utils::utf8_string_parser<Iterator> jlf_label_double_quote;
     
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> jlf_lattice_score;
     boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               jlf_lattice_arc;
