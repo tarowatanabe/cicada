@@ -74,12 +74,12 @@ namespace cicada
       escape_char.add
 	("\\\"", '\"')
 	("\\\\", '\\')
-	("\\/", '/')
-	("\\b", '\b')
-	("\\f", '\f')
-	("\\n", '\n')
-	("\\r", '\r')
-	("\\t", '\t')
+	("\\/",  '/')
+	("\\b",  '\b')
+	("\\f",  '\f')
+	("\\n",  '\n')
+	("\\r",  '\r')
+	("\\t",  '\t')
 	("\\u0020", ' ');
 
       escaped_utf8_rule %= "\\u" >> uint16_;
@@ -103,6 +103,7 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, std::string(), space_type>   escaped_utf8_converted;
     
     boost::spirit::qi::symbols<char, char> escape_char;
+    
     boost::spirit::qi::rule<Iterator, std::string(), space_type>                key;
     boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
