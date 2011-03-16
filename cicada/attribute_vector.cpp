@@ -18,6 +18,7 @@
 #include "attribute_vector.hpp"
 
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/utf8_string_parser.hpp"
 
 namespace cicada
 {
@@ -39,20 +40,7 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	("\\\"", '\"')
-	("\\\\", '\\')
-	("\\/",  '/')
-	("\\b",  '\b')
-	("\\f",  '\f')
-	("\\n",  '\n')
-	("\\r",  '\r')
-	("\\t",  '\t')
-	("\\u0020", ' ');
-      
-      key %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"' - standard::space))] >> '\"');
-      data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
-      data %= data_value | double_dot | int64_;
+      data %= data_string | double_dot | int64_;
       
       attribute %= key >> ':' >> data;
       attributes %= '{' >> -(attribute % ',') >> '}';
@@ -62,11 +50,10 @@ namespace cicada
     
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
+
+    utils::utf8_string_parser<Iterator> key;
+    utils::utf8_string_parser<Iterator> data_string;
     
-    boost::spirit::qi::symbols<char, char> escape_char;
-    
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>                key;
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
     boost::spirit::qi::rule<Iterator, attribute_set_parsed_type(), space_type>  attributes;
