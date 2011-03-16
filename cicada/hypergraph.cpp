@@ -22,6 +22,7 @@
 #include "utils/config.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/utf8_string_parser.hpp"
 
 #include <google/dense_hash_map>
 
@@ -79,30 +80,16 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	("\\\"", '\"')
-	("\\\\", '\\')
-	("\\/", '/')
-	("\\b", '\b')
-	("\\f", '\f')
-	("\\n", '\n')
-	("\\r", '\r')
-	("\\t", '\t')
-	("\\u0020", ' ');
-      
-      rule_string %= ('\"' >> qi::lexeme[*(escape_char | ~standard::char_('\"'))] >> '\"') ;
       rule_string_action = rule_string [add_rule(rules)];
       rule_string_set = '[' >> -(rule_string_action % ',')  >> ']';
       
       tail_node_set %= '[' >> -(qi::uint_ % ',') >> ']';
       
-      feature       %= '\"' >> qi::lexeme[*(escape_char | ~standard::char_('\"'))] >> "\":" >> qi::double_;
+      feature       %= feature_name >> qi::lit(':') >> qi::double_;
       feature_set   %= '{' >> -(feature % ',' )  >> '}';
       
       // attributes...
-      key %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"' - standard::space))] >> '\"');
-      data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
-      data %= data_value | double_dot | int64_;
+      data %= data_string | double_dot | int64_;
       attribute %= key >> ':' >> data;
       attribute_set %= '{' >> -(attribute % ',') >> '}';
       
@@ -210,22 +197,23 @@ namespace cicada
 
     typedef boost::spirit::standard::space_type space_type;
     
-    boost::spirit::qi::symbols<char, char> escape_char;
+    utils::utf8_string_parser<Iterator> rule_string;
     
-    boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string;
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string_action;
     boost::spirit::qi::rule<Iterator, rule_parsed_set_type(), space_type> rule_string_set;
     
     boost::spirit::qi::rule<Iterator, tail_node_set_type(), space_type>      tail_node_set;
     
+    utils::utf8_string_parser<Iterator> feature_name;
     boost::spirit::qi::rule<Iterator, feature_parsed_type(), space_type>     feature;
     boost::spirit::qi::rule<Iterator, feature_parsed_set_type(), space_type> feature_set;
     
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>                key;
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
+    utils::utf8_string_parser<Iterator> key;
+    utils::utf8_string_parser<Iterator> data_string;
+    
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
     boost::spirit::qi::rule<Iterator, attribute_parsed_set_type(), space_type>  attribute_set;

@@ -101,6 +101,7 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
     
+#if 0
       jlf_escape_char.add
 	("\\\"", '\"')
 	("\\\\", '\\')
@@ -110,6 +111,7 @@ namespace cicada
 	("\\n", '\n')
 	("\\r", '\r')
 	("\\t", '\t');
+#endif
 
       plf_escape_char.add
 	("\\\"", '\"')
@@ -141,7 +143,7 @@ namespace cicada
     
     typedef boost::spirit::standard::space_type space_type;
 
-    boost::spirit::qi::symbols<char, char> jlf_escape_char;
+    //boost::spirit::qi::symbols<char, char> jlf_escape_char;
     
     //boost::spirit::qi::rule<Iterator, std::string(), space_type> jlf_label_double_quote;
     utils::utf8_string_parser<Iterator> jlf_label_double_quote;

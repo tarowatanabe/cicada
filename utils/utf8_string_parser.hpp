@@ -82,7 +82,7 @@ namespace utils
 	case 'r':  result += '\r'; break;
 	case '\"': result += '\"'; break;
 	case '\\': result += '\\'; break;
-	case '/': result += '/'; break;
+	case '/':  result += '/'; break;
 	}
       }
     };
