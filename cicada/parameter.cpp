@@ -18,6 +18,9 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 
+#include "utils/c_string_parser.hpp"
+#include "utils/c_string_generator.hpp"
+
 namespace cicada
 {
   
@@ -34,19 +37,6 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	("\\\"", '\"')
-	("\\\\", '\\')
-	("\\a", '\a')
-	("\\b", '\b')
-	("\\f", '\f')
-	("\\n", '\n')
-	("\\r", '\r')
-	("\\t", '\t')
-	("\\v", '\v');
-      
-      escaped %= '"' >> qi::lexeme[*(escape_char | ~standard::char_('"'))] >> '"';
-      
       param %= qi::lexeme[+(standard::char_ - standard::space - ':')];
       key   %= qi::lexeme[+(standard::char_ - standard::space - '=')];
       value %= qi::lexeme[+(standard::char_ - standard::space - ',')];
@@ -56,9 +46,7 @@ namespace cicada
     
     typedef boost::spirit::standard::space_type space_type;
     
-    boost::spirit::qi::symbols<char, char> escape_char;
-    
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>           escaped;
+    utils::c_string_parser<Iterator> escaped;
     
     boost::spirit::qi::rule<Iterator, std::string(), space_type>           param;
     boost::spirit::qi::rule<Iterator, std::string(), space_type>           key;
@@ -95,22 +83,9 @@ namespace cicada
   {
     typedef std::ostream_iterator<char> iterator_type;
 
-    boost::spirit::karma::symbols<char, const char*> escape_char;
-    boost::spirit::karma::rule<iterator_type, std::string()> escaped;
+    utils::c_string_generator<iterator_type> escaped;
     boost::spirit::karma::rule<iterator_type, value_parsed_type()> value;
     
-    escape_char.add
-      ('\"', "\\\"")
-      ('\\', "\\\\")
-      ('\a', "\\a")
-      ('\b', "\\b")
-      ('\f', "\\f")
-      ('\n', "\\n")
-      ('\r', "\\r")
-      ('\t', "\\t")
-      ('\v', "\\v");
-    
-    escaped %= '"' << *(escape_char | boost::spirit::standard::char_) << '"';
     value %= escaped << '=' << escaped;
     
     iterator_type iter(os);
