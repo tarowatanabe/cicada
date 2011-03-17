@@ -2,8 +2,8 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __UTILS__JSON_STRING_PARSER__HPP__
-#define __UTILS__JSON_STRING_PARSER__HPP__ 1
+#ifndef __UTILS__PYTHON_STRING_PARSER__HPP__
+#define __UTILS__PYTHON_STRING_PARSER__HPP__ 1
 
 #include <string>
 
@@ -16,9 +16,22 @@
 namespace utils
 {
   template <typename Iterator>
-  struct json_string_parser : boost::spirit::qi::grammar<Iterator, std::string()>
+  struct python_string_parser : boost::spirit::qi::grammar<Iterator, std::string()>
   {
     typedef uint32_t uchar_type;
+
+    struct push_raw_func
+    {
+      template<class, class>
+      struct result {
+	typedef void type;
+      };
+      
+      void operator()(std::string& result, const uchar_type c) const
+      {
+	result += c;
+      }
+    };
     
     struct push_utf8_func
     {
@@ -75,33 +88,41 @@ namespace utils
       void operator()(std::string& result, const uchar_type c) const
       {
 	switch (c) {
-	case 'b':  result += '\b'; break;
-	case 't':  result += '\t'; break;
-	case 'n':  result += '\n'; break;
-	case 'f':  result += '\f'; break;
-	case 'r':  result += '\r'; break;
-	case '\"': result += '\"'; break;
 	case '\\': result += '\\'; break;
-	case '/':  result += '/'; break;
+	case '\'':  result += '\''; break;
+	case '\"': result += '\"'; break;
+	case 'a':  result += '\b'; break;
+	case 'b':  result += '\a'; break;
+	case 'f':  result += '\f'; break;
+	case 'n':  result += '\n'; break;
+	case 'r':  result += '\r'; break;
+	case 't':  result += '\t'; break;
+	case 'v':  result += '\v'; break;
 	}
       }
     };
     
-    json_string_parser() : json_string_parser::base_type(string)
+    python_string_parser() : python_string_parser::base_type(string)
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
       escaped = '\\' >> (('u' >> hex4)   [push_utf8(qi::_r1, qi::_1)]
 			 | ('U' >> hex8) [push_utf8(qi::_r1, qi::_1)]
-			 | standard::char_("btnfr\\\"/") [push_escaped(qi::_r1, qi::_1)]);
+			 | ('x' >> hex2 [push_raw(qi::_r1, qi::_1)])
+			 | standard::char_("abfnrtv\\\"'") [push_escaped(qi::_r1, qi::_1)]
+			 | oct [push_raw(qi::_r1, qi::_1)]);
       
-      string = '\"' >> *(escaped(qi::_val) | (~standard::char_('\"'))[qi::_val += qi::_1]) >> '\"';
+      string = (('\"' >> *(escaped(qi::_val) | (~standard::char_('\"'))[qi::_val += qi::_1]) >> '\"')
+		| ('\'' >> *(escaped(qi::_val) | (~standard::char_('\"'))[qi::_val += qi::_1]) >> '\''));
     }
-
-    boost::phoenix::function<push_utf8_func> const push_utf8;
+    
+    boost::phoenix::function<push_raw_func> const     push_raw;
+    boost::phoenix::function<push_utf8_func> const    push_utf8;
     boost::phoenix::function<push_escaped_func> const push_escaped;
     
+    boost::spirit::qi::uint_parser<uchar_type, 8, 3, 3> oct;
+    boost::spirit::qi::uint_parser<uchar_type, 16, 2, 2> hex2;
     boost::spirit::qi::uint_parser<uchar_type, 16, 4, 4> hex4;
     boost::spirit::qi::uint_parser<uchar_type, 16, 8, 8> hex8;
     
