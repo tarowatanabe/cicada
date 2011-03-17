@@ -46,6 +46,8 @@ byte_aligned_code.hpp \
 byte_aligned_vector.hpp \
 byte_aligned_delta_vector.hpp \
 byte_aligned_pair_delta_vector.hpp \
+c_string_generator.hpp \
+c_string_parser.hpp \
 chart.hpp \
 chunk_vector.hpp \
 compact_trie.hpp \

@@ -109,7 +109,7 @@ namespace utils
       
       escaped = '\\' >> (('u' >> hex4)   [push_utf8(qi::_r1, qi::_1)]
 			 | ('U' >> hex8) [push_utf8(qi::_r1, qi::_1)]
-			 | ('x' >> hex2 [push_raw(qi::_r1, qi::_1)])
+			 | ('x' >> hex2) [push_raw(qi::_r1, qi::_1)]
 			 | standard::char_("abfnrtv\\\"'") [push_escaped(qi::_r1, qi::_1)]
 			 | oct [push_raw(qi::_r1, qi::_1)]);
       
