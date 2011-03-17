@@ -28,6 +28,7 @@
 #include "utils/packed_vector.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/utf8_string_parser.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -137,23 +138,10 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	("\\\"", '\"')
-	("\\\\", '\\')
-	("\\/", '/')
-	("\\b", '\b')
-	("\\f", '\f')
-	("\\n", '\n')
-	("\\r", '\r')
-	("\\t", '\t')
-	("\\u0020", ' ');
-
-      
       score  %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> qi::double_;
       scores %= *score;
       
-      data_value %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
-      data %= data_value | double_dot | int64_;
+      data %= data_string | double_dot | int64_;
       
       attribute %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> data;
       attributes %= *attribute;
@@ -166,12 +154,10 @@ namespace cicada
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
-    boost::spirit::qi::symbols<char, char> escape_char;
-    
     boost::spirit::qi::rule<Iterator, score_parsed_type(), space_type>  score;
     boost::spirit::qi::rule<Iterator, scores_parsed_type(), space_type> scores;
 
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>                data_value;
+    utils::utf8_string_parser<Iterator> data_string;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attr_parsed_type(), space_type>           attribute;
     boost::spirit::qi::rule<Iterator, attrs_parsed_type(), space_type>          attributes;
