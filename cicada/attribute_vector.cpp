@@ -214,29 +214,15 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	("\\\"", '\"')
-	("\\\\", '\\')
-	("\\/", '/')
-	("\\b", '\b')
-	("\\f", '\f')
-	("\\n", '\n')
-	("\\r", '\r')
-	("\\t", '\t')
-	("\\u0020", ' ');
-      
-      str %= ('\"' >> qi::lexeme[*(escape_char | (standard::char_ - '\"'))] >> '\"');
-      data %= str | double_dot | int64_;
+      data %= string | double_dot | int64_;
     }
     
     typedef boost::spirit::standard::space_type space_type;
-    
+
+    utils::utf8_string_parser<Iterator> string;
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
-    boost::spirit::qi::symbols<char, char> escape_char;
-    
-    boost::spirit::qi::rule<Iterator, std::string(), space_type>                str;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
   };
 
@@ -248,22 +234,10 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	('\\', "\\\\")
-	('\"', "\\\"")
-	('/', "\\/")
-	('\b', "\\b")
-	('\f', "\\f")
-	('\n', "\\n")
-	('\r', "\\r")
-	('\t', "\\t")
-	(' ', "\\u0020");
-      
-      str %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"');
-      data %= int64_ | double10 | str;
+      data %= int64_ | double10 | string;
     }
     
-        struct real_precision : boost::spirit::karma::real_policies<double>
+    struct real_precision : boost::spirit::karma::real_policies<double>
     {
       static unsigned int precision(double) 
       { 
@@ -273,9 +247,8 @@ namespace cicada
     
     boost::spirit::karma::real_generator<double, real_precision> double10;
     boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
+    utils::utf8_string_generator<Iterator, true> string;
     
-    boost::spirit::karma::symbols<char, const char*> escape_char;
-    boost::spirit::karma::rule<Iterator, std::string()> str;
     boost::spirit::karma::rule<Iterator, AttributeVector::data_type()> data;
   };
 
