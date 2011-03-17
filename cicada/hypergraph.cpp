@@ -320,23 +320,21 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	('\\', "\\\\")
-	('\"', "\\\"")
-	('/', "\\/")
-	('\b', "\\b")
-	('\f', "\\f")
-	('\n', "\\n")
-	('\r', "\\r")
-	('\t', "\\t");
+      lhs %= *(&standard::char_('\b') << "\\b"
+	       | &standard::char_('\t') << "\\t"
+	       | &standard::char_('\n') << "\\n"
+	       | &standard::char_('\f') << "\\f"
+	       | &standard::char_('\r') << "\\r"
+	       | &standard::char_('\"') << "\\\""
+	       | &standard::char_('\\') << "\\\\"
+	       | &standard::char_('/') << "\\/"
+	       | standard::char_);
       
-      lhs %= *(escape_char | ~standard::char_('\"'));
       phrase %= -(lhs % ' ');
       
       rule %= lhs << " ||| " << phrase;
     }
     
-    boost::spirit::karma::symbols<char, const char*> escape_char;
     
     boost::spirit::karma::rule<Iterator, symbol_type()>      lhs;
     boost::spirit::karma::rule<Iterator, symbol_set_type()>  phrase;
@@ -353,19 +351,6 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-#if 0
-      escape_char.add
-	('\\', "\\\\")
-	('\"', "\\\"")
-	('/', "\\/")
-	('\b', "\\b")
-	('\f', "\\f")
-	('\n', "\\n")
-	('\r', "\\r")
-	('\t', "\\t");
-      
-      features %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"' << ':' << double10) % ",";
-#endif
       features %= (name << ':' << double10) % ',';
     }
 
@@ -380,7 +365,6 @@ namespace cicada
     boost::spirit::karma::real_generator<double, real_precision> double10;
     utils::utf8_string_generator<Iterator>                       name;
     
-    //boost::spirit::karma::symbols<char, const char*> escape_char;
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };
 
