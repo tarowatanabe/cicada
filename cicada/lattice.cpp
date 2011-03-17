@@ -22,6 +22,7 @@
 
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
+#include "utils/python_string_parser.hpp"
 #include "utils/json_string_parser.hpp"
 #include "utils/json_string_generator.hpp"
 
@@ -102,6 +103,7 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
 
+#if 0
       plf_escape_char.add
 	("\\\"", '\"')
 	("\\\'", '\'')
@@ -116,12 +118,13 @@ namespace cicada
       
       plf_label_double_quote %= '"' >> qi::lexeme[*(plf_escape_char | ~standard::char_('"'))] >> '"';
       plf_label_single_quote %= '\'' >> qi::lexeme[*(plf_escape_char | ~standard::char_('\''))] >> '\'';
+#endif
       
-      jlf_lattice_score %= jlf_label_double_quote >> ':' >> qi::double_;
+      jlf_lattice_score %= jlf_label >> ':' >> qi::double_;
       plf_lattice_score %= qi::attr("lattice-cost") >> qi::double_;
       
-      jlf_lattice_arc %= '[' >> jlf_label_double_quote >> ',' >> '{' >> -(jlf_lattice_score % ',') >> '}' >> ',' >> qi::int_ >> ']';
-      plf_lattice_arc %= '(' >> (plf_label_double_quote | plf_label_single_quote) >> ',' >> qi::repeat(1)[plf_lattice_score] >> ',' >> qi::int_ >> ')';
+      jlf_lattice_arc %= '[' >> jlf_label >> ',' >> '{' >> -(jlf_lattice_score % ',') >> '}' >> ',' >> qi::int_ >> ']';
+      plf_lattice_arc %= '(' >> plf_label >> ',' >> qi::repeat(1)[plf_lattice_score] >> ',' >> qi::int_ >> ')';
       
       jlf_lattice_set %= '[' >> -(jlf_lattice_arc % ',') >> ']';
       plf_lattice_set %= '(' >> +(plf_lattice_arc >> ',') >> ')';
@@ -131,16 +134,17 @@ namespace cicada
     
     typedef boost::spirit::standard::space_type space_type;
     
-    utils::json_string_parser<Iterator> jlf_label_double_quote;
+    utils::json_string_parser<Iterator>   jlf_label;
+    utils::python_string_parser<Iterator> plf_label;
     
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> jlf_lattice_score;
     boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               jlf_lattice_arc;
     boost::spirit::qi::rule<Iterator, Lattice::arc_set_type(), space_type>           jlf_lattice_set;
     
-    boost::spirit::qi::symbols<char, char> plf_escape_char;
+    //boost::spirit::qi::symbols<char, char> plf_escape_char;
     
-    boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_double_quote;
-    boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_single_quote;
+    //boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_double_quote;
+    //boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_single_quote;
     
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> plf_lattice_score;
     boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               plf_lattice_arc;

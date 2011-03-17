@@ -89,7 +89,7 @@ namespace utils
       {
 	switch (c) {
 	case '\\': result += '\\'; break;
-	case '\'':  result += '\''; break;
+	case '\'': result += '\''; break;
 	case '\"': result += '\"'; break;
 	case 'a':  result += '\b'; break;
 	case 'b':  result += '\a'; break;
