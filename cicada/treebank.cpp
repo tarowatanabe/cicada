@@ -36,20 +36,17 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	('(', "-LRB-")
-	(')', "-RRB-")
-	('[', "-LSB-")
-	(']', "-RSB-")
-	('{', "-LCB-")
-	('}', "-RCB-")
-	('/', "\\/")
-	('*', "\\*");
-      
-      label %= +(escape_char | standard::char_);
+      label %= +(&standard::char_('(') << "-LRB-"
+		 | &standard::char_(')') << "-RRB-"
+		 | &standard::char_('[') << "-LSB-"
+		 | &standard::char_(']') << "-RSB-"
+		 | &standard::char_('{') << "-LCB-"
+		 | &standard::char_('}') << "-RCB-"
+		 | &standard::char_('/') << "\\/"
+		 | &standard::char_('*') << "\\*"
+		 | standard::char_);
     };
     
-    boost::spirit::karma::symbols<char, const char*>        escape_char;
     boost::spirit::karma::rule<Iterator, std::string()>     label;
   };
 

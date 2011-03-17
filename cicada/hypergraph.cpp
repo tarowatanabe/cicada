@@ -22,8 +22,8 @@
 #include "utils/config.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/thread_specific_ptr.hpp"
-#include "utils/utf8_string_parser.hpp"
-#include "utils/utf8_string_generator.hpp"
+#include "utils/json_string_parser.hpp"
+#include "utils/json_string_generator.hpp"
 
 #include <google/dense_hash_map>
 
@@ -198,22 +198,22 @@ namespace cicada
 
     typedef boost::spirit::standard::space_type space_type;
     
-    utils::utf8_string_parser<Iterator> rule_string;
+    utils::json_string_parser<Iterator> rule_string;
     
     boost::spirit::qi::rule<Iterator, rule_parsed_type(), space_type>     rule_string_action;
     boost::spirit::qi::rule<Iterator, rule_parsed_set_type(), space_type> rule_string_set;
     
     boost::spirit::qi::rule<Iterator, tail_node_set_type(), space_type>      tail_node_set;
     
-    utils::utf8_string_parser<Iterator> feature_name;
+    utils::json_string_parser<Iterator> feature_name;
     boost::spirit::qi::rule<Iterator, feature_parsed_type(), space_type>     feature;
     boost::spirit::qi::rule<Iterator, feature_parsed_set_type(), space_type> feature_set;
     
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
-    utils::utf8_string_parser<Iterator> key;
-    utils::utf8_string_parser<Iterator> data_string;
+    utils::json_string_parser<Iterator> key;
+    utils::json_string_parser<Iterator> data_string;
     
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
@@ -363,7 +363,7 @@ namespace cicada
     };
 
     boost::spirit::karma::real_generator<double, real_precision> double10;
-    utils::utf8_string_generator<Iterator>                       name;
+    utils::json_string_generator<Iterator>                       name;
     
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };

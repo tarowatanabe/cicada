@@ -18,8 +18,8 @@
 #include "attribute_vector.hpp"
 
 #include "utils/thread_specific_ptr.hpp"
-#include "utils/utf8_string_parser.hpp"
-#include "utils/utf8_string_generator.hpp"
+#include "utils/json_string_parser.hpp"
+#include "utils/json_string_generator.hpp"
 
 namespace cicada
 {
@@ -52,8 +52,8 @@ namespace cicada
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
 
-    utils::utf8_string_parser<Iterator> key;
-    utils::utf8_string_parser<Iterator> data_string;
+    utils::json_string_parser<Iterator> key;
+    utils::json_string_parser<Iterator> data_string;
     
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attribute_parsed_type(), space_type>      attribute;
@@ -84,7 +84,7 @@ namespace cicada
     
     boost::spirit::karma::real_generator<double, real_precision> double10;
     boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
-    utils::utf8_string_generator<Iterator, true> string;
+    utils::json_string_generator<Iterator, true> string;
 
     boost::spirit::karma::rule<Iterator, AttributeVector::data_type()> data;
     boost::spirit::karma::rule<Iterator, AttributeVector::value_type()> attribute;
@@ -219,7 +219,7 @@ namespace cicada
     
     typedef boost::spirit::standard::space_type space_type;
 
-    utils::utf8_string_parser<Iterator> string;
+    utils::json_string_parser<Iterator> string;
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
@@ -247,7 +247,7 @@ namespace cicada
     
     boost::spirit::karma::real_generator<double, real_precision> double10;
     boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
-    utils::utf8_string_generator<Iterator, true> string;
+    utils::json_string_generator<Iterator, true> string;
     
     boost::spirit::karma::rule<Iterator, AttributeVector::data_type()> data;
   };

@@ -22,8 +22,8 @@
 
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
-#include "utils/utf8_string_parser.hpp"
-#include "utils/utf8_string_generator.hpp"
+#include "utils/json_string_parser.hpp"
+#include "utils/json_string_generator.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Lattice::arc_type,
@@ -131,7 +131,7 @@ namespace cicada
     
     typedef boost::spirit::standard::space_type space_type;
     
-    utils::utf8_string_parser<Iterator> jlf_label_double_quote;
+    utils::json_string_parser<Iterator> jlf_label_double_quote;
     
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> jlf_lattice_score;
     boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               jlf_lattice_arc;
@@ -251,7 +251,7 @@ namespace cicada
       lattice_grammar %= '[' << -(lattice_set % ", ") << ']';
     }
     
-    utils::utf8_string_generator<Iterator> label_double_quote;
+    utils::json_string_generator<Iterator> label_double_quote;
 
     boost::spirit::karma::rule<Iterator, std::pair<std::string, double >()> lattice_score;
     boost::spirit::karma::rule<Iterator, Lattice::arc_type()> lattice_arc;

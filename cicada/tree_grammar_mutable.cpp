@@ -28,7 +28,7 @@
 #include "utils/packed_vector.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/utf8_string_parser.hpp"
+#include "utils/json_string_parser.hpp"
 
 #include <boost/lexical_cast.hpp>
 
@@ -157,7 +157,7 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, score_parsed_type(), space_type>  score;
     boost::spirit::qi::rule<Iterator, scores_parsed_type(), space_type> scores;
 
-    utils::utf8_string_parser<Iterator> data_string;
+    utils::json_string_parser<Iterator> data_string;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
     boost::spirit::qi::rule<Iterator, attr_parsed_type(), space_type>           attribute;
     boost::spirit::qi::rule<Iterator, attrs_parsed_type(), space_type>          attributes;
