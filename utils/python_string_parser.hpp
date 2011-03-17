@@ -91,8 +91,8 @@ namespace utils
 	case '\\': result += '\\'; break;
 	case '\'': result += '\''; break;
 	case '\"': result += '\"'; break;
-	case 'a':  result += '\b'; break;
-	case 'b':  result += '\a'; break;
+	case 'a':  result += '\a'; break;
+	case 'b':  result += '\b'; break;
 	case 'f':  result += '\f'; break;
 	case 'n':  result += '\n'; break;
 	case 'r':  result += '\r'; break;
@@ -114,7 +114,7 @@ namespace utils
 			 | oct [push_raw(qi::_r1, qi::_1)]);
       
       string = (('\"' >> *(escaped(qi::_val) | (~standard::char_('\"'))[qi::_val += qi::_1]) >> '\"')
-		| ('\'' >> *(escaped(qi::_val) | (~standard::char_('\"'))[qi::_val += qi::_1]) >> '\''));
+		| ('\'' >> *(escaped(qi::_val) | (~standard::char_('\''))[qi::_val += qi::_1]) >> '\''));
     }
     
     boost::phoenix::function<push_raw_func> const     push_raw;
