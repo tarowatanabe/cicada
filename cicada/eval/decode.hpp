@@ -17,6 +17,7 @@
 #include <boost/fusion/adapted.hpp>
 
 #include <utils/base64.hpp>
+#include <utils/json_string_parser.hpp>
 
 namespace cicada
 {
@@ -31,28 +32,20 @@ namespace cicada
 	operator double() const { return utils::decode_base64<double>(static_cast<const std::string&>(*this)); }
       };
       
+      
       double_base64_parser() : double_base64_parser::base_type(decoded)
       {
 	namespace qi = boost::spirit::qi;
 	namespace standard = boost::spirit::standard;
 	
-	escape_char.add
-	  ("\\\"", '\"')
-	  ("\\\\", '\\')
-	  ("\\/", '/')
-	  ("\\b", '\b')
-	  ("\\f", '\f')
-	  ("\\n", '\n')
-	  ("\\r", '\r')
-	  ("\\t", '\t');
-	
-	encoded %= '\"' >> qi::lexeme[+(escape_char | ~standard::char_('\"'))] >> '\"';
+	encoded %= string;
 	decoded %= encoded;
       }
       
       typedef boost::spirit::standard::space_type space_type;
+      
+      utils::json_string_parser<Iterator> string;
 
-      boost::spirit::qi::symbols<char, char> escape_char;
       boost::spirit::qi::rule<Iterator, double_base64_type(), space_type> encoded;
       boost::spirit::qi::rule<Iterator, double(), space_type> decoded;
     };
