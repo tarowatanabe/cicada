@@ -103,23 +103,6 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
 
-#if 0
-      plf_escape_char.add
-	("\\\"", '\"')
-	("\\\'", '\'')
-	("\\\\", '\\')
-	("\\a", '\a')
-	("\\b", '\b')
-	("\\f", '\f')
-	("\\n", '\n')
-	("\\r", '\r')
-	("\\t", '\t')
-	("\\v", '\v');
-      
-      plf_label_double_quote %= '"' >> qi::lexeme[*(plf_escape_char | ~standard::char_('"'))] >> '"';
-      plf_label_single_quote %= '\'' >> qi::lexeme[*(plf_escape_char | ~standard::char_('\''))] >> '\'';
-#endif
-      
       jlf_lattice_score %= jlf_label >> ':' >> qi::double_;
       plf_lattice_score %= qi::attr("lattice-cost") >> qi::double_;
       
@@ -140,11 +123,6 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> jlf_lattice_score;
     boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               jlf_lattice_arc;
     boost::spirit::qi::rule<Iterator, Lattice::arc_set_type(), space_type>           jlf_lattice_set;
-    
-    //boost::spirit::qi::symbols<char, char> plf_escape_char;
-    
-    //boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_double_quote;
-    //boost::spirit::qi::rule<Iterator, std::string(), space_type> plf_label_single_quote;
     
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> plf_lattice_score;
     boost::spirit::qi::rule<Iterator, Lattice::arc_type(), space_type>               plf_lattice_arc;

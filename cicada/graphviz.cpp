@@ -35,32 +35,29 @@ namespace cicada
   template <typename Iterator>
   struct graphviz_label_generator : boost::spirit::karma::grammar<Iterator, std::string()>
   {
-    graphviz_label_generator() : graphviz_label_generator::base_type(label)
+    graphviz_label_generator() : graphviz_label_generator::base_type(string)
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-      
-      escape_char.add
-	('\\', "\\\\")
-	('\"', "\\\"")
-	('{', "\\{")
-	('}', "\\}")
-	('<', "\\<")
-	('>', "\\>")
-	('|', "\\|")
-	(' ',  "\\ ")
-	('/', "\\/")
-	('\n', "\\n")
-	('\r', "\\r")
-	('\t', "\\t");
-      
-      label %= *(escape_char | ~standard::char_('\"'));
-    }
-    
-    boost::spirit::karma::symbols<char, const char*> escape_char;
-    
-    boost::spirit::karma::rule<Iterator, std::string()> label;
+
+      string = *(&standard::char_('\t') << "\\t"
+		 | &standard::char_('\n') << "\\n"
+		 | &standard::char_('\r') << "\\r"
+		 | &standard::char_('\"') << "\\\""
+		 | &standard::char_('\\') << "\\\\"
+		 | &standard::char_('{') << "\\{"
+		 | &standard::char_('}') << "\\}"
+		 | &standard::char_('<') << "\\<"
+		 | &standard::char_('>') << "\\>"
+		 | &standard::char_('|') << "\\|"
+		 | &standard::char_(' ') << "\\ "
+		 | &standard::char_('/') << "\\/"
+		 | standard::char_);
+    }    
+    boost::spirit::karma::rule<Iterator, std::string()> string;
   };
+  
+
   
   template <typename Iterator>
   struct graphviz_rule_generator : boost::spirit::karma::grammar<Iterator, cicada::Rule()>
@@ -74,29 +71,12 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	('\\', "\\\\")
-	('\"', "\\\"")
-	('{', "\\{")
-	('}', "\\}")
-	('<', "\\<")
-	('>', "\\>")
-	('|', "\\|")
-	(' ',  "\\ ")
-	('/', "\\/")
-	('\n', "\\n")
-	('\r', "\\r")
-	('\t', "\\t");
-      
-      lhs %= *(escape_char | ~standard::char_('\"'));
       phrase %= -(lhs % "\\ ");
       
       rule %= lhs << " | " << phrase;
     }
     
-    boost::spirit::karma::symbols<char, const char*> escape_char;
-    
-    boost::spirit::karma::rule<Iterator, symbol_type()>      lhs;
+    graphviz_label_generator<Iterator> lhs;
     boost::spirit::karma::rule<Iterator, symbol_set_type()>  phrase;
     boost::spirit::karma::rule<Iterator, rule_type()>        rule;
   };
@@ -134,25 +114,11 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
-      escape_char.add
-	('\\', "\\\\")
-	('\"', "\\\"")
-	('{', "\\{")
-	('}', "\\}")
-	('<', "\\<")
-	('>', "\\>")
-	('|', "\\|")
-	(' ',  "\\ ")
-	('/', "\\/")
-	('\n', "\\n")
-	('\r', "\\r")
-	('\t', "\\t");
-      
       // left adjusted newlines
-      features %= -(((+(escape_char | ~standard::char_('\"')) << ":\\ " << karma::double_) % "\\l") << "\\l");
+      features %= -(((string << ":\\ " << karma::double_) % "\\l") << "\\l");
     }
     
-    boost::spirit::karma::symbols<char, const char*> escape_char;
+    graphviz_label_generator<Iterator> string;
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };
   

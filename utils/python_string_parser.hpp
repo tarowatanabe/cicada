@@ -121,7 +121,7 @@ namespace utils
     boost::phoenix::function<push_utf8_func> const    push_utf8;
     boost::phoenix::function<push_escaped_func> const push_escaped;
     
-    boost::spirit::qi::uint_parser<uchar_type, 8, 3, 3> oct;
+    boost::spirit::qi::uint_parser<uchar_type, 8, 3, 3>  oct;
     boost::spirit::qi::uint_parser<uchar_type, 16, 2, 2> hex2;
     boost::spirit::qi::uint_parser<uchar_type, 16, 4, 4> hex4;
     boost::spirit::qi::uint_parser<uchar_type, 16, 8, 8> hex8;
