@@ -353,6 +353,7 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
+#if 0
       escape_char.add
 	('\\', "\\\\")
 	('\"', "\\\"")
@@ -364,6 +365,8 @@ namespace cicada
 	('\t', "\\t");
       
       features %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"' << ':' << double10) % ",";
+#endif
+      features %= (name << ':' << double10) % ',';
     }
 
     struct real_precision : boost::spirit::karma::real_policies<double>
@@ -375,8 +378,9 @@ namespace cicada
     };
 
     boost::spirit::karma::real_generator<double, real_precision> double10;
+    utils::utf8_string_generator<Iterator>                       name;
     
-    boost::spirit::karma::symbols<char, const char*> escape_char;
+    //boost::spirit::karma::symbols<char, const char*> escape_char;
     boost::spirit::karma::rule<Iterator, feature_set_type()> features;
   };
 
