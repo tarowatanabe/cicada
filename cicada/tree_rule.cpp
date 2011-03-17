@@ -103,18 +103,15 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-    
-      escaped_char.add
-	("\\\\", '\\')
-	("\\(", '(')
-	("\\)", ')');
       
-      label %= qi::lexeme[+(escaped_char | (standard::char_ - standard::space - '(' - ')' - '\\')) - "|||"];
+      label %= qi::lexeme[+('\\' >> standard::char_('\\')
+			    | '\\' >> standard::char_('(')
+			    | '\\' >> standard::char_(')')
+			    | (standard::char_ - standard::space - '(' - ')' - '\\')) - "|||"];
       tree_rule %= label >> (qi::hold['(' >> +tree_rule >> ')'] | qi::eps);
       root %= -tree_rule;
     }
     
-    boost::spirit::qi::symbols<char, char>        escaped_char;
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type>   label;
     boost::spirit::qi::rule<Iterator, cicada_treebank_type(), boost::spirit::standard::space_type> tree_rule;
     boost::spirit::qi::rule<Iterator, cicada_treebank_type(), boost::spirit::standard::space_type> root;
@@ -127,18 +124,15 @@ namespace cicada
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
-    
-      escaped_char.add
-	('\\', "\\\\")
-	('(',  "\\(")
-	(')',  "\\)");
       
-      label %= *(escaped_char | standard::char_);
+      label %= *(&standard::char_('\\') << "\\\\"
+		 | &standard::char_('(') << "\\("
+		 | &standard::char_(')') << "\\)"
+		 | standard::char_);
       antecedents %= tree_rule % ' ';
       tree_rule %= label << (karma::buffer['(' << antecedents << ')'] | karma::eps);
     }
     
-    boost::spirit::karma::symbols<char, const char*>                       escaped_char;
     boost::spirit::karma::rule<Iterator, TreeRule::label_type()>           label;
     boost::spirit::karma::rule<Iterator, TreeRule::antecedent_set_type()>  antecedents;
     boost::spirit::karma::rule<Iterator, TreeRule()>                       tree_rule;
