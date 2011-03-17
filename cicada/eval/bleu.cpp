@@ -57,14 +57,14 @@ namespace cicada
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"bleu\",";
       stream << "\"reference\":[";
-      stream << "\"" << escaper(length_reference) << "\"";
+      stream << escaper(length_reference);
       for (size_t i = 0; i != ngrams_reference.size(); ++ i)
-	stream << ",\"" << escaper(ngrams_reference[i]) << "\"";
+	stream << ',' << escaper(ngrams_reference[i]);
       stream << "],";
       stream << "\"hypothesis\":[";
-      stream << "\"" << escaper(length_hypothesis) << "\"";
+      stream << escaper(length_hypothesis);
       for (size_t i = 0; i != ngrams_hypothesis.size(); ++ i)
-	stream << ",\"" << escaper(ngrams_hypothesis[i]) << "\"";
+	stream << ',' << escaper(ngrams_hypothesis[i]);
       stream << "]";
       stream << '}';
       

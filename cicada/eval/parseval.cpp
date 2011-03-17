@@ -32,9 +32,9 @@ namespace cicada
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"parseval\",";
       stream << "\"brackets\":[";
-      stream << '\"' << escaper(matched) << "\",";
-      stream << '\"' << escaper(test) << "\",";
-      stream << '\"' << escaper(reference) << '\"';
+      stream << escaper(matched)
+	     << ',' << escaper(test)
+	     << ',' << escaper(reference);
       stream << "]}";
       return stream.str();
     }

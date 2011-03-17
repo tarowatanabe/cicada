@@ -26,12 +26,14 @@ namespace cicada
       {
 	const std::string base64 = utils::encode_base64(x.value);
 	
+	os << '\"';
 	std::string::const_iterator iter_end = base64.end();
 	for (std::string::const_iterator iter = base64.begin(); iter != iter_end; ++ iter)
 	  if (*iter == '/')
 	    os << "\\/";
 	  else
 	    os << *iter;
+	os << '\"';
 	
 	return os;
       }

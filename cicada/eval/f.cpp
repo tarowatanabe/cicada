@@ -32,12 +32,10 @@ namespace cicada
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"" << __description() << "\",";
       stream << "\"reference\":[";
-      stream << "\"" << escaper(match_ref) << "\",";
-      stream << "\"" << escaper(norm_ref) << "\"";
+      stream << escaper(match_ref) << ',' << escaper(norm_ref);
       stream << "],";
       stream << "\"hypothesis\":[";
-      stream << "\"" << escaper(match_hyp) << "\",";
-      stream << "\"" << escaper(norm_hyp) << "\"";
+      stream << escaper(match_hyp) << ',' << escaper(norm_hyp);
       stream << "]";
       stream << '}';
       return stream.str();

@@ -45,8 +45,8 @@ namespace cicada
       stream << "\"weight\":[";
       if (! weights.empty()) {
 	for (size_t i = 0; i != weights.size() - 1; ++ i)
-	  stream << '\"' << escaper(weights[i]) << "\",";
-	stream << '\"' << escaper(weights.back()) << '\"';
+	  stream << escaper(weights[i]) << ',';
+	stream << escaper(weights.back());
       }
       stream << "]";
       stream << '}';

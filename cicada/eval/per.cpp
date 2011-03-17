@@ -34,10 +34,10 @@ namespace cicada
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"per\",";
       stream << "\"edits\":[";
-      stream << '\"' << escaper(insertion) << "\",";
-      stream << '\"' << escaper(deletion) << "\",";
-      stream << '\"' << escaper(substitution) << "\",";
-      stream << '\"' << escaper(references) << '\"';
+      stream << escaper(insertion)
+	     << ',' << escaper(deletion)
+	     << ',' << escaper(substitution)
+	     << ',' << escaper(references);
       stream << "]}";
       return stream.str();
     }
