@@ -2,8 +2,8 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __UTILS__UTF8_STRING_GENERATOR__HPP__
-#define __UTILS__UTF8_STRING_GENERATOR__HPP__ 1
+#ifndef __UTILS__JSON_STRING_GENERATOR__HPP__
+#define __UTILS__JSON_STRING_GENERATOR__HPP__ 1
 
 #include <string>
 
@@ -12,11 +12,11 @@
 namespace utils
 {
   template <typename Iterator, bool EscapeSpace=false>
-  struct utf8_string_generator : boost::spirit::karma::grammar<Iterator, std::string()>
+  struct json_string_generator : boost::spirit::karma::grammar<Iterator, std::string()>
   {
     typedef uint32_t uchar_type;
     
-    utf8_string_generator() : utf8_string_generator::base_type(string)
+    json_string_generator() : json_string_generator::base_type(string)
     {
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;

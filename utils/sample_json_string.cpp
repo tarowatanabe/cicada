@@ -1,6 +1,6 @@
 
-#include "utils/utf8_string_parser.hpp"
-#include "utils/utf8_string_generator.hpp"
+#include "utils/json_string_parser.hpp"
+#include "utils/json_string_generator.hpp"
 
 #include <iostream>
 #include <iterator>
@@ -13,9 +13,9 @@ int main(int argc, char** argv)
 
   typedef std::ostream_iterator<char> oiterator_type;
     
-  utils::utf8_string_parser<std::string::const_iterator> parser;
-  utils::utf8_string_generator<oiterator_type> generator;
-  utils::utf8_string_generator<oiterator_type, true> generator_no_space;
+  utils::json_string_parser<std::string::const_iterator> parser;
+  utils::json_string_generator<oiterator_type> generator;
+  utils::json_string_generator<oiterator_type, true> generator_no_space;
   
   std::string line;
   std::string parsed;

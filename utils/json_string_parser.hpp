@@ -2,8 +2,8 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __UTILS__UTF8_STRING_PARSER__HPP__
-#define __UTILS__UTF8_STRING_PARSER__HPP__ 1
+#ifndef __UTILS__JSON_STRING_PARSER__HPP__
+#define __UTILS__JSON_STRING_PARSER__HPP__ 1
 
 #include <string>
 
@@ -16,11 +16,11 @@
 namespace utils
 {
   template <typename Iterator>
-  struct utf8_string_parser : boost::spirit::qi::grammar<Iterator, std::string()>
+  struct json_string_parser : boost::spirit::qi::grammar<Iterator, std::string()>
   {
     typedef uint32_t uchar_type;
     
-    struct push_utf8_func
+    struct push_json_func
     {
       template<class, class>
       struct result {
@@ -87,19 +87,19 @@ namespace utils
       }
     };
     
-    utf8_string_parser() : utf8_string_parser::base_type(string)
+    json_string_parser() : json_string_parser::base_type(string)
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      escaped = '\\' >> (('u' >> hex4)   [push_utf8(qi::_r1, qi::_1)]
-			 | ('U' >> hex8) [push_utf8(qi::_r1, qi::_1)]
+      escaped = '\\' >> (('u' >> hex4)   [push_json(qi::_r1, qi::_1)]
+			 | ('U' >> hex8) [push_json(qi::_r1, qi::_1)]
 			 | standard::char_("btnfr\\\"/") [push_escaped(qi::_r1, qi::_1)]);
       
       string = '\"' >> *(escaped(qi::_val) | (~standard::char_('\"'))[qi::_val += qi::_1]) >> '\"';
     }
 
-    boost::phoenix::function<push_utf8_func> const push_utf8;
+    boost::phoenix::function<push_json_func> const push_json;
     boost::phoenix::function<push_escaped_func> const push_escaped;
     
     boost::spirit::qi::uint_parser<uchar_type, 16, 4, 4> hex4;
