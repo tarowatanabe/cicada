@@ -1,13 +1,21 @@
+
 #include "utils/utf8_string_parser.hpp"
+#include "utils/utf8_string_generator.hpp"
 
 #include <iostream>
+#include <iterator>
 
 int main(int argc, char** argv)
 {
   namespace qi = boost::spirit::qi;
+  namespace karma = boost::spirit::karma;
   namespace standard = boost::spirit::standard;
+
+  typedef std::ostream_iterator<char> oiterator_type;
     
   utils::utf8_string_parser<std::string::const_iterator> parser;
+  utils::utf8_string_generator<oiterator_type> generator;
+  utils::utf8_string_generator<oiterator_type, true> generator_no_space;
   
   std::string line;
   std::string parsed;
@@ -20,6 +28,12 @@ int main(int argc, char** argv)
       std::cout << "parsed: " << parsed << std::endl;
     else
       std::cout << "failed: " << std::string(iter, end) << std::endl;
+
+    karma::generate(oiterator_type(std::cout), generator, parsed);
+    std::cout << std::endl;
+    karma::generate(oiterator_type(std::cout), generator_no_space, parsed);
+    std::cout << std::endl;
+			     
   }
   
 }

@@ -23,6 +23,7 @@
 #include "utils/hashmurmur.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/utf8_string_parser.hpp"
+#include "utils/utf8_string_generator.hpp"
 
 #include <google/dense_hash_map>
 

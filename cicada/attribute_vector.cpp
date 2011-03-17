@@ -19,6 +19,7 @@
 
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/utf8_string_parser.hpp"
+#include "utils/utf8_string_generator.hpp"
 
 namespace cicada
 {
@@ -67,6 +68,7 @@ namespace cicada
       namespace karma = boost::spirit::karma;
       namespace standard = boost::spirit::standard;
       
+#if 0
       escape_char.add
 	('\\', "\\\\")
 	('\"', "\\\"")
@@ -77,8 +79,9 @@ namespace cicada
 	('\r', "\\r")
 	('\t', "\\t")
 	(' ', "\\u0020");
+#endif
       
-      key %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"');
+      //key %= ('\"' << +(escape_char | ~standard::char_('\"')) << '\"');
       data %= int64_ | double10 | key;
       
       attribute %= key << ':' << data;
@@ -97,8 +100,11 @@ namespace cicada
     
     boost::spirit::karma::int_generator<AttributeVector::int_type, 10, false> int64_;
     
-    boost::spirit::karma::symbols<char, const char*> escape_char;
-    boost::spirit::karma::rule<Iterator, std::string()> key;
+    //boost::spirit::karma::symbols<char, const char*> escape_char;
+    //boost::spirit::karma::rule<Iterator, std::string()> key;
+    
+    utils::utf8_string_generator<Iterator, true> key;
+
     boost::spirit::karma::rule<Iterator, AttributeVector::data_type()> data;
     boost::spirit::karma::rule<Iterator, AttributeVector::value_type()> attribute;
     boost::spirit::karma::rule<Iterator, AttributeVector::attribute_vector_type()> attributes;

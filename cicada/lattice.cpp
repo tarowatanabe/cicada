@@ -23,6 +23,7 @@
 #include "utils/config.hpp"
 #include "utils/thread_specific_ptr.hpp"
 #include "utils/utf8_string_parser.hpp"
+#include "utils/utf8_string_generator.hpp"
 
 BOOST_FUSION_ADAPT_STRUCT(
 			  cicada::Lattice::arc_type,
@@ -100,18 +101,6 @@ namespace cicada
     {
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
-    
-#if 0
-      jlf_escape_char.add
-	("\\\"", '\"')
-	("\\\\", '\\')
-	("\\/", '/')
-	("\\b", '\b')
-	("\\f", '\f')
-	("\\n", '\n')
-	("\\r", '\r')
-	("\\t", '\t');
-#endif
 
       plf_escape_char.add
 	("\\\"", '\"')
@@ -125,7 +114,6 @@ namespace cicada
 	("\\t", '\t')
 	("\\v", '\v');
       
-      //jlf_label_double_quote %= '"' >> qi::lexeme[*(jlf_escape_char | ~standard::char_('"'))] >> '"';
       plf_label_double_quote %= '"' >> qi::lexeme[*(plf_escape_char | ~standard::char_('"'))] >> '"';
       plf_label_single_quote %= '\'' >> qi::lexeme[*(plf_escape_char | ~standard::char_('\''))] >> '\'';
       
@@ -142,10 +130,7 @@ namespace cicada
     }
     
     typedef boost::spirit::standard::space_type space_type;
-
-    //boost::spirit::qi::symbols<char, char> jlf_escape_char;
     
-    //boost::spirit::qi::rule<Iterator, std::string(), space_type> jlf_label_double_quote;
     utils::utf8_string_parser<Iterator> jlf_label_double_quote;
     
     boost::spirit::qi::rule<Iterator, std::pair<std::string, double >(), space_type> jlf_lattice_score;
@@ -259,18 +244,6 @@ namespace cicada
       namespace standard = boost::spirit::standard;
 
       // json grammar...
-      escape_char.add
-	('\\', "\\\\")
-	('\"', "\\\"")
-	('/', "\\/")
-	('\b', "\\b")
-	('\f', "\\f")
-	('\n', "\\n")
-	('\r', "\\r")
-	('\t', "\\t");
-      
-      label_double_quote %= '\"' << *(escape_char | ~standard::char_('\"')) << '\"';
-
       lattice_score %= label_double_quote << ": " << karma::double_;
       
       lattice_arc %= '[' << label_double_quote << ", " << '{' << -(lattice_score % ',') << '}' << ", " << karma::int_ << ']';
@@ -278,9 +251,8 @@ namespace cicada
       lattice_grammar %= '[' << -(lattice_set % ", ") << ']';
     }
     
-    boost::spirit::karma::symbols<char, const char*> escape_char;
-    
-    boost::spirit::karma::rule<Iterator, std::string()> label_double_quote;
+    utils::utf8_string_generator<Iterator> label_double_quote;
+
     boost::spirit::karma::rule<Iterator, std::pair<std::string, double >()> lattice_score;
     boost::spirit::karma::rule<Iterator, Lattice::arc_type()> lattice_arc;
     boost::spirit::karma::rule<Iterator, Lattice::arc_set_type()> lattice_set;
