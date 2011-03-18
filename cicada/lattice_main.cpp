@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     
     cicada::remove_epsilon(input, removed);
 
-    std::cout << "shortest: " << removed.shortest_distance()
+    std::cout << "removed shortest: " << removed.shortest_distance()
 	      << " longest: " << removed.longest_distance()
 	      << " nodes: " << removed.size()
 	      << std::endl;
