@@ -87,6 +87,7 @@ packed_vector.hpp \
 piece.hpp \
 program_options.hpp \
 python_string_parser.hpp \
+python_string_generator.hpp \
 regex_group.hpp \
 repository.hpp \
 resource.hpp \
