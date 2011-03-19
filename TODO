@@ -84,3 +84,12 @@ Implement scalable training by L1 regularized feature selection:
      features easily collectable from bilingual data (with monolingual data), (pairs, ngrams etc.)
      or, 
      features requing complex hidden variables...?
+
+
+Accurate unlexicalied parsing:
+   Iteratively split/EM then, merge/EM
+   Smoothing via dirichlet prior (or naive variational Bayes)
+   UNK handling:
+      map rare words mapped into UNK-signature (-ed/-ing/digits/etc.)
+      The mapped UNK-signature is simply a "non-terminal"
+      Decide "rare words" by threshold

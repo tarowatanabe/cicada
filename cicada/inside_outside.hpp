@@ -207,6 +207,20 @@ namespace cicada
     __outside(graph, weights_inside, weights_outside);
   }
 
+  template <typename XWeightSet, typename KFunction, typename XFunction>
+  inline
+  void inside_outside(const HyperGraph& graph,
+		      XWeightSet& x,
+		      KFunction function_k,
+		      XFunction function_x)
+  {
+    InsideOutside<KFunction, XFunction> __inside_outside(function_k, function_x);
+    
+    std::vector<typename KFunction::value_type, std::allocator<typename KFunction::value_type> > inside_k(graph.nodes.size());
+    
+    __inside_outside(graph, inside_k, x);
+  }
+
   template <typename KWeightSet, typename XWeightSet,
 	    typename KFunction, typename XFunction>
   inline
