@@ -43,6 +43,12 @@ typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 typedef rule_type::symbol_type     symbol_type;
 typedef rule_type::symbol_set_type symbol_set_type;
 
+typedef hypergraph_type::feature_set_type   feature_set_type;
+typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+typedef feature_set_type::feature_type     feature_type;
+typedef attribute_set_type::attribute_type attribute_type;
+
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
 typedef boost::filesystem::path path_type;
@@ -134,7 +140,7 @@ int main(int argc, char** argv)
   
 }
 
-symbol_type annotate_symbol(const symbol_type& symbol, const int mask)
+symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit=true)
 {
   if (symbol.is_non_terminal()) {
     namespace xpressive = boost::xpressive;
@@ -149,16 +155,24 @@ symbol_type annotate_symbol(const symbol_type& symbol, const int mask)
     static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
     
     const utils::piece piece = sumbol.non_terminal_strip();
+    const int mask = 1 << bitpos;
     
     pmatch what;
-    if (xpressive::regex_math(piece), what, re)
-      return '[' + what[1] + '@' + utils::lexical_cast<std::string>(utils::lexical_cast<int>(what[2]) | mask) + ']';
-    else
-      return '[' + piece + '@' + utils::lexical_cast<std::string>(mask) + ']';
+    if (xpressive::regex_math(piece), what, re) {
+      const int value = (utils::lexical_cast<int>(what[2]) & (~mask)) | (-bit & mask);
+      return '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
+    } else
+      return '[' + piece + '@' + utils::lexical_cast<std::string>(-bit & mask) + ']';
   } else
     return symbol;
 }
 
+struct attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
+{
+  attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+  attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
+  attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
+};
 
 void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const int bits)
 {
@@ -168,6 +182,8 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   
   weight_set_type inside;
   weight_set_type outside;
+
+  static const attribute_type attr_node("node");
   
   hypergraph_set_type::const_iterator titer_end = treebanks.end();
   for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
@@ -180,10 +196,27 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
     
     cicada::inside(treebank, inside, weight_function(grammar));
     cicada::outside(treebank, inside, outside, weight_function(grammar));
-    
+
+    hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
+    for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
+      const hypergraph_type::node_type& node = *niter;
+      const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
+      
+      const symbol_type lhs = edge.rule->lhs;
+      
+      attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
+      if (aiter == edge.attributes.end())
+	throw std::runtime_error("no node attribute?");
+      const int node_id_prev = boost::apply_visitor(attribute_integer(), iter->second);
+      if (node_id_prev < 0)
+	throw std::runtime_error("invalid node attribute?");
+      
+      const weight_type weight = inside[node.id] * outside[node.id];
+      
+    }
   }
   
-  // given the loss, 
+  // given the loss, ....
 }
 
 void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const int bits)
@@ -208,10 +241,7 @@ void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   
   // split treebanks...
   // we will control by "bits"
-  
-  const int bit_mask0 = 0;
-  const int bit_mask1 = (1 << bits);
-  
+    
   rule_set_type rules;
   node_map_type node_map;
   hypergraph_type treebank_new;
@@ -222,6 +252,7 @@ void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   symbol_set_type symbols_new;
 
   static const symbol_type root("[ROOT]");
+  static const attribute_type attr_node("node");
   
   // construct treebanks...
   hypergraph_set_type::iterator titer_end = treebanks.end();
@@ -265,7 +296,7 @@ void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
 	  // construct rule
 	  for (size_t i = 0; i != symbols.size(); ++ i)
 	    if (j_end[i])
-	      symbols_new[i] = annotate_symbol(symbols[i], utils::bithask::branch(j[i], bit_mask1, bit_mask0));
+	      symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
 	  
 	  const rule_ptr_type rule = *rules.insert(rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()))).first;
 	  
@@ -292,6 +323,7 @@ void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
 	  
 	  hypergraph_type::edge_type& edge_new = treebank_new.add_edge(tails.begin(), tails.end());
 	  edge_new.rule = rule;
+	  edge_new.attributes[attr_node] = attribute_set_type::int_type(edge.head);
 	  
 	  treebank_new.connect_edge(edge_new.id, head.first->second);
 	  
@@ -339,7 +371,7 @@ void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
     for (;;) {
       for (size_t i = 0; i != symbols.size(); ++ i)
 	if (j_end[i])
-	  symbols_new[i] = annotate_symbol(symbols[i], utils::bithask::branch(j[i], bit_mask1, bit_mask0));
+	  symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
       
       const rule_ptr_type rule = *rules.insert(rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()))).first;
       
@@ -420,6 +452,8 @@ void grammar_learn(const hypergraph_set_type& treebanks, gramamr_type& grammar, 
   weight_set_type outside;
 
   count_set_type counts;
+
+  weight_type logprob(cicada::semiring::traits<weight_type>::one());
   
   // expectation
   hypergraph_set_type::const_iterator titer_end = treebanks.end();
@@ -434,7 +468,15 @@ void grammar_learn(const hypergraph_set_type& treebanks, gramamr_type& grammar, 
     accumulator_type accumulator(treebank, counts);
     
     cicada::inside_outside(treebank, inside, outside, accumulator, function, function);
+    
+    if (debug >= 2)
+      std::cerr << "inside: " << cicada::semiring::log(inside.back()) << std::endl;
+    
+    logprob *= inside.back();
   }
+  
+  if (debug)
+    std::cerr << "log-likelihood: " << cicada::semiring::log(logprob) << std::endl;
   
   // maximization
   if (variational_bayes_mode)
