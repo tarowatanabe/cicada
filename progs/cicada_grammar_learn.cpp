@@ -348,7 +348,8 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
 	node_map[node.id] = node_map_prev[node_id_prev];
       }
     }
-  
+  }
+    
   // perform grammar merging
   count_set_type counts;
   
