@@ -184,6 +184,21 @@ struct greater_ptr_second
   }
 };
 
+struct filter_pruned
+{
+  typedef std::vector<bool, std::allocator<bool> > removed_type;
+
+  const removed_type& removed;
+  
+  filter_pruned(const removed_type& __removed) : removed(__removed) {}
+  
+  template <typename Edge>
+  bool operator()(const Edge& edge) const
+  {
+    return removed[edge.id];
+  }
+};
+
 void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const int bits)
 {
   // compute "loss" incurred by splitting...
@@ -203,9 +218,6 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
   typedef googe::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
-
-  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
-  
   
   weight_set_type inside;
   weight_set_type outside;
@@ -287,67 +299,48 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   const size_t sorted_size = merge_ratio * sorted.size();
   std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
   
-  merged_set_type merged;
+  merged_set_type remove;
   merged.set_empty_key(symbol_type());
   
   sorted_type::const_iterator siter_end = sorted.begin() + sorted_size;
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) {
     // perform merging for symbol (*siter)->first;
     
-    merged.insert((*siter)->first);
     merged.insert(annotate_symbol((*siter)->first, bits, true));
   }
   
-  rule_set_type rules;
-  node_map_type node_map;
-  node_map_type node_map_prev;
   hypergraph_type treebank_new;
+  rule_set_type   rules;
   
-  // perform hypergraph merging... HOW?
+  // perform hypergraph merging... we will simply remove the rules with removed symbol...!
   // topological order, and we need to keep track of new node-id...
   //
   for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
     hypergraph_type& treebank = *titer;
-    treebank_new.clear();
-    
-    node_map_prev.clear();
-    node_map.clear();
-    node_map.resize(treebank.nodes.size());
-    
-    hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
-    for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
-      const hypergraph_type::node_type& node = *niter;
-      
-      //
-      // the rule with lhs with additional bit-set will be discarded...
-      //
-      
-      const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
+
+    filter_pruned::removed_type removed(treebank.edges.size(), false);
+
+    hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
+    for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
+      hypergraph_type::edge_type& edge = *eiter;
       
       const symbol_type lhs = edge.rule->lhs;
-      
-      if (merged.find(lhs) == merged.end()) {
-	node_map[node.id] = treebank_new.add_node().id;
-	
-	if (treebank.goal == node.id)
-	  treebank_new.goal = node_map[node.id];
-      } else {
-	attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
-	if (aiter == edge.attributes.end())
-	  throw std::runtime_error("no node attribute?");
-	const int node_id_prev = boost::apply_visitor(attribute_integer(), iter->second);
-	if (node_id_prev < 0)
-	  throw std::runtime_error("invalid node attribute?");
-	
-	if (node_id_prev >= node_map_prev.size())
-	  node_map_prev.resize(node_id_prev + 1, hypergraph_type::invalid);
-	
-	if (node_map_prev[node_id_prev] == hypergraph_type::invalid)
-	  node_map_prev[node_id_prev] = treebank_new.add_node().id;
-	
-	node_map[node.id] = node_map_prev[node_id_prev];
+      if (merged.find(lhs) != merged.end())
+	removed[edge.id] = true;
+      else {
+	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+	  if (riter->is_non_terminal() && merged.find(*riter) != merged.end())
+	    removed[edge.id] = true;
       }
+      
+      if (removed[edge.id])
+	edge.rule = *rules.insert(edge.rule).first;
     }
+    
+    cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
+    
+    treebank.swap(treebank_new);
   }
     
   // perform grammar merging
