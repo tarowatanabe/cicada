@@ -193,7 +193,6 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
 #else
   typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #endif
-  
 
   typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
   typedef std::pair<symbol_type, hypergraph_type::id_type> symbol_id_type;
@@ -202,7 +201,11 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   
   typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
+  
+  typedef googe::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
 
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
+  
   
   weight_set_type inside;
   weight_set_type outside;
@@ -285,7 +288,8 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
   
   merged_set_type merged;
-
+  merged.set_empty_key(symbol_type());
+  
   sorted_type::const_iterator siter_end = sorted.begin() + sorted_size;
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) {
     // perform merging for symbol (*siter)->first;
@@ -293,17 +297,57 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
     merged.insert((*siter)->first);
     merged.insert(annotate_symbol((*siter)->first, bits, true));
   }
-
+  
   rule_set_type rules;
+  node_map_type node_map;
+  node_map_type node_map_prev;
+  hypergraph_type treebank_new;
   
   // perform hypergraph merging... HOW?
   // topological order, and we need to keep track of new node-id...
   //
   for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
     hypergraph_type& treebank = *titer;
+    treebank_new.clear();
     
+    node_map_prev.clear();
+    node_map.clear();
+    node_map.resize(treebank.nodes.size());
     
-  }
+    hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
+    for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
+      const hypergraph_type::node_type& node = *niter;
+      
+      //
+      // the rule with lhs with additional bit-set will be discarded...
+      //
+      
+      const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
+      
+      const symbol_type lhs = edge.rule->lhs;
+      
+      if (merged.find(lhs) == merged.end()) {
+	node_map[node.id] = treebank_new.add_node().id;
+	
+	if (treebank.goal == node.id)
+	  treebank_new.goal = node_map[node.id];
+      } else {
+	attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
+	if (aiter == edge.attributes.end())
+	  throw std::runtime_error("no node attribute?");
+	const int node_id_prev = boost::apply_visitor(attribute_integer(), iter->second);
+	if (node_id_prev < 0)
+	  throw std::runtime_error("invalid node attribute?");
+	
+	if (node_id_prev >= node_map_prev.size())
+	  node_map_prev.resize(node_id_prev + 1, hypergraph_type::invalid);
+	
+	if (node_map_prev[node_id_prev] == hypergraph_type::invalid)
+	  node_map_prev[node_id_prev] = treebank_new.add_node().id;
+	
+	node_map[node.id] = node_map_prev[node_id_prev];
+      }
+    }
   
   // perform grammar merging
   count_set_type counts;
@@ -362,8 +406,8 @@ void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   node_map_type node_map;
   hypergraph_type treebank_new;
 
-  index_set_type  index;
-  index_set_type  index_end;
+  index_set_type  j;
+  index_set_type  j_end;
   symbol_set_type symbols;
   symbol_set_type symbols_new;
 
