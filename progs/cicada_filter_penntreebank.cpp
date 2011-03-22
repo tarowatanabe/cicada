@@ -189,7 +189,8 @@ void transform_collapse(treebank_type& treebank)
   for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
     transform_collapse(*aiter);
 
-  if (treebank.antecedents.size() == 1 && treebank.cat == treebank.antecedents.front().cat)
+  // unary rule + the same category...
+  if (treebank.antecedents.size() == 1 && treebank.antecedents.front().antecedents.size() == 1 && treebank.cat == treebank.antecedents.front().cat)
     treebank.antecedents = treebank.antecedents.front().antecedents;
 }
 
