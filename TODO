@@ -93,3 +93,4 @@ Accurate unlexicalied parsing:
       map rare words mapped into UNK-signature (-ed/-ing/digits/etc.)
       The mapped UNK-signature is simply a "non-terminal"
       Decide "rare words" by threshold
+      Do we allow splitting for UNK words...?

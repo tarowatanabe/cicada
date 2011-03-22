@@ -30,7 +30,7 @@
 #include <boost/program_options.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
-
+#include <boost/random.hpp>
 #include <boost/xpressive/xpressive.hpp>
 
 #include <utils/bithack.hpp>
@@ -41,6 +41,7 @@
 #include <utils/resource.hpp>
 #include <utils/mathop.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/lockfree_list_queue.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -149,11 +150,14 @@ int debug = 0;
 
 symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit=true);
 
-void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits);
-void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits);
+template <typename Generator>
+void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator);
+
+template <typename Generator>
+void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator);
 
 template <typename Function>
-void grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function);
+double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function);
 
 template <typename Maximizer>
 void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
@@ -203,22 +207,72 @@ int main(int argc, char** argv)
     if (input_files.empty())
       input_files.push_back("-");
     
+    threads = utils::bithack::max(threads, 1);
+    
     hypergraph_set_type treebanks;
     read_treebank(input_files, treebanks);
     
     grammar_type grammar;
     grammar_learn(treebanks, grammar, zero_function());
     
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
+    
+    if (debug)
+      std::cerr << "grammar size: " << grammar.size() << std::endl;
+    
     for (int iter = 0; iter < max_iteration; ++ iter) {
+      
+      if (debug)
+	std::cerr << "iteration: " << (iter + 1) << std::endl;
+      
       // split...
-      grammar_split(treebanks, grammar, iter);
-      for (int i = 0; i < max_iteration_split; ++ i)
-	grammar_learn(treebanks, grammar, weight_function(grammar));
+      {
+	const utils::resource split_start;
+	grammar_split(treebanks, grammar, iter, generator);
+	const utils::resource split_end;
+	
+	if (debug)
+	  std::cerr << "split: " << "grammar size: " << grammar.size() << std::endl;
+	
+	double logprob = 0.0;
+	for (int i = 0; i < max_iteration_split; ++ i) {
+	  if (debug)
+	    std::cerr << "split iteration: " << (i + 1) << std::endl;
+	  
+	  const utils::resource learn_start;
+	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar));
+	  const utils::resource learn_end;
+	  
+	  if (i && logprob_curr < logprob) break;
+	  
+	  logprob = logprob_curr;
+	}
+      }
       
       // merge..
-      grammar_merge(treebanks, grammar, iter);
-      for (int i = 0; i < max_iteration_merge; ++ i)
-	grammar_learn(treebanks, grammar, weight_function(grammar));
+      {
+	const utils::resource merge_start;
+	grammar_merge(treebanks, grammar, iter, generator);
+	const utils::resource merge_end;
+	
+	if (debug)
+	  std::cerr << "merge: " << "grammar size: " << grammar.size() << std::endl;
+	
+	double logprob = 0.0;
+	for (int i = 0; i < max_iteration_merge; ++ i) {
+	  if (debug)
+	    std::cerr << "merge iteration: " << (i + 1) << std::endl;
+	  
+	  const utils::resource learn_start;
+	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar));
+	  const utils::resource learn_end;
+	  
+	  if (i && logprob_curr < logprob) break;
+	  
+	  logprob = logprob_curr;
+	}
+      }
     }
     
     // output grammar...
@@ -329,7 +383,8 @@ struct MaximizeBayes
   }  
 };
 
-void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits)
+template <typename Generator>
+void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
   // compute "loss" incurred by splitting...
 
@@ -464,7 +519,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 	    removed[edge.id] = true;
       }
       
-      if (removed[edge.id])
+      if (! removed[edge.id])
 	edge.rule = *rules.insert(edge.rule).first;
     }
     
@@ -503,7 +558,8 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     maximize_grammar(counts, grammar, Maximize());
 }
 
-void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits)
+template <typename Generator>
+void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
 #ifdef HAVE_TR1_UNORDERED_SET
   typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
@@ -659,7 +715,8 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
       
       const rule_ptr_type rule = *rules.insert(rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()))).first;
       
-      counts[rule->lhs][rule] += utils::mathop::exp(giter->second);
+      // we will add 1% of randomness...
+      counts[rule->lhs][rule] += utils::mathop::exp(giter->second) * boost::uniform_real<double>(0.99, 1.01)(generator);
       
       size_t index = 0;
       for (/**/; index != j.size(); ++ index) 
@@ -685,53 +742,127 @@ struct accumulator_type
 {
   typedef weight_type value_type;
 
-  accumulator_type(const hypergraph_type& __treebank,
+  accumulator_type(const weight_type& __weight_total,
+		   const hypergraph_type& __treebank,
 		   count_set_type& __counts)
-    : treebank(__treebank), counts(__counts) {}
+    : weight_total(__weight_total), treebank(__treebank), counts(__counts) {}
+
+  struct Count
+  {
+    Count(count_type& __count, const weight_type& __weight) : count(__count), weight(__weight) {}
+    
+    Count& operator+=(const weight_type& value)
+    {
+      count += value / weight;
+      return *this;
+    }
+    
+    count_type& count;
+    const weight_type& weight;
+  };
   
-  count_type& operator[](const hypergraph_type::id_type& x)
+  Count operator[](const hypergraph_type::id_type& x)
   {
     const rule_ptr_type& rule = treebank.edges[x].rule;
     
-    return counts[rule->lhs][rule];
+    return Count(counts[rule->lhs][rule], weight_total);
   }
   
+  const weight_type& weight_total;
   const hypergraph_type& treebank;
   count_set_type& counts;
 };
 
 template <typename Function>
-void grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function)
+struct Task
 {
-  // TODO: support threading!
-  
-  typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
-  
-  weight_set_type inside;
-  weight_set_type outside;
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
 
+  Task(const hypergraph_set_type& __treebanks, queue_type& __queue, Function __function)
+    : treebanks(__treebanks),
+      queue(__queue),
+      function(__function),
+      logprob(cicada::semiring::traits<weight_type>::one()),
+      counts() {}
+  
+  void operator()()
+  {
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    
+    weight_set_type inside;
+    weight_set_type outside;
+    
+    int id = 0;
+    
+    for (;;) {
+      queue.pop(id);
+      if (id < 0) break;
+      
+      const hypergraph_type& treebank = treebanks[id];
+      
+      inside.clear();
+      outside.clear();
+      inside.resize(treebank.nodes.size());
+      outside.resize(treebank.nodes.size());
+      
+      accumulator_type accumulator(inside.back(), treebank, counts);
+      
+      cicada::inside_outside(treebank, inside, outside, accumulator, function, function);
+      
+      if (debug >= 2)
+	std::cerr << "inside: " << cicada::semiring::log(inside.back()) << std::endl;
+      
+      logprob *= inside.back();
+    }
+  }
+  
+  const hypergraph_set_type& treebanks;
+  queue_type&    queue;
+  Function       function;
+  
+  weight_type    logprob;
   count_set_type counts;
+};
 
-  weight_type logprob(cicada::semiring::traits<weight_type>::one());
+template <typename Function>
+double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function)
+{
+  typedef Task<Function> task_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  typedef typename task_type::queue_type queue_type;
+
+  queue_type queue;
+  task_set_type tasks(threads, task_type(treebanks, queue, function));
+
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+
+  for (size_t i = 0; i != treebanks.size(); ++ i)
+    queue.push(i);
   
-  // expectation
-  hypergraph_set_type::const_iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
-    const hypergraph_type& treebank = *titer;
+  for (int i = 0; i != threads; ++ i)
+    queue.push(-1);
+  
+  workers.join_all();
+  
+  weight_type logprob(cicada::semiring::traits<weight_type>::one());
+  count_set_type counts;
+  for (int i = 0; i != threads; ++ i) {
+    logprob *= tasks[i].logprob;
     
-    inside.clear();
-    outside.clear();
-    inside.resize(treebank.nodes.size());
-    outside.resize(treebank.nodes.size());
-    
-    accumulator_type accumulator(treebank, counts);
-    
-    cicada::inside_outside(treebank, inside, outside, accumulator, function, function);
-    
-    if (debug >= 2)
-      std::cerr << "inside: " << cicada::semiring::log(inside.back()) << std::endl;
-    
-    logprob *= inside.back();
+    if (counts.empty())
+      counts.swap(tasks[i].counts);
+    else {
+      count_set_type::const_iterator liter_end = tasks[i].counts.end();
+      for (count_set_type::const_iterator liter = tasks[i].counts.begin(); liter != liter_end; ++ liter) {
+	grammar_type& grammar = counts[liter->first];
+
+	grammar_type::const_iterator giter_end = liter->second.end();
+	for (grammar_type::const_iterator giter = liter->second.begin(); giter != giter_end; ++ giter)
+	  grammar[giter->first] += giter->second;
+      }
+    }
   }
   
   if (debug)
@@ -742,6 +873,8 @@ void grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, 
     maximize_grammar(counts, grammar, MaximizeBayes());
   else
     maximize_grammar(counts, grammar, Maximize());
+  
+  return cicada::semiring::log(logprob);
 }
 
 
@@ -750,7 +883,7 @@ template <typename Maximizer>
 void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer)
 {
   grammar.clear();
-  
+
   count_set_type::const_iterator citer_end = counts.end();
   for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
     maximizer(citer->second, grammar);
