@@ -403,94 +403,160 @@ struct MaximizeBayes
   }  
 };
 
+struct TaskMerge
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
+  
+  TaskMerge(const hypergraph_set_type& __treebanks,
+	    const grammar_type& __grammar,
+	    const int& __bits,
+	    queue_type& __queue)
+    : treebanks(__treebanks),
+      grammar(__grammar),
+      bits(__bits),
+      queue(__queue),
+      loss()
+  {
+    loss.set_empty_key(symbol_type());
+  }
+  
+  void operator()()
+  {
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    typedef std::pair<symbol_type, hypergraph_type::id_type> symbol_id_type;
+    typedef std::vector<symbol_id_type, std::allocator<symbol_id_type> > symbol_id_set_type;
+    typedef std::vector<symbol_id_set_type, std::allocator<symbol_id_set_type> > symbol_id_map_type;
+    
+    weight_set_type inside;
+    weight_set_type outside;
+    symbol_id_map_type symbols;
+    
+    const attribute_type attr_node("node");
+    
+    int id = 0;
+    for (;;) {
+      queue.pop(id);
+      if (id < 0) break;
+      
+      const hypergraph_type& treebank = treebanks[id];
+      
+      inside.clear();
+      outside.clear();
+      inside.resize(treebank.nodes.size());
+      outside.resize(treebank.nodes.size());
+    
+      cicada::inside(treebank, inside, weight_function(grammar));
+      cicada::outside(treebank, inside, outside, weight_function(grammar));
+    
+      symbols.clear();
+      hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
+	const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
+      
+	const symbol_type lhs = edge.rule->lhs;
+      
+	attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
+	if (aiter == edge.attributes.end())
+	  throw std::runtime_error("no node attribute?");
+	const int node_id_prev = boost::apply_visitor(attribute_integer(), aiter->second);
+	if (node_id_prev < 0)
+	  throw std::runtime_error("invalid node attribute?");
+      
+	if (node_id_prev >= static_cast<int>(symbols.size()))
+	  symbols.resize(node_id_prev + 1);
+      
+	symbols[node_id_prev].push_back(symbol_id_type(lhs, node.id));
+      }
+    
+      // now, collect loss...
+      const weight_type weight_total = inside.back();
+      
+      symbol_id_map_type::const_iterator siter_end = symbols.end();
+      for (symbol_id_map_type::const_iterator siter = symbols.begin(); siter != siter_end; ++ siter) {
+	if (siter->size() == 2) {
+	  weight_type prob_split;
+	  weight_type inside_merge;
+	  weight_type outside_merge;
+	  
+	  // is it correct?
+	  symbol_id_set_type::const_iterator iter_end = siter->end();
+	  for (symbol_id_set_type::const_iterator iter = siter->begin(); iter != iter_end; ++ iter) {
+	    prob_split += inside[iter->second] * outside[iter->second];
+	    inside_merge += inside[iter->second] * (inside[iter->second] * outside[iter->second] / weight_total);
+	    outside_merge += outside[iter->second];
+	  }
+	  
+	  const weight_type loss_node = inside_merge * outside_merge / prob_split;
+	  
+	  std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate_symbol(siter->front().first, bits, false), loss_node));
+	  if (! result.second)
+	    result.first->second *= loss_node;
+	} else if (siter->size() > 2)
+	  throw std::runtime_error("more than two splitting?");
+      }
+    }
+  }
+  
+  const hypergraph_set_type& treebanks;
+  const grammar_type& grammar;
+  const int bits;
+  
+  queue_type& queue;
+  
+  loss_set_type loss;
+};
+
 template <typename Generator>
 void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
   // compute "loss" incurred by splitting...
+
+  typedef TaskMerge task_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  typedef task_type::queue_type    queue_type;
+  typedef task_type::loss_set_type loss_set_type;
 
 #ifdef HAVE_TR1_UNORDERED_SET
   typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #else
   typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #endif
-
-  typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
-  typedef std::pair<symbol_type, hypergraph_type::id_type> symbol_id_type;
-  typedef std::vector<symbol_id_type, std::allocator<symbol_id_type> > symbol_id_set_type;
-  typedef std::vector<symbol_id_set_type, std::allocator<symbol_id_set_type> > symbol_id_map_type;
   
-  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
   
-  weight_set_type inside;
-  weight_set_type outside;
+  queue_type queue;
+  task_set_type tasks(threads, task_type(treebanks, grammar, bits, queue));
   
-  symbol_id_map_type symbols;
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  
+  for (size_t i = 0; i != treebanks.size(); ++ i)
+    queue.push(i);
+  
+  for (int i = 0; i != threads; ++ i)
+    queue.push(-1);
+  
+  workers.join_all();
+  
   loss_set_type      loss;
   loss.set_empty_key(symbol_type());
-  
-  static const attribute_type attr_node("node");
-  
-  hypergraph_set_type::iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
-    const hypergraph_type& treebank = *titer;
-    
-    inside.clear();
-    outside.clear();
-    inside.resize(treebank.nodes.size());
-    outside.resize(treebank.nodes.size());
-    
-    cicada::inside(treebank, inside, weight_function(grammar));
-    cicada::outside(treebank, inside, outside, weight_function(grammar));
-    
-    symbols.clear();
-    hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
-    for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
-      const hypergraph_type::node_type& node = *niter;
-      const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
-      
-      const symbol_type lhs = edge.rule->lhs;
-      
-      attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
-      if (aiter == edge.attributes.end())
-	throw std::runtime_error("no node attribute?");
-      const int node_id_prev = boost::apply_visitor(attribute_integer(), aiter->second);
-      if (node_id_prev < 0)
-	throw std::runtime_error("invalid node attribute?");
-      
-      if (node_id_prev >= static_cast<int>(symbols.size()))
-	symbols.resize(node_id_prev + 1);
-      
-      symbols[node_id_prev].push_back(symbol_id_type(lhs, node.id));
-    }
-    
-    // now, collect loss...
-    const weight_type weight_total = inside.back();
-    
-    symbol_id_map_type::const_iterator siter_end = symbols.end();
-    for (symbol_id_map_type::const_iterator siter = symbols.begin(); siter != siter_end; ++ siter)
-      if (siter->size() == 2) {
-	weight_type prob_split;
-	weight_type inside_merge;
-	weight_type outside_merge;
-	
-	// is it correct?
-	symbol_id_set_type::const_iterator iter_end = siter->end();
-	for (symbol_id_set_type::const_iterator iter = siter->begin(); iter != iter_end; ++ iter) {
-	  prob_split += inside[iter->second] * outside[iter->second];
-	  inside_merge += inside[iter->second] * (inside[iter->second] * outside[iter->second] / weight_total);
-	  outside_merge += outside[iter->second];
-	}
-	
-	const weight_type loss_node = inside_merge * outside_merge / prob_split;
-	
-	std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate_symbol(siter->front().first, bits, false), loss_node));
+
+  for (int i = 0; i != threads; ++ i) {
+    if (loss.empty())
+      loss.swap(tasks[i].loss);
+    else {
+      loss_set_type::const_iterator liter_end = tasks[i].loss.end();
+      for (loss_set_type::const_iterator liter = tasks[i].loss.begin(); liter != liter_end; ++ liter) {
+	std::pair<loss_set_type::iterator, bool> result = loss.insert(*liter);
 	if (! result.second)
-	  result.first->second *= loss_node;
-      } else if (siter->size() > 2)
-	throw std::runtime_error("more than two splitting?");
+	  result.first->second *= liter->second;
+      }
+    }
   }
   
   // sort wrt loss of splitting == reward of merging...
@@ -517,6 +583,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   // perform hypergraph merging... we will simply remove the rules with removed symbol...!
   // topological order, and we need to keep track of new node-id...
   //
+  hypergraph_set_type::iterator titer_end = treebanks.end();
   for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
     hypergraph_type& treebank = *titer;
 
@@ -791,11 +858,11 @@ struct accumulator_type
 };
 
 template <typename Function>
-struct Task
+struct TaskLearn
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
-
-  Task(const hypergraph_set_type& __treebanks, queue_type& __queue, Function __function)
+  
+  TaskLearn(const hypergraph_set_type& __treebanks, queue_type& __queue, Function __function)
     : treebanks(__treebanks),
       queue(__queue),
       function(__function),
@@ -844,7 +911,7 @@ struct Task
 template <typename Function>
 double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function)
 {
-  typedef Task<Function> task_type;
+  typedef TaskLearn<Function> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef typename task_type::queue_type queue_type;
 
