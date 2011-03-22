@@ -775,19 +775,19 @@ void options(int argc, char** argv)
     ("prior-terminal",  po::value<double>(&prior_terminal)->default_value(prior_terminal), "Dirichlet prior for terminal rule")
 
     ("cutoff-threshold", po::value<double>(&cutoff_threshold)->default_value(cutoff_threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
-    ("cutoff-unk",       po::value<double>(&cutoff_unk)->default_value(cutoff_unk),             "cut-off threshold for unk (<=1 implies no cutoff)"))
-
+    ("cutoff-unk",       po::value<int>(&cutoff_unk)->default_value(cutoff_unk),                "cut-off threshold for unk (<=1 implies no cutoff)")
+    
     ("threads", po::value<int>(&threads), "# of threads")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
   
   po::variables_map variables;
-
+  
   po::store(po::parse_command_line(argc, argv, desc, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
   
   po::notify(variables);
-
+  
   if (variables.count("help")) {
     std::cout << argv[0] << " [options]\n"
 	      << desc << std::endl;
