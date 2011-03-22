@@ -111,6 +111,7 @@ typedef Grammar grammar_type;
 #endif
 
 
+
 path_set_type input_files;
 
 int max_iteration = 6;         // max split-merge iterations
@@ -174,19 +175,46 @@ struct attribute_integer : public boost::static_visitor<attribute_set_type::int_
   attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
 };
 
+template <typename Tp>
+struct greater_ptr_second
+{
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second > y->second;
+  }
+};
+
 void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const int bits)
 {
   // compute "loss" incurred by splitting...
 
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<const rule_ptr_type> > rule_set_type;
+#else
+  typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
+#endif
+  
+
   typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+  typedef std::pair<symbol_type, hypergraph_type::id_type> symbol_id_type;
+  typedef std::vector<symbol_id_type, std::allocator<symbol_id_type> > symbol_id_set_type;
+  typedef std::vector<symbol_id_set_type, std::allocator<symbol_id_set_type> > symbol_id_map_type;
+  
+  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
+  typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
+
   
   weight_set_type inside;
   weight_set_type outside;
-
+  
+  symbol_id_map_type symbols;
+  loss_set_type      loss;
+  loss.set_empty_key(symbol_type());
+  
   static const attribute_type attr_node("node");
   
-  hypergraph_set_type::const_iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+  hypergraph_set_type::iterator titer_end = treebanks.end();
+  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
     const hypergraph_type& treebank = *titer;
     
     inside.clear();
@@ -196,7 +224,8 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
     
     cicada::inside(treebank, inside, weight_function(grammar));
     cicada::outside(treebank, inside, outside, weight_function(grammar));
-
+    
+    symbols.clear();
     hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
       const hypergraph_type::node_type& node = *niter;
@@ -211,12 +240,99 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
       if (node_id_prev < 0)
 	throw std::runtime_error("invalid node attribute?");
       
-      const weight_type weight = inside[node.id] * outside[node.id];
+      if (node_id_prev >= symbols.size())
+	symbols.resize(node_id_prev + 1);
       
+      symbols[node_id_prev].push_back(symbol_id_type(lhs, node.id));
     }
+    
+    // now, collect loss...
+    const weight_type weight_total = inside.back();
+    
+    symbol_id_map_type::const_iterator siter_end = symbols.end();
+    for (symbol_id_map_type::const_iterator siter = symbols.begin(); siter != siter_end; ++ siter)
+      if (siter->size() == 2) {
+	weight_type prob_split;
+	weight_type inside_merge;
+	weight_type outside_merge;
+	
+	// is it correct?
+	symbol_id_set_type::const_iterator iter_end = siter->end();
+	for (symbol_id_set_type::const_iterator iter = siter->begin(); iter != iter_end; ++ iter) {
+	  prob_split += inside[iter->second] * outside[iter->second];
+	  inside_merge += inside[iter->second] * (inside[iter->second] * outside[iter->second] / weight_total);
+	  outside_merge += outside[iter->second];
+	}
+	
+	const weight_type loss_node = inside_merge * outside_merge / prob_split;
+	
+	std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate_symbol(siter->front().first, bits, false), loss_node));
+	if (! result.second)
+	  result.first->second *= loss_node;
+      } else if (siter->size() > 2)
+	throw std::runtime_error("more than two splitting?");
   }
   
-  // given the loss, ....
+  // sort wrt loss of splitting == reward of merging...
+  sorted_type sorted;
+  sorted.reserve(loss.size());
+  
+  loss_set_type::const_iterator liter_end = loss.end();
+  for (loss_set_type::const_iterator liter = loss.begin(); liter != liter_end; ++ liter)
+    sorted.push_back(&(*liter));
+  
+  const size_t sorted_size = merge_ratio * sorted.size();
+  std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
+  
+  merged_set_type merged;
+
+  sorted_type::const_iterator siter_end = sorted.begin() + sorted_size;
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) {
+    // perform merging for symbol (*siter)->first;
+    
+    merged.insert((*siter)->first);
+    merged.insert(annotate_symbol((*siter)->first, bits, true));
+  }
+
+  rule_set_type rules;
+  
+  // perform hypergraph merging... HOW?
+  // topological order, and we need to keep track of new node-id...
+  //
+  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+    hypergraph_type& treebank = *titer;
+    
+    
+  }
+  
+  // perform grammar merging
+  count_set_type counts;
+  
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
+    const rule_ptr_type& rule = giter->first;
+    
+    symbol_type lhs = rule->lhs;
+    if (merged.find(lhs) != merged.end())
+      lhs = annotate_symbol(lhs, bits, false);
+    
+    symbol_set_type symbols(rule->rhs);
+    
+    symbol_set_type::iterator siter_end = symbols.end();
+    for (symbol_set_type::iterator siter = symbols.begin(); siter != siter_end; ++ siter)
+      if (siter->is_non_terminal() && if (merged.find(*siter) != merged.end()))
+	*siter = annotate_symbol(*siter, bits, false);
+    
+    const rule_ptr_type rule_new = *rules.insert(rule_type::create(rule_type(lhs, symbols))).first;
+    
+    counts[lhs][rule_new] += utils::mathop::exp(giter->second);
+  }
+  
+  // maximization
+  if (variational_bayes_mode)
+    maximize_gramamr(counts, grammar, MaximizeBayes());
+  else
+    maximize_grammar(counts, grammar, Maximize());
 }
 
 void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const int bits)
