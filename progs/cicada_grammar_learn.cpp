@@ -234,6 +234,11 @@ int main(int argc, char** argv)
 	
 	if (debug)
 	  std::cerr << "split: " << "grammar size: " << grammar.size() << std::endl;
+
+	if (debug)
+	  std::cerr << "cpu time: " << (split_end.cpu_time() - split_start.cpu_time())
+		    << " user time: " << (split_end.user_time() - split_start.user_time())
+		    << std::endl;
 	
 	double logprob = 0.0;
 	for (int i = 0; i < max_iteration_split; ++ i) {
@@ -243,6 +248,11 @@ int main(int argc, char** argv)
 	  const utils::resource learn_start;
 	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar));
 	  const utils::resource learn_end;
+
+	  if (debug)
+	    std::cerr << "cpu time: " << (learn_end.cpu_time() - learn_start.cpu_time())
+		      << " user time: " << (learn_end.user_time() - learn_start.user_time())
+		      << std::endl;
 	  
 	  if (i && logprob_curr < logprob) break;
 	  
@@ -258,6 +268,11 @@ int main(int argc, char** argv)
 	
 	if (debug)
 	  std::cerr << "merge: " << "grammar size: " << grammar.size() << std::endl;
+
+	if (debug)
+	  std::cerr << "cpu time: " << (merge_end.cpu_time() - merge_start.cpu_time())
+		    << " user time: " << (merge_end.user_time() - merge_start.user_time())
+		    << std::endl;
 	
 	double logprob = 0.0;
 	for (int i = 0; i < max_iteration_merge; ++ i) {
@@ -267,6 +282,11 @@ int main(int argc, char** argv)
 	  const utils::resource learn_start;
 	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar));
 	  const utils::resource learn_end;
+	  
+	  if (debug)
+	    std::cerr << "cpu time: " << (learn_end.cpu_time() - learn_start.cpu_time())
+		      << " user time: " << (learn_end.user_time() - learn_start.user_time())
+		      << std::endl;
 	  
 	  if (i && logprob_curr < logprob) break;
 	  
