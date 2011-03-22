@@ -121,6 +121,29 @@ typedef Grammar grammar_type;
 			std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
 #endif
 
+path_set_type input_files;
+
+int max_iteration = 6;         // max split-merge iterations
+int max_iteration_split = 20;  // max EM-iterations for split
+int max_iteration_merge = 20;  // max EM-iterations for merge
+
+bool binarize_left = false;
+bool binarize_right = false;
+bool binarize_all = false;
+
+// naive variational bayes for smoothing... otherwise, dirichlet prior
+bool variational_bayes_mode = false;
+
+double prior          = 0.01;
+double prior_terminal = 0.01;
+
+double merge_ratio = 0.5;
+double cutoff_threshold = 1e-10;
+int    cutoff_unk = 1;
+
+int threads = 1;
+
+int debug = 0;
 
 symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit=true);
 
@@ -136,34 +159,21 @@ void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maxim
 
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks);
 
-
-path_set_type input_files;
-
-int max_iteration = 6;         // max split-merge iterations
-int max_iteration_split = 20;  // max EM-iterations for split
-int max_iteration_merge = 20;  // max EM-iterations for merge
-
-bool binarize_left = false;
-bool binarize_right = false;
-bool binarize_all = false;
-
-// naive variational bayes for smoothing... otherwise, dirichlet prior
-bool variational_bayes_mode = false;
-
-double prior          = 0.01;
-
-double merge_ratio = 0.5;
-double cutoff_threshold = 1e-10;
-int    cutoff_unk_terminal = 2;
-
-int threads = 1;
-
-int debug = 0;
+void options(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
-  grammar_type grammar;
-  
+  try {
+    options(argc, argv);
+    
+    grammar_type grammar;
+    
+  }
+  catch (std::exception& err) {
+    std::cerr << "error: " << err.what() << std::endl;
+    return 1;
+  }
+  return 0;
 }
 
 symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit)
@@ -738,5 +748,49 @@ void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
       treebanks.push_back(hypergraph_type());
       treebanks.back().swap(treebank);
     }
+  }
+}
+
+void options(int argc, char** argv)
+{
+  namespace po = boost::program_options;
+  
+  po::options_description desc("options");
+  
+  desc.add_options()
+    ("input",  po::value<path_set_type>(&input_files), "input treebank")
+    
+    ("max-iteration",       po::value<int>(&max_iteration)->default_value(max_iteration),             "maximum split/merge iterations")
+    ("max-iteration-split", po::value<int>(&max_iteration_split)->default_value(max_iteration_split), "maximum EM iterations after split")
+    ("max-iteration-merge", po::value<int>(&max_iteration_merge)->default_value(max_iteration_merge), "maximum EM iterations after merge")
+    
+    ("binarize-left",  po::bool_switch(&binarize_left),  "left binarization")
+    ("binarize-right", po::bool_switch(&binarize_right), "right binarization")
+    ("binarize-all",   po::bool_switch(&binarize_all),   "all binarization")
+    
+    ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
+    
+    
+    ("prior",           po::value<double>(&prior)->default_value(prior),                   "Dirichlet prior")
+    ("prior-terminal",  po::value<double>(&prior_terminal)->default_value(prior_terminal), "Dirichlet prior for terminal rule")
+
+    ("cutoff-threshold", po::value<double>(&cutoff_threshold)->default_value(cutoff_threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
+    ("cutoff-unk",       po::value<double>(&cutoff_unk)->default_value(cutoff_unk),             "cut-off threshold for unk (<=1 implies no cutoff)"))
+
+    ("threads", po::value<int>(&threads), "# of threads")
+    
+    ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
+    ("help", "help message");
+  
+  po::variables_map variables;
+
+  po::store(po::parse_command_line(argc, argv, desc, po::command_line_style::unix_style & (~po::command_line_style::allow_guessing)), variables);
+  
+  po::notify(variables);
+
+  if (variables.count("help")) {
+    std::cout << argv[0] << " [options]\n"
+	      << desc << std::endl;
+    exit(0);
   }
 }
