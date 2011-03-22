@@ -122,6 +122,8 @@ typedef Grammar grammar_type;
 #endif
 
 path_set_type input_files;
+path_type     output_grammar_file = "-";
+path_type     output_unknown_file = "-";
 
 int max_iteration = 6;         // max split-merge iterations
 int max_iteration_split = 20;  // max EM-iterations for split
@@ -156,17 +158,79 @@ void grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, 
 template <typename Maximizer>
 void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
 
-
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks);
 
 void options(int argc, char** argv);
+
+struct zero_function
+{
+  typedef weight_type value_type;
+  
+  template <typename Edge>
+  weight_type operator()(const Edge& edge) const
+  {
+    return cicada::semiring::traits<weight_type>::exp(0.0);
+  }
+};
+
+struct weight_function
+{
+  typedef weight_type value_type;
+
+  weight_function(const grammar_type& __grammar) : grammar(__grammar) {}
+  
+  template <typename Edge>
+  weight_type operator()(const Edge& edge) const
+  {
+    grammar_type::const_iterator giter = grammar.find(edge.rule);
+    if (giter == grammar.end())
+      throw std::runtime_error("invalid rule");
+
+    return cicada::semiring::traits<weight_type>::exp(giter->second);
+  }
+  
+  const grammar_type& grammar;
+};
 
 int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
     
+    if (int(binarize_left) + binarize_right + binarize_all > 1)
+      throw std::runtime_error("specify either binarize-{left,right,all}");
+
+    if (input_files.empty())
+      input_files.push_back("-");
+    
+    hypergraph_set_type treebanks;
+    read_treebank(input_files, treebanks);
+    
     grammar_type grammar;
+    grammar_learn(treebanks, grammar, zero_function());
+    
+    for (int iter = 0; iter < max_iteration; ++ iter) {
+      // split...
+      grammar_split(treebanks, grammar, iter);
+      for (int i = 0; i < max_iteration_split; ++ i)
+	grammar_learn(treebanks, grammar, weight_function(grammar));
+      
+      // merge..
+      grammar_merge(treebanks, grammar, iter);
+      for (int i = 0; i < max_iteration_merge; ++ i)
+	grammar_learn(treebanks, grammar, weight_function(grammar));
+    }
+    
+    // output grammar...
+    {
+      utils::compress_ostream os(output_grammar_file, 1024 * 1024);
+      
+      grammar_type::const_iterator giter_end = grammar.end();
+      for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+	os << *(giter->first) << " ||| ||| " << giter->second << '\n';
+    }
+    
+    // output unknown handler...
     
   }
   catch (std::exception& err) {
@@ -234,33 +298,6 @@ struct filter_pruned
   }
 };
 
-struct zero_function
-{
-  template <typename Edge>
-  weight_type operator()(const Edge& edge) const
-  {
-    return cicada::semiring::traits<weight_type>::exp(0.0);
-  }
-  
-  const grammar_type& grammar;
-};
-
-struct weight_function
-{
-  weight_function(const grammar_type& __grammar) : grammar(__grammar) {}
-  
-  template <typename Edge>
-  weight_type operator()(const Edge& edge) const
-  {
-    grammar_type::const_iterator giter = grammar.find(edge.rule);
-    if (giter == grammar.end())
-      throw std::runtime_error("invalid rule");
-
-    return cicada::semiring::traits<weight_type>::exp(giter->second);
-  }
-  
-  const grammar_type& grammar;
-};
 
 struct Maximize
 {
@@ -646,6 +683,8 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 
 struct accumulator_type
 {
+  typedef weight_type value_type;
+
   accumulator_type(const hypergraph_type& __treebank,
 		   count_set_type& __counts)
     : treebank(__treebank), counts(__counts) {}
@@ -759,6 +798,8 @@ void options(int argc, char** argv)
   
   desc.add_options()
     ("input",  po::value<path_set_type>(&input_files), "input treebank")
+    ("output-grammar", po::value<path_type>(&output_grammar_file), "output grammar")
+    ("output-unknown", po::value<path_type>(&output_unknown_file), "output unknown rules")
     
     ("max-iteration",       po::value<int>(&max_iteration)->default_value(max_iteration),             "maximum split/merge iterations")
     ("max-iteration-split", po::value<int>(&max_iteration_split)->default_value(max_iteration_split), "maximum EM iterations after split")
