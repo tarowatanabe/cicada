@@ -21,13 +21,17 @@
 #include <deque>
 
 #include <cicada/hypergraph.hpp>
-#include <cicada/inside_ouside.hpp>
+#include <cicada/inside_outside.hpp>
 #include <cicada/semiring.hpp>
+#include <cicada/sort.hpp>
+#include <cicada/binarize.hpp>
 
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
+
+#include <boost/xpressive/xpressive.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
@@ -35,6 +39,11 @@
 #include <utils/sgi_hash_set.hpp>
 #include <utils/compress_stream.hpp>
 #include <utils/resource.hpp>
+#include <utils/mathop.hpp>
+#include <utils/lexical_cast.hpp>
+
+#include <google/dense_hash_map>
+#include <google/dense_hash_set>
 
 typedef cicada::HyperGraph hypergraph_type;
 typedef hypergraph_type::rule_type     rule_type;
@@ -57,16 +66,18 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 // use of google dense_map for holding const rule_type*, not rule_ptr_type!
 
 template <typename Tp>
-struct ptr_hash
+struct ptr_hash : public boost::hash<Tp>
 {
+  typedef boost::hash<Tp> hasher_type;
+
   size_t operator()(const Tp* x) const
   {
-    return boost::hash_value(*x);
+    return hasher_type::operator()(*x);
   }
   
-  size_t operator()(const boost::shared_ptr<Tp>* x) const
+  size_t operator()(const boost::shared_ptr<Tp>& x) const
   {
-    return boost::hash_value(*x);
+    return hasher_type::operator()(*x);
   }
 
 };
@@ -111,6 +122,20 @@ typedef Grammar grammar_type;
 #endif
 
 
+symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit=true);
+
+void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits);
+void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits);
+
+template <typename Function>
+void grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function);
+
+template <typename Maximizer>
+void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
+
+
+void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks);
+
 
 path_set_type input_files;
 
@@ -141,7 +166,7 @@ int main(int argc, char** argv)
   
 }
 
-symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit=true)
+symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit)
 {
   if (symbol.is_non_terminal()) {
     namespace xpressive = boost::xpressive;
@@ -155,11 +180,11 @@ symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const b
     
     static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
     
-    const utils::piece piece = sumbol.non_terminal_strip();
+    const utils::piece piece = symbol.non_terminal_strip();
     const int mask = 1 << bitpos;
     
     pmatch what;
-    if (xpressive::regex_math(piece), what, re) {
+    if (xpressive::regex_match(piece, what, re)) {
       const int value = (utils::lexical_cast<int>(what[2]) & (~mask)) | (-bit & mask);
       return '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
     } else
@@ -199,12 +224,70 @@ struct filter_pruned
   }
 };
 
-void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const int bits)
+struct zero_function
+{
+  template <typename Edge>
+  weight_type operator()(const Edge& edge) const
+  {
+    return cicada::semiring::traits<weight_type>::exp(0.0);
+  }
+  
+  const grammar_type& grammar;
+};
+
+struct weight_function
+{
+  weight_function(const grammar_type& __grammar) : grammar(__grammar) {}
+  
+  template <typename Edge>
+  weight_type operator()(const Edge& edge) const
+  {
+    grammar_type::const_iterator giter = grammar.find(edge.rule);
+    if (giter == grammar.end())
+      throw std::runtime_error("invalid rule");
+
+    return cicada::semiring::traits<weight_type>::exp(giter->second);
+  }
+  
+  const grammar_type& grammar;
+};
+
+struct Maximize
+{
+  void operator()(const grammar_type& counts, grammar_type& grammar) const
+  {
+    double sum = 0.0;
+    grammar_type::const_iterator citer_end = counts.end();
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      sum += citer->second + prior;
+    
+    const double logsum = utils::mathop::log(sum);
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      grammar[citer->first] = utils::mathop::log(citer->second + prior) - logsum;
+  }
+};
+
+struct MaximizeBayes
+{
+  void operator()(const grammar_type& counts, grammar_type& grammar) const
+  {
+    double sum = 0.0;
+    grammar_type::const_iterator citer_end = counts.end();
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      sum += citer->second + prior;
+    
+    const double logsum = utils::mathop::digamma(sum);
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      grammar[citer->first] = utils::mathop::digamma(citer->second + prior) - logsum;
+  }  
+};
+
+void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits)
 {
   // compute "loss" incurred by splitting...
 
 #ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<const rule_ptr_type> > rule_set_type;
+  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #else
   typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #endif
@@ -217,7 +300,7 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
-  typedef googe::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
+  typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
   
   weight_set_type inside;
   weight_set_type outside;
@@ -251,11 +334,11 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
       attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
       if (aiter == edge.attributes.end())
 	throw std::runtime_error("no node attribute?");
-      const int node_id_prev = boost::apply_visitor(attribute_integer(), iter->second);
+      const int node_id_prev = boost::apply_visitor(attribute_integer(), aiter->second);
       if (node_id_prev < 0)
 	throw std::runtime_error("invalid node attribute?");
       
-      if (node_id_prev >= symbols.size())
+      if (node_id_prev >= static_cast<int>(symbols.size()))
 	symbols.resize(node_id_prev + 1);
       
       symbols[node_id_prev].push_back(symbol_id_type(lhs, node.id));
@@ -299,7 +382,7 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   const size_t sorted_size = merge_ratio * sorted.size();
   std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
   
-  merged_set_type remove;
+  merged_set_type merged;
   merged.set_empty_key(symbol_type());
   
   sorted_type::const_iterator siter_end = sorted.begin() + sorted_size;
@@ -358,7 +441,7 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
     
     symbol_set_type::iterator siter_end = symbols.end();
     for (symbol_set_type::iterator siter = symbols.begin(); siter != siter_end; ++ siter)
-      if (siter->is_non_terminal() && if (merged.find(*siter) != merged.end()))
+      if (siter->is_non_terminal() && merged.find(*siter) != merged.end())
 	*siter = annotate_symbol(*siter, bits, false);
     
     const rule_ptr_type rule_new = *rules.insert(rule_type::create(rule_type(lhs, symbols))).first;
@@ -368,15 +451,15 @@ void grammar_merge(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   
   // maximization
   if (variational_bayes_mode)
-    maximize_gramamr(counts, grammar, MaximizeBayes());
+    maximize_grammar(counts, grammar, MaximizeBayes());
   else
     maximize_grammar(counts, grammar, Maximize());
 }
 
-void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const int bits)
+void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits)
 {
 #ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<const rule_ptr_type> > rule_set_type;
+  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #else
   typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #endif
@@ -545,38 +628,11 @@ void grammar_split(hypergraph_set_type& treebanks, gramamr_type& grammar, const 
   
   // maximization
   if (variational_bayes_mode)
-    maximize_gramamr(counts, grammar, MaximizeBayes());
+    maximize_grammar(counts, grammar, MaximizeBayes());
   else
     maximize_grammar(counts, grammar, Maximize());
 }
 
-struct zero_function
-{
-  template <typename Edge>
-  weight_type operator()(const Edge& edge) const
-  {
-    return cicada::semiring::traits<weight_type>::exp(0.0);
-  }
-  
-  const gramamr_type& grammar;
-};
-
-struct weight_function
-{
-  wegiht_function(const grammar_type& __grammar) : grammar(__grammar) {}
-  
-  template <typename Edge>
-  weight_type operator()(const Edge& edge) const
-  {
-    gramamr_type::const_iterator giter = grammar.find(edge.rule);
-    if (giter == grammar.end())
-      throw std::runtime_error("invalid rule");
-
-    return cicada::semiring::traits<weight_type>::exp(giter->second);
-  }
-  
-  const gramamr_type& grammar;
-};
 
 struct accumulator_type
 {
@@ -596,7 +652,7 @@ struct accumulator_type
 };
 
 template <typename Function>
-void grammar_learn(const hypergraph_set_type& treebanks, gramamr_type& grammar, Function function)
+void grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function)
 {
   // TODO: support threading!
   
@@ -634,41 +690,12 @@ void grammar_learn(const hypergraph_set_type& treebanks, gramamr_type& grammar, 
   
   // maximization
   if (variational_bayes_mode)
-    maximize_gramamr(counts, grammar, MaximizeBayes());
+    maximize_grammar(counts, grammar, MaximizeBayes());
   else
     maximize_grammar(counts, grammar, Maximize());
 }
 
 
-struct Maximize
-{
-  void operator()(const grammar_type& counts, grammar_type& grammar) const
-  {
-    double sum = 0.0;
-    grammar_type::const_iterator citer_end = counts.end();
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      sum += citer->second + prior;
-    
-    const double logsum = utils::mathop::log(sum);
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      grammar[citer->first] = utils::mathop::log(citer->second + prior) - logsum;
-  }
-};
-
-struct MaximizeBayes
-{
-  void operator()(const grammar_type& counts, grammar_type& grammar) const
-  {
-    double sum = 0.0;
-    grammar_type::const_iterator citer_end = counts.end();
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      sum += citer->second + prior;
-    
-    const double logsum = utils::mathop::digamma(sum);
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      grammar[citer->first] = utils::mathop::digamma(citer->second + prior) - logsum;
-  }  
-};
 
 template <typename Maximizer>
 void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer)
@@ -677,19 +704,19 @@ void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maxim
   
   count_set_type::const_iterator citer_end = counts.end();
   for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-    maximize(citer->second, grammar);
+    maximizer(citer->second, grammar);
 }
 
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
 {
 #ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<const rule_ptr_type> > rule_set_type;
+  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #else
   typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #endif
   
-  hypergrap_type treebank;
-  rule_set_type rules;
+  hypergraph_type treebank;
+  rule_set_type   rules;
   
   path_set_type::const_iterator fiter_end = files.end();
   for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {

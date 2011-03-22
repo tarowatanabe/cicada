@@ -50,6 +50,7 @@ bin_PROGRAMS = \
 	cicada_filter_penntreebank \
 	cicada_filter_terminal \
 	cicada_filter_weights \
+	cicada_grammar_learn \
 	cicada_index_cluster \
 	cicada_index_grammar \
 	cicada_index_global_lexicon \
@@ -171,6 +172,9 @@ cicada_filter_kbest_LDADD   = $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_weights_SOURCES = cicada_filter_weights.cpp
 cicada_filter_weights_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_grammar_learn_SOURCES = cicada_grammar_learn.cpp
+cicada_grammar_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_index_cluster_SOURCES = cicada_index_cluster.cpp
 cicada_index_cluster_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
