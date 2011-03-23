@@ -184,6 +184,7 @@ operation/permute.hpp \
 operation/prune.hpp \
 operation/remove_annotation.hpp \
 operation/remove_epsilon.hpp \
+operation/remove_unknown.hpp \
 operation/sort_tail.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp
@@ -204,6 +205,7 @@ operation/permute.cpp \
 operation/prune.cpp \
 operation/remove_annotation.cpp \
 operation/remove_epsilon.cpp \
+operation/remove_unknown.cpp \
 operation/sort_tail.cpp \
 operation/span_forest.cpp 
 libcicada_operation_la_CPPFLAGS = $(AM_CPPFLAGS)
@@ -277,6 +279,7 @@ prune_kbest.hpp \
 quantizer.hpp \
 remove_annotation.hpp \
 remove_epsilon.hpp \
+remove_unknown.hpp \
 rule.hpp \
 semiring.hpp \
 sentence.hpp \

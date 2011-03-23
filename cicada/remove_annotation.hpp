@@ -33,6 +33,11 @@ namespace cicada
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
+      if (! source.is_valid()) {
+	target.clear();
+	return;
+      }
+
       target = source;
       
       hypergraph_type::edge_set_type::iterator eiter_end = target.edges.end();
