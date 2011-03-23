@@ -1146,6 +1146,8 @@ void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
     utils::compress_istream is(*fiter, 1024 * 1024);
     
     while (is >> treebank) {
+      if (! treebank.is_valid()) continue;
+
       if (binarize_left)
 	cicada::binarize_left(treebank, 0);
       else if (binarize_right)
