@@ -653,13 +653,13 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     maximize_grammar(counts, grammar, Maximize());
 }
 
-struct TaskSplit
+struct TaskSplitTreebank
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   
-  TaskSplit(hypergraph_set_type& __treebanks,
-	    const int __bits,
-	    queue_type& __queue)
+  TaskSplitTreebank(hypergraph_set_type& __treebanks,
+		    const int __bits,
+		    queue_type& __queue)
     : treebanks(__treebanks),
       bits(__bits),
       queue(__queue)
@@ -795,25 +795,25 @@ struct TaskSplit
 template <typename Generator>
 void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
-  typedef TaskSplit task_type;
-  typedef task_type::queue_type  queue_type;  
+  typedef TaskSplitTreebank task_treebank_type;
+  typedef task_treebank_type::queue_type  queue_treebank_type;
 
   typedef std::vector<int, std::allocator<int> > index_set_type;
   typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
 
-  queue_type queue;
+  queue_treebank_type queue_treebank;
   
-  boost::thread_group workers;
+  boost::thread_group workers_treebank;
   for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(treebanks, bits, queue)));
+    workers_treebank.add_thread(new boost::thread(task_treebank_type(treebanks, bits, queue_treebank)));
 
   for (size_t i = 0; i != treebanks.size(); ++ i)
-    queue.push(i);
+    queue_treebank.push(i);
   
   for (int i = 0; i != threads; ++ i)
-    queue.push(-1);
+    queue_treebank.push(-1);
 
-  workers.join_all();
+  workers_treebank.join_all();
   
   // split grammar...
   count_set_type counts;
