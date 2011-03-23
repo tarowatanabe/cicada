@@ -182,6 +182,7 @@ operation/output.hpp \
 operation/parse.hpp \
 operation/permute.hpp \
 operation/prune.hpp \
+operation/remove_annotation.hpp \
 operation/remove_epsilon.hpp \
 operation/sort_tail.hpp \
 operation/span_forest.hpp \
@@ -201,6 +202,7 @@ operation/output.cpp \
 operation/parse.cpp \
 operation/permute.cpp \
 operation/prune.cpp \
+operation/remove_annotation.cpp \
 operation/remove_epsilon.cpp \
 operation/sort_tail.cpp \
 operation/span_forest.cpp 

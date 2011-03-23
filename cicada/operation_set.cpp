@@ -26,6 +26,7 @@
 #include "operation/expected_ngram.hpp"
 #include "operation/parse.hpp"
 #include "operation/prune.hpp"
+#include "operation/remove_annotation.hpp"
 #include "operation/remove_epsilon.hpp"
 #include "operation/sort_tail.hpp"
 #include "operation/span_forest.hpp"
@@ -137,6 +138,7 @@ prune: pruning\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
+remove-annotation: remove latent annotation from forest\n\
 remove-epsilon: remove epsilon for lattice\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 span-forest: annotate terminal span\n\
@@ -227,6 +229,8 @@ span-forest: annotate terminal span\n\
 	operations.push_back(operation_ptr_type(new operation::Intersect(*piter, debug)));
       else if (param_name == "normalize")
 	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
+      else if (param_name == "remove-annotation")
+	operations.push_back(operation_ptr_type(new operation::RemoveAnnotation(*piter, debug)));
       else if (param_name == "remove-epsilon")
 	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
       else if (param_name == "debinarize")

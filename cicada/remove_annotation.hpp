@@ -64,6 +64,25 @@ namespace cicada
     }
     
   };
+  
+  inline
+  void remove_annotation(HyperGraph& graph)
+  {
+    RemoveAnnotation remover;
+    
+    HyperGraph graph_removed;
+    remover(graph, graph_removed);
+    graph.swap(graph_removed)
+  }
+  
+  inline
+  void remove_annotation(const HyperGraph& source, HyperGraph& target)
+  {
+    RemoveAnnotation remover;
+    
+    remover(source, target);
+  }
+
 };
 
 #endif
