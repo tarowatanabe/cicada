@@ -103,10 +103,10 @@ typedef double logprob_type;
 
 typedef cicada::semiring::Logprob<double> weight_type;
 
-class Grammar : public google::dense_hash_map<rule_ptr_type, count_type, boost::hash<rule_ptr_type>, std::equal_to<rule_ptr_type> >
+class Grammar : public google::dense_hash_map<rule_ptr_type, count_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
 {
 public:
-  typedef google::dense_hash_map<rule_ptr_type, count_type, boost::hash<rule_ptr_type>, std::equal_to<rule_ptr_type> > count_set_type;
+  typedef google::dense_hash_map<rule_ptr_type, count_type, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
   
 public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
@@ -535,12 +535,6 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef task_type::queue_type    queue_type;
   typedef task_type::loss_set_type loss_set_type;
-
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
-#else
-  typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
-#endif
   
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
@@ -601,7 +595,6 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   }
   
   hypergraph_type treebank_new;
-  rule_set_type   rules;
   
   // perform hypergraph merging... we will simply remove the rules with removed symbol...!
   // topological order, and we need to keep track of new node-id...
@@ -625,9 +618,6 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 	  if (riter->is_non_terminal() && merged.find(*riter) != merged.end())
 	    removed[edge.id] = true;
       }
-      
-      if (! removed[edge.id])
-	edge.rule = *rules.insert(edge.rule).first;
     }
     
     cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
@@ -653,9 +643,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
       if (siter->is_non_terminal() && merged.find(*siter) != merged.end())
 	*siter = annotate_symbol(*siter, bits, false);
     
-    const rule_ptr_type rule_new = *rules.insert(rule_type::create(rule_type(lhs, symbols))).first;
-    
-    counts[lhs][rule_new] += utils::mathop::exp(giter->second);
+    counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(giter->second);
   }
   
   // maximization
@@ -813,12 +801,6 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   typedef std::vector<int, std::allocator<int> > index_set_type;
   typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
 
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
-#else
-  typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
-#endif
-
   queue_type queue;
   
   boost::thread_group workers;
@@ -832,18 +814,6 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     queue.push(-1);
 
   workers.join_all();
-
-  rule_set_type rules;
-  
-  // construct treebanks...
-  hypergraph_set_type::iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
-    hypergraph_type& treebank = *titer;
-    
-    hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
-    for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter)
-      eiter->rule = *rules.insert(eiter->rule).first;
-  }
   
   // split grammar...
   count_set_type counts;
@@ -879,7 +849,7 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 	if (j_end[i])
 	  symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
       
-      const rule_ptr_type rule = *rules.insert(rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()))).first;
+      const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
       
       // we will add 1% of randomness...
       counts[rule->lhs][rule] += utils::mathop::exp(giter->second) * boost::uniform_real<double>(0.99, 1.01)(generator);
@@ -1132,14 +1102,7 @@ void write_grammar(const path_type& file, const grammar_type& grammar)
 
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
 {
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
-#else
-  typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
-#endif
-  
   hypergraph_type treebank;
-  rule_set_type   rules;
   
   path_set_type::const_iterator fiter_end = files.end();
   for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
@@ -1154,11 +1117,6 @@ void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
 	cicada::binarize_right(treebank, 0);
       else if (binarize_all)
 	cicada::binarize_all(treebank);
-      
-      // use of unique rules...
-      hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
-      for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter)
-	eiter->rule = *(rules.insert(eiter->rule).first);
       
       treebanks.push_back(hypergraph_type());
       treebanks.back().swap(treebank);
