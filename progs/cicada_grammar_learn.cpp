@@ -822,7 +822,7 @@ struct TaskSplitGrammar
       queue.pop(ptr);
       if (! ptr) break;
       
-      const rule_ptr_type rule = ptr->first;
+      const rule_ptr_type& rule = ptr->first;
       
       symbols.clear();
       symbols.push_back(rule->lhs);
