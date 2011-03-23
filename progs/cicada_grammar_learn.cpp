@@ -73,12 +73,12 @@ struct ptr_hash : public boost::hash<Tp>
 
   size_t operator()(const Tp* x) const
   {
-    return hasher_type::operator()(*x);
+    return (x ? hasher_type::operator()(*x) : size_t(0));
   }
   
   size_t operator()(const boost::shared_ptr<Tp>& x) const
   {
-    return hasher_type::operator()(*x);
+    return (x ? hasher_type::operator()(*x) : size_t(0));
   }
 
 };
@@ -88,12 +88,12 @@ struct ptr_equal
 {
   bool operator()(const Tp* x, const Tp* y) const
   {
-    return x == y || *x == *y;
+    return x == y || (x && y && *x == *y);
   }
   
   bool operator()(const boost::shared_ptr<Tp>& x, const boost::shared_ptr<Tp>& y) const
   {
-    return x == y || *x == *y;
+    return x == y || (x && y && *x == *y);
   }
 };
 
