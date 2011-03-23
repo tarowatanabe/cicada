@@ -913,13 +913,18 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   count_set_type counts;
   
   for (int i = 0; i != threads; ++ i) {
-    count_set_type::const_iterator citer_end = tasks_grammar[i].counts.end();
-    for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer) {
-      grammar_type& grammar = counts[citer->first];
-      
-      grammar_type::const_iterator giter_end = citer->second.end();
-      for (grammar_type::const_iterator giter = citer->second.begin(); giter != giter_end; ++ giter)
-	grammar[giter->first] += giter->second;
+    
+    if (counts.empty())
+      counts.swap(tasks_grammar[i].counts);
+    else {
+      count_set_type::const_iterator citer_end = tasks_grammar[i].counts.end();
+      for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer) {
+	grammar_type& grammar = counts[citer->first];
+	
+	grammar_type::const_iterator giter_end = citer->second.end();
+	for (grammar_type::const_iterator giter = citer->second.begin(); giter != giter_end; ++ giter)
+	  grammar[giter->first] += giter->second;
+      }
     }
   }
   
