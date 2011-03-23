@@ -40,7 +40,7 @@ namespace cicada
 	edge_type& edge = *eiter;
 	const rule_type& rule = *edge.rule;
 	
-	const symbol_type lhs = remove_annotation(symbol);
+	const symbol_type lhs = remove_annotation(rule.lhs);
 	symbol_set_type rhs(rule.rhs);
 	
 	symbol_set_type::iterator riter_end = rhs.end();
@@ -62,7 +62,6 @@ namespace cicada
       else
 	return symbol.non_terminal();
     }
-    
   };
   
   inline
@@ -72,7 +71,7 @@ namespace cicada
     
     HyperGraph graph_removed;
     remover(graph, graph_removed);
-    graph.swap(graph_removed)
+    graph.swap(graph_removed);
   }
   
   inline

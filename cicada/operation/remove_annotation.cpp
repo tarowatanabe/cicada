@@ -9,6 +9,7 @@
 
 #include <cicada/operation/remove_annotation.hpp>
 
+#include <utils/lexical_cast.hpp>
 #include <utils/resource.hpp>
 #include <utils/piece.hpp>
 
