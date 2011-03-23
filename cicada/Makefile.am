@@ -273,6 +273,7 @@ prune_beam.hpp \
 prune_density.hpp \
 prune_kbest.hpp \
 quantizer.hpp \
+remove_annotation.hpp \
 remove_epsilon.hpp \
 rule.hpp \
 semiring.hpp \
