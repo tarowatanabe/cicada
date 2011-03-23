@@ -1201,10 +1201,9 @@ double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar
   }
   
   if (debug)
-    std::cerr << "log-likelihood: " << cicada::semiring::log(logprob) << std::endl;
-
-  if (debug)
-    std::cerr << "# of symbols: " << counts.size() << std::endl;
+    std::cerr << "log-likelihood: " << cicada::semiring::log(logprob)
+	      << " # of symbols: " << counts.size()
+	      << std::endl;
   
   // maximization
   if (variational_bayes_mode)
