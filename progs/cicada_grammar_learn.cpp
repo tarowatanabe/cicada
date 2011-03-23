@@ -42,6 +42,7 @@
 #include <utils/mathop.hpp>
 #include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
+#include <utils/array_power2.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -759,9 +760,11 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     maximize_grammar(counts, grammar, Maximize());
 }
 
-struct TaskSplitTreebank
+struct TaskSplitTreebank : public utils::hashmurmur<size_t>
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+  typedef utils::hashmurmur<size_t> hasher_type;
   
   TaskSplitTreebank(hypergraph_set_type& __treebanks,
 		    const int __bits,
@@ -770,6 +773,32 @@ struct TaskSplitTreebank
       bits(__bits),
       queue(__queue)
   {}
+
+
+  struct Cache
+  {
+    symbol_type symbol;
+    symbol_type annotated;
+    bool bit;
+    
+    Cache() : symbol(), annotated(), bit(false) {}
+  };
+  typedef Cache cache_type;
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+
+  cache_set_type caches;
+  
+  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
+  {
+    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
+    cache_type& cache = caches[cache_pos];
+    if (cache.symbol != symbol || cache.bit != bit) {
+      cache.symbol = symbol;
+      cache.bit = bit;
+      cache.annotated = annotate_symbol(symbol, bits, bit);
+    }
+    return cache.annotated;
+  }
   
   void operator()()
   {
@@ -839,8 +868,10 @@ struct TaskSplitTreebank
 	  for (;;) {
 	    // construct rule
 	    for (size_t i = 0; i != symbols.size(); ++ i)
-	      if (j_end[i])
-		symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
+	      if (j_end[i]) {
+		symbols_new[i] = annotate(symbols[i], j[i]);
+		//symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
+	      }
 	    
 	    const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
 	  
@@ -899,16 +930,45 @@ struct TaskSplitTreebank
 };
 
 template <typename Generator>
-struct TaskSplitGrammar
+struct TaskSplitGrammar : public utils::hashmurmur<size_t>
 {
   typedef utils::lockfree_list_queue<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > queue_type;
   
+  typedef utils::hashmurmur<size_t> hasher_type;
+
   TaskSplitGrammar(Generator __generator,
 		   const int& __bits,
 		   queue_type& __queue)
     : generator(__generator),
       bits(__bits),
       queue(__queue) {}
+  
+  
+  struct Cache
+  {
+    symbol_type symbol;
+    symbol_type annotated;
+    bool bit;
+    
+    Cache() : symbol(), annotated(), bit(false) {}
+  };
+  typedef Cache cache_type;
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+  
+  cache_set_type caches;
+  
+  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
+  {
+    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
+    cache_type& cache = caches[cache_pos];
+    if (cache.symbol != symbol || cache.bit != bit) {
+      cache.symbol = symbol;
+      cache.bit = bit;
+      cache.annotated = annotate_symbol(symbol, bits, bit);
+    }
+    return cache.annotated;
+  }
+
 
   void operator()()
   {
@@ -946,8 +1006,10 @@ struct TaskSplitGrammar
     
       for (;;) {
 	for (size_t i = 0; i != symbols.size(); ++ i)
-	  if (j_end[i])
-	    symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
+	  if (j_end[i]) {
+	    symbols_new[i] = annotate(symbols[i], j[i]);
+	    //symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
+	  }
       
 	const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
       
@@ -1294,6 +1356,10 @@ void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
       treebanks.back().swap(treebank);
     }
   }
+  
+  if (debug)
+    std::cerr << "# of treebank: " << treebanks.size() << std::endl;
+
 }
 
 void options(int argc, char** argv)
