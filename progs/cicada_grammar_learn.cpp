@@ -458,25 +458,84 @@ struct MaximizeBayes
   }  
 };
 
-struct TaskMergeWeights : public Annotator
+template <typename Scale>
+struct TaskMergeScale
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  typedef Scale scale_set_type;
   
+  TaskMergeScale(const hypergraph_set_type& __treebanks,
+		 const grammar_type& __grammar,
+		 queue_type& __queue)
+    : treebanks(__treebanks),
+      grammar(__grammar),
+      queue(__queue),
+      scale()
+  {
+    scale.set_empty_key(symbol_type());
+  }
   
+  void operator()()
+  {
+    // we will statistics that are requried for P(A_1 | A) and P(A_2 | A)
+    
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    
+    weight_set_type inside;
+    weight_set_type outside;
+    
+    int id = 0;
+    for (;;) {
+      queue.pop(id);
+      if (id < 0) break;
+      
+      const hypergraph_type& treebank = treebanks[id];
+      
+      inside.clear();
+      outside.clear();
+      inside.resize(treebank.nodes.size());
+      outside.resize(treebank.nodes.size());
+      
+      cicada::inside(treebank, inside, weight_function(grammar));
+      cicada::outside(treebank, inside, outside, weight_function(grammar));
+      
+      const weight_type weight_total = inside.back();
+
+      hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
+	const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
+	const symbol_type lhs = edge.rule->lhs;
+	
+	scale[lhs] += inside[node.id] * outside[node.id] / weight_total;
+      }
+    }
+  }
+  
+  const hypergraph_set_type& treebanks;
+  const grammar_type& grammar;
+  queue_type& queue;
+
+  scale_set_type scale;
 };
 
+template <typename Loss, typename Scale>
 struct TaskMergeLoss : public Annotator
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
-  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
+
+  typedef Loss loss_set_type;
+  typedef Scale scale_set_type;
 
   TaskMergeLoss(const hypergraph_set_type& __treebanks,
 		const grammar_type& __grammar,
+		const scale_set_type& __scale,
 		const int& __bits,
 		queue_type& __queue)
     : Annotator(__bits),
       treebanks(__treebanks),
       grammar(__grammar),
+      scale(__scale),
       queue(__queue),
       loss()
   {
@@ -541,18 +600,26 @@ struct TaskMergeLoss : public Annotator
 	  weight_type prob_split;
 	  weight_type inside_merge;
 	  weight_type outside_merge;
+	  count_type  scale_norm = 0.0;
 	  
 	  // is it correct?
 	  symbol_id_set_type::const_iterator iter_end = siter->end();
 	  for (symbol_id_set_type::const_iterator iter = siter->begin(); iter != iter_end; ++ iter) {
+	    
+	    typename scale_set_type::const_iterator witer = scale.find(iter->first);
+	    if (witer == scale.end())
+	      throw std::runtime_error("no scale? " + static_cast<const std::string&>(iter->first));
+
 	    prob_split += inside[iter->second] * outside[iter->second];
-	    inside_merge += inside[iter->second];
+	    inside_merge += inside[iter->second] * weight_type(witer->second);
 	    outside_merge += outside[iter->second];
+	    
+	    scale_norm += witer->second;
 	  }
 	  
-	  const weight_type loss_node = inside_merge * outside_merge / prob_split;
+	  const weight_type loss_node = (inside_merge * outside_merge / weight_type(scale_norm)) / prob_split;
 	  
-	  std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, false), loss_node));
+	  std::pair<typename loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, false), loss_node));
 	  if (! result.second)
 	    result.first->second *= loss_node;
 	} else if (siter->size() > 2)
@@ -563,6 +630,7 @@ struct TaskMergeLoss : public Annotator
   
   const hypergraph_set_type& treebanks;
   const grammar_type& grammar;
+  const scale_set_type& scale;
   
   queue_type& queue;
   
@@ -585,7 +653,6 @@ struct TaskMergeTreebank
   {
     hypergraph_type treebank_new;
     filter_pruned::removed_type removed;
-    
 
     int id = 0;
     for (;;) {
@@ -668,26 +735,57 @@ struct TaskMergeGrammar : public Annotator
 template <typename Generator>
 void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
-
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
+  typedef google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > scale_set_type;
+  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
 
-  typedef TaskMergeLoss                      task_loss_type;
-  typedef TaskMergeTreebank<merged_set_type> task_treebank_type;
-  typedef TaskMergeGrammar<merged_set_type>  task_grammar_type;
+  typedef TaskMergeScale<scale_set_type>               task_scale_type;
+  typedef TaskMergeLoss<loss_set_type, scale_set_type> task_loss_type;
+  typedef TaskMergeTreebank<merged_set_type>           task_treebank_type;
+  typedef TaskMergeGrammar<merged_set_type>            task_grammar_type;
   
+  typedef std::vector<task_scale_type, std::allocator<task_scale_type> >       task_scale_set_type;
   typedef std::vector<task_loss_type, std::allocator<task_loss_type> >         task_loss_set_type;
   typedef std::vector<task_treebank_type, std::allocator<task_treebank_type> > task_treebank_set_type;
   typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> >   task_grammar_set_type;
   
+  typedef typename task_scale_type::queue_type    queue_scale_type;
   typedef typename task_loss_type::queue_type     queue_loss_type;
   typedef typename task_treebank_type::queue_type queue_treebank_type;
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
   
-  typedef task_loss_type::loss_set_type loss_set_type;
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
+  queue_scale_type queue_scale;
+  task_scale_set_type tasks_scale(threads, task_scale_type(treebanks, grammar, queue_scale));
+  
+  boost::thread_group workers_scale;
+  for (int i = 0; i != threads; ++ i)
+    workers_scale.add_thread(new boost::thread(boost::ref(tasks_scale[i])));
+  
+  for (size_t i = 0; i != treebanks.size(); ++ i)
+    queue_scale.push(i);
+  
+  for (int i = 0; i != threads; ++ i)
+    queue_scale.push(-1);
+  
+  workers_scale.join_all();
+  
+  scale_set_type scale;
+  scale.set_empty_key(symbol_type());
+  
+  for (int i = 0; i != threads; ++ i) {
+    if (scale.empty())
+      scale.swap(tasks_scale[i].scale);
+    else {
+      scale_set_type::const_iterator siter_end = tasks_scale[i].scale.end();
+      for (scale_set_type::const_iterator siter = tasks_scale[i].scale.begin(); siter != siter_end; ++ siter)
+	scale[siter->first] += siter->second;
+    }
+  }
+  
   queue_loss_type queue_loss;
-  task_loss_set_type tasks_loss(threads, task_loss_type(treebanks, grammar, bits, queue_loss));
+  task_loss_set_type tasks_loss(threads, task_loss_type(treebanks, grammar, scale, bits, queue_loss));
   
   boost::thread_group workers_loss;
   for (int i = 0; i != threads; ++ i)
