@@ -128,7 +128,7 @@ path_type     output_unknown_file = "-";
 
 int max_iteration = 6;         // max split-merge iterations
 int max_iteration_split = 20;  // max EM-iterations for split
-int max_iteration_merge = 20;  // max EM-iterations for merge
+int max_iteration_merge = 10;  // max EM-iterations for merge
 
 bool binarize_left = false;
 bool binarize_right = false;
