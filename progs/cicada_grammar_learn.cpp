@@ -984,16 +984,60 @@ double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar
   return cicada::semiring::log(logprob);
 }
 
+template <typename Maximizer>
+struct TaskMaximize
+{
+  typedef utils::lockfree_list_queue<const count_set_type::value_type*, std::allocator<const count_set_type::value_type*> > queue_type;
+  
+  TaskMaximize(queue_type& __queue,
+	       Maximizer __maximizer)
+    : queue(__queue),
+      maximizer(__maximizer) {}
+  
+  void operator()()
+  {
+    const count_set_type::value_type* ptr = 0;
+    
+    for (;;) {
+      queue.pop(ptr);
+      if (! ptr) break;
+      
+      maximizer(ptr->second, grammar);
+    }
+  }
+  
+  queue_type& queue;
+  grammar_type grammar;
+  Maximizer    maximizer;
+};
 
 
 template <typename Maximizer>
 void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer)
 {
-  grammar.clear();
+  typedef TaskMaximize<Maximizer> task_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  typedef typename task_type::queue_type queue_type;
 
+  queue_type queue;
+  task_set_type tasks(threads, task_type(queue, maximizer));
+
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  
   count_set_type::const_iterator citer_end = counts.end();
   for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-    maximizer(citer->second, grammar);
+    queue.push(&(*citer));
+  
+  for (int i = 0; i != threads; ++ i)
+    queue.push(0);
+  
+  workers.join_all();
+  
+  grammar.clear();
+  for (int i = 0; i != threads; ++ i)
+    grammar.insert(tasks[i].grammar.begin(), tasks[i].grammar.end());
 }
 
 void write_grammar(const path_type& file, const grammar_type& grammar)
