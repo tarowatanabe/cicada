@@ -137,12 +137,12 @@ bool binarize_all = false;
 // naive variational bayes for smoothing... otherwise, dirichlet prior
 bool variational_bayes_mode = false;
 
-double prior          = 0.01;
+double prior          = 0.1;
 double prior_terminal = 0.01;
 
 double merge_ratio = 0.5;
 double cutoff_threshold = 1e-10;
-int    cutoff_unk = 1;
+int    cutoff_unknown = 1;
 
 int threads = 1;
 
@@ -162,6 +162,7 @@ double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar
 template <typename Maximizer>
 void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
 
+void write_grammar(const path_type& file, const grammar_type& grammar);
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks);
 
 void options(int argc, char** argv);
@@ -201,8 +202,14 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
     
+    if (merge_ratio <= 0.0 || 1.0 <= merge_ratio)
+      throw std::runtime_error("invalid merge ratio");
+      
     if (int(binarize_left) + binarize_right + binarize_all > 1)
       throw std::runtime_error("specify either binarize-{left,right,all}");
+
+    if (int(binarize_left) + binarize_right + binarize_all == 0)
+      binarize_left = true;
 
     if (input_files.empty())
       input_files.push_back("-");
@@ -296,13 +303,7 @@ int main(int argc, char** argv)
     }
     
     // output grammar...
-    {
-      utils::compress_ostream os(output_grammar_file, 1024 * 1024);
-      
-      grammar_type::const_iterator giter_end = grammar.end();
-      for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
-	os << *(giter->first) << " ||| ||| " << giter->second << '\n';
-    }
+    write_grammar(output_grammar_file, grammar);
     
     // output unknown handler...
     
@@ -357,6 +358,15 @@ struct greater_ptr_second
   }
 };
 
+template <typename Tp>
+struct less_ptr_second
+{
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second < y->second;
+  }
+};
+
 struct filter_pruned
 {
   typedef std::vector<bool, std::allocator<bool> > removed_type;
@@ -377,14 +387,18 @@ struct Maximize
 {
   void operator()(const grammar_type& counts, grammar_type& grammar) const
   {
+    bool is_terminal = false;
     double sum = 0.0;
     grammar_type::const_iterator citer_end = counts.end();
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+      sum += citer->second;
+      is_terminal |= citer->first->rhs.front().is_terminal();
+    }
+
+    const double prior_lhs = (is_terminal ? prior_terminal : prior);
+    const double logsum = utils::mathop::log(sum + prior_lhs * counts.size());
     for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      sum += citer->second + prior;
-    
-    const double logsum = utils::mathop::log(sum);
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      grammar[citer->first] = utils::mathop::log(citer->second + prior) - logsum;
+      grammar[citer->first] = utils::mathop::log(citer->second + prior_lhs) - logsum;
   }
 };
 
@@ -392,14 +406,18 @@ struct MaximizeBayes
 {
   void operator()(const grammar_type& counts, grammar_type& grammar) const
   {
+    bool is_terminal = false;
     double sum = 0.0;
     grammar_type::const_iterator citer_end = counts.end();
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      sum += citer->second + prior;
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+      sum += citer->second;
+      is_terminal |= citer->first->rhs.front().is_terminal();
+    }
     
-    const double logsum = utils::mathop::digamma(sum);
+    const double prior_lhs = (is_terminal ? prior_terminal : prior);
+    const double logsum = utils::mathop::digamma(sum + prior_lhs * counts.size());
     for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      grammar[citer->first] = utils::mathop::digamma(citer->second + prior) - logsum;
+      grammar[citer->first] = utils::mathop::digamma(citer->second + prior_lhs) - logsum;
   }  
 };
 
@@ -559,7 +577,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     }
   }
   
-  // sort wrt loss of splitting == reward of merging...
+  // sort wrt loss of merging == reward of splitting...
   sorted_type sorted;
   sorted.reserve(loss.size());
   
@@ -567,15 +585,20 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   for (loss_set_type::const_iterator liter = loss.begin(); liter != liter_end; ++ liter)
     sorted.push_back(&(*liter));
   
-  const size_t sorted_size = merge_ratio * sorted.size();
-  std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
+  const size_t sorted_size = utils::bithack::min(utils::bithack::max(1, int(merge_ratio * sorted.size())), int(sorted.size() - 1));
+  std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), less_ptr_second<loss_set_type::value_type>());
+
+  const weight_type loss_threshold = sorted[sorted_size]->second;
   
   merged_set_type merged;
   merged.set_empty_key(symbol_type());
   
-  sorted_type::const_iterator siter_end = sorted.begin() + sorted_size;
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+  sorted_type::const_iterator siter_end = sorted.end();
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second <= loss_threshold; ++ siter) {
+    if (debug >= 3)
+      std::cerr << "merge: " << (*siter)->first << " loss: " << (*siter)->second << std::endl;
     merged.insert(annotate_symbol((*siter)->first, bits, true));
+  }
   
   hypergraph_type treebank_new;
   rule_set_type   rules;
@@ -973,6 +996,37 @@ void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maxim
     maximizer(citer->second, grammar);
 }
 
+void write_grammar(const path_type& file, const grammar_type& grammar)
+{
+  typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
+
+  if (grammar.empty()) return;
+  
+  sorted_type sorted;
+  sorted.reserve(grammar.size());
+  
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    sorted.push_back(&(*giter));
+  
+  std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
+  
+  utils::compress_ostream os(file, 1024 * 1024);
+
+  if (0.0 < cutoff_threshold && cutoff_threshold < 1.0) {
+    const double logprob_max = sorted.front()->second;
+    const double logprob_threshold = logprob_max + utils::mathop::log(cutoff_threshold);
+    
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
+      os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+  } else {
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+      os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+  }
+}
+
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
 {
 #ifdef HAVE_TR1_UNORDERED_SET
@@ -1033,7 +1087,7 @@ void options(int argc, char** argv)
     ("prior-terminal",  po::value<double>(&prior_terminal)->default_value(prior_terminal), "Dirichlet prior for terminal rule")
 
     ("cutoff-threshold", po::value<double>(&cutoff_threshold)->default_value(cutoff_threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
-    ("cutoff-unk",       po::value<int>(&cutoff_unk)->default_value(cutoff_unk),                "cut-off threshold for unk (<=1 implies no cutoff)")
+    ("cutoff-unknown",   po::value<int>(&cutoff_unknown)->default_value(cutoff_unknown),        "cut-off threshold for unknown word (<=1 implies no cutoff)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
