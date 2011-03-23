@@ -224,7 +224,7 @@ int main(int argc, char** argv)
     
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
-    
+
     if (debug)
       std::cerr << "grammar size: " << grammar.size() << std::endl;
     
@@ -793,15 +793,93 @@ struct TaskSplitTreebank
 };
 
 template <typename Generator>
+struct TaskSplitGrammar
+{
+  typedef utils::lockfree_list_queue<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > queue_type;
+  
+  TaskSplitGrammar(Generator __generator,
+		   const int& __bits,
+		   queue_type& __queue)
+    : generator(__generator),
+      bits(__bits),
+      queue(__queue) {}
+
+  void operator()()
+  {
+    typedef std::vector<int, std::allocator<int> > index_set_type;
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+    
+    index_set_type  j;
+    index_set_type  j_end;
+    symbol_set_type symbols;
+    symbol_set_type symbols_new;
+    
+    const symbol_type root("[ROOT]");
+    
+    const grammar_type::value_type* ptr = 0;
+    
+    for (;;) {
+      queue.pop(ptr);
+      if (! ptr) break;
+      
+      const rule_ptr_type& rule = ptr->first;
+      
+      symbols.clear();
+      symbols.push_back(rule->lhs);
+      symbols.insert(symbols.end(), rule->rhs.begin(), rule->rhs.end());
+
+      symbols_new.clear();
+      symbols_new.insert(symbols_new.end(), symbols.begin(), symbols.end());
+    
+      j.clear();
+      j.resize(rule->rhs.size() + 1, 0);
+      j_end.resize(rule->rhs.size() + 1);
+    
+      for (size_t i = 0; i != symbols.size(); ++ i)
+	j_end[i] = utils::bithack::branch(symbols[i] == root, 1, utils::bithack::branch(symbols[i].is_non_terminal(), 2, 0));
+    
+      for (;;) {
+	for (size_t i = 0; i != symbols.size(); ++ i)
+	  if (j_end[i])
+	    symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
+      
+	const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
+      
+	// we will add 1% of randomness...
+	counts[rule->lhs][rule] += utils::mathop::exp(ptr->second) * boost::uniform_real<double>(0.99, 1.01)(generator);
+	
+	size_t index = 0;
+	for (/**/; index != j.size(); ++ index) 
+	  if (j_end[index]) {
+	    ++ j[index];
+	    if (j[index] < j_end[index]) break;
+	    j[index] = 0;
+	  }
+	
+	if (index == j.size()) break;
+      }
+    }
+  }
+  
+  Generator generator;
+  const int bits;
+  queue_type& queue;
+  count_set_type counts;
+};
+
+template <typename Generator>
 void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
-  typedef TaskSplitTreebank task_treebank_type;
-  typedef task_treebank_type::queue_type  queue_treebank_type;
+  typedef TaskSplitTreebank           task_treebank_type;
+  typedef TaskSplitGrammar<Generator> task_grammar_type;
 
-  typedef std::vector<int, std::allocator<int> > index_set_type;
-  typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
-
+  typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> > task_grammar_set_type;
+  
+  typedef typename task_treebank_type::queue_type  queue_treebank_type;
+  typedef typename task_grammar_type::queue_type  queue_grammar_type;
+  
   queue_treebank_type queue_treebank;
+  
   
   boost::thread_group workers_treebank;
   for (int i = 0; i != threads; ++ i)
@@ -814,55 +892,34 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     queue_treebank.push(-1);
 
   workers_treebank.join_all();
+
+  queue_grammar_type  queue_grammar;
+  task_grammar_set_type tasks_grammar(threads, task_grammar_type(generator, bits, queue_grammar));
   
-  // split grammar...
-  count_set_type counts;
-
-  index_set_type  j;
-  index_set_type  j_end;
-  symbol_set_type symbols;
-  symbol_set_type symbols_new;
-
-  const symbol_type root("[ROOT]");
-  const attribute_type attr_node("node");
+  boost::thread_group workers_grammar;
+  for (int i = 0; i != threads; ++ i)
+    workers_treebank.add_thread(new boost::thread(boost::ref(tasks_grammar[i])));
   
   grammar_type::const_iterator giter_end = grammar.end();
-  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
-    const rule_ptr_type& rule = giter->first;
-    
-    symbols.clear();
-    symbols.push_back(rule->lhs);
-    symbols.insert(symbols.end(), rule->rhs.begin(), rule->rhs.end());
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    queue_grammar.push(&(*giter));
+  
+  for (int i = 0; i != threads; ++ i)
+    queue_grammar.push(0);
+  
+  workers_grammar.join_all();
 
-    symbols_new.clear();
-    symbols_new.insert(symbols_new.end(), symbols.begin(), symbols.end());
-    
-    j.clear();
-    j.resize(rule->rhs.size() + 1, 0);
-    j_end.resize(rule->rhs.size() + 1);
-    
-    for (size_t i = 0; i != symbols.size(); ++ i)
-      j_end[i] = utils::bithack::branch(symbols[i] == root, 1, utils::bithack::branch(symbols[i].is_non_terminal(), 2, 0));
-    
-    for (;;) {
-      for (size_t i = 0; i != symbols.size(); ++ i)
-	if (j_end[i])
-	  symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
+  // split grammar...
+  count_set_type counts;
+  
+  for (int i = 0; i != threads; ++ i) {
+    count_set_type::const_iterator citer_end = tasks_grammar[i].counts.end();
+    for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer) {
+      grammar_type& grammar = counts[citer->first];
       
-      const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
-      
-      // we will add 1% of randomness...
-      counts[rule->lhs][rule] += utils::mathop::exp(giter->second) * boost::uniform_real<double>(0.99, 1.01)(generator);
-      
-      size_t index = 0;
-      for (/**/; index != j.size(); ++ index) 
-	if (j_end[index]) {
-	  ++ j[index];
-	  if (j[index] < j_end[index]) break;
-	  j[index] = 0;
-	}
-      
-      if (index == j.size()) break;
+      grammar_type::const_iterator giter_end = citer->second.end();
+      for (grammar_type::const_iterator giter = citer->second.begin(); giter != giter_end; ++ giter)
+	grammar[giter->first] += giter->second;
     }
   }
   
