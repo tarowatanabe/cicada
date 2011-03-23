@@ -21,6 +21,9 @@ namespace cicada
 {
   struct RemoveUnknown
   {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+
     typedef HyperGraph hypergraph_type;
     
     typedef hypergraph_type::id_type id_type;
@@ -29,6 +32,9 @@ namespace cicada
 
     typedef hypergraph_type::rule_type     rule_type;
     typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
 
     typedef rule_type::symbol_type     symbol_type;
     typedef rule_type::symbol_set_type symbol_set_type;
@@ -189,7 +195,7 @@ namespace cicada
 
     bool is_unknown(const symbol_type& symbol)
     {
-      if (! symbol.is_non_terminal()) return;
+      if (! symbol.is_non_terminal()) return false;
       
       const utils::piece piece = symbol.non_terminal_strip();
       
