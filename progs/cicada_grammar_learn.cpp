@@ -145,8 +145,9 @@ double prior_terminal = 0.01;
 
 bool keep_terminal = false;
 double merge_ratio = 0.5;
+
 double cutoff_threshold = 1e-20;
-int    cutoff_unknown = 1;
+int    cutoff_unknown = 10;
 
 int threads = 1;
 
