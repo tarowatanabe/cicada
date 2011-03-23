@@ -822,7 +822,7 @@ struct TaskSplitGrammar
       queue.pop(ptr);
       if (! ptr) break;
       
-      const rule_ptr_type& rule = ptr->first;
+      const rule_ptr_type rule = ptr->first;
       
       symbols.clear();
       symbols.push_back(rule->lhs);
@@ -875,11 +875,10 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 
   typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> > task_grammar_set_type;
   
-  typedef typename task_treebank_type::queue_type  queue_treebank_type;
+  typedef typename task_treebank_type::queue_type queue_treebank_type;
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
   
   queue_treebank_type queue_treebank;
-  
   
   boost::thread_group workers_treebank;
   for (int i = 0; i != threads; ++ i)
