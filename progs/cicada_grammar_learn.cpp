@@ -138,7 +138,7 @@ bool binarize_all = false;
 // naive variational bayes for smoothing... otherwise, dirichlet prior
 bool variational_bayes_mode = false;
 
-double prior          = 0.1;
+double prior          = 0.01;
 double prior_terminal = 0.01;
 
 double merge_ratio = 0.5;
