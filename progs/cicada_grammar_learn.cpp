@@ -422,11 +422,13 @@ struct MaximizeBayes
   }  
 };
 
-struct TaskMerge
+struct TaskMerge : public utils::hashmurmur<size_t>
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
   
+  typedef utils::hashmurmur<size_t> hasher_type;
+
   TaskMerge(const hypergraph_set_type& __treebanks,
 	    const grammar_type& __grammar,
 	    const int& __bits,
@@ -438,6 +440,32 @@ struct TaskMerge
       loss()
   {
     loss.set_empty_key(symbol_type());
+  }
+  
+  
+  struct Cache
+  {
+    symbol_type symbol;
+    symbol_type annotated;
+    bool bit;
+    
+    Cache() : symbol(), annotated(), bit(false) {}
+  };
+  typedef Cache cache_type;
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+  
+  cache_set_type caches;
+  
+  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
+  {
+    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
+    cache_type& cache = caches[cache_pos];
+    if (cache.symbol != symbol || cache.bit != bit) {
+      cache.symbol = symbol;
+      cache.bit = bit;
+      cache.annotated = annotate_symbol(symbol, bits, bit);
+    }
+    return cache.annotated;
   }
   
   void operator()()
@@ -509,7 +537,8 @@ struct TaskMerge
 	  
 	  const weight_type loss_node = inside_merge * outside_merge / prob_split;
 	  
-	  std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate_symbol(siter->front().first, bits, false), loss_node));
+	  //std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate_symbol(siter->front().first, bits, false), loss_node));
+	  std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, false), loss_node));
 	  if (! result.second)
 	    result.first->second *= loss_node;
 	} else if (siter->size() > 2)
@@ -582,16 +611,43 @@ struct TaskMergeTreebank
 };
 
 template <typename Merged>
-struct TaskMergeGrammar
+struct TaskMergeGrammar : public utils::hashmurmur<size_t>
 {
   typedef utils::lockfree_list_queue<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > queue_type;
   
+  typedef utils::hashmurmur<size_t> hasher_type;
+
   TaskMergeGrammar(const int __bits,
 		   const Merged& __merged,
 		   queue_type& __queue)
     : bits(__bits),
       merged(__merged),
       queue(__queue) {}
+
+  struct Cache
+  {
+    symbol_type symbol;
+    symbol_type annotated;
+    bool bit;
+    
+    Cache() : symbol(), annotated(), bit(false) {}
+  };
+  typedef Cache cache_type;
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+  
+  cache_set_type caches;
+  
+  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
+  {
+    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
+    cache_type& cache = caches[cache_pos];
+    if (cache.symbol != symbol || cache.bit != bit) {
+      cache.symbol = symbol;
+      cache.bit = bit;
+      cache.annotated = annotate_symbol(symbol, bits, bit);
+    }
+    return cache.annotated;
+  }
   
   void operator()()
   {
@@ -603,15 +659,19 @@ struct TaskMergeGrammar
       const rule_ptr_type& rule = ptr->first;
       
       symbol_type lhs = rule->lhs;
-      if (merged.find(lhs) != merged.end())
-	lhs = annotate_symbol(lhs, bits, false);
+      if (merged.find(lhs) != merged.end()) {
+	lhs = annotate(lhs, false);
+	//lhs = annotate_symbol(lhs, bits, false);
+      }
       
       symbol_set_type symbols(rule->rhs);
       
       symbol_set_type::iterator siter_end = symbols.end();
       for (symbol_set_type::iterator siter = symbols.begin(); siter != siter_end; ++ siter)
-	if (siter->is_non_terminal() && merged.find(*siter) != merged.end())
-	  *siter = annotate_symbol(*siter, bits, false);
+	if (siter->is_non_terminal() && merged.find(*siter) != merged.end()) {
+	  *siter = annotate(*siter, false);
+	  //*siter = annotate_symbol(*siter, bits, false);
+	}
       
       counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(ptr->second);
     }
