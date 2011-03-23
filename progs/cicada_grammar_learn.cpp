@@ -15,6 +15,8 @@
 //    8.  Merge
 //    9.  EM-iterations
 //
+// TODO: Do we differentiate terminal-rules and rules?
+// 
 
 #include <stdexcept>
 #include <vector>
@@ -160,7 +162,7 @@ template <typename Function>
 double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function);
 
 template <typename Maximizer>
-void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
+void grammar_maximize(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
 
 void write_grammar(const path_type& file, const grammar_type& grammar);
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks);
@@ -787,9 +789,9 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   
   // maximization
   if (variational_bayes_mode)
-    maximize_grammar(counts, grammar, MaximizeBayes());
+    grammar_maximize(counts, grammar, MaximizeBayes());
   else
-    maximize_grammar(counts, grammar, Maximize());
+    grammar_maximize(counts, grammar, Maximize());
 }
 
 struct TaskSplitTreebank : public Annotator
@@ -1070,9 +1072,9 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   
   // maximization
   if (variational_bayes_mode)
-    maximize_grammar(counts, grammar, MaximizeBayes());
+    grammar_maximize(counts, grammar, MaximizeBayes());
   else
-    maximize_grammar(counts, grammar, Maximize());
+    grammar_maximize(counts, grammar, Maximize());
 }
 
 
@@ -1210,9 +1212,9 @@ double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar
   
   // maximization
   if (variational_bayes_mode)
-    maximize_grammar(counts, grammar, MaximizeBayes());
+    grammar_maximize(counts, grammar, MaximizeBayes());
   else
-    maximize_grammar(counts, grammar, Maximize());
+    grammar_maximize(counts, grammar, Maximize());
   
   return cicada::semiring::log(logprob);
 }
@@ -1246,7 +1248,7 @@ struct TaskMaximize
 
 
 template <typename Maximizer>
-void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer)
+void grammar_maximize(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer)
 {
   typedef TaskMaximize<Maximizer> task_type;
   typedef typename task_type::queue_type queue_type;
