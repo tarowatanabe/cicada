@@ -139,7 +139,7 @@ bool binarize_all = false;
 bool variational_bayes_mode = false;
 
 double prior          = 0.01;
-double prior_terminal = 0.01;
+double prior_terminal = 0.1;
 
 double merge_ratio = 0.5;
 double cutoff_threshold = 1e-20;
