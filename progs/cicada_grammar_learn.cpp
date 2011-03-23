@@ -142,7 +142,7 @@ double prior          = 0.1;
 double prior_terminal = 0.01;
 
 double merge_ratio = 0.5;
-double cutoff_threshold = 1e-10;
+double cutoff_threshold = 1e-20;
 int    cutoff_unknown = 1;
 
 int threads = 1;
@@ -1277,25 +1277,48 @@ void write_grammar(const path_type& file, const grammar_type& grammar)
 
   if (grammar.empty()) return;
   
-  sorted_type sorted;
-  sorted.reserve(grammar.size());
-  
-  grammar_type::const_iterator giter_end = grammar.end();
-  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
-    sorted.push_back(&(*giter));
-  
-  std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
-  
-  utils::compress_ostream os(file, 1024 * 1024);
-
   if (0.0 < cutoff_threshold && cutoff_threshold < 1.0) {
-    const double logprob_max = sorted.front()->second;
-    const double logprob_threshold = logprob_max + utils::mathop::log(cutoff_threshold);
+    count_set_type counts;
+    sorted_type sorted;
     
-    sorted_type::const_iterator siter_end = sorted.end();
-    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
-      os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+    grammar_type::const_iterator giter_end = grammar.end();
+    for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+      counts[giter->first->lhs][giter->first] = giter->second;
+
+    utils::compress_ostream os(file, 1024 * 1024);
+    
+    count_set_type::const_iterator citer_end = counts.end();
+    for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+      const grammar_type& grammar = citer->second;
+      
+      sorted.clear();
+      
+      grammar_type::const_iterator giter_end = grammar.end();
+      for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+	sorted.push_back(&(*giter));
+      
+      std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
+      
+      const double logprob_max = sorted.front()->second;
+      const double logprob_threshold = logprob_max + utils::mathop::log(cutoff_threshold);
+      
+      sorted_type::const_iterator siter_end = sorted.end();
+      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
+	os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+    }
   } else {
+    // we will dump in sorted order...
+    sorted_type sorted;
+    sorted.reserve(grammar.size());
+    
+    grammar_type::const_iterator giter_end = grammar.end();
+    for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+      sorted.push_back(&(*giter));
+    
+    std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
+    
+    utils::compress_ostream os(file, 1024 * 1024);
+    
     sorted_type::const_iterator siter_end = sorted.end();
     for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
       os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
