@@ -665,137 +665,196 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     maximize_grammar(counts, grammar, Maximize());
 }
 
+struct TaskSplit
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+  TaskSplit(hypergraph_set_type& __treebanks,
+	    const int __bits,
+	    queue_type& __queue)
+    : treebanks(__treebanks),
+      bits(__bits),
+      queue(__queue)
+  {}
+  
+  void operator()()
+  {
+    typedef std::vector<int, std::allocator<int> > index_set_type;
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+    
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+      std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
+#else
+    typedef sgi::hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
+#endif
+    typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
+    
+    node_map_type   node_map;
+    hypergraph_type treebank_new;
+    
+    index_set_type  j;
+    index_set_type  j_end;
+    symbol_set_type symbols;
+    symbol_set_type symbols_new;
+    
+    const symbol_type root("[ROOT]");
+    const attribute_type attr_node("node");
+    
+    int id = 0;
+    for (;;) {
+      queue.pop(id);
+      if (id < 0) break;
+      
+      hypergraph_type& treebank = treebanks[id];
+      treebank_new.clear();
+      
+      //
+      // we will create node for original node-id + new-symbol
+      //
+      
+      node_map.clear();
+      node_map.resize(treebank.nodes.size());
+    
+      hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
+      
+	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const hypergraph_type::edge_type& edge = treebank.edges[*eiter];
+	  const rule_ptr_type& rule = edge.rule;
+	
+	  symbols.clear();
+	  symbols.push_back(rule->lhs);
+	  symbols.insert(symbols.end(), rule->rhs.begin(), rule->rhs.end());
+	
+	  symbols_new.clear();
+	  symbols_new.insert(symbols_new.end(), symbols.begin(), symbols.end());
+	
+	  j.clear();
+	  j.resize(rule->rhs.size() + 1, 0);
+	  j_end.resize(rule->rhs.size() + 1);
+	
+	  hypergraph_type::edge_type::node_set_type tails(edge.tails.size());
+	
+	  for (size_t i = 0; i != symbols.size(); ++ i)
+	    j_end[i] = utils::bithack::branch(symbols[i] == root, 1, utils::bithack::branch(symbols[i].is_non_terminal(), 2, 0));
+	
+	  for (;;) {
+	    // construct rule
+	    for (size_t i = 0; i != symbols.size(); ++ i)
+	      if (j_end[i])
+		symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
+	    
+	    const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
+	  
+	    // construct edge
+	    std::pair<node_set_type::iterator, bool> head = node_map[edge.head].insert(std::make_pair(symbols_new.front(), 0));
+	    if (head.second) {
+	      head.first->second = treebank_new.add_node().id;
+	    
+	      // handling goal... assuming penntreebank style...
+	      if (node.id == treebank.goal)
+		treebank_new.goal = head.first->second;
+	    }
+	  
+	    size_t pos = 0;
+	    for (size_t i = 1; i != symbols_new.size(); ++ i)
+	      if (j_end[i]) {
+		node_set_type::const_iterator iter = node_map[edge.tails[pos]].find(symbols_new[i]);
+		if (iter == node_map[edge.tails[pos]].end())
+		  throw std::runtime_error("invalid node...?");
+	      
+		tails[pos] = iter->second;
+		++ pos;
+	      }
+	  
+	    hypergraph_type::edge_type& edge_new = treebank_new.add_edge(tails.begin(), tails.end());
+	    edge_new.rule = rule;
+	    edge_new.attributes[attr_node] = attribute_set_type::int_type(edge.head);
+	  
+	    treebank_new.connect_edge(edge_new.id, head.first->second);
+	  
+	    size_t index = 0;
+	    for (/**/; index != j.size(); ++ index) 
+	      if (j_end[index]) {
+		++ j[index];
+		if (j[index] < j_end[index]) break;
+		j[index] = 0;
+	      }
+	  
+	    if (index == j.size()) break;
+	  }
+	}   
+      }
+
+      if (treebank_new.is_valid())
+	treebank_new.topologically_sort();
+    
+      treebank.swap(treebank_new);
+      treebank_new.clear();
+    }
+    
+  }
+  
+  hypergraph_set_type& treebanks;
+  const int bits;
+  queue_type& queue;
+};
+
 template <typename Generator>
 void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
+  typedef TaskSplit task_type;
+  typedef task_type::queue_type  queue_type;  
+
+  typedef std::vector<int, std::allocator<int> > index_set_type;
+  typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+
 #ifdef HAVE_TR1_UNORDERED_SET
   typedef std::tr1::unordered_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #else
   typedef sgi::hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type>, std::allocator<rule_ptr_type> > rule_set_type;
 #endif
 
-  typedef std::vector<int, std::allocator<int> > index_set_type;
-  typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
-
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-				  std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
-#else
-  typedef sgi::hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
-#endif
-  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
+  queue_type queue;
   
-  // split treebanks...
-  // we will control by "bits"
-    
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(task_type(treebanks, bits, queue)));
+
+  for (size_t i = 0; i != treebanks.size(); ++ i)
+    queue.push(i);
+  
+  for (int i = 0; i != threads; ++ i)
+    queue.push(-1);
+
+  workers.join_all();
+
   rule_set_type rules;
-  node_map_type node_map;
-  hypergraph_type treebank_new;
+  
+  // construct treebanks...
+  hypergraph_set_type::iterator titer_end = treebanks.end();
+  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+    hypergraph_type& treebank = *titer;
+    
+    hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
+    for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter)
+      eiter->rule = *rules.insert(eiter->rule).first;
+  }
+  
+  // split grammar...
+  count_set_type counts;
 
   index_set_type  j;
   index_set_type  j_end;
   symbol_set_type symbols;
   symbol_set_type symbols_new;
 
-  static const symbol_type root("[ROOT]");
-  static const attribute_type attr_node("node");
-  
-  // construct treebanks...
-  hypergraph_set_type::iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
-    hypergraph_type& treebank = *titer;
-    treebank_new.clear();
-    
-    //
-    // we will create node for original node-id + new-symbol
-    //
-    
-    node_map.clear();
-    node_map.resize(treebank.nodes.size());
-    
-    hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
-    for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
-      const hypergraph_type::node_type& node = *niter;
-      
-      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = treebank.edges[*eiter];
-	const rule_ptr_type& rule = edge.rule;
-	
-	symbols.clear();
-	symbols.push_back(rule->lhs);
-	symbols.insert(symbols.end(), rule->rhs.begin(), rule->rhs.end());
-	
-	symbols_new.clear();
-	symbols_new.insert(symbols_new.end(), symbols.begin(), symbols.end());
-	
-	j.clear();
-	j.resize(rule->rhs.size() + 1, 0);
-	j_end.resize(rule->rhs.size() + 1);
-	
-	hypergraph_type::edge_type::node_set_type tails(edge.tails.size());
-	
-	for (size_t i = 0; i != symbols.size(); ++ i)
-	  j_end[i] = utils::bithack::branch(symbols[i] == root, 1, utils::bithack::branch(symbols[i].is_non_terminal(), 2, 0));
-	
-	for (;;) {
-	  // construct rule
-	  for (size_t i = 0; i != symbols.size(); ++ i)
-	    if (j_end[i])
-	      symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
-	  
-	  const rule_ptr_type rule = *rules.insert(rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()))).first;
-	  
-	  // construct edge
-	  std::pair<node_set_type::iterator, bool> head = node_map[edge.head].insert(std::make_pair(symbols_new.front(), 0));
-	  if (head.second) {
-	    head.first->second = treebank_new.add_node().id;
-	    
-	    // handling goal... assuming penntreebank style...
-	    if (node.id == treebank.goal)
-	      treebank_new.goal = head.first->second;
-	  }
-	  
-	  size_t pos = 0;
-	  for (size_t i = 1; i != symbols_new.size(); ++ i)
-	    if (j_end[i]) {
-	      node_set_type::const_iterator iter = node_map[edge.tails[pos]].find(symbols_new[i]);
-	      if (iter == node_map[edge.tails[pos]].end())
-		throw std::runtime_error("invalid node...?");
-	      
-	      tails[pos] = iter->second;
-	      ++ pos;
-	    }
-	  
-	  hypergraph_type::edge_type& edge_new = treebank_new.add_edge(tails.begin(), tails.end());
-	  edge_new.rule = rule;
-	  edge_new.attributes[attr_node] = attribute_set_type::int_type(edge.head);
-	  
-	  treebank_new.connect_edge(edge_new.id, head.first->second);
-	  
-	  size_t index = 0;
-	  for (/**/; index != j.size(); ++ index) 
-	    if (j_end[index]) {
-	      ++ j[index];
-	      if (j[index] < j_end[index]) break;
-	      j[index] = 0;
-	    }
-	  
-	  if (index == j.size()) break;
-	}
-      }   
-    }
-
-    if (treebank_new.is_valid())
-      treebank_new.topologically_sort();
-    
-    treebank.swap(treebank_new);
-    treebank_new.clear();
-  }
-  
-  // split grammar...
-  count_set_type counts;
+  const symbol_type root("[ROOT]");
+  const attribute_type attr_node("node");
   
   grammar_type::const_iterator giter_end = grammar.end();
   for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
