@@ -897,7 +897,7 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   
   boost::thread_group workers_grammar;
   for (int i = 0; i != threads; ++ i)
-    workers_treebank.add_thread(new boost::thread(boost::ref(tasks_grammar[i])));
+    workers_grammar.add_thread(new boost::thread(boost::ref(tasks_grammar[i])));
   
   grammar_type::const_iterator giter_end = grammar.end();
   for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
