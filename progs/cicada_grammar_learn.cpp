@@ -131,7 +131,7 @@ path_type     output_unknown_file = "-";
 
 int max_iteration = 6;         // max split-merge iterations
 int max_iteration_split = 20;  // max EM-iterations for split
-int max_iteration_merge = 10;  // max EM-iterations for merge
+int max_iteration_merge = 20;  // max EM-iterations for merge
 
 bool binarize_left = false;
 bool binarize_right = false;
@@ -458,16 +458,22 @@ struct MaximizeBayes
   }  
 };
 
+struct TaskMergeWeights : public Annotator
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+  
+};
 
-struct TaskMerge : public Annotator
+struct TaskMergeLoss : public Annotator
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
 
-  TaskMerge(const hypergraph_set_type& __treebanks,
-	    const grammar_type& __grammar,
-	    const int& __bits,
-	    queue_type& __queue)
+  TaskMergeLoss(const hypergraph_set_type& __treebanks,
+		const grammar_type& __grammar,
+		const int& __bits,
+		queue_type& __queue)
     : Annotator(__bits),
       treebanks(__treebanks),
       grammar(__grammar),
@@ -540,7 +546,7 @@ struct TaskMerge : public Annotator
 	  symbol_id_set_type::const_iterator iter_end = siter->end();
 	  for (symbol_id_set_type::const_iterator iter = siter->begin(); iter != iter_end; ++ iter) {
 	    prob_split += inside[iter->second] * outside[iter->second];
-	    inside_merge += inside[iter->second] * (inside[iter->second] * outside[iter->second] / weight_total);
+	    inside_merge += inside[iter->second];
 	    outside_merge += outside[iter->second];
 	  }
 	  
@@ -662,49 +668,48 @@ struct TaskMergeGrammar : public Annotator
 template <typename Generator>
 void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
-  // compute "loss" incurred by splitting...
 
-  typedef TaskMerge task_type;
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-  typedef task_type::queue_type    queue_type;
-  typedef task_type::loss_set_type loss_set_type;
-  
-  typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
-  
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
-  
+
+  typedef TaskMergeLoss                      task_loss_type;
   typedef TaskMergeTreebank<merged_set_type> task_treebank_type;
   typedef TaskMergeGrammar<merged_set_type>  task_grammar_type;
-
-  typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> > task_grammar_set_type;
   
+  typedef std::vector<task_loss_type, std::allocator<task_loss_type> >         task_loss_set_type;
+  typedef std::vector<task_treebank_type, std::allocator<task_treebank_type> > task_treebank_set_type;
+  typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> >   task_grammar_set_type;
+  
+  typedef typename task_loss_type::queue_type     queue_loss_type;
   typedef typename task_treebank_type::queue_type queue_treebank_type;
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
   
-  queue_type queue;
-  task_set_type tasks(threads, task_type(treebanks, grammar, bits, queue));
+  typedef task_loss_type::loss_set_type loss_set_type;
+  typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
-  boost::thread_group workers;
+  queue_loss_type queue_loss;
+  task_loss_set_type tasks_loss(threads, task_loss_type(treebanks, grammar, bits, queue_loss));
+  
+  boost::thread_group workers_loss;
   for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    workers_loss.add_thread(new boost::thread(boost::ref(tasks_loss[i])));
   
   for (size_t i = 0; i != treebanks.size(); ++ i)
-    queue.push(i);
+    queue_loss.push(i);
   
   for (int i = 0; i != threads; ++ i)
-    queue.push(-1);
+    queue_loss.push(-1);
   
-  workers.join_all();
+  workers_loss.join_all();
   
   loss_set_type      loss;
   loss.set_empty_key(symbol_type());
 
   for (int i = 0; i != threads; ++ i) {
     if (loss.empty())
-      loss.swap(tasks[i].loss);
+      loss.swap(tasks_loss[i].loss);
     else {
-      loss_set_type::const_iterator liter_end = tasks[i].loss.end();
-      for (loss_set_type::const_iterator liter = tasks[i].loss.begin(); liter != liter_end; ++ liter) {
+      loss_set_type::const_iterator liter_end = tasks_loss[i].loss.end();
+      for (loss_set_type::const_iterator liter = tasks_loss[i].loss.begin(); liter != liter_end; ++ liter) {
 	std::pair<loss_set_type::iterator, bool> result = loss.insert(*liter);
 	if (! result.second)
 	  result.first->second *= liter->second;
