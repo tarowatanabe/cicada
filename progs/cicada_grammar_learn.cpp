@@ -137,9 +137,7 @@ bool binarize_all = false;
 
 // naive variational bayes for smoothing... otherwise, dirichlet prior
 bool variational_bayes_mode = false;
-bool interpolate_mode = false;
 
-double smooth         = 0.01;
 double prior          = 0.01;
 double prior_terminal = 0.01;
 
@@ -317,18 +315,6 @@ int main(int argc, char** argv)
   return 0;
 }
 
-symbol_type strip_symbol(const symbol_type& symbol)
-{
-  if (! symbol.is_non_terminal()) return symbol;
-  
-  const utils::piece piece = symbol.non_terminal_strip();
-  
-  utils::piece::size_type pos = piece.find('@');
-  if (pos != utils::piece::npos())
-    return '[' + piece.substr(0, pos) + ']';
-  else
-    return symbol;
-}
 
 symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit)
 {
@@ -448,10 +434,6 @@ struct Maximize
     for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
       grammar[citer->first] = utils::mathop::log(citer->second + prior_lhs) - logsum;
   }
-  void operator()(grammar_type& grammar) const
-  {
-    // do nothing here
-  }
 };
 
 struct MaximizeBayes
@@ -471,25 +453,8 @@ struct MaximizeBayes
     for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
       grammar[citer->first] = utils::mathop::digamma(citer->second + prior_lhs) - logsum;
   }  
-
-  void operator()(grammar_type& grammar) const
-  {
-    // do nothing here
-  }
 };
 
-struct MaximizeInterpolate
-{
-  void operator()(const grammar_type& counts, grammar_type& grammar) const
-  {
-    
-  }
-  
-  void operator()(grammar_type& grammar) const
-  {
-    
-  }
-};
 
 struct TaskMerge : public Annotator
 {
@@ -1272,8 +1237,6 @@ struct TaskMaximize
       
       maximizer(ptr->second, grammar);
     }
-
-    maximizer(grammar);
   }
   
   queue_type& queue;
@@ -1288,41 +1251,27 @@ void maximize_grammar(const count_set_type& counts, grammar_type& grammar, Maxim
   typedef TaskMaximize<Maximizer> task_type;
   typedef typename task_type::queue_type queue_type;
   
-  typedef boost::shared_ptr<task_type>  task_ptr_type;
-  typedef boost::shared_ptr<queue_type> queue_ptr_type;
-
-  typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> >   task_ptr_set_type;
-  typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   
-  queue_ptr_set_type queues;
-  task_ptr_set_type  tasks;
+  queue_type queue;
+  task_set_type tasks(threads, task_type(queue, maximizer));
   
   boost::thread_group workers;
-  for (int i = 0; i != threads; ++ i) {
-    queues[i].reset(new queue_type());
-    tasks[i].reset(new task_type(*queues[i], maximizer));
-    
-    workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
-  }
-
-  utils::hashmurmur<size_t> hasher;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
   count_set_type::const_iterator citer_end = counts.end();
-  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-    // we will distribute counts wrt the non-annotated lhs...
-    const int pos = hasher(strip_symbol(citer->first).id()) % threads;
-    
-    queues[pos]->push(&(*citer));
-  }
+  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+    queue.push(&(*citer));
   
   for (int i = 0; i != threads; ++ i)
-    queues[i]->push(0);
+    queue.push(0);
   
   workers.join_all();
   
   grammar.clear();
   for (int i = 0; i != threads; ++ i)
-    grammar.insert(tasks[i]->grammar.begin(), tasks[i]->grammar.end());
+    grammar.insert(tasks[i].grammar.begin(), tasks[i].grammar.end());
 }
 
 void write_grammar(const path_type& file, const grammar_type& grammar)
@@ -1427,9 +1376,7 @@ void options(int argc, char** argv)
     ("binarize-all",   po::bool_switch(&binarize_all),   "all binarization")
     
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
-    ("interpolate",       po::bool_switch(&interpolate_mode),       "interpolation smoothing")
     
-    ("smooth",          po::value<double>(&smooth)->default_value(smooth),                 "interpolation parameter")
     ("prior",           po::value<double>(&prior)->default_value(prior),                   "Dirichlet prior")
     ("prior-terminal",  po::value<double>(&prior_terminal)->default_value(prior_terminal), "Dirichlet prior for terminal rule")
 
