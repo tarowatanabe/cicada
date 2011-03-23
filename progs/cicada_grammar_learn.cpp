@@ -717,13 +717,13 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   const size_t sorted_size = utils::bithack::min(utils::bithack::max(1, int(merge_ratio * sorted.size())), int(sorted.size() - 1));
   std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
 
-  const weight_type loss_threshold = sorted[sorted_size]->second;
+  const weight_type threshold = sorted[sorted_size]->second;
   
   merged_set_type merged;
   merged.set_empty_key(symbol_type());
   
   sorted_type::const_iterator siter_end = sorted.end();
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= loss_threshold; ++ siter) {
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= threshold; ++ siter) {
     if (debug >= 3)
       std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
     merged.insert(annotate_symbol((*siter)->first, bits, true));
