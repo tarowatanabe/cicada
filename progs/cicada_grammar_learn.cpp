@@ -526,6 +526,103 @@ struct TaskMerge
   loss_set_type loss;
 };
 
+template <typename Merged>
+struct TaskMergeTreebank
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+  TaskMergeTreebank(hypergraph_set_type& __treebanks,
+		    const Merged& __merged,
+		    queue_type& __queue)
+    : treebanks(__treebanks),
+      merged(__merged),
+      queue(__queue) {}
+  
+  void operator()()
+  {
+    hypergraph_type treebank_new;
+    filter_pruned::removed_type removed;
+    
+
+    int id = 0;
+    for (;;) {
+      queue.pop(id);
+      if (id < 0) break;
+      
+      hypergraph_type& treebank = treebanks[id];
+      
+      removed.clear();
+      removed.resize(treebank.edges.size(), false);
+      
+      hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
+      for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
+	hypergraph_type::edge_type& edge = *eiter;
+	
+	const symbol_type lhs = edge.rule->lhs;
+	if (merged.find(lhs) != merged.end())
+	  removed[edge.id] = true;
+	else {
+	  symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	  for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+	    if (riter->is_non_terminal() && merged.find(*riter) != merged.end())
+	      removed[edge.id] = true;
+	}
+      }
+      
+      cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
+      
+      treebank.swap(treebank_new);
+    }
+  }
+  
+  hypergraph_set_type& treebanks;
+  const Merged& merged;
+  queue_type& queue;
+};
+
+template <typename Merged>
+struct TaskMergeGrammar
+{
+  typedef utils::lockfree_list_queue<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > queue_type;
+  
+  TaskMergeGrammar(const int __bits,
+		   const Merged& __merged,
+		   queue_type& __queue)
+    : bits(__bits),
+      merged(__merged),
+      queue(__queue) {}
+  
+  void operator()()
+  {
+    const grammar_type::value_type* ptr = 0;
+    for (;;) {
+      queue.pop(ptr);
+      if (! ptr) break;
+      
+      const rule_ptr_type& rule = ptr->first;
+      
+      symbol_type lhs = rule->lhs;
+      if (merged.find(lhs) != merged.end())
+	lhs = annotate_symbol(lhs, bits, false);
+      
+      symbol_set_type symbols(rule->rhs);
+      
+      symbol_set_type::iterator siter_end = symbols.end();
+      for (symbol_set_type::iterator siter = symbols.begin(); siter != siter_end; ++ siter)
+	if (siter->is_non_terminal() && merged.find(*siter) != merged.end())
+	  *siter = annotate_symbol(*siter, bits, false);
+      
+      counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(ptr->second);
+    }
+  }
+  
+  const int bits;
+  const Merged& merged;
+  queue_type& queue;
+  count_set_type counts;
+};
+
+
 template <typename Generator>
 void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
 {
@@ -539,6 +636,14 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
+  
+  typedef TaskMergeTreebank<merged_set_type> task_treebank_type;
+  typedef TaskMergeGrammar<merged_set_type>  task_grammar_type;
+
+  typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> > task_grammar_set_type;
+  
+  typedef typename task_treebank_type::queue_type queue_treebank_type;
+  typedef typename task_grammar_type::queue_type  queue_grammar_type;
   
   queue_type queue;
   task_set_type tasks(threads, task_type(treebanks, grammar, bits, queue));
@@ -594,57 +699,58 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     merged.insert(annotate_symbol((*siter)->first, bits, true));
   }
   
-  hypergraph_type treebank_new;
+  queue_treebank_type queue_treebank;
+
+  boost::thread_group workers_treebank;
+  for (int i = 0; i != threads; ++ i)
+    workers_treebank.add_thread(new boost::thread(task_treebank_type(treebanks, merged, queue_treebank)));
   
-  // perform hypergraph merging... we will simply remove the rules with removed symbol...!
-  // topological order, and we need to keep track of new node-id...
-  //
-  hypergraph_set_type::iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
-    hypergraph_type& treebank = *titer;
+  for (size_t i = 0; i != treebanks.size(); ++ i)
+    queue_treebank.push(i);
+  
+  for (int i = 0; i != threads; ++ i)
+    queue_treebank.push(-1);
 
-    filter_pruned::removed_type removed(treebank.edges.size(), false);
-
-    hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
-    for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
-      hypergraph_type::edge_type& edge = *eiter;
-      
-      const symbol_type lhs = edge.rule->lhs;
-      if (merged.find(lhs) != merged.end())
-	removed[edge.id] = true;
-      else {
-	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
-	for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
-	  if (riter->is_non_terminal() && merged.find(*riter) != merged.end())
-	    removed[edge.id] = true;
-      }
-    }
-    
-    cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
-    
-    treebank.swap(treebank_new);
-  }
-    
+  workers_treebank.join_all();
+  
+  queue_grammar_type queue_grammar;
+  task_grammar_set_type tasks_grammar(threads, task_grammar_type(bits, merged, queue_grammar));
+  
+  boost::thread_group workers_grammar;
+  for (int i = 0; i != threads; ++ i)
+    workers_grammar.add_thread(new boost::thread(boost::ref(tasks_grammar[i])));
+  
+  
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    queue_grammar.push(&(*giter));
+  
+  
+  for (int i = 0; i != threads; ++ i)
+    queue_grammar.push(0);
+  
+  workers_grammar.join_all();
+  
   // perform grammar merging
   count_set_type counts;
   
-  grammar_type::const_iterator giter_end = grammar.end();
-  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
-    const rule_ptr_type& rule = giter->first;
-    
-    symbol_type lhs = rule->lhs;
-    if (merged.find(lhs) != merged.end())
-      lhs = annotate_symbol(lhs, bits, false);
-    
-    symbol_set_type symbols(rule->rhs);
-    
-    symbol_set_type::iterator siter_end = symbols.end();
-    for (symbol_set_type::iterator siter = symbols.begin(); siter != siter_end; ++ siter)
-      if (siter->is_non_terminal() && merged.find(*siter) != merged.end())
-	*siter = annotate_symbol(*siter, bits, false);
-    
-    counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(giter->second);
+  for (int i = 0; i != threads; ++ i) {
+    if (counts.empty())
+      counts.swap(tasks_grammar[i].counts);
+    else {
+      count_set_type::const_iterator citer_end = tasks_grammar[i].counts.end();
+      for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer) {
+	grammar_type& grammar = counts[citer->first];
+	
+	grammar_type::const_iterator giter_end = citer->second.end();
+	for (grammar_type::const_iterator giter = citer->second.begin(); giter != giter_end; ++ giter)
+	  grammar[giter->first] += giter->second;
+      }
+    }
   }
+  
+  if (debug)
+    std::cerr << "# of symbols: " << counts.size() << std::endl;
   
   // maximization
   if (variational_bayes_mode)
@@ -912,7 +1018,6 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   count_set_type counts;
   
   for (int i = 0; i != threads; ++ i) {
-    
     if (counts.empty())
       counts.swap(tasks_grammar[i].counts);
     else {
@@ -926,6 +1031,9 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
       }
     }
   }
+
+  if (debug)
+    std::cerr << "# of symbols: " << counts.size() << std::endl;
   
   // maximization
   if (variational_bayes_mode)
