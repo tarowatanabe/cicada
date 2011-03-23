@@ -149,8 +149,6 @@ int threads = 1;
 
 int debug = 0;
 
-symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit=true);
-
 template <typename Generator>
 void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator);
 
@@ -343,6 +341,39 @@ symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const b
     return symbol;
 }
 
+struct Annotator : public utils::hashmurmur<size_t>
+{
+  typedef utils::hashmurmur<size_t> hasher_type;
+  
+  Annotator(const int __bits) : bits(__bits) {}
+  
+  struct Cache
+  {
+    symbol_type symbol;
+    symbol_type annotated;
+    bool bit;
+    
+    Cache() : symbol(), annotated(), bit(false) {}
+  };
+  typedef Cache cache_type;
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+  
+  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
+  {
+    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
+    cache_type& cache = caches[cache_pos];
+    if (cache.symbol != symbol || cache.bit != bit) {
+      cache.symbol = symbol;
+      cache.bit = bit;
+      cache.annotated = annotate_symbol(symbol, bits, bit);
+    }
+    return cache.annotated;
+  }
+  
+  cache_set_type caches;
+  const int bits;
+};
+
 struct attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
 {
   attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
@@ -422,50 +453,22 @@ struct MaximizeBayes
   }  
 };
 
-struct TaskMerge : public utils::hashmurmur<size_t>
+  struct TaskMerge : public Annotator
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
-  
-  typedef utils::hashmurmur<size_t> hasher_type;
 
   TaskMerge(const hypergraph_set_type& __treebanks,
 	    const grammar_type& __grammar,
 	    const int& __bits,
 	    queue_type& __queue)
-    : treebanks(__treebanks),
+    : Annotator(__bits),
+      treebanks(__treebanks),
       grammar(__grammar),
-      bits(__bits),
       queue(__queue),
       loss()
   {
     loss.set_empty_key(symbol_type());
-  }
-  
-  
-  struct Cache
-  {
-    symbol_type symbol;
-    symbol_type annotated;
-    bool bit;
-    
-    Cache() : symbol(), annotated(), bit(false) {}
-  };
-  typedef Cache cache_type;
-  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
-  
-  cache_set_type caches;
-  
-  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
-  {
-    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
-    cache_type& cache = caches[cache_pos];
-    if (cache.symbol != symbol || cache.bit != bit) {
-      cache.symbol = symbol;
-      cache.bit = bit;
-      cache.annotated = annotate_symbol(symbol, bits, bit);
-    }
-    return cache.annotated;
   }
   
   void operator()()
@@ -537,7 +540,6 @@ struct TaskMerge : public utils::hashmurmur<size_t>
 	  
 	  const weight_type loss_node = inside_merge * outside_merge / prob_split;
 	  
-	  //std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate_symbol(siter->front().first, bits, false), loss_node));
 	  std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, false), loss_node));
 	  if (! result.second)
 	    result.first->second *= loss_node;
@@ -549,7 +551,6 @@ struct TaskMerge : public utils::hashmurmur<size_t>
   
   const hypergraph_set_type& treebanks;
   const grammar_type& grammar;
-  const int bits;
   
   queue_type& queue;
   
@@ -611,43 +612,16 @@ struct TaskMergeTreebank
 };
 
 template <typename Merged>
-struct TaskMergeGrammar : public utils::hashmurmur<size_t>
+struct TaskMergeGrammar : public Annotator
 {
   typedef utils::lockfree_list_queue<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > queue_type;
   
-  typedef utils::hashmurmur<size_t> hasher_type;
-
   TaskMergeGrammar(const int __bits,
 		   const Merged& __merged,
 		   queue_type& __queue)
-    : bits(__bits),
+    : Annotator(__bits),
       merged(__merged),
       queue(__queue) {}
-
-  struct Cache
-  {
-    symbol_type symbol;
-    symbol_type annotated;
-    bool bit;
-    
-    Cache() : symbol(), annotated(), bit(false) {}
-  };
-  typedef Cache cache_type;
-  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
-  
-  cache_set_type caches;
-  
-  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
-  {
-    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
-    cache_type& cache = caches[cache_pos];
-    if (cache.symbol != symbol || cache.bit != bit) {
-      cache.symbol = symbol;
-      cache.bit = bit;
-      cache.annotated = annotate_symbol(symbol, bits, bit);
-    }
-    return cache.annotated;
-  }
   
   void operator()()
   {
@@ -659,25 +633,20 @@ struct TaskMergeGrammar : public utils::hashmurmur<size_t>
       const rule_ptr_type& rule = ptr->first;
       
       symbol_type lhs = rule->lhs;
-      if (merged.find(lhs) != merged.end()) {
+      if (merged.find(lhs) != merged.end())
 	lhs = annotate(lhs, false);
-	//lhs = annotate_symbol(lhs, bits, false);
-      }
       
       symbol_set_type symbols(rule->rhs);
       
       symbol_set_type::iterator siter_end = symbols.end();
       for (symbol_set_type::iterator siter = symbols.begin(); siter != siter_end; ++ siter)
-	if (siter->is_non_terminal() && merged.find(*siter) != merged.end()) {
+	if (siter->is_non_terminal() && merged.find(*siter) != merged.end())
 	  *siter = annotate(*siter, false);
-	  //*siter = annotate_symbol(*siter, bits, false);
-	}
       
       counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(ptr->second);
     }
   }
   
-  const int bits;
   const Merged& merged;
   queue_type& queue;
   count_set_type counts;
@@ -820,7 +789,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     maximize_grammar(counts, grammar, Maximize());
 }
 
-struct TaskSplitTreebank : public utils::hashmurmur<size_t>
+struct TaskSplitTreebank : public Annotator
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   
@@ -829,36 +798,10 @@ struct TaskSplitTreebank : public utils::hashmurmur<size_t>
   TaskSplitTreebank(hypergraph_set_type& __treebanks,
 		    const int __bits,
 		    queue_type& __queue)
-    : treebanks(__treebanks),
-      bits(__bits),
+    : Annotator(__bits),
+      treebanks(__treebanks),
       queue(__queue)
   {}
-
-
-  struct Cache
-  {
-    symbol_type symbol;
-    symbol_type annotated;
-    bool bit;
-    
-    Cache() : symbol(), annotated(), bit(false) {}
-  };
-  typedef Cache cache_type;
-  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
-
-  cache_set_type caches;
-  
-  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
-  {
-    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
-    cache_type& cache = caches[cache_pos];
-    if (cache.symbol != symbol || cache.bit != bit) {
-      cache.symbol = symbol;
-      cache.bit = bit;
-      cache.annotated = annotate_symbol(symbol, bits, bit);
-    }
-    return cache.annotated;
-  }
   
   void operator()()
   {
@@ -928,10 +871,8 @@ struct TaskSplitTreebank : public utils::hashmurmur<size_t>
 	  for (;;) {
 	    // construct rule
 	    for (size_t i = 0; i != symbols.size(); ++ i)
-	      if (j_end[i]) {
+	      if (j_end[i])
 		symbols_new[i] = annotate(symbols[i], j[i]);
-		//symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
-	      }
 	    
 	    const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
 	  
@@ -985,50 +926,20 @@ struct TaskSplitTreebank : public utils::hashmurmur<size_t>
   }
   
   hypergraph_set_type& treebanks;
-  const int bits;
   queue_type& queue;
 };
 
 template <typename Generator>
-struct TaskSplitGrammar : public utils::hashmurmur<size_t>
+struct TaskSplitGrammar : public Annotator
 {
   typedef utils::lockfree_list_queue<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > queue_type;
-  
-  typedef utils::hashmurmur<size_t> hasher_type;
 
   TaskSplitGrammar(Generator __generator,
 		   const int& __bits,
 		   queue_type& __queue)
-    : generator(__generator),
-      bits(__bits),
+    : Annotator(__bits),
+      generator(__generator),
       queue(__queue) {}
-  
-  
-  struct Cache
-  {
-    symbol_type symbol;
-    symbol_type annotated;
-    bool bit;
-    
-    Cache() : symbol(), annotated(), bit(false) {}
-  };
-  typedef Cache cache_type;
-  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
-  
-  cache_set_type caches;
-  
-  const symbol_type& annotate(const symbol_type& symbol, const bool bit)
-  {
-    const size_t cache_pos = hasher_type::operator()(symbol.id(), bit) & (caches.size() - 1);
-    cache_type& cache = caches[cache_pos];
-    if (cache.symbol != symbol || cache.bit != bit) {
-      cache.symbol = symbol;
-      cache.bit = bit;
-      cache.annotated = annotate_symbol(symbol, bits, bit);
-    }
-    return cache.annotated;
-  }
-
 
   void operator()()
   {
@@ -1066,10 +977,8 @@ struct TaskSplitGrammar : public utils::hashmurmur<size_t>
     
       for (;;) {
 	for (size_t i = 0; i != symbols.size(); ++ i)
-	  if (j_end[i]) {
+	  if (j_end[i])
 	    symbols_new[i] = annotate(symbols[i], j[i]);
-	    //symbols_new[i] = annotate_symbol(symbols[i], bits, j[i]);
-	  }
       
 	const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
       
@@ -1090,7 +999,6 @@ struct TaskSplitGrammar : public utils::hashmurmur<size_t>
   }
   
   Generator generator;
-  const int bits;
   queue_type& queue;
   count_set_type counts;
 };
