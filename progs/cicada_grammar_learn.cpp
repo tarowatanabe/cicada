@@ -723,7 +723,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   merged.set_empty_key(symbol_type());
   
   sorted_type::const_iterator siter_end = sorted.end();
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second <= loss_threshold; ++ siter) {
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= loss_threshold; ++ siter) {
     if (debug >= 3)
       std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
     merged.insert(annotate_symbol((*siter)->first, bits, true));
