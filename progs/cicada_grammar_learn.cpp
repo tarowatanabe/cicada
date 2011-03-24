@@ -619,7 +619,7 @@ struct TaskMergeLoss : public Annotator
 	  
 	  const weight_type loss_node = (inside_merge * outside_merge / weight_type(scale_norm)) / prob_split;
 	  
-	  std::pair<typename loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, false), loss_node));
+	  std::pair<typename loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, true), loss_node));
 	  if (! result.second)
 	    result.first->second *= loss_node;
 	} else if (siter->size() > 2)
@@ -837,7 +837,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   sorted_type::const_iterator siter_end = sorted.end();
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= threshold; ++ siter) {
     //std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
-    merged.insert(annotate_symbol((*siter)->first, bits, true));
+    merged.insert((*siter)->first);
   }
   
   // MapReduce to merge treeebanks
