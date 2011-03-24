@@ -27,6 +27,7 @@
 #include <cicada/semiring.hpp>
 #include <cicada/sort.hpp>
 #include <cicada/binarize.hpp>
+#include <cicada/signature.hpp>
 
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
@@ -61,6 +62,8 @@ typedef hypergraph_type::attribute_set_type attribute_set_type;
 
 typedef feature_set_type::feature_type     feature_type;
 typedef attribute_set_type::attribute_type attribute_type;
+
+typedef cicada::Signature signature_type;
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
@@ -127,7 +130,8 @@ typedef Grammar grammar_type;
 
 path_set_type input_files;
 path_type     output_grammar_file = "-";
-path_type     output_unknown_file = "-";
+path_type     output_lexicon_file = "-";
+path_type     output_character_file = "-";
 
 int max_iteration = 6;         // max split-merge iterations
 int max_iteration_split = 20;  // max EM-iterations for split
@@ -145,6 +149,9 @@ double prior_terminal = 0.01;
 
 bool keep_terminal = false;
 double merge_ratio = 0.5;
+
+std::string signature = "";
+bool signature_list = false;
 
 double cutoff_threshold = 1e-20;
 int    cutoff_unknown = 10;
@@ -204,6 +211,11 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+
+    if (signature_list) {
+      std::cout << signature_type::lists();
+      return 0;
+    }
     
     if (merge_ratio <= 0.0 || 1.0 <= merge_ratio)
       throw std::runtime_error("invalid merge ratio");
@@ -308,7 +320,7 @@ int main(int argc, char** argv)
     // output grammar...
     write_grammar(output_grammar_file, grammar);
     
-    // output unknown handler...
+    // output lexical rule
     
   }
   catch (std::exception& err) {
@@ -1480,8 +1492,9 @@ void options(int argc, char** argv)
   
   desc.add_options()
     ("input",  po::value<path_set_type>(&input_files), "input treebank")
-    ("output-grammar", po::value<path_type>(&output_grammar_file), "output grammar")
-    ("output-unknown", po::value<path_type>(&output_unknown_file), "output unknown rules")
+    ("output-grammar",   po::value<path_type>(&output_grammar_file),   "output grammar")
+    ("output-lexicon",   po::value<path_type>(&output_lexicon_file),   "output lexical rules")
+    ("output-character", po::value<path_type>(&output_character_file), "output character bigram")
     
     ("max-iteration",       po::value<int>(&max_iteration)->default_value(max_iteration),             "maximum split/merge iterations")
     ("max-iteration-split", po::value<int>(&max_iteration_split)->default_value(max_iteration_split), "maximum EM iterations after split")
@@ -1499,6 +1512,9 @@ void options(int argc, char** argv)
     
     ("keep-terminal", po::bool_switch(&keep_terminal),                             "keep terminal rule (and do not split/merge)")
     ("merge-ratio",   po::value<double>(&merge_ratio)->default_value(merge_ratio), "merging ratio")
+
+    ("signature",      po::value<std::string>(&signature), "signature for unknown word")
+    ("signature-list", po::bool_switch(&signature_list),   "list of signatures")
     
     ("cutoff-threshold", po::value<double>(&cutoff_threshold)->default_value(cutoff_threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
     ("cutoff-unknown",   po::value<int>(&cutoff_unknown)->default_value(cutoff_unknown),        "cut-off threshold for unknown word (<=1 implies no cutoff)")
