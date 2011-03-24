@@ -1098,7 +1098,7 @@ struct TaskSplitGrammar : public Annotator
 	const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
       
 	// we will add 1% of randomness...
-	counts[rule->lhs][rule] += utils::mathop::exp(ptr->second) * boost::uniform_real<double>(0.99, 1.01)(generator);
+	grammar[rule] = ptr->second * boost::uniform_real<double>(0.99, 1.01)(generator);
 	
 	size_t index = 0;
 	for (/**/; index != j.size(); ++ index) 
@@ -1115,7 +1115,7 @@ struct TaskSplitGrammar : public Annotator
   
   Generator generator;
   queue_type& queue;
-  count_set_type counts;
+  grammar_type grammar;
 };
 
 template <typename Generator>
@@ -1159,6 +1159,15 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   
   workers_grammar.join_all();
 
+  grammar.clear();
+  for (int i = 0; i != threads; ++ i) {
+    if (grammar.empty())
+      grammar.swap(tasks_grammar[i].grammar);
+    else
+      grammar.insert(tasks_grammar[i].grammar.begin(), tasks_grammar[i].grammar.end());
+  }
+
+#if 0
   // split grammar...
   count_set_type counts;
   
@@ -1185,6 +1194,7 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     grammar_maximize(counts, grammar, MaximizeBayes());
   else
     grammar_maximize(counts, grammar, Maximize());
+#endif
 }
 
 
@@ -1382,8 +1392,12 @@ void grammar_maximize(const count_set_type& counts, grammar_type& grammar, Maxim
   workers.join_all();
   
   grammar.clear();
-  for (int i = 0; i != threads; ++ i)
-    grammar.insert(tasks[i].grammar.begin(), tasks[i].grammar.end());
+  for (int i = 0; i != threads; ++ i) {
+    if (grammar.empty())
+      grammar.swap(tasks[i].grammar);
+    else
+      grammar.insert(tasks[i].grammar.begin(), tasks[i].grammar.end());
+  }
 }
 
 void write_grammar(const path_type& file, const grammar_type& grammar)
