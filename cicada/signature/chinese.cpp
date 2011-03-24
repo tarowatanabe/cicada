@@ -55,12 +55,15 @@ namespace cicada
 	: number_match(".*[[:^Numeric_Type=None:]〇○◯].*"),
 	  date_match(".*[[:^Numeric_Type=None:]〇○◯].*[年月日号]"),
 	  ordinal_match("第.*"),
-	  proper_name_match(".*[··•․‧∙⋅・].*") {}
+	  proper_name_match(".*[··•․‧∙⋅・].*"),
+	  punct_match(".*[[:P:]].*")
+      {}
 
       matcher_type number_match;
       matcher_type date_match;
       matcher_type ordinal_match;
       matcher_type proper_name_match;
+      matcher_type punct_match;
     };
 
     Chinese::Chinese() : pimpl(new ChineseImpl()) {}
@@ -100,6 +103,8 @@ namespace cicada
 	
 	if (impl.proper_name_match(uword))
 	  signature += "-PROPER";
+	if (impl.punct_match(uword))
+	  signature += "-PUNCT";
 	
 	__cache[word.id()] = signature;
       }
