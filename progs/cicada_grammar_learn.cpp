@@ -330,18 +330,30 @@ int main(int argc, char** argv)
   return 0;
 }
 
+bool is_fixed_non_terminal(const symbol_type& symbol)
+{  
+  if (symbol.is_terminal()) return false;
+  
+  static const symbol_type root("[ROOT]");
+  
+  if (symbol == root) return true;
+  
+  const utils::piece piece = symbol.non_terminal_strip();
+  
+  return (piece.size() >= 7 && piece.substr(0, 7) == "UNKNOWN");
+};
 
 symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit)
 {
   if (symbol.is_non_terminal()) {
+    if (is_fixed_non_terminal(symbol)) return symbol;
+
     namespace xpressive = boost::xpressive;
     
     typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
     typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
     
-    static const symbol_type root("[ROOT]");
     
-    if (symbol == root) return root;
     
     static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
     
@@ -952,7 +964,6 @@ struct TaskSplitTreebank : public Annotator
     symbol_set_type symbols;
     symbol_set_type symbols_new;
     
-    const symbol_type root("[ROOT]");
     const attribute_type attr_node("node");
     
     int id = 0;
@@ -993,7 +1004,7 @@ struct TaskSplitTreebank : public Annotator
 	  hypergraph_type::edge_type::node_set_type tails(edge.tails.size());
 	
 	  for (size_t i = 0; i != symbols.size(); ++ i)
-	    j_end[i] = utils::bithack::branch(symbols[i] == root, 1, utils::bithack::branch(symbols[i].is_non_terminal(), 2, 0));
+	    j_end[i] = utils::bithack::branch(symbols[i].is_non_terminal(), utils::bithack::branch(is_fixed_non_terminal(symbols[i]), 1, 2), 0);
 	
 	  for (;;) {
 	    // construct rule
@@ -1078,8 +1089,6 @@ struct TaskSplitGrammar : public Annotator
     symbol_set_type symbols;
     symbol_set_type symbols_new;
     
-    const symbol_type root("[ROOT]");
-    
     const grammar_type::value_type* ptr = 0;
     
     for (;;) {
@@ -1100,7 +1109,7 @@ struct TaskSplitGrammar : public Annotator
       j_end.resize(rule->rhs.size() + 1);
     
       for (size_t i = 0; i != symbols.size(); ++ i)
-	j_end[i] = utils::bithack::branch(symbols[i] == root, 1, utils::bithack::branch(symbols[i].is_non_terminal(), 2, 0));
+	j_end[i] = utils::bithack::branch(symbols[i].is_non_terminal(), utils::bithack::branch(is_fixed_non_terminal(symbols[i]), 1, 2), 0);
     
       for (;;) {
 	for (size_t i = 0; i != symbols.size(); ++ i)
