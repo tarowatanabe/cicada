@@ -12,6 +12,7 @@ libcicada-eval.la \
 libcicada-head.la \
 libcicada-optimize.la \
 libcicada-operation.la \
+libcicada-signature.la  \
 libcicada-stemmer.la 
 
 libcicadaincludedir= $(pkgincludedir)/cicada
@@ -21,6 +22,7 @@ evaldir      = $(pkgincludedir)/cicada/eval
 headdir      = $(pkgincludedir)/cicada/head
 optimizedir  = $(pkgincludedir)/cicada/optimize
 featuredir   = $(pkgincludedir)/cicada/feature
+signaturedir = $(pkgincludedir)/cicada/signature
 stemmerdir   = $(pkgincludedir)/cicada/stemmer
 operationdir = $(pkgincludedir)/cicada/operation
 tokenizerdir = $(pkgincludedir)/cicada/tokenizer
@@ -126,6 +128,14 @@ feature/span.cpp \
 feature/variational.cpp
 
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
+
+dist_signature_HEADERS = \
+signature/english.hpp
+
+libcicada_signature_la_SOURCES = \
+signature/english.cpp
+
+libcicada_signature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_stemmer_HEADERS = \
 stemmer/arabic.hpp \
@@ -284,6 +294,7 @@ rule.hpp \
 semiring.hpp \
 sentence.hpp \
 sentence_vector.hpp \
+signature.hpp \
 sort.hpp \
 sort_tail.hpp \
 sort_topologically.hpp \
@@ -332,6 +343,7 @@ parameter.cpp \
 rule.cpp \
 sentence.cpp \
 sentence_vector.cpp \
+signature.cpp \
 span_vector.cpp \
 stemmer.cpp \
 tokenizer.cpp \
@@ -360,6 +372,7 @@ libcicada_la_LIBADD = \
 	libcicada-optimize.la \
 	libcicada-operation.la \
 	libcicada-semiring.la \
+	libcicada-signature.la \
 	libcicada-stemmer.la \
 	\
 	$(LIBUTILS) \

@@ -756,6 +756,8 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
+
+  // MapReduce to compute scaling
   queue_scale_type queue_scale;
   task_scale_set_type tasks_scale(threads, task_scale_type(treebanks, grammar, queue_scale));
   
@@ -784,6 +786,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     }
   }
   
+  // MapReduce to compute loss
   queue_loss_type queue_loss;
   task_loss_set_type tasks_loss(threads, task_loss_type(treebanks, grammar, scale, bits, queue_loss));
   
@@ -837,6 +840,7 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
     merged.insert(annotate_symbol((*siter)->first, bits, true));
   }
   
+  // MapReduce to merge treeebanks
   queue_treebank_type queue_treebank;
 
   boost::thread_group workers_treebank;
@@ -851,13 +855,13 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 
   workers_treebank.join_all();
   
+  // MapReduce to merge grammar
   queue_grammar_type queue_grammar;
   task_grammar_set_type tasks_grammar(threads, task_grammar_type(bits, merged, queue_grammar));
   
   boost::thread_group workers_grammar;
   for (int i = 0; i != threads; ++ i)
     workers_grammar.add_thread(new boost::thread(boost::ref(tasks_grammar[i])));
-  
   
   grammar_type::const_iterator giter_end = grammar.end();
   for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
@@ -869,7 +873,6 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   
   workers_grammar.join_all();
   
-  // perform grammar merging
   count_set_type counts;
   
   for (int i = 0; i != threads; ++ i) {
