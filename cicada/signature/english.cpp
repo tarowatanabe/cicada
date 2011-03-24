@@ -49,6 +49,8 @@ namespace cicada
     
       if (__cache[word.id()] == vocab_type::EMPTY) {
 	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
+
+	std::string signature = "UNKNOWN";
 	
 	// signature for English, taken from Stanford parser's getSignature5
 	int num_caps = 0;
@@ -56,14 +58,79 @@ namespace cicada
 	bool has_dash = false;
 	bool has_lower = false;
 	
+	size_t length = 0;
+	UChar32 ch0 = 0;
+	UChar32 ch_1 = 0;
+	UChar32 ch_2 = 0;
 	StringCharacterIterator iter(uword);
-	for (iter.setToStart(); iter.hasNext(); /**/) {
+	for (iter.setToStart(); iter.hasNext(); ++ length) {
 	  UChar32 ch = iter.next32PostInc();
 	  
+	  // keep initial char...
+	  if (ch0 == 0)
+	    ch0 = ch;
+	  
+	  ch_2 = ch_1;
+	  ch_1 = ch;
+	  
+	  if (u_getNumericValue(ch) != U_NO_NUMERIC_VALUE)
+	    has_digit = true;
+	  if (u_hasBinaryProperty(ch,  UCHAR_DASH))
+	    has_dash = true;
+	  if (u_isUAlphabetic(ch)) {
+	    if (u_isULowercase(ch))
+	      has_lower = true;
+	    else if (u_istitle(ch)) {
+	      has_lower = true;
+	      ++num_caps;
+	    } else
+	      ++num_caps;
+	  }
 	}
 	
 	// transform into lower...
 	static_cast<Transliterator*>(pimpl)->transliterate(uword);
+	ch_2 = (ch_2 ? u_tolower(ch_2) : ch_2);
+	ch_1 = (ch_1 ? u_tolower(ch_1) : ch_1);
+	
+	// we do not check loc...
+	if (u_isUUppercase(ch0) || u_istitle(ch0))
+	  signature += "-CAPS";
+	else if (! u_isUAlphabetic(ch0) && num_caps > 0)
+	  signature += "-CAPS";
+	else if (has_lower)
+	  signature += "-LC";
+	
+	if (has_digit)
+	  signature += "-NUM";
+	if (has_dash)
+	  signature += "-DASH";
+	
+	if (length >= 3 && ch_1 == 's') {
+	  if (ch_2 != 's' && ch_2 != 'i' && ch_2 != 'u')
+	    signature += "-s";
+	} else if (length >= 5 && ! has_dash && ! (has_digit && num_caps > 0)) {
+	  if (uword.endsWith("ed"))
+	    signature += "-ed";
+	  else if (uword.endsWith("ing"))
+	    signature += "-ing";
+	  else if (uword.endsWith("ion"))
+	    signature += "-ion";
+	  else if (uword.endsWith("er"))
+	    signature += "-er";
+	  else if (uword.endsWith("est"))
+	    signature += "-est";
+	  else if (uword.endsWith("ly"))
+	    signature += "-ly";
+	  else if (uword.endsWith("ity"))
+	    signature += "-ity";
+	  else if (uword.endsWith("y"))
+	    signature += "-y";
+	  else if (uword.endsWith("al"))
+	    signature += "-al";
+	}
+	
+	__cache[word.id()] = signature;
       }
       
       return __cache[word.id()];

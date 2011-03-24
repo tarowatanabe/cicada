@@ -3,13 +3,14 @@
 //
 
 #include "signature.hpp"
+#include "signature/english.hpp"
 
 #include "parameter.hpp"
 
 #include <utils/sgi_hash_map.hpp>
 #include <utils/thread_specific_ptr.hpp>
 #include <utils/piece.hpp>
-#include "utils/lexical_cast.hpp"
+#include <utils/lexical_cast.hpp>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
@@ -18,7 +19,9 @@ namespace cicada
 {
   const char* Signature::lists()
   {
-    static const char* desc = "";
+    static const char* desc = "\
+english: English signature\n\
+";
     
     return desc;
   }
@@ -70,6 +73,18 @@ namespace cicada
     
     const parameter_type param(parameter);
     
+    if (utils::ipiece(param.name()) == "english") {
+      const std::string name("english");
+      
+      signature_map_type::iterator iter = signatures_map.find(name);
+      if (iter == signatures_map.end()) {
+	iter = signatures_map.insert(std::make_pair(name, signature_ptr_type(new signature::English()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else
+      throw std::runtime_error("invalid parameter: " + parameter);
     
   }
   
