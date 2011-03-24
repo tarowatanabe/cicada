@@ -3,6 +3,7 @@
 //
 
 #include "signature.hpp"
+#include "signature/chinese.hpp"
 #include "signature/english.hpp"
 
 #include "parameter.hpp"
@@ -73,7 +74,17 @@ english: English signature\n\
     
     const parameter_type param(parameter);
     
-    if (utils::ipiece(param.name()) == "english") {
+    if (utils::ipiece(param.name()) == "chinese") {
+      const std::string name("chinese");
+      
+      signature_map_type::iterator iter = signatures_map.find(name);
+      if (iter == signatures_map.end()) {
+	iter = signatures_map.insert(std::make_pair(name, signature_ptr_type(new signature::Chinese()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "english") {
       const std::string name("english");
       
       signature_map_type::iterator iter = signatures_map.find(name);
