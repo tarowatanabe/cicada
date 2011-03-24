@@ -130,9 +130,11 @@ feature/variational.cpp
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_signature_HEADERS = \
-signature/english.hpp
+signature/chinese.hpp  \
+signature/english.hpp 
 
 libcicada_signature_la_SOURCES = \
+signature/chinese.cpp \
 signature/english.cpp
 
 libcicada_signature_la_CPPFLAGS = $(AM_CPPFLAGS)
