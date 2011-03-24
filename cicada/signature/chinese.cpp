@@ -52,8 +52,8 @@ namespace cicada
       
       
       ChineseImpl()
-	: number_match(".*[0-9０-９一二三四五六七八九十百千万亿零〇○◯].*"),
-	  date_match(".*[0-9０-９一二三四五六七八九十百千万亿零〇○◯].*[年月日号]"),
+	: number_match(".*[[:^Numeric_Type=None:]〇○◯].*"),
+	  date_match(".*[[:^Numeric_Type=None:]〇○◯].*[年月日号]"),
 	  ordinal_match("第.*"),
 	  proper_name_match(".*[··•․‧∙⋅・].*") {}
 
