@@ -833,10 +833,14 @@ void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const 
   
   merged_set_type merged;
   merged.set_empty_key(symbol_type());
+
+  if (debug >= 2)
+    std::cerr << "threshold: " << threshold << std::endl;
   
   sorted_type::const_iterator siter_end = sorted.end();
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= threshold; ++ siter) {
-    //std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
+    if (debug >= 2)
+      std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
     merged.insert((*siter)->first);
   }
   
@@ -1255,7 +1259,7 @@ struct TaskLearn
       
       cicada::inside_outside(treebank, inside, outside, accumulator, function, function);
       
-      if (debug >= 2)
+      if (debug >= 3)
 	std::cerr << "inside: " << cicada::semiring::log(inside.back()) << std::endl;
       
       logprob *= inside.back();
