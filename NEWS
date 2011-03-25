@@ -1,6 +1,8 @@
 2011-3-XX
+New grammar API: use --grammar and/or --tree-grammar only, and removed options, such as --grammar-static etc.
 Added parser component. Currently, we support tabular-CKY and bottom-up agenda-based best-first search with pruning.
 Added parseval evaluator.
+Added grammar learner based on latent annotation grammar
 Better scanner/generator for hypergraph/lattice structures etc. by eliminating (potentially slower) symbol-tables.
 
 2011-2-14
