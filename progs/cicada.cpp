@@ -214,8 +214,8 @@ void options(int argc, char** argv)
   po::options_description desc_command;
   po::options_description desc_visible;
   
-  desc_config.add(opts_config).add(opts_deprecated);
-  desc_command.add(opts_config).add(opts_command).add(opts_deprecated);
+  desc_config.add(opts_deprecated).add(opts_config);
+  desc_command.add(opts_deprecated).add(opts_config).add(opts_command);
   desc_visible.add(opts_config).add(opts_command);
   
   po::variables_map variables;
