@@ -41,9 +41,9 @@ insertion: terminal insertion rule\n\
 \tnon-terminal=[defaut non-terminal]\n\
 deletion: terminal deletion rule\n\
 \tnon-terminal=[defaut non-terminal]\n\
-pair: terminal pair rule\n\
+pair: terminal pair rule (for alignment composition)\n\
 \tnon-terminal=[defaut non-terminal]\n\
-pos: terminal pos rule\n\
+pos: terminal pos rule (for POS annotated input) \n\
 ";
     return desc;
   }
