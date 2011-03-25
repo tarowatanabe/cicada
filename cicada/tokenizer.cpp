@@ -7,6 +7,7 @@
 #include "parameter.hpp"
 
 #include "tokenizer/lower.hpp"
+#include "tokenizer/characters.hpp"
 #include "tokenizer/nonascii.hpp"
 #include "tokenizer/tokenize.hpp"
 #include "tokenizer/nist.hpp"
@@ -30,6 +31,7 @@ namespace cicada
     static const char* desc = "\
 lower: lower casing\n\
 nonascii: split non ascii characters\n\
+character: split all the characters\n\
 nist: NIST mteval style tokenization\n\
 penn: penn-treebank stye tokenization\n\
 stemmer: tokenize by stemming algorithm\n\
@@ -37,6 +39,7 @@ stemmer: tokenize by stemming algorithm\n\
 tokenize: use the chain of tokenization\n\
 \tlower=[true|false] perform lower casing\n\
 \tnonascii=[true|false] perform non ascii character splitting\n\
+\tcharacter=[true|false] perform all character splitting\n\
 \tnist=[true|false] perform NIST tokenization\n\
 \tpenn=[true|false] perform Penn-treebank tokenization\n\
 \tstemmer=[stemmer spec] perform by stemmring tokenization\n\
@@ -129,6 +132,16 @@ tokenize: use the chain of tokenization\n\
       }
       
       return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "character" || utils::ipiece(param.name()) == "characters") {
+      const std::string name("character");
+      
+      tokenizer_map_type::iterator iter = tokenizers_map.find(name);
+      if (iter == tokenizers_map.end()) {
+	iter = tokenizers_map.insert(std::make_pair(name, tokenizer_ptr_type(new tokenizer::Characters()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
     } else if (utils::ipiece(param.name()) == "stemmer") {
       std::string algorithm;
       
@@ -169,6 +182,9 @@ tokenize: use the chain of tokenization\n\
 	  } else if (utils::ipiece(piter->first) == "nonascii") {
 	    if (utils::lexical_cast<bool>(piter->second))
 	      tokenize->insert(create("nonascii"));
+	  } else if (utils::ipiece(piter->first) == "character" || utils::ipiece(piter->first) == "characters") {
+	    if (utils::lexical_cast<bool>(piter->second))
+	      tokenize->insert(create("character"));
 	  } else if (utils::ipiece(piter->first) == "stemmer")
 	    tokenize->insert(create("stemmer:algorithm=" + piter->second));
 	  else

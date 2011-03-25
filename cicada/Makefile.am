@@ -161,6 +161,7 @@ libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)
 libcicada_stemmer_la_LIBADD = $(top_builddir)/libstemmer_c/libstemmer.la
 
 dist_tokenizer_HEADERS = \
+tokenizer/characters.hpp \
 tokenizer/lower.hpp \
 tokenizer/nist.hpp \
 tokenizer/nonascii.hpp \
