@@ -28,6 +28,9 @@ namespace cicada
     typedef transducer_type::rule_pair_type     rule_pair_type;
     typedef transducer_type::rule_pair_set_type rule_pair_set_type;
 
+    typedef transducer_type::hypergraph_type hypergraph_type;
+    typedef transducer_type::lattice_type    lattice_type;
+    
   private:
     typedef std::vector<transducer_ptr_type, std::allocator<transducer_ptr_type> > transducer_ptr_set_type;
 
@@ -69,6 +72,20 @@ namespace cicada
 	__grammar.push_back((*iter)->clone());
       
       return __grammar;
+    }
+
+    void assign(const lattice_type& lattice) const
+    {
+      transducer_ptr_set_type::const_iterator iter_end = transducers.end();
+      for (transducer_ptr_set_type::const_iterator iter = transducers.begin(); iter != iter_end; ++ iter)
+	const_cast<transducer_ptr_type&>(*iter)->assign(lattice);
+    }
+    
+    void assign(const hypergraph_type& hypergraph) const
+    {
+      transducer_ptr_set_type::const_iterator iter_end = transducers.end();
+      for (transducer_ptr_set_type::const_iterator iter = transducers.begin(); iter != iter_end; ++ iter)
+	const_cast<transducer_ptr_type&>(*iter)->assign(hypergraph);
     }
     
   private:

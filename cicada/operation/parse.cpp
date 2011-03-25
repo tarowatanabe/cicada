@@ -24,13 +24,9 @@ namespace cicada
     ParseCKY::ParseCKY(const std::string& parameter,
 		       const grammar_type& __grammar,
 		       const std::string& __goal,
-		       const std::string& __non_terminal,
-		       const bool __insertion,
-		       const bool __deletion,
 		       const int __debug)
       : grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
-	insertion(__insertion), deletion(__deletion),
+	goal(__goal), 
 	weights(0),
 	weights_assigned(0),
 	size(200),
@@ -108,19 +104,12 @@ namespace cicada
 
       utils::resource start;
 
-      grammar_type grammar_parse(grammar);
-    
-      if (insertion)
-	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
-      if (deletion)
-	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
-      if (pos_mode)
-	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPOS(lattice)));
+      grammar.assign(lattice);
 	
       if (weights_one)
-	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
+	cicada::parse_cky(goal, grammar, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
       else
-	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
+	cicada::parse_cky(goal, grammar, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
       
       utils::resource end;
     
@@ -142,13 +131,9 @@ namespace cicada
     ParseAgenda::ParseAgenda(const std::string& parameter,
 		       const grammar_type& __grammar,
 		       const std::string& __goal,
-		       const std::string& __non_terminal,
-		       const bool __insertion,
-		       const bool __deletion,
 		       const int __debug)
       : grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
-	insertion(__insertion), deletion(__deletion),
+	goal(__goal),
 	weights(0),
 	weights_assigned(0),
 	size(200),
@@ -223,19 +208,12 @@ namespace cicada
 
       utils::resource start;
 
-      grammar_type grammar_parse(grammar);
-    
-      if (insertion)
-	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
-      if (deletion)
-	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
-      if (pos_mode)
-	grammar_parse.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPOS(lattice)));
+      grammar.assign(lattice);
       
       if (weights_one)
-	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode);
+	cicada::parse_agenda(goal, grammar, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode);
       else
-	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode);
+	cicada::parse_agenda(goal, grammar, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode);
       
       utils::resource end;
     

@@ -17,6 +17,7 @@
 #include <cicada/vocab.hpp>
 #include <cicada/rule.hpp>
 #include <cicada/hypergraph.hpp>
+#include <cicada/lattice.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -32,9 +33,12 @@ namespace cicada
     typedef cicada::Symbol symbol_type;
     typedef cicada::Vocab  vocab_type;
     typedef cicada::Rule   rule_type;
+    
+    typedef cicada::HyperGraph hypergraph_type;
+    typedef cicada::Lattice    lattice_type;
 
-    typedef cicada::HyperGraph::feature_set_type   feature_set_type;
-    typedef cicada::HyperGraph::attribute_set_type attribute_set_type;
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
     
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
     
@@ -79,6 +83,12 @@ namespace cicada
     virtual id_type next(const id_type& node, const symbol_type& symbol) const = 0;
     virtual bool has_next(const id_type& node) const = 0;
     virtual const rule_pair_set_type& rules(const id_type& node) const = 0;
+    
+    virtual void assign(const lattice_type& lattice) {}
+    virtual void assign(const hypergraph_type& hypergraph) {}
+    
+    virtual void assign(const lattice_type& lattice, const lattice_type& lattice2) {}
+    virtual void assign(const hypergraph_type& hypergraph, const lattice_type& lattice) {}
   };
   
   

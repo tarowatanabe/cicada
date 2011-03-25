@@ -19,6 +19,7 @@
 #include <cicada/rule.hpp>
 #include <cicada/tree_rule.hpp>
 #include <cicada/hypergraph.hpp>
+#include <cicada/lattice.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -38,9 +39,12 @@ namespace cicada
     typedef cicada::TreeRule rule_type;
 
     typedef cicada::SymbolVector symbol_set_type;
-    
-    typedef cicada::HyperGraph::feature_set_type   feature_set_type;
-    typedef cicada::HyperGraph::attribute_set_type attribute_set_type;
+
+    typedef cicada::HyperGraph hypergraph_type;
+    typedef cicada::Lattice    lattice_type;
+
+    typedef hypergraph_type::feature_set_type   feature_set_type;
+    typedef hypergraph_type::attribute_set_type attribute_set_type;
     
     typedef boost::shared_ptr<rule_type> rule_ptr_type;
     
@@ -99,6 +103,9 @@ namespace cicada
     virtual id_type next(const id_type& node, const edge_type& edge) const = 0;
     virtual bool has_next(const id_type& node) const = 0;
     virtual const rule_pair_set_type& rules(const id_type& node) const = 0;
+
+    virtual void assign(const lattice_type& lattice) {}
+    virtual void assign(const hypergraph_type& hypergraph) {}
   };
   
   

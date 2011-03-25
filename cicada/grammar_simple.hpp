@@ -44,6 +44,8 @@ namespace cicada
     {
       construct(goal, non_terminal);
     }
+
+    transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarGlue(*this)); }
     
     bool valid_span(int first, int last, int distance) const
     {
@@ -100,15 +102,17 @@ namespace cicada
   class GrammarPair : public GrammarMutable
   {
   public:
-    typedef Lattice    lattice_type;
-    typedef HyperGraph hypergraph_type;
+    GrammarPair(const symbol_type& __non_terminal)
+      : GrammarMutable(1), non_terminal(__non_terminal) {}
     
-  public:
-    GrammarPair(const hypergraph_type& source, const lattice_type& target, const symbol_type& non_terminal)
-      : GrammarMutable(1)
+    transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarPair(*this)); }
+    
+    void assign(const hypergraph_type& source, const lattice_type& target)
     {
       typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
       typedef google::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> > symbol_pair_set_type;
+      
+      clear();
       
       symbol_pair_set_type symbols;
       symbols.set_empty_key(symbol_pair_type());
@@ -119,7 +123,7 @@ namespace cicada
       attributes["pair"] = attribute_set_type::int_type(1);
       
       hypergraph_type::edge_set_type::const_iterator eiter_end = source.edges.end();
-      for (hypergraph_type::edge_set_type::const_iterator eiter = source.edges.begin(); eiter != eiter_end; ++ eiter) 
+      for (hypergraph_type::edge_set_type::const_iterator eiter = source.edges.begin(); eiter != eiter_end; ++ eiter)
 	if (eiter->rule) {
 	  const rule_type& rule = *(eiter->rule);
 	  
@@ -152,11 +156,12 @@ namespace cicada
 	}
     }
 
-    GrammarPair(const lattice_type& source, const lattice_type& target, const symbol_type& non_terminal)
-      : GrammarMutable(1)
+    void assign(const lattice_type& source, const lattice_type& target)
     {
       typedef std::pair<symbol_type, symbol_type> symbol_pair_type;
       typedef google::dense_hash_set<symbol_pair_type, boost::hash<symbol_pair_type>, std::equal_to<symbol_pair_type> > symbol_pair_set_type;
+
+      clear();
       
       symbol_pair_set_type symbols;
       symbols.set_empty_key(symbol_pair_type());
@@ -197,18 +202,23 @@ namespace cicada
 	  }
       }
     }
-  };
 
+  private:
+    symbol_type non_terminal;
+  };
+  
   class GrammarPOS : public GrammarMutable
   {
   public:
-    typedef Lattice    lattice_type;
+    GrammarPOS() : GrammarMutable(1) {}
+
+    transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarPOS(*this)); }
     
-  public:
-    GrammarPOS(const lattice_type& lattice)
-      : GrammarMutable(1)
+    void assign(const lattice_type& lattice)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+
+      clear();
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -243,14 +253,16 @@ namespace cicada
   class GrammarInsertion : public GrammarMutable
   {
   public:
-    typedef Lattice    lattice_type;
-    typedef HyperGraph hypergraph_type;
+    GrammarInsertion(const symbol_type& __non_terminal)
+      : GrammarMutable(1), non_terminal(__non_terminal) {}
 
-  public:
-    GrammarInsertion(const hypergraph_type& graph, const symbol_type& non_terminal)
-      : GrammarMutable(1)
+    transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarInsertion(*this)); }
+    
+    void assign(const hypergraph_type& graph)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+      
+      clear();
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -276,10 +288,11 @@ namespace cicada
 	}
     }
 
-    GrammarInsertion(const lattice_type& lattice, const symbol_type& non_terminal)
-      : GrammarMutable(1)
+    void assign(const lattice_type& lattice)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+
+      clear();
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -302,20 +315,25 @@ namespace cicada
 	  }
       }
     }
+
+  private:
+    symbol_type non_terminal;
   };
   
   
   class GrammarDeletion : public GrammarMutable
   {
   public:
-    typedef Lattice    lattice_type;
-    typedef HyperGraph hypergraph_type;
+    GrammarDeletion(const symbol_type& __non_terminal)
+      : GrammarMutable(1), non_terminal(__non_terminal) {}
     
-  public:
-    GrammarDeletion(const hypergraph_type& graph, const symbol_type& non_terminal)
-      : GrammarMutable(1)
+    transducer_ptr_type clone() const { return transducer_ptr_type(new GrammarDeletion(*this)); }
+    
+    void assign(const hypergraph_type& graph)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+
+      clear();
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -343,10 +361,11 @@ namespace cicada
 	}
     }
 
-    GrammarDeletion(const lattice_type& lattice, const symbol_type& non_terminal)
-      : GrammarMutable(1)
+    void assign(const lattice_type& lattice)
     {
       typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > symbol_set_type;
+
+      clear();
       
       symbol_set_type symbols;
       symbols.set_empty_key(symbol_type());
@@ -371,6 +390,9 @@ namespace cicada
 	  }
       }
     }
+    
+  private:
+    symbol_type non_terminal;
   };
 };
 

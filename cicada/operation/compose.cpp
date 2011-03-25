@@ -23,14 +23,9 @@ namespace cicada
 			     const tree_grammar_type& __tree_grammar,
 			     const grammar_type& __grammar,
 			     const std::string& __goal,
-			     const std::string& __non_terminal,
-			     const bool __insertion,
-			     const bool __deletion,
-			     const bool __fallback,
 			     const int __debug)
       : tree_grammar(__tree_grammar), grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
-	insertion(__insertion), deletion(__deletion), fallback(__fallback),
+	goal(__goal),
 	yield_source(false),
 	debug(__debug)
     {
@@ -72,20 +67,11 @@ namespace cicada
 	std::cerr << "compose tree: " << data.id << std::endl;
 	
       utils::resource start;
-	
-      grammar_type grammar_compose(grammar);
-    
-      if (insertion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(hypergraph, non_terminal)));
-      if (deletion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(hypergraph, non_terminal)));
 
-
-      tree_grammar_type tree_grammar_compose(tree_grammar);
-      if (fallback)
-	tree_grammar_compose.push_back(tree_grammar_type::transducer_ptr_type(new cicada::TreeGrammarFallback(hypergraph, non_terminal)));
+      grammar.assign(hypergraph);
+      tree_grammar.assign(hypergraph);
 	
-      cicada::compose_tree(goal, tree_grammar_compose, grammar_compose, hypergraph, composed, yield_source);
+      cicada::compose_tree(goal, tree_grammar, grammar, hypergraph, composed, yield_source);
 	
       utils::resource end;
     
@@ -107,13 +93,9 @@ namespace cicada
     ComposeEarley::ComposeEarley(const std::string& parameter,
 				 const grammar_type& __grammar,
 				 const std::string& __goal,
-				 const std::string& __non_terminal,
-				 const bool __insertion,
-				 const bool __deletion,
 				 const int __debug)
       : grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
-	insertion(__insertion), deletion(__deletion),
+	goal(__goal),
 	yield_source(false),
 	debug(__debug)
     {
@@ -156,15 +138,9 @@ namespace cicada
 
       utils::resource start;
 
-      grammar_type grammar_compose(grammar);
+      grammar.assign(hypergraph);
     
-      if (insertion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(hypergraph, non_terminal)));
-      if (deletion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(hypergraph, non_terminal)));
-
-    
-      cicada::compose_earley(grammar_compose, hypergraph, composed, yield_source);
+      cicada::compose_earley(grammar, hypergraph, composed, yield_source);
     
       utils::resource end;
     
@@ -186,13 +162,9 @@ namespace cicada
     ComposeCKY::ComposeCKY(const std::string& parameter,
 			   const grammar_type& __grammar,
 			   const std::string& __goal,
-			   const std::string& __non_terminal,
-			   const bool __insertion,
-			   const bool __deletion,
 			   const int __debug)
       : grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
-	insertion(__insertion), deletion(__deletion),
+	goal(__goal),
 	yield_source(false),
 	treebank(false),
 	pos_mode(false),
@@ -246,16 +218,9 @@ namespace cicada
 
       utils::resource start;
 
-      grammar_type grammar_compose(grammar);
-    
-      if (insertion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
-      if (deletion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
-      if (pos_mode)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPOS(lattice)));
+      grammar.assign(lattice);
 	
-      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, pos_mode, unique_goal);
+      cicada::compose_cky(goal, grammar, lattice, composed, yield_source, treebank, pos_mode, unique_goal);
     
       utils::resource end;
     
@@ -277,13 +242,9 @@ namespace cicada
     ComposeGrammar::ComposeGrammar(const std::string& parameter,
 				   const grammar_type& __grammar,
 				   const std::string& __goal,
-				   const std::string& __non_terminal,
-				   const bool __insertion,
-				   const bool __deletion,
 				   const int __debug)
       : grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
-	insertion(__insertion), deletion(__deletion),
+	goal(__goal),
 	yield_source(false),
 	debug(__debug)
     {
@@ -327,15 +288,9 @@ namespace cicada
 
       utils::resource start;
 
-      grammar_type grammar_compose(grammar);
-    
-      if (insertion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(hypergraph, non_terminal)));
-      if (deletion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(hypergraph, non_terminal)));
-
-    
-      cicada::compose_grammar(grammar_compose, hypergraph, composed, yield_source);
+      grammar.assign(hypergraph);
+      
+      cicada::compose_grammar(grammar, hypergraph, composed, yield_source);
     
       utils::resource end;
     
@@ -358,13 +313,9 @@ namespace cicada
     ComposePhrase::ComposePhrase(const std::string& parameter,
 				 const grammar_type& __grammar,
 				 const std::string& __goal,
-				 const std::string& __non_terminal,
-				 const bool __insertion,
-				 const bool __deletion,
 				 const int __debug)
       : grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
-	insertion(__insertion), deletion(__deletion),
+	goal(__goal),
 	distortion(0),
 	yield_source(false),
 	debug(__debug)
@@ -412,15 +363,9 @@ namespace cicada
 
       utils::resource start;
 
-      grammar_type grammar_compose(grammar);
+      grammar.assign(lattice);
     
-      if (insertion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(lattice, non_terminal)));
-      if (deletion)
-	grammar_compose.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(lattice, non_terminal)));
-
-    
-      cicada::compose_phrase(non_terminal, grammar_compose, lattice, distortion, composed);
+      cicada::compose_phrase(goal, grammar, lattice, distortion, composed);
     
       utils::resource end;
     
@@ -443,10 +388,9 @@ namespace cicada
     ComposeAlignment::ComposeAlignment(const std::string& parameter,
 				       const grammar_type& __grammar,
 				       const std::string& __goal,
-				       const std::string& __non_terminal,
 				       const int __debug)
       : grammar(__grammar),
-	goal(__goal), non_terminal(__non_terminal), 
+	goal(__goal),
 	lattice_mode(false),
 	forest_mode(false),
 	debug(__debug)
@@ -457,9 +401,6 @@ namespace cicada
       if (utils::ipiece(param.name()) != "compose-alignment")
 	throw std::runtime_error("this is not a alignment composer");
 
-      bool source = false;
-      bool target = false;
-	
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "lattice")
 	  lattice_mode = utils::lexical_cast<bool>(piter->second);
@@ -500,17 +441,17 @@ namespace cicada
 	std::cerr << "compose alignment: " << data.id << std::endl;
 	
       utils::resource start;
-	
-      grammar_type grammar_alignment(grammar);
+
+      
       if (lattice_mode)
-	grammar_alignment.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPair(lattice, target, non_terminal)));
+	grammar.assign(lattice, target);
       else
-	grammar_alignment.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPair(hypergraph, target, non_terminal)));
+	grammar.assign(hypergraph, target);
 	
       if (lattice_mode)
-	cicada::compose_alignment(non_terminal, grammar_alignment, lattice, target, composed);
+	cicada::compose_alignment(goal, grammar, lattice, target, composed);
       else
-	cicada::compose_alignment(non_terminal, grammar_alignment, hypergraph, target, composed);
+	cicada::compose_alignment(goal, grammar, hypergraph, target, composed);
     
       utils::resource end;
     

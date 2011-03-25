@@ -20,9 +20,6 @@ namespace cicada
       ParseCKY(const std::string& parameter,
 	       const grammar_type& __grammar,
 	       const std::string& __goal,
-	       const std::string& __non_terminal,
-	       const bool __insertion,
-	       const bool __deletion,
 	       const int __debug);
   
       void operator()(data_type& data) const;
@@ -32,11 +29,7 @@ namespace cicada
       const grammar_type& grammar;
   
       std::string goal;
-      std::string non_terminal;
   
-      bool insertion;
-      bool deletion;
-      
       const weights_path_type* weights;
       const weight_set_type*   weights_assigned;
       int size;
@@ -56,9 +49,6 @@ namespace cicada
       ParseAgenda(const std::string& parameter,
 		  const grammar_type& __grammar,
 		  const std::string& __goal,
-		  const std::string& __non_terminal,
-		  const bool __insertion,
-		  const bool __deletion,
 		  const int __debug);
       
       void operator()(data_type& data) const;
@@ -68,11 +58,7 @@ namespace cicada
       const grammar_type& grammar;
       
       std::string goal;
-      std::string non_terminal;
       
-      bool insertion;
-      bool deletion;
-
       const weights_path_type* weights;
       const weight_set_type*   weights_assigned;
       int size;

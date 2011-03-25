@@ -154,10 +154,6 @@ span-forest: annotate terminal span\n\
 				const grammar_type& grammar,
 				const tree_grammar_type& tree_grammar,
 				const std::string& goal,
-				const std::string& non_terminal,
-				const bool insertion,
-				const bool deletion,
-				const bool fallback,
 				const bool __input_id,
 				const bool __input_lattice,
 				const bool __input_forest,
@@ -202,23 +198,23 @@ span-forest: annotate terminal span\n\
       else if (param_name == "clear")
 	operations.push_back(operation_ptr_type(new operation::Clear(*piter, debug)));
       else if (param_name == "compose-tree")
-	operations.push_back(operation_ptr_type(new operation::ComposeTree(*piter, tree_grammar, grammar, goal, non_terminal, insertion, deletion, fallback, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposeTree(*piter, tree_grammar, grammar, goal, debug)));
       else if (param_name == "compose-earley")
-	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, debug)));
       else if (param_name == "compose-cky" || param_name == "compose-cyk")
-	operations.push_back(operation_ptr_type(new operation::ComposeCKY(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposeCKY(*piter, grammar, goal, debug)));
       else if (param_name == "compose-grammar")
-	operations.push_back(operation_ptr_type(new operation::ComposeGrammar(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposeGrammar(*piter, grammar, goal, debug)));
       else if (param_name == "compose-phrase")
-	operations.push_back(operation_ptr_type(new operation::ComposePhrase(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposePhrase(*piter, grammar, goal, debug)));
       else if (param_name == "compose-alignment")
-	operations.push_back(operation_ptr_type(new operation::ComposeAlignment(*piter, grammar, goal, non_terminal, debug)));
+	operations.push_back(operation_ptr_type(new operation::ComposeAlignment(*piter, grammar, goal, debug)));
       else if (param_name == "parse-agenda")
-	operations.push_back(operation_ptr_type(new operation::ParseAgenda(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ParseAgenda(*piter, grammar, goal, debug)));
       else if (param_name == "parse-cky" || param_name == "parse-cyk")
-	operations.push_back(operation_ptr_type(new operation::ParseCKY(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::ParseCKY(*piter, grammar, goal, debug)));
       else if (param_name == "generate-earley")
-	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, non_terminal, insertion, deletion, debug)));
+	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, debug)));
       else if (param_name == "apply")
 	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
       else if (param_name == "prune")

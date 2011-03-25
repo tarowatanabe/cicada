@@ -147,14 +147,12 @@ bool variational_bayes_mode = false;
 double prior          = 0.01;
 double prior_terminal = 0.01;
 
-bool keep_terminal = false;
 double merge_ratio = 0.5;
 
 std::string signature = "";
 bool signature_list = false;
 
 double cutoff_threshold = 1e-20;
-int    cutoff_unknown = 10;
 
 int threads = 1;
 
@@ -169,10 +167,15 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 template <typename Function>
 double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function);
 
+template <typename Function>
+void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& lexicon, Function function);
+
 template <typename Maximizer>
 void grammar_maximize(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
 
+
 void write_grammar(const path_type& file, const grammar_type& grammar);
+
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks);
 
 void options(int argc, char** argv);
@@ -222,7 +225,9 @@ int main(int argc, char** argv)
       
     if (int(binarize_left) + binarize_right + binarize_all > 1)
       throw std::runtime_error("specify either binarize-{left,right,all}");
-
+    
+    const signature_type* sig = (! signature.empty() ? &signature_type::create(signature) : 0);
+    
     if (int(binarize_left) + binarize_right + binarize_all == 0)
       binarize_left = true;
 
@@ -233,7 +238,7 @@ int main(int argc, char** argv)
     
     hypergraph_set_type treebanks;
     read_treebank(input_files, treebanks);
-    
+
     grammar_type grammar;
     grammar_learn(treebanks, grammar, zero_function());
     
@@ -321,6 +326,18 @@ int main(int argc, char** argv)
     write_grammar(output_grammar_file, grammar);
     
     // output lexical rule
+    // in signature mode, we will estimate A -> signature from the current grammar + treebanks
+    // and dump A -> signature and A -> word
+    
+    if (sig) {
+      // we will learn lexical probabilities...
+      grammar_type lexicon;
+      grammar_learn(treebanks, lexicon, weight_function(grammar));
+    } else {
+      // do noghing
+    }
+      
+    // learn character distribution..
     
   }
   catch (std::exception& err) {
@@ -331,16 +348,10 @@ int main(int argc, char** argv)
 }
 
 bool is_fixed_non_terminal(const symbol_type& symbol)
-{  
-  if (symbol.is_terminal()) return false;
-  
+{ 
   static const symbol_type root("[ROOT]");
   
-  if (symbol == root) return true;
-  
-  const utils::piece piece = symbol.non_terminal_strip();
-  
-  return (piece.size() >= 7 && piece.substr(0, 7) == "UNKNOWN");
+  return symbol.is_non_terminal() && symbol == root;
 };
 
 symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit)
@@ -1199,40 +1210,6 @@ void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const 
 }
 
 
-struct accumulator_type
-{
-  typedef weight_type value_type;
-
-  accumulator_type(const weight_type& __weight_total,
-		   const hypergraph_type& __treebank,
-		   count_set_type& __counts)
-    : weight_total(__weight_total), treebank(__treebank), counts(__counts) {}
-
-  struct Count
-  {
-    Count(count_type& __count, const weight_type& __weight) : count(__count), weight(__weight) {}
-    
-    Count& operator+=(const weight_type& value)
-    {
-      count += value / weight;
-      return *this;
-    }
-    
-    count_type& count;
-    const weight_type& weight;
-  };
-  
-  Count operator[](const hypergraph_type::id_type& x)
-  {
-    const rule_ptr_type& rule = treebank.edges[x].rule;
-    
-    return Count(counts[rule->lhs][rule], weight_total);
-  }
-  
-  const weight_type& weight_total;
-  const hypergraph_type& treebank;
-  count_set_type& counts;
-};
 
 template <typename Function>
 struct TaskLearn
@@ -1245,6 +1222,42 @@ struct TaskLearn
       logprob(cicada::semiring::traits<weight_type>::one()),
       counts() {}
   
+  struct accumulator_type
+  {
+    typedef weight_type value_type;
+
+    accumulator_type(const weight_type& __weight_total,
+		     const hypergraph_type& __treebank,
+		     count_set_type& __counts)
+      : weight_total(__weight_total), treebank(__treebank), counts(__counts) {}
+
+    struct Count
+    {
+      Count(count_type& __count, const weight_type& __weight) : count(__count), weight(__weight) {}
+      
+      Count& operator+=(const weight_type& value)
+      {
+	count += value / weight;
+	return *this;
+      }
+    
+      count_type& count;
+      const weight_type& weight;
+    };
+  
+    Count operator[](const hypergraph_type::id_type& x)
+    {
+      const rule_ptr_type& rule = treebank.edges[x].rule;
+      
+      return Count(counts[rule->lhs][rule], weight_total);
+    }
+    
+    const weight_type& weight_total;
+    const hypergraph_type& treebank;
+    count_set_type& counts;
+  };
+
+
   void operator()()
   {
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
@@ -1337,6 +1350,163 @@ double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar
   
   return cicada::semiring::log(logprob);
 }
+
+template <typename Function>
+struct TaskLexiconLearn
+{
+  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+  
+  TaskLexiconLearn(queue_type& __queue, Function __function)
+    : queue(__queue),
+      function(__function),
+      counts() {}
+  
+  struct accumulator_type
+  {
+    typedef weight_type value_type;
+
+    accumulator_type(const weight_type& __weight_total,
+		     const hypergraph_type& __treebank,
+		     const signature_type& __signature,
+		     count_set_type& __counts)
+      : weight_total(__weight_total),
+	treebank(__treebank),
+	signature(__signature),
+	counts(__counts),
+	count_dummy() {}
+    
+    struct Count
+    {
+      Count(count_type& __count, const weight_type& __weight) : count(__count), weight(__weight) {}
+      
+      Count& operator+=(const weight_type& value)
+      {
+	count += value / weight;
+	return *this;
+      }
+      
+      count_type& count;
+      const weight_type& weight;
+    };
+    
+    Count operator[](const hypergraph_type::id_type& x)
+    {
+      if (! treebank.edges[x].tails.empty())
+	return Count(count_dummy, weight_total);
+      else {
+	const rule_ptr_type& rule = treebank.edges[x].rule;
+	
+	symbol_set_type rhs(rule->rhs);
+	symbol_set_type::iterator riter_end = rhs.end();
+	for (symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
+	  *riter = signature(*riter);
+	
+	const rule_ptr_type rule_new = rule_type::create(rule_type(rule->lhs, rhs));
+	
+	return Count(counts[rule_new->lhs][rule_new], weight_total);
+      }
+    }
+    
+    const weight_type& weight_total;
+    const hypergraph_type& treebank;
+    const signature_type& signature;
+    count_set_type& counts;
+    
+    count_type count_dummy;
+  };
+  
+  void operator()()
+  {
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    
+    weight_set_type inside;
+    weight_set_type outside;
+    
+    const signature_type* __signature = &signature_type::create(signature);
+    
+    const hypergraph_type* __treebank = 0;
+    for (;;) {
+      queue.pop(__treebank);
+      if (! __treebank) break;
+      
+      const hypergraph_type& treebank = *__treebank;
+      
+      inside.clear();
+      outside.clear();
+      inside.resize(treebank.nodes.size());
+      outside.resize(treebank.nodes.size());
+      
+      accumulator_type accumulator(inside.back(), treebank, *__signature, counts);
+      
+      cicada::inside_outside(treebank, inside, outside, accumulator, function, function);
+    }
+  }
+  
+  queue_type&    queue;
+  Function       function;
+  
+  count_set_type counts;
+};
+
+template <typename Function>
+void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function)
+{
+  // we will learn a trigram of tag-signature-word, but dump tag-signature only...
+  // 
+  // a trick is: since we are learning OOV probability, tag-signature-word trigram
+  // will always backoff (with tag-signature backoff penalty) to signature-word which will
+  // always backoff (with signature backoff penalty) to uniform distribution...
+  //
+  // Thus, we simply preserve tag-signature bigram probability with the penalties 
+  // consisting of tag-sinature backoff + signarue backoff + uniform distribution
+  
+
+  typedef TaskLexiconLearn<Function> task_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  typedef typename task_type::queue_type queue_type;
+
+  queue_type queue;
+  task_set_type tasks(threads, task_type(queue, function));
+
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  
+  hypergraph_set_type::const_iterator titer_end = treebanks.end();
+  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+    queue.push(&(*titer));
+  
+  for (int i = 0; i != threads; ++ i)
+    queue.push(0);
+  
+  workers.join_all();
+  
+  count_set_type counts;
+  for (int i = 0; i != threads; ++ i) {
+    if (counts.empty())
+      counts.swap(tasks[i].counts);
+    else {
+      count_set_type::const_iterator liter_end = tasks[i].counts.end();
+      for (count_set_type::const_iterator liter = tasks[i].counts.begin(); liter != liter_end; ++ liter) {
+	grammar_type& grammar = counts[liter->first];
+	
+	grammar_type::const_iterator giter_end = liter->second.end();
+	for (grammar_type::const_iterator giter = liter->second.begin(); giter != giter_end; ++ giter)
+	  grammar[giter->first] += giter->second;
+      }
+    }
+  }
+  
+  if (debug)
+    std::cerr << " # of symbols: " << counts.size() << std::endl;
+  
+  // maximization
+  if (variational_bayes_mode)
+    grammar_maximize(counts, grammar, MaximizeBayes());
+  else
+    grammar_maximize(counts, grammar, Maximize());
+}
+
 
 template <typename Maximizer>
 struct TaskMaximize
@@ -1453,6 +1623,7 @@ void write_grammar(const path_type& file, const grammar_type& grammar)
   }
 }
 
+
 void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
 {
   hypergraph_type treebank;
@@ -1506,15 +1677,12 @@ void options(int argc, char** argv)
     ("prior",           po::value<double>(&prior)->default_value(prior),                   "Dirichlet prior")
     ("prior-terminal",  po::value<double>(&prior_terminal)->default_value(prior_terminal), "Dirichlet prior for terminal rule")
 
-    
-    ("keep-terminal", po::bool_switch(&keep_terminal),                             "keep terminal rule (and do not split/merge)")
     ("merge-ratio",   po::value<double>(&merge_ratio)->default_value(merge_ratio), "merging ratio")
 
     ("signature",      po::value<std::string>(&signature), "signature for unknown word")
     ("signature-list", po::bool_switch(&signature_list),   "list of signatures")
     
     ("cutoff-threshold", po::value<double>(&cutoff_threshold)->default_value(cutoff_threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
-    ("cutoff-unknown",   po::value<int>(&cutoff_unknown)->default_value(cutoff_unknown),        "cut-off threshold for unknown word (<=1 implies no cutoff)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     

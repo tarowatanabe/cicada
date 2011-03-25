@@ -21,10 +21,6 @@ namespace cicada
 		  const tree_grammar_type& __tree_grammar,
 		  const grammar_type& __grammar,
 		  const std::string& __goal,
-		  const std::string& __non_terminal,
-		  const bool __insertion,
-		  const bool __deletion,
-		  const bool __fallback,
 		  const int __debug);
       
       void operator()(data_type& data) const;
@@ -33,11 +29,6 @@ namespace cicada
       const grammar_type&      grammar;
       
       std::string goal;
-      std::string non_terminal;
-      
-      bool insertion;
-      bool deletion;
-      bool fallback;
       
       bool yield_source;
       
@@ -50,9 +41,6 @@ namespace cicada
       ComposeEarley(const std::string& parameter,
 		    const grammar_type& __grammar,
 		    const std::string& __goal,
-		    const std::string& __non_terminal,
-		    const bool __insertion,
-		    const bool __deletion,
 		    const int __debug);
   
       void operator()(data_type& data) const;
@@ -60,11 +48,7 @@ namespace cicada
       const grammar_type& grammar;
   
       std::string goal;
-      std::string non_terminal;
   
-      bool insertion;
-      bool deletion;
-
       bool yield_source;
   
       int debug;
@@ -76,9 +60,6 @@ namespace cicada
       ComposeCKY(const std::string& parameter,
 		 const grammar_type& __grammar,
 		 const std::string& __goal,
-		 const std::string& __non_terminal,
-		 const bool __insertion,
-		 const bool __deletion,
 		 const int __debug);
   
       void operator()(data_type& data) const;
@@ -86,11 +67,7 @@ namespace cicada
       const grammar_type& grammar;
   
       std::string goal;
-      std::string non_terminal;
   
-      bool insertion;
-      bool deletion;
-
       bool yield_source;
       bool treebank;
       bool pos_mode;
@@ -105,9 +82,6 @@ namespace cicada
       ComposeGrammar(const std::string& parameter,
 		     const grammar_type& __grammar,
 		     const std::string& __goal,
-		     const std::string& __non_terminal,
-		     const bool __insertion,
-		     const bool __deletion,
 		     const int __debug);
   
       void operator()(data_type& data) const;
@@ -115,10 +89,6 @@ namespace cicada
       const grammar_type& grammar;
 
       std::string goal;
-      std::string non_terminal;
-
-      bool insertion;
-      bool deletion;
 
       bool yield_source;
       
@@ -132,9 +102,6 @@ namespace cicada
       ComposePhrase(const std::string& parameter,
 		    const grammar_type& __grammar,
 		    const std::string& __goal,
-		    const std::string& __non_terminal,
-		    const bool __insertion,
-		    const bool __deletion,
 		    const int __debug);
   
       void operator()(data_type& data) const;
@@ -142,11 +109,7 @@ namespace cicada
       const grammar_type& grammar;
   
       std::string goal;
-      std::string non_terminal;
   
-      bool insertion;
-      bool deletion;
-
       int distortion;
       
       bool yield_source;
@@ -161,7 +124,6 @@ namespace cicada
       ComposeAlignment(const std::string& parameter,
 		       const grammar_type& __grammar,
 		       const std::string& __goal,
-		       const std::string& __non_terminal,
 		       const int __debug);
   
       void operator()(data_type& data) const;
@@ -169,7 +131,6 @@ namespace cicada
       const grammar_type& grammar;
   
       std::string goal;
-      std::string non_terminal;
 
       bool lattice_mode;
       bool forest_mode;

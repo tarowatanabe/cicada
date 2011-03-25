@@ -91,6 +91,8 @@ bool grammar_glue_straight = false;
 bool grammar_glue_inverted = false;
 bool grammar_insertion = false;
 bool grammar_deletion = false;
+bool grammar_pos = false;
+bool grammar_pair = false;
 
 grammar_file_set_type tree_grammar_mutable_files;
 grammar_file_set_type tree_grammar_static_files;
@@ -221,8 +223,16 @@ int main(int argc, char ** argv)
 										    grammar_glue_straight,
 										    grammar_glue_inverted)));
     }
-      
-
+     
+    if (grammar_insertion)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(symbol_non_terminal)));
+    if (grammar_deletion)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(symbol_non_terminal)));
+    if (grammar_pos)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPOS()));
+    if (grammar_pair)
+      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPair(symbol_non_terminal)));
+    
     if (debug && mpi_rank == 0)
       std::cerr << "grammar: " << grammar.size() << std::endl;
 
@@ -230,11 +240,14 @@ int main(int argc, char ** argv)
     const size_t tree_grammar_static_size  = load_grammar<cicada::TreeGrammarStatic>(tree_grammar, tree_grammar_static_files);
     const size_t tree_grammar_mutable_size = load_grammar<cicada::TreeGrammarMutable>(tree_grammar, tree_grammar_mutable_files);
     
-    if (debug)
+    if (debug && mpi_rank == 0)
       std::cerr << "loaded static tree grammar: " << tree_grammar_static_size << std::endl
 		<< "loaded mutable tree grammar: " << tree_grammar_mutable_size << std::endl;
     
-    if (debug)
+    if (tree_grammar_fallback)
+      tree_grammar.push_back(tree_grammar_type::transducer_ptr_type(new cicada::TreeGrammarFallback(symbol_non_terminal)));
+    
+    if (debug && mpi_rank == 0)
       std::cerr << "tree grammar: " << tree_grammar.size() << std::endl;
     
     // read features...
@@ -274,10 +287,6 @@ int main(int argc, char ** argv)
 				  grammar,
 				  tree_grammar,
 				  symbol_goal,
-				  symbol_non_terminal,
-				  grammar_insertion,
-				  grammar_deletion,
-				  tree_grammar_fallback,
 				  true,
 				  input_lattice_mode,
 				  input_forest_mode,
@@ -1664,6 +1673,8 @@ void options(int argc, char** argv)
     ("grammar-glue-inverted", po::bool_switch(&grammar_glue_inverted), "add inverted hiero glue rule")
     ("grammar-insertion",     po::bool_switch(&grammar_insertion),     "source-to-target transfer grammar")
     ("grammar-deletion",      po::bool_switch(&grammar_deletion),      "source-to-<epsilon> transfer grammar")
+    ("grammar-pos",           po::bool_switch(&grammar_pos),           "POS annotated input grammar")
+    ("grammar-pair",          po::bool_switch(&grammar_pair),          "source/target alignment grammar")
 
     // tree-grammar
     ("tree-grammar",          po::value<grammar_file_set_type >(&tree_grammar_mutable_files)->composing(), "tree grammar file(s)")

@@ -23,7 +23,7 @@ namespace cicada
     typedef hypergraph_type::rule_type     graph_rule_type;
     typedef hypergraph_type::rule_ptr_type graph_rule_ptr_type;
 
-  public:
+  private:
     struct rule_ptr_hash
     {
       size_t operator()(const graph_rule_ptr_type& x) const
@@ -41,14 +41,30 @@ namespace cicada
     };
 
     typedef google::dense_hash_set<graph_rule_ptr_type, rule_ptr_hash, rule_ptr_equal> graph_rule_ptr_set_type;
-
+    
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
   public:
 
-    // copy, but use default non-terminal category
-    TreeGrammarFallback(const hypergraph_type& graph, const symbol_type& non_terminal)
-    {
-      typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
+    TreeGrammarFallback(const symbol_type& __non_terminal)
+      : non_terminal(__non_terminal) {}
+    TreeGrammarFallback()
+      : non_terminal() {}
+    
+    transducer_ptr_type clone() const { return transducer_ptr_type(new TreeGrammarFallback(*this)); }
 
+    void assign(const hypergraph_type& graph)
+    {
+      if (non_terminal.empty())
+	__assign(graph);
+      else
+	__assign(graph, non_terminal);
+    }
+    
+  private:
+    void __assign(const hypergraph_type& graph, const symbol_type& non_terminal)
+    {
+      clear();
+      
       graph_rule_ptr_set_type rules;
       rules.set_empty_key(graph_rule_ptr_type());
 
@@ -77,9 +93,11 @@ namespace cicada
     }
     
     // simply copy and preserve the same non-terminal category...
-    TreeGrammarFallback(const hypergraph_type& graph)
+    void __assign(const hypergraph_type& graph)
     {
-      typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
+      
+      
+      clear();
 
       graph_rule_ptr_set_type rules;
       rules.set_empty_key(graph_rule_ptr_type());
@@ -101,7 +119,9 @@ namespace cicada
 	insert(rule_pair_type(rule, rule, features));
       }
     }
-
+    
+  private:
+    symbol_type non_terminal;
   };
   
 };

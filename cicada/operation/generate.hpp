@@ -18,9 +18,6 @@ namespace cicada
       GenerateEarley(const std::string& parameter,
 		     const grammar_type& __grammar,
 		     const std::string& __goal,
-		     const std::string& __non_terminal,
-		     const bool __insertion,
-		     const bool __deletion,
 		     const int __debug);
   
       void operator()(data_type& data) const;
