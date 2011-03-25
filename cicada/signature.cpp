@@ -22,6 +22,7 @@ namespace cicada
   {
     static const char* desc = "\
 english: English signature\n\
+chinese: Chinese signature\n\
 ";
     
     return desc;
