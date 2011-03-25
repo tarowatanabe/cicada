@@ -80,14 +80,14 @@ pos: terminal pos rule\n\
       if (int(inverted) + straight == 0)
 	throw std::runtime_error("no insetion or straight glue rules?");
       if (goal.empty() || ! goal.is_non_terminal())
-	throw std::runtime_error("invalid goal? " + static_cast<const std::string&>(goal));
+	throw std::runtime_error("invalid goal for glue rules? " + static_cast<const std::string&>(goal));
       
       if (! fallback_file.empty()) {
 	if (fallback_file != "-" && boost::filesystem::exists(fallback_file))
-	  throw std::runtime_error("invalid fallback?" + fallback_file.string());
+	  throw std::runtime_error("invalid fallback for glue rules?" + fallback_file.string());
 	
 	if (! non_terminal.empty() && ! non_terminal.is_non_terminal())
-	  throw std::runtime_error("invalid non_terminal? " + static_cast<const std::string&>(non_terminal));
+	  throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal));
 	
 	utils::compress_istream is(fallback_file, 1024 * 1024);
 	
@@ -99,7 +99,7 @@ pos: terminal pos rule\n\
 						   inverted));
       } else {
 	if (non_terminal.empty() || ! non_terminal.is_non_terminal())
-	  throw std::runtime_error("invalid non_terminal? " + static_cast<const std::string&>(non_terminal));
+	  throw std::runtime_error("invalid non_terminal for glue rules? " + static_cast<const std::string&>(non_terminal));
 	
 	return transducer_ptr_type(new GrammarGlue(goal, non_terminal, straight, inverted));
       }
