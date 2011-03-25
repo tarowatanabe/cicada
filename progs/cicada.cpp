@@ -154,7 +154,7 @@ struct deprecated
   template <typename Tp>
   void operator()(const Tp& x) const
   {
-    std::cerr << desc << std::endl;
+    std::cout << desc << std::endl;
     exit(1);
   }
   
@@ -203,12 +203,12 @@ void options(int argc, char** argv)
   opts_deprecated.add_options()
     ("non-terminal",          po::value<std::string>()->notifier(deprecated(opts_deprecated)), "see --grammar-list")
     ("grammar-static",        po::value<grammar_file_set_type >()->composing()->notifier(deprecated(opts_deprecated)), "use --grammar ")
-    ("grammar-glue-straight", po::bool_switch()->notifier(deprecated(opts_deprecated)), "use --grammar glue:straight=[true|false],inverted=[true|false],non-terminal=[x]")
-    ("grammar-glue-inverted", po::bool_switch()->notifier(deprecated(opts_deprecated)), "use --grammar glue:straight=[true|false],inverted=[true|false],non-terminal=[x]")
-    ("grammar-insertion",     po::bool_switch()->notifier(deprecated(opts_deprecated)), "use --grammar insetion:non-terminal=[x]")
-    ("grammar-deletion",      po::bool_switch()->notifier(deprecated(opts_deprecated)), "use --grammar deletion:non-terminal=[x]")
+    ("grammar-glue-straight", po::value<bool>()->notifier(deprecated(opts_deprecated))->zero_tokens(), "use --grammar glue:straight=[true|false],inverted=[true|false],non-terminal=[x]")
+    ("grammar-glue-inverted", po::value<bool>()->notifier(deprecated(opts_deprecated))->zero_tokens(), "use --grammar glue:straight=[true|false],inverted=[true|false],non-terminal=[x]")
+    ("grammar-insertion",     po::value<bool>()->notifier(deprecated(opts_deprecated))->zero_tokens(), "use --grammar insetion:non-terminal=[x]")
+    ("grammar-deletion",      po::value<bool>()->notifier(deprecated(opts_deprecated))->zero_tokens(), "use --grammar deletion:non-terminal=[x]")
     ("tree-grammar-static",   po::value<grammar_file_set_type >()->composing()->notifier(deprecated(opts_deprecated)),  "use --tree-grammar")
-    ("tree-grammar-fallback", po::bool_switch()->notifier(deprecated(opts_deprecated)), "use --tree-grammar fallback:non-terminal=[x]");
+    ("tree-grammar-fallback", po::value<bool>()->notifier(deprecated(opts_deprecated))->zero_tokens(), "use --tree-grammar fallback:non-terminal=[x]");
 
   po::options_description desc_config;
   po::options_description desc_command;
