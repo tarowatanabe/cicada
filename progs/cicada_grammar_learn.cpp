@@ -1517,6 +1517,7 @@ void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, 
   }
   
   ngram_count_set_type backoffs;
+  backoffs.set_empty_key(ngram_type());
   
   // order == 1
   double total = 0.0;
@@ -1575,18 +1576,23 @@ void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, 
     // copy logprob into actual storage..
     logprob_set_type::iterator liter = logprobs_local.begin();
     typename ngram_set_type::iterator niter_end = ngrams_local.end();
-    for (typename ngram_set_type::iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter)
+    for (typename ngram_set_type::iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
       (*niter)->second = *liter;
+      if (debug >= 3)
+	std::cerr << "unigram: " << (*niter)->first << " " << *liter << std::endl;
+    }
   }
   
   // this is the logprob of UNK after the series of backoff...
   const double logprob_unk = utils::mathop::log(discount);
 
+  if (debug >= 2)
+    std::cerr << "unk: " << logprob_unk << std::endl;
+
   ngram_count_map_type ngrams;
   ngrams.set_empty_key(ngram_type());
   
   for (int order = 2; order <= 3; ++ order) {
-
     ngrams.clear();
     
     // collect ngrams with order
@@ -1651,6 +1657,11 @@ void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, 
 	if (discount > 0.0) break;
 	++ total;
       }
+      
+      // copy logprob into actual storage..
+      logprob_set_type::iterator liter = logprobs_local.begin();
+      for (typename ngram_set_type::iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter)
+	(*niter)->second = *liter;
       
       backoffs[citer->first] = utils::mathop::log(discount) -  utils::mathop::log(discount_lower);
     }
@@ -1742,51 +1753,39 @@ void write_grammar(const path_type& file, const grammar_type& grammar)
 
   if (grammar.empty()) return;
   
-  if (0.0 < cutoff_threshold && cutoff_threshold < 1.0) {
-    count_set_type counts;
-    sorted_type sorted;
+  count_set_type counts;
+  sorted_type sorted;
     
-    grammar_type::const_iterator giter_end = grammar.end();
-    for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
-      counts[giter->first->lhs][giter->first] = giter->second;
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    counts[giter->first->lhs][giter->first] = giter->second;
 
-    utils::compress_ostream os(file, 1024 * 1024);
+  utils::compress_ostream os(file, 1024 * 1024);
     
-    count_set_type::const_iterator citer_end = counts.end();
-    for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-      const grammar_type& grammar = citer->second;
+  count_set_type::const_iterator citer_end = counts.end();
+  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+    const grammar_type& grammar = citer->second;
       
-      sorted.clear();
+    sorted.clear();
       
-      grammar_type::const_iterator giter_end = grammar.end();
-      for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
-	sorted.push_back(&(*giter));
-      
-      std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
-      
-      const double logprob_max = sorted.front()->second;
-      const double logprob_threshold = logprob_max + utils::mathop::log(cutoff_threshold);
-      
-      sorted_type::const_iterator siter_end = sorted.end();
-      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
-	os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
-    }
-  } else {
-    // we will dump in sorted order...
-    sorted_type sorted;
-    sorted.reserve(grammar.size());
-    
     grammar_type::const_iterator giter_end = grammar.end();
     for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
       sorted.push_back(&(*giter));
-    
+      
     std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
-    
-    utils::compress_ostream os(file, 1024 * 1024);
-    
-    sorted_type::const_iterator siter_end = sorted.end();
-    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-      os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+
+    if (0.0 < cutoff_threshold && cutoff_threshold < 1.0) {
+      const double logprob_max = sorted.front()->second;
+      const double logprob_threshold = logprob_max + utils::mathop::log(cutoff_threshold);
+	
+      sorted_type::const_iterator siter_end = sorted.end();
+      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
+	os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+    } else {
+      sorted_type::const_iterator siter_end = sorted.end();
+      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+	os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+    }
   }
 }
 
