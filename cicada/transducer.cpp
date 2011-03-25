@@ -35,8 +35,8 @@ glue: glue rules\n\
 \tgoal=[goal non-terminal]\n\
 \tnon-terminal=[default non-terminal]\n\
 \tfallback=[file] the list of fallback non-terminal\n\
-\tstraight=[true|false] straing glue-rule\n\
-\tinverted=[true|false] straing glue-rule\n\
+\tstraight=[true|false] straight glue-rule\n\
+\tinverted=[true|false] inverted glue-rule\n\
 insertion: terminal insertion rule\n\
 \tnon-terminal=[defaut non-terminal]\n\
 deletion: terminal deletion rule\n\
