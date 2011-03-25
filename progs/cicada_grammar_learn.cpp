@@ -130,8 +130,8 @@ typedef Grammar grammar_type;
 
 path_set_type input_files;
 path_type     output_grammar_file = "-";
-path_type     output_lexicon_file = "-";
-path_type     output_character_file = "-";
+path_type     output_lexicon_file;
+path_type     output_character_file;
 
 int max_iteration = 6;         // max split-merge iterations
 int max_iteration_split = 20;  // max EM-iterations for split
@@ -225,8 +225,12 @@ int main(int argc, char** argv)
       
     if (int(binarize_left) + binarize_right + binarize_all > 1)
       throw std::runtime_error("specify either binarize-{left,right,all}");
-    
+
     const signature_type* sig = (! signature.empty() ? &signature_type::create(signature) : 0);
+    
+    if (! output_character_file.empty())
+      if (output_lexicon_file.empty())
+	throw std::runtime_error("we will dump character file, but no lexicon file");
     
     if (int(binarize_left) + binarize_right + binarize_all == 0)
       binarize_left = true;
@@ -321,23 +325,31 @@ int main(int argc, char** argv)
 	}
       }
     }
-    
-    // output grammar...
-    write_grammar(output_grammar_file, grammar);
-    
-    // output lexical rule
-    // in signature mode, we will estimate A -> signature from the current grammar + treebanks
-    // and dump A -> signature and A -> word
-    
-    if (sig) {
-      // we will learn lexical probabilities...
-      grammar_type lexicon;
-      grammar_learn(treebanks, lexicon, weight_function(grammar));
-    } else {
-      // do noghing
-    }
+
+    if (! output_lexicon_file.empty()) {
+      // output lexical rule
+      // in signature mode, we will estimate A -> signature from the current grammar + treebanks
+      // and dump A -> signature and A -> word
       
-    // learn character distribution..
+      if (! output_character_file.empty()) {
+	
+	
+      }
+      
+      if (sig) {
+	// we will learn lexical probabilities...
+	grammar_type lexicon;
+	grammar_learn(treebanks, lexicon, weight_function(grammar));
+	
+	
+      } else {
+	// we will simply split grammar into two: terminal rule and other rules.
+	
+	
+      }
+    } else
+      write_grammar(output_grammar_file, grammar);
+    
     
   }
   catch (std::exception& err) {

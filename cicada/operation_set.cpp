@@ -28,7 +28,6 @@
 #include "operation/prune.hpp"
 #include "operation/remove_annotation.hpp"
 #include "operation/remove_epsilon.hpp"
-#include "operation/remove_unknown.hpp"
 #include "operation/sort_tail.hpp"
 #include "operation/span_forest.hpp"
 #include "operation/intersect.hpp"
@@ -141,7 +140,6 @@ prune: pruning\n\
 \tweights-one=[true|false] one initialzied weight\n\
 remove-annotation: remove latent annotation from forest\n\
 remove-epsilon: remove epsilon for lattice\n\
-remove-unknown: remove unknown node from forest\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 span-forest: annotate terminal span\n\
 ";
@@ -231,8 +229,6 @@ span-forest: annotate terminal span\n\
 	operations.push_back(operation_ptr_type(new operation::RemoveAnnotation(*piter, debug)));
       else if (param_name == "remove-epsilon")
 	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
-      else if (param_name == "remove-unknown")
-	operations.push_back(operation_ptr_type(new operation::RemoveUnknown(*piter, debug)));
       else if (param_name == "debinarize")
 	operations.push_back(operation_ptr_type(new operation::Debinarize(*piter, debug)));
       else if (param_name == "expected-ngram")

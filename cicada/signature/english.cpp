@@ -50,7 +50,7 @@ namespace cicada
       if (__cache[word.id()] == vocab_type::EMPTY) {
 	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 
-	std::string signature = "UNKNOWN";
+	std::string signature = "<UNK";
 	
 	// signature for English, taken from Stanford parser's getSignature5
 	int num_caps = 0;
@@ -129,6 +129,8 @@ namespace cicada
 	  else if (uword.endsWith("al"))
 	    signature += "-al";
 	}
+
+	signature += '>';
 	
 	__cache[word.id()] = signature;
       }

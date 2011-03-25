@@ -91,7 +91,7 @@ namespace cicada
 	
 	UnicodeString uword = UnicodeString::fromUTF8(static_cast<const std::string&>(word));
 	
-	std::string signature = "UNKNOWN";
+	std::string signature = "<UNK";
 
 	if (impl.date_match(uword))
 	  signature += "-DATE";
@@ -105,6 +105,8 @@ namespace cicada
 	  signature += "-PROPER";
 	if (impl.punct_match(uword))
 	  signature += "-PUNCT";
+	
+	signature += '>';
 	
 	__cache[word.id()] = signature;
       }
