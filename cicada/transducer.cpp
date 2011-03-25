@@ -24,7 +24,7 @@ namespace cicada
   {
     static const char* desc ="\
 file-name: indexed grammar or plain text grammar\n\
-\tmax-span=[int] maximum span\n\
+\tmax-span=[int] maximum span (<=0 for no-constraint)\n\
 \tfeature0=[feature-name]\n\
 \tfeature1=[feature-name]\n\
 \t...\n\
