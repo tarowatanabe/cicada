@@ -2,7 +2,7 @@ cicada
 
 A statistical machine translation toolkit based on a semiring parsing framework[1].
 Based on the generic framework, we can
-   - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree), word alignment
+   - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree), word alignment, grammar for parsing
    - translate sentence, lattice and/or parse tree
    - align between {hypergraph,lattice}-to-lattice (currently, we assume penn-treebank style hypergraph and sentence-like lattice)
    - parse lattices (or sentences)
@@ -51,6 +51,10 @@ Or, you can combine outputs from multiple systems by (New! and TODO):
    - Create lattice from n-best list by incremental merging
    - Construct hypergraph by linear grammar (grammar-glue-straight + grammar-insertion)
    - Generate k-best translations after feature application etc.
+
+Monolingual grammar learning is implemented:
+   - A simple PCFG by simply extracting rules.
+   - Learn latent annotated PCFG by split/merge process with an EM algorihtm [25].
 
 Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
    - A conventional phrase extract algorithm in Moses
@@ -380,3 +384,18 @@ References:
     pages = {123--134},
     publisher = {}
 }
+
+[25]
+@InProceedings{petrov-EtAl:2006:COLACL,
+  author    = {Petrov, Slav  and  Barrett, Leon  and  Thibaux, Romain  and  Klein, Dan},
+  title     = {Learning Accurate, Compact, and Interpretable Tree Annotation},
+  booktitle = {Proceedings of the 21st International Conference on Computational Linguistics and 44th Annual Meeting of the Association for Computational Linguistics},
+  month     = {July},
+  year      = {2006},
+  address   = {Sydney, Australia},
+  publisher = {Association for Computational Linguistics},
+  pages     = {433--440},
+  url       = {http://www.aclweb.org/anthology/P06-1055},
+  doi       = {10.3115/1220175.1220230}
+}
+
