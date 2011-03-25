@@ -21,6 +21,8 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
   
@@ -89,6 +91,10 @@ namespace cicada
     
     virtual void assign(const lattice_type& lattice, const lattice_type& lattice2) {}
     virtual void assign(const hypergraph_type& hypergraph, const lattice_type& lattice) {}
+
+  public:
+    static const char* lists();
+    static transducer_ptr_type create(const utils::piece& parameter);
   };
   
   

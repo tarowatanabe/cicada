@@ -81,23 +81,12 @@ bool input_directory_mode = false;
 path_type weights_file;
 
 std::string symbol_goal         = vocab_type::S;
-std::string symbol_non_terminal = vocab_type::X;
-path_type   symbol_fallback_file;
 
-grammar_file_set_type grammar_mutable_files;
-grammar_file_set_type grammar_static_files;
+grammar_file_set_type grammar_files;
+bool grammar_list = false;
 
-bool grammar_glue_straight = false;
-bool grammar_glue_inverted = false;
-bool grammar_insertion = false;
-bool grammar_deletion = false;
-bool grammar_pos = false;
-bool grammar_pair = false;
-
-grammar_file_set_type tree_grammar_mutable_files;
-grammar_file_set_type tree_grammar_static_files;
-
-bool tree_grammar_fallback = false;
+grammar_file_set_type tree_grammar_files;
+bool tree_grammar_list = false;
 
 feature_parameter_set_type feature_parameters;
 bool feature_list = false;
@@ -185,69 +174,36 @@ int main(int argc, char ** argv)
 
 
     if (feature_list) {
-      std::cout << cicada::FeatureFunction::lists();
+      if (mpi_rank == 0)
+	std::cout << cicada::FeatureFunction::lists();
       return 0;
     }
 
     if (op_list) {
-      std::cout << operation_set_type::lists();
+      if (mpi_rank == 0)
+	std::cout << operation_set_type::lists();
       return 0;
     }
     
-    // read grammars...
-    grammar_type grammar;
-    const size_t grammar_static_size  = load_grammar<cicada::GrammarStatic>(grammar, grammar_static_files);
-    const size_t grammar_mutable_size = load_grammar<cicada::GrammarMutable>(grammar, grammar_mutable_files);    
-    
-    if (debug && mpi_rank == 0)
-      std::cerr << "loaded static grammar: " << grammar_static_size << std::endl
-		<< "loaded mutable grammar: " << grammar_mutable_size << std::endl;
-
-    
-    if (grammar_glue_straight || grammar_glue_inverted) {
-      if (! symbol_fallback_file.empty()) {
-	if (symbol_fallback_file != "-" && ! boost::filesystem::exists(symbol_fallback_file))
-	  throw std::runtime_error("invalid fallback non-terminal file: " + symbol_fallback_file.string());
-	
-	utils::compress_istream is(symbol_fallback_file, 1024 * 1024);
-	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
-										    symbol_non_terminal,
-										    std::istream_iterator<std::string>(is),
-										    std::istream_iterator<std::string>(),
-										    grammar_glue_straight,
-										    grammar_glue_inverted)));
-	
-      } else
-	grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarGlue(symbol_goal,
-										    symbol_non_terminal,
-										    grammar_glue_straight,
-										    grammar_glue_inverted)));
+    if (grammar_list) {
+      if (mpi_rank == 0)
+	std::cout << grammar_type::lists();
+      return 0;
     }
-     
-    if (grammar_insertion)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarInsertion(symbol_non_terminal)));
-    if (grammar_deletion)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarDeletion(symbol_non_terminal)));
-    if (grammar_pos)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPOS()));
-    if (grammar_pair)
-      grammar.push_back(grammar_type::transducer_ptr_type(new cicada::GrammarPair(symbol_non_terminal)));
-    
+
+    if (tree_grammar_list) {
+      if (mpi_rank == 0)
+	std::cout << tree_grammar_type::lists();
+      return 0;
+    }
+
+    // read grammars...
+    grammar_type grammar(grammar_files.begin(), grammar_files.end());
     if (debug && mpi_rank == 0)
       std::cerr << "grammar: " << grammar.size() << std::endl;
 
-    tree_grammar_type tree_grammar;
-    const size_t tree_grammar_static_size  = load_grammar<cicada::TreeGrammarStatic>(tree_grammar, tree_grammar_static_files);
-    const size_t tree_grammar_mutable_size = load_grammar<cicada::TreeGrammarMutable>(tree_grammar, tree_grammar_mutable_files);
-    
-    if (debug && mpi_rank == 0)
-      std::cerr << "loaded static tree grammar: " << tree_grammar_static_size << std::endl
-		<< "loaded mutable tree grammar: " << tree_grammar_mutable_size << std::endl;
-    
-    if (tree_grammar_fallback)
-      tree_grammar.push_back(tree_grammar_type::transducer_ptr_type(new cicada::TreeGrammarFallback(symbol_non_terminal)));
-    
-    if (debug && mpi_rank == 0)
+    tree_grammar_type tree_grammar(tree_grammar_files.begin(), tree_grammar_files.end());
+    if (mpi_rank == 0 && debug)
       std::cerr << "tree grammar: " << tree_grammar.size() << std::endl;
     
     // read features...
@@ -1662,26 +1618,11 @@ void options(int argc, char** argv)
     ("weights", po::value<path_type>(&weights_file), "initial weights")
     
     // grammar
-    ("goal",           po::value<std::string>(&symbol_goal)->default_value(symbol_goal),                 "goal symbol")
-    ("non-terminal",   po::value<std::string>(&symbol_non_terminal)->default_value(symbol_non_terminal), "default non-terminal symbol")
-    ("fallback",       po::value<path_type>(&symbol_fallback_file),                                      "fallback non-terminal list")
-    ("grammar",        po::value<grammar_file_set_type >(&grammar_mutable_files)->composing(),           "grammar file(s)")
-    ("grammar-static", po::value<grammar_file_set_type >(&grammar_static_files)->composing(),            "static binary grammar file(s)")
-    
-    // special handling
-    ("grammar-glue-straight", po::bool_switch(&grammar_glue_straight), "add straight hiero glue rule")
-    ("grammar-glue-inverted", po::bool_switch(&grammar_glue_inverted), "add inverted hiero glue rule")
-    ("grammar-insertion",     po::bool_switch(&grammar_insertion),     "source-to-target transfer grammar")
-    ("grammar-deletion",      po::bool_switch(&grammar_deletion),      "source-to-<epsilon> transfer grammar")
-    ("grammar-pos",           po::bool_switch(&grammar_pos),           "POS annotated input grammar")
-    ("grammar-pair",          po::bool_switch(&grammar_pair),          "source/target alignment grammar")
-
-    // tree-grammar
-    ("tree-grammar",          po::value<grammar_file_set_type >(&tree_grammar_mutable_files)->composing(), "tree grammar file(s)")
-    ("tree-grammar-static",   po::value<grammar_file_set_type >(&tree_grammar_static_files)->composing(),  "static binary tree grammar file(s)")
-    
-    // special handling
-    ("tree-grammar-fallback", po::bool_switch(&tree_grammar_fallback),                                     "source-to-target transfer tree grammar")
+    ("goal",              po::value<std::string>(&symbol_goal)->default_value(symbol_goal),    "goal symbol")
+    ("grammar",           po::value<grammar_file_set_type >(&grammar_files)->composing(),      "grammar specification(s)")
+    ("grammar-list",      po::bool_switch(&grammar_list),                                      "list of available grammar specifications")
+    ("tree-grammar",      po::value<grammar_file_set_type >(&tree_grammar_files)->composing(), "tree grammar specification(s)")
+    ("tree-grammar-list", po::bool_switch(&tree_grammar_list),                                 "list of available grammar specifications")
     
     // models...
     ("feature-function",      po::value<feature_parameter_set_type >(&feature_parameters)->composing(), "feature function(s)")

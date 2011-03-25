@@ -7,3 +7,15 @@ string-to-string rules (aka Hiero rules):
 tree-to-string/string-to-tree transduction rules:
 
 [LHS]([NN,1](terminal [NP](xxx) [NP,2])) ||| [LHS]([VP](yyy [x,2] zzz) [x,1]) ||| feature=6.8 ||| attr2="attribute 2"
+
+
+In cicada, various file-based gramamr can be loaded in addition to pre-defined glue-rules, by
+
+	--grammar file-name:max-span="maximum-span",feature0="name-of-first-feature", feature1="name-of-second-feature", ...
+	--grammar glue:straight=ture,inverted=true,non-terminal=[x],goal=[s],fallback=<fallback non-terminal symbol list>
+	--grammar insertion:non-terminal=[x]
+	--grammar deletion:non-terminal=[x]
+	--grammar pos
+	--grammar pair:non-terminal=[x]
+
+For detail see --grammar-list

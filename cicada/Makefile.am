@@ -352,9 +352,11 @@ tokenizer.cpp \
 treebank.cpp \
 symbol.cpp \
 symbol_vector.cpp \
+transducer.cpp \
 tree_grammar_mutable.cpp \
 tree_grammar_static.cpp \
 tree_rule.cpp \
+tree_transducer.cpp \
 vocab.cpp
 
 libcicada_la_LDFLAGS = \

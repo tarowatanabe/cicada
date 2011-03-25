@@ -441,7 +441,6 @@ namespace cicada
 	std::cerr << "compose alignment: " << data.id << std::endl;
 	
       utils::resource start;
-
       
       if (lattice_mode)
 	grammar.assign(lattice, target);

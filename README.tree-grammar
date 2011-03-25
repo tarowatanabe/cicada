@@ -7,4 +7,9 @@ We can use tree-transduce grammar as in:
 no '(' or ')' allowed in non-terminals or terminals, but you can still "escape" by '\(' '\)'
 (You should escape '\' by '\\')
 
+In cicada file-based grammar can be loaded in additin to pre-defined fallback-rules via
 
+   --tree-grammar file-name:feature0="name-of-first-feature", feature1="name-of-second-feature", ...
+   --tree-grammar fallback:non-terminal=[x]
+
+For defailt, see --tree-grammar-list

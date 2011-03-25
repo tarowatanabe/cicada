@@ -46,9 +46,18 @@ namespace cicada
   public:
 
     TreeGrammarFallback(const symbol_type& __non_terminal)
-      : non_terminal(__non_terminal) {}
+      : non_terminal(__non_terminal)
+    {
+      rules.set_empty_key(graph_rule_ptr_type());
+      features["tree-insertion-penalty"] = -1.0;
+    }
+    
     TreeGrammarFallback()
-      : non_terminal() {}
+      : non_terminal()
+    {
+      rules.set_empty_key(graph_rule_ptr_type());
+      features["tree-insertion-penalty"] = -1.0;
+    }
     
     transducer_ptr_type clone() const { return transducer_ptr_type(new TreeGrammarFallback(*this)); }
 
@@ -63,22 +72,14 @@ namespace cicada
   private:
     void __assign(const hypergraph_type& graph, const symbol_type& non_terminal)
     {
+      rules.clear();
       clear();
-      
-      graph_rule_ptr_set_type rules;
-      rules.set_empty_key(graph_rule_ptr_type());
-
-      feature_set_type features;
-      features["tree-insertion-penalty"] = -1.0;
-
-      non_terminal_set_type non_terminals;
       
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = *eiter;
 	
-	if (rules.find(edge.rule) != rules.end()) continue;
-	rules.insert(edge.rule);
+	if (! rules.insert(edge.rule).second) continue;
 	
 	non_terminals.clear();
 	symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
@@ -95,24 +96,14 @@ namespace cicada
     // simply copy and preserve the same non-terminal category...
     void __assign(const hypergraph_type& graph)
     {
-      
-      
+      rules.clear();
       clear();
-
-      graph_rule_ptr_set_type rules;
-      rules.set_empty_key(graph_rule_ptr_type());
-
-      feature_set_type features;
-      features["tree-insertion-penalty"] = -1.0;
-
-      non_terminal_set_type non_terminals;
       
       hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
 	const hypergraph_type::edge_type& edge = *eiter;
 	
-	if (rules.find(edge.rule) != rules.end()) continue;
-	rules.insert(edge.rule);
+	if (! rules.insert(edge.rule).second) continue;
 	
 	rule_ptr_type rule(rule_type::create(rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end())));
 	
@@ -122,6 +113,11 @@ namespace cicada
     
   private:
     symbol_type non_terminal;
+
+    graph_rule_ptr_set_type rules;
+    feature_set_type        features;
+    non_terminal_set_type   non_terminals;
+    
   };
   
 };

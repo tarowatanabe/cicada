@@ -8,11 +8,9 @@
 
 #include <cicada/tree_transducer.hpp>
 
-#include <cicada/tree_grammar_mutable.hpp>
-#include <cicada/tree_grammar_static.hpp>
-#include <cicada/tree_grammar_simple.hpp>
-
 #include <boost/shared_ptr.hpp>
+
+#include <utils/piece.hpp>
 
 namespace cicada
 {
@@ -46,6 +44,20 @@ namespace cicada
     
   public:
     TreeGrammar() : transducers() {}
+    template <typename Iterator>
+    TreeGrammar(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first)
+	push_back(*first);
+    }
+    
+    template <typename Iterator>
+    void assign(Iterator first, Iterator last)
+    {
+      clear();
+      for (/**/; first != last; ++ first)
+	push_back(*first);
+    }
     
     size_type size() const { return transducers.size(); }
     bool empty() const { return transducers.empty(); }
@@ -60,6 +72,7 @@ namespace cicada
     iterator end() { return transducers.end(); }
     
     void push_back(const transducer_ptr_type& x) { transducers.push_back(x); }
+    void push_back(const utils::piece& parameter) { transducers.push_back(transducer_type::create(parameter)); }
     void pop_back() { transducers.pop_back(); }
     void clear() { transducers.clear(); }
     
@@ -87,6 +100,10 @@ namespace cicada
       for (transducer_ptr_set_type::const_iterator iter = transducers.begin(); iter != iter_end; ++ iter)
 	const_cast<transducer_ptr_type&>(*iter)->assign(hypergraph);
     }
+
+  public:
+    static const char* lists() { return transducer_type::lists(); }
+    static transducer_ptr_type create(const utils::piece& parameter) { return transducer_type::create(parameter); }
     
   private:
     transducer_ptr_set_type transducers;
