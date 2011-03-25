@@ -373,6 +373,8 @@ bool unary_bottom = false;
 bool unary_root = false;
 bool exclude_terminal = false;
 
+bool validate = false;
+
 int debug = 0;
 
 void options(int argc, char** argv);
@@ -527,9 +529,29 @@ int main(int argc, char** argv)
 	if (debug)
 	  std::cerr << "transformed into hypergraph" << std::endl;
 
-	if (! graph.edges.empty())
+	if (! graph.edges.empty()) {
 	  graph.topologically_sort();
-	else
+	  
+	  if (validate) {
+	    hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+	    for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
+	      const hypergraph_type::edge_type& edge = *eiter;
+	      
+	      if (edge.tails.empty()) {
+		if (edge.rule->rhs.size() != 1)
+		  throw std::runtime_error("terminal rule has more than one terminal?");
+		if (edge.rule->rhs.front().is_non_terminal())
+		  throw std::runtime_error("terminal rule has non-terminal in rhs?");
+	      } else {
+		hypergraph_type::rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+		for (hypergraph_type::rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+		  if (riter->is_terminal())
+		    throw std::runtime_error("non-terminal rule has terminal!");
+	      }
+	    }
+	  }
+	  
+	} else
 	  graph.clear();
 	
 	if (rule) {
@@ -577,6 +599,8 @@ void options(int argc, char** argv)
     ("unary-root",   po::bool_switch(&unary_root),   "use single category for root")
     
     ("exclude-terminal", po::bool_switch(&exclude_terminal), "no terminal in span")
+
+    ("validate", po::bool_switch(&validate), "validate penntreebank")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
