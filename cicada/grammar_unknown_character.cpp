@@ -2,24 +2,24 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-
-#include "grammar_unknown.hpp"
-
-#include <utils/lexical_cast.hpp>
-#include <utils/space_separator.hpp>
+#include "grammar_unknown_character.hpp"
 
 #include <boost/filesystem.hpp>
-#include <boost/tokenizer.hpp>
+
+#include "utils/compress_stream.hpp"
 
 namespace cicada
 {
-  void GrammarUnknown::read_character(const std::string& file)
+  void GrammarUnknownCharacter::read_character(const std::string& path)
   {
+    if (path != "-" && ! boost::filesystem::exists(path))
+      throw std::runtime_error("no path? " + path);
+    
     
     
   }
 
-  void GrammarUnknown::insert(const symbol_type& word)
+  void GrammarUnknownCharacter::insert(const symbol_type& word)
   {
     id_type node = base_type::next(base_type::root(), word);
     if (node != base_type::root()) return;
@@ -38,20 +38,12 @@ namespace cicada
     
     rule_pair_set_type rules_new;
     rules_new.reserve(__rules.size());
-    
-    if (ngram.empty()) {
-      rule_pair_set_type::const_iterator riter_end = __rules.end();
-      for (rule_pair_set_type::const_iterator riter = __rules.begin(); riter != riter_end; ++ riter) {
-	const rule_ptr_type rule = rule_type::create(rule_type(riter->source->lhs, rule_type::symbol_set_type(1, word)));
-	rules_new.push_back(rule_pair_type(rule, riter->target, riter->features, riter->attributes));
-      }
-    } else {
+    {
       rule_pair_set_type::const_iterator riter_end = __rules.end();
       for (rule_pair_set_type::const_iterator riter = __rules.begin(); riter != riter_end; ++ riter) {
 	const rule_ptr_type rule = rule_type::create(rule_type(riter->source->lhs, rule_type::symbol_set_type(1, word)));
 	
-	// compute score by characters...
-	
+	// we will add a feature, unknown-character
 	
 	rules_new.push_back(rule_pair_type(rule, riter->target, riter->features, riter->attributes));
       }

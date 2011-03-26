@@ -201,9 +201,8 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
 
 template <typename Function>
 void characters_learn(const hypergraph_set_type& treebanks,
-		      const grammar_type& lexicon,
-		      ngram_count_set_type& model_char,
-		      ngram_count_set_type& model_sig,
+		      ngram_count_set_type& model,
+		      ngram_count_set_type& backoff,
 		      Function function);
 
 template <typename Maximizer>
@@ -212,8 +211,8 @@ void grammar_maximize(const count_set_type& counts,
 		      Maximizer maximizer);
 
 void write_characters(const path_type& file,
-		      const ngram_count_set_type& model_char,
-		      const ngram_count_set_type& model_sig,
+		      const ngram_count_set_type& model,
+		      const ngram_count_set_type& backoff,
 		      const double cutoff);
 void write_grammar(const path_type& file,
 		   const grammar_type& grammar,
@@ -388,13 +387,15 @@ int main(int argc, char** argv)
       }
       
       if (! output_character_file.empty()) {
-	ngram_count_set_type model_char;
-	ngram_count_set_type model_sig;
+	ngram_count_set_type model;
+	ngram_count_set_type backoff;
 	
-	characters_learn(treebanks, lexicon, model_char, model_sig, weight_function(grammar));
+	characters_learn(treebanks, model, backoff, weight_function(grammar));
 	
-	write_characters(output_character_file, model_char, model_sig, cutoff_character);
-      } else if (sig)
+	write_characters(output_character_file, model, backoff, cutoff_character);
+      } 
+      
+      if (sig)
 	lexicon_learn(treebanks, lexicon, weight_function(grammar));
       
       write_grammar(output_grammar_file, rules, cutoff_rule);
@@ -1836,8 +1837,7 @@ struct TaskCharacterCount
   TaskCharacterCount(queue_type& __queue, Function __function)
     : queue(__queue),
       function(__function),
-      counts(),
-      counts_sig() { }
+      counts() { }
   
   void operator()()
   {
@@ -1887,8 +1887,6 @@ struct TaskCharacterCount
 	ngram[1] = __signature(rule.rhs.front());
 	phrase.front() = rule.rhs.front();
 	
-	counts_sig[ngram_type(ngram.begin(), ngram.begin() + 2)] += count;
-	counts_sig[ngram_type(ngram.begin() + 1, ngram.begin() + 2)] += count;
 	
 	__tokenizer(phrase, tokenized);
 	phrase_type::const_iterator titer_end = tokenized.end();
@@ -1907,14 +1905,12 @@ struct TaskCharacterCount
   Function       function;
   
   ngram_count_set_type counts; // counts of tag-signature-word
-  ngram_count_set_type counts_sig; // counts of tag-signature
 };
 
 template <typename Function>
 void characters_learn(const hypergraph_set_type& treebanks,
-		      const grammar_type& lexicon,
-		      ngram_count_set_type& model_char,
-		      ngram_count_set_type& model_sig,
+		      ngram_count_set_type& model,
+		      ngram_count_set_type& backoff,
 		      Function function)
 {
   typedef cicada::Vocab vocab_type;
@@ -1940,7 +1936,6 @@ void characters_learn(const hypergraph_set_type& treebanks,
   workers.join_all();
   
   ngram_count_set_type counts;
-  ngram_count_set_type counts_sig;
   for (int i = 0; i != threads; ++ i) {
     if (counts.empty())
       counts.swap(tasks[i].counts);
@@ -1949,56 +1944,12 @@ void characters_learn(const hypergraph_set_type& treebanks,
       for (ngram_count_set_type::const_iterator niter = tasks[i].counts.begin(); niter != niter_end; ++ niter)
 	counts[niter->first] += niter->second;
     }
-    
-    if (counts_sig.empty())
-      counts_sig.swap(tasks[i].counts_sig);
-    else {
-      ngram_count_set_type::const_iterator niter_end = tasks[i].counts_sig.end();
-      for (ngram_count_set_type::const_iterator niter = tasks[i].counts_sig.begin(); niter != niter_end; ++ niter)
-	counts_sig[niter->first] += niter->second;
-    }
   }
   
   // estimate for tag-sig-word
-  const double logprob_unk = LexiconEstimate(prior_lexicon, 3)(counts, model_char, model_char);
-
-  model_char[ngram_type(1, vocab_type::UNK)] = logprob_unk;
+  const double logprob_unk = LexiconEstimate(prior_character, 3)(counts, model, backoff);
   
-  //std::cerr << "logprob-unk: " << logprob_unk << std::endl;
-  
-  // estimate for tas-sig
-  const double logprob_unk_sig = LexiconEstimate(prior_signature, 2)(counts_sig, model_sig, model_sig);
-  
-  model_sig[ngram_type(1, vocab_type::UNK)] = logprob_unk_sig;
-  
-  ngram_count_set_type model_tag;
-  grammar_type::const_iterator liter_end = lexicon.end();
-  for (grammar_type::const_iterator liter = lexicon.begin(); liter != liter_end; ++ liter) {
-    const symbol_type& lhs = liter->first->lhs;
-    
-    std::pair<ngram_count_set_type::iterator, bool> result = model_tag.insert(std::make_pair(ngram_type(1, lhs), liter->second));
-    if (! result.second)
-      result.first->second = utils::mathop::logsum(result.first->second, liter->second);
-  }
-  
-  ngram_count_set_type::iterator siter_end = model_sig.end();
-  for (ngram_count_set_type::iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
-    if (siter->first.front().is_non_terminal()) {
-      using namespace boost::math::policies;
-      typedef policy<domain_error<errno_on_error>,
-		     pole_error<errno_on_error>,
-		     overflow_error<errno_on_error>,
-		     rounding_error<errno_on_error>,
-		     evaluation_error<errno_on_error> > policy_type;
-
-      ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, siter->first.front()));
-      if (tag_iter == model_tag.end())
-	throw std::runtime_error("invalid tag model!?");
-      
-      const logprob_type score_backoff = utils::mathop::log(- boost::math::expm1(tag_iter->second, policy_type()));
-      
-      siter->second += score_backoff;
-    }
+  model[ngram_type(1, vocab_type::UNK)] = logprob_unk;
 }
 
 
@@ -2073,50 +2024,50 @@ bool is_sgml_tag(const symbol_type& symbol)
 }
 
 void write_characters(const path_type& file,
-		      const ngram_count_set_type& model_char,
-		      const ngram_count_set_type& model_sig,
+		      const ngram_count_set_type& model,
+		      const ngram_count_set_type& backoff,
 		      const double cutoff)
 {
+  typedef std::vector<const ngram_count_set_type::value_type*, std::allocator<const ngram_count_set_type::value_type*> > sorted_type;
+  typedef google::dense_hash_map<ngram_type, sorted_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > sorted_map_type;
+  
   utils::compress_ostream os(file, 1024 * 1024);
   
-  ngram_count_set_type::const_iterator siter_end = model_sig.end();  
-  // backoff
-  for (ngram_count_set_type::const_iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
-    if (siter->first.size() == 1 && siter->first.front().is_non_terminal())
-      os << "signature: " << siter->first << ' ' << siter->second << '\n';
-  // signature
-  for (ngram_count_set_type::const_iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
-    if (siter->first.size() == 1 && siter->first.front().is_terminal())
-      os << "signature: " << siter->first << ' ' << siter->second << '\n';
-  // tag-signature
-  for (ngram_count_set_type::const_iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
-    if (siter->first.size() == 2)
-      os << "signature: " << siter->first << ' ' << siter->second << '\n';
-
-  ngram_count_set_type::const_iterator citer_end = model_char.end();
-  // backoff by signature
-  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
-    if (citer->first.size() == 1 && is_sgml_tag(citer->first.back()))
-      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  sorted_map_type sorted;
+  sorted.set_empty_key(ngram_type(1, symbol_type()));
   
-  // backoff by tag-signature
-  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
-    if (citer->first.size() == 2 && is_sgml_tag(citer->first.back()))
-      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  ngram_count_set_type::const_iterator biter_end = backoff.end();
+  for (ngram_count_set_type::const_iterator biter = backoff.begin(); biter != biter_end; ++ biter)
+    sorted[ngram_type(biter->first.begin(), biter->first.end() - 1)].push_back(&(*biter));
   
-  // character
-  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
-    if (citer->first.size() == 1 && ! is_sgml_tag(citer->first.back()))
-      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  for (int order = 1; order <= 2; ++ order) {
+    sorted_map_type::iterator biter_end = sorted.end();
+    for (sorted_map_type::iterator biter = sorted.begin(); biter != biter_end; ++ biter)
+      if (static_cast<int>(biter->first.size()) == order - 1) {
+	std::sort(biter->second.begin(), biter->second.end(), greater_ptr_second<ngram_count_set_type::value_type>());
+	
+	sorted_type::const_iterator siter_end = biter->second.end();
+	for (sorted_type::const_iterator siter = biter->second.begin(); siter != siter_end; ++ siter)
+	  os << "backoff: " << (*siter)->first << ' ' << (*siter)->second << '\n';
+      }
+  }
   
-  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
-    if (citer->first.size() == 2 && ! is_sgml_tag(citer->first.back()))
-      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  sorted.clear();
+  ngram_count_set_type::const_iterator miter_end = model.end();
+  for (ngram_count_set_type::const_iterator miter = model.begin(); miter != miter_end; ++ miter)
+    sorted[ngram_type(miter->first.begin(), miter->first.end() - 1)].push_back(&(*miter));
   
-  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
-    if (citer->first.size() == 3)
-      os << "character: " << citer->first << ' ' << citer->second << '\n';
-  
+  for (int order = 1; order <= 3; ++ order) {
+    sorted_map_type::iterator miter_end = sorted.end();
+    for (sorted_map_type::iterator miter = sorted.begin(); miter != miter_end; ++ miter)
+      if (static_cast<int>(miter->first.size()) == order - 1) {
+	std::sort(miter->second.begin(), miter->second.end(), greater_ptr_second<ngram_count_set_type::value_type>());
+	
+	sorted_type::const_iterator siter_end = miter->second.end();
+	for (sorted_type::const_iterator siter = miter->second.begin(); siter != siter_end; ++ siter)
+	  os << "model: " << (*siter)->first << ' ' << (*siter)->second << '\n';
+      }
+  }
 }
 
 void write_grammar(const path_type& file,

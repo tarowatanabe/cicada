@@ -47,7 +47,8 @@ pair: terminal pair rule (for alignment composition)\n\
 pos: terminal pos rule (for POS annotated input) \n\
 unknown: pos assignment by signature\n\
 \tsignature=[signature for OOV]\n\
-\tfile=[filename]\n\
+\tfile=[file-name] lexical grammar\n\
+\tcharacter=[file-name] character model\n\
 ";
     return desc;
   }
@@ -155,21 +156,32 @@ unknown: pos assignment by signature\n\
     } else if (utils::ipiece(param.name()) == "unknown") {
       std::string signature;
       std::string file;
+      std::string character;
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "signature")
 	  signature = piter->second;	
 	else if (utils::ipiece(piter->first) == "file")
 	  file = piter->second;
+	else if (utils::ipiece(piter->first) == "character" || utils::ipiece(piter->first) == "char")
+	  character = piter->second;
 	else
 	  throw std::runtime_error("unsupported parameter for unknown grammar: " + piter->first + "=" + piter->second);
       }
       
       if (file != "-" && ! boost::filesystem::exists(file))
 	throw std::runtime_error("no file? " + file);
+      
+      if (! character.empty())
+	if (character != "-" && ! boost::filesystem::exists(character))
+	  throw std::runtime_error("no character model file? " + character);
+      
       if (signature.empty())
 	throw std::runtime_error("no signature?");
       
-      return transducer_ptr_type(new GrammarUnknown(signature, file));
+      if (! character.empty())
+	return transducer_ptr_type(new GrammarUnknown(signature, file, character));
+      else
+	return transducer_ptr_type(new GrammarUnknown(signature, file));
     } else {
       const path_type path = param.name();
       if (path != "-" && ! boost::filesystem::exists(path))
