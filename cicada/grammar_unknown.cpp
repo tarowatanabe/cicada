@@ -66,53 +66,49 @@ namespace cicada
 	  // we will query tag-sig-ch
 	  {
 	    ngram_set_type::id_type node = ngram.find(ngram.root(), tag);
-	    if (node == ngram.root())
-	      throw std::runtime_error("cannot find tag in trigram? " + static_cast<const std::string&>(tag));
-	    
-	    node = ngram.find(node, sig);
-	    if (node == ngram.root())
-	      throw std::runtime_error("cannot find signature in trigram? " + static_cast<const std::string&>(sig));
-	    
-	    unigram_set_type::const_iterator titer = ngram[node].find(ch);
-	    if (titer != ngram[node].end()) {
-	      logprob += titer->second;
-	      continue;
+	    if (node != ngram.root()) {
+	      node = ngram.find(node, sig);
+	      
+	      if (node != ngram.root()) {
+		unigram_set_type::const_iterator titer = ngram[node].find(ch);
+		
+		if (titer != ngram[node].end()) {
+		  logprob += titer->second;
+		  continue;
+		}
+	      }
 	    }
 	  }
 	  
 	  // backoff with tag-sig
 	  {
 	    backoff_set_type::id_type node = backoff.find(backoff.root(), tag);
-	    if (node == backoff.root())
-	      throw std::runtime_error("cannot find tag in trigram backoff? " + static_cast<const std::string&>(tag));
-	    
-	    node = backoff.find(node, sig);
-	    if (node == backoff.root())
-	      throw std::runtime_error("cannot find signature in trigram backoff? " + static_cast<const std::string&>(sig));
-	    
-	    logprob += backoff[node];
+	    if (node != backoff.root()) {
+	      node = backoff.find(node, sig);
+	      
+	      if (node != backoff.root())
+		logprob += backoff[node];
+	    }
 	  }
 
 	  // we will query sig-ch
 	  {
 	    ngram_set_type::id_type node = ngram.find(ngram.root(), sig);
-	    if (node == ngram.root())
-	      throw std::runtime_error("cannot find signature in bigram? " + static_cast<const std::string&>(sig));
-	    
-	    unigram_set_type::const_iterator titer = ngram[node].find(ch);
-	    if (titer != ngram[node].end()) {
-	      logprob += titer->second;
-	      continue;
+	    if (node != ngram.root()) {
+	      unigram_set_type::const_iterator titer = ngram[node].find(ch);
+	      
+	      if (titer != ngram[node].end()) {
+		logprob += titer->second;
+		continue;
+	      }
 	    }
 	  }
 	  
 	  // backoff with sig
 	  {
 	    backoff_set_type::id_type node = backoff.find(backoff.root(), sig);
-	    if (node == backoff.root())
-	      throw std::runtime_error("cannot find signature in bigram backoff? " + static_cast<const std::string&>(sig));
-	    
-	    logprob += backoff[node];
+	    if (node != backoff.root())
+	      logprob += backoff[node];
 	  }
 	  
 	  // unigram...
