@@ -67,7 +67,7 @@ namespace cicada
 	ngram(symbol_type()),
 	unigram(),
 	logprob_unk(0),
-	feature_character("character-penalty")
+	feature_character("rule-character")
     {
       base_type::read(__parameter);
       read_character(__character);

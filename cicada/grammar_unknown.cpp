@@ -4,9 +4,6 @@
 
 #include "grammar_unknown.hpp"
 
-#include <utils/lexical_cast.hpp>
-#include <utils/space_separator.hpp>
-
 #include <boost/filesystem.hpp>
 #include <boost/tokenizer.hpp>
 
@@ -14,11 +11,15 @@
 #include <unicode/unistr.h>
 #include <unicode/schriter.h>
 
+#include <utils/lexical_cast.hpp>
+#include <utils/space_separator.hpp>
+#include <utils/compress_stream.hpp>
+
 namespace cicada
 {
   void GrammarUnknown::read_character(const std::string& file)
   {
-    
+    utils::compress_istream is(file, 1024 * 1024);
     
   }
 
