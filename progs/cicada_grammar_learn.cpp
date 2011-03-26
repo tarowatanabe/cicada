@@ -28,6 +28,8 @@
 #include <cicada/sort.hpp>
 #include <cicada/binarize.hpp>
 #include <cicada/signature.hpp>
+#include <cicada/tokenizer.hpp>
+#include <cicada/sentence.hpp>
 
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
@@ -65,6 +67,7 @@ typedef feature_set_type::feature_type     feature_type;
 typedef attribute_set_type::attribute_type attribute_type;
 
 typedef cicada::Signature signature_type;
+typedef cicada::Tokenizer tokenizer_type;
 
 typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
@@ -199,7 +202,7 @@ template <typename Function>
 void characters_learn(const hypergraph_set_type& treebanks,
 		      const grammar_type& lexicon,
 		      ngram_count_set_type& model_char,
-		      ngram_count_set_type& model_tag,
+		      ngram_count_set_type& model_sig,
 		      Function function);
 
 template <typename Maximizer>
@@ -381,9 +384,9 @@ int main(int argc, char** argv)
       
       if (! output_character_file.empty()) {
 	ngram_count_set_type model_char;
-	ngram_count_set_type model_tag;
+	ngram_count_set_type model_sig;
 	
-	characters_learn(treebanks, lexicon, model_char, model_tag, weight_function(grammar));
+	characters_learn(treebanks, lexicon, model_char, model_sig, weight_function(grammar));
 	
       } else if (sig)
 	lexicon_learn(treebanks, lexicon, weight_function(grammar));
@@ -1707,11 +1710,6 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef typename task_type::queue_type queue_type;
 
-  typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
-
-  typedef std::vector<ngram_count_set_type::value_type*, std::allocator<ngram_count_set_type::value_type*> > ngram_set_type;
-  typedef google::dense_hash_map<ngram_type, ngram_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > ngram_count_map_type;
-
   queue_type queue;
   task_set_type tasks(threads, task_type(queue, function));
 
@@ -1823,14 +1821,155 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
 }
 
 template <typename Function>
+struct TaskCharacterCount
+{
+  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+  
+  // we will collect, tag-signature-word, signature-word, word
+  
+  TaskCharacterCount(queue_type& __queue, Function __function)
+    : queue(__queue),
+      function(__function),
+      counts(),
+      counts_sig() { }
+  
+  void operator()()
+  {
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    typedef cicada::Sentence phrase_type;
+    
+    weight_set_type inside;
+    weight_set_type outside;
+    weight_set_type scores;
+    
+    ngram_type ngram(3);
+
+    phrase_type phrase(1);
+    phrase_type tokenized;
+    
+    const signature_type& __signature = signature_type::create(signature);
+    const tokenizer_type& __tokenizer = tokenizer_type::create("character");
+    
+    const hypergraph_type* __treebank = 0;
+    for (;;) {
+      queue.pop(__treebank);
+      if (! __treebank) break;
+      
+      const hypergraph_type& treebank = *__treebank;
+      
+      inside.clear();
+      outside.clear();
+      inside.resize(treebank.nodes.size());
+      outside.resize(treebank.nodes.size());
+      
+      scores.clear();
+      scores.resize(treebank.edges.size());
+      
+      cicada::inside_outside(treebank, inside, outside, scores, function, function);
+      
+      hypergraph_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = *eiter;
+	if (! edge.tails.empty()) continue;
+	
+	const rule_type& rule = *edge.rule;
+
+	const count_type count = scores[edge.id] / inside.back();
+	
+	// assume penntreebank style...
+	ngram[0] = rule.lhs;
+	ngram[1] = __signature(rule.rhs.front());
+	phrase.front() = rule.rhs.front();
+	
+	counts_sig[ngram_type(ngram.begin(), ngram.begin() + 2)] += count;
+	counts_sig[ngram_type(ngram.begin() + 1, ngram.begin() + 2)] += count;
+	
+	__tokenizer(phrase, tokenized);
+	phrase_type::const_iterator titer_end = tokenized.end();
+	for (phrase_type::const_iterator titer = tokenized.begin(); titer != titer_end; ++ titer) {
+	  ngram[2] = *titer;
+	  
+	  counts[ngram] += count;
+	  counts[ngram_type(ngram.begin() + 1, ngram.end())] += count;
+	  counts[ngram_type(ngram.begin() + 2, ngram.end())] += count;
+	}
+      }
+    }
+  }
+  
+  queue_type&    queue;
+  Function       function;
+  
+  ngram_count_set_type counts; // counts of tag-signature-word
+  ngram_count_set_type counts_sig; // counts of tag-signature
+};
+
+template <typename Function>
 void characters_learn(const hypergraph_set_type& treebanks,
 		      const grammar_type& lexicon,
 		      ngram_count_set_type& model_char,
-		      ngram_count_set_type& model_tag,
+		      ngram_count_set_type& model_sig,
 		      Function function)
 {
+  typedef TaskCharacterCount<Function> task_type;
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  typedef typename task_type::queue_type queue_type;
 
+  queue_type queue;
+  task_set_type tasks(threads, task_type(queue, function));
 
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  
+  hypergraph_set_type::const_iterator titer_end = treebanks.end();
+  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+    queue.push(&(*titer));
+  
+  for (int i = 0; i != threads; ++ i)
+    queue.push(0);
+  
+  workers.join_all();
+  
+  ngram_count_set_type counts;
+  ngram_count_set_type counts_sig;
+  for (int i = 0; i != threads; ++ i) {
+    if (counts.empty())
+      counts.swap(tasks[i].counts);
+    else {
+      ngram_count_set_type::const_iterator niter_end = tasks[i].counts.end();
+      for (ngram_count_set_type::const_iterator niter = tasks[i].counts.begin(); niter != niter_end; ++ niter)
+	counts[niter->first] += niter->second;
+    }
+    
+    if (counts_sig.empty())
+      counts_sig.swap(tasks[i].counts_sig);
+    else {
+      ngram_count_set_type::const_iterator niter_end = tasks[i].counts_sig.end();
+      for (ngram_count_set_type::const_iterator niter = tasks[i].counts_sig.begin(); niter != niter_end; ++ niter)
+	counts_sig[niter->first] += niter->second;
+    }
+  }
+  
+  // estimate for tag-sig-word
+  const double logprob_unk = LexiconEstimate(prior_lexicon, 3)(counts, model_char, model_char);
+  
+  //std::cerr << "logprob-unk: " << logprob_unk << std::endl;
+  
+  // estimate for tas-sig
+  const double logprob_unk_sig = LexiconEstimate(prior_signature, 2)(counts_sig, model_sig, model_sig);
+
+  ngram_count_set_type model_tag;
+  grammar_type::const_iterator liter_end = lexicon.end();
+  for (grammar_type::const_iterator liter = lexicon.begin(); liter != liter_end; ++ liter) {
+    const symbol_type& lhs = liter->first->lhs;
+    
+    std::pair<ngram_count_set_type::iterator, bool> result = model_tag.insert(std::make_pair(ngram_type(1, lhs), liter->second));
+    if (! result.second)
+      result.first->second = utils::mathop::logsum(result.first->second, liter->second);
+  }
+  
+  
 }
 
 
@@ -1928,7 +2067,7 @@ void write_grammar(const path_type& file,
 
     if (0.0 < cutoff && cutoff < 1.0) {
       const double logprob_max = sorted.front()->second;
-      const double logprob_threshold = logprob_max + utils::mathop::log(cutoff_threshold);
+      const double logprob_threshold = logprob_max + utils::mathop::log(cutoff);
 	
       sorted_type::const_iterator siter_end = sorted.end();
       for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
