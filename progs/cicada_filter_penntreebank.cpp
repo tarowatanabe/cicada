@@ -31,6 +31,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "cicada/hypergraph.hpp"
+#include "cicada/stemmer.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -92,6 +93,8 @@ struct penntreebank_grammar : boost::spirit::qi::grammar<Iterator, treebank_type
 
 typedef cicada::HyperGraph hypergraph_type;
 typedef std::vector<std::string, std::allocator<std::string> > sentence_type;
+
+typedef cicada::Stemmer stemmer_type;
 
 typedef std::pair<int, int> span_type;
 typedef std::pair<span_type, std::string> span_cat_type;
@@ -243,6 +246,15 @@ void transform_unescape(treebank_type& treebank)
       transform_unescape(*aiter);
 }
 
+void transform_stemmer(treebank_type& treebank, const stemmer_type& stemmer)
+{
+  if (treebank.antecedents.empty())
+    treebank.cat = stemmer(treebank.cat);
+  else
+    for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+      transform_stemmer(*aiter, stemmer);
+}
+
 void transform_remove_none(treebank_type& treebank)
 {
   if (treebank.cat == "-NONE-") {
@@ -361,6 +373,7 @@ bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
 bool collapse = false;
+std::string stemmer;
 
 bool leaf = false;
 bool rule = false;
@@ -402,6 +415,8 @@ int main(int argc, char** argv)
       
       ms.reset(new utils::compress_istream(map_file, 1024 * 1024));
     }
+
+    const stemmer_type* __stemmer = (! stemmer.empty() ? &stemmer_type::create(stemmer) : 0);
     
     penntreebank_grammar<iter_type>         grammar;
 
@@ -468,6 +483,9 @@ int main(int argc, char** argv)
       
       if (unescape_terminal)
 	transform_unescape(parsed);
+
+      if (__stemmer)
+	transform_stemmer(parsed, *__stemmer);
 
       if (leaf) {
 	sent.clear();
@@ -586,6 +604,7 @@ void options(int argc, char** argv)
     ("normalize",   po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
     ("remove-none", po::bool_switch(&remove_none),       "remove -NONE-")
     ("collapse",    po::bool_switch(&collapse),          "collapse unary rules")
+    ("stemmer",     po::value<std::string>(&stemmer),    "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")

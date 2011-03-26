@@ -32,7 +32,7 @@ namespace cicada
 	UErrorCode status = U_ZERO_ERROR;
 	UParseError status_parse;
 	Transliterator* __trans = Transliterator::createFromRules(UnicodeString::fromUTF8("AnyLatinNoAccents"),
-								  UnicodeString::fromUTF8(":: Any-Latin:: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
+								  UnicodeString::fromUTF8(":: Any-Latin; :: NFKD; [[:Z:][:M:][:C:]] > ; :: NFKC;"),
 								  UTRANS_FORWARD, status_parse, status);
 	if (U_FAILURE(status))
 	  throw std::runtime_error(std::string("transliterator::create_from_rules(): ") + u_errorName(status));
