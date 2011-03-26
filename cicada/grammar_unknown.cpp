@@ -59,8 +59,9 @@ namespace cicada
 	
 	// compute score by characters...
 	double logprob = 0.0;
+	size_t num_char = 0;
 	StringCharacterIterator iter(uword);
-	for (iter.setToStart(); iter.hasNext(); /**/) {
+	for (iter.setToStart(); iter.hasNext(); ++ num_char) {
 	  const UChar32 ch = iter.next32PostInc();
 	  
 	  // we will query tag-sig-ch
@@ -122,7 +123,7 @@ namespace cicada
 	}
 	
 	rules_new.push_back(rule_pair_type(rule, riter->target, riter->features, riter->attributes));
-	rules_new.back().features[feature_character] = logprob;
+	rules_new.back().features[feature_character] = logprob / num_char;
       }
     }
     
