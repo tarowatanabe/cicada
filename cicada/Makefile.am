@@ -146,6 +146,7 @@ stemmer/suffix.hpp \
 stemmer/latin.hpp \
 stemmer/lower.hpp \
 stemmer/digit.hpp \
+stemmer/nfkc.hpp \
 stemmer/snowball.hpp
 
 libcicada_stemmer_la_SOURCES = \
@@ -155,6 +156,7 @@ stemmer/suffix.cpp \
 stemmer/latin.cpp \
 stemmer/lower.cpp \
 stemmer/digit.cpp \
+stemmer/nfkc.cpp \
 stemmer/snowball.cpp
 
 libcicada_stemmer_la_CPPFLAGS = $(AM_CPPFLAGS)

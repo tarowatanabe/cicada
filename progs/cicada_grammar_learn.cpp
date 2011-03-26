@@ -22,6 +22,7 @@
 #include <vector>
 #include <deque>
 
+#include <cicada/vocab.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/inside_outside.hpp>
 #include <cicada/semiring.hpp>
@@ -210,6 +211,10 @@ void grammar_maximize(const count_set_type& counts,
 		      grammar_type& grammar,
 		      Maximizer maximizer);
 
+void write_characters(const path_type& file,
+		      const ngram_count_set_type& model_char,
+		      const ngram_count_set_type& model_sig,
+		      const double cutoff);
 void write_grammar(const path_type& file,
 		   const grammar_type& grammar,
 		   const double cutoff);
@@ -269,7 +274,7 @@ int main(int argc, char** argv)
     
     if (! output_character_file.empty()) {
       if (! sig)
-	throw std::runtime_error("chracter estimation requires signature");
+	throw std::runtime_error("character estimation requires signature");
       
       if (output_lexicon_file.empty())
 	throw std::runtime_error("we will dump character file, but no lexicon file");
@@ -388,6 +393,7 @@ int main(int argc, char** argv)
 	
 	characters_learn(treebanks, lexicon, model_char, model_sig, weight_function(grammar));
 	
+	write_characters(output_character_file, model_char, model_sig, cutoff_character);
       } else if (sig)
 	lexicon_learn(treebanks, lexicon, weight_function(grammar));
       
@@ -1911,6 +1917,8 @@ void characters_learn(const hypergraph_set_type& treebanks,
 		      ngram_count_set_type& model_sig,
 		      Function function)
 {
+  typedef cicada::Vocab vocab_type;
+
   typedef TaskCharacterCount<Function> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef typename task_type::queue_type queue_type;
@@ -1953,12 +1961,16 @@ void characters_learn(const hypergraph_set_type& treebanks,
   
   // estimate for tag-sig-word
   const double logprob_unk = LexiconEstimate(prior_lexicon, 3)(counts, model_char, model_char);
+
+  model_char[ngram_type(1, vocab_type::UNK)] = logprob_unk;
   
   //std::cerr << "logprob-unk: " << logprob_unk << std::endl;
   
   // estimate for tas-sig
   const double logprob_unk_sig = LexiconEstimate(prior_signature, 2)(counts_sig, model_sig, model_sig);
-
+  
+  model_sig[ngram_type(1, vocab_type::UNK)] = logprob_unk_sig;
+  
   ngram_count_set_type model_tag;
   grammar_type::const_iterator liter_end = lexicon.end();
   for (grammar_type::const_iterator liter = lexicon.begin(); liter != liter_end; ++ liter) {
@@ -1969,7 +1981,24 @@ void characters_learn(const hypergraph_set_type& treebanks,
       result.first->second = utils::mathop::logsum(result.first->second, liter->second);
   }
   
-  
+  ngram_count_set_type::iterator siter_end = model_sig.end();
+  for (ngram_count_set_type::iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
+    if (siter->first.front().is_non_terminal()) {
+      using namespace boost::math::policies;
+      typedef policy<domain_error<errno_on_error>,
+		     pole_error<errno_on_error>,
+		     overflow_error<errno_on_error>,
+		     rounding_error<errno_on_error>,
+		     evaluation_error<errno_on_error> > policy_type;
+
+      ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, siter->first.front()));
+      if (tag_iter == model_tag.end())
+	throw std::runtime_error("invalid tag model!?");
+      
+      const logprob_type score_backoff = utils::mathop::log(- boost::math::expm1(tag_iter->second, policy_type()));
+      
+      siter->second += score_backoff;
+    }
 }
 
 
@@ -2034,6 +2063,60 @@ void grammar_maximize(const count_set_type& counts,
     else
       grammar.insert(tasks[i].grammar.begin(), tasks[i].grammar.end());
   }
+}
+
+inline
+bool is_sgml_tag(const symbol_type& symbol)
+{
+  const size_t size = symbol.size();
+  return size != 0 && symbol[0] == '<' && symbol[size - 1] == '>';
+}
+
+void write_characters(const path_type& file,
+		      const ngram_count_set_type& model_char,
+		      const ngram_count_set_type& model_sig,
+		      const double cutoff)
+{
+  utils::compress_ostream os(file, 1024 * 1024);
+  
+  ngram_count_set_type::const_iterator siter_end = model_sig.end();  
+  // backoff
+  for (ngram_count_set_type::const_iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
+    if (siter->first.size() == 1 && siter->first.front().is_non_terminal())
+      os << "signature: " << siter->first << ' ' << siter->second << '\n';
+  // signature
+  for (ngram_count_set_type::const_iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
+    if (siter->first.size() == 1 && siter->first.front().is_terminal())
+      os << "signature: " << siter->first << ' ' << siter->second << '\n';
+  // tag-signature
+  for (ngram_count_set_type::const_iterator siter = model_sig.begin(); siter != siter_end; ++ siter) 
+    if (siter->first.size() == 2)
+      os << "signature: " << siter->first << ' ' << siter->second << '\n';
+
+  ngram_count_set_type::const_iterator citer_end = model_char.end();
+  // backoff by signature
+  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
+    if (citer->first.size() == 1 && is_sgml_tag(citer->first.back()))
+      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  
+  // backoff by tag-signature
+  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
+    if (citer->first.size() == 2 && is_sgml_tag(citer->first.back()))
+      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  
+  // character
+  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
+    if (citer->first.size() == 1 && ! is_sgml_tag(citer->first.back()))
+      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  
+  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
+    if (citer->first.size() == 2 && ! is_sgml_tag(citer->first.back()))
+      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  
+  for (ngram_count_set_type::const_iterator citer = model_char.begin(); citer != citer_end; ++ citer)
+    if (citer->first.size() == 3)
+      os << "character: " << citer->first << ' ' << citer->second << '\n';
+  
 }
 
 void write_grammar(const path_type& file,

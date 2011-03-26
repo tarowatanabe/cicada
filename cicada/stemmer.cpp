@@ -9,6 +9,7 @@
 #include "stemmer/latin.hpp"
 #include "stemmer/digit.hpp"
 #include "stemmer/lower.hpp"
+#include "stemmer/nfkc.hpp"
 #include "stemmer/snowball.hpp"
 
 #include "parameter.hpp"
@@ -37,6 +38,7 @@ suffix: taking suffix of letters\n\
 digit: digits normalized to @\n\
 latin: romanization\n\
 lower: lower casing\n\
+nfkc: NFKC\n\
 ";
     return desc;
   }
@@ -156,6 +158,16 @@ lower: lower casing\n\
       stemmer_map_type::iterator iter = stemmers_map.find(name);
       if (iter == stemmers_map.end()) {
 	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::Lower()))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "nfkc") {
+      const std::string name("nfkc");
+      
+      stemmer_map_type::iterator iter = stemmers_map.find(name);
+      if (iter == stemmers_map.end()) {
+	iter = stemmers_map.insert(std::make_pair(name, stemmer_ptr_type(new stemmer::NFKC()))).first;
 	iter->second->__algorithm = parameter;
       }
       
