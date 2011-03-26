@@ -27,6 +27,8 @@ namespace cicada
     
     typedef int32_t uchar_type;
 
+    typedef feature_set_type::feature_type feature_type;
+
   private:
     typedef utils::compact_trie_dense<symbol_type, double, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				      std::allocator<std::pair<const symbol_type, double> > > backoff_set_type;
@@ -50,7 +52,8 @@ namespace cicada
 	backoff(symbol_type()),
 	ngram(symbol_type()),
 	unigram(),
-	logprob_unk(0)
+	logprob_unk(0),
+	feature_character()
     {
       base_type::read(__parameter);
     }
@@ -63,7 +66,8 @@ namespace cicada
 	backoff(symbol_type()),
 	ngram(symbol_type()),
 	unigram(),
-	logprob_unk(0)
+	logprob_unk(0),
+	feature_character("character-penalty")
     {
       base_type::read(__parameter);
       read_character(__character);
@@ -115,6 +119,8 @@ namespace cicada
     unigram_set_type unigram;
     
     double logprob_unk;
+    
+    feature_type feature_character;
   };
 };
 
