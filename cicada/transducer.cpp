@@ -167,7 +167,7 @@ unknown: pos assignment by signature\n\
       if (file != "-" && ! boost::filesystem::exists(file))
 	throw std::runtime_error("no file? " + file);
       if (signature.empty())
-	throw std::rutime_error("no signature?");
+	throw std::runtime_error("no signature?");
       
       return transducer_ptr_type(new GrammarUnknown(signature, file));
     } else {
