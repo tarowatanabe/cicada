@@ -129,6 +129,16 @@ typedef Grammar grammar_type;
 			std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
 #endif
 
+typedef symbol_set_type ngram_type;
+class NGramCounts : public google::dense_hash_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >
+{
+public:
+  typedef google::dense_hash_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > count_set_type;
+
+  NGramCounts() : count_set_type() { count_set_type::set_empty_key(ngram_type()); }
+};
+typedef NGramCounts ngram_count_set_type;
+
 path_set_type input_files;
 path_type     output_grammar_file = "-";
 path_type     output_lexicon_file;
@@ -145,39 +155,64 @@ bool binarize_all = false;
 // naive variational bayes for smoothing... otherwise, dirichlet prior
 bool variational_bayes_mode = false;
 
-double prior          = 0.01;
-double prior_terminal = 0.01;
+double prior_rule      = 0.01;
+double prior_lexicon   = 0.01;
+double prior_signature = 0.01;
+double prior_character = 0.01;
 
 double merge_ratio = 0.5;
 
 std::string signature = "";
 bool signature_list = false;
 
-double cutoff_threshold = 1e-30;
+double cutoff_rule = 1e-30;
+double cutoff_lexicon = 1e-40;
+double cutoff_character = 0;
 
 int threads = 1;
 
 int debug = 0;
 
 template <typename Generator>
-void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator);
+void grammar_merge(hypergraph_set_type& treebanks,
+		   grammar_type& grammar,
+		   const int bits,
+		   Generator& generator);
 
 template <typename Generator>
-void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator);
+void grammar_split(hypergraph_set_type& treebanks,
+		   grammar_type& grammar,
+		   const int bits,
+		   Generator& generator);
 
 template <typename Function>
-double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function);
+double grammar_learn(const hypergraph_set_type& treebanks,
+		     grammar_type& grammar,
+		     Function function);
 
 template <typename Function>
-void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& lexicon, Function function);
+void lexicon_learn(const hypergraph_set_type& treebanks,
+		   grammar_type& lexicon,
+		   Function function);
+
+template <typename Function>
+void characters_learn(const hypergraph_set_type& treebanks,
+		      const grammar_type& lexicon,
+		      ngram_count_set_type& model_char,
+		      ngram_count_set_type& model_tag,
+		      Function function);
 
 template <typename Maximizer>
-void grammar_maximize(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer);
+void grammar_maximize(const count_set_type& counts,
+		      grammar_type& grammar,
+		      Maximizer maximizer);
 
+void write_grammar(const path_type& file,
+		   const grammar_type& grammar,
+		   const double cutoff);
 
-void write_grammar(const path_type& file, const grammar_type& grammar);
-
-void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks);
+void read_treebank(const path_set_type& files,
+		   hypergraph_set_type& treebanks);
 
 void options(int argc, char** argv);
 
@@ -229,9 +264,13 @@ int main(int argc, char** argv)
 
     const signature_type* sig = (! signature.empty() ? &signature_type::create(signature) : 0);
     
-    if (! output_character_file.empty())
+    if (! output_character_file.empty()) {
+      if (! sig)
+	throw std::runtime_error("chracter estimation requires signature");
+      
       if (output_lexicon_file.empty())
 	throw std::runtime_error("we will dump character file, but no lexicon file");
+    }
     
     if (int(binarize_left) + binarize_right + binarize_all == 0)
       binarize_left = true;
@@ -328,49 +367,31 @@ int main(int argc, char** argv)
     }
 
     if (! output_lexicon_file.empty()) {
-      // output lexical rule
-      // in signature mode, we will estimate A -> signature from the current grammar + treebanks
-      // and dump A -> signature and A -> word
+      // first, split into two
+      grammar_type rules;
+      grammar_type lexicon;
+      
+      grammar_type::const_iterator giter_end = grammar.end();
+      for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
+	if (giter->first->rhs.size() == 1 && giter->first->rhs.front().is_terminal())
+	  lexicon.insert(*giter);
+	else
+	  rules.insert(*giter);
+      }
       
       if (! output_character_file.empty()) {
-	//characters_learn(treebanks, weight_function(grammar));
+	ngram_count_set_type model_char;
+	ngram_count_set_type model_tag;
 	
-      }
-      
-      if (sig) {
-	// we will learn lexical probabilities...
-	grammar_type rules;
-	grammar_type lexicon;
+	characters_learn(treebanks, lexicon, model_char, model_tag, weight_function(grammar));
+	
+      } else if (sig)
 	lexicon_learn(treebanks, lexicon, weight_function(grammar));
-	
-	grammar_type::const_iterator giter_end = grammar.end();
-	for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
-	  if (giter->first->rhs.size() == 1 && giter->first->rhs.front().is_terminal())
-	    lexicon.insert(*giter);
-	  else
-	    rules.insert(*giter);
-	}
-	
-	write_grammar(output_grammar_file, rules);
-	write_grammar(output_lexicon_file, lexicon);
-      } else {
-	// we will simply split grammar into two: terminal rule and other rules.
-	grammar_type rules;
-	grammar_type lexicon;
-	
-	grammar_type::const_iterator giter_end = grammar.end();
-	for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
-	  if (giter->first->rhs.size() == 1 && giter->first->rhs.front().is_terminal())
-	    lexicon.insert(*giter);
-	  else
-	    rules.insert(*giter);
-	}
-	
-	write_grammar(output_grammar_file, rules);
-	write_grammar(output_lexicon_file, lexicon);
-      }
+      
+      write_grammar(output_grammar_file, rules, cutoff_rule);
+      write_grammar(output_lexicon_file, lexicon, cutoff_lexicon);
     } else
-      write_grammar(output_grammar_file, grammar);
+      write_grammar(output_grammar_file, grammar, cutoff_rule);
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -491,6 +512,14 @@ struct Maximize
 {
   void operator()(const grammar_type& counts, grammar_type& grammar) const
   {
+    using namespace boost::math::policies;
+    typedef policy<domain_error<errno_on_error>,
+		   pole_error<errno_on_error>,
+		   overflow_error<errno_on_error>,
+		   rounding_error<errno_on_error>,
+		   evaluation_error<errno_on_error> > policy_type;
+    
+  
     bool is_terminal = false;
     double sum = 0.0;
     grammar_type::const_iterator citer_end = counts.end();
@@ -499,10 +528,23 @@ struct Maximize
       is_terminal |= citer->first->rhs.front().is_terminal();
     }
 
-    const double prior_lhs = (is_terminal ? prior_terminal : prior);
-    const double logsum = utils::mathop::log(sum + prior_lhs * counts.size());
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      grammar[citer->first] = utils::mathop::log(citer->second + prior_lhs) - logsum;
+    for (;;) {
+      double logprob_sum = boost::numeric::bounds<double>::lowest();
+      
+      const double prior_lhs = (is_terminal ? prior_lexicon : prior_rule);
+      const double logsum = utils::mathop::log(sum + prior_lhs * counts.size());
+      for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+	const double logprob = utils::mathop::log(citer->second + prior_lhs) - logsum;
+	
+	logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
+	grammar[citer->first] = logprob;
+      }
+      
+      const double discount = - boost::math::expm1(logprob_sum, policy_type());
+      
+      if (discount > 0.0) break;
+      ++ sum;
+    }
   }
 };
 
@@ -510,6 +552,13 @@ struct MaximizeBayes
 {
   void operator()(const grammar_type& counts, grammar_type& grammar) const
   {
+    using namespace boost::math::policies;
+    typedef policy<domain_error<errno_on_error>,
+		   pole_error<errno_on_error>,
+		   overflow_error<errno_on_error>,
+		   rounding_error<errno_on_error>,
+		   evaluation_error<errno_on_error> > policy_type;
+  
     bool is_terminal = false;
     double sum = 0.0;
     grammar_type::const_iterator citer_end = counts.end();
@@ -518,10 +567,23 @@ struct MaximizeBayes
       is_terminal |= citer->first->rhs.front().is_terminal();
     }
     
-    const double prior_lhs = (is_terminal ? prior_terminal : prior);
-    const double logsum = utils::mathop::digamma(sum + prior_lhs * counts.size());
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      grammar[citer->first] = utils::mathop::digamma(citer->second + prior_lhs) - logsum;
+    for (;;) {
+      double logprob_sum = boost::numeric::bounds<double>::lowest();
+      
+      const double prior_lhs = (is_terminal ? prior_lexicon : prior_rule);
+      const double logsum = utils::mathop::digamma(sum + prior_lhs * counts.size());
+      for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+	const double logprob = utils::mathop::digamma(citer->second + prior_lhs) - logsum;
+	
+	logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
+	grammar[citer->first] = logprob;
+      }
+      
+      const double discount = - boost::math::expm1(logprob_sum, policy_type());
+      
+      if (discount > 0.0) break;
+      ++ sum;
+    }
   }  
 };
 
@@ -791,7 +853,10 @@ struct TaskMergeGrammar : public Annotator
 
 
 template <typename Generator>
-void grammar_merge(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
+void grammar_merge(hypergraph_set_type& treebanks,
+		   grammar_type& grammar,
+		   const int bits,
+		   Generator& generator)
 {
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
   typedef google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > scale_set_type;
@@ -1172,7 +1237,10 @@ struct TaskSplitGrammar : public Annotator
 };
 
 template <typename Generator>
-void grammar_split(hypergraph_set_type& treebanks, grammar_type& grammar, const int bits, Generator& generator)
+void grammar_split(hypergraph_set_type& treebanks,
+		   grammar_type& grammar,
+		   const int bits,
+		   Generator& generator)
 {
   typedef TaskSplitTreebank           task_treebank_type;
   typedef TaskSplitGrammar<Generator> task_grammar_type;
@@ -1328,7 +1396,9 @@ struct TaskLearn
 };
 
 template <typename Function>
-double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function)
+double grammar_learn(const hypergraph_set_type& treebanks,
+		     grammar_type& grammar,
+		     Function function)
 {
   typedef TaskLearn<Function> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -1384,21 +1454,17 @@ double grammar_learn(const hypergraph_set_type& treebanks, grammar_type& grammar
 }
 
 template <typename Function>
-struct TaskLexiconLearn
+struct TaskLexiconCount
 {
   typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
   
   // we will collect, tag-signature-word, signature-word, word
   
-  typedef symbol_set_type ngram_type;
-  
-  typedef google::dense_hash_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > ngram_count_set_type;
-  
-  
-  TaskLexiconLearn(queue_type& __queue, Function __function)
+  TaskLexiconCount(queue_type& __queue, Function __function)
     : queue(__queue),
       function(__function),
-      counts() { counts.set_empty_key(ngram_type()); }
+      counts(),
+      counts_sig() { }
   
   void operator()()
   {
@@ -1442,10 +1508,13 @@ struct TaskLexiconLearn
 	ngram[2] = rule.rhs.front();
 	
 	const count_type count = scores[edge.id] / inside.back();
-
+	
 	counts[ngram] += count;
 	counts[ngram_type(ngram.begin() + 1, ngram.end())] += count;
 	counts[ngram_type(ngram.begin() + 2, ngram.end())] += count;
+	
+	counts_sig[ngram_type(ngram.begin(), ngram.begin() + 2)] += count;
+	counts_sig[ngram_type(ngram.begin() + 1, ngram.begin() + 2)] += count;
       }
     }
   }
@@ -1453,11 +1522,176 @@ struct TaskLexiconLearn
   queue_type&    queue;
   Function       function;
   
-  ngram_count_set_type counts;
+  ngram_count_set_type counts; // counts of tag-signature-word
+  ngram_count_set_type counts_sig; // counts of tag-signature
+};
+
+struct LexiconEstimate
+{
+  typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
+  
+  typedef std::vector<const ngram_count_set_type::value_type*, std::allocator<const ngram_count_set_type::value_type*> > ngram_set_type;
+  typedef google::dense_hash_map<ngram_type, ngram_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > ngram_count_map_type;
+  
+  LexiconEstimate(const double& __prior, const int __order) : prior(__prior), order(__order) {}
+  
+  double operator()(const ngram_count_set_type& counts, ngram_count_set_type& model, ngram_count_set_type& backoff)
+  {
+    using namespace boost::math::policies;
+    typedef policy<domain_error<errno_on_error>,
+		   pole_error<errno_on_error>,
+		   overflow_error<errno_on_error>,
+		   rounding_error<errno_on_error>,
+		   evaluation_error<errno_on_error> > policy_type;
+  
+    double total = 0.0;
+    size_t vocab_size = 0;
+    
+    ngram_set_type ngrams_local;
+    {
+      ngram_count_set_type::const_iterator niter_end = counts.end();
+      for (ngram_count_set_type::const_iterator niter = counts.begin(); niter != niter_end; ++ niter)
+	if (niter->first.size() == 1) {
+	  total += niter->second;
+	  ++ vocab_size;
+	  ngrams_local.push_back(&(*niter));
+	}
+    }
+    
+    logprob_set_type logprobs_local(ngrams_local.size());
+    
+    // we will loop, increment total until we have enough mass discounted...
+    double discount = 0.0;
+    for (;;) {
+      discount = 0.0;
+      
+      if (variational_bayes_mode) {
+	double logprob_sum = boost::numeric::bounds<double>::lowest();
+	const double lognorm = utils::mathop::digamma(prior_lexicon * vocab_size + total);
+	
+	logprob_set_type::iterator liter = logprobs_local.begin();
+	ngram_set_type::const_iterator niter_end = ngrams_local.end();
+	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
+	  const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
+	  logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
+	  *liter = logprob;
+	}
+	
+	discount = - boost::math::expm1(logprob_sum, policy_type());
+      } else {
+	double prob_sum = 0.0;
+	
+	logprob_set_type::iterator liter = logprobs_local.begin();
+	ngram_set_type::const_iterator niter_end = ngrams_local.end();
+	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
+	  const double prob = (prior_lexicon + (*niter)->second) / (prior_lexicon * vocab_size + total);
+	  prob_sum += prob;
+	  *liter = utils::mathop::log(prob);
+	}
+	
+	discount = 1.0 - prob_sum;
+      }
+      
+      if (discount > 0.0) break;
+      ++ total;
+    }
+    
+    {
+      // copy logprob into actual storage..
+      logprob_set_type::iterator liter = logprobs_local.begin();
+      ngram_set_type::const_iterator niter_end = ngrams_local.end();
+      for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter)
+	model[(*niter)->first] = *liter;
+    }
+    
+    const double logprob_unk = utils::mathop::log(discount);
+
+    ngram_count_map_type ngrams;
+    ngrams.set_empty_key(ngram_type());
+        
+    for (int n = 2; n <= order; ++ n) {
+      ngrams.clear();
+      
+      {
+	ngram_count_set_type::const_iterator niter_end = counts.end();
+	for (ngram_count_set_type::const_iterator niter = counts.begin(); niter != niter_end; ++ niter)
+	  if (static_cast<int>(niter->first.size()) == n) 
+	    ngrams[ngram_type(niter->first.begin(), niter->first.begin() + n - 1)].push_back(&(*niter));
+      }
+      
+      ngram_count_map_type::const_iterator citer_end = ngrams.end();
+      for (ngram_count_map_type::const_iterator citer = ngrams.begin(); citer != citer_end; ++ citer) {
+	const ngram_set_type& ngrams_local = citer->second;
+	logprobs_local.resize(ngrams_local.size());
+	
+	double total = 0.0;
+	double logsum_lower = boost::numeric::bounds<double>::lowest();
+	ngram_set_type::const_iterator niter_end = ngrams_local.end();
+	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter) {
+	  total += (*niter)->second;
+	  
+	  ngram_count_set_type::const_iterator liter = model.find(ngram_type((*niter)->first.end() - n + 1, (*niter)->first.end()));
+	  if (liter == model.end())
+	    throw std::runtime_error("invlaid lower order count: " + utils::lexical_cast<std::string>((*niter)->first));
+	  
+	  logsum_lower = utils::mathop::logsum(logsum_lower, liter->second);
+	}
+	
+	const double discount_lower = - boost::math::expm1(logsum_lower, policy_type());
+	double discount = 0.0;
+	
+	for (;;) {
+	  discount = 0.0;
+	
+	  if (variational_bayes_mode) {
+	    double logprob_sum = boost::numeric::bounds<double>::lowest();
+	    const double lognorm = utils::mathop::digamma(prior_lexicon * ngrams_local.size() + total);
+	    
+	    logprob_set_type::iterator liter = logprobs_local.begin();
+	    for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
+	      const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
+	      logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
+	      *liter = logprob;
+	    }
+	    
+	    discount = - boost::math::expm1(logprob_sum, policy_type());
+	  } else {
+	    double prob_sum = 0.0;
+	    
+	    logprob_set_type::iterator liter = logprobs_local.begin();
+	    for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
+	      const double prob = (prior_lexicon + (*niter)->second) / (prior_lexicon * ngrams_local.size() + total);
+	      prob_sum += prob;
+	      *liter = utils::mathop::log(prob);
+	    }
+	    
+	    discount = 1.0 - prob_sum;
+	  }
+	  
+	  if (discount > 0.0) break;
+	  ++ total;
+	}
+	
+	// copy logprob into actual storage..
+	logprob_set_type::const_iterator liter = logprobs_local.begin();
+	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter)
+	  model[(*niter)->first] = *liter;
+	
+	backoff[citer->first] = utils::mathop::log(discount) -  utils::mathop::log(discount_lower);
+      }
+    }
+
+    return logprob_unk;
+  }
+  
+  const double prior;
+  const int order;
 };
 
 template <typename Function>
-void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, Function function)
+void lexicon_learn(const hypergraph_set_type& treebanks,
+		   grammar_type& lexicon,
+		   Function function)
 {
   // we will learn a trigram of tag-signature-word, but dump tag-signature only...
   // 
@@ -1468,24 +1702,14 @@ void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, 
   // Thus, we simply preserve tag-signature bigram probability with the penalties 
   // consisting of tag-sinature backoff + signarue backoff + uniform distribution
   
-  using namespace boost::math::policies;
-  typedef policy<domain_error<errno_on_error>,
-		 pole_error<errno_on_error>,
-		 overflow_error<errno_on_error>,
-		 rounding_error<errno_on_error>,
-		 evaluation_error<errno_on_error>
-		 > policy_type;
-
-  typedef TaskLexiconLearn<Function> task_type;
+  
+  typedef TaskLexiconCount<Function> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef typename task_type::queue_type queue_type;
 
-  typedef typename task_type::ngram_type ngram_type;
-  typedef typename task_type::ngram_count_set_type ngram_count_set_type;
-  
   typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
 
-  typedef std::vector<typename ngram_count_set_type::value_type*, std::allocator<typename ngram_count_set_type::value_type*> > ngram_set_type;
+  typedef std::vector<ngram_count_set_type::value_type*, std::allocator<ngram_count_set_type::value_type*> > ngram_set_type;
   typedef google::dense_hash_map<ngram_type, ngram_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > ngram_count_map_type;
 
   queue_type queue;
@@ -1505,184 +1729,108 @@ void lexicon_learn(const hypergraph_set_type& treebanks, grammar_type& grammar, 
   workers.join_all();
   
   ngram_count_set_type counts;
-  counts.set_empty_key(ngram_type());
+  ngram_count_set_type counts_sig;
   for (int i = 0; i != threads; ++ i) {
     if (counts.empty())
       counts.swap(tasks[i].counts);
     else {
-      typename ngram_count_set_type::const_iterator niter_end = tasks[i].counts.end();
-      for (typename ngram_count_set_type::const_iterator niter = tasks[i].counts.begin(); niter != niter_end; ++ niter)
+      ngram_count_set_type::const_iterator niter_end = tasks[i].counts.end();
+      for (ngram_count_set_type::const_iterator niter = tasks[i].counts.begin(); niter != niter_end; ++ niter)
 	counts[niter->first] += niter->second;
     }
-  }
-  
-  ngram_count_set_type backoffs;
-  backoffs.set_empty_key(ngram_type());
-  
-  // order == 1
-  double total = 0.0;
-  size_t vocab_size = 0;
-  
-  ngram_set_type ngrams_local;
-  {
-    typename ngram_count_set_type::iterator niter_end = counts.end();
-    for (typename ngram_count_set_type::iterator niter = counts.begin(); niter != niter_end; ++ niter)
-      if (niter->first.size() == 1) {
-	total += niter->second;
-	++ vocab_size;
-	ngrams_local.push_back(&(*niter));
-      }
-  }
-  
-  logprob_set_type logprobs_local(ngrams_local.size());
-  
-  // we will loop, increment total until we have enough mass discounted...
-  double discount = 0.0;
-  for (;;) {
-    discount = 0.0;
     
-    if (variational_bayes_mode) {
-      double logprob_sum = boost::numeric::bounds<double>::lowest();
-      const double lognorm = utils::mathop::digamma(prior_terminal * vocab_size + total);
-      
-      logprob_set_type::iterator liter = logprobs_local.begin();
-      typename ngram_set_type::const_iterator niter_end = ngrams_local.end();
-      for (typename ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	const double logprob = utils::mathop::digamma(prior_terminal + (*niter)->second) - lognorm;
-	logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	*liter = logprob;
-      }
-      
-      discount = - boost::math::expm1(logprob_sum, policy_type());
-    } else {
-      double prob_sum = 0.0;
-      
-      logprob_set_type::iterator liter = logprobs_local.begin();
-      typename ngram_set_type::const_iterator niter_end = ngrams_local.end();
-      for (typename ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	const double prob = (prior_terminal + (*niter)->second) / (prior_terminal * vocab_size + total);
-	prob_sum += prob;
-	*liter = utils::mathop::log(prob);
-      }
-      
-      discount = 1.0 - prob_sum;
-    }
-    
-    if (discount > 0.0) break;
-    ++ total;
-  }
-  
-  {
-    // copy logprob into actual storage..
-    logprob_set_type::iterator liter = logprobs_local.begin();
-    typename ngram_set_type::iterator niter_end = ngrams_local.end();
-    for (typename ngram_set_type::iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-      (*niter)->second = *liter;
-      if (debug >= 3)
-	std::cerr << "unigram: " << (*niter)->first << " " << *liter << std::endl;
+    if (counts_sig.empty())
+      counts_sig.swap(tasks[i].counts_sig);
+    else {
+      ngram_count_set_type::const_iterator niter_end = tasks[i].counts_sig.end();
+      for (ngram_count_set_type::const_iterator niter = tasks[i].counts_sig.begin(); niter != niter_end; ++ niter)
+	counts_sig[niter->first] += niter->second;
     }
   }
-  
-  // this is the logprob of UNK after the series of backoff...
-  const double logprob_unk = utils::mathop::log(discount);
 
-  if (debug >= 2)
-    std::cerr << "unk: " << logprob_unk << std::endl;
+  ngram_count_set_type model;
+  ngram_count_set_type backoff;
 
-  ngram_count_map_type ngrams;
-  ngrams.set_empty_key(ngram_type());
+  ngram_count_set_type model_sig;
+  ngram_count_set_type backoff_sig;
   
-  for (int order = 2; order <= 3; ++ order) {
-    ngrams.clear();
-    
-    // collect ngrams with order
-    {
-      typename ngram_count_set_type::iterator niter_end = counts.end();
-      for (typename ngram_count_set_type::iterator niter = counts.begin(); niter != niter_end; ++ niter)
-	if (static_cast<int>(niter->first.size()) == order) 
-	  ngrams[ngram_type(niter->first.begin(), niter->first.begin() + order - 1)].push_back(&(*niter));
-    }
-    
-    typename ngram_count_map_type::iterator citer_end = ngrams.end();
-    for (typename ngram_count_map_type::iterator citer = ngrams.begin(); citer != citer_end; ++ citer) {
-      ngram_set_type& ngrams_local = citer->second;
-      logprobs_local.resize(ngrams_local.size());
-      
-      double total = 0.0;
-      double logsum_lower = boost::numeric::bounds<double>::lowest();
-      typename ngram_set_type::iterator niter_end = ngrams_local.end();
-      for (typename ngram_set_type::iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter) {
-	total += (*niter)->second;
-	
-	typename ngram_count_set_type::const_iterator liter = counts.find(ngram_type((*niter)->first.end() - order + 1, (*niter)->first.end()));
-	if (liter == counts.end())
-	  throw std::runtime_error("invlaid lower order count: " + utils::lexical_cast<std::string>((*niter)->first));
-	
-	logsum_lower = utils::mathop::logsum(logsum_lower, liter->second);
-      }
-      
-      const double discount_lower = - boost::math::expm1(logsum_lower, policy_type());
-      double discount = 0.0;
-      
-      for (;;) {
-	discount = 0.0;
-	
-	if (variational_bayes_mode) {
-	  double logprob_sum = boost::numeric::bounds<double>::lowest();
-	  const double lognorm = utils::mathop::digamma(prior_terminal * ngrams_local.size() + total);
-	  
-	  logprob_set_type::iterator liter = logprobs_local.begin();
-	  typename ngram_set_type::const_iterator niter_end = ngrams_local.end();
-	  for (typename ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	    const double logprob = utils::mathop::digamma(prior_terminal + (*niter)->second) - lognorm;
-	    logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	    *liter = logprob;
-	  }
-	  
-	  discount = - boost::math::expm1(logprob_sum, policy_type());
-	} else {
-	  double prob_sum = 0.0;
-	  
-	  logprob_set_type::iterator liter = logprobs_local.begin();
-	  typename ngram_set_type::const_iterator niter_end = ngrams_local.end();
-	  for (typename ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	    const double prob = (prior_terminal + (*niter)->second) / (prior_terminal * ngrams_local.size() + total);
-	    prob_sum += prob;
-	    *liter = utils::mathop::log(prob);
-	  }
-      
-	  discount = 1.0 - prob_sum;
-	}
-	
-	if (discount > 0.0) break;
-	++ total;
-      }
-      
-      // copy logprob into actual storage..
-      logprob_set_type::iterator liter = logprobs_local.begin();
-      for (typename ngram_set_type::iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter)
-	(*niter)->second = *liter;
-      
-      backoffs[citer->first] = utils::mathop::log(discount) -  utils::mathop::log(discount_lower);
-    }
-  }
+  // estimate for tag-sig-word
+  const double logprob_unk = LexiconEstimate(prior_lexicon, 3)(counts, model, backoff);
+  
+  //std::cerr << "logprob-unk: " << logprob_unk << std::endl;
+
+  // estimate for tag-sig
+  const double logprob_unk_sig = LexiconEstimate(prior_signature, 2)(counts_sig, model_sig, backoff_sig);
+
+  //std::cerr << "logprob-unk-sig: " << logprob_unk_sig << std::endl;
+  
   
   // finished computation...
   // actually, we do not need full-trigram!
   // we need: tag-signature-<UNK>
   // which will be computed by bakoff(tag-signature) + backoff(signature) + unk which is stored in backoffs!
   
-  typename ngram_count_set_type::const_iterator biter_end = backoffs.end();
-  for (typename ngram_count_set_type::const_iterator biter = backoffs.begin(); biter != biter_end; ++ biter) 
+  // also, we need tag-signature probability
+  // and probability mass left out from KNOWN lexicon...
+  
+  //
+  // From lexicon, compute discounted mass in fully observed counts, that is (probably) available in lexicon...
+  //
+
+  ngram_count_set_type model_tag;
+  grammar_type::const_iterator liter_end = lexicon.end();
+  for (grammar_type::const_iterator liter = lexicon.begin(); liter != liter_end; ++ liter) {
+    const symbol_type& lhs = liter->first->lhs;
+    
+    std::pair<ngram_count_set_type::iterator, bool> result = model_tag.insert(std::make_pair(ngram_type(1, lhs), liter->second));
+    if (! result.second)
+      result.first->second = utils::mathop::logsum(result.first->second, liter->second);
+  }
+  
+  ngram_count_set_type::const_iterator biter_end = backoff.end();
+  for (ngram_count_set_type::const_iterator biter = backoff.begin(); biter != biter_end; ++ biter) 
     if (biter->first.size() == 2) {
-      typename ngram_count_set_type::const_iterator siter = backoffs.find(ngram_type(1, biter->first.back()));
-      if (siter == backoffs.end())
+      using namespace boost::math::policies;
+      typedef policy<domain_error<errno_on_error>,
+		     pole_error<errno_on_error>,
+		     overflow_error<errno_on_error>,
+		     rounding_error<errno_on_error>,
+		     evaluation_error<errno_on_error> > policy_type;
+
+      ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, biter->first.front()));
+      if (tag_iter == model_tag.end())
+	throw std::runtime_error("invalid tag model!?");
+      
+      ngram_count_set_type::const_iterator sig_iter = model_sig.find(biter->first);
+      if (sig_iter == model_sig.end())
+	throw std::runtime_error("invalid signature model!?");
+      
+      ngram_count_set_type::const_iterator siter = backoff.find(ngram_type(1, biter->first.back()));
+      if (siter == backoff.end())
 	throw std::runtime_error("invalid backoffs!");
       
-      const logprob_type score = biter->second + siter->second + logprob_unk;
+      const logprob_type score_backoff = utils::mathop::log(- boost::math::expm1(tag_iter->second, policy_type()));
+      const logprob_type score_bigram  = sig_iter->second;
+      const logprob_type score_trigram = biter->second + siter->second + logprob_unk;
       
-      grammar.insert(std::make_pair(rule_type::create(rule_type(biter->first.front(), siter->first)), score));
+      //std::cerr << "backoff: " << score_backoff << " bigram: " << score_bigram << " trigram: " << score_trigram << std::endl;
+      //std::cerr << "biter: " << biter->second << " siter: " << siter->second << std::endl;
+
+      const logprob_type score = score_trigram + score_bigram + score_backoff;
+      
+      lexicon.insert(std::make_pair(rule_type::create(rule_type(biter->first.front(), siter->first)), score));
     }
+}
+
+template <typename Function>
+void characters_learn(const hypergraph_set_type& treebanks,
+		      const grammar_type& lexicon,
+		      ngram_count_set_type& model_char,
+		      ngram_count_set_type& model_tag,
+		      Function function)
+{
+
+
 }
 
 
@@ -1715,7 +1863,9 @@ struct TaskMaximize
 
 
 template <typename Maximizer>
-void grammar_maximize(const count_set_type& counts, grammar_type& grammar, Maximizer maximizer)
+void grammar_maximize(const count_set_type& counts,
+		      grammar_type& grammar,
+		      Maximizer maximizer)
 {
   typedef TaskMaximize<Maximizer> task_type;
   typedef typename task_type::queue_type queue_type;
@@ -1747,7 +1897,9 @@ void grammar_maximize(const count_set_type& counts, grammar_type& grammar, Maxim
   }
 }
 
-void write_grammar(const path_type& file, const grammar_type& grammar)
+void write_grammar(const path_type& file,
+		   const grammar_type& grammar,
+		   const double cutoff)
 {
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
 
@@ -1774,7 +1926,7 @@ void write_grammar(const path_type& file, const grammar_type& grammar)
       
     std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
 
-    if (0.0 < cutoff_threshold && cutoff_threshold < 1.0) {
+    if (0.0 < cutoff && cutoff < 1.0) {
       const double logprob_max = sorted.front()->second;
       const double logprob_threshold = logprob_max + utils::mathop::log(cutoff_threshold);
 	
@@ -1790,7 +1942,8 @@ void write_grammar(const path_type& file, const grammar_type& grammar)
 }
 
 
-void read_treebank(const path_set_type& files, hypergraph_set_type& treebanks)
+void read_treebank(const path_set_type& files,
+		   hypergraph_set_type& treebanks)
 {
   hypergraph_type treebank;
   
@@ -1840,15 +1993,20 @@ void options(int argc, char** argv)
     
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
     
-    ("prior",           po::value<double>(&prior)->default_value(prior),                   "Dirichlet prior")
-    ("prior-terminal",  po::value<double>(&prior_terminal)->default_value(prior_terminal), "Dirichlet prior for terminal rule")
+    ("prior-rule",      po::value<double>(&prior_rule)->default_value(prior_rule),           "Dirichlet prior for rules")
+    ("prior-lexicon",   po::value<double>(&prior_lexicon)->default_value(prior_lexicon),     "Dirichlet prior for lexical rule")
+    ("prior-signature", po::value<double>(&prior_signature)->default_value(prior_signature), "Dirichlet prior for signature")
+    ("prior-character", po::value<double>(&prior_character)->default_value(prior_character), "Dirichlet prior for character")
 
+    ("cutoff-rule",      po::value<double>(&cutoff_rule)->default_value(cutoff_rule),           "Dirichlet cutoff for rules")
+    ("cutoff-lexicon",   po::value<double>(&cutoff_lexicon)->default_value(cutoff_lexicon),     "Dirichlet cutoff for lexical rule")
+    ("cutoff-character", po::value<double>(&cutoff_character)->default_value(cutoff_character), "Dirichlet cutoff for character")
+    
     ("merge-ratio",   po::value<double>(&merge_ratio)->default_value(merge_ratio), "merging ratio")
-
+    
     ("signature",      po::value<std::string>(&signature), "signature for unknown word")
     ("signature-list", po::bool_switch(&signature_list),   "list of signatures")
     
-    ("cutoff-threshold", po::value<double>(&cutoff_threshold)->default_value(cutoff_threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
     
     ("threads", po::value<int>(&threads), "# of threads")
     
