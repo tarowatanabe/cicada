@@ -1,0 +1,74 @@
+// -*- mode: c++ -*-
+//
+//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
+
+#ifndef __CICADA__GRAMMAR_UNKNOWN__HPP__
+#define __CICADA__GRAMMAR_UNKNOWN__HPP__ 1
+
+#include <string>
+#include <vector>
+
+#include <cicada/grammar_mutable.hpp>
+#include <cicada/signature.hpp>
+
+namespace cicada
+{
+  class GrammarUnknown : public GrammarMutable
+  {
+  private:
+    typedef GrammarMutable base_type;
+    typedef Signature signature_type;
+    
+  public:
+    GrammarUnknown(const std::string& __signature,
+		   const std::string& __parameter)
+      : base_type(1),
+	signature(&signature_type::create(__signature))
+    {
+      base_type::read(__parameter);
+    }
+    
+    transducer_ptr_type clone() const
+    {
+      std::auto_ptr<GrammarUnknown> __tmp(new GrammarUnknown(*this));
+      __tmp->signature = &signature_type::create(signature->algorithm());
+      
+      return transducer_ptr_type(__tmp.release());
+    }
+    
+    void assign(const hypergraph_type& graph)
+    {
+      hypergraph_type::edge_set_type::const_iterator eiter_end = graph.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) 
+	if (eiter->rule) {
+	  const rule_type& rule = *(eiter->rule);
+	  
+	  rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) 
+	    if (*siter != vocab_type::EPSILON && siter->is_terminal())
+	      insert(*siter);
+	}
+    }
+    
+    void assign(const lattice_type& lattice)
+    {
+      for (size_t first = 0; first != lattice.size(); ++ first) {
+	const lattice_type::arc_set_type& arcs = lattice[first];
+	
+	lattice_type::arc_set_type::const_iterator aiter_end = arcs.end();
+	for (lattice_type::arc_set_type::const_iterator aiter = arcs.begin(); aiter != aiter_end; ++ aiter)
+	  if (aiter->label != vocab_type::EPSILON)
+	    insert(aiter->label);
+      }
+    }
+    
+  private:
+    void insert(const symbol_type& word);
+    
+  private:
+    const signature_type* signature;
+  };
+};
+
+#endif

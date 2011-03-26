@@ -265,6 +265,7 @@ grammar.hpp \
 grammar_mutable.hpp \
 grammar_simple.hpp \
 grammar_static.hpp \
+grammar_unknown.hpp \
 graphviz.hpp \
 head_finder.hpp \
 hypergraph.hpp \
@@ -331,6 +332,7 @@ feature_function.cpp \
 global_lexicon.cpp \
 grammar_mutable.cpp \
 grammar_static.cpp \
+grammar_unknown.cpp \
 graphviz.cpp \
 head_finder.cpp \
 hypergraph.cpp \

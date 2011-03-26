@@ -10,6 +10,7 @@
 #include <cicada/grammar_mutable.hpp>
 #include <cicada/grammar_static.hpp>
 #include <cicada/grammar_simple.hpp>
+#include <cicada/grammar_unknown.hpp>
 
 #include <cicada/parameter.hpp>
 
@@ -44,6 +45,9 @@ deletion: terminal deletion rule\n\
 pair: terminal pair rule (for alignment composition)\n\
 \tnon-terminal=[defaut non-terminal]\n\
 pos: terminal pos rule (for POS annotated input) \n\
+unknown: pos assignment by signature\n\
+\tsignature=[signature for OOV]\n\
+\tfile=[filename]\n\
 ";
     return desc;
   }
@@ -148,6 +152,24 @@ pos: terminal pos rule (for POS annotated input) \n\
 	throw std::runtime_error("unsupported parameter for POS grammar: " + piter->first + "=" + piter->second);
       
       return transducer_ptr_type(new GrammarPOS());
+    } else if (utils::ipiece(param.name()) == "unknown") {
+      std::string signature;
+      std::string file;
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "signature")
+	  signature = piter->second;	
+	else if (utils::ipiece(piter->first) == "file")
+	  file = piter->second;
+	else
+	  throw std::runtime_error("unsupported parameter for unknown grammar: " + piter->first + "=" + piter->second);
+      }
+      
+      if (file != "-" && ! boost::filesystem::exists(file))
+	throw std::runtime_error("no file? " + file);
+      if (signature.empty())
+	throw std::rutime_error("no signature?");
+      
+      return transducer_ptr_type(new GrammarUnknown(signature, file));
     } else {
       const path_type path = param.name();
       if (path != "-" && ! boost::filesystem::exists(path))
