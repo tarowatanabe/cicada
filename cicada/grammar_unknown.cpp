@@ -178,7 +178,7 @@ namespace cicada
 	StringCharacterIterator iter(uword);
 	for (iter.setToStart(); iter.hasNext(); ++ num_char) {
 	  const UChar32 ch = iter.next32PostInc();
-	  
+
 	  // we will query tag-sig-ch
 	  {
 	    ngram_set_type::id_type node = ngram.find(ngram.root(), tag);
@@ -195,7 +195,7 @@ namespace cicada
 	      }
 	    }
 	  }
-	  
+
 	  // backoff with tag-sig
 	  {
 	    backoff_set_type::id_type node = backoff.find(backoff.root(), tag);
@@ -219,18 +219,18 @@ namespace cicada
 	      }
 	    }
 	  }
-	  
+
 	  // backoff with sig
 	  {
 	    backoff_set_type::id_type node = backoff.find(backoff.root(), sig);
 	    if (node != backoff.root())
 	      logprob += backoff[node];
 	  }
-	  
+
 	  // unigram...
 	  {
-	    unigram_set_type::const_iterator titer = ngram[node].find(ch);
-	    if (titer != ngram[node].end())
+	    unigram_set_type::const_iterator titer = unigram.find(ch);
+	    if (titer != unigram.end())
 	      logprob += titer->second;
 	    else
 	      logprob += logprob_unk;

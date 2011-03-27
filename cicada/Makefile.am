@@ -396,6 +396,7 @@ cluster_main \
 eval_main \
 grammar_mutable_main \
 grammar_static_main \
+grammar_unknown_main \
 hypergraph_main \
 lattice_main \
 matcher_main \
@@ -429,6 +430,9 @@ grammar_mutable_main_LDADD = libcicada.la
 
 grammar_static_main_SOURCES = grammar_static_main.cpp
 grammar_static_main_LDADD = libcicada.la
+
+grammar_unknown_main_SOURCES = grammar_unknown_main.cpp
+grammar_unknown_main_LDADD = libcicada.la
 
 hypergraph_main_SOURCES = hypergraph_main.cpp
 hypergraph_main_LDADD = libcicada.la
