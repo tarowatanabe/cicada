@@ -89,6 +89,11 @@ namespace cicada
     typedef std::vector<utils::piece, std::allocator<utils::piece> > tokens_type;
     typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
     
+    backoff.clear();
+    ngram.clear();
+    unigram.clear();
+    logprob_unk = 0.0;
+    
     utils::compress_istream is(file, 1024 * 1024);
     std::string line;
     tokens_type tokens;
