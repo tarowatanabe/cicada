@@ -26,6 +26,7 @@
 namespace cicada
 {
   
+
   template <typename Iterator>
   inline
   uint32_t parse_utf8(Iterator first, Iterator last)
@@ -40,7 +41,6 @@ namespace cicada
     else if ((*first & 0xc0) == 0xc0) {
       if (first + 1 >= last)
 	throw std::runtime_error("invalid utf8");
-      
       return ((uchar((*first) & 0x1f) << 6)
 	      | (uchar((*(first + 1)) & 0x3f)));
     } else if ((*first & 0xe0) == 0xe0) {
@@ -76,6 +76,13 @@ namespace cicada
     } else
       throw std::runtime_error("invlaid utf8 sequence");
   }
+
+  template <typename Container>
+  inline
+  uint32_t parse_utf8(const Container& container)
+  {
+    return parse_utf8(container.begin(), container.end());
+  }
   
   void GrammarUnknown::read_character(const std::string& file)
   {
@@ -94,12 +101,14 @@ namespace cicada
       tokens.insert(tokens.end(), tokenizer.begin(), tokenizer.end());
       
       if (tokens.empty()) continue;
-      
+
+      const double score = utils::lexical_cast<double>(tokens.back());
+
       if (tokens.front() == "backoff:") {
 	switch (tokens.size()) {
 	case 3:
 	case 4:
-	  backoff[backoff.insert(tokens.begin() + 1, tokens.end() - 1)] = utils::lexical_cast<double>(tokens.back());
+	  backoff[backoff.insert(tokens.begin() + 1, tokens.end() - 1)] = score;
 	  break;
 	default:
 	  throw std::runtime_error("invaid backoff? " + line);
@@ -108,16 +117,13 @@ namespace cicada
 	switch (tokens.size()) {
 	case 5:
 	case 4:
-	  // convert into uchar_type
-	  
+	  ngram[ngram.insert(tokens.begin() + 1, tokens.end() - 2)][parse_utf8(*(tokens.end() - 2))] = score;
 	  break;
 	case 3:
 	  if (tokens[1] == "<unk>")
-	    logprob_unk = utils::lexical_cast<double>(tokens.back());
-	  else {
-	    // convert into uchar_type
-	    
-	  }
+	    logprob_unk = score;
+	  else
+	    unigram[parse_utf8(tokens[1])] = score;
 	  break;
 	default:
 	  throw std::runtime_error("invaid model? " + line);
