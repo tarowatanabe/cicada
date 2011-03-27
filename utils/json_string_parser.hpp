@@ -41,7 +41,7 @@ namespace utils
 				  (c & 0x3f) | 0x80};
 	  result.append(buffer, 3);
 	} else if (c <= 0x1fffff) {
-	  const char buffer[4] = {((c >> 18) & 0x03) | 0xf0,
+	  const char buffer[4] = {((c >> 18) & 0x07) | 0xf0,
 				  ((c >> 12) & 0x3f) | 0x80,
 				  ((c >> 6)  & 0x3f) | 0x80,
 				  (c & 0x3f) | 0x80};
