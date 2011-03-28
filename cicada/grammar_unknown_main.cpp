@@ -5,7 +5,6 @@
 
 int main(int argc, char** argv)
 {
-  
   typedef cicada::Transducer transducer_type;
   typedef transducer_type::transducer_ptr_type transducer_ptr_type;
   typedef cicada::Sentence sentence_type;
@@ -28,8 +27,13 @@ int main(int argc, char** argv)
 	std::cerr << "no rules?" << std::endl;
       
       transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-	std::cout << *(riter->source) << " ||| " << *(riter->target) << " ||| " << riter->features << " ||| " << riter->attributes << std::endl;
+      for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	std::cout << *(riter->source) << " ||| " << *(riter->target) << " |||";
+	transducer_type::feature_set_type::const_iterator fiter_end = riter->features.end();
+	for (transducer_type::feature_set_type::const_iterator fiter = riter->features.begin(); fiter != fiter_end; ++ fiter)
+	  std::cout << ' ' << fiter->first << '=' << fiter->second;
+	std::cout << " ||| " << riter->attributes << std::endl;
+      }
     }
   }
 }
