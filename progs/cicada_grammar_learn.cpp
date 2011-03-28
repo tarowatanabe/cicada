@@ -15,7 +15,8 @@
 //    8.  Merge
 //    9.  EM-iterations
 //
-// TODO: Do we differentiate terminal-rules and rules?
+//
+// TODO: sample unknown word...
 // 
 
 #include <stdexcept>
@@ -165,6 +166,8 @@ double prior_signature = 0.01;
 double prior_character = 0.01;
 
 double merge_ratio = 0.5;
+double unknown_ratio = 0.5;
+double unknown_threshold = 20;
 
 std::string signature = "";
 bool signature_list = false;
@@ -194,10 +197,11 @@ double grammar_learn(const hypergraph_set_type& treebanks,
 		     grammar_type& grammar,
 		     Function function);
 
-template <typename Function>
+template <typename Function, typename Generator>
 void lexicon_learn(const hypergraph_set_type& treebanks,
 		   grammar_type& lexicon,
-		   Function function);
+		   Function function,
+		   Generator& generator);
 
 template <typename Function>
 void characters_learn(const hypergraph_set_type& treebanks,
@@ -396,7 +400,7 @@ int main(int argc, char** argv)
       } 
       
       if (sig)
-	lexicon_learn(treebanks, lexicon, weight_function(grammar));
+	lexicon_learn(treebanks, lexicon, weight_function(grammar), generator);
       
       write_grammar(output_grammar_file, rules, cutoff_rule);
       write_grammar(output_lexicon_file, lexicon, cutoff_lexicon);
@@ -1702,10 +1706,11 @@ struct LexiconEstimate
   const int order;
 };
 
-template <typename Function>
+template <typename Function, typename Generator>
 void lexicon_learn(const hypergraph_set_type& treebanks,
 		   grammar_type& lexicon,
-		   Function function)
+		   Function function,
+		   Generator& generator)
 {
   // we will learn a trigram of tag-signature-word, but dump tag-signature only...
   // 
@@ -1716,14 +1721,13 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   // Thus, we simply preserve tag-signature bigram probability with the penalties 
   // consisting of tag-sinature backoff + signarue backoff + uniform distribution
   
-  
   typedef TaskLexiconCount<Function> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef typename task_type::queue_type queue_type;
 
   queue_type queue;
   task_set_type tasks(threads, task_type(queue, function));
-
+  
   boost::thread_group workers;
   for (int i = 0; i != threads; ++ i)
     workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -2183,7 +2187,10 @@ void options(int argc, char** argv)
     ("cutoff-lexicon",   po::value<double>(&cutoff_lexicon)->default_value(cutoff_lexicon),     "cutoff for lexical rule")
     ("cutoff-character", po::value<double>(&cutoff_character)->default_value(cutoff_character), "cutoff for character")
     
-    ("merge-ratio",   po::value<double>(&merge_ratio)->default_value(merge_ratio), "merging ratio")
+    ("merge-ratio",   po::value<double>(&merge_ratio)->default_value(merge_ratio),     "merging ratio")
+    
+    ("unknown-ratio",     po::value<double>(&unknown_ratio)->default_value(unknown_ratio),         "unknown word ratio")
+    ("unknown-threshold", po::value<double>(&unknown_threshold)->default_value(unknown_threshold), "unknown word threshold")
     
     ("signature",      po::value<std::string>(&signature), "signature for unknown word")
     ("signature-list", po::bool_switch(&signature_list),   "list of signatures")
