@@ -562,8 +562,12 @@ namespace cicada
 	  
 	  // add passive edge.. level is zero..
 	  typename rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	  for (typename rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	  for (typename rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	    
+	    //std::cerr << "scan: " << *((*riter)->rule)  << std::endl;
+	    
 	    insert_edge(edge_type(score_next * function((*riter)->features), active, dot_next, span_next, *riter, features, active.attributes));
+	  }
 	  
 	  // add active edge
 	  if (transducer.has_next(node))
@@ -592,7 +596,7 @@ namespace cicada
 	
 	const dot_type dot_next(table, node);
 	
-	const rule_candidate_ptr_set_type& rules = cands(passive.dot.table, node);
+	const rule_candidate_ptr_set_type& rules = cands(table, node);
 	
 	// add passive edge... this is definitedly unary-rule, thus level must be passive.level + 1!
 	typename rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
@@ -600,6 +604,8 @@ namespace cicada
 	  const symbol_type& lhs = (*riter)->rule->lhs;
 	  
 	  const span_type span(passive.span.first, passive.span.last, utils::bithack::branch(lhs == goal, 0, passive.span.level + 1));
+	  
+	  //std::cerr << "predict: " << *((*riter)->rule)  << std::endl;
 	  
 	  insert_edge(edge_type(passive.score * function((*riter)->features), passive, dot_next, span, *riter));
 	}
@@ -639,8 +645,11 @@ namespace cicada
 	
 	// add passive edge.. level is zero
 	typename rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	for (typename rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	for (typename rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	  //std::cerr << "complete active: " << *((*riter)->rule)  << std::endl;
+	  
 	  insert_edge(edge_type(score_next * function((*riter)->features), active, passive, dot_next, span_next, *riter, active.features, active.attributes));
+	}
 	
 	// add active edge
 	if (transducer.has_next(node))
@@ -679,8 +688,11 @@ namespace cicada
 	
 	// add passive edge.. level is zero.
 	typename rule_candidate_ptr_set_type::const_iterator riter_end = rules.end();
-	for (typename rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	for (typename rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	  //std::cerr << "complete passive: " << *((*riter)->rule)  << std::endl;
+
 	  insert_edge(edge_type(score_next * function((*riter)->features), active, passive, dot_next, span_next, *riter, active.features, active.attributes));
+	}
 	
 	// add active edge
 	if (transducer.has_next(node))

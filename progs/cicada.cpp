@@ -125,19 +125,23 @@ int main(int argc, char ** argv)
       for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
 	utils::compress_istream is(*iter, 1024 * 1024);
 	
-	if (std::getline(is, line))
+	if (std::getline(is, line)) {
 	  operations(line);
+	  operations.clear();
+	}
       }
       
     } else {
       utils::compress_istream is(input_file, 1024 * 1024);
       
       std::string line;
-      while (std::getline(is, line))
+      while (std::getline(is, line)) {
 	operations(line);
+	operations.clear();
+      }
     }
 
-    operations.clear();
+    
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
