@@ -1484,7 +1484,8 @@ struct TaskLexiconCount
     weight_set_type outside;
     weight_set_type scores;
     
-    ngram_type ngram(3);
+    ngram_type trigram(3);
+    ngram_type bigram(2);
     
     const signature_type& __signature = signature_type::create(signature);
     
@@ -1513,18 +1514,21 @@ struct TaskLexiconCount
 	const rule_type& rule = *edge.rule;
 	
 	// assume penntreebank style...
-	ngram[0] = rule.lhs;
-	ngram[1] = __signature(rule.rhs.front());
-	ngram[2] = rule.rhs.front();
+	bigram[0] = rule.lhs;
+	bigram[1] = __signature(rule.rhs.front());
+
+	trigram[0] = bigram[1];
+	trigram[1] = bigram[0];
+	trigram[2] = rule.rhs.front();
 	
 	const count_type count = scores[edge.id] / inside.back();
 	
-	counts[ngram] += count;
-	counts[ngram_type(ngram.begin() + 1, ngram.end())] += count;
-	counts[ngram_type(ngram.begin() + 2, ngram.end())] += count;
+	counts[trigram] += count;
+	counts[ngram_type(trigram.begin() + 1, trigram.end())] += count;
+	counts[ngram_type(trigram.begin() + 2, trigram.end())] += count;
 	
-	counts_sig[ngram_type(ngram.begin(), ngram.begin() + 2)] += count;
-	counts_sig[ngram_type(ngram.begin() + 1, ngram.begin() + 2)] += count;
+	counts_sig[bigram] += count;
+	counts_sig[ngram_type(bigram.begin() + 1, bigram.end())] += count;
       }
     }
   }
@@ -1642,7 +1646,7 @@ struct LexiconEstimate
 	  
 	  ngram_count_set_type::const_iterator liter = model.find(ngram_type((*niter)->first.end() - n + 1, (*niter)->first.end()));
 	  if (liter == model.end())
-	    throw std::runtime_error("invlaid lower order count: " + utils::lexical_cast<std::string>((*niter)->first));
+	    throw std::runtime_error("invalid lower order count: " + utils::lexical_cast<std::string>((*niter)->first));
 	  
 	  logsum_lower = utils::mathop::logsum(logsum_lower, liter->second);
 	}
@@ -1769,7 +1773,6 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
 
   //std::cerr << "logprob-unk-sig: " << logprob_unk_sig << std::endl;
   
-  
   // finished computation...
   // actually, we do not need full-trigram!
   // we need: tag-signature-<UNK>
@@ -1791,26 +1794,32 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
     if (! result.second)
       result.first->second = utils::mathop::logsum(result.first->second, liter->second);
   }
+
+  ngram_type bigram(2);
   
   ngram_count_set_type::const_iterator biter_end = backoff.end();
   for (ngram_count_set_type::const_iterator biter = backoff.begin(); biter != biter_end; ++ biter) 
     if (biter->first.size() == 2) {
       using namespace boost::math::policies;
       typedef policy<domain_error<errno_on_error>,
-		     pole_error<errno_on_error>,
-		     overflow_error<errno_on_error>,
-		     rounding_error<errno_on_error>,
-		     evaluation_error<errno_on_error> > policy_type;
-
-      ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, biter->first.front()));
+	pole_error<errno_on_error>,
+	overflow_error<errno_on_error>,
+	rounding_error<errno_on_error>,
+	evaluation_error<errno_on_error> > policy_type;
+      
+      // swap backoff context..!
+      bigram[0] = biter->first[1];
+      bigram[1] = biter->first[0];
+      
+      ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, bigram.front()));
       if (tag_iter == model_tag.end())
 	throw std::runtime_error("invalid tag model!?");
       
-      ngram_count_set_type::const_iterator sig_iter = model_sig.find(biter->first);
+      ngram_count_set_type::const_iterator sig_iter = model_sig.find(bigram);
       if (sig_iter == model_sig.end())
 	throw std::runtime_error("invalid signature model!?");
       
-      ngram_count_set_type::const_iterator siter = backoff.find(ngram_type(1, biter->first.back()));
+      ngram_count_set_type::const_iterator siter = backoff.find(ngram_type(1, bigram.front()));
       if (siter == backoff.end())
 	throw std::runtime_error("invalid backoffs!");
       
@@ -1823,7 +1832,7 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
 
       const logprob_type score = score_trigram + score_bigram + score_backoff;
       
-      lexicon.insert(std::make_pair(rule_type::create(rule_type(biter->first.front(), siter->first)), score));
+      lexicon.insert(std::make_pair(rule_type::create(rule_type(bigram.front(), rule_type::symbol_set_type(1, bigram.back()))), score));
     }
 }
 
@@ -1883,10 +1892,9 @@ struct TaskCharacterCount
 	const count_type count = scores[edge.id] / inside.back();
 	
 	// assume penntreebank style...
-	ngram[0] = rule.lhs;
-	ngram[1] = __signature(rule.rhs.front());
+	ngram[0] = __signature(rule.rhs.front());
+	ngram[1] = rule.lhs;
 	phrase.front() = rule.rhs.front();
-	
 	
 	__tokenizer(phrase, tokenized);
 	phrase_type::const_iterator titer_end = tokenized.end();

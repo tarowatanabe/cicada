@@ -179,11 +179,11 @@ namespace cicada
 	for (iter.setToStart(); iter.hasNext(); ++ num_char) {
 	  const UChar32 ch = iter.next32PostInc();
 
-	  // we will query tag-sig-ch
+	  // we will query sig-tag-ch
 	  {
-	    ngram_set_type::id_type node = ngram.find(ngram.root(), tag);
+	    ngram_set_type::id_type node = ngram.find(ngram.root(), sig);
 	    if (node != ngram.root()) {
-	      node = ngram.find(node, sig);
+	      node = ngram.find(node, tag);
 	      
 	      if (node != ngram.root()) {
 		unigram_set_type::const_iterator titer = ngram[node].find(ch);
@@ -196,20 +196,20 @@ namespace cicada
 	    }
 	  }
 
-	  // backoff with tag-sig
+	  // backoff with sig-tag
 	  {
-	    backoff_set_type::id_type node = backoff.find(backoff.root(), tag);
+	    backoff_set_type::id_type node = backoff.find(backoff.root(), sig);
 	    if (node != backoff.root()) {
-	      node = backoff.find(node, sig);
+	      node = backoff.find(node, tag);
 	      
 	      if (node != backoff.root())
 		logprob += backoff[node];
 	    }
 	  }
 
-	  // we will query sig-ch
+	  // we will query tag-ch
 	  {
-	    ngram_set_type::id_type node = ngram.find(ngram.root(), sig);
+	    ngram_set_type::id_type node = ngram.find(ngram.root(), tag);
 	    if (node != ngram.root()) {
 	      unigram_set_type::const_iterator titer = ngram[node].find(ch);
 	      
@@ -220,9 +220,9 @@ namespace cicada
 	    }
 	  }
 
-	  // backoff with sig
+	  // backoff with tag
 	  {
-	    backoff_set_type::id_type node = backoff.find(backoff.root(), sig);
+	    backoff_set_type::id_type node = backoff.find(backoff.root(), tag);
 	    if (node != backoff.root())
 	      logprob += backoff[node];
 	  }
