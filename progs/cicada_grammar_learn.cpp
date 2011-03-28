@@ -144,6 +144,15 @@ public:
 };
 typedef NGramCounts ngram_count_set_type;
 
+class WordCounts : public google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+{
+public:
+  typedef google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > count_set_type;
+
+  WordCounts() : count_set_type() { count_set_type::set_empty_key(symbol_type()); }
+};
+typedef WordCounts word_count_set_type;
+
 path_set_type input_files;
 path_type     output_grammar_file = "-";
 path_type     output_lexicon_file;
@@ -1467,14 +1476,71 @@ double grammar_learn(const hypergraph_set_type& treebanks,
 }
 
 template <typename Function>
+struct TaskLexiconFrequency
+{
+  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+
+  TaskLexiconFrequency(queue_type& __queue, Function __function)
+    : queue(__queue),
+      function(__function),
+      counts() { }
+
+  void operator()()
+  {
+        typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    
+    weight_set_type inside;
+    weight_set_type outside;
+    weight_set_type scores;
+    
+    ngram_type trigram(3);
+    ngram_type bigram(2);
+    
+    const signature_type& __signature = signature_type::create(signature);
+    
+    const hypergraph_type* __treebank = 0;
+    for (;;) {
+      queue.pop(__treebank);
+      if (! __treebank) break;
+      
+      const hypergraph_type& treebank = *__treebank;
+      
+      inside.clear();
+      outside.clear();
+      inside.resize(treebank.nodes.size());
+      outside.resize(treebank.nodes.size());
+      
+      scores.clear();
+      scores.resize(treebank.edges.size());
+      
+      cicada::inside_outside(treebank, inside, outside, scores, function, function);
+      
+      hypergraph_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = *eiter;
+	if (! edge.tails.empty()) continue;
+	
+	counts[edge.rule->rhs.front()] += scores[edge.id] / inside.back();
+      }
+    }
+  }
+  
+  queue_type&    queue;
+  Function       function;
+  
+  word_count_set_type counts;
+};
+
+template <typename Function>
 struct TaskLexiconCount
 {
   typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
   
   // we will collect, tag-signature-word, signature-word, word
   
-  TaskLexiconCount(queue_type& __queue, Function __function)
-    : queue(__queue),
+  TaskLexiconCount(const word_count_set_type& __word_counts, queue_type& __queue, Function __function)
+    : word_counts(__word_counts),
+      queue(__queue),
       function(__function),
       counts(),
       counts_sig() { }
@@ -1532,15 +1598,24 @@ struct TaskLexiconCount
 	
 	counts_sig[bigram] += count;
 	counts_sig[ngram_type(bigram.begin() + 1, bigram.end())] += count;
+
+	word_count_set_type::const_iterator witer = word_counts.find(rule.rhs.front());
+	if (witer == word_counts.end())
+	  throw std::runtime_error("invalid word???");
+	
+	if (witer->second <= unknown_threshold)
+	  counts_unknown[bigram] += count;
       }
     }
   }
   
+  const word_count_set_type& word_counts;
   queue_type&    queue;
   Function       function;
   
   ngram_count_set_type counts; // counts of tag-signature-word
   ngram_count_set_type counts_sig; // counts of tag-signature
+  ngram_count_set_type counts_unknown; // count of unknown pair of tag-signature
 };
 
 struct LexiconEstimate
@@ -1719,43 +1794,83 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   // Thus, we simply preserve tag-signature bigram probability with the penalties 
   // consisting of tag-sinature backoff + signarue backoff + uniform distribution
   
-  typedef TaskLexiconCount<Function> task_type;
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-  typedef typename task_type::queue_type queue_type;
-
-  queue_type queue;
-  task_set_type tasks(threads, task_type(queue, function));
+  typedef TaskLexiconFrequency<Function> task_frequency_type;
+  typedef TaskLexiconCount<Function>     task_count_type;
   
-  boost::thread_group workers;
+  typedef std::vector<task_frequency_type, std::allocator<task_frequency_type> > task_frequency_set_type;
+  typedef std::vector<task_count_type, std::allocator<task_count_type> >         task_count_set_type;
+  
+  typedef typename task_frequency_type::queue_type queue_frequency_type;
+  typedef typename task_count_type::queue_type     queue_count_type;
+
+  queue_frequency_type queue_frequency;
+  task_frequency_set_type tasks_frequency(threads, task_frequency_type(queue_frequency, function));
+  
+  boost::thread_group workers_frequency;
   for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    workers_frequency.add_thread(new boost::thread(boost::ref(tasks_frequency[i])));
   
   hypergraph_set_type::const_iterator titer_end = treebanks.end();
   for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
-    queue.push(&(*titer));
+    queue_frequency.push(&(*titer));
   
   for (int i = 0; i != threads; ++ i)
-    queue.push(0);
+    queue_frequency.push(0);
   
-  workers.join_all();
+  workers_frequency.join_all();
+  
+  word_count_set_type word_counts;
+  for (int i = 0; i != threads; ++ i) {
+    if (word_counts.empty())
+      word_counts.swap(tasks_frequency[i].counts);
+    else {
+      word_count_set_type::const_iterator witer_end = tasks_frequency[i].counts.end();
+      for (word_count_set_type::const_iterator witer = tasks_frequency[i].counts.begin(); witer != witer_end; ++ witer)
+	word_counts[witer->first] += witer->second;
+    }
+  }
+
+  queue_count_type queue_count;
+  task_count_set_type tasks_count(threads, task_count_type(word_counts, queue_count, function));
+  
+  boost::thread_group workers_count;
+  for (int i = 0; i != threads; ++ i)
+    workers_count.add_thread(new boost::thread(boost::ref(tasks_count[i])));
+  
+  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+    queue_count.push(&(*titer));
+  
+  for (int i = 0; i != threads; ++ i)
+    queue_count.push(0);
+  
+  workers_count.join_all();
   
   ngram_count_set_type counts;
   ngram_count_set_type counts_sig;
+  ngram_count_set_type counts_unknown;
   for (int i = 0; i != threads; ++ i) {
     if (counts.empty())
-      counts.swap(tasks[i].counts);
+      counts.swap(tasks_count[i].counts);
     else {
-      ngram_count_set_type::const_iterator niter_end = tasks[i].counts.end();
-      for (ngram_count_set_type::const_iterator niter = tasks[i].counts.begin(); niter != niter_end; ++ niter)
+      ngram_count_set_type::const_iterator niter_end = tasks_count[i].counts.end();
+      for (ngram_count_set_type::const_iterator niter = tasks_count[i].counts.begin(); niter != niter_end; ++ niter)
 	counts[niter->first] += niter->second;
     }
     
     if (counts_sig.empty())
-      counts_sig.swap(tasks[i].counts_sig);
+      counts_sig.swap(tasks_count[i].counts_sig);
     else {
-      ngram_count_set_type::const_iterator niter_end = tasks[i].counts_sig.end();
-      for (ngram_count_set_type::const_iterator niter = tasks[i].counts_sig.begin(); niter != niter_end; ++ niter)
+      ngram_count_set_type::const_iterator niter_end = tasks_count[i].counts_sig.end();
+      for (ngram_count_set_type::const_iterator niter = tasks_count[i].counts_sig.begin(); niter != niter_end; ++ niter)
 	counts_sig[niter->first] += niter->second;
+    }
+    
+    if (counts_unknown.empty())
+      counts_unknown.swap(tasks_count[i].counts_unknown);
+    else {
+      ngram_count_set_type::const_iterator niter_end = tasks_count[i].counts_unknown.end();
+      for (ngram_count_set_type::const_iterator niter = tasks_count[i].counts_unknown.begin(); niter != niter_end; ++ niter)
+	counts_unknown[niter->first] += niter->second;
     }
   }
 
@@ -1812,6 +1927,9 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
       // swap backoff context..!
       bigram[0] = biter->first[1];
       bigram[1] = biter->first[0];
+      
+      // check if this is really unknown rule...
+      if (counts_unknow.find(bigram) == counts_unknown.end()) continue;
       
       ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, bigram.front()));
       if (tag_iter == model_tag.end())
