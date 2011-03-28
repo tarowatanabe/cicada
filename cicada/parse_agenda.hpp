@@ -459,7 +459,7 @@ namespace cicada
 	    
 	    const edge_type* edge = agenda_finishing[i].top();
 	    agenda_finishing[i].pop();
-	    ++ num_popped;
+	    num_popped += edge->is_passive();
 	    
 	    //std::cerr << "edge: span: " << edge->span << std::endl;
 #if 0

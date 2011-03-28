@@ -197,11 +197,10 @@ double grammar_learn(const hypergraph_set_type& treebanks,
 		     grammar_type& grammar,
 		     Function function);
 
-template <typename Function, typename Generator>
+template <typename Function>
 void lexicon_learn(const hypergraph_set_type& treebanks,
 		   grammar_type& lexicon,
-		   Function function,
-		   Generator& generator);
+		   Function function);
 
 template <typename Function>
 void characters_learn(const hypergraph_set_type& treebanks,
@@ -400,7 +399,7 @@ int main(int argc, char** argv)
       } 
       
       if (sig)
-	lexicon_learn(treebanks, lexicon, weight_function(grammar), generator);
+	lexicon_learn(treebanks, lexicon, weight_function(grammar));
       
       write_grammar(output_grammar_file, rules, cutoff_rule);
       write_grammar(output_lexicon_file, lexicon, cutoff_lexicon);
@@ -1706,11 +1705,10 @@ struct LexiconEstimate
   const int order;
 };
 
-template <typename Function, typename Generator>
+template <typename Function>
 void lexicon_learn(const hypergraph_set_type& treebanks,
 		   grammar_type& lexicon,
-		   Function function,
-		   Generator& generator)
+		   Function function)
 {
   // we will learn a trigram of tag-signature-word, but dump tag-signature only...
   // 
