@@ -2162,7 +2162,7 @@ void options(int argc, char** argv)
     ("input",  po::value<path_set_type>(&input_files), "input treebank")
     ("output-grammar",   po::value<path_type>(&output_grammar_file),   "output grammar")
     ("output-lexicon",   po::value<path_type>(&output_lexicon_file),   "output lexical rules")
-    ("output-character", po::value<path_type>(&output_character_file), "output character bigram")
+    ("output-character", po::value<path_type>(&output_character_file), "output character model")
     
     ("max-iteration",       po::value<int>(&max_iteration)->default_value(max_iteration),             "maximum split/merge iterations")
     ("max-iteration-split", po::value<int>(&max_iteration_split)->default_value(max_iteration_split), "maximum EM iterations after split")
@@ -2179,9 +2179,9 @@ void options(int argc, char** argv)
     ("prior-signature", po::value<double>(&prior_signature)->default_value(prior_signature), "Dirichlet prior for signature")
     ("prior-character", po::value<double>(&prior_character)->default_value(prior_character), "Dirichlet prior for character")
 
-    ("cutoff-rule",      po::value<double>(&cutoff_rule)->default_value(cutoff_rule),           "Dirichlet cutoff for rules")
-    ("cutoff-lexicon",   po::value<double>(&cutoff_lexicon)->default_value(cutoff_lexicon),     "Dirichlet cutoff for lexical rule")
-    ("cutoff-character", po::value<double>(&cutoff_character)->default_value(cutoff_character), "Dirichlet cutoff for character")
+    ("cutoff-rule",      po::value<double>(&cutoff_rule)->default_value(cutoff_rule),           "cutoff for rules")
+    ("cutoff-lexicon",   po::value<double>(&cutoff_lexicon)->default_value(cutoff_lexicon),     "cutoff for lexical rule")
+    ("cutoff-character", po::value<double>(&cutoff_character)->default_value(cutoff_character), "cutoff for character")
     
     ("merge-ratio",   po::value<double>(&merge_ratio)->default_value(merge_ratio), "merging ratio")
     
