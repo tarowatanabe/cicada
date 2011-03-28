@@ -243,7 +243,7 @@ int main(int argc, char** argv)
       task_type::path_set_type::const_iterator piter_end = task.paths.end();
       for (task_type::path_set_type::const_iterator piter = task.paths.begin(); piter != piter_end; ++ piter) {
 	utils::tempfile::erase(*piter);
-	os << piter->filename() << '\n';
+	os << path_type(piter->filename()).string() << '\n';
       }
       
       for (int rank = 1; rank != mpi_size; ++ rank) {
@@ -255,7 +255,7 @@ int main(int argc, char** argv)
 	  if (! boost::filesystem::exists(line))
 	    throw std::runtime_error("no file?");
 	  
-	  os << path_type(line).filename() << '\n';
+	  os << path_type(path_type(line).filename()).string() << '\n';
 	}
       }
       

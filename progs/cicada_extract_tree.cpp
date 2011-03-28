@@ -129,7 +129,7 @@ int main(int argc, char** argv)
       task_type::path_set_type::const_iterator piter_end = tasks[i].paths.end();
       for (task_type::path_set_type::const_iterator piter = tasks[i].paths.begin(); piter != piter_end; ++ piter) {
 	utils::tempfile::erase(*piter);
-	os << piter->filename() << '\n';
+	os << path_type(piter->filename()).string() << '\n';
       }
     }
   }
