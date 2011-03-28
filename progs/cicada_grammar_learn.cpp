@@ -1929,7 +1929,7 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
       bigram[1] = biter->first[0];
       
       // check if this is really unknown rule...
-      if (counts_unknow.find(bigram) == counts_unknown.end()) continue;
+      if (counts_unknown.find(bigram) == counts_unknown.end()) continue;
       
       ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, bigram.front()));
       if (tag_iter == model_tag.end())
