@@ -166,7 +166,7 @@ struct SimpleSymbol
   {
     if (! symbol.is_non_terminal()) return symbol;
     if (symbol == goal) return symbol;
-    if (lexicon.find(symbol) != lexicon.end()) symbol;
+    if (lexicon.find(symbol) != lexicon.end()) return symbol;
     
     const utils::piece piece = symbol.non_terminal_strip();
     
@@ -191,7 +191,7 @@ struct CoarseSymbol
   {
     if (! symbol.is_non_terminal()) return symbol;
     if (symbol == goal) return symbol;
-    if (lexicon.find(symbol) != lexicon.end()) symbol;
+    if (lexicon.find(symbol) != lexicon.end()) return symbol;
     
     const size_t cache_pos = hash_value(symbol) & (caches.size() - 1);
     cache_type& cache = caches[cache_pos];
