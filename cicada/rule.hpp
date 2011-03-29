@@ -31,6 +31,7 @@ namespace cicada
     typedef boost::shared_ptr<Rule> rule_ptr_type;
     
   public:
+    Rule() : lhs(), rhs() {}
     Rule(const utils::piece& x) { assign(x); }
     Rule(const symbol_type& x_lhs, const symbol_set_type& x_rhs) : lhs(x_lhs), rhs(x_rhs) {}
     template <typename Iterator>
