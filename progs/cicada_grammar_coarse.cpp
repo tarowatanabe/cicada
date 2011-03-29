@@ -94,7 +94,6 @@ public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
 };
 
-
 class Lexicon : public google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
 {
 public:
@@ -126,6 +125,7 @@ int threads = 1;
 int debug = 0;
 
 void options(int argc, char** argv);
+void write_grammar(const path_type& path, const grammar_type& grammar);
 void read_grammar(const path_type& path, grammar_type& grammar);
 void read_lexicon(const path_type& path, lexicon_type& lexicon);
 
@@ -133,7 +133,7 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
-
+    
     if (output_prefix.empty())
       throw std::runtime_error("empty output prefix");
     
@@ -144,9 +144,9 @@ int main(int argc, char** argv)
     
     read_lexicon(input_lexicon_file, lexicon);
     
-    for (int order = max_iteration - 1; order >= 0; -- order) {
+    for (int order = max_order - 1; order >= 0; -- order) {
       
-      
+      // dump grammar...!
     }
     
     // finally reduce to minus-grammar:
@@ -156,6 +156,65 @@ int main(int argc, char** argv)
     return 1;
   }
   return 0;
+}
+
+template <typename Tp>
+struct greater_ptr_second
+{
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second > y->second;
+  }
+};
+
+template <typename Tp>
+struct less_ptr_second
+{
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second < y->second;
+  }
+};
+
+void write_grammar(const path_type& path, const grammar_type& grammar)
+{
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+    std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
+#else
+  typedef sgi::hash_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+    std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
+#endif
+  
+  typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
+  
+  if (grammar.empty()) return;
+
+  count_set_type counts;
+  sorted_type sorted;
+    
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    counts[giter->first->lhs][giter->first] = giter->second;
+
+  utils::compress_ostream os(path, 1024 * 1024);
+  
+  count_set_type::const_iterator citer_end = counts.end();
+  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+    const grammar_type& grammar = citer->second;
+      
+    sorted.clear();
+      
+    grammar_type::const_iterator giter_end = grammar.end();
+    for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+      sorted.push_back(&(*giter));
+      
+    std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
+
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+      os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+  }
 }
 
 inline
@@ -194,8 +253,6 @@ void read_grammar(const path_type& path, grammar_type& grammar)
 void read_lexicon(const path_type& path, lexicon_type& lexicon)
 {
   utils::compress_istream is(path, 1024 * 1024);
-
-  utils::compress_istream is(path, 1024 * 1024);
   
   std::string line;
   rule_type rule;
@@ -206,7 +263,6 @@ void read_lexicon(const path_type& path, lexicon_type& lexicon)
     
     lexicon.insert(rule.lhs);
   }
-  
 }
 
 void options(int argc, char** argv)
