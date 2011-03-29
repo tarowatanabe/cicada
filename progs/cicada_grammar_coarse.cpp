@@ -352,7 +352,7 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
     expected_counts_type::const_iterator citer_end = counts.end();
     for (expected_counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
       count_set_type::const_iterator iiter = indexed.find(citer->first);
-      if (iiter != indexed.end())
+      if (iiter == indexed.end())
 	continue;
       
       const grammar_type& rules = iiter->second;
@@ -373,6 +373,7 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
       counts_next.insert(*citer);
     
     counts.swap(counts_next);
+    counts_next.clear();
   }
 }
 
