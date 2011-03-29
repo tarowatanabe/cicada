@@ -125,7 +125,7 @@ path_type output_prefix;
 symbol_type goal = "[ROOT]";
 
 int max_order = 6;
-int max_iteration = 25;
+int max_iteration = 32;
 
 // naive variational bayes for smoothing... otherwise, dirichlet prior
 bool variational_bayes_mode = false;
@@ -138,6 +138,8 @@ int threads = 1;
 int debug = 0;
 
 void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, expected_counts_type& counts);
+template <typename Coarser>
+void grammar_coarse(const grammar_type& grammar, const expected_counts_type& counts, grammar_type& coarse, Coarser coarser);
 
 void write_grammar(const path_type& path, const grammar_type& grammar);
 void read_grammar(const path_type& path, grammar_type& grammar);
@@ -165,7 +167,7 @@ struct SimpleSymbol
   }
   
   const lexicon_type& lexicon;
-  const symbol_type goal;
+  symbol_type goal;
 };
 
 struct CoarseSymbol
@@ -194,11 +196,11 @@ struct CoarseSymbol
       static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
       
       const utils::piece piece = symbol.non_terminal_strip();
-      const int mask = 1 << bits;
+      const int mask = (1 << bits) - 1;
       
       pmatch what;
       if (xpressive::regex_match(piece, what, re)) {
-	const int value = (utils::lexical_cast<int>(what[2]) & (~mask));
+	const int value = (utils::lexical_cast<int>(what[2]) & mask);
 	cache.annotated = '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
       } else
 	cache.annotated = '[' + piece + "@0]";
@@ -219,8 +221,8 @@ struct CoarseSymbol
   typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
   
   const lexicon_type& lexicon;
-  const symbol_type goal;
-  const int bits;
+  symbol_type goal;
+  int bits;
   
   cache_set_type caches;
 };
@@ -239,25 +241,35 @@ int main(int argc, char** argv)
     read_grammar(input_grammar_file, grammar);
     
     read_lexicon(input_lexicon_file, lexicon);
-
+    
     // compute expected counts over the grammar
-
+    
     expected_counts_type counts;
     grammar_counts(grammar, lexicon, counts);
     
-    
+    grammar_type coarse;
     for (int order = max_order - 1; order >= 0; -- order) {
+      grammar_coarse(grammar, counts, coarse, CoarseSymbol(lexicon, goal, order));
       
-      // dump grammar...!
+      
     }
     
-    // finally reduce to minus-grammar:
+    // finally reduce to minus-grammar:-)
+    grammar_coarse(grammar, counts, coarse, SimpleSymbol(lexicon, goal));
+    
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
     return 1;
   }
   return 0;
+}
+
+template <typename Coarser>
+void grammar_coarse(const grammar_type& grammar, const expected_counts_type& counts, grammar_type& coarse, Coarser coarser)
+{
+  
+  
 }
 
 void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, expected_counts_type& counts)
@@ -287,7 +299,7 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
 	}
     }
     
-    counts_next.swap(counts);
+    counts.swap(counts_next);
   }
 }
 
