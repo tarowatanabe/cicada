@@ -434,8 +434,66 @@ namespace cicada
 	  if (! lattice[i].empty() && transducer.valid_span(i, i, 0)) {
 	    edges.push_back(edge_type(semiring::traits<score_type>::one(), dot_type(table, transducer.root()), span_type(i, i)));
 	    agenda_finishing[0].push_back(&edges.back());
+	    //agenda_finishing.front().push_back(&edges.back());
 	  }
       }
+
+      // TODO: keep track of popped count for each span..
+      // if we reached maximum, do not consider this span again...
+      // how to control this...?
+      
+#if 0
+      while (! agenda_finishing.front().empty()) {
+	// explore traversals
+	typename agenda_exploration_type::const_iterator aiter_end = agenda_exploration.end();
+	for (typename agenda_exploration_type::const_iterator aiter = agenda_exploration.begin(); aiter != aiter_end; ++ aiter)
+	  explore_traversal(*(*aiter), graph);
+	agenda_exploration.clear();
+	
+	if (agenda_finishing.front().empty()) break;
+	
+	// we cannnot perform dynamic updates... this is TODO...
+	agenda_finishing.front().make_heap();
+	
+	const edge_type* edge = agenda_finishing.front().top();
+	agenda_finishing.front().pop();
+	//std::cerr << "edge: span: " << edge->span << std::endl;
+#if 0
+	if (edge->is_passive())
+	  std::cerr << "finished passive: " << edge->score
+		    << " span: " << edge->span
+		    << " lhs: " << edge->rule->rule->lhs << std::endl;
+	else
+	  std::cerr << "finished active: " << edge->score
+		    << " span: " << edge->span
+		    << " dot: " << edge->dot << std::endl;
+#endif
+	
+	insert_hypergraph(*edge, lattice, graph);
+	
+#if 0
+	if (edge->is_passive())
+	  std::cerr << "graph size: " << graph.edges.size() << std::endl;
+#endif
+	
+	if (edge->is_active()) {
+	  if (pos_mode)
+	    scan(*edge, lattice, __extract_terminal());
+	  else
+	    scan(*edge, lattice, __extract());
+	  complete_active(*edge);
+	} else {
+	  complete_passive(*edge);
+	  predict(*edge, lattice);
+	}
+
+	// check if we reached the goal!
+	if (graph.is_valid()) break;
+      }
+#endif
+      
+#if 1
+      const size_type num_popped_max = utils::bithack::max(lattice.size(), beam_size);
       
       for (;;) {
 	// loop forever...
@@ -443,8 +501,6 @@ namespace cicada
 	for (size_type i = 0; i <= lattice.size(); ++ i) {
 
 	  size_type num_popped = 0;
-	  const size_type num_popped_max = utils::bithack::max(lattice.size(), beam_size);
-	  
 	  while (! agenda_finishing[i].empty() && num_popped != num_popped_max) {
 	    // explore traversals
 	    typename agenda_exploration_type::const_iterator aiter_end = agenda_exploration.end();
@@ -497,6 +553,7 @@ namespace cicada
 	// check if we reached the goal!
 	if (graph.is_valid()) break;
       }
+#endif
       
       if (graph.is_valid())
 	graph.topologically_sort();
@@ -579,6 +636,7 @@ namespace cicada
     void predict(const edge_type& passive, const lattice_type& lattice)
     {
       if (passive.span.first == passive.span.last) return;
+      //if (passive.span.level == 4) return; // max-unary chain
 
       //std::cerr << "predict passive: " << passive.span << std::endl;
 
@@ -720,6 +778,7 @@ namespace cicada
 	  
 	  // passive edge...
 	  agenda_finishing[edge.span.size()].push_back(&edge);
+	  //agenda_finishing.front().push_back(&edge);
 	  
 	  diter = discovered_passive.insert(std::make_pair(&edge, head_edge_set_type())).first;
 	  diter->second.score = edge.score;
@@ -738,6 +797,7 @@ namespace cicada
 	  
 	  // active edge...
 	  agenda_finishing[edge.span.size()].push_back(&edge);
+	  //agenda_finishing.front().push_back(&edge);
 	}
       }
     }
