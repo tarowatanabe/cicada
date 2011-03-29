@@ -242,6 +242,8 @@ int main(int argc, char** argv)
     
     if (output_file.empty())
       throw std::runtime_error("empty output file");
+
+    threads = utils::bithack::max(threads, 1);
     
     grammar_type grammar;
     lexicon_type lexicon;
@@ -331,6 +333,11 @@ void grammar_coarse(const grammar_type& grammar, const expected_counts_type& exp
 
 void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, expected_counts_type& counts)
 {
+  count_set_type indexed;
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    indexed[giter->first->lhs][giter->first] = giter->second;
+
   counts.clear();
   counts[goal] = cicada::semiring::traits<weight_type>::one();
   
@@ -345,20 +352,23 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
     expected_counts_type::const_iterator citer_end = counts.end();
     for (expected_counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
       
-      grammar_type::const_iterator riter_end = grammar.end();
-      for (grammar_type::const_iterator riter = grammar.begin(); riter != riter_end; ++ riter)
-	if (riter->first->lhs == citer->first) {
-	  // enumerate rhs...
-	  
-	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(riter->second) * citer->second;
-	  
-	  symbol_set_type::const_iterator siter_end = riter->first->rhs.end();
-	  for (symbol_set_type::const_iterator siter = riter->first->rhs.begin(); siter != siter_end; ++ siter)
-	    if (siter->is_non_terminal())
-	      counts_next[*siter] += weight;
-	}
+      count_set_type::const_iterator iiter = indexed.find(citer->first);
+      if (iiter == indexed.end())
+	throw std::runtime_error("invalid index...");
+      
+      const grammar_type& rules = iiter->second;
+      
+      grammar_type::const_iterator riter_end = rules.end();
+      for (grammar_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(riter->second) * citer->second;
+	
+	symbol_set_type::const_iterator siter_end = riter->first->rhs.end();
+	for (symbol_set_type::const_iterator siter = riter->first->rhs.begin(); siter != siter_end; ++ siter)
+	  if (siter->is_non_terminal())
+	    counts_next[*siter] += weight;
+      }
     }
-
+    
     // final insertion...!
     for (expected_counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
       counts_next.insert(*citer);
