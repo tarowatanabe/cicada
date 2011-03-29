@@ -118,9 +118,17 @@ typedef Grammar grammar_type;
 typedef Lexicon lexicon_type;
 typedef ExpectedCounts expected_counts_type;
 
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
+#else
+  typedef sgi::hash_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
+#endif
+
 path_type input_grammar_file = "-";
 path_type input_lexicon_file = "-";
-path_type output_prefix;
+path_type output_file;
 
 symbol_type goal = "[ROOT]";
 
@@ -141,7 +149,7 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
 template <typename Coarser>
 void grammar_coarse(const grammar_type& grammar, const expected_counts_type& counts, grammar_type& coarse, Coarser coarser);
 
-void write_grammar(const path_type& path, const grammar_type& grammar);
+void write_grammar(const path_type& prefix, const int order, const grammar_type& grammar);
 void read_grammar(const path_type& path, grammar_type& grammar);
 void read_lexicon(const path_type& path, lexicon_type& lexicon);
 
@@ -232,8 +240,8 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
     
-    if (output_prefix.empty())
-      throw std::runtime_error("empty output prefix");
+    if (output_file.empty())
+      throw std::runtime_error("empty output file");
     
     grammar_type grammar;
     lexicon_type lexicon;
@@ -243,20 +251,31 @@ int main(int argc, char** argv)
     read_lexicon(input_lexicon_file, lexicon);
     
     // compute expected counts over the grammar
+
+    if (debug)
+      std::cerr << "computing expected counts" << std::endl;
     
     expected_counts_type counts;
     grammar_counts(grammar, lexicon, counts);
     
     grammar_type coarse;
     for (int order = max_order - 1; order >= 0; -- order) {
+      if (debug)
+	std::cerr << "coarse order: " << order << std::endl;
+
       grammar_coarse(grammar, counts, coarse, CoarseSymbol(lexicon, goal, order));
       
-      
+      write_grammar(output_file, order + 1, coarse);
     }
     
     // finally reduce to minus-grammar:-)
+    
+    if (debug)
+      std::cerr << "final coarse grammar" << std::endl;
+
     grammar_coarse(grammar, counts, coarse, SimpleSymbol(lexicon, goal));
     
+    write_grammar(output_file, 0, coarse);
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -266,10 +285,48 @@ int main(int argc, char** argv)
 }
 
 template <typename Coarser>
-void grammar_coarse(const grammar_type& grammar, const expected_counts_type& counts, grammar_type& coarse, Coarser coarser)
+void grammar_coarse(const grammar_type& grammar, const expected_counts_type& expected_counts, grammar_type& coarse, Coarser coarser)
 {
+  count_set_type counts;
   
+  grammar_type::const_iterator riter_end = grammar.end();
+  for (grammar_type::const_iterator riter = grammar.begin(); riter != riter_end; ++ riter) {
+    expected_counts_type::const_iterator eiter = expected_counts.find(riter->first->lhs);
+    if (eiter == expected_counts.end())
+      throw std::runtime_error("invalid counts");
+    
+    const weight_type count = cicada::semiring::traits<weight_type>::exp(riter->second) * eiter->second;
+    
+    //
+    // transform rule into a coarse rule
+    //
+    
+    const symbol_type lhs = coarser(riter->first->lhs);
+    symbol_set_type rhs(riter->first->rhs);
+    symbol_set_type::iterator siter_end = rhs.end();
+    for (symbol_set_type::iterator siter = rhs.begin(); siter != siter_end; ++ siter)
+      *siter = coarser(*siter);
+    
+    std::pair<grammar_type::iterator, bool> result = counts[lhs].insert(std::make_pair(rule_type::create(rule_type(lhs, rhs)), count));
+    if (! result.second)
+      result.first->second = cicada::semiring::log(cicada::semiring::traits<weight_type>::exp(result.first->second) + count);
+  }
   
+  // perform maximum-likelihood estimation...
+  // Do we smooth here...?
+  
+  coarse.clear();
+  count_set_type::const_iterator citer_end = counts.end();
+  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+    // simple max-like estimation w/o smoothing...
+    weight_type sum;
+    grammar_type::const_iterator riter_end = citer->second.end();
+    for (grammar_type::const_iterator riter = citer->second.begin(); riter != riter_end; ++ riter)
+      sum += cicada::semiring::traits<weight_type>::exp(riter->second);
+    
+    for (grammar_type::const_iterator riter = citer->second.begin(); riter != riter_end; ++ riter)
+      coarse[riter->first] = cicada::semiring::log(cicada::semiring::traits<weight_type>::exp(riter->second) / sum);
+  }
 }
 
 void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, expected_counts_type& counts)
@@ -280,6 +337,9 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
   expected_counts_type counts_next;
   
   for (int iter = 0; iter < max_iteration; ++ iter) {
+    if (debug)
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
+
     counts_next.clear();
     
     expected_counts_type::const_iterator citer_end = counts.end();
@@ -298,6 +358,10 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
 	      counts_next[*siter] += weight;
 	}
     }
+
+    // final insertion...!
+    for (expected_counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      counts_next.insert(*citer);
     
     counts.swap(counts_next);
   }
@@ -322,19 +386,30 @@ struct less_ptr_second
   }
 };
 
-void write_grammar(const path_type& path, const grammar_type& grammar)
-{
-#ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-    std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#else
-  typedef sgi::hash_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-    std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
-#endif
-  
+void write_grammar(const path_type& prefix, const int order, const grammar_type& grammar)
+{  
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
   
   if (grammar.empty()) return;
+  
+  bool has_suffix_gz  = false;
+  bool has_suffix_bz2 = false;
+  
+  path_type path = prefix;
+
+  if (prefix.extension() == ".gz") {
+    path = prefix.parent_path() / prefix.stem();
+    has_suffix_gz = true;
+  } else if (prefix.extension() == ".bz2") {
+    path = prefix.parent_path() / prefix.stem();
+    has_suffix_bz2 = true;
+  }
+  
+  path = path.string() + "." + utils::lexical_cast<std::string>(order);
+  if (has_suffix_gz)
+    path = path.string() + ".gz";
+  else if (has_suffix_bz2)
+    path = path.string() + ".bz2";
 
   count_set_type counts;
   sorted_type sorted;
@@ -420,7 +495,7 @@ void options(int argc, char** argv)
   desc.add_options()
     ("grammar", po::value<path_type>(&input_grammar_file)->default_value("-"), "input grammar")
     ("lexicon", po::value<path_type>(&input_lexicon_file)->default_value("-"), "input lexical rules")
-    ("prefix",  po::value<path_type>(&output_prefix),      "output prefix")
+    ("output",  po::value<path_type>(&output_file),      "output file (will be augmented by order)")
     
     ("goal", po::value<symbol_type>(&goal)->default_value(goal), "goal")
     
