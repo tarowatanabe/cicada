@@ -506,7 +506,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   idevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
   
-  const size_t queue_size = 1024 * 1024;
+  const size_t queue_size = 1024 * 128;
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new istream_type());
