@@ -439,8 +439,6 @@ symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const b
     typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
     typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
     
-    
-    
     static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
     
     const utils::piece piece = symbol.non_terminal_strip();

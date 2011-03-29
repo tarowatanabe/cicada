@@ -129,6 +129,86 @@ void write_grammar(const path_type& path, const grammar_type& grammar);
 void read_grammar(const path_type& path, grammar_type& grammar);
 void read_lexicon(const path_type& path, lexicon_type& lexicon);
 
+struct SimpleSymbol
+{
+  SimpleSymbol(const lexicon_type& __lexicon,
+	       const symbol_type& __goal)
+    : lexicon(__lexicon),
+      goal(__goal) {}
+
+  symbol_type operator()(const symbol_type& symbol)
+  {
+    if (! symbol.is_non_terminal()) return symbol;
+    if (symbol == goal) return symbol;
+    if (lexicon.find(symbol) != lexicon.end()) symbol;
+    
+    const utils::piece piece = symbol.non_terminal_strip();
+    
+    // default X
+    return (piece.find('^') != utils::piece::npos() ? "[x^]" : "[x]");
+  }
+  
+  const lexicon_type& lexicon;
+  const symbol_type goal;
+};
+
+struct CoarseSymbol
+{
+  CoarseSymbol(const lexicon_type& __lexicon,
+	       const symbol_type& __goal,
+	       const int __bits)
+    : lexicon(__lexicon),
+      goal(__goal),
+      bits(__bits) {}
+
+  symbol_type operator()(const symbol_type& symbol)
+  {
+    if (! symbol.is_non_terminal()) return symbol;
+    if (symbol == goal) return symbol;
+    if (lexicon.find(symbol) != lexicon.end()) symbol;
+    
+    const size_t cache_pos = hash_value(symbol) & (caches.size() - 1);
+    cache_type& cache = caches[cache_pos];
+    if (cache.symbol != symbol) {
+      namespace xpressive = boost::xpressive;
+      
+      typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+      typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+      
+      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
+      
+      const utils::piece piece = symbol.non_terminal_strip();
+      const int mask = 1 << bits;
+      
+      pmatch what;
+      if (xpressive::regex_match(piece, what, re)) {
+	const int value = (utils::lexical_cast<int>(what[2]) & (~mask));
+	cache.annotated = '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
+      } else
+	cache.annotated = '[' + piece + "@0]";
+      
+      cache.symbol = symbol;
+    }
+    return cache.annotated;
+  }
+  
+  struct Cache
+  {
+    symbol_type symbol;
+    symbol_type annotated;
+    
+    Cache() : symbol(), annotated() {}
+  };
+  typedef Cache cache_type;
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+  
+  const lexicon_type& lexicon;
+  const symbol_type goal;
+  const int bits;
+  
+  cache_set_type caches;
+};
+
 int main(int argc, char** argv)
 {
   try {
