@@ -1442,7 +1442,7 @@ public:
     cache_type() : node(index_db_type::size_type(-1)), counts() {}
   };
   
-  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> >               cache_set_type;
+  typedef utils::array_power2<cache_type, 1024 * 4, std::allocator<cache_type> >               cache_set_type;
   
   PhraseCounts() : counts_size(size_type(-1)) {}
   
