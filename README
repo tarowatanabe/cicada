@@ -55,6 +55,7 @@ Or, you can combine outputs from multiple systems by (New! and TODO):
 Monolingual grammar learning is implemented:
    - A simple PCFG by simply extracting rules.
    - Learn latent annotated PCFG by split/merge process with an EM algorihtm [25].
+   - Also, learn coarse grammar from latent annotated PCFG[26].
 
 Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
    - A conventional phrase extract algorithm in Moses
@@ -399,3 +400,15 @@ References:
   doi       = {10.3115/1220175.1220230}
 }
 
+[26]
+@InProceedings{petrov-klein:2007:main,
+  author    = {Petrov, Slav  and  Klein, Dan},
+  title     = {Improved Inference for Unlexicalized Parsing},
+  booktitle = {Human Language Technologies 2007: The Conference of the North American Chapter of the Association for Computational Linguistics; Proceedings of the Main Conference},
+  month     = {April},
+  year      = {2007},
+  address   = {Rochester, New York},
+  publisher = {Association for Computational Linguistics},
+  pages     = {404--411},
+  url       = {http://www.aclweb.org/anthology/N/N07/N07-1051}
+}
