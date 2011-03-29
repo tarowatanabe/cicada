@@ -243,7 +243,7 @@ void read_grammar(const path_type& path, grammar_type& grammar)
   double logprob;
   
   while (std::getline(is, line)) {
-    if (! parse_rule(line, rule, logrpob)) continue;
+    if (! parse_rule(line, rule, logprob)) continue;
     
     grammar[rule_type::create(rule)] = logprob;
   }
@@ -259,7 +259,7 @@ void read_lexicon(const path_type& path, lexicon_type& lexicon)
   double logprob;
   
   while (std::getline(is, line)) {
-    if (! parse_rule(line, rule, logrpob)) continue;
+    if (! parse_rule(line, rule, logprob)) continue;
     
     lexicon.insert(rule.lhs);
   }
