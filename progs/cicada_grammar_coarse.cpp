@@ -293,9 +293,11 @@ void grammar_coarse(const grammar_type& grammar, const expected_counts_type& exp
   
   grammar_type::const_iterator riter_end = grammar.end();
   for (grammar_type::const_iterator riter = grammar.begin(); riter != riter_end; ++ riter) {
+    
+    // if not found... not reachable from ROOT!
     expected_counts_type::const_iterator eiter = expected_counts.find(riter->first->lhs);
     if (eiter == expected_counts.end())
-      throw std::runtime_error("invalid counts");
+      continue;
     
     const weight_type count = cicada::semiring::traits<weight_type>::exp(riter->second) * eiter->second;
     
@@ -336,7 +338,7 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
   count_set_type indexed;
   grammar_type::const_iterator giter_end = grammar.end();
   for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
-    indexed[giter->first->lhs][giter->first] = giter->second;
+    indexed[giter->first->lhs].insert(*giter);
 
   counts.clear();
   counts[goal] = cicada::semiring::traits<weight_type>::one();
