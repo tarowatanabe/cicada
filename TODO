@@ -85,7 +85,6 @@ Implement scalable training by L1 regularized feature selection:
      or, 
      features requing complex hidden variables...?
 
-
 Accurate unlexicalied parsing:
    Iteratively split/EM then, merge/EM
    Smoothing via dirichlet prior (or naive variational Bayes)
@@ -97,3 +96,11 @@ Accurate unlexicalied parsing:
       Use of character ngram language model to estimate POS tag?
       Signature class to compute signature for English/Chinese etc.
       Character bigram/tribgram to estimate POS for Chinese
+
+Coarse-to-fine parsing:
+    Estimate coarse grammar by EM-like estimation,
+    or simply taking "max" in A* sense?
+    Coarse grammar is learned by preserving pre-terminals, but
+    reducing bits.
+    
+    
