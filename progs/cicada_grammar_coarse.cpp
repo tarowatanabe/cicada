@@ -18,6 +18,7 @@
 
 #include <cicada/hypergraph.hpp>
 #include <cicada/rule.hpp>
+#include <cicada/semiring.hpp>
 
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
@@ -85,6 +86,8 @@ typedef double count_type;
 typedef double prob_type;
 typedef double logprob_type;
 
+typedef cicada::semiring::Logprob<double> weight_type;
+
 class Grammar : public google::dense_hash_map<rule_ptr_type, count_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
 {
 public:
@@ -102,8 +105,18 @@ public:
   Lexicon() : lexicon_type() { lexicon_type::set_empty_key(symbol_type()); }
 };
 
+class ExpectedCounts : public google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+{
+public:
+  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >expected_counts_type;
+  
+  ExpectedCounts() : expected_counts_type() { expected_counts_type::set_empty_key(symbol_type()); }
+};
+
+
 typedef Grammar grammar_type;
 typedef Lexicon lexicon_type;
+typedef ExpectedCounts expected_counts_type;
 
 path_type input_grammar_file = "-";
 path_type input_lexicon_file = "-";
@@ -124,10 +137,13 @@ int threads = 1;
 
 int debug = 0;
 
-void options(int argc, char** argv);
+void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, expected_counts_type& counts);
+
 void write_grammar(const path_type& path, const grammar_type& grammar);
 void read_grammar(const path_type& path, grammar_type& grammar);
 void read_lexicon(const path_type& path, lexicon_type& lexicon);
+
+void options(int argc, char** argv);
 
 struct SimpleSymbol
 {
@@ -223,6 +239,12 @@ int main(int argc, char** argv)
     read_grammar(input_grammar_file, grammar);
     
     read_lexicon(input_lexicon_file, lexicon);
+
+    // compute expected counts over the grammar
+
+    expected_counts_type counts;
+    grammar_counts(grammar, lexicon, counts);
+    
     
     for (int order = max_order - 1; order >= 0; -- order) {
       
@@ -237,6 +259,38 @@ int main(int argc, char** argv)
   }
   return 0;
 }
+
+void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, expected_counts_type& counts)
+{
+  counts.clear();
+  counts[goal] = cicada::semiring::traits<weight_type>::one();
+  
+  expected_counts_type counts_next;
+  
+  for (int iter = 0; iter < max_iteration; ++ iter) {
+    counts_next.clear();
+    
+    expected_counts_type::const_iterator citer_end = counts.end();
+    for (expected_counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+      
+      grammar_type::const_iterator riter_end = grammar.end();
+      for (grammar_type::const_iterator riter = grammar.begin(); riter != riter_end; ++ riter)
+	if (riter->first->lhs == citer->first) {
+	  // enumerate rhs...
+	  
+	  const weight_type weight = cicada::semiring::traits<weight_type>::exp(riter->second) * citer->second;
+	  
+	  symbol_set_type::const_iterator siter_end = riter->first->rhs.end();
+	  for (symbol_set_type::const_iterator siter = riter->first->rhs.begin(); siter != siter_end; ++ siter)
+	    if (siter->is_non_terminal())
+	      counts_next[*siter] += weight;
+	}
+    }
+    
+    counts_next.swap(counts);
+  }
+}
+
 
 template <typename Tp>
 struct greater_ptr_second
