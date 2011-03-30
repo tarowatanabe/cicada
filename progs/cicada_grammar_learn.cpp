@@ -166,10 +166,8 @@ bool binarize_left = false;
 bool binarize_right = false;
 bool binarize_all = false;
 
-// naive variational bayes for smoothing... otherwise, dirichlet prior
-bool variational_bayes_mode = false;
 
-double prior_rule      = 0.01;
+double prior_rule      = 0.1;
 double prior_lexicon   = 0.01;
 double prior_signature = 0.01;
 double prior_character = 0.01;
@@ -189,22 +187,25 @@ int threads = 1;
 
 int debug = 0;
 
-template <typename Generator>
+template <typename Generator, typename Maximizer>
 void grammar_merge(hypergraph_set_type& treebanks,
 		   grammar_type& grammar,
 		   const int bits,
-		   Generator& generator);
+		   Generator& generator,
+		   Maximizer maximizer);
 
-template <typename Generator>
+template <typename Generator, typename Maximizer>
 void grammar_split(hypergraph_set_type& treebanks,
 		   grammar_type& grammar,
 		   const int bits,
-		   Generator& generator);
+		   Generator& generator,
+		   Maximizer maximizer);
 
-template <typename Function>
+template <typename Function, typename Maximizer>
 double grammar_learn(const hypergraph_set_type& treebanks,
 		     grammar_type& grammar,
-		     Function function);
+		     Function function,
+		     Maximizer maximier);
 
 template <typename Function>
 void lexicon_learn(const hypergraph_set_type& treebanks,
@@ -227,11 +228,13 @@ void write_characters(const path_type& file,
 		      const ngram_count_set_type& backoff,
 		      const double cutoff);
 void write_grammar(const path_type& file,
-		   const grammar_type& grammar,
-		   const double cutoff);
+		   const grammar_type& grammar);
 
 void read_treebank(const path_set_type& files,
 		   hypergraph_set_type& treebanks);
+
+void grammar_prune(grammar_type& grammar, const double cutoff);
+void lexicon_prune(grammar_type& grammar, const double cutoff);
 
 void options(int argc, char** argv);
 
@@ -263,6 +266,123 @@ struct weight_function
   }
   
   const grammar_type& grammar;
+};
+
+struct Maximize
+{
+  void operator()(const grammar_type& counts, grammar_type& grammar) const
+  {
+    // simle maximizer...
+    double sum = 0.0;
+    grammar_type::const_iterator citer_end = counts.end();
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      sum += citer->second;
+    
+    const double logsum = cicada::semiring::log(weight_type(sum));
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      grammar[citer->first] = cicada::semiring::log(weight_type(citer->second)) - logsum;
+  }
+};
+
+struct MaximizeBayes : public utils::hashmurmur<size_t>
+{
+  typedef utils::hashmurmur<size_t> hasher_type;
+  
+  MaximizeBayes(const grammar_type& __base) : base(__base) {}
+  
+  typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;
+  
+  struct Cache
+  {
+    symbol_type symbol;
+    symbol_type coarse;
+    
+    Cache() : symbol(), coarse() {}
+  };
+  typedef Cache cache_type;
+  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+
+  const symbol_type& coarse(const symbol_type& symbol) const
+  {
+    if (symbol.is_terminal()) return symbol;
+
+    const size_t cache_pos = hasher_type::operator()(symbol.id()) & (caches.size() - 1);
+    cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
+    if (cache.symbol != symbol) {
+      cache.symbol = symbol;
+      
+      const std::string str = symbol.non_terminal_strip();
+      std::string::size_type pos = str.rfind('@');
+      if (pos != std::string::npos)
+	cache.coarse = '[' + str.substr(0, pos) + ']';
+      else
+	cache.coarse = symbol;
+    }
+    return cache.coarse;
+  }
+  
+  
+  prob_set_type  __probs;
+  cache_set_type caches;
+  const grammar_type& base;
+  
+  void operator()(const grammar_type& counts, grammar_type& grammar) const
+  {
+    using namespace boost::math::policies;
+    typedef policy<domain_error<errno_on_error>,
+		   pole_error<errno_on_error>,
+		   overflow_error<errno_on_error>,
+		   rounding_error<errno_on_error>,
+		   evaluation_error<errno_on_error> > policy_type;
+    
+    if (counts.empty()) return;
+    
+    const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
+    const double prior = (is_terminal ? prior_lexicon : prior_rule);
+
+    prob_set_type& probs = const_cast<prob_set_type&>(__probs);
+    
+    probs.resize(counts.size());
+    
+    double sum = 0.0;
+    prob_set_type::iterator piter = probs.begin();
+    grammar_type::const_iterator citer_end = counts.end();
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
+      const symbol_type lhs = coarse(citer->first->lhs);
+      symbol_set_type rhs(citer->first->rhs);
+      symbol_set_type::iterator riter_end = rhs.end();
+      for (symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
+	*riter = coarse(*riter);
+      
+      const rule_ptr_type rule_coarse(rule_type::create(rule_type(lhs, rhs)));
+      
+      grammar_type::const_iterator biter = base.find(rule_coarse);
+      if (biter == base.end())
+	throw std::runtime_error("no base?");
+      
+      *piter = utils::mathop::exp(biter->second);
+      
+      sum += citer->second + prior * (*piter);
+    }
+    
+    for (;;) {
+      weight_type logprob_sum;
+      const double logsum = utils::mathop::digamma(sum);
+      
+      prob_set_type::iterator piter = probs.begin();
+      for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
+	const double logprob = utils::mathop::digamma(citer->second + prior * *piter) - logsum;
+	
+	grammar[citer->first] = logprob;
+	logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+      }
+      
+      const double discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
+      if (discount > 0.0) break;
+      
+      ++ sum;
+    }
+  }
 };
 
 int main(int argc, char** argv)
@@ -303,13 +423,15 @@ int main(int argc, char** argv)
     read_treebank(input_files, treebanks);
 
     grammar_type grammar;
-    grammar_learn(treebanks, grammar, zero_function());
+    grammar_learn(treebanks, grammar, zero_function(), Maximize());
     
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
-
+    
     if (debug)
       std::cerr << "grammar size: " << grammar.size() << std::endl;
+    
+    grammar_type base(grammar);
     
     for (int iter = 0; iter < max_iteration; ++ iter) {
       
@@ -319,7 +441,7 @@ int main(int argc, char** argv)
       // split...
       {
 	const utils::resource split_start;
-	grammar_split(treebanks, grammar, iter, generator);
+	grammar_split(treebanks, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource split_end;
 	
 	if (debug)
@@ -336,7 +458,7 @@ int main(int argc, char** argv)
 	    std::cerr << "split iteration: " << (i + 1) << std::endl;
 	  
 	  const utils::resource learn_start;
-	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar));
+	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar), MaximizeBayes(base));
 	  const utils::resource learn_end;
 
 	  if (debug)
@@ -353,7 +475,7 @@ int main(int argc, char** argv)
       // merge..
       {
 	const utils::resource merge_start;
-	grammar_merge(treebanks, grammar, iter, generator);
+	grammar_merge(treebanks, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource merge_end;
 	
 	if (debug)
@@ -370,7 +492,7 @@ int main(int argc, char** argv)
 	    std::cerr << "merge iteration: " << (i + 1) << std::endl;
 	  
 	  const utils::resource learn_start;
-	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar));
+	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar), MaximizeBayes(base));
 	  const utils::resource learn_end;
 	  
 	  if (debug)
@@ -409,11 +531,16 @@ int main(int argc, char** argv)
       
       if (sig)
 	lexicon_learn(treebanks, lexicon, weight_function(grammar));
+
+      if (cutoff_rule > 0.0)
+	grammar_prune(rules, cutoff_rule);
+      if (cutoff_lexicon > 0.0)
+	lexicon_prune(lexicon, cutoff_lexicon);
       
-      write_grammar(output_grammar_file, rules, cutoff_rule);
-      write_grammar(output_lexicon_file, lexicon, cutoff_lexicon);
+      write_grammar(output_grammar_file, rules);
+      write_grammar(output_lexicon_file, lexicon);
     } else
-      write_grammar(output_grammar_file, grammar, cutoff_rule);
+      write_grammar(output_grammar_file, grammar);
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -528,84 +655,6 @@ struct filter_pruned
 };
 
 
-struct Maximize
-{
-  void operator()(const grammar_type& counts, grammar_type& grammar) const
-  {
-    using namespace boost::math::policies;
-    typedef policy<domain_error<errno_on_error>,
-		   pole_error<errno_on_error>,
-		   overflow_error<errno_on_error>,
-		   rounding_error<errno_on_error>,
-		   evaluation_error<errno_on_error> > policy_type;
-    
-  
-    bool is_terminal = false;
-    double sum = 0.0;
-    grammar_type::const_iterator citer_end = counts.end();
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-      sum += citer->second;
-      is_terminal |= citer->first->rhs.front().is_terminal();
-    }
-
-    for (;;) {
-      double logprob_sum = boost::numeric::bounds<double>::lowest();
-      
-      const double prior_lhs = (is_terminal ? prior_lexicon : prior_rule);
-      const double logsum = utils::mathop::log(sum + prior_lhs * counts.size());
-      for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-	const double logprob = utils::mathop::log(citer->second + prior_lhs) - logsum;
-	
-	logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	grammar[citer->first] = logprob;
-      }
-      
-      const double discount = - boost::math::expm1(logprob_sum, policy_type());
-      
-      if (discount > 0.0) break;
-      ++ sum;
-    }
-  }
-};
-
-struct MaximizeBayes
-{
-  void operator()(const grammar_type& counts, grammar_type& grammar) const
-  {
-    using namespace boost::math::policies;
-    typedef policy<domain_error<errno_on_error>,
-		   pole_error<errno_on_error>,
-		   overflow_error<errno_on_error>,
-		   rounding_error<errno_on_error>,
-		   evaluation_error<errno_on_error> > policy_type;
-  
-    bool is_terminal = false;
-    double sum = 0.0;
-    grammar_type::const_iterator citer_end = counts.end();
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-      sum += citer->second;
-      is_terminal |= citer->first->rhs.front().is_terminal();
-    }
-    
-    for (;;) {
-      double logprob_sum = boost::numeric::bounds<double>::lowest();
-      
-      const double prior_lhs = (is_terminal ? prior_lexicon : prior_rule);
-      const double logsum = utils::mathop::digamma(sum + prior_lhs * counts.size());
-      for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
-	const double logprob = utils::mathop::digamma(citer->second + prior_lhs) - logsum;
-	
-	logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	grammar[citer->first] = logprob;
-      }
-      
-      const double discount = - boost::math::expm1(logprob_sum, policy_type());
-      
-      if (discount > 0.0) break;
-      ++ sum;
-    }
-  }  
-};
 
 template <typename Scale>
 struct TaskMergeScale
@@ -872,11 +921,12 @@ struct TaskMergeGrammar : public Annotator
 };
 
 
-template <typename Generator>
+template <typename Generator, typename Maximizer>
 void grammar_merge(hypergraph_set_type& treebanks,
 		   grammar_type& grammar,
 		   const int bits,
-		   Generator& generator)
+		   Generator& generator,
+		   Maximizer maximizer)
 {
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
   typedef google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > scale_set_type;
@@ -1041,11 +1091,7 @@ void grammar_merge(hypergraph_set_type& treebanks,
   if (debug)
     std::cerr << "# of symbols: " << counts.size() << std::endl;
   
-  // maximization
-  if (variational_bayes_mode)
-    grammar_maximize(counts, grammar, MaximizeBayes());
-  else
-    grammar_maximize(counts, grammar, Maximize());
+  grammar_maximize(counts, grammar, maximizer);
 }
 
 struct TaskSplitTreebank : public Annotator
@@ -1256,11 +1302,12 @@ struct TaskSplitGrammar : public Annotator
   count_set_type counts;
 };
 
-template <typename Generator>
+template <typename Generator, typename Maximizer>
 void grammar_split(hypergraph_set_type& treebanks,
 		   grammar_type& grammar,
 		   const int bits,
-		   Generator& generator)
+		   Generator& generator,
+		   Maximizer maximizer)
 {
   typedef TaskSplitTreebank           task_treebank_type;
   typedef TaskSplitGrammar<Generator> task_grammar_type;
@@ -1323,12 +1370,8 @@ void grammar_split(hypergraph_set_type& treebanks,
     std::cerr << "# of symbols: " << counts.size() << std::endl;
   
   // maximization
-  if (variational_bayes_mode)
-    grammar_maximize(counts, grammar, MaximizeBayes());
-  else
-    grammar_maximize(counts, grammar, Maximize());
+  grammar_maximize(counts, grammar, maximizer);
 }
-
 
 
 template <typename Function>
@@ -1415,10 +1458,11 @@ struct TaskLearn
   count_set_type counts;
 };
 
-template <typename Function>
+template <typename Function, typename Maximizer>
 double grammar_learn(const hypergraph_set_type& treebanks,
 		     grammar_type& grammar,
-		     Function function)
+		     Function function,
+		     Maximizer maximizer)
 {
   typedef TaskLearn<Function> task_type;
   typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
@@ -1465,10 +1509,7 @@ double grammar_learn(const hypergraph_set_type& treebanks,
 	      << std::endl;
   
   // maximization
-  if (variational_bayes_mode)
-    grammar_maximize(counts, grammar, MaximizeBayes());
-  else
-    grammar_maximize(counts, grammar, Maximize());
+  grammar_maximize(counts, grammar, maximizer);
   
   return cicada::semiring::log(logprob);
 }
@@ -1655,32 +1696,18 @@ struct LexiconEstimate
     for (;;) {
       discount = 0.0;
       
-      if (variational_bayes_mode) {
-	double logprob_sum = boost::numeric::bounds<double>::lowest();
-	const double lognorm = utils::mathop::digamma(prior_lexicon * vocab_size + total);
-	
-	logprob_set_type::iterator liter = logprobs_local.begin();
-	ngram_set_type::const_iterator niter_end = ngrams_local.end();
-	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	  const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
-	  logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	  *liter = logprob;
-	}
-	
-	discount = - boost::math::expm1(logprob_sum, policy_type());
-      } else {
-	double prob_sum = 0.0;
-	
-	logprob_set_type::iterator liter = logprobs_local.begin();
-	ngram_set_type::const_iterator niter_end = ngrams_local.end();
-	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	  const double prob = (prior_lexicon + (*niter)->second) / (prior_lexicon * vocab_size + total);
-	  prob_sum += prob;
-	  *liter = utils::mathop::log(prob);
-	}
-	
-	discount = 1.0 - prob_sum;
+      double logprob_sum = boost::numeric::bounds<double>::lowest();
+      const double lognorm = utils::mathop::digamma(prior_lexicon * vocab_size + total);
+      
+      logprob_set_type::iterator liter = logprobs_local.begin();
+      ngram_set_type::const_iterator niter_end = ngrams_local.end();
+      for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
+	const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
+	logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
+	*liter = logprob;
       }
+      
+      discount = - boost::math::expm1(logprob_sum, policy_type());
       
       if (discount > 0.0) break;
       ++ total;
@@ -1733,30 +1760,17 @@ struct LexiconEstimate
 	for (;;) {
 	  discount = 0.0;
 	
-	  if (variational_bayes_mode) {
-	    double logprob_sum = boost::numeric::bounds<double>::lowest();
-	    const double lognorm = utils::mathop::digamma(prior_lexicon * ngrams_local.size() + total);
-	    
-	    logprob_set_type::iterator liter = logprobs_local.begin();
-	    for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	      const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
-	      logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	      *liter = logprob;
-	    }
-	    
-	    discount = - boost::math::expm1(logprob_sum, policy_type());
-	  } else {
-	    double prob_sum = 0.0;
-	    
-	    logprob_set_type::iterator liter = logprobs_local.begin();
-	    for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	      const double prob = (prior_lexicon + (*niter)->second) / (prior_lexicon * ngrams_local.size() + total);
-	      prob_sum += prob;
-	      *liter = utils::mathop::log(prob);
-	    }
-	    
-	    discount = 1.0 - prob_sum;
+	  double logprob_sum = boost::numeric::bounds<double>::lowest();
+	  const double lognorm = utils::mathop::digamma(prior_lexicon * ngrams_local.size() + total);
+	  
+	  logprob_set_type::iterator liter = logprobs_local.begin();
+	  for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
+	    const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
+	    logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
+	    *liter = logprob;
 	  }
+	  
+	  discount = - boost::math::expm1(logprob_sum, policy_type());
 	  
 	  if (discount > 0.0) break;
 	  ++ total;
@@ -2196,9 +2210,131 @@ void write_characters(const path_type& file,
   }
 }
 
+void grammar_prune(grammar_type& grammar, const double cutoff)
+{
+  typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
+  
+  typedef std::pair<rule_ptr_type, logprob_type> rule_logprob_type;
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
+#else
+  typedef sgi::hash_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
+#endif
+  // we will first compute "reachable" rules...
+  // reachable label -> rule mapping
+  
+  count_set_type counts;
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    counts[giter->first->lhs].insert(*giter);
+  
+  reachable_set_type reachables;
+  reachable_set_type reachables_next;
+  
+  reachables["[ROOT]"];
+  
+  for (;;) {
+    bool equilibrate = true;
+    
+    reachables_next.clear();
+    reachables_next = reachables;
+    
+    reachable_set_type::const_iterator riter_end = reachables.end();
+    for (reachable_set_type::const_iterator riter = reachables.begin(); riter != riter_end; ++ riter) {
+      count_set_type::const_iterator citer = counts.find(riter->first);
+      if (citer == counts.end()) continue; // ignore lexical rule, preterminals
+      
+      const grammar_type& grammar = citer->second;
+      
+      grammar_type::const_iterator giter_end = grammar.end();
+      for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
+      
+	symbol_set_type::const_iterator siter_end = giter->first->rhs.end();
+	for (symbol_set_type::const_iterator siter = giter->first->rhs.begin(); siter != siter_end; ++ siter)
+	  if (siter->is_non_terminal()) {
+	    // we will keep the best rule....
+	    std::pair<reachable_set_type::iterator, bool> result = reachables_next.insert(std::make_pair(*siter, *giter));
+	    if (result.second)
+	      equilibrate = false;
+	    else if (giter->second > result.first->second.second)
+	      result.first->second = *giter;
+	  }
+      }
+    }
+    
+    reachables.swap(reachables_next);
+    
+    if (equilibrate) break;
+  }
+  
+  // reachables are set of rules we "must" preserve, and should not be pruned away...
+  
+  grammar.clear();
+  reachable_set_type::const_iterator riter_end = reachables.end();
+  for (reachable_set_type::const_iterator riter = reachables.begin(); riter != riter_end; ++ riter)
+    grammar.insert(riter->second);
+  
+  const double logcutoff = utils::mathop::log(cutoff);
+  sorted_type sorted;
+  
+  count_set_type::const_iterator citer_end = counts.end();
+  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+    const grammar_type& grammar_local = citer->second;
+    
+    sorted.clear();
+    grammar_type::const_iterator giter_end = grammar_local.end();
+    for (grammar_type::const_iterator giter = grammar_local.begin(); giter != giter_end; ++ giter)
+      sorted.push_back(&(*giter));
+    
+    std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
+    
+    const double logprob_max = sorted.front()->second;
+    const double logprob_threshold = logprob_max + logcutoff;
+    
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
+      grammar.insert(*(*siter));
+  }
+}
+
+void lexicon_prune(grammar_type& grammar, const double cutoff)
+{
+  typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
+
+  count_set_type counts;
+  grammar_type::const_iterator giter_end = grammar.end();
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+    counts[giter->first->lhs].insert(*giter);
+  
+  grammar.clear();
+  
+  const double logcutoff = utils::mathop::log(cutoff);
+  sorted_type sorted;
+  
+  count_set_type::const_iterator citer_end = counts.end();
+  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+    const grammar_type& grammar_local = citer->second;
+    
+    sorted.clear();
+    grammar_type::const_iterator giter_end = grammar_local.end();
+    for (grammar_type::const_iterator giter = grammar_local.begin(); giter != giter_end; ++ giter)
+      sorted.push_back(&(*giter));
+    
+    std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
+    
+    const double logprob_max = sorted.front()->second;
+    const double logprob_threshold = logprob_max + logcutoff;
+    
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
+      grammar.insert(*(*siter));
+  }
+}
+
 void write_grammar(const path_type& file,
-		   const grammar_type& grammar,
-		   const double cutoff)
+		   const grammar_type& grammar)
 {
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
 
@@ -2224,19 +2360,10 @@ void write_grammar(const path_type& file,
       sorted.push_back(&(*giter));
       
     std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
-
-    if (0.0 < cutoff && cutoff < 1.0) {
-      const double logprob_max = sorted.front()->second;
-      const double logprob_threshold = logprob_max + utils::mathop::log(cutoff);
-	
-      sorted_type::const_iterator siter_end = sorted.end();
-      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
-	os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
-    } else {
-      sorted_type::const_iterator siter_end = sorted.end();
-      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-	os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
-    }
+    
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+      os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
   }
 }
 
@@ -2290,8 +2417,6 @@ void options(int argc, char** argv)
     ("binarize-right", po::bool_switch(&binarize_right), "right binarization")
     ("binarize-all",   po::bool_switch(&binarize_all),   "all binarization")
     
-    ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
-    
     ("prior-rule",      po::value<double>(&prior_rule)->default_value(prior_rule),           "Dirichlet prior for rules")
     ("prior-lexicon",   po::value<double>(&prior_lexicon)->default_value(prior_lexicon),     "Dirichlet prior for lexical rule")
     ("prior-signature", po::value<double>(&prior_signature)->default_value(prior_signature), "Dirichlet prior for signature")
@@ -2308,7 +2433,6 @@ void options(int argc, char** argv)
     
     ("signature",      po::value<std::string>(&signature), "signature for unknown word")
     ("signature-list", po::bool_switch(&signature_list),   "list of signatures")
-    
     
     ("threads", po::value<int>(&threads), "# of threads")
     

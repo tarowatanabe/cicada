@@ -339,17 +339,22 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
   grammar_type::const_iterator giter_end = grammar.end();
   for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
     indexed[giter->first->lhs].insert(*giter);
-
+  
   counts.clear();
   counts[goal] = cicada::semiring::traits<weight_type>::one();
   
   expected_counts_type counts_next;
+
+  int iter2 = 0;
   
-  for (int iter = 0; iter < max_iteration; ++ iter) {
+  for (int iter = 0; /**/; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
 
+    bool equilibrate = true;
+
     counts_next.clear();
+    counts_next = counts;
     
     expected_counts_type::const_iterator citer_end = counts.end();
     for (expected_counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
@@ -365,17 +370,20 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
 	
 	symbol_set_type::const_iterator siter_end = riter->first->rhs.end();
 	for (symbol_set_type::const_iterator siter = riter->first->rhs.begin(); siter != siter_end; ++ siter)
-	  if (siter->is_non_terminal())
-	    counts_next[*siter] += weight;
+	  if (siter->is_non_terminal()) {
+	    std::pair<expected_counts_type::iterator, bool> result = counts_next.insert(std::make_pair(*siter, weight));
+	    if (result.second)
+	      equilibrate = false;
+	    else
+	      result.first->second += weight;
+	  }
       }
     }
     
-    // final insertion...!
-    for (expected_counts_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      counts_next.insert(*citer);
-    
     counts.swap(counts_next);
-    counts_next.clear();
+    
+    iter2 += equilibrate;
+    if (iter2 >= max_iteration) break;
   }
 }
 

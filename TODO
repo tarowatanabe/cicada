@@ -96,6 +96,7 @@ Accurate unlexicalied parsing:
       Use of character ngram language model to estimate POS tag?
       Signature class to compute signature for English/Chinese etc.
       Character bigram/tribgram to estimate POS for Chinese
+   Add prior: max-like estimate w/o annotation
 
 Coarse-to-fine parsing:
     Estimate coarse grammar by EM-like estimation,
