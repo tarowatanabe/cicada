@@ -439,6 +439,7 @@ void write_grammar(const path_type& prefix, const int order, const grammar_type&
     counts[giter->first->lhs][giter->first] = giter->second;
 
   utils::compress_ostream os(path, 1024 * 1024);
+  os.precision(10);
   
   count_set_type::const_iterator citer_end = counts.end();
   for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
