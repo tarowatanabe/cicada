@@ -845,6 +845,11 @@ struct TaskMergeTreebank
   
   void operator()()
   {
+    typedef google::dense_hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type> > rule_set_type;
+    
+    rule_set_type rules;
+    rules.set_empty_key(rule_ptr_type());
+    
     hypergraph_type treebank_new;
     filter_pruned::removed_type removed;
     
@@ -876,6 +881,13 @@ struct TaskMergeTreebank
       cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
       
       treebank.swap(treebank_new);
+      
+      {
+	// unique rules...
+	hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
+	for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter)
+	  eiter->rule = *(rules.insert(eiter->rule).first);
+      }
     }
   }
   
@@ -1124,6 +1136,11 @@ struct TaskSplitTreebank : public Annotator
 #endif
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
     
+    typedef google::dense_hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type> > rule_set_type;
+    
+    rule_set_type rules;
+    rules.set_empty_key(rule_ptr_type());
+    
     node_map_type   node_map;
     hypergraph_type treebank_new;
     
@@ -1180,7 +1197,7 @@ struct TaskSplitTreebank : public Annotator
 	      if (j_end[i])
 		symbols_new[i] = annotate(symbols[i], j[i]);
 	    
-	    const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
+	    const rule_ptr_type rule = *(rules.insert(rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()))).first);
 	  
 	    // construct edge
 	    std::pair<node_set_type::iterator, bool> head = node_map[edge.head].insert(std::make_pair(symbols_new.front(), 0));
