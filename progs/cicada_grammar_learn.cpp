@@ -1047,11 +1047,12 @@ void grammar_merge(hypergraph_set_type& treebanks,
   
   // do we stricktly erase...?
   sorted_type::const_iterator siter_end = sorted.end();
-  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= threshold; ++ siter) {
-    if (debug >= 2)
-      std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
-    merged.insert((*siter)->first);
-  }
+  for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter) 
+    if ((*siter)->second >= threshold) {
+      if (debug >= 2)
+	std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
+      merged.insert((*siter)->first);
+    }
   
   if (debug)
     std::cerr << "merged: " << merged.size() << " split: " << (sorted.size() - merged.size()) << std::endl;
@@ -1563,8 +1564,6 @@ struct TaskLexiconFrequency
     
     ngram_type trigram(3);
     ngram_type bigram(2);
-    
-    const signature_type& __signature = signature_type::create(signature);
     
     const hypergraph_type* __treebank = 0;
     for (;;) {
