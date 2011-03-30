@@ -876,6 +876,8 @@ struct TaskMergeTreebank
       cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
       
       treebank.swap(treebank_new);
+      treebank_new.clear();
+      hypergraph_type(treebank).swap(treebank);
     }
   }
   
@@ -1221,7 +1223,7 @@ struct TaskSplitTreebank : public Annotator
 		if (j[index] < j_end[index]) break;
 		j[index] = 0;
 	      }
-	  
+	    
 	    if (index == j.size()) break;
 	  }
 	}   
@@ -1229,11 +1231,11 @@ struct TaskSplitTreebank : public Annotator
 
       if (treebank_new.is_valid())
 	treebank_new.topologically_sort();
-    
+      
       treebank.swap(treebank_new);
       treebank_new.clear();
+      hypergraph_type(treebank).swap(treebank);
     }
-    
   }
   
   queue_type& queue;
