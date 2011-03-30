@@ -906,7 +906,7 @@ struct TaskMergeGrammar : public Annotator
       
       const rule_ptr_type& rule = ptr->first;
       
-      annotated = false;
+      bool annotated = false;
       symbol_type lhs = rule->lhs;
       if (merged.find(lhs) != merged.end()) {
 	lhs = annotate(lhs, false);
