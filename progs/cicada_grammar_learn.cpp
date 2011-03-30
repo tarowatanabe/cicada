@@ -1049,16 +1049,21 @@ void grammar_merge(hypergraph_set_type& treebanks,
   sorted_type::const_iterator siter = sorted.begin();
   sorted_type::const_iterator siter_end = sorted.end();
   sorted_type::const_iterator siter_last = siter + sorted_size;
+
+  bool found_equal = false;
   for (/**/; siter != siter_last; ++ siter) {
     if (debug >= 2)
       std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
     merged.insert((*siter)->first);
+
+    found_equal |= ((*siter)->second == threshold);
   }
-  for (/**/; siter != siter_end && (*siter)->second == threshold; ++ siter) {
-    if (debug >= 2)
-      std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
-    merged.insert((*siter)->first);
-  }
+  if (found_equal)
+    for (/**/; siter != siter_end && (*siter)->second == threshold; ++ siter) {
+      if (debug >= 2)
+	std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
+      merged.insert((*siter)->first);
+    }
   
   if (debug)
     std::cerr << "merged: " << merged.size() << " split: " << (sorted.size() - merged.size()) << std::endl;
