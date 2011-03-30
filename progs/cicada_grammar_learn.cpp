@@ -896,7 +896,7 @@ struct TaskMergeGrammar : public Annotator
     : Annotator(__bits),
       merged(__merged),
       queue(__queue) {}
-  
+
   void operator()()
   {
     const grammar_type::value_type* ptr = 0;
