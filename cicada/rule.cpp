@@ -25,7 +25,7 @@
 
 namespace cicada
 {  
-  typedef utils::array_power2<Rule::rule_ptr_type, 1024 * 256, std::allocator<Rule::rule_ptr_type> > cache_type;
+  typedef utils::array_power2<Rule::rule_ptr_type, 1024 * 32, std::allocator<Rule::rule_ptr_type> > cache_type;
 
 #ifdef HAVE_TLS
   static __thread cache_type* __rule_cache_tls = 0;
