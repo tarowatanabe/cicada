@@ -17,6 +17,7 @@
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/semiring.hpp>
+#include <cicada/span_vector.hpp>
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
@@ -38,6 +39,9 @@ namespace cicada
   // input is a set of grammars, or use iterators
   // 
   // vector<grammar_type> grammar_set_type;
+  //
+  // Actually, we need different implementation....
+  // How to handle this in the same framework.... separate this into different project...?
   //
   
   template <typename Semiring, typename Function>
@@ -84,12 +88,12 @@ namespace cicada
     {
       CoarseSymbol(const int __bits) : bits(__bits) {}
       
-      symbol_type operator()(const symbol_type& symbol)
+      symbol_type operator()(const symbol_type& symbol) const
       {
 	if (! symbol.is_non_terminal()) return symbol;
 	
 	const size_t cache_pos = hash_value(symbol) & (caches.size() - 1);
-	cache_type& cache = caches[cache_pos];
+	cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
 	if (cache.symbol != symbol) {
 	  cache.symbol = symbol;
 	  cache.coarse = symbol.coarse(bits);
@@ -113,14 +117,11 @@ namespace cicada
     
     struct CoarseSimple
     {
-      symbol_type operator()(const symbol_type& symbol)
+      symbol_type operator()(const symbol_type& symbol) const
       {
 	if (! symbol.is_non_terminal()) return symbol;
 	
-	const utils::piece piece = symbol.non_terminal_strip();
-	
-	// default X
-	return (piece.find('^') != utils::piece::npos() ? "[x^]" : "[x]");
+	return (symbol.binarized() ? "[x^]" : "[x]");
       }
     };
     
@@ -129,7 +130,7 @@ namespace cicada
     {
       PruceCoarse(Coarser __coarser) : coarser(__coarser) {}
       
-      bool operator()(const int first, const int last, const symbol_type& label)
+      bool operator()(const int first, const int last, const symbol_type& label) const
       {
 	const label_score_set_type& labels = prunes(first, last);
 	
@@ -157,22 +158,285 @@ namespace cicada
       // CKY parser... but we will not a construct hypergraph, but a tabular structure...
       //
       
-      //
-      // output is chart structure with label-score
-      //
+      typedef cicada::SpanVector::span_type span_type;
+      typedef cicada::SpanVector::span_type tail_type;
+      typedef utils::simple_vector<tail_type, std::allocator<tail_type> > tail_set_type;
+
+      struct Edge
+      {
+	tail_set_type tails;
+	score_type score;
+	
+	Edge() : tails(), score(cicada::semiring::traits<score_type>::one()) {}
+	Edge(const tail_set_type& __tails, const score_type& __score) : tails(__tails), score(__score) {}
+      };
+      
+      typedef Edge edge_type;
+      typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
+      
+      struct Active
+      {
+	Actice(const transducer_type::id_type& __node)
+	  : node(__node), edge() {}
+	Actice(const transducer_type::id_type& __node,
+	       const edge_type& __edge)
+	  : node(__node), edge(__edge) {}
+	
+	transducer_type::id_type node;
+	edge_type edge;
+      };
+      
+      struct Passive
+      {
+	Passive(const span_type& __span) : span(__span), edges() {}
+	
+	span_type     span;
+	edge_set_type edges;
+      };
+      
+      typedef Active  active_type;
+      typedef Passive passive_type;
+      
+      typedef utils::chunk_vector<active_type, 4096 / sizeof(active_type), std::allocator<active_type> > active_set_type;
+      
+      typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
+      typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
+      
+      typedef utils::chunk_vector<passive_type, 4096 / sizeof(passive_type), std::allocator<passive_type> > passive_set_type;
+      typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
+      
+      typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > node_map_type;
       
       ParseCKY(const symbol_type& __goal,
 	       const grammar_type& __grammar,
 	       const bool __yield_source=false,
 	       const bool __treebank=false,
 	       const bool __pos_mode=false)
-	: goal(__goal), grammar(__grammar), threshold(__threshold), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode) {}
+	: goal(__goal), grammar(__grammar), threshold(__threshold), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode)
+      {
+	node_map.set_empty_key(symbol_type());
+      }
       
       template <typename Pruner>
       void operator()(const lattice_type& lattice, label_score_chart_type& scores, const Pruner& pruner)
       {
+	if (lattice.empty())
+	  return;
+	
+	scores.clear();
+	actives.clear();
+	passives.clear();
+	
+	actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
+	passives.resize(lattice.size() + 1);
+	scores.resize(lattice.size() + 1);
+	
+	compute_inside(lattice, pruner);
+	compute_outside();
+	compute_inside_outside(scores);
+      }
+      
+      void compute_inside_outside(label_score_chart_type& scores)
+      {
 	
 	
+      }
+      
+      void compute_ouside()
+      {
+	// traverse back passives from TOP
+	
+	
+      }
+
+      template <typename Pruner>
+      void compute_inside(const lattice_type& lattice, const Pruner& pruner)
+      {
+	// initialize active chart...
+	for (size_type table = 0; table != grammar.size(); ++ table) {
+	  const transducer_type::id_type root = grammar[table].root();
+	  
+	  for (size_type pos = 0; pos != lattice.size(); ++ pos)
+	    if (grammar[table].valid_span(pos, pos, 0))
+	      actives[table](pos, pos), push_back(active_type(root));
+	}
+	
+	// compute inside...
+	for (size_type length = 1; length <= lattice.size(); ++ length)
+	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
+	    const size_type last = first + length;
+	    
+	    node_map.clear();
+	    
+	    for (size_t table = 0; table != grammar.size(); ++ table) {
+	      const transducer_type& transducer = grammar[table];
+	      
+	      // we will advance active spans, but constrained by transducer's valid span
+	      if (transducer.valid_span(first, last, lattice.shortest_distance(first, last))) {
+		
+		active_set_type& cell = actives[table](first, last);
+		for (size_t middle = first + 1; middle < last; ++ middle) {
+		  const active_set_type&  active_arcs  = actives[table](first, middle);
+		  const passive_set_type& passive_arcs = passives(middle, last);
+		  
+		  extend_actives(transducer, active_arcs, passive_arcs, cell);
+		}
+		
+		if (! treebank || length == 1) {
+		  // then, advance by terminal(s) at lattice[last - 1];
+		  
+		  const active_set_type&  active_arcs  = actives[table](first, last - 1);
+		  const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
+		  
+		  active_set_type::const_iterator aiter_begin = active_arcs.begin();
+		  active_set_type::const_iterator aiter_end = active_arcs.end();
+		  
+		  if (aiter_begin != aiter_end) {
+		    if (pos_mode) {
+		      lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+		      for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+			const symbol_type terminal = piter->label.terminal();
+			
+			active_set_type& cell = actives[table](first, last - 1 + piter->distance);
+			
+			// handling of EPSILON rule...
+			if (terminal == vocab_type::EPSILON) {
+			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score + function(piter->features))));
+			} else {
+			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+			    if (node == transducer.root()) continue;
+			    
+			    cell.push_back(active_type(node, edge_type(aiter->edge.tails, aiter->edge.score * function(piter->features))));
+			  }
+			}
+		      }
+		    } else {
+		      lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+		      for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+			const symbol_type& terminal = piter->label;
+			
+			active_set_type& cell = actives[table](first, last - 1 + piter->distance);
+			
+			// handling of EPSILON rule...
+			if (terminal == vocab_type::EPSILON) {
+			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score + function(piter->features))));
+			} else {
+			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
+			    if (node == transducer.root()) continue;
+			    
+			    cell.push_back(active_type(node, edge_type(aiter->edge.tails, aiter->edge.score * function(piter->features))));
+			  }
+			}
+		      }
+		    }
+		  }
+		}
+	      }
+	      
+	      // complete active items if possible... The active items may be created from child span due to the
+	      // lattice structure...
+	      // apply rules on actives at [first, last)
+	      
+	      active_set_type&  cell         = actives[table](first, last);
+	      passive_set_type& passive_arcs = passives(first, last);
+	      
+	      active_set_type::const_iterator citer_end = cell.end();
+	      for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
+		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
+		
+		if (rules.empty()) continue;
+		
+		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
+		transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
+		
+		for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
+		  const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
+		  const symbol_type& lhs = rule->lhs;
+		  
+		  // check pruning!
+		  if (pruner(first, last, lhs)) continue;
+		  
+		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(lhs, passive_arcs.size()));
+		  if (result.second)
+		    passive_arcs.push_back(span_type(first, last, lhs));
+		  
+		  passive_arcs[result.first->second].edges.push_back(edge_type(citer->edge.tails, citer->edge.score * function(iter->features)));
+		}
+	      }
+	    }
+	    
+	    if (! passives(first, last).empty()) {
+	      // unary rules...
+	      // we will cache unary rule application by precomputing clusure...
+	      // how to avoid cycles...?
+	      //
+	      // compute closure from the list of possives...
+	      // we assume that the rules are maximum-likely estimated meaning negative scores..
+	      // 
+	      // we will simply perform max-like computation...
+	      
+	      
+	    }
+	    
+	    // extend root with passive items at [first, last)
+	    for (size_t table = 0; table != grammar.size(); ++ table) {
+	      const transducer_type& transducer = grammar[table];
+	      
+	      if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+	      
+	      const active_set_type&  active_arcs  = actives[table](first, first);
+	      const passive_set_type& passive_arcs = passives(first, last);
+	      
+	      active_set_type& cell = actives[table](first, last);
+	      
+	      extend_actives(transducer, active_arcs, passive_arcs, cell);
+	    }
+	  }
+      }
+      
+      bool extend_actives(const transducer_type& transducer,
+			  const active_set_type& actives, 
+			  const passive_set_type& passives,
+			  active_set_type& cell)
+      {
+	active_set_type::const_iterator aiter_begin = actives.begin();
+	active_set_type::const_iterator aiter_end   = actives.end();
+	
+	passive_set_type::const_iterator piter_begin = passives.begin();
+	passive_set_type::const_iterator piter_end   = passives.end();
+	
+	bool found = false;
+	
+	if (piter_begin != piter_end)
+	  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	    if (transducer.has_next(aiter->node)) {
+	      symbol_type label;
+	      transducer_type::id_type node = transducer.root();
+	      
+	      tail_set_type tails(aiter->edge.tails.size() + 1);
+	      std::copy(aiter->edge.tails.begin(), aiter->edge.tails.end(), tails.begin());
+	      
+	      for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
+		const symbol_type& non_terminal = piter->span.label;
+		
+		if (label != non_terminal) {
+		  node = transducer.next(aiter->node, non_terminal);
+		  label = non_terminal;
+		}
+		if (node == transducer.root()) continue;
+		
+		tails.back() = piter->span;
+		cell.push_back(active_type(node, edge_type(tails, aiter->edge.score)));
+		
+		found = true;
+	      }
+	    }
+      
+	return found;
       }
       
       const symbol_type goal;
@@ -180,6 +444,8 @@ namespace cicada
       const bool yield_source;
       const bool treebank;
       const bool pos_mode;
+
+      node_map_type node_map;
     };
     
     template <typename IteratorGrammar, typename IteratorThreshold>

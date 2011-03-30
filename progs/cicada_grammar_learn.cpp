@@ -781,7 +781,7 @@ struct TaskMergeLoss : public Annotator
 	const int node_id_prev = boost::apply_visitor(attribute_integer(), aiter->second);
 	if (node_id_prev < 0)
 	  throw std::runtime_error("invalid node attribute?");
-      
+	
 	if (node_id_prev >= static_cast<int>(symbols.size()))
 	  symbols.resize(node_id_prev + 1);
       
@@ -806,7 +806,7 @@ struct TaskMergeLoss : public Annotator
 	    typename scale_set_type::const_iterator witer = scale.find(iter->first);
 	    if (witer == scale.end())
 	      throw std::runtime_error("no scale? " + static_cast<const std::string&>(iter->first));
-
+	    
 	    prob_split += inside[iter->second] * outside[iter->second];
 	    inside_merge += inside[iter->second] * weight_type(witer->second);
 	    outside_merge += outside[iter->second];
@@ -906,18 +906,26 @@ struct TaskMergeGrammar : public Annotator
       
       const rule_ptr_type& rule = ptr->first;
       
+      annotated = false;
       symbol_type lhs = rule->lhs;
-      if (merged.find(lhs) != merged.end())
+      if (merged.find(lhs) != merged.end()) {
 	lhs = annotate(lhs, false);
+	annotated = true;
+      }
       
       symbol_set_type symbols(rule->rhs);
       
       symbol_set_type::iterator siter_end = symbols.end();
       for (symbol_set_type::iterator siter = symbols.begin(); siter != siter_end; ++ siter)
-	if (siter->is_non_terminal() && merged.find(*siter) != merged.end())
+	if (siter->is_non_terminal() && merged.find(*siter) != merged.end()) {
 	  *siter = annotate(*siter, false);
+	  annotated = true;
+	}
       
-      counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(ptr->second);
+      if (annotated)
+	counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(ptr->second);
+      else
+	counts[rule->lhs][rule] += utils::mathop::exp(ptr->second);
     }
   }
   
@@ -1026,7 +1034,7 @@ void grammar_merge(hypergraph_set_type& treebanks,
   for (loss_set_type::const_iterator liter = loss.begin(); liter != liter_end; ++ liter)
     sorted.push_back(&(*liter));
   
-  const size_t sorted_size = utils::bithack::min(utils::bithack::max(1, int(merge_ratio * sorted.size())), int(sorted.size() - 1));
+  const size_t sorted_size = utils::bithack::min(utils::bithack::max(size_t(1), size_t(merge_ratio * sorted.size())), size_t(sorted.size() - 1));
   std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
   
   const weight_type threshold = sorted[sorted_size]->second;
