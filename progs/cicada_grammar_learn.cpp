@@ -1183,7 +1183,7 @@ struct TaskSplitTreebank : public Annotator
 		symbols_new[i] = annotate(symbols[i], j[i]);
 
 	    rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
-	    grammar_type::const_itertor giter = grammar.find(rule);
+	    grammar_type::const_iterator giter = grammar.find(rule);
 	    if (giter != grammar.end())
 	      rule = giter->first;
 	  
