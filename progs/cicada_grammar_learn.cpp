@@ -2184,6 +2184,7 @@ void write_characters(const path_type& file,
   typedef google::dense_hash_map<ngram_type, sorted_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > sorted_map_type;
   
   utils::compress_ostream os(file, 1024 * 1024);
+  os.precision(10);
   
   sorted_map_type sorted;
   sorted.set_empty_key(ngram_type(1, symbol_type()));
@@ -2363,6 +2364,7 @@ void write_grammar(const path_type& file,
     counts[giter->first->lhs][giter->first] = giter->second;
 
   utils::compress_ostream os(file, 1024 * 1024);
+  os.precision(10);
     
   count_set_type::const_iterator citer_end = counts.end();
   for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
