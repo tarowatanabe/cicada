@@ -934,6 +934,11 @@ struct TaskMergeGrammar : public Annotator
   count_set_type counts;
 };
 
+inline
+double round(double number)
+{
+  return number < 0.0 ? std::ceil(number - 0.5) : std::floor(number + 0.5);
+}
 
 template <typename Generator, typename Maximizer>
 void grammar_merge(hypergraph_set_type& treebanks,
@@ -1034,7 +1039,7 @@ void grammar_merge(hypergraph_set_type& treebanks,
   for (loss_set_type::const_iterator liter = loss.begin(); liter != liter_end; ++ liter)
     sorted.push_back(&(*liter));
   
-  const size_t sorted_size = utils::bithack::min(utils::bithack::max(size_t(1), size_t(merge_ratio * sorted.size())), size_t(sorted.size() - 1));
+  const size_t sorted_size = utils::bithack::min(utils::bithack::max(size_t(1), size_t(round(merge_ratio * sorted.size()))), size_t(sorted.size() - 1));
   std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
   
   const weight_type threshold = sorted[sorted_size]->second;
