@@ -111,6 +111,14 @@ namespace cicada
     // the pos-assigned terminal takes the form of: word|[pos] or word/[pos]
     Symbol pos() const;
     Symbol terminal() const;
+
+    // binarized...
+    bool binarized() const;
+
+    // latent-annotation
+    Symbol annotation(const int pos, const bool bit) const;
+    Symbol coarse(const int pos) const;
+    
     
   public:
     // boost hash

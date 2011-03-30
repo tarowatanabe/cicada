@@ -12,6 +12,7 @@
 
 #include <boost/xpressive/xpressive.hpp>
 
+#include <utils/lexical_cast.hpp>
 #include <utils/config.hpp>
 #include <utils/thread_specific_ptr.hpp>
 
@@ -310,6 +311,57 @@ namespace cicada
     return maps[__id];
   }
 
+  bool Symbol::binarized() const
+  {
+    if (! is_non_terminal()) return false;
+    
+    return non_terminal_strip().find('^') != piece_type::npos();
+  }
+
+  Symbol Symbol::annotation(const int pos, const bool bit) const
+  {
+    if (! is_non_terminal()) return *this;
+    
+    namespace xpressive = boost::xpressive;
+    
+    typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+    typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+    
+    static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
+    
+    const piece_type piece = non_terminal_strip();
+    const int mask = 1 << pos;
+    
+    pmatch what;
+    if (xpressive::regex_match(piece, what, re)) {
+      const int value = (utils::lexical_cast<int>(what[2]) & (~mask)) | (-bit & mask);
+      return '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
+    } else
+      return '[' + piece + '@' + utils::lexical_cast<std::string>(-bit & mask) + ']';
+  }
+  
+  Symbol Symbol::coarse(const int pos) const
+  {
+    if (! is_non_terminal()) return *this;
+    
+    namespace xpressive = boost::xpressive;
+    
+    typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+    typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+    
+    static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
+    
+    const piece_type piece = non_terminal_strip();
+    const int mask = (1 << pos) - 1;
+    
+    pmatch what;
+    if (xpressive::regex_match(piece, what, re)) {
+      const int value = (utils::lexical_cast<int>(what[2]) & mask);
+      return '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
+    } else
+      return '[' + piece + "@0]";
+  }
+  
   void Symbol::write(const path_type& path)
   {
     lock_type lock(__mutex_data);
