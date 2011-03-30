@@ -2233,7 +2233,9 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
   reachable_set_type reachables;
   reachable_set_type reachables_next;
   
-  reachables["[ROOT]"];
+  const symbol_type goal("[ROOT]");
+  
+  reachables[goal];
   
   for (;;) {
     bool equilibrate = true;
@@ -2274,7 +2276,8 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
   grammar.clear();
   reachable_set_type::const_iterator riter_end = reachables.end();
   for (reachable_set_type::const_iterator riter = reachables.begin(); riter != riter_end; ++ riter)
-    grammar.insert(riter->second);
+    if (riter->second.first != rule_ptr_type())
+      grammar.insert(riter->second);
   
   const double logcutoff = utils::mathop::log(cutoff);
   sorted_type sorted;
