@@ -845,11 +845,6 @@ struct TaskMergeTreebank
   
   void operator()()
   {
-    typedef google::dense_hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type> > rule_set_type;
-    
-    rule_set_type rules;
-    rules.set_empty_key(rule_ptr_type());
-    
     hypergraph_type treebank_new;
     filter_pruned::removed_type removed;
     
@@ -881,13 +876,6 @@ struct TaskMergeTreebank
       cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
       
       treebank.swap(treebank_new);
-      
-      {
-	// unique rules...
-	hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
-	for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter)
-	  eiter->rule = *(rules.insert(eiter->rule).first);
-      }
     }
   }
   
@@ -1117,9 +1105,11 @@ struct TaskSplitTreebank : public Annotator
   typedef utils::hashmurmur<size_t> hasher_type;
   
   TaskSplitTreebank(const int __bits,
-		    queue_type& __queue)
+		    queue_type& __queue,
+		    const grammar_type& __grammar)
     : Annotator(__bits),
-      queue(__queue)
+      queue(__queue),
+      grammar(__grammar)
   {}
   
   void operator()()
@@ -1135,11 +1125,6 @@ struct TaskSplitTreebank : public Annotator
 			std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
 #endif
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
-    
-    typedef google::dense_hash_set<rule_ptr_type, ptr_hash<rule_type>, ptr_equal<rule_type> > rule_set_type;
-    
-    rule_set_type rules;
-    rules.set_empty_key(rule_ptr_type());
     
     node_map_type   node_map;
     hypergraph_type treebank_new;
@@ -1196,8 +1181,11 @@ struct TaskSplitTreebank : public Annotator
 	    for (size_t i = 0; i != symbols.size(); ++ i)
 	      if (j_end[i])
 		symbols_new[i] = annotate(symbols[i], j[i]);
-	    
-	    const rule_ptr_type rule = *(rules.insert(rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()))).first);
+
+	    rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
+	    grammar_type::const_itertor giter = grammar.find(rule);
+	    if (giter != grammar.end())
+	      rule = giter->first;
 	  
 	    // construct edge
 	    std::pair<node_set_type::iterator, bool> head = node_map[edge.head].insert(std::make_pair(symbols_new.front(), 0));
@@ -1249,6 +1237,7 @@ struct TaskSplitTreebank : public Annotator
   }
   
   queue_type& queue;
+  const grammar_type& grammar;
 };
 
 template <typename Generator>
@@ -1337,22 +1326,8 @@ void grammar_split(hypergraph_set_type& treebanks,
   
   typedef typename task_treebank_type::queue_type queue_treebank_type;
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
-  
-  queue_treebank_type queue_treebank;
-  
-  boost::thread_group workers_treebank;
-  for (int i = 0; i != threads; ++ i)
-    workers_treebank.add_thread(new boost::thread(task_treebank_type(bits, queue_treebank)));
-  
-  hypergraph_set_type::iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
-    queue_treebank.push(&(*titer));
-  
-  for (int i = 0; i != threads; ++ i)
-    queue_treebank.push(0);
 
-  workers_treebank.join_all();
-
+  
   queue_grammar_type  queue_grammar;
   task_grammar_set_type tasks_grammar(threads, task_grammar_type(generator, bits, queue_grammar));
   
@@ -1386,12 +1361,28 @@ void grammar_split(hypergraph_set_type& treebanks,
       }
     }
   }
-
+  
   if (debug)
     std::cerr << "# of symbols: " << counts.size() << std::endl;
   
   // maximization
   grammar_maximize(counts, grammar, maximizer);
+  
+  queue_treebank_type queue_treebank;
+  
+  boost::thread_group workers_treebank;
+  for (int i = 0; i != threads; ++ i)
+    workers_treebank.add_thread(new boost::thread(task_treebank_type(bits, queue_treebank, grammar)));
+  
+  hypergraph_set_type::iterator titer_end = treebanks.end();
+  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+    queue_treebank.push(&(*titer));
+  
+  for (int i = 0; i != threads; ++ i)
+    queue_treebank.push(0);
+
+  workers_treebank.join_all();
+
 }
 
 
