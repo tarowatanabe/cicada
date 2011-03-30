@@ -1041,16 +1041,20 @@ void grammar_merge(hypergraph_set_type& treebanks,
   
   merged_set_type merged;
   merged.set_empty_key(symbol_type());
-
+  
   if (debug >= 2)
     std::cerr << "threshold: " << threshold << std::endl;
   
+  // do we stricktly erase...?
   sorted_type::const_iterator siter_end = sorted.end();
   for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= threshold; ++ siter) {
     if (debug >= 2)
       std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
     merged.insert((*siter)->first);
   }
+  
+  if (debug)
+    std::cerr << "merged: " << merged.size() << " split: " << (sorted.size() - merged.size()) << std::endl;
   
   // MapReduce to merge treeebanks
   queue_treebank_type queue_treebank;
@@ -1371,12 +1375,16 @@ void grammar_split(hypergraph_set_type& treebanks,
       }
     }
   }
+
+  tasks_grammar.clear();
   
   if (debug)
     std::cerr << "# of symbols: " << counts.size() << std::endl;
   
   // maximization
   grammar_maximize(counts, grammar, maximizer);
+
+  counts.clear();
   
   queue_treebank_type queue_treebank;
   
@@ -1392,7 +1400,6 @@ void grammar_split(hypergraph_set_type& treebanks,
     queue_treebank.push(0);
 
   workers_treebank.join_all();
-
 }
 
 
