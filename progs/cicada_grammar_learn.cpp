@@ -532,15 +532,19 @@ int main(int argc, char** argv)
       if (sig)
 	lexicon_learn(treebanks, lexicon, weight_function(grammar));
 
-      if (cutoff_rule > 0.0)
+      if (0.0 < cutoff_rule && cutoff_rule < 1.0)
 	grammar_prune(rules, cutoff_rule);
-      if (cutoff_lexicon > 0.0)
+      if (0.0 < cutoff_lexicon && cutoff_lexicon < 1.0)
 	lexicon_prune(lexicon, cutoff_lexicon);
       
       write_grammar(output_grammar_file, rules);
       write_grammar(output_lexicon_file, lexicon);
-    } else
+    } else {
+      if (0.0 < cutoff_rule && cutoff_rule < 1.0)
+	grammar_prune(grammar, cutoff_rule);
+      
       write_grammar(output_grammar_file, grammar);
+    }
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
