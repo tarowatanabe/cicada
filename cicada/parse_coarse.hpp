@@ -264,20 +264,25 @@ namespace cicada
 	if (lattice.empty())
 	  return;
 	
+	inside.clear();
+	outside.clear();
 	scores.clear();
+	
+	inside.resize(lattice.size() + 1);
+	outside.resize(lattice.size() + 1);
+	scores.resize(lattice.size() + 1);
+	
 	actives.clear();
 	passives.clear();
 	passives_unary.clear();
 	goal_node = hypergraph_type::invalid;
-
-	unaries.clear();
 	
 	actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
 	passives.resize(lattice.size() + 1);
-	passives_unary.resize(lattice.size() + 1);
-	scores.resize(lattice.size() + 1);
+	passives_unary.reesize(lattice.size() + 1);
 	
-
+	unaries.clear();
+	
 	compute_inside(lattice, pruner);
 	compute_outside(lattice);
 	compute_inside_outside(lattice, scores);
@@ -285,8 +290,21 @@ namespace cicada
       
       void compute_inside_outside(const lattice_type& lattice, label_score_chart_type& scores)
       {
-	
-	
+	// we simply enumerate chart...!
+	for (size_type length = 1; length <= lattice.size(); ++ length)
+	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
+	    const size_type last = first + length;
+	    
+	    label_score_set_type&  labels_scores = scores(first, last);
+	    const label_score_set_type& labels_inside = inside(first, last);
+	    
+	    label_score_set_type::const_iterator oiter_end = outside(first, last).end();
+	    for (label_score_set_type::const_iterator oiter = outside(first, last).begin(); oiter != oiter_end; ++ oiter) {
+	      label_score_set_type::const_iterator iiter = labels_inside.find(oiter->first);
+	      if (iiter != labels_inside.end())
+		labels_scores[oiter->first] = oiter->second * iiter->second;
+	    }
+	  }
       }
       
       void compute_outside(const lattice_type& lattice)
@@ -298,9 +316,68 @@ namespace cicada
 	// how do we traverse back this complicated structure....
 	//
 	
+	outside(0, lattice.size())[goal] = cicada::semiring::traits<score_type>::one();
 	
-      }
+	for (size_type length = lattice.size(); length != 0; -- length)
+	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
+	    const size_type last = first + length;
+	    
+	    // first, enumerate unary rules
+	    const passive_set_type& unaries = passives_unary(first, last);
+	    
+	    passive_set_type::const_iterator uiter_end = unaries.end();
+	    for (passive_set_type::const_iterator uiter = unaries.begin(); uiter != uiter_end; ++ uiter) {
+	      const symbol_type& head = uiter->span.label;
+	      
+	      label_score_set_type::const_iterator oiter = outside(first, last).find(head);
+	      if (oiter == outside(first, last).end()) continue;
 
+	      const score_type score_head = oiter->second;
+	      
+	      edge_set_type::const_iterator eiter_end = uiter->edges.end();
+	      for (edge_set_type::const_iterator eiter = uiter->edges.begin(); eiter != eiter_end; ++ eiter) {
+		const edge_type& edge = *eiter;
+		const symbol_type& tail = edge.tails.front().label;
+		
+		score_type& score = outside(first, last)[tail];
+		
+		score = std::max(score, score_head * edge.score);
+	      }
+	    }
+	    
+	    // second, enumerate non-unary rules
+	    const passive_set_type& rules = passives(firt, last);
+	    
+	    passive_set_type::const_iterator riter_end = rules.end();
+	    for (passive_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	      const symbol_type& head = riter->span.label;
+	      
+	      label_score_set_type::const_iterator oiter = outside(first, last).find(head);
+	      if (oiter == outside(first, last).end()) continue;
+	      
+	      const score_type score_head = oiter->second;
+	      
+	      edge_set_type::const_iterator eiter_end = riter->edges.end();
+	      for (edge_set_type::const_iterator eiter = riter->edges.begin(); eiter != eiter_end; ++ eiter) {
+		const edge_type& edge = *eiter;
+		
+		const score_type score_edge = score_head * edge.score;
+		
+		tail_set_type::const_iterator titer_end = edge.tails.end();
+		for (tail_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+		  score_type score_outside = score_edge;
+		  for (tail_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+		    if (titer != niter)
+		      score_outside *= inside(niter->first, niter->last)[niter->label];
+		  
+		  score_type& score = outside(titer->first, titer->last)[titer->label];
+		  score = std::max(score, score_outside);
+		}
+	      }
+	    }
+	  }
+      }
+      
       template <typename Pruner>
       void compute_inside(const lattice_type& lattice, const Pruner& pruner)
       {
