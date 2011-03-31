@@ -679,6 +679,14 @@ namespace cicada
 
       node_map_type node_map;
     };
+
+    // Parsing with forest construction
+    // we will use beam search...??
+    struct ParseForest
+    {
+      
+      
+    };
     
     template <typename IteratorGrammar, typename IteratorThreshold>
     ParseCoarse(const symbol_type& __goal,
@@ -711,6 +719,11 @@ namespace cicada
       
       if (lattice.empty()) return;
       
+      // initial grammar is coarser than penn-treebank
+      
+      // corse-to-fine 
+      
+      // final parsing with hypergraph construction
       
       
     }
