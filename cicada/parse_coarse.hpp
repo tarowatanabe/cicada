@@ -275,13 +275,10 @@ namespace cicada
 	actives.clear();
 	passives.clear();
 	passives_unary.clear();
-	goal_node = hypergraph_type::invalid;
 	
 	actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
 	passives.resize(lattice.size() + 1);
 	passives_unary.reesize(lattice.size() + 1);
-	
-	unaries.clear();
 	
 	compute_inside(lattice, pruner);
 	compute_outside(lattice);
@@ -474,12 +471,18 @@ namespace cicada
 	      
 	      active_set_type&  cell         = actives[table](first, last);
 	      passive_set_type& passive_arcs = passives(first, last);
+	      label_score_set_type& labels_inside = inside(first, last);
 	      
 	      active_set_type::const_iterator citer_end = cell.end();
 	      for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
 		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
 		
 		if (rules.empty()) continue;
+		
+		score_type score_tails = cicada::semiring::traits<score_type>::one();
+		tail_set_type::const_iterator titer_end = citer->tails.end();
+		for (tail_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
+		  score_tails *= inside(titer->first, titer->last)[titer->label];
 		
 		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
 		transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
@@ -495,7 +498,12 @@ namespace cicada
 		  if (result.second)
 		    passive_arcs.push_back(span_type(first, last, lhs));
 		  
-		  passive_arcs[result.first->second].edges.push_back(edge_type(citer->edge.tails, citer->edge.score * function(iter->features)));
+		  const score_type score_edge = citer->edge.score * function(iter->features);
+		  
+		  passive_arcs[result.first->second].edges.push_back(edge_type(citer->edge.tails, score_edge));
+		  
+		  score_type& score = labels_inside[lhs];
+		  score = std::max(score, score_tails * score_edge);
 		}
 	      }
 	    }
@@ -517,11 +525,14 @@ namespace cicada
 	      node_map.clear();
 
 	      passive_set_type& passive_unary = passives_unary(first, last);
+	      label_score_set_type& elabels_inside = inside(first, last);
 	      
 	      passive_set_type::const_iterator piter_end = passives(first, last).end();
 	      for (passive_set_type::const_iterator piter = passives(first, last).begin(); piter != piter_end; ++ piter) {
 		// child to parent...
 		const unary_set_type& closure = unary_closure(piter->span.label);
+
+		const score_type score_tail = labels_inside[piter->span.label];
 		
 		unary_set_type::const_iterator citer_end = closure.end();
 		for (unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
@@ -529,14 +540,13 @@ namespace cicada
 		  if (pruner(first, last, citer->label)) continue;
 		  
 		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(citer->label, passive_unary.size()));
-		  if (result.second) {
-		    if (length == lattice.size() && citer->label == goal)
-		      goal_node = passive_unary.size();
-		    
+		  if (result.second)
 		    passive_unary.push_back(span_type(first, last, citer->label));
-		  }
 		  
 		  passive_unary[result.first->second].edges.push_back(edge_type(tail_set_type(1, piter->span), citer->score));
+		  
+		  score_type& score = labels_inside[citer->label];
+		  score = std::max(score, score_tail * citer->score);
 		}
 	      }
 	    }
