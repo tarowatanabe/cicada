@@ -29,7 +29,6 @@
 #include <utils/bithack.hpp>
 #include <utils/array_power2.hpp>
 
-
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
 
@@ -129,9 +128,16 @@ namespace cicada
     struct PruneCoarse
     {
       PruceCoarse(Coarser __coarser) : coarser(__coarser) {}
+
+      bool operator()(const int first, const int last) const
+      {
+	return prunes(first, last).empty();
+      }
       
       bool operator()(const int first, const int last, const symbol_type& label) const
       {
+	if (prunes(first, last).empty()) return true;
+	
 	const label_score_set_type& labels = prunes(first, last);
 	
 	label_score_set_type::const_iterator liter = labels.find(label);
@@ -149,7 +155,15 @@ namespace cicada
     
     struct PruneNone
     {
-      bool operator()(const int first, const int last, const symbol_type& label) const { return false; }
+      bool operator()(const int first, const int last) const
+      {
+	return false;
+      }
+
+      bool operator()(const int first, const int last, const symbol_type& label) const
+      {
+	return false;
+      }
     };
     
     struct ParseCKY
@@ -197,8 +211,22 @@ namespace cicada
 	edge_set_type edges;
       };
       
+      struct Unary
+      {
+	symbol_type label;
+	score_type  score;
+	
+	Unary() : label(), score(cicada::semiring::traits<score_type>::one()) {}
+	Unary(const symbol_type& __label, const score_type& __score)
+	  : label(__label), score(__score) {}
+	template <typename Label, typename Score>
+	Unary(const std::pair<Label, Score>& x)
+	  : label(x.first), score(x.second) {}
+      };
+      
       typedef Active  active_type;
       typedef Passive passive_type;
+      typedef Unary   unary_type;
       
       typedef utils::chunk_vector<active_type, 4096 / sizeof(active_type), std::allocator<active_type> > active_set_type;
       
@@ -209,6 +237,16 @@ namespace cicada
       typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
       
       typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > node_map_type;
+      
+      typedef std::vector<unary_type, std::allocator<unary_type> > unary_set_type;
+#ifdef HAVE_TR1_UNORDERED_MAP
+      typedef std::tr1::unordered_map<symbol_type, unary_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				      std::allocator<std::pair<const symbol_type, unary_set_type> > > unary_map_type;
+#else
+      typedef sgi::hash_map<symbol_type, unary_set_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			    std::allocator<std::pair<const symbol_type, unary_set_type> > > unary_map_type;
+#endif
+      typedef google::dense_hash_map<symbol_type, score_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_set_type;
       
       ParseCKY(const symbol_type& __goal,
 	       const grammar_type& __grammar,
@@ -230,6 +268,8 @@ namespace cicada
 	actives.clear();
 	passives.clear();
 	passives_unary.clear();
+
+	unaries.clear();
 	
 	actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
 	passives.resize(lattice.size() + 1);
@@ -270,6 +310,9 @@ namespace cicada
 	for (size_type length = 1; length <= lattice.size(); ++ length)
 	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
 	    const size_type last = first + length;
+
+	    // check pruning!
+	    if (pruner(first, last)) continue;
 	    
 	    node_map.clear();
 	    
@@ -386,7 +429,28 @@ namespace cicada
 	      // the obvious unary chain is zero-rules...
 	      // simply insert a single-tail edge, with log-score of zero (or prob of 1)
 	      //
+
+	      node_map.clear();
+
+	      passive_set_type& passive_unary = passives_unary(first, last);
 	      
+	      passive_set_type::const_iterator piter_end = passives(first, last).end();
+	      for (passive_set_type::const_iterator piter = passives(first, last).begin(); piter != piter_end; ++ piter) {
+		// child to parent...
+		const unary_set_type& closure = unary_closure(piter->span.label);
+		
+		unary_set_type::const_iterator citer_end = closure.end();
+		for (unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
+		  // check pruning!
+		  if (pruner(first, last, citer->label)) continue;
+		  
+		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(citer->label, passive_unary.size()));
+		  if (result.second)
+		    passive_unary.push_back(span_type(first, last, citer->label));
+		  
+		  passive_unary[result.first->second].edges.push_back(edge_type(tail_set_type(1, piter->span), citer->score));
+		}
+	      }
 	    }
 	    
 	    // extend root with passive items at [first, last)
@@ -405,14 +469,67 @@ namespace cicada
 	  }
       }
       
-      void unary_closure(const symbol_type& child)
+      const unary_set_type& unary_closure(const symbol_type& child)
       {
+	
 	//
 	// given this child state, compute closure...
 	// we do not allow cycle, and keep only max-rules
 	//
-	
-	
+
+	unary_map_type::iterator uiter = unaries.find(child);
+	if (uiter == unaries.end()) {
+	  closure.clear();
+	  closure_next.clear();
+	  closure.insert(std::make_pair(child, cicada::semiring::traits<score_type>::one()));
+	  
+	  for (;;) {
+	    bool equilibrate = true;
+
+	    closure_next = closure;
+	    
+	    closure_set_type::const_iterator citer_end = closure.end();
+	    for (closure_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
+	      for (size_type table = 0; table != grammar.size(); ++ table) {
+		const transducer_type& transducer = grammar[table];
+		
+		const transducer_type::id_type node = transducer.next(transducer.root(), citer->first);
+		if (node == transducer.root()) continue;
+		
+		const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+		
+		if (rules.empty()) continue;
+		
+		transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+		for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+		  const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
+		  const symbol_type& lhs = rule->lhs;
+		  
+		  // we assume max-like estimate grammar!
+		  if (lhs == child) continue;
+		  
+		  const score_type score = function(riter->features);
+		  
+		  std::pair<closure_set_type::iterator, bool> result = closure_next.insert(std::make_pair(lhs, score));
+		  if (result.second)
+		    equilibrate = false;
+		  else if (result.first->second < citer->second * score) {
+		    equilibrate = false;
+		    result.first->second = citer->second * score;
+		  }
+		}
+	      }
+	    }
+	    
+	    closure.swap(closure_next);
+	    closure_next.clear();
+	    
+	    if (equilibrate) break;
+	  }
+	  
+	  uiter = unaries.insert(std::make_pair(child, unary_set_type(closure.begin(), closure.end()))).second;
+	}
+	return uiter->second;
       }
       
       bool extend_actives(const transducer_type& transducer,
