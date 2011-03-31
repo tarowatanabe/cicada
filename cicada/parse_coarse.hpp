@@ -157,6 +157,9 @@ namespace cicada
       //
       // CKY parser... but we will not a construct hypergraph, but a tabular structure...
       //
+      // we keep two-passives, passives for keeping unary chain result (including zero-unary!)
+      // and passives for keeping after non-unary...
+      //
       
       typedef cicada::SpanVector::span_type span_type;
       typedef cicada::SpanVector::span_type tail_type;
@@ -226,9 +229,11 @@ namespace cicada
 	scores.clear();
 	actives.clear();
 	passives.clear();
+	passives_unary.clear();
 	
 	actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
 	passives.resize(lattice.size() + 1);
+	passives_unary.resize(lattice.size() + 1);
 	scores.resize(lattice.size() + 1);
 	
 	compute_inside(lattice, pruner);
@@ -273,11 +278,10 @@ namespace cicada
 	      
 	      // we will advance active spans, but constrained by transducer's valid span
 	      if (transducer.valid_span(first, last, lattice.shortest_distance(first, last))) {
-		
 		active_set_type& cell = actives[table](first, last);
 		for (size_t middle = first + 1; middle < last; ++ middle) {
 		  const active_set_type&  active_arcs  = actives[table](first, middle);
-		  const passive_set_type& passive_arcs = passives(middle, last);
+		  const passive_set_type& passive_arcs = passives_unary(middle, last);
 		  
 		  extend_actives(transducer, active_arcs, passive_arcs, cell);
 		}
@@ -371,14 +375,17 @@ namespace cicada
 	    
 	    if (! passives(first, last).empty()) {
 	      // unary rules...
-	      // we will cache unary rule application by precomputing closure...
+	      // we will cache unary rule application by caching closure...
 	      // how to avoid cycles...?
 	      //
 	      // compute closure from the list of possives...
-	      // we assume that the rules are maximum-likely estimated meaning negative scores..
+	      // we assume that the rules are maximum-likely estimated, meaning negative scores..
 	      // 
 	      // we will simply perform max-like computation...
 	      
+	      // the obvious unary chain is zero-rules...
+	      // simply insert a single-tail edge, with log-score of zero (or prob of 1)
+	      //
 	      
 	    }
 	    
@@ -389,13 +396,23 @@ namespace cicada
 	      if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
 	      
 	      const active_set_type&  active_arcs  = actives[table](first, first);
-	      const passive_set_type& passive_arcs = passives(first, last);
+	      const passive_set_type& passive_arcs = passives_unary(first, last);
 	      
 	      active_set_type& cell = actives[table](first, last);
 	      
 	      extend_actives(transducer, active_arcs, passive_arcs, cell);
 	    }
 	  }
+      }
+      
+      void unary_closure(const symbol_type& child)
+      {
+	//
+	// given this child state, compute closure...
+	// we do not allow cycle, and keep only max-rules
+	//
+	
+	
       }
       
       bool extend_actives(const transducer_type& transducer,
