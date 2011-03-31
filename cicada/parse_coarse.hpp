@@ -508,14 +508,14 @@ namespace cicada
 		  // we assume max-like estimate grammar!
 		  if (lhs == child) continue;
 		  
-		  const score_type score = function(riter->features);
+		  const score_type score = function(riter->features) * citer->second;
 		  
 		  std::pair<closure_set_type::iterator, bool> result = closure_next.insert(std::make_pair(lhs, score));
 		  if (result.second)
 		    equilibrate = false;
-		  else if (result.first->second < citer->second * score) {
+		  else if (result.first->second < score) {
 		    equilibrate = false;
-		    result.first->second = citer->second * score;
+		    result.first->second = score;
 		  }
 		}
 	      }
