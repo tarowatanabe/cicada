@@ -268,6 +268,7 @@ namespace cicada
 	actives.clear();
 	passives.clear();
 	passives_unary.clear();
+	goal_node = hypergraph_type::invalid;
 
 	unaries.clear();
 	
@@ -276,20 +277,26 @@ namespace cicada
 	passives_unary.resize(lattice.size() + 1);
 	scores.resize(lattice.size() + 1);
 	
+
 	compute_inside(lattice, pruner);
-	compute_outside();
-	compute_inside_outside(scores);
+	compute_outside(lattice);
+	compute_inside_outside(lattice, scores);
       }
       
-      void compute_inside_outside(label_score_chart_type& scores)
+      void compute_inside_outside(const lattice_type& lattice, label_score_chart_type& scores)
       {
 	
 	
       }
       
-      void compute_ouside()
+      void compute_outside(const lattice_type& lattice)
       {
 	// traverse back passives from TOP
+	
+	// find goal node out of passives_unary.
+	//
+	// how do we traverse back this complicated structure....
+	//
 	
 	
       }
@@ -445,8 +452,12 @@ namespace cicada
 		  if (pruner(first, last, citer->label)) continue;
 		  
 		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(citer->label, passive_unary.size()));
-		  if (result.second)
+		  if (result.second) {
+		    if (length == lattice.size() && citer->label == goal)
+		      goal_node = passive_unary.size();
+		    
 		    passive_unary.push_back(span_type(first, last, citer->label));
+		  }
 		  
 		  passive_unary[result.first->second].edges.push_back(edge_type(tail_set_type(1, piter->span), citer->score));
 		}
