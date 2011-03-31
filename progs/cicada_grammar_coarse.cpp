@@ -82,16 +82,13 @@ struct ptr_equal
   }
 };
 
-typedef double count_type;
-typedef double prob_type;
-typedef double logprob_type;
 
 typedef cicada::semiring::Logprob<double> weight_type;
 
-class Grammar : public google::dense_hash_map<rule_ptr_type, count_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
+class Grammar : public google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
 {
 public:
-  typedef google::dense_hash_map<rule_ptr_type, count_type, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
+  typedef google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
   
 public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
@@ -299,7 +296,7 @@ void grammar_coarse(const grammar_type& grammar, const expected_counts_type& exp
     if (eiter == expected_counts.end())
       continue;
     
-    const weight_type count = cicada::semiring::traits<weight_type>::exp(riter->second) * eiter->second;
+    const weight_type count = riter->second * eiter->second;
     
     //
     // transform rule into a coarse rule
@@ -311,9 +308,7 @@ void grammar_coarse(const grammar_type& grammar, const expected_counts_type& exp
     for (symbol_set_type::iterator siter = rhs.begin(); siter != siter_end; ++ siter)
       *siter = coarser(*siter);
     
-    std::pair<grammar_type::iterator, bool> result = counts[lhs].insert(std::make_pair(rule_type::create(rule_type(lhs, rhs)), count));
-    if (! result.second)
-      result.first->second = cicada::semiring::log(cicada::semiring::traits<weight_type>::exp(result.first->second) + count);
+    counts[lhs][rule_type::create(rule_type(lhs, rhs))] += count;
   }
   
   // perform maximum-likelihood estimation...
@@ -326,10 +321,10 @@ void grammar_coarse(const grammar_type& grammar, const expected_counts_type& exp
     weight_type sum;
     grammar_type::const_iterator riter_end = citer->second.end();
     for (grammar_type::const_iterator riter = citer->second.begin(); riter != riter_end; ++ riter)
-      sum += cicada::semiring::traits<weight_type>::exp(riter->second);
+      sum += riter->second;
     
     for (grammar_type::const_iterator riter = citer->second.begin(); riter != riter_end; ++ riter)
-      coarse[riter->first] = cicada::semiring::log(cicada::semiring::traits<weight_type>::exp(riter->second) / sum);
+      coarse[riter->first] = riter->second / sum;
   }
 }
 
@@ -366,16 +361,16 @@ void grammar_counts(const grammar_type& grammar, const lexicon_type& lexicon, ex
       
       grammar_type::const_iterator riter_end = rules.end();
       for (grammar_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(riter->second) * citer->second;
+	const weight_type count = riter->second * citer->second;
 	
 	symbol_set_type::const_iterator siter_end = riter->first->rhs.end();
 	for (symbol_set_type::const_iterator siter = riter->first->rhs.begin(); siter != siter_end; ++ siter)
 	  if (siter->is_non_terminal()) {
-	    std::pair<expected_counts_type::iterator, bool> result = counts_next.insert(std::make_pair(*siter, weight));
+	    std::pair<expected_counts_type::iterator, bool> result = counts_next.insert(std::make_pair(*siter, count));
 	    if (result.second)
 	      equilibrate = false;
 	    else
-	      result.first->second += weight;
+	      result.first->second += count;
 	  }
       }
     }
@@ -455,7 +450,7 @@ void write_grammar(const path_type& prefix, const int order, const grammar_type&
 
     sorted_type::const_iterator siter_end = sorted.end();
     for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-      os << *((*siter)->first) << " ||| ||| " << (*siter)->second << '\n';
+      os << *((*siter)->first) << " ||| ||| " << cicada::semiring::log((*siter)->second) << '\n';
   }
 }
 
@@ -487,9 +482,8 @@ void read_grammar(const path_type& path, grammar_type& grammar)
   while (std::getline(is, line)) {
     if (! parse_rule(line, rule, logprob)) continue;
     
-    grammar[rule_type::create(rule)] = logprob;
+    grammar[rule_type::create(rule)] = cicada::semiring::traits<weight_type>::exp(logprob);
   }
-  
 }
 
 void read_lexicon(const path_type& path, lexicon_type& lexicon)
