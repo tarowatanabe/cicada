@@ -806,8 +806,6 @@ namespace cicada
 	
 	// corse-to-fine 
 	for (size_t level = 1; level != grammars.size() - 1; ++ level) {
-	  //std::cerr << "level: " << level << std::endl;
-
 	  ParseCKY parser(goal, grammars[level], function, yield_source, treebank, pos_mode);
 	  
 	  scores_prev.swap(scores);
@@ -838,7 +836,8 @@ namespace cicada
 							     thresholds.back() * factor,
 							     CoarseSymbol(grammars.size() - 2)));
 	
-	break;
+	if (graph.is_valid()) break;
+	factor *= 0.5;
       }
     }
     
