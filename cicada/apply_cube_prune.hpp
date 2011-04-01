@@ -400,7 +400,18 @@ namespace cicada
       return inserted;
 #endif
 #if 1
+      //
       // Faster Cube Pruning
+      //
+      // @inproceedings{iwslt10:TP:gesmundo,
+      //   author = {Andrea Gesmundo and James Henderson},
+      //   editor = {Marcello Federico and Ian Lane and Michael Paul and Fran\c{c}ois Yvon},
+      //   title = {{Faster Cube Pruning}},
+      //   booktitle = {Proceedings of the seventh International Workshop on Spoken Language Translation (IWSLT)},
+      //   year = {2010},
+      //   pages = {267--274},
+      //   location = {Paris, France}
+      //
       candidate_type query(candidate.j);
       
       query.in_edge = candidate.in_edge;
