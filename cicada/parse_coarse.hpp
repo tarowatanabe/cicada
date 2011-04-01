@@ -128,7 +128,7 @@ namespace cicada
     template <typename Coarser>
     struct PruneCoarse
     {
-      PruceCoarse(const label_score_chart_type& __prunes,
+      PruneCoarse(const label_score_chart_type& __prunes,
 		  const score_type& __cutoff,
 		  Coarser __coarser)
 	: prunes(__prunes),
@@ -146,12 +146,12 @@ namespace cicada
 	
 	const label_score_set_type& labels = prunes(first, last);
 	
-	label_score_set_type::const_iterator liter = labels.find(label);
+	typename label_score_set_type::const_iterator liter = labels.find(label);
 	if (liter != labels.end())
 	  return liter->second < cutoff;
 	
-	label_score_set_type::const_iterator citer = labels.find(coarser(label));
-	return (citr == labels.end() || citer->second < cutoff);
+	typename label_score_set_type::const_iterator citer = labels.find(coarser(label));
+	return (citer == labels.end() || citer->second < cutoff);
       }
       
       const label_score_chart_type& prunes;
@@ -199,9 +199,9 @@ namespace cicada
       
       struct Active
       {
-	Actice(const transducer_type::id_type& __node)
+	Active(const transducer_type::id_type& __node)
 	  : node(__node), edge() {}
-	Actice(const transducer_type::id_type& __node,
+	Active(const transducer_type::id_type& __node,
 	       const edge_type& __edge)
 	  : node(__node), edge(__edge) {}
 	
@@ -256,12 +256,16 @@ namespace cicada
       
       ParseCKY(const symbol_type& __goal,
 	       const grammar_type& __grammar,
+	       const function_type& __function,
 	       const bool __yield_source=false,
 	       const bool __treebank=false,
 	       const bool __pos_mode=false)
-	: goal(__goal), grammar(__grammar), threshold(__threshold), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode)
+	: goal(__goal), grammar(__grammar), function(__function), yield_source(__yield_source), treebank(__treebank), pos_mode(__pos_mode)
       {
 	node_map.set_empty_key(symbol_type());
+	
+	closure.set_empty_key(symbol_type());
+	closure_next.set_empty_key(symbol_type());
       }
       
       template <typename Pruner>
@@ -308,9 +312,9 @@ namespace cicada
 	    label_score_set_type&  labels_scores = scores(first, last);
 	    const label_score_set_type& labels_inside = inside(first, last);
 	    
-	    label_score_set_type::const_iterator oiter_end = outside(first, last).end();
-	    for (label_score_set_type::const_iterator oiter = outside(first, last).begin(); oiter != oiter_end; ++ oiter) {
-	      label_score_set_type::const_iterator iiter = labels_inside.find(oiter->first);
+	    typename label_score_set_type::const_iterator oiter_end = outside(first, last).end();
+	    for (typename label_score_set_type::const_iterator oiter = outside(first, last).begin(); oiter != oiter_end; ++ oiter) {
+	      typename label_score_set_type::const_iterator iiter = labels_inside.find(oiter->first);
 	      if (iiter != labels_inside.end())
 		labels_scores[oiter->first] = oiter->second * iiter->second;
 	    }
@@ -335,17 +339,17 @@ namespace cicada
 	    // first, enumerate unary rules
 	    const passive_set_type& unaries = passives_unary(first, last);
 	    
-	    passive_set_type::const_iterator uiter_end = unaries.end();
-	    for (passive_set_type::const_iterator uiter = unaries.begin(); uiter != uiter_end; ++ uiter) {
+	    typename passive_set_type::const_iterator uiter_end = unaries.end();
+	    for (typename passive_set_type::const_iterator uiter = unaries.begin(); uiter != uiter_end; ++ uiter) {
 	      const symbol_type& head = uiter->span.label;
 	      
-	      label_score_set_type::const_iterator oiter = outside(first, last).find(head);
+	      typename label_score_set_type::const_iterator oiter = outside(first, last).find(head);
 	      if (oiter == outside(first, last).end()) continue;
 
 	      const score_type score_head = oiter->second;
 	      
-	      edge_set_type::const_iterator eiter_end = uiter->edges.end();
-	      for (edge_set_type::const_iterator eiter = uiter->edges.begin(); eiter != eiter_end; ++ eiter) {
+	      typename edge_set_type::const_iterator eiter_end = uiter->edges.end();
+	      for (typename edge_set_type::const_iterator eiter = uiter->edges.begin(); eiter != eiter_end; ++ eiter) {
 		const edge_type& edge = *eiter;
 		const symbol_type& tail = edge.tails.front().label;
 		
@@ -356,27 +360,27 @@ namespace cicada
 	    }
 	    
 	    // second, enumerate non-unary rules
-	    const passive_set_type& rules = passives(firt, last);
+	    const passive_set_type& rules = passives(first, last);
 	    
-	    passive_set_type::const_iterator riter_end = rules.end();
-	    for (passive_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+	    typename passive_set_type::const_iterator riter_end = rules.end();
+	    for (typename passive_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	      const symbol_type& head = riter->span.label;
 	      
-	      label_score_set_type::const_iterator oiter = outside(first, last).find(head);
+	      typename label_score_set_type::const_iterator oiter = outside(first, last).find(head);
 	      if (oiter == outside(first, last).end()) continue;
 	      
 	      const score_type score_head = oiter->second;
 	      
-	      edge_set_type::const_iterator eiter_end = riter->edges.end();
-	      for (edge_set_type::const_iterator eiter = riter->edges.begin(); eiter != eiter_end; ++ eiter) {
+	      typename edge_set_type::const_iterator eiter_end = riter->edges.end();
+	      for (typename edge_set_type::const_iterator eiter = riter->edges.begin(); eiter != eiter_end; ++ eiter) {
 		const edge_type& edge = *eiter;
 		
 		const score_type score_edge = score_head * edge.score;
 		
-		tail_set_type::const_iterator titer_end = edge.tails.end();
-		for (tail_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+		typename tail_set_type::const_iterator titer_end = edge.tails.end();
+		for (typename tail_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
 		  score_type score_outside = score_edge;
-		  for (tail_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+		  for (typename tail_set_type::const_iterator niter = edge.tails.begin(); niter != titer_end; ++ niter)
 		    if (titer != niter)
 		      score_outside *= inside(niter->first, niter->last)[niter->label];
 		  
@@ -429,8 +433,8 @@ namespace cicada
 		  const active_set_type&  active_arcs  = actives[table](first, last - 1);
 		  const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
 		  
-		  active_set_type::const_iterator aiter_begin = active_arcs.begin();
-		  active_set_type::const_iterator aiter_end = active_arcs.end();
+		  typename active_set_type::const_iterator aiter_begin = active_arcs.begin();
+		  typename active_set_type::const_iterator aiter_end = active_arcs.end();
 		  
 		  if (aiter_begin != aiter_end) {
 		    if (pos_mode) {
@@ -442,10 +446,10 @@ namespace cicada
 			
 			// handling of EPSILON rule...
 			if (terminal == vocab_type::EPSILON) {
-			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score + function(piter->features))));
 			} else {
-			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 			    if (node == transducer.root()) continue;
 			    
@@ -462,10 +466,10 @@ namespace cicada
 			
 			// handling of EPSILON rule...
 			if (terminal == vocab_type::EPSILON) {
-			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score + function(piter->features))));
 			} else {
-			  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 			    if (node == transducer.root()) continue;
 			    
@@ -486,15 +490,15 @@ namespace cicada
 	      passive_set_type& passive_arcs = passives(first, last);
 	      label_score_set_type& labels_inside = inside(first, last);
 	      
-	      active_set_type::const_iterator citer_end = cell.end();
-	      for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
+	      typename active_set_type::const_iterator citer_end = cell.end();
+	      for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
 		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
 		
 		if (rules.empty()) continue;
 		
 		score_type score_tails = cicada::semiring::traits<score_type>::one();
-		tail_set_type::const_iterator titer_end = citer->tails.end();
-		for (tail_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
+		typename tail_set_type::const_iterator titer_end = citer->tails.end();
+		for (typename tail_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
 		  score_tails *= inside(titer->first, titer->last)[titer->label];
 		
 		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
@@ -507,11 +511,11 @@ namespace cicada
 		  // check pruning!
 		  if (pruner(first, last, lhs)) continue;
 		  
-		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(lhs, passive_arcs.size()));
+		  std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(lhs, passive_arcs.size()));
 		  if (result.second)
 		    passive_arcs.push_back(span_type(first, last, lhs));
 		  
-		  const score_type score_edge = citer->edge.score * function(iter->features);
+		  const score_type score_edge = citer->edge.score * function(riter->features);
 		  
 		  passive_arcs[result.first->second].edges.push_back(edge_type(citer->edge.tails, score_edge));
 		  
@@ -538,21 +542,21 @@ namespace cicada
 	      node_map.clear();
 
 	      passive_set_type& passive_unary = passives_unary(first, last);
-	      label_score_set_type& elabels_inside = inside(first, last);
+	      label_score_set_type& labels_inside = inside(first, last);
 	      
-	      passive_set_type::const_iterator piter_end = passives(first, last).end();
-	      for (passive_set_type::const_iterator piter = passives(first, last).begin(); piter != piter_end; ++ piter) {
+	      typename passive_set_type::const_iterator piter_end = passives(first, last).end();
+	      for (typename passive_set_type::const_iterator piter = passives(first, last).begin(); piter != piter_end; ++ piter) {
 		// child to parent...
 		const unary_set_type& closure = unary_closure(piter->span.label);
 
 		const score_type score_tail = labels_inside[piter->span.label];
 		
-		unary_set_type::const_iterator citer_end = closure.end();
-		for (unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
+		typename unary_set_type::const_iterator citer_end = closure.end();
+		for (typename unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
 		  // check pruning!
 		  if (pruner(first, last, citer->label)) continue;
 		  
-		  std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(citer->label, passive_unary.size()));
+		  std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(citer->label, passive_unary.size()));
 		  if (result.second)
 		    passive_unary.push_back(span_type(first, last, citer->label));
 		  
@@ -588,7 +592,7 @@ namespace cicada
 	// we do not allow cycle, and keep only max-rules
 	//
 
-	unary_map_type::iterator uiter = unaries.find(child);
+	typename unary_map_type::iterator uiter = unaries.find(child);
 	if (uiter == unaries.end()) {
 	  closure.clear();
 	  closure_next.clear();
@@ -599,8 +603,8 @@ namespace cicada
 
 	    closure_next = closure;
 	    
-	    closure_set_type::const_iterator citer_end = closure.end();
-	    for (closure_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
+	    typename closure_set_type::const_iterator citer_end = closure.end();
+	    for (typename closure_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
 	      for (size_type table = 0; table != grammar.size(); ++ table) {
 		const transducer_type& transducer = grammar[table];
 		
@@ -621,7 +625,7 @@ namespace cicada
 		  
 		  const score_type score = function(riter->features) * citer->second;
 		  
-		  std::pair<closure_set_type::iterator, bool> result = closure_next.insert(std::make_pair(lhs, score));
+		  std::pair<typename closure_set_type::iterator, bool> result = closure_next.insert(std::make_pair(lhs, score));
 		  if (result.second)
 		    equilibrate = false;
 		  else if (result.first->second < score) {
@@ -648,16 +652,16 @@ namespace cicada
 			  const passive_set_type& passives,
 			  active_set_type& cell)
       {
-	active_set_type::const_iterator aiter_begin = actives.begin();
-	active_set_type::const_iterator aiter_end   = actives.end();
+	typename active_set_type::const_iterator aiter_begin = actives.begin();
+	typename active_set_type::const_iterator aiter_end   = actives.end();
 	
-	passive_set_type::const_iterator piter_begin = passives.begin();
-	passive_set_type::const_iterator piter_end   = passives.end();
+	typename passive_set_type::const_iterator piter_begin = passives.begin();
+	typename passive_set_type::const_iterator piter_end   = passives.end();
 	
 	bool found = false;
 	
 	if (piter_begin != piter_end)
-	  for (active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 	    if (transducer.has_next(aiter->node)) {
 	      symbol_type label;
 	      transducer_type::id_type node = transducer.root();
@@ -665,7 +669,7 @@ namespace cicada
 	      tail_set_type tails(aiter->edge.tails.size() + 1);
 	      std::copy(aiter->edge.tails.begin(), aiter->edge.tails.end(), tails.begin());
 	      
-	      for (passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
+	      for (typename passive_set_type::const_iterator piter = piter_begin; piter != piter_end; ++ piter) {
 		const symbol_type& non_terminal = piter->span.label;
 		
 		if (label != non_terminal) {
@@ -686,11 +690,25 @@ namespace cicada
       
       const symbol_type goal;
       const grammar_type& grammar;
+      
+      const function_type& function;
+      
       const bool yield_source;
       const bool treebank;
       const bool pos_mode;
 
       node_map_type node_map;
+      
+      label_score_chart_type inside;
+      label_score_chart_type outside;
+      
+      active_chart_set_type actives;
+      passive_chart_type passives;
+      passive_chart_type passives_unary;
+      
+      unary_map_type unaries;
+      closure_set_type closure;
+      closure_set_type closure_next;
     };
     
     template <typename IteratorGrammar, typename IteratorThreshold>
@@ -707,13 +725,11 @@ namespace cicada
 	function(__function),
 	yield_source(__yield_source),
 	treebank(__treebank),
-	pos_mode(__pos_mode),
-	attr_span_first("span-first"),
-	attr_span_last("span-last")
+	pos_mode(__pos_mode)
     {
       if (grammars.empty())
 	throw std::runtime_error("no grammar?");
-      if (thresholds.size() + 1 != grammar.size())
+      if (thresholds.size() + 1 != grammars.size())
 	throw std::runtime_error("do we have enough threshold parameters for grammars?");
     }
     
@@ -729,7 +745,7 @@ namespace cicada
       label_score_chart_type scores_prev;
       
       {
-	ParseCKY parser(goal, gramamrs[level], yield_source, treebank, pos_mode);
+	ParseCKY parser(goal, grammars.front(), function, yield_source, treebank, pos_mode);
 	parser(lattice, scores_init, PruneNone());
       }
       
@@ -742,14 +758,14 @@ namespace cicada
 	
 	// corse-to-fine 
 	for (size_t level = 1; level != grammars.size() - 1; ++ level) {
-	  ParseCKY parser(goal, gramamrs[level], yield_source, treebank, pos_mode);
+	  ParseCKY parser(goal, grammars[level], function, yield_source, treebank, pos_mode);
 	  
 	  scores_prev.swap(scores);
 	  
 	  if (level == 1)
-	    succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1] * factor, CoarseSimple()));
+	    succeed = parser(lattice, scores, PruneCoarse<CoarseSimple>(scores_prev, thresholds[level - 1] * factor, CoarseSimple()));
 	  else
-	    succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1] * factor, CoarseSymbol(level - 2)));
+	    succeed = parser(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev, thresholds[level - 1] * factor, CoarseSymbol(level - 2)));
 	  
 	  if (! succeed) break;
 	}
@@ -761,9 +777,16 @@ namespace cicada
 	
 	// final parsing with hypergraph construction
 	ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
-	composer(lattice, graph, PruneCoarse(scores,
-					     thresholds.back() * factor,
-					     CoarseSymbol(grammars.size() - 2)));
+	
+	// we will fallback to simple tag!
+	if (grammars.size() == 2)
+	  composer(lattice, graph, PruneCoarse<CoarseSimple>(scores,
+							     thresholds.back() * factor,
+							     CoarseSimple()));
+	else
+	  composer(lattice, graph, PruneCoarse<CoarseSymbol>(scores,
+							     thresholds.back() * factor,
+							     CoarseSymbol(grammars.size() - 2)));
       }
     }
     
@@ -777,8 +800,6 @@ namespace cicada
     const bool yield_source;
     const bool treebank;
     const bool pos_mode;
-    const attribute_type attr_span_first;
-    const attribute_type attr_span_last;
   };
   
   

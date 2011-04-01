@@ -8,5 +8,6 @@
 
 #include <cicada/parse_agenda.hpp>
 #include <cicada/parse_cky.hpp>
+#include <cicada/parse_coarse.hpp>
 
 #endif

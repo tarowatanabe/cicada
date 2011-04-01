@@ -285,6 +285,7 @@ parameter.hpp \
 parse.hpp \
 parse_agenda.hpp \
 parse_cky.hpp \
+parse_coarse.hpp \
 permute.hpp \
 prune.hpp \
 prune_beam.hpp \
