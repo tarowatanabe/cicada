@@ -72,16 +72,23 @@ compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
 \tunique-goal=[true|false] unique goal\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
 compose-grammar: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
 \tdistortion=[distortion limit] default: 0 (== monotone)\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
 compose-alignment: composition from lattice (or forest) with target\n\
 \tlattice=[true|false] lattice composition\n\
 \tforest=[true|false] forest composition\n\
 compose-tree: composition from tree with tree grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
+\ttree-grammar=[grammar spec] tree grammar\n\
 debinarize: de-binarize forest\n\
 expected-ngram: expected ngram computation\n\
 \torder=<ngram order>\n\
@@ -116,6 +123,8 @@ parse-agenda: parsing via agenda\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
@@ -124,6 +133,8 @@ parse-cky|cyk: parsing via CKY\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
 \tunique-goal=[true|false] unique goal\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\

@@ -27,7 +27,7 @@ namespace cicada
       void assign(const weight_set_type& __weights);
       
       const grammar_type& grammar;
-  
+      grammar_type grammar_local;
       std::string goal;
   
       const weights_path_type* weights;
@@ -56,7 +56,7 @@ namespace cicada
       void assign(const weight_set_type& __weights);
       
       const grammar_type& grammar;
-      
+      grammar_type grammar_local;
       std::string goal;
       
       const weights_path_type* weights;

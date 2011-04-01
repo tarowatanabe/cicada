@@ -58,6 +58,10 @@ namespace cicada
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "yield") {
 	  if (utils::ipiece(piter->second) == "source")
 	    source = true;
@@ -106,15 +110,17 @@ namespace cicada
 	std::cerr << "parse cky: " << data.id << std::endl;
 
       const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
+      
+      const grammar_type& grammar_parse = (grammar_local.empty() ? grammar : grammar_local);
 
       utils::resource start;
-
-      grammar.assign(lattice);
+      
+      grammar_parse.assign(lattice);
 	
       if (weights_one)
-	cicada::parse_cky(goal, grammar, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
+	cicada::parse_cky(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
       else
-	cicada::parse_cky(goal, grammar, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
+	cicada::parse_cky(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode, unique_goal);
       
       utils::resource end;
     
@@ -164,6 +170,10 @@ namespace cicada
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
 	else if (utils::ipiece(piter->first) == "yield") {
 	  if (utils::ipiece(piter->second) == "source")
 	    source = true;
@@ -211,14 +221,16 @@ namespace cicada
       
       const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
 
+      const grammar_type& grammar_parse = (grammar_local.empty() ? grammar : grammar_local);
+
       utils::resource start;
 
-      grammar.assign(lattice);
+      grammar_parse.assign(lattice);
       
       if (weights_one)
-	cicada::parse_agenda(goal, grammar, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode);
+	cicada::parse_agenda(goal, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode);
       else
-	cicada::parse_agenda(goal, grammar, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode);
+	cicada::parse_agenda(goal, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode);
       
       utils::resource end;
     

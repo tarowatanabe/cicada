@@ -27,7 +27,8 @@ namespace cicada
       
       const tree_grammar_type& tree_grammar;
       const grammar_type&      grammar;
-      
+      tree_grammar_type tree_grammar_local;
+      grammar_type      grammar_local;
       std::string goal;
       
       bool yield_source;
@@ -65,7 +66,7 @@ namespace cicada
       void operator()(data_type& data) const;
   
       const grammar_type& grammar;
-  
+      grammar_type grammar_local;
       std::string goal;
   
       bool yield_source;
@@ -107,7 +108,7 @@ namespace cicada
       void operator()(data_type& data) const;
   
       const grammar_type& grammar;
-  
+      grammar_type grammar_local;
       std::string goal;
   
       int distortion;
@@ -129,7 +130,7 @@ namespace cicada
       void operator()(data_type& data) const;
   
       const grammar_type& grammar;
-  
+      grammar_type grammar_local;
       std::string goal;
 
       bool lattice_mode;

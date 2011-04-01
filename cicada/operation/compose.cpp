@@ -45,7 +45,13 @@ namespace cicada
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
-	} else
+	} else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "tree-grammar")
+	  tree_grammar_local.push_back(piter->second);
+	else
 	  std::cerr << "WARNING: unsupported parameter for Tree composer: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -64,13 +70,16 @@ namespace cicada
 
       if (debug)
 	std::cerr << "compose tree: " << data.id << std::endl;
+      
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
+      const tree_grammar_type& tree_grammar_compose = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
 	
       utils::resource start;
 
-      grammar.assign(hypergraph);
-      tree_grammar.assign(hypergraph);
+      grammar_compose.assign(hypergraph);
+      tree_grammar_compose.assign(hypergraph);
 	
-      cicada::compose_tree(goal, tree_grammar, grammar, hypergraph, composed, yield_source);
+      cicada::compose_tree(goal, tree_grammar_compose, grammar_compose, hypergraph, composed, yield_source);
 	
       utils::resource end;
     
@@ -193,6 +202,10 @@ namespace cicada
 	  pos_mode = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
 	  unique_goal = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for CKY composer: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -215,11 +228,13 @@ namespace cicada
       if (debug)
 	std::cerr << "compose cky: " << data.id << std::endl;
 
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
+
       utils::resource start;
 
-      grammar.assign(lattice);
+      grammar_compose.assign(lattice);
 	
-      cicada::compose_cky(goal, grammar, lattice, composed, yield_source, treebank, pos_mode, unique_goal);
+      cicada::compose_cky(goal, grammar_compose, lattice, composed, yield_source, treebank, pos_mode, unique_goal);
     
       utils::resource end;
     
@@ -338,7 +353,11 @@ namespace cicada
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
-	} else
+	} else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else
 	  std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -359,12 +378,14 @@ namespace cicada
     
       if (debug)
 	std::cerr << "compose phrase: " << data.id << std::endl;
+      
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 
       utils::resource start;
 
-      grammar.assign(lattice);
+      grammar_compose.assign(lattice);
     
-      cicada::compose_phrase(goal, grammar, lattice, distortion, composed);
+      cicada::compose_phrase(goal, grammar_compose, lattice, distortion, composed);
     
       utils::resource end;
     
@@ -403,9 +424,13 @@ namespace cicada
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "lattice")
 	  lattice_mode = utils::lexical_cast<bool>(piter->second);
-	else if (utils::ipiece(piter->first) == "forest") {
+	else if (utils::ipiece(piter->first) == "forest")
 	  forest_mode = utils::lexical_cast<bool>(piter->second);
-	} else
+	else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else
 	  std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -438,18 +463,20 @@ namespace cicada
 	
       if (debug)
 	std::cerr << "compose alignment: " << data.id << std::endl;
+      
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 	
       utils::resource start;
       
       if (lattice_mode)
-	grammar.assign(lattice, target);
+	grammar_compose.assign(lattice, target);
       else
-	grammar.assign(hypergraph, target);
+	grammar_compose.assign(hypergraph, target);
 	
       if (lattice_mode)
-	cicada::compose_alignment(goal, grammar, lattice, target, composed);
+	cicada::compose_alignment(goal, grammar_compose, lattice, target, composed);
       else
-	cicada::compose_alignment(goal, grammar, hypergraph, target, composed);
+	cicada::compose_alignment(goal, grammar_compose, hypergraph, target, composed);
     
       utils::resource end;
     
