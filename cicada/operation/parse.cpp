@@ -12,7 +12,7 @@
 #include <cicada/operation.hpp>
 #include <cicada/parameter.hpp>
 #include <cicada/parse.hpp>
-#include <cicada/grammar_simple.hpp>
+#include <cicada/grammar_unknown.hpp>
 
 #include <cicada/operation/functional.hpp>
 #include <cicada/operation/parse.hpp>
@@ -322,6 +322,23 @@ namespace cicada
 	grammars.push_back(grammar_local);
       else
 	grammars.push_back(grammar);
+      
+      // assign unknown grammar from the fine-grammar
+      if (grammars.back().size() >= 2) {
+	grammar_type::transducer_ptr_type unknown;
+	
+	grammar_type::iterator giter_end = grammars.back().end();
+	for (grammar_type::iterator giter = grammars.back().begin(); giter != giter_end; ++ giter)
+	  if (dynamic_cast<GrammarUnknown*>(&(*(*giter))))
+	    unknown = *giter;
+	
+	if (unknown) {
+	  grammar_set_type::iterator giter_end = grammars.end();
+	  for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
+	    if (giter->size() == 1)
+	      giter->push_back(unknown);
+	}
+      }
     }
 
     void ParseCoarse::assign(const weight_set_type& __weights)

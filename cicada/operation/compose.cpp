@@ -7,7 +7,6 @@
 #include <cicada/operation.hpp>
 #include <cicada/parameter.hpp>
 #include <cicada/compose.hpp>
-#include <cicada/grammar_simple.hpp>
 
 #include <cicada/operation/compose.hpp>
 
