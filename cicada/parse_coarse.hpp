@@ -724,33 +724,47 @@ namespace cicada
       
       if (lattice.empty()) return;
 
+      label_score_chart_type scores_init;
       label_score_chart_type scores;
       label_score_chart_type scores_prev;
       
-      // corse-to-fine 
-      for (size_t level = 0; level != grammars.size() - 1; ++ level) {
+      {
 	ParseCKY parser(goal, gramamrs[level], yield_source, treebank, pos_mode);
-	
-	scores_prev.swap(scores);
-
-	bool succeed = false;
-	
-	switch (level) {
-	case 0:  succeed = parser(lattice, scores, PruneNone()); break;
-	case 1:  succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1], CoarseSimple())); break;
-	default: succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1], CoarseSymbol(level - 2))); break;
-	}
-	
-	// if not successful, we will relax our threshold by adjusting factors...
-	
+	parser(lattice, scores_init, PruneNone());
       }
       
-      // final parsing with hypergraph construction
+      double factor = 1.0;
       
-      ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
-      composer(lattice, graph, PruneCoarse(scores,
-					   thresholds.back(),
-					   CoarseSymbol(grammars.size() - 2)));
+      for (;;) {
+	scores = scores_init;
+	
+	bool succeed = true;
+	
+	// corse-to-fine 
+	for (size_t level = 1; level != grammars.size() - 1; ++ level) {
+	  ParseCKY parser(goal, gramamrs[level], yield_source, treebank, pos_mode);
+	  
+	  scores_prev.swap(scores);
+	  
+	  if (level == 1)
+	    succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1] * factor, CoarseSimple()));
+	  else
+	    succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1] * factor, CoarseSymbol(level - 2)));
+	  
+	  if (! succeed) break;
+	}
+	
+	if (! succeed) {
+	  factor *= 0.5;
+	  continue;
+	}
+	
+	// final parsing with hypergraph construction
+	ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
+	composer(lattice, graph, PruneCoarse(scores,
+					     thresholds.back() * factor,
+					     CoarseSymbol(grammars.size() - 2)));
+      }
     }
     
   private:
