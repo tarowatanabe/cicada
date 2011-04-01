@@ -845,7 +845,7 @@ namespace cicada
 	}
 	
 	if (! succeed) {
-	  factor *= 0.5;
+	  factor *= 0.1;
 	  continue;
 	}
 	
@@ -862,7 +862,7 @@ namespace cicada
 							     thresholds.back() * factor,
 							     CoarseSymbol(grammars.size() - 2)));
 	if (graph.is_valid()) break;
-	factor *= 0.5;
+	factor *= 0.1;
       }
     }
     
