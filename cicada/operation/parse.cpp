@@ -289,12 +289,12 @@ namespace cicada
 	  
 	  int id = -1;
 	  if (qi::parse(iter, iter_end, "coarse" >> qi::int_, id) && iter == iter_end) {
-	    if (id >= grammars.size())
+	    if (id >= static_cast<int>(grammars.size()))
 	      grammars.resize(id + 1);
 	    
 	    grammars[id].push_back(piter->second);
 	  } else if (qi::parse(iter, iter_end, "threshold" >> qi::int_, id) && iter == iter_end) {
-	    if (id >= thresholds.size())
+	    if (id >= static_cast<int>(thresholds.size()))
 	      thresholds.resize(id + 1);
 	    thresholds[id] = utils::lexical_cast<double>(piter->second);
 	  } else
