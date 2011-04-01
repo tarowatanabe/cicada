@@ -787,6 +787,8 @@ namespace cicada
 	  composer(lattice, graph, PruneCoarse<CoarseSymbol>(scores,
 							     thresholds.back() * factor,
 							     CoarseSymbol(grammars.size() - 2)));
+	
+	break;
       }
     }
     
