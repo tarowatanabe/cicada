@@ -29,6 +29,7 @@
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
 #include <utils/array_power2.hpp>
+#include <utils/indexed_set.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
