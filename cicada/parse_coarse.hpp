@@ -382,8 +382,7 @@ namespace cicada
 	    
 	    // first, enumerate final rules
 	    const passive_unary_set_type& finals = passives_final(first, last);
-	    const id_type finals_size = finals.size();
-	    for (id_type id = 0; id != finals_size; ++ id) 
+	    for (id_type id = 0; id != static_cast<id_type>(finals.size()); ++ id) 
 	      if (! finals[id].edges.empty()) {
 		const score_type score_head = outside(first, last)[id];
 		
@@ -400,8 +399,7 @@ namespace cicada
 	    
 	    // second, enumerate unary rules
 	    const passive_unary_set_type& unaries = passives_unary(first, last);
-	    const id_type unaries_size = unaries.size();
-	    for (id_type id = 0; id != unaries_size; ++ id) 
+	    for (id_type id = 0; id != static_cast<id_type>(unaries.size()); ++ id) 
 	      if (! unaries[id].edges.empty()) {
 		const score_type score_head = outside(first, last)[id];
 		
@@ -418,9 +416,7 @@ namespace cicada
 	    
 	    // third, enumerate non-unary rules
 	    const passive_set_type& rules = passives(first, last);
-
-	    const id_type rules_size = utils::bithack::min(rules.size(), outside(first, last).size());
-	    for (id_type id = 0; id != rules_size; ++ id) 
+	    for (id_type id = 0; id != static_cast<id_type>(rules.size()); ++ id) 
 	      if (! rules[id].edges.empty()) {
 		const score_type score_head = outside(first, last)[id];
 	      
@@ -612,7 +608,7 @@ namespace cicada
 	    if (! passives_unary(first, last).empty()) {
 	      // unary rules...
 	      const passive_unary_set_type& passive = passives_unary(first, last);
-	      passive_unary_set_type& passive_unary = passives_final(first, last);
+	      passive_unary_set_type& passive_final = passives_final(first, last);
 	      score_set_type&         scores_inside = inside(first, last);
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
@@ -626,12 +622,12 @@ namespace cicada
 		    // check pruning!
 		    if (pruner(first, last, symbol_map[citer->id])) continue;
 
-		    if (citer->id >= static_cast<id_type>(passive_unary.size()))
-		      passive_unary.resize(citer->id + 1);
+		    if (citer->id >= static_cast<id_type>(passive_final.size()))
+		      passive_final.resize(citer->id + 1);
 		    if (citer->id >= static_cast<id_type>(scores_inside.size()))
 		      scores_inside.resize(citer->id + 1);
 		    
-		    passive_unary[citer->id].edges.push_back(unary_edge_type(id, citer->score));
+		    passive_final[citer->id].edges.push_back(unary_edge_type(id, citer->score));
 		    scores_inside[citer->id] = std::max(scores_inside[citer->id], score_tail * citer->score);
 		  }
 		}
