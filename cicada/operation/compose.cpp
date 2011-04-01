@@ -124,7 +124,9 @@ namespace cicada
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
-	} else
+	} else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else
 	  std::cerr << "WARNING: unsupported parameter for Earley composer: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -144,11 +146,13 @@ namespace cicada
       if (debug)
 	std::cerr << "compose earley: " << data.id << std::endl;
 
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
+
       utils::resource start;
 
-      grammar.assign(hypergraph);
+      grammar_compose.assign(hypergraph);
     
-      cicada::compose_earley(grammar, hypergraph, composed, yield_source);
+      cicada::compose_earley(grammar_compose, hypergraph, composed, yield_source);
     
       utils::resource end;
     
@@ -280,7 +284,9 @@ namespace cicada
 	    target = true;
 	  else
 	    throw std::runtime_error("unknown yield: " + piter->second);
-	} else
+	} else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else
 	  std::cerr << "WARNING: unsupported parameter for composer: " << piter->first << "=" << piter->second << std::endl;
       }
 	
@@ -300,11 +306,13 @@ namespace cicada
       if (debug)
 	std::cerr << "compose grammar: " << data.id << std::endl;
 
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
+
       utils::resource start;
 
-      grammar.assign(hypergraph);
+      grammar_compose.assign(hypergraph);
       
-      cicada::compose_grammar(grammar, hypergraph, composed, yield_source);
+      cicada::compose_grammar(grammar_compose, hypergraph, composed, yield_source);
     
       utils::resource end;
     

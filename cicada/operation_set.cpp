@@ -67,6 +67,7 @@ clear: clear data structure\n\
 \tcounts=[true|false] clear ngram counts\n\
 compose-earley: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tgrammar=[grammar spec] grammar\n\
 compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
@@ -76,6 +77,7 @@ compose-cky|cyk: composition from lattice (or sentence) with grammar\n\
 \tgrammar=[grammar spec] grammar\n\
 compose-grammar: composition from tree with grammar\n\
 \tyield=[source|target] use source or target yield for rule\n\
+\tgrammar=[grammar spec] grammar\n\
 compose-phrase: composition from lattice (or sentence) with phrase-based grammar\n\
 \tdistortion=[distortion limit] default: 0 (== monotone)\n\
 \tyield=[source|target] use source or target yield for rule\n\
