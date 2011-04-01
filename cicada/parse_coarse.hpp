@@ -287,6 +287,7 @@ namespace cicada
 	passives.resize(lattice.size() + 1);
 	passives_unary.resize(lattice.size() + 1);
 	
+	
 	compute_inside(lattice, pruner);
 	
 	const bool has_goal = inside(0, lattice.size()).find(goal) != inside(0, lattice.size()).end();
@@ -301,6 +302,10 @@ namespace cicada
       
       void compute_inside_outside(const lattice_type& lattice, label_score_chart_type& scores)
       {
+	//std::cerr << "inside-outside" << std::endl;
+
+	const score_type score_sum = inside(0, lattice.size())[goal];
+
 	// we simply enumerate chart...!
 	for (size_type length = 1; length <= lattice.size(); ++ length)
 	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
@@ -313,13 +318,15 @@ namespace cicada
 	    for (typename label_score_set_type::const_iterator oiter = outside(first, last).begin(); oiter != oiter_end; ++ oiter) {
 	      typename label_score_set_type::const_iterator iiter = labels_inside.find(oiter->first);
 	      if (iiter != labels_inside.end())
-		labels_scores[oiter->first] = oiter->second * iiter->second;
+		labels_scores[oiter->first] = oiter->second * iiter->second / score_sum;
 	    }
 	  }
       }
       
       void compute_outside(const lattice_type& lattice)
       {
+	//std::cerr << "outside" << std::endl;
+
 	// traverse back passives from TOP
 	
 	// find goal node out of passives_unary.
@@ -392,6 +399,8 @@ namespace cicada
       template <typename Pruner>
       void compute_inside(const lattice_type& lattice, const Pruner& pruner)
       {
+	//std::cerr << "inside: " << grammar.size() << std::endl;
+
 	// initialize active chart...
 	for (size_type table = 0; table != grammar.size(); ++ table) {
 	  const transducer_type::id_type root = grammar[table].root();
@@ -408,6 +417,8 @@ namespace cicada
 
 	    // check pruning!
 	    if (pruner(first, last)) continue;
+	    
+	    //std::cerr << "span: " << first << ".." << last << std::endl;
 	    
 	    node_map.clear();
 	    
@@ -507,6 +518,8 @@ namespace cicada
 		  
 		  // check pruning!
 		  if (pruner(first, last, lhs)) continue;
+
+		  //std::cerr << "rule: " << *rule << std::endl;
 		  
 		  std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(lhs, passive_arcs.size()));
 		  if (result.second)
@@ -558,6 +571,8 @@ namespace cicada
 		    passive_unary.push_back(span_type(first, last, citer->label));
 		  
 		  passive_unary[result.first->second].edges.push_back(edge_type(tail_set_type(1, piter->span), citer->score));
+		  
+		  //std::cerr << "unary: " << citer->label << " ||| " << piter->span.label << std::endl;
 		  
 		  score_type& score = labels_inside[citer->label];
 		  score = std::max(score, score_tail * citer->score);
@@ -741,6 +756,7 @@ namespace cicada
       label_score_chart_type scores;
       label_score_chart_type scores_prev;
       
+      //std::cerr << "initial" << std::endl;
       {
 	ParseCKY parser(goal, grammars.front(), function, yield_source, treebank, pos_mode);
 	parser(lattice, scores_init, PruneNone());
@@ -755,6 +771,8 @@ namespace cicada
 	
 	// corse-to-fine 
 	for (size_t level = 1; level != grammars.size() - 1; ++ level) {
+	  //std::cerr << "level: " << level << std::endl;
+
 	  ParseCKY parser(goal, grammars[level], function, yield_source, treebank, pos_mode);
 	  
 	  scores_prev.swap(scores);

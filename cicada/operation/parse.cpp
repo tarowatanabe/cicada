@@ -330,7 +330,7 @@ namespace cicada
 	throw std::runtime_error("no coarse grammar(s)?");
       
       // use either local or globally assigned grammar
-      if (grammar_local.empty())
+      if (! grammar_local.empty())
 	grammars.push_back(grammar_local);
       else
 	grammars.push_back(grammar);
@@ -345,7 +345,7 @@ namespace cicada
 	    unknown = *giter;
 	
 	if (unknown) {
-	  grammar_set_type::iterator giter_end = grammars.end();
+	  grammar_set_type::iterator giter_end = grammars.end() - 1;
 	  for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
 	    if (giter->size() == 1)
 	      giter->push_back(unknown);
