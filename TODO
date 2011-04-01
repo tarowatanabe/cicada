@@ -103,6 +103,3 @@ Coarse-to-fine parsing:
     or simply taking "max" in A* sense?
     Coarse grammar is learned by preserving pre-terminals, but
     reducing bits.
-    
-Keep list of non-terminals in transducer class...
-   For faster parsing with unary chain computation, we need the list of possible non-terminals...
