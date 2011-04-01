@@ -368,7 +368,16 @@ namespace cicada
       for (grammar_set_type::const_iterator giter = grammars.begin(); giter != giter_end; ++ giter)
 	giter->assign(lattice);
       
-      
+      if (weights_one)
+	cicada::parse_coarse(goal,
+			     grammars.begin(), grammars.end(),
+			     thresholds.begin(), thresholds.end(),
+			     weight_function_one<weight_type>(), lattice, parsed, yield_source, treebank, pos_mode);
+      else
+	cicada::parse_coarse(goal,
+			     grammars.begin(), grammars.end(),
+			     thresholds.begin(), thresholds.end(),
+			     weight_function<weight_type>(*weights_parse), lattice, parsed, yield_source, treebank, pos_mode);
       
       utils::resource end;
     

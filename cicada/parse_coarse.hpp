@@ -271,9 +271,6 @@ namespace cicada
       template <typename Pruner>
       bool operator()(const lattice_type& lattice, label_score_chart_type& scores, const Pruner& pruner)
       {
-	if (lattice.empty())
-	  return;
-	
 	inside.clear();
 	outside.clear();
 	scores.clear();
@@ -288,7 +285,7 @@ namespace cicada
 	
 	actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
 	passives.resize(lattice.size() + 1);
-	passives_unary.reesize(lattice.size() + 1);
+	passives_unary.resize(lattice.size() + 1);
 	
 	compute_inside(lattice, pruner);
 	
@@ -401,7 +398,7 @@ namespace cicada
 	  
 	  for (size_type pos = 0; pos != lattice.size(); ++ pos)
 	    if (grammar[table].valid_span(pos, pos, 0))
-	      actives[table](pos, pos), push_back(active_type(root));
+	      actives[table](pos, pos).push_back(active_type(root));
 	}
 	
 	// compute inside...
@@ -497,8 +494,8 @@ namespace cicada
 		if (rules.empty()) continue;
 		
 		score_type score_tails = cicada::semiring::traits<score_type>::one();
-		typename tail_set_type::const_iterator titer_end = citer->tails.end();
-		for (typename tail_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
+		typename tail_set_type::const_iterator titer_end = citer->edge.tails.end();
+		for (typename tail_set_type::const_iterator titer = citer->edge.tails.begin(); titer != titer_end; ++ titer)
 		  score_tails *= inside(titer->first, titer->last)[titer->label];
 		
 		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
@@ -642,7 +639,7 @@ namespace cicada
 	    if (equilibrate) break;
 	  }
 	  
-	  uiter = unaries.insert(std::make_pair(child, unary_set_type(closure.begin(), closure.end()))).second;
+	  uiter = unaries.insert(std::make_pair(child, unary_set_type(closure.begin(), closure.end()))).first;
 	}
 	return uiter->second;
       }
@@ -805,6 +802,20 @@ namespace cicada
   };
   
   
+  template <typename IteratorGrammar, typename IteratorThreshold, typename Function>
+  inline
+  void parse_coarse(const Symbol& goal, 
+		    IteratorGrammar gfirst, IteratorGrammar glast,
+		    IteratorThreshold tfirst, IteratorThreshold tlast,
+		    const Function& function,
+		    const Lattice& lattice,
+		    HyperGraph& graph,
+		    const bool yield_source=false,
+		    const bool treebank=false,
+		    const bool pos_mode=false)
+  {
+    ParseCoarse<typename Function::value_type, Function>(goal, gfirst, glast, tfirst, tlast, function, yield_source, treebank, pos_mode)(lattice, graph);
+  }
   
   
 };

@@ -127,6 +127,19 @@ parse-cky|cyk: parsing via CKY\n\
 \tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
+parse-coarse: parsing via coarse-to-fine\n\
+\tyield=[source|target] use source or target yield for rule\n\
+\ttreebank=[true|false] assume treebank-style grammar\n\
+\tpos=[true|false] pos-annotated input\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialized weight\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] fine grammar\n\
+\tcoarse0=[coarse grammar spec] the first coarse grammar\n\
+\tthreshold0=[double] threshold for the first coarse grammar\n\
+\tcoarse1=[coarse grammar spec] the second coarse grammar\n\
+\tthreshold1=[double] threshold for the second coarse grammar\n\
+\t...\n\
 permute: permute tree (monolingual tree only)\n\
 \tsize=permute size\n\
 \texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
@@ -211,6 +224,8 @@ span-forest: annotate terminal span\n\
 	operations.push_back(operation_ptr_type(new operation::ParseAgenda(*piter, grammar, goal, debug)));
       else if (param_name == "parse-cky" || param_name == "parse-cyk")
 	operations.push_back(operation_ptr_type(new operation::ParseCKY(*piter, grammar, goal, debug)));
+      else if (param_name == "parse-coarse")
+	operations.push_back(operation_ptr_type(new operation::ParseCoarse(*piter, grammar, goal, debug)));
       else if (param_name == "generate-earley")
 	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, debug)));
       else if (param_name == "apply")
