@@ -220,7 +220,8 @@ namespace cicada
 	const candidate_type* item = make_candidate(edge, j, graph_out, is_goal);
 	
 	cand.push(item);
-	cand_unique.insert(item);
+	// for faster cube pruning, we do not insert here!
+	//cand_unique.insert(item); 
       }
       
       //std::cerr << "perform cube-prune" << std::endl;
@@ -320,6 +321,38 @@ namespace cicada
 			candidate_set_unique_type& candidates_unique,
 			hypergraph_type& graph_out)
     {
+#if 0
+      // original cube-pruning
+      candidate_type query(candidate.j);
+      
+      query.in_edge = candidate.in_edge;
+      index_set_type& j = query.j;
+      
+      size_type inserted = 0;
+      for (size_t i = 0; i != candidate.j.size(); ++ i) {
+	
+	++ j[i];
+
+	if (j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size())) {
+	  if (candidates_unique.find(&query) == candidates_unique.end()) {
+	    // new candidate...
+	    const candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
+	    
+	    cand.push(candidate_new);
+	    candidates_unique.insert(candidate_new);
+	    
+	    ++ inserted;
+	  }
+	}
+	
+	-- j[i];
+      }
+      
+      //std::cerr << "inserted: " << inserted << std::endl;
+      
+      return inserted;
+#endif
+#if 0
       // proceed to the next until we find better candidate...
       // @InProceedings{iglesias-EtAl:2009:EACL,
       //  author    = {Iglesias, Gonzalo  and  de Gispert, Adri\`{a}  and  Banga, Eduardo R.  and  Byrne, William},
@@ -365,6 +398,46 @@ namespace cicada
       //std::cerr << "inserted: " << inserted << std::endl;
       
       return inserted;
+#endif
+#if 1
+      // Faster Cube Pruning
+      candidate_type query(candidate.j);
+      
+      query.in_edge = candidate.in_edge;
+      index_set_type& j = query.j;
+      
+      size_type inserted = 0;
+      for (size_t i = 0; i != j.size(); ++ i) {
+	++ j[i];
+	
+	if (j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size())) {
+	  
+	  // check all the predecessor are already popped
+	  bool predecessor = true;
+	  for (size_t k = 0; k != j.size() && predecessor; ++ k) 
+	    if (i != k && j[k]) {
+	      -- j[k];
+	      
+	      if (candidates_unique.find(&query) == candidates_unique.end())
+		predecessor = false;
+	      
+	      ++ j[k];
+	    }
+	  
+	  if (predecessor)
+	    cand.push(make_candidate(*candidate.in_edge, j, graph_out, is_goal));
+
+	  inserted += predecessor;
+	}
+	
+	-- j[i];
+      }
+      
+      // this candidate is already popped
+      candidates_unique.insert(&candidate);
+      
+      return inserted;
+#endif
     }
     
     const candidate_type* make_candidate(const edge_type& edge, const index_set_type& j, const hypergraph_type& graph, const bool is_goal)

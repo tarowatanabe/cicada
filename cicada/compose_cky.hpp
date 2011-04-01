@@ -140,10 +140,30 @@ namespace cicada
       
       const non_terminal_set_type& non_terminals;
     };
-    
-    
+
+    struct PruneNone
+    {
+      bool operator()(const int first, const int last) const
+      {
+	return false;
+      }
+      
+      bool operator()(const int first, const int last, const symbol_type& label) const
+      {
+	return false;
+      }
+    };
+
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
+    {
+      operator()(lattice, graph, PruneNone());
+    }
+    
+    template <typename Pruner>
+    void operator()(const lattice_type& lattice,
+		    hypergraph_type& graph,
+		    const Pruner& pruner)
     {
       graph.clear();
       
@@ -170,6 +190,8 @@ namespace cicada
       for (size_t length = 1; length <= lattice.size(); ++ length)
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
+
+	  if (pruner(first, last)) continue;
 	  
 	  node_map.clear();
 	  
@@ -261,13 +283,18 @@ namespace cicada
 	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
 	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
 	      
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter)
-		apply_rule(yield_source ? riter->source : riter->target, riter->features + citer->features, riter->attributes + citer->attributes,
+	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
+		const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
+		const symbol_type& lhs = rule->lhs;
+		
+		if (pruner(first, last, lhs)) continue;
+		
+		apply_rule(rule, riter->features + citer->features, riter->attributes + citer->attributes,
 			   citer->tails.begin(), citer->tails.end(), passive_arcs, graph,
 			   first, last);
+	      }
 	    }
 	  }
-	  
 	  
 	  if (! passives(first, last).empty()) {
 	    //std::cerr << "closure from passives: " << passives(first, last).size() << std::endl;
@@ -310,8 +337,10 @@ namespace cicada
 		  
 		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-		    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
+		    const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
 		    const symbol_type& lhs = rule->lhs;
+
+		    if (pruner(first, last, lhs)) continue;
 		    
 		    closure_level_type::const_iterator citer = closure.find(lhs);
 		    const int level = (citer != closure.end() ? citer->second : 0);

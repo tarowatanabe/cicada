@@ -18,6 +18,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/semiring.hpp>
 #include <cicada/span_vector.hpp>
+#include <cicada/compose_cky.hpp>
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
@@ -127,7 +128,12 @@ namespace cicada
     template <typename Coarser>
     struct PruneCoarse
     {
-      PruceCoarse(Coarser __coarser) : coarser(__coarser) {}
+      PruceCoarse(const label_score_chart_type& __prunes,
+		  const score_type& __cutoff,
+		  Coarser __coarser)
+	: prunes(__prunes),
+	  cutoff(__cutoff),
+	  coarser(__coarser) {}
 
       bool operator()(const int first, const int last) const
       {
@@ -259,7 +265,7 @@ namespace cicada
       }
       
       template <typename Pruner>
-      void operator()(const lattice_type& lattice, label_score_chart_type& scores, const Pruner& pruner)
+      bool operator()(const lattice_type& lattice, label_score_chart_type& scores, const Pruner& pruner)
       {
 	if (lattice.empty())
 	  return;
@@ -281,8 +287,15 @@ namespace cicada
 	passives_unary.reesize(lattice.size() + 1);
 	
 	compute_inside(lattice, pruner);
+	
+	const bool has_goal = inside(0, lattice.size()).find(goal) != inside(0, lattice.size()).end();
+
+	if (! has_goal) return false;
+
 	compute_outside(lattice);
 	compute_inside_outside(lattice, scores);
+
+	return true;
       }
       
       void compute_inside_outside(const lattice_type& lattice, label_score_chart_type& scores)
@@ -679,14 +692,6 @@ namespace cicada
 
       node_map_type node_map;
     };
-
-    // Parsing with forest construction
-    // we will use beam search...??
-    struct ParseForest
-    {
-      
-      
-    };
     
     template <typename IteratorGrammar, typename IteratorThreshold>
     ParseCoarse(const symbol_type& __goal,
@@ -718,14 +723,34 @@ namespace cicada
       graph.clear();
       
       if (lattice.empty()) return;
-      
-      // initial grammar is coarser than penn-treebank
+
+      label_score_chart_type scores;
+      label_score_chart_type scores_prev;
       
       // corse-to-fine 
+      for (size_t level = 0; level != grammars.size() - 1; ++ level) {
+	ParseCKY parser(goal, gramamrs[level], yield_source, treebank, pos_mode);
+	
+	scores_prev.swap(scores);
+
+	bool succeed = false;
+	
+	switch (level) {
+	case 0:  succeed = parser(lattice, scores, PruneNone()); break;
+	case 1:  succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1], CoarseSimple())); break;
+	default: succeed = parser(lattice, scores, PruneCoarse(scores_prev, thresholds[level - 1], CoarseSymbol(level - 2))); break;
+	}
+	
+	// if not successful, we will relax our threshold by adjusting factors...
+	
+      }
       
       // final parsing with hypergraph construction
       
-      
+      ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
+      composer(lattice, graph, PruneCoarse(scores,
+					   thresholds.back(),
+					   CoarseSymbol(grammars.size() - 2)));
     }
     
   private:
