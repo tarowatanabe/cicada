@@ -372,7 +372,7 @@ path_type map_file;
 bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
-bool cycle = false;
+bool remove_cycle = false;
 std::string stemmer;
 
 bool leaf = false;
@@ -478,7 +478,7 @@ int main(int argc, char** argv)
       if (normalize)
 	transform_normalize(parsed);
 
-      if (cycle)
+      if (remove_cycle)
 	transform_cycle(parsed);
       
       if (unescape_terminal)
@@ -603,7 +603,7 @@ void options(int argc, char** argv)
     ("unescape",     po::bool_switch(&unescape_terminal), "unescape terminal symbols, such as -LRB-, \\* etc.")
     ("normalize",    po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
     ("remove-none",  po::bool_switch(&remove_none),       "remove -NONE-")
-    ("remove-cycle", po::bool_switch(&collapse),          "remove cycle unary rules")
+    ("remove-cycle", po::bool_switch(&remove_cycle),      "remove cycle unary rules")
     ("stemmer",      po::value<std::string>(&stemmer),    "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
