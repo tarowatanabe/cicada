@@ -168,8 +168,8 @@ unknown: pos assignment by signature\n\
 	  throw std::runtime_error("unsupported parameter for unknown grammar: " + piter->first + "=" + piter->second);
       }
       
-      if (file != "-" && ! boost::filesystem::exists(file))
-	throw std::runtime_error("no file? " + file);
+      if (file.empty())
+	throw std::runtime_error("no file? ");
       
       if (! character.empty())
 	if (character != "-" && ! boost::filesystem::exists(character))
