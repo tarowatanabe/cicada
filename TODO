@@ -56,9 +56,6 @@ Added binarization to cicada-extract, or use cicada tool for binarization?
 Cutting-plane learning under cicada_maxlike{,_mpi}...
 	We need to merge feature vector...
 
-Revise grammar API:
-  It is very hard to come-up with new API w/o breaking existing code...
-
 Flexible MERT:
   Allow arbitrary yield function to envelope semiring
 
@@ -74,3 +71,11 @@ Implement scalable training by L1 regularized feature selection:
      or, 
      features requing complex hidden variables...?
 
+A unified framework to output verbose informaiton... HOW?
+
+POS annotated sentence input:
+  How to convert each POS into latent annotated POS?
+
+
+Implement epsilon removal for forest:
+  We need to handle arbitrary structure, and diferentiate epsilon removed parents.

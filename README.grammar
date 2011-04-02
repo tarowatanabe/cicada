@@ -17,5 +17,6 @@ In cicada, various file-based gramamr can be loaded in addition to pre-defined g
 	--grammar deletion:non-terminal=[x]
 	--grammar pos
 	--grammar pair:non-terminal=[x]
+	--grammar unknown:signature=English,file=[grammar spec],character=[character model]
 
 For detail see --grammar-list

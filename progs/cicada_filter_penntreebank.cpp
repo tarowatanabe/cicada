@@ -197,6 +197,19 @@ void transform_cycle(treebank_type& treebank)
     treebank.antecedents = treebank.antecedents.front().antecedents;
 }
 
+void transform_collapse(treebank_type& treebank)
+{
+  // no terminal...
+  if (treebank.antecedents.empty()) return;
+  
+  for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+    transform_collapse(*aiter);
+  
+  // unary rule + the same category...
+  if (treebank.antecedents.size() == 1 && treebank.antecedents.front().antecedents.size() == 1)
+    treebank.antecedents = treebank.antecedents.front().antecedents;
+}
+
 template <typename Iterator>
 struct terminal_parser : boost::spirit::qi::grammar<Iterator, std::string()>
 {
@@ -373,6 +386,7 @@ bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
 bool remove_cycle = false;
+bool collapse = false;
 std::string stemmer;
 
 bool leaf = false;
@@ -480,6 +494,9 @@ int main(int argc, char** argv)
 
       if (remove_cycle)
 	transform_cycle(parsed);
+
+      if (collapse)
+	transform_collapse(parsed);
       
       if (unescape_terminal)
 	transform_unescape(parsed);
@@ -604,6 +621,7 @@ void options(int argc, char** argv)
     ("normalize",    po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
     ("remove-none",  po::bool_switch(&remove_none),       "remove -NONE-")
     ("remove-cycle", po::bool_switch(&remove_cycle),      "remove cycle unary rules")
+    ("collapse",     po::bool_switch(&collapse),          "collapse unary rules")
     ("stemmer",      po::value<std::string>(&stemmer),    "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
