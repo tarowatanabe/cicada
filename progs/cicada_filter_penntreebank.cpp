@@ -184,13 +184,13 @@ void transform_normalize(treebank_type& treebank)
     transform_normalize(*aiter);
 }
 
-void transform_collapse(treebank_type& treebank)
+void transform_cycle(treebank_type& treebank)
 {
   // no terminal...
   if (treebank.antecedents.empty()) return;
   
   for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
-    transform_collapse(*aiter);
+    transform_cycle(*aiter);
 
   // unary rule + the same category...
   if (treebank.antecedents.size() == 1 && treebank.antecedents.front().antecedents.size() == 1 && treebank.cat == treebank.antecedents.front().cat)
@@ -372,7 +372,7 @@ path_type map_file;
 bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
-bool collapse = false;
+bool cycle = false;
 std::string stemmer;
 
 bool leaf = false;
@@ -478,8 +478,8 @@ int main(int argc, char** argv)
       if (normalize)
 	transform_normalize(parsed);
 
-      if (collapse)
-	transform_collapse(parsed);
+      if (cycle)
+	transform_cycle(parsed);
       
       if (unescape_terminal)
 	transform_unescape(parsed);
@@ -600,11 +600,11 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
-    ("unescape",    po::bool_switch(&unescape_terminal), "unescape terminal symbols, such as -LRB-, \\* etc.")
-    ("normalize",   po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
-    ("remove-none", po::bool_switch(&remove_none),       "remove -NONE-")
-    ("collapse",    po::bool_switch(&collapse),          "collapse unary rules")
-    ("stemmer",     po::value<std::string>(&stemmer),    "stemming for terminals")
+    ("unescape",      po::bool_switch(&unescape_terminal), "unescape terminal symbols, such as -LRB-, \\* etc.")
+    ("normalize",     po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
+    ("remove-none",   po::bool_switch(&remove_none),       "remove -NONE-")
+    ("reomove-cycle", po::bool_switch(&collapse),          "remove cycle unary rules")
+    ("stemmer",       po::value<std::string>(&stemmer),    "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
