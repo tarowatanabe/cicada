@@ -382,6 +382,7 @@ path_type input_file = "-";
 path_type output_file = "-";
 path_type map_file;
 
+std::string root_symbol;
 bool normalize = false;
 bool remove_none = false;
 bool unescape_terminal = false;
@@ -485,6 +486,9 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("# of words do not match?");
 	}
       }
+      
+      if (! root_symbol.empty())
+	parsed.cat = root_symbol;
 
       if (remove_none)
 	transform_remove_none(parsed);
@@ -617,12 +621,13 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
-    ("unescape",     po::bool_switch(&unescape_terminal), "unescape terminal symbols, such as -LRB-, \\* etc.")
-    ("normalize",    po::bool_switch(&normalize),         "normalize category, such as [,] [.] etc.")
-    ("remove-none",  po::bool_switch(&remove_none),       "remove -NONE-")
-    ("remove-cycle", po::bool_switch(&remove_cycle),      "remove cycle unary rules")
-    ("collapse",     po::bool_switch(&collapse),          "collapse unary rules")
-    ("stemmer",      po::value<std::string>(&stemmer),    "stemming for terminals")
+    ("replace-root", po::value<std::string>(&root_symbol), "replace root symbol")
+    ("unescape",     po::bool_switch(&unescape_terminal),  "unescape terminal symbols, such as -LRB-, \\* etc.")
+    ("normalize",    po::bool_switch(&normalize),          "normalize category, such as [,] [.] etc.")
+    ("remove-none",  po::bool_switch(&remove_none),        "remove -NONE-")
+    ("remove-cycle", po::bool_switch(&remove_cycle),       "remove cycle unary rules")
+    ("collapse",     po::bool_switch(&collapse),           "collapse unary rules")
+    ("stemmer",      po::value<std::string>(&stemmer),     "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
