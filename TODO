@@ -53,11 +53,6 @@ Reimplement cicada-learn-online:
 
 Added binarization to cicada-extract, or use cicada tool for binarization?
 
-MONOLINGUAL PARSING!
-  It is possible to do parsing, given cky composer... (or, we may implement earley-composer...)
-  But, the problem is: how to normalize penntreebank... 
-  Remove -NONE-, normalize non-terminal symbols, (remove -[0-9]+$,  =[0-9]+$ etc.)
-
 Cutting-plane learning under cicada_maxlike{,_mpi}...
 	We need to merge feature vector...
 
@@ -66,12 +61,6 @@ Revise grammar API:
 
 Flexible MERT:
   Allow arbitrary yield function to envelope semiring
-
-Support for POS assignment for OOV:
-  1. use external pos tagger (Easiest!)
-  2. use Stanford parser style unknown word estimator...
-	Sounds like maximum-likelihood estimate or maxent estimates?
-	Automatically learn parameters from treebanks?
 
 Implement scalable training by L1 regularized feature selection:
   1. Collect features.. it is the hardest part...
@@ -85,21 +74,3 @@ Implement scalable training by L1 regularized feature selection:
      or, 
      features requing complex hidden variables...?
 
-Accurate unlexicalied parsing:
-   Iteratively split/EM then, merge/EM
-   Smoothing via dirichlet prior (or naive variational Bayes)
-   UNK handling:
-      map rare words mapped into UNK-signature (-ed/-ing/digits/etc.)
-      The mapped UNK-signature is simply a "non-terminal"
-      Decide "rare words" by threshold
-      Do we allow splitting for UNK words...?
-      Use of character ngram language model to estimate POS tag?
-      Signature class to compute signature for English/Chinese etc.
-      Character bigram/tribgram to estimate POS for Chinese
-   Add prior: max-like estimate w/o annotation
-
-Coarse-to-fine parsing:
-    Estimate coarse grammar by EM-like estimation,
-    or simply taking "max" in A* sense?
-    Coarse grammar is learned by preserving pre-terminals, but
-    reducing bits.
