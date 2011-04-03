@@ -282,9 +282,17 @@ namespace cicada
       typedef google::dense_hash_map<id_type, score_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > closure_set_type;
       
       typedef utils::indexed_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type> > symbol_map_type;
-
-      typedef std::vector<score_type, std::allocator<score_type> > score_set_type;
-      typedef utils::chart<score_set_type, std::allocator<score_set_type> > score_chart_type;
+      
+      struct InsideOutsideScore
+      {
+	score_type inside;
+	score_type outside;
+	
+	InsideOutsideScore() : inside(), outside() {}
+      };
+      typedef InsideOutsideScore score_pair_type;
+      typedef std::vector<score_pair_type, std::allocator<score_pair_type> > score_pair_set_type;
+      typedef utils::chart<score_pair_set_type, std::allocator<score_pair_set_type> > score_pair_chart_type;
       
     public:
       ParseCKY(const symbol_type& __goal,
@@ -303,12 +311,10 @@ namespace cicada
       template <typename Pruner>
       bool operator()(const lattice_type& lattice, label_score_chart_type& scores, const Pruner& pruner)
       {
-	inside.clear();
-	outside.clear();
+	inside_outside.clear();
 	scores.clear();
 	
-	inside.resize(lattice.size() + 1);
-	outside.resize(lattice.size() + 1);
+	inside_outside.resize(lattice.size() + 1);
 	scores.resize(lattice.size() + 1);
 	
 	actives.clear();
@@ -326,8 +332,8 @@ namespace cicada
 	
 	compute_inside(lattice, pruner);
 	
-	const bool has_goal = (goal_id < static_cast<id_type>(inside(0, lattice.size()).size())
-			       && inside(0, lattice.size())[goal_id] != cicada::semiring::traits<score_type>::zero());
+	const bool has_goal = (goal_id < static_cast<id_type>(inside_outside(0, lattice.size()).size())
+			       && inside_outside(0, lattice.size())[goal_id].inside != cicada::semiring::traits<score_type>::zero());
 	
 	if (! has_goal) return false;
 
@@ -340,22 +346,20 @@ namespace cicada
     private:
       void compute_inside_outside(const lattice_type& lattice, label_score_chart_type& scores)
       {
-	const score_type score_sum = inside(0, lattice.size())[goal_id];
+	const score_type score_sum = inside_outside(0, lattice.size())[goal_id].inside;
 	
 	// we simply enumerate chart...!
 	for (size_type length = 1; length <= lattice.size(); ++ length)
 	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
 	    const size_type last = first + length;
 
-	    if (inside(first, last).empty()) continue;
+	    if (inside_outside(first, last).empty()) continue;
 	    
-	    label_score_set_type& labels_scores  = scores(first, last);
-	    const score_set_type& scores_inside  = inside(first, last);
-	    const score_set_type& scores_outside = outside(first, last);
+	    label_score_set_type& labels_scores = scores(first, last);
+	    const score_pair_set_type& scores   = inside_outside(first, last);
 	    
-	    const id_type size = utils::bithack::min(scores_inside.size(), scores_outside.size());
-	    for (id_type id = 0; id != size; ++ id) {
-	      const score_type score = scores_inside[id] * scores_outside[id];
+	    for (id_type id = 0; id != static_cast<id_type>(scores.size()); ++ id) {
+	      const score_type score = scores[id].inside * scores[id].outside;
 	      if (score != cicada::semiring::traits<score_type>::zero())
 		labels_scores[symbol_map[id]] = score / score_sum;
 	    }
@@ -371,23 +375,19 @@ namespace cicada
 	// how do we traverse back this complicated structure....
 	//
 	
-	outside(0, lattice.size()).resize(goal_id + 1);
-	outside(0, lattice.size())[goal_id] = cicada::semiring::traits<score_type>::one();
+	inside_outside(0, lattice.size())[goal_id].outside = cicada::semiring::traits<score_type>::one();
 	
 	for (size_type length = lattice.size(); length != 0; -- length)
 	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
 	    const size_type last = first + length;
-
-	    if (inside(first, last).empty()) continue;
-
-	    outside(first, last).reserve(inside(first, last).size());
-	    outside(first, last).resize(inside(first, last).size());
+	    
+	    if (inside_outside(first, last).empty()) continue;
 	    
 	    // first, enumerate final rules
 	    const passive_unary_set_type& finals = passives_final(first, last);
 	    for (id_type id = 0; id != static_cast<id_type>(finals.size()); ++ id) 
 	      if (! finals[id].edges.empty()) {
-		const score_type score_head = outside(first, last)[id];
+		const score_type score_head = inside_outside(first, last)[id].outside;
 		
 		if (score_head == cicada::semiring::traits<score_type>::zero()) continue;
 		
@@ -395,7 +395,7 @@ namespace cicada
 		for (typename unary_edge_set_type::const_iterator eiter = finals[id].edges.begin(); eiter != eiter_end; ++ eiter) {
 		  const unary_edge_type& edge = *eiter;
 		  
-		  score_type& score = outside(first, last)[edge.tail];
+		  score_type& score = inside_outside(first, last)[edge.tail].outside;
 		  score = std::max(score, score_head * edge.score);
 		}
 	      }
@@ -404,7 +404,7 @@ namespace cicada
 	    const passive_unary_set_type& unaries = passives_unary(first, last);
 	    for (id_type id = 0; id != static_cast<id_type>(unaries.size()); ++ id) 
 	      if (! unaries[id].edges.empty()) {
-		const score_type score_head = outside(first, last)[id];
+		const score_type score_head = inside_outside(first, last)[id].outside;
 		
 		if (score_head == cicada::semiring::traits<score_type>::zero()) continue;
 		
@@ -412,7 +412,7 @@ namespace cicada
 		for (typename unary_edge_set_type::const_iterator eiter = unaries[id].edges.begin(); eiter != eiter_end; ++ eiter) {
 		  const unary_edge_type& edge = *eiter;
 		  
-		  score_type& score = outside(first, last)[edge.tail];
+		  score_type& score = inside_outside(first, last)[edge.tail].outside;
 		  score = std::max(score, score_head * edge.score);
 		}
 	      }
@@ -421,8 +421,8 @@ namespace cicada
 	    const passive_set_type& rules = passives(first, last);
 	    for (id_type id = 0; id != static_cast<id_type>(rules.size()); ++ id) 
 	      if (! rules[id].edges.empty()) {
-		const score_type score_head = outside(first, last)[id];
-	      
+		const score_type score_head = inside_outside(first, last)[id].outside;
+		
 		if (score_head == cicada::semiring::traits<score_type>::zero()) continue;
 	      
 		typename edge_set_type::const_iterator eiter_end = rules[id].edges.end();
@@ -430,18 +430,15 @@ namespace cicada
 		  const edge_type& edge = *eiter;
 		
 		  const score_type score_edge = score_head * edge.score;
-		
+		  
 		  typename tail_set_type::const_iterator titer_end = edge.tails.end();
 		  for (typename tail_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
 		    score_type score_outside = score_edge;
 		    for (typename tail_set_type::const_iterator niter = edge.tails.begin(); niter != titer_end; ++ niter)
 		      if (titer != niter)
-			score_outside *= inside(niter->first, niter->last)[niter->id];
-		  
-		    if (titer->id >= static_cast<id_type>(outside(titer->first, titer->last).size()))
-		      outside(titer->first, titer->last).resize(titer->id + 1);
-		  
-		    score_type& score = outside(titer->first, titer->last)[titer->id];
+			score_outside *= inside_outside(niter->first, niter->last)[niter->id].inside;
+		    
+		    score_type& score = inside_outside(titer->first, titer->last)[titer->id].outside;
 		    score = std::max(score, score_outside);
 		  }
 		}
@@ -541,9 +538,9 @@ namespace cicada
 	      // lattice structure...
 	      // apply rules on actives at [first, last)
 	      
-	      active_set_type&  cell          = actives[table](first, last);
-	      passive_set_type& passive_arcs  = passives(first, last);
-	      score_set_type&   scores_inside = inside(first, last);
+	      active_set_type&     cell          = actives[table](first, last);
+	      passive_set_type&    passive_arcs  = passives(first, last);
+	      score_pair_set_type& scores_inside = inside_outside(first, last);
 	      
 	      typename active_set_type::const_iterator citer_end = cell.end();
 	      for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
@@ -554,7 +551,7 @@ namespace cicada
 		score_type score_tails = cicada::semiring::traits<score_type>::one();
 		typename tail_set_type::const_iterator titer_end = citer->edge.tails.end();
 		for (typename tail_set_type::const_iterator titer = citer->edge.tails.begin(); titer != titer_end; ++ titer)
-		  score_tails *= inside(titer->first, titer->last)[titer->id];
+		  score_tails *= inside_outside(titer->first, titer->last)[titer->id].inside;
 		
 		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
 		transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
@@ -574,7 +571,7 @@ namespace cicada
 		    scores_inside.resize(lhs + 1);
 		  
 		  passive_arcs[lhs].edges.push_back(edge_type(citer->edge.tails, score_edge));
-		  scores_inside[lhs] = std::max(scores_inside[lhs], score_tails * score_edge);
+		  scores_inside[lhs].inside = std::max(scores_inside[lhs].inside, score_tails * score_edge);
 		}
 	      }
 	    }
@@ -583,13 +580,13 @@ namespace cicada
 	      // unary rules...
 	      const passive_set_type& passive = passives(first, last);
 	      passive_unary_set_type& passive_unary = passives_unary(first, last);
-	      score_set_type&         scores_inside = inside(first, last);
+	      score_pair_set_type&    scores_inside = inside_outside(first, last);
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
 		  // child to parent...
 		  const unary_set_type& closure = unary_closure(id);
-		  const score_type score_tail = scores_inside[id];
+		  const score_type score_tail = scores_inside[id].inside;
 		  
 		  typename unary_set_type::const_iterator citer_end = closure.end();
 		  for (typename unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
@@ -602,7 +599,7 @@ namespace cicada
 		      scores_inside.resize(citer->id + 1);
 		    
 		    passive_unary[citer->id].edges.push_back(unary_edge_type(id, citer->score));
-		    scores_inside[citer->id] = std::max(scores_inside[citer->id], score_tail * citer->score);
+		    scores_inside[citer->id].inside = std::max(scores_inside[citer->id].inside, score_tail * citer->score);
 		  }
 		}
 	    }
@@ -612,13 +609,13 @@ namespace cicada
 	      // unary rules...
 	      const passive_unary_set_type& passive = passives_unary(first, last);
 	      passive_unary_set_type& passive_final = passives_final(first, last);
-	      score_set_type&         scores_inside = inside(first, last);
+	      score_pair_set_type&    scores_inside = inside_outside(first, last);
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
 		  // child to parent...
 		  const unary_set_type& closure = unary_closure(id);
-		  const score_type score_tail = scores_inside[id];
+		  const score_type score_tail = scores_inside[id].inside;
 		  
 		  typename unary_set_type::const_iterator citer_end = closure.end();
 		  for (typename unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
@@ -631,7 +628,7 @@ namespace cicada
 		      scores_inside.resize(citer->id + 1);
 		    
 		    passive_final[citer->id].edges.push_back(unary_edge_type(id, citer->score));
-		    scores_inside[citer->id] = std::max(scores_inside[citer->id], score_tail * citer->score);
+		    scores_inside[citer->id].inside = std::max(scores_inside[citer->id].inside, score_tail * citer->score);
 		  }
 		}
 	    }
@@ -773,8 +770,7 @@ namespace cicada
       symbol_map_type symbol_map;
       id_type goal_id;
       
-      score_chart_type inside;
-      score_chart_type outside;
+      score_pair_chart_type inside_outside;
       
       active_chart_set_type    actives;
       passive_chart_type       passives;
