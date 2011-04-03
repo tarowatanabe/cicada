@@ -346,9 +346,10 @@ namespace cicada
 	for (size_type length = 1; length <= lattice.size(); ++ length)
 	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
 	    const size_type last = first + length;
+
+	    if (inside(first, last).empty()) continue;
 	    
-	    label_score_set_type&  labels_scores = scores(first, last);
-	    
+	    label_score_set_type& labels_scores  = scores(first, last);
 	    const score_set_type& scores_inside  = inside(first, last);
 	    const score_set_type& scores_outside = outside(first, last);
 	    
@@ -376,6 +377,8 @@ namespace cicada
 	for (size_type length = lattice.size(); length != 0; -- length)
 	  for (size_type first = 0; first + length <= lattice.size(); ++ first) {
 	    const size_type last = first + length;
+
+	    if (inside(first, last).empty()) continue;
 
 	    outside(first, last).reserve(inside(first, last).size());
 	    outside(first, last).resize(inside(first, last).size());
@@ -694,7 +697,6 @@ namespace cicada
 		  if (lhs == child) continue;
 		  
 		  const score_type score = function(riter->features) * citer->second;
-
 		  
 		  std::pair<typename closure_set_type::iterator, bool> result = closure_next.insert(std::make_pair(lhs, score));
 		  if (result.second)
