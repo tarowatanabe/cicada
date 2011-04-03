@@ -21,6 +21,7 @@
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_map.hpp>
+#include <utils/indexed_set.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -123,11 +124,8 @@ namespace cicada
     
     typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
     typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
-
-  
-    typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
-
     
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     
     struct less_non_terminal
     {
@@ -526,7 +524,6 @@ namespace cicada
       
       return found;
     }
-
     
   private:
     const symbol_type goal;
