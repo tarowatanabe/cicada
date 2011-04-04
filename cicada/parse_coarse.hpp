@@ -270,10 +270,10 @@ namespace cicada
       typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
       typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
       
-      typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
+      typedef utils::chunk_vector<passive_type, 1024 / sizeof(passive_type), std::allocator<passive_type> > passive_set_type;
       typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
       
-      typedef std::vector<passive_unary_type, std::allocator<passive_unary_type> > passive_unary_set_type;
+      typedef utils::chunk_vector<passive_unary_type, 1024 / sizeof(passive_unary_type), std::allocator<passive_unary_type> > passive_unary_set_type;
       typedef utils::chart<passive_unary_set_type, std::allocator<passive_unary_set_type> > passive_unary_chart_type;
             
       typedef std::vector<unary_type, std::allocator<unary_type> > unary_set_type;
@@ -551,7 +551,6 @@ namespace cicada
 	      passive_set_type&    passive_arcs  = passives(first, last);
 	      score_pair_set_type& scores_inside = inside_outside(first, last);
 
-	      passive_arcs.reserve(symbol_map.size());
 	      scores_inside.reserve(symbol_map.size());
 	      
 	      typename active_set_type::const_iterator citer_end = cell.end();
@@ -594,7 +593,6 @@ namespace cicada
 	      passive_unary_set_type& passive_unary = passives_unary(first, last);
 	      score_pair_set_type&    scores_inside = inside_outside(first, last);
 
-	      passive_unary.reserve(symbol_map.size());
 	      scores_inside.reserve(symbol_map.size());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
@@ -626,7 +624,6 @@ namespace cicada
 	      passive_unary_set_type& passive_final = passives_final(first, last);
 	      score_pair_set_type&    scores_inside = inside_outside(first, last);
 	      
-	      passive_final.reserve(symbol_map.size());
 	      scores_inside.reserve(symbol_map.size());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
