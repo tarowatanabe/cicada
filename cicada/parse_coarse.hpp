@@ -278,6 +278,7 @@ namespace cicada
             
       typedef std::vector<unary_type, std::allocator<unary_type> > unary_set_type;
       typedef std::deque<unary_set_type, std::allocator<unary_set_type> > unary_map_type;
+      typedef std::vector<bool, std::allocator<bool> > unary_computed_type;
       
       typedef google::dense_hash_map<id_type, score_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > closure_set_type;
       
@@ -558,8 +559,6 @@ namespace cicada
 	      passive_set_type&    passive_arcs  = passives(first, last);
 	      score_pair_set_type& scores_inside = inside_outside(first, last);
 
-	      scores_inside.reserve(symbol_map.size());
-	      
 	      typename active_set_type::const_iterator citer_end = cell.end();
 	      for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
 		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
@@ -600,8 +599,6 @@ namespace cicada
 	      passive_unary_set_type& passive_unary = passives_unary(first, last);
 	      score_pair_set_type&    scores_inside = inside_outside(first, last);
 
-	      scores_inside.reserve(symbol_map.size());
-	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
 		  // child to parent...
@@ -630,8 +627,6 @@ namespace cicada
 	      const passive_unary_set_type& passive = passives_unary(first, last);
 	      passive_unary_set_type& passive_final = passives_final(first, last);
 	      score_pair_set_type&    scores_inside = inside_outside(first, last);
-	      
-	      scores_inside.reserve(symbol_map.size());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
@@ -799,8 +794,8 @@ namespace cicada
       passive_unary_chart_type passives_unary;
       passive_unary_chart_type passives_final;
       
-      unary_map_type unaries;
-      std::vector<bool, std::allocator<bool> > unaries_computed;
+      unary_map_type      unaries;
+      unary_computed_type unaries_computed;
       closure_set_type closure;
       closure_set_type closure_next;
     };
