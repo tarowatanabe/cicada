@@ -270,10 +270,10 @@ namespace cicada
       typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
       typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
       
-      typedef utils::chunk_vector<passive_type, 1024 / sizeof(passive_type), std::allocator<passive_type> > passive_set_type;
+      typedef utils::chunk_vector<passive_type, 4096 / sizeof(passive_type), std::allocator<passive_type> > passive_set_type;
       typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
       
-      typedef utils::chunk_vector<passive_unary_type, 1024 / sizeof(passive_unary_type), std::allocator<passive_unary_type> > passive_unary_set_type;
+      typedef utils::chunk_vector<passive_unary_type, 4096 / sizeof(passive_unary_type), std::allocator<passive_unary_type> > passive_unary_set_type;
       typedef utils::chart<passive_unary_set_type, std::allocator<passive_unary_set_type> > passive_unary_chart_type;
             
       typedef std::vector<unary_type, std::allocator<unary_type> > unary_set_type;
@@ -342,12 +342,19 @@ namespace cicada
 	const bool has_goal = (goal_id < static_cast<id_type>(inside_outside(0, lattice.size()).size())
 			       && inside_outside(0, lattice.size())[goal_id].inside != cicada::semiring::traits<score_type>::zero());
 	
-	if (! has_goal) return false;
+	if (has_goal) {
+	  compute_outside(lattice);
+	  compute_inside_outside(lattice, scores);
+	}
 
-	compute_outside(lattice);
-	compute_inside_outside(lattice, scores);
-
-	return true;
+	inside_outside.clear();
+	
+	actives.clear();
+	passives.clear();
+	passives_unary.clear();
+	passives_final.clear();
+	
+	return has_goal;
       }
       
     private:

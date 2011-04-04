@@ -423,8 +423,13 @@ namespace cicada
 	  }
       }
       
+      actives.clear();
+      passives.clear();
+      non_terminals.clear();
+      
       // we will sort to remove unreachable nodes......
-      graph.topologically_sort();
+      if (graph.is_valid())
+	graph.topologically_sort();
     }
 
   private:
