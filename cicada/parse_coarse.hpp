@@ -314,6 +314,9 @@ namespace cicada
 	inside_outside.clear();
 	scores.clear();
 	
+	inside_outside.reserve(lattice.size() + 1);
+	scores.reserve(lattice.size() + 1);
+	
 	inside_outside.resize(lattice.size() + 1);
 	scores.resize(lattice.size() + 1);
 	
@@ -321,6 +324,11 @@ namespace cicada
 	passives.clear();
 	passives_unary.clear();
 	passives_final.clear();
+	
+	actives.reserve(grammar.size());
+	passives.reserve(lattice.size() + 1);
+	passives_unary.reserve(lattice.size() + 1);
+	passives_final.reserve(lattice.size() + 1);
 	
 	actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
 	passives.resize(lattice.size() + 1);
