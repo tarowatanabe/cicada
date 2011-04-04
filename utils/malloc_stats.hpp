@@ -6,6 +6,7 @@
 #ifndef __UTILS__MALLOC_STATS__HPP__
 #define __UTILS__MALLOC_STATS__HPP__ 1
 
+#include <cstdlib>
 #include <stdint.h>
 
 #include <memory>
