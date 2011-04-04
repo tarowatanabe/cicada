@@ -543,6 +543,9 @@ namespace cicada
 	      active_set_type&     cell          = actives[table](first, last);
 	      passive_set_type&    passive_arcs  = passives(first, last);
 	      score_pair_set_type& scores_inside = inside_outside(first, last);
+
+	      passive_arcs.reserve(symbol_map.size());
+	      scores_inside.reserve(symbol_map.size());
 	      
 	      typename active_set_type::const_iterator citer_end = cell.end();
 	      for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
@@ -583,6 +586,9 @@ namespace cicada
 	      const passive_set_type& passive = passives(first, last);
 	      passive_unary_set_type& passive_unary = passives_unary(first, last);
 	      score_pair_set_type&    scores_inside = inside_outside(first, last);
+
+	      passive_unary.reserve(symbol_map.size());
+	      scores_inside.reserve(symbol_map.size());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
@@ -612,6 +618,9 @@ namespace cicada
 	      const passive_unary_set_type& passive = passives_unary(first, last);
 	      passive_unary_set_type& passive_final = passives_final(first, last);
 	      score_pair_set_type&    scores_inside = inside_outside(first, last);
+	      
+	      passive_final.reserve(symbol_map.size());
+	      scores_inside.reserve(symbol_map.size());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
