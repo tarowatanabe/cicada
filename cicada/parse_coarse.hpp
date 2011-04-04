@@ -327,7 +327,6 @@ namespace cicada
 	passives_unary.resize(lattice.size() + 1);
 	passives_final.resize(lattice.size() + 1);
 	
-	symbol_map.clear();
 	goal_id = id_map(goal);
 	
 	compute_inside(lattice, pruner);
@@ -819,6 +818,10 @@ namespace cicada
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
     {
+      typedef ParseCKY parser_type;
+      typedef boost::shared_ptr<parser_type> parser_ptr_type;
+      typedef std::vector<parser_ptr_type, std::allocator<parser_ptr_type> > parser_ptr_set_type;
+      
       graph.clear();
       
       if (lattice.empty()) return;
@@ -826,11 +829,10 @@ namespace cicada
       label_score_chart_type scores_init;
       label_score_chart_type scores;
       label_score_chart_type scores_prev;
+      parser_ptr_set_type parsers(grammars.size() - 1);
       
-      {
-	ParseCKY parser(goal, grammars.front(), function, yield_source, treebank, pos_mode);
-	parser(lattice, scores_init, PruneNone());
-      }
+      parsers.front().reset(new ParseCKY(goal, grammars.front(), function, yield_source, treebank, pos_mode));
+      parsers.front()->operator()(lattice, scores_init, PruneNone());
       
       double factor = 1.0;
       
@@ -841,14 +843,15 @@ namespace cicada
 	
 	// corse-to-fine 
 	for (size_t level = 1; level != grammars.size() - 1; ++ level) {
-	  ParseCKY parser(goal, grammars[level], function, yield_source, treebank, pos_mode);
+	  if (! parsers[level])
+	    parsers[level].reset(new ParseCKY(goal, grammars[level], function, yield_source, treebank, pos_mode));
 	  
 	  scores_prev.swap(scores);
 	  
 	  if (level == 1)
-	    succeed = parser(lattice, scores, PruneCoarse<CoarseSimple>(scores_prev, thresholds[level - 1] * factor, CoarseSimple()));
+	    succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSimple>(scores_prev, thresholds[level - 1] * factor, CoarseSimple()));
 	  else
-	    succeed = parser(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev, thresholds[level - 1] * factor, CoarseSymbol(level - 2)));
+	    succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev, thresholds[level - 1] * factor, CoarseSymbol(level - 2)));
 	  
 	  if (! succeed) break;
 	}
