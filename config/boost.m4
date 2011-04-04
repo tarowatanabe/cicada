@@ -403,7 +403,7 @@ dnl generated only once above (before we start the for loops).
       LDFLAGS=$boost_save_LDFLAGS
       LIBS=$boost_save_LIBS
       if test x"$Boost_lib" = xyes; then
-        Boost_lib_LDFLAGS="-L$boost_ldpath -R$boost_ldpath"
+        Boost_lib_LDFLAGS="-L$boost_ldpath -Wl,-R$boost_ldpath"
         Boost_lib_LDPATH="$boost_ldpath"
         break 6
       else
@@ -969,6 +969,7 @@ if test x$boost_cv_inc_path != xno; then
   # I'm not sure about my test for `il' (be careful: Intel's ICC pre-defines
   # the same defines as GCC's).
   for i in \
+    _BOOST_gcc_test(4, 6) \
     _BOOST_gcc_test(4, 5) \
     _BOOST_gcc_test(4, 4) \
     _BOOST_gcc_test(4, 3) \
