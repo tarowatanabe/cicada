@@ -466,6 +466,10 @@ namespace cicada
 		} else
 		  rhs.push_back(*riter);
 	      }
+
+	      // this new epsilon-rule should be deleted again!
+	      if (tails.empty() && rhs.empty())
+		rhs.push_back(vocab_type::EPSILON);
 	      
 	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	      edge_new.rule = rule_type::create(rule_type(edge.rule->lhs, rhs.begin(), rhs.end()));
