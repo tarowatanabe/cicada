@@ -32,6 +32,8 @@ namespace cicada
     typedef Lattice    lattice_type;
     typedef HyperGraph hypergraph_type;
     typedef Vocab      vocab_type;
+
+    typedef hypergraph_type::rule_type rule_type;
     
     typedef lattice_type::symbol_type      symbol_type;
     typedef lattice_type::feature_set_type feature_set_type;
@@ -365,7 +367,46 @@ namespace cicada
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
+      typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_set_type;
       target = source;
+
+      if (! target.is_valid()) return;
+
+      rhs_set_type rhs;
+      
+      hypergraph_type::node_set_type::iterator niter_end = target.nodes.end();
+      for (hypergraph_type::node_set_type::iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
+	const hypergraph_type::node_type& node_source = source.nodes[node.id];
+	
+	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node_source.edges.end();
+	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  hypergraph_type::edge_type&       edge = target.edges[*eiter];
+	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
+	  
+	  const rule_type& rule = *edge.rule;
+	  
+	  if (rule.rhs.size() == 1 && rule.rhs.front() == vocab_type::EPSILON) {
+	    // we will mark this as deleted,
+	    // and keep bit-vector indicating the node.id has a edge with epsilon...
+	    
+	  } else {
+	    rhs.clear();
+	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) {
+	      if (*siter != vocab_type::EPSILON)
+		rhs.push_back(*siter);
+	    }
+	    
+	    if (rhs.size() != rule.rhs)
+	      edge.rule = rule_type::create(rule_type(rule.lhs, rhs.begin(), rhs.end()));
+	  }
+	}
+	
+	// iterate again...
+	
+	
+      }
     }
   };
   
