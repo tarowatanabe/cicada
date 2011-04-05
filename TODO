@@ -76,6 +76,5 @@ A unified framework to output verbose informaiton... HOW?
 POS annotated sentence input:
   How to convert each POS into latent annotated POS?
 
-
 Implement epsilon removal for forest:
   We need to handle arbitrary structure, and diferentiate epsilon removed parents.

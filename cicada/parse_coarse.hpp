@@ -24,8 +24,6 @@
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_map.hpp>
 #include <utils/sgi_hash_set.hpp>
-#include <utils/b_heap.hpp>
-#include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/indexed_set.hpp>
