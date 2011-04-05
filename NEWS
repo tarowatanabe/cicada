@@ -1,3 +1,7 @@
+2011-4-X
+Added coarse-to-fine parsing
+Added coarse grammar learning
+
 2011-3-28
 New grammar API: use --grammar and/or --tree-grammar only, and removed options, such as --grammar-static etc.
 Added parser component. Currently, we support tabular-CKY and bottom-up agenda-based best-first search with pruning.

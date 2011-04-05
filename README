@@ -55,7 +55,7 @@ Or, you can combine outputs from multiple systems by (New! and TODO):
 Monolingual grammar learning is implemented:
    - A simple PCFG by simply extracting rules.
    - Learn latent annotated PCFG by split/merge process with an EM algorihtm [25].
-   - Also, learn coarse grammars from latent annotated PCFG [26].
+   - Also, learn coarse grammars from the latent annotated PCFG for coarse-to-fine parsing [26].
 
 Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are implemented:
    - A conventional phrase extract algorithm in Moses
