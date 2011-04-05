@@ -13,6 +13,7 @@
 #include <utility>
 
 #include <cicada/lattice.hpp>
+#include <cicada/hypergraph.hpp>
 #include <cicada/vocab.hpp>
 
 #include <utils/hashmurmur.hpp>
@@ -28,8 +29,9 @@ namespace cicada
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
 
-    typedef Lattice lattice_type;
-    typedef Vocab   vocab_type;
+    typedef Lattice    lattice_type;
+    typedef HyperGraph hypergraph_type;
+    typedef Vocab      vocab_type;
     
     typedef lattice_type::symbol_type      symbol_type;
     typedef lattice_type::feature_set_type feature_set_type;
@@ -357,8 +359,13 @@ namespace cicada
 	  }
 	}
       
-      
       target.initialize_distance();
+    }
+
+    
+    void operator()(const hypergraph_type& source, hypergraph_type& target)
+    {
+      target = source;
     }
   };
   
@@ -377,6 +384,22 @@ namespace cicada
   {
     RemoveEpsilon __remover;
     __remover(lattice, removed);
+  }
+
+  inline
+  void remove_epsilon(HyperGraph& graph)
+  {
+    RemoveEpsilon __remover;
+    HyperGraph removed;
+    __remover(graph, removed);
+    graph.swap(removed);
+  }
+  
+  inline
+  void remove_epsilon(const HyperGraph& graph, HyperGraph& removed)
+  {
+    RemoveEpsilon __remover;
+    __remover(graph, removed);
   }
   
 };
