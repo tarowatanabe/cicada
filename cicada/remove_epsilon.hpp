@@ -15,10 +15,12 @@
 #include <cicada/lattice.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/vocab.hpp>
+#include <cicada/sort.hpp>
 
 #include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/bithack.hpp>
 
 namespace cicada
 {
@@ -364,16 +366,40 @@ namespace cicada
       target.initialize_distance();
     }
 
+    typedef utils::simple_vector<int, std::allocator<int> > index_set_type;
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_set_type;
+    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
+    
+    typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > epsilon_set_type;
+    typedef std::vector<epsilon_set_type, std::allocator<epsilon_set_type> > epsilon_map_type;
+
+    typedef std::vector<bool, std::allocator<bool> > removed_type;
+    
+    struct filter_edge
+    {
+      filter_edge(const removed_type& __removed) : removed(__removed) {}
+      
+      bool operator()(const hypergraph_type::edge_type& edge) const
+      {
+        return removed[edge.id];
+      }
+      
+      const removed_type& removed;
+     };
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
-      typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_set_type;
+      
       target = source;
 
       if (! target.is_valid()) return;
 
       rhs_set_type rhs;
+      tail_set_type tails;
       
+      epsilon_map_type epsilons(target.nodes.size());
+      removed_type     removed(target.edges.size(), false);
+
       hypergraph_type::node_set_type::iterator niter_end = target.nodes.end();
       for (hypergraph_type::node_set_type::iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
@@ -381,8 +407,7 @@ namespace cicada
 	
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node_source.edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node_source.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  hypergraph_type::edge_type&       edge = target.edges[*eiter];
-	  const hypergraph_type::edge_type& edge_source = source.edges[*eiter];
+	  hypergraph_type::edge_type& edge = target.edges[*eiter];
 	  
 	  const rule_type& rule = *edge.rule;
 	  
@@ -390,6 +415,8 @@ namespace cicada
 	    // we will mark this as deleted,
 	    // and keep bit-vector indicating the node.id has a edge with epsilon...
 	    
+	    epsilons[node.id].push_back(edge.id);
+	    removed[edge.id] = true;
 	  } else {
 	    rhs.clear();
 	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
@@ -400,13 +427,75 @@ namespace cicada
 	    
 	    if (rhs.size() != rule.rhs)
 	      edge.rule = rule_type::create(rule_type(rule.lhs, rhs.begin(), rhs.end()));
+	    
+	    index_set_type j_ends(edge.tails.size(), 0);
+	    index_set_type j(edge.tails.size(), 0);
+	    
+	    bool found_epsilon = false;
+	    
+	    for (size_type i = 0; i != edge.tails.size(); ++ i) {
+	      found_epsilon |= ! epsilons[edge.tails[i]].empty();
+	      j_ends[i] = utils::bithack::branch(epsilons[edge.tails[i]].empty(), size_type(0), epsilons[edge.tails[i]].size() + 1);
+	    }
+	    
+	    if (! found_epsilon) continue;
+	    
+	    for (;;) {
+	      tails.clear();
+	      rhs.clear();
+	      
+	      feature_set_type features = edge.features;
+	      
+	      int non_terminal_pos = 0;
+	      rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	      for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
+		if (riter->is_non_terminal()) {
+		  const int __non_terminal_index = riter->non_terminal_index();
+		  const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+		  ++ non_terminal_pos;
+		  
+		  if (j[antecedent_index] > 0 && j_ends[antecedent_index] > 0) {
+		    const hypergraph_type::edge_type& edge_antecedent = target.edges[epsilons[edge.tails[antecedent_index]][j[antecedent_index] - 1]];
+		    
+		    features += edge_antecedent.features;
+		    // edge_antcedent is an epsilon rule without tails!
+		  } else {
+		    tails.push_back(edge.tails[antecedent_index]);
+		    rhs.push_back(riter->non_terminal());
+		  }
+		} else
+		  rhs.push_back(*riter);
+	      }
+	      
+	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
+	      edge_new.rule = rule_type::create(rule_type(edge.rule->lhs, rhs.begin(), rhs.end()));
+	      edge_new.features = features;
+	      edge_new.attributes = edge.attributes;
+	      
+	      target.connect_edge(edge_new.id, edge.head);
+	      
+	      // proceed to the next...
+	      size_type index = 0;
+	      for (/**/; index != j.size(); ++ index) 
+		if (j_ends[index] != 0){
+		  ++ j[index];
+		  if (j[index] < j_ends[index]) break;
+		  j[index] = 0;
+		}
+	      
+	      // finished!
+	      if (index == j.size()) break;
+	    }
 	  }
 	}
-	
-	// iterate again...
-	
-	
       }
+      
+      // topologically sort...
+      removed.resize(target.edges.size(), false);
+      
+      hypergraph_type sorted;
+      topologically_sort(target, sorted, filter_edge(removed), true);
+      target.swap(sorted);
     }
   };
   
@@ -419,7 +508,6 @@ namespace cicada
     lattice.swap(__lattice);
   }
   
-
   inline
   void remove_epsilon(const Lattice& lattice, Lattice& removed)
   {
