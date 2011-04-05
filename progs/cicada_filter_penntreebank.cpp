@@ -259,6 +259,19 @@ void transform_unescape(treebank_type& treebank)
       transform_unescape(*aiter);
 }
 
+void transform_bracket(treebank_type& treebank)
+{
+  if (treebank.antecedents.empty()) {
+    const size_t size = treebank.cat.size();
+    
+    if (treebank.cat[0] == '[' && treebank.cat[size - 1] == ']')
+      treebank.cat = treebank.cat.substr(1, size - 2);
+    
+  } else
+    for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+      transform_bracket(*aiter);
+}
+
 void transform_stemmer(treebank_type& treebank, const stemmer_type& stemmer)
 {
   if (treebank.antecedents.empty())
@@ -388,6 +401,7 @@ bool remove_none = false;
 bool unescape_terminal = false;
 bool remove_cycle = false;
 bool collapse = false;
+bool remove_bracket = false;
 std::string stemmer;
 
 bool leaf = false;
@@ -508,6 +522,10 @@ int main(int argc, char** argv)
       if (__stemmer)
 	transform_stemmer(parsed, *__stemmer);
 
+      if (remove_bracket)
+	transform_bracket(parsed);
+      
+
       if (leaf) {
 	sent.clear();
 	
@@ -621,13 +639,14 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
-    ("replace-root", po::value<std::string>(&root_symbol), "replace root symbol")
-    ("unescape",     po::bool_switch(&unescape_terminal),  "unescape terminal symbols, such as -LRB-, \\* etc.")
-    ("normalize",    po::bool_switch(&normalize),          "normalize category, such as [,] [.] etc.")
-    ("remove-none",  po::bool_switch(&remove_none),        "remove -NONE-")
-    ("remove-cycle", po::bool_switch(&remove_cycle),       "remove cycle unary rules")
-    ("collapse",     po::bool_switch(&collapse),           "collapse unary rules")
-    ("stemmer",      po::value<std::string>(&stemmer),     "stemming for terminals")
+    ("replace-root",   po::value<std::string>(&root_symbol), "replace root symbol")
+    ("unescape",       po::bool_switch(&unescape_terminal),  "unescape terminal symbols, such as -LRB-, \\* etc.")
+    ("normalize",      po::bool_switch(&normalize),          "normalize category, such as [,] [.] etc.")
+    ("remove-none",    po::bool_switch(&remove_none),        "remove -NONE-")
+    ("remove-cycle",   po::bool_switch(&remove_cycle),       "remove cycle unary rules")
+    ("remove-bracket", po::bool_switch(&remove_bracket),     "remove bracket terminal (which may be confued with non-terminal!)")
+    ("collapse",       po::bool_switch(&collapse),           "collapse unary rules")
+    ("stemmer",        po::value<std::string>(&stemmer),     "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
     ("rule",      po::bool_switch(&rule),    "collect rules only")
