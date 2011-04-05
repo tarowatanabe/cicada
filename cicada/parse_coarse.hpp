@@ -8,7 +8,6 @@
 
 #include <vector>
 #include <algorithm>
-#include <set>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
