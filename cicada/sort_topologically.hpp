@@ -213,12 +213,16 @@ namespace cicada
 	  nodes_empty.insert(node_new.id);
       }
       
+      if (sorted.edges.empty() || sorted.nodes.empty()) {
+	sorted.clear();
+	return;
+      }
+      
       sorted.goal = sorted.nodes.size() - 1;
       
       if ((! nodes_empty.empty() && validate) || ! edges_cycle.empty()) {
 	hypergraph_type sorted_new;
 	filter_edge filter(sorted.edges.size());
-	
 	
 	id_set_type::const_iterator eiter_end = edges_cycle.end();
 	for (id_set_type::const_iterator eiter = edges_cycle.begin(); eiter != eiter_end; ++ eiter)

@@ -509,7 +509,7 @@ namespace cicada
       }
       
       // further removal...
-      if (epsilon_new) {
+      if (target.is_valid() && epsilon_new) {
 	hypergraph_type removed;
 	operator()(target, removed);
 	target.swap(removed);
