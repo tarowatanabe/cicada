@@ -26,7 +26,6 @@
 #include <utils/indexed_set.hpp>
 
 #include <google/dense_hash_map>
-#include <google/dense_hash_set>
 
 namespace cicada
 {
