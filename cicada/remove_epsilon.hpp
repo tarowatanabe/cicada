@@ -399,7 +399,9 @@ namespace cicada
       
       epsilon_map_type epsilons(target.nodes.size());
       removed_type     removed(target.edges.size(), false);
-
+      size_type        epsilon_remove = 0;
+      size_type        epsilon_new = 0;
+      
       hypergraph_type::node_set_type::iterator niter_end = target.nodes.end();
       for (hypergraph_type::node_set_type::iterator niter = target.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
@@ -417,6 +419,7 @@ namespace cicada
 	    
 	    epsilons[node.id].push_back(edge.id);
 	    removed[edge.id] = true;
+	    ++ epsilon_remove;
 	  } else {
 	    rhs.clear();
 	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
@@ -468,8 +471,10 @@ namespace cicada
 	      }
 
 	      // this new epsilon-rule should be deleted again!
-	      if (tails.empty() && rhs.empty())
+	      if (tails.empty() && rhs.empty()) {
 		rhs.push_back(vocab_type::EPSILON);
+		++ epsilon_new;
+	      }
 	      
 	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	      edge_new.rule = rule_type::create(rule_type(edge.rule->lhs, rhs.begin(), rhs.end()));
@@ -495,11 +500,20 @@ namespace cicada
       }
       
       // topologically sort...
-      removed.resize(target.edges.size(), false);
+      if (epsilon_remove) {
+	removed.resize(target.edges.size(), false);
+	
+	hypergraph_type sorted;
+	topologically_sort(target, sorted, filter_edge(removed), true);
+	target.swap(sorted);
+      }
       
-      hypergraph_type sorted;
-      topologically_sort(target, sorted, filter_edge(removed), true);
-      target.swap(sorted);
+      // further removal...
+      if (epsilon_new) {
+	hypergraph_type removed;
+	operator()(target, removed);
+	target.swap(removed);
+      }
     }
   };
   
