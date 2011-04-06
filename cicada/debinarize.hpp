@@ -116,9 +116,6 @@ namespace cicada
 	  
 	  removed[edge.id] = true;
 	  
-	  // TODO: we do not care index in categories...
-	  // This is potentially a hard work in that we need to adjust index...
-	  
 	  for (;;) {
 	    tails.clear();
 	    rhs.clear();
