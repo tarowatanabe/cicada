@@ -415,6 +415,7 @@ bool unary_bottom = false;
 bool unary_root = false;
 bool exclude_terminal = false;
 
+bool skip_invalid = false;
 bool validate = false;
 
 int debug = 0;
@@ -525,7 +526,6 @@ int main(int argc, char** argv)
       if (remove_bracket)
 	transform_bracket(parsed);
       
-
       if (leaf) {
 	sent.clear();
 	
@@ -616,8 +616,10 @@ int main(int argc, char** argv)
 	  for (hypergraph_type::edge_set_type::const_iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter)
 	    if (eiter->rule)
 	      os << *(eiter->rule) << '\n';
-	} else
-	  os << graph << '\n';
+	} else {
+	  if (! skip_invalid || graph.is_valid())
+	    os << graph << '\n';
+	}
       }
     }
   }
@@ -660,8 +662,9 @@ void options(int argc, char** argv)
     ("unary-root",   po::bool_switch(&unary_root),   "use single category for root")
     
     ("exclude-terminal", po::bool_switch(&exclude_terminal), "no terminal in span")
-
-    ("validate", po::bool_switch(&validate), "validate penntreebank")
+    
+    ("skip",     po::bool_switch(&skip_invalid), "skip invalid penntree")
+    ("validate", po::bool_switch(&validate),     "validate penntreebank")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
