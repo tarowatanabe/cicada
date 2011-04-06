@@ -109,10 +109,6 @@ struct ptr_equal
   }
 };
 
-//typedef double count_type;
-//typedef double prob_type;
-//typedef double logprob_type;
-
 typedef cicada::semiring::Logprob<double> weight_type;
 
 class Grammar : public google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
@@ -261,8 +257,8 @@ struct weight_function
     grammar_type::const_iterator giter = grammar.find(edge.rule);
     if (giter == grammar.end())
       throw std::runtime_error("invalid rule");
-
-    return cicada::semiring::traits<weight_type>::exp(giter->second);
+    
+    return giter->second;
   }
   
   const grammar_type& grammar;
@@ -360,7 +356,6 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
 	throw std::runtime_error("no base?");
       
       *piter = biter->second;
-      
       sum += static_cast<double>(citer->second) + prior * (*piter);
     }
     
