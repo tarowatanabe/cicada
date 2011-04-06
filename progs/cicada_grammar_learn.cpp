@@ -148,6 +148,7 @@ public:
   WordCounts() : count_set_type() { count_set_type::set_empty_key(symbol_type()); }
 };
 typedef WordCounts word_count_set_type;
+typedef WordCounts label_count_set_type;
 
 path_set_type input_files;
 path_type     output_grammar_file = "-";
@@ -163,7 +164,6 @@ int min_iteration_merge = 15;  // min EM-iterations for merge
 bool binarize_left = false;
 bool binarize_right = false;
 bool binarize_all = false;
-
 
 double prior_rule      = 0.1;
 double prior_lexicon   = 0.01;
@@ -187,6 +187,7 @@ int debug = 0;
 
 template <typename Generator, typename Maximizer>
 void grammar_merge(hypergraph_set_type& treebanks,
+		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
 		   Generator& generator,
@@ -194,6 +195,7 @@ void grammar_merge(hypergraph_set_type& treebanks,
 
 template <typename Generator, typename Maximizer>
 void grammar_split(hypergraph_set_type& treebanks,
+		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
 		   Generator& generator,
@@ -201,6 +203,7 @@ void grammar_split(hypergraph_set_type& treebanks,
 
 template <typename Function, typename Maximizer>
 double grammar_learn(const hypergraph_set_type& treebanks,
+		     label_count_set_type& labels,
 		     grammar_type& grammar,
 		     Function function,
 		     Maximizer maximier);
@@ -422,9 +425,10 @@ int main(int argc, char** argv)
     
     hypergraph_set_type treebanks;
     read_treebank(input_files, treebanks);
-
+    
+    label_count_set_type labels;
     grammar_type grammar;
-    grammar_learn(treebanks, grammar, zero_function(), Maximize());
+    grammar_learn(treebanks, labels, grammar, zero_function(), Maximize());
     
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
@@ -443,7 +447,7 @@ int main(int argc, char** argv)
       {
 	// for splitting, we will simply compute by maximization...
 	const utils::resource split_start;
-	grammar_split(treebanks, grammar, iter, generator, Maximize());
+	grammar_split(treebanks, labels, grammar, iter, generator, Maximize());
 	const utils::resource split_end;
 	
 	if (debug)
@@ -460,7 +464,7 @@ int main(int argc, char** argv)
 	    std::cerr << "split iteration: " << (i + 1) << std::endl;
 	  
 	  const utils::resource learn_start;
-	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar), MaximizeBayes(base));
+	  const double logprob_curr = grammar_learn(treebanks, labels, grammar, weight_function(grammar), MaximizeBayes(base));
 	  const utils::resource learn_end;
 
 	  if (debug)
@@ -477,7 +481,7 @@ int main(int argc, char** argv)
       // merge..
       {
 	const utils::resource merge_start;
-	grammar_merge(treebanks, grammar, iter, generator, Maximize());
+	grammar_merge(treebanks, labels, grammar, iter, generator, Maximize());
 	const utils::resource merge_end;
 	
 	if (debug)
@@ -494,7 +498,7 @@ int main(int argc, char** argv)
 	    std::cerr << "merge iteration: " << (i + 1) << std::endl;
 	  
 	  const utils::resource learn_start;
-	  const double logprob_curr = grammar_learn(treebanks, grammar, weight_function(grammar), MaximizeBayes(base));
+	  const double logprob_curr = grammar_learn(treebanks, labels, grammar, weight_function(grammar), MaximizeBayes(base));
 	  const utils::resource learn_end;
 	  
 	  if (debug)
@@ -944,6 +948,7 @@ double round(double number)
 
 template <typename Generator, typename Maximizer>
 void grammar_merge(hypergraph_set_type& treebanks,
+		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
 		   Generator& generator,
@@ -1349,6 +1354,7 @@ struct TaskSplitGrammar : public Annotator
 
 template <typename Generator, typename Maximizer>
 void grammar_split(hypergraph_set_type& treebanks,
+		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
 		   Generator& generator,
@@ -1507,6 +1513,7 @@ struct TaskLearn
 
 template <typename Function, typename Maximizer>
 double grammar_learn(const hypergraph_set_type& treebanks,
+		     label_count_set_type& labels,
 		     grammar_type& grammar,
 		     Function function,
 		     Maximizer maximizer)
