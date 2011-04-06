@@ -441,7 +441,7 @@ int main(int argc, char** argv)
       {
 	// for splitting, we will simply compute by maximization...
 	const utils::resource split_start;
-	grammar_split(treebanks, grammar, iter, generator, Maximize());
+	grammar_split(treebanks, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource split_end;
 	
 	if (debug)
@@ -475,7 +475,7 @@ int main(int argc, char** argv)
       // merge..
       {
 	const utils::resource merge_start;
-	grammar_merge(treebanks, grammar, iter, generator, Maximize());
+	grammar_merge(treebanks, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource merge_end;
 	
 	if (debug)
