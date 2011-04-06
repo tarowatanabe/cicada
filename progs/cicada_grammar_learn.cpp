@@ -475,7 +475,7 @@ int main(int argc, char** argv)
       // merge..
       {
 	const utils::resource merge_start;
-	grammar_merge(treebanks, grammar, iter, generator, MaximizeBayes(base));
+	grammar_merge(treebanks, grammar, iter, generator, Maximize());
 	const utils::resource merge_end;
 	
 	if (debug)
