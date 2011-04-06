@@ -22,6 +22,7 @@
 #include <stdexcept>
 #include <vector>
 #include <deque>
+#include <numeric>
 
 #include <cicada/vocab.hpp>
 #include <cicada/hypergraph.hpp>
@@ -1326,6 +1327,7 @@ struct TaskSplitGrammar : public Annotator
   {
     typedef std::vector<int, std::allocator<int> > index_set_type;
     typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
+    typedef std::vector<double, std::allocator<double> > random_set_type;
     
     index_set_type  j;
     index_set_type  j_end;
@@ -1335,6 +1337,7 @@ struct TaskSplitGrammar : public Annotator
     const grammar_type::value_type* ptr = 0;
     
     grammar_type grammar_local;
+    random_set_type randoms;
     
     for (;;) {
       queue.pop(ptr);
@@ -1384,11 +1387,18 @@ struct TaskSplitGrammar : public Annotator
       }
       
       // transform grammar_local to counts...
-      const weight_type count = liter->second * ptr->second / weight_type(grammar_local.size());
+      const weight_type count = liter->second * ptr->second;
       
+      // random partition...
+      randoms.clear();
+      for (size_t i = 0; i != grammar_local.size(); ++ i)
+	randoms.push_back(boost::uniform_real<double>(0.99, 1.01)(generator));
+      const double random_sum = std::accumulate(randoms.begin(), randoms.end(), double(0.0));
+      
+      random_set_type::const_iterator riter = randoms.begin();
       grammar_type::const_iterator giter_end = grammar_local.end();
-      for (grammar_type::const_iterator giter = grammar_local.begin(); giter != giter_end; ++ giter)
-	counts[giter->first->lhs][giter->first] += count * weight_type(boost::uniform_real<double>(0.99, 1.01)(generator));
+      for (grammar_type::const_iterator giter = grammar_local.begin(); giter != giter_end; ++ giter, ++ riter)
+	counts[giter->first->lhs][giter->first] += count * weight_type(*riter / random_sum);
     }
   }
   
@@ -1443,6 +1453,8 @@ void grammar_split(hypergraph_set_type& treebanks,
     }
   }
 
+  generator = tasks_grammar.front().generator;
+  
   tasks_grammar.clear();
   
   if (debug)
