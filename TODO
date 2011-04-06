@@ -75,3 +75,5 @@ A unified framework to output verbose informaiton... HOW?
 
 POS annotated sentence input:
   How to convert each POS into latent annotated POS?
+
+Add more tests

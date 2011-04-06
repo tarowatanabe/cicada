@@ -117,6 +117,7 @@ namespace cicada
 	  removed[edge.id] = true;
 	  
 	  // TODO: we do not care index in categories...
+	  // This is potentially a hard work in that we need to adjust index...
 	  
 	  for (;;) {
 	    tails.clear();
@@ -125,15 +126,21 @@ namespace cicada
 	    feature_set_type features = edge.features;
 	    
 	    bool invalid = false;
-	    size_type i = 0;
+	    int non_terminal_pos = 0;
 	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
 	      if (riter->is_non_terminal()) {
-		if (j_ends[i] > 0) {
-		  const hypergraph_type::node_type& node_antecedent = target.nodes[edge.tails[i]];
-		  const hypergraph_type::edge_type& edge_antecedent = target.edges[node_antecedent.edges[j[i]]];
+		const int __non_terminal_index = riter->non_terminal_index();
+		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+		++ non_terminal_pos;
+		
+		if (j_ends[antecedent_index] > 0) {
+		  const hypergraph_type::node_type& node_antecedent = target.nodes[edge.tails[antecedent_index]];
+		  const hypergraph_type::edge_type& edge_antecedent = target.edges[node_antecedent.edges[j[antecedent_index]]];
 		  
 		  features += edge_antecedent.features;
+		  
+		  // special care is reqiured for gran-antecedents by converting indices....
 		  
 		  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge_antecedent.tails.end();
 		  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge_antecedent.tails.begin(); titer != titer_end; ++ titer) {
@@ -144,8 +151,9 @@ namespace cicada
 		  rule_type::symbol_set_type::const_iterator aiter_end = edge_antecedent.rule->rhs.end();
 		  for (rule_type::symbol_set_type::const_iterator aiter = edge_antecedent.rule->rhs.begin(); aiter != aiter_end; ++ aiter)
 		    rhs.push_back(aiter->is_non_terminal() ? aiter->non_terminal() : *aiter);
+		  
 		} else {
-		  tails.push_back(edge.tails[i]);
+		  tails.push_back(edge.tails[antecedent_index]);
 		  rhs.push_back(riter->non_terminal());
 		}
 		
