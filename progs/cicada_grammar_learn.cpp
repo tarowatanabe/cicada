@@ -186,8 +186,6 @@ path_type     output_character_file;
 int max_iteration = 6;         // max split-merge iterations
 int max_iteration_split = 20;  // max EM-iterations for split
 int max_iteration_merge = 20;  // max EM-iterations for merge
-int min_iteration_split = 15;  // min EM-iterations for split
-int min_iteration_merge = 15;  // min EM-iterations for merge
 
 bool binarize_left = false;
 bool binarize_right = false;
@@ -427,11 +425,6 @@ int main(int argc, char** argv)
       
     if (int(binarize_left) + binarize_right + binarize_all > 1)
       throw std::runtime_error("specify either binarize-{left,right,all}");
-
-    if (min_iteration_split > max_iteration_split)
-      throw std::runtime_error("minimum iteration for split is bigger than maximum iteration?");
-    if (min_iteration_merge > max_iteration_merge)
-      throw std::runtime_error("minimum iteration for merge is bigger than maximum iteration?");
     
     const signature_type* sig = (! signature.empty() ? &signature_type::create(signature) : 0);
     
@@ -500,7 +493,7 @@ int main(int argc, char** argv)
 		      << " user time: " << (learn_end.user_time() - learn_start.user_time())
 		      << std::endl;
 	  
-	  if (i >= min_iteration_split && logprob_curr < logprob) break;
+	  if (i && logprob_curr < logprob) break;
 	  
 	  logprob = logprob_curr;
 	}
@@ -534,7 +527,7 @@ int main(int argc, char** argv)
 		      << " user time: " << (learn_end.user_time() - learn_start.user_time())
 		      << std::endl;
 	  
-	  if (i >= min_iteration_merge && logprob_curr < logprob) break;
+	  if (i && logprob_curr < logprob) break;
 	  
 	  logprob = logprob_curr;
 	}
@@ -2529,8 +2522,6 @@ void options(int argc, char** argv)
     ("max-iteration",       po::value<int>(&max_iteration)->default_value(max_iteration),             "maximum split/merge iterations")
     ("max-iteration-split", po::value<int>(&max_iteration_split)->default_value(max_iteration_split), "maximum EM iterations after split")
     ("max-iteration-merge", po::value<int>(&max_iteration_merge)->default_value(max_iteration_merge), "maximum EM iterations after merge")
-    ("min-iteration-split", po::value<int>(&min_iteration_split)->default_value(min_iteration_split), "minimum EM iterations after split")
-    ("min-iteration-merge", po::value<int>(&min_iteration_merge)->default_value(min_iteration_merge), "minimum EM iterations after merge")
     
     ("binarize-left",  po::bool_switch(&binarize_left),  "left binarization")
     ("binarize-right", po::bool_switch(&binarize_right), "right binarization")
