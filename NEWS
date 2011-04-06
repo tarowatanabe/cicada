@@ -1,6 +1,7 @@
 2011-4-X
 Added coarse-to-fine parsing
 Added coarse grammar learning
+Added epsilon-removal for hypergraph
 
 2011-3-28
 New grammar API: use --grammar and/or --tree-grammar only, and removed options, such as --grammar-static etc.
