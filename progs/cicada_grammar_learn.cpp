@@ -109,16 +109,16 @@ struct ptr_equal
   }
 };
 
-typedef double count_type;
-typedef double prob_type;
-typedef double logprob_type;
+//typedef double count_type;
+//typedef double prob_type;
+//typedef double logprob_type;
 
 typedef cicada::semiring::Logprob<double> weight_type;
 
-class Grammar : public google::dense_hash_map<rule_ptr_type, count_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
+class Grammar : public google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> >
 {
 public:
-  typedef google::dense_hash_map<rule_ptr_type, count_type, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
+  typedef google::dense_hash_map<rule_ptr_type, weight_type, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
   
 public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
@@ -135,19 +135,19 @@ typedef Grammar grammar_type;
 #endif
 
 typedef symbol_set_type ngram_type;
-class NGramCounts : public google::dense_hash_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >
+class NGramCounts : public google::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >
 {
 public:
-  typedef google::dense_hash_map<ngram_type, count_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > count_set_type;
+  typedef google::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > count_set_type;
 
   NGramCounts() : count_set_type() { count_set_type::set_empty_key(ngram_type()); }
 };
 typedef NGramCounts ngram_count_set_type;
 
-class WordCounts : public google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+class WordCounts : public google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
 {
 public:
-  typedef google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > count_set_type;
+  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > count_set_type;
 
   WordCounts() : count_set_type() { count_set_type::set_empty_key(symbol_type()); }
 };
@@ -273,14 +273,13 @@ struct Maximize
   void operator()(const grammar_type& counts, grammar_type& grammar) const
   {
     // simle maximizer...
-    double sum = 0.0;
+    weight_type sum;
     grammar_type::const_iterator citer_end = counts.end();
     for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
       sum += citer->second;
     
-    const double logsum = cicada::semiring::log(weight_type(sum));
     for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
-      grammar[citer->first] = cicada::semiring::log(weight_type(citer->second)) - logsum;
+      grammar[citer->first] = citer->second / sum;
   }
 };
 
@@ -290,7 +289,7 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   
   MaximizeBayes(const grammar_type& __base) : base(__base) {}
   
-  typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;
+  typedef std::vector<double, std::allocator<double> > prob_set_type;
   
   struct Cache
   {
@@ -360,9 +359,9 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
       if (biter == base.end())
 	throw std::runtime_error("no base?");
       
-      *piter = utils::mathop::exp(biter->second);
+      *piter = biter->second;
       
-      sum += citer->second + prior * (*piter);
+      sum += static_cast<double>(citer->second) + prior * (*piter);
     }
     
     for (;;) {
@@ -371,9 +370,9 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
       
       prob_set_type::iterator piter = probs.begin();
       for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
-	const double logprob = utils::mathop::digamma(citer->second + prior * *piter) - logsum;
+	const double logprob = utils::mathop::digamma(static_cast<double>(citer->second) + prior * (*piter)) - logsum;
 	
-	grammar[citer->first] = logprob;
+	grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
 	logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
       }
       
@@ -440,8 +439,9 @@ int main(int argc, char** argv)
       
       // split...
       {
+	// for splitting, we will simply compute by maximization...
 	const utils::resource split_start;
-	grammar_split(treebanks, grammar, iter, generator, MaximizeBayes(base));
+	grammar_split(treebanks, grammar, iter, generator, Maximize());
 	const utils::resource split_end;
 	
 	if (debug)
@@ -797,7 +797,7 @@ struct TaskMergeLoss : public Annotator
 	  weight_type prob_split;
 	  weight_type inside_merge;
 	  weight_type outside_merge;
-	  count_type  scale_norm = 0.0;
+	  weight_type scale_norm;
 	  
 	  // is it correct?
 	  symbol_id_set_type::const_iterator iter_end = siter->end();
@@ -814,7 +814,7 @@ struct TaskMergeLoss : public Annotator
 	    scale_norm += witer->second;
 	  }
 	  
-	  const weight_type loss_node = (inside_merge * outside_merge / weight_type(scale_norm)) / prob_split;
+	  const weight_type loss_node = (inside_merge * outside_merge / scale_norm) / prob_split;
 	  
 	  std::pair<typename loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, true), loss_node));
 	  if (! result.second)
@@ -923,9 +923,9 @@ struct TaskMergeGrammar : public Annotator
 	}
       
       if (annotated)
-	counts[lhs][rule_type::create(rule_type(lhs, symbols))] += utils::mathop::exp(ptr->second);
+	counts[lhs][rule_type::create(rule_type(lhs, symbols))] += ptr->second;
       else
-	counts[rule->lhs][rule] += utils::mathop::exp(ptr->second);
+	counts[rule->lhs][rule] += ptr->second;
     }
   }
   
@@ -948,7 +948,7 @@ void grammar_merge(hypergraph_set_type& treebanks,
 		   Maximizer maximizer)
 {
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
-  typedef google::dense_hash_map<symbol_type, count_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > scale_set_type;
+  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > scale_set_type;
   typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
 
   typedef TaskMergeScale<scale_set_type>               task_scale_type;
@@ -1306,10 +1306,10 @@ struct TaskSplitGrammar : public Annotator
       symbols.clear();
       symbols.push_back(rule->lhs);
       symbols.insert(symbols.end(), rule->rhs.begin(), rule->rhs.end());
-
+      
       symbols_new.clear();
       symbols_new.insert(symbols_new.end(), symbols.begin(), symbols.end());
-    
+      
       j.clear();
       j.resize(rule->rhs.size() + 1, 0);
       j_end.resize(rule->rhs.size() + 1);
@@ -1321,11 +1321,11 @@ struct TaskSplitGrammar : public Annotator
 	for (size_t i = 0; i != symbols.size(); ++ i)
 	  if (j_end[i])
 	    symbols_new[i] = annotate(symbols[i], j[i]);
-      
+	
 	const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
-      
+	
 	// we will add 1% of randomness...
-	counts[rule->lhs][rule] = utils::mathop::exp(ptr->second) * boost::uniform_real<double>(0.99, 1.01)(generator);
+	counts[rule->lhs][rule] = ptr->second * weight_type(boost::uniform_real<double>(0.99, 1.01)(generator));
 	
 	size_t index = 0;
 	for (/**/; index != j.size(); ++ index) 
@@ -1359,7 +1359,6 @@ void grammar_split(hypergraph_set_type& treebanks,
   
   typedef typename task_treebank_type::queue_type queue_treebank_type;
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
-
   
   queue_grammar_type  queue_grammar;
   task_grammar_set_type tasks_grammar(threads, task_grammar_type(generator, bits, queue_grammar));
@@ -1444,18 +1443,18 @@ struct TaskLearn
 
     struct Count
     {
-      Count(count_type& __count, const weight_type& __weight) : count(__count), weight(__weight) {}
+      Count(weight_type& __count, const weight_type& __weight) : count(__count), weight(__weight) {}
       
       Count& operator+=(const weight_type& value)
       {
 	count += value / weight;
 	return *this;
       }
-    
-      count_type& count;
+      
+      weight_type& count;
       const weight_type& weight;
     };
-  
+    
     Count operator[](const hypergraph_type::id_type& x)
     {
       const rule_ptr_type& rule = treebank.edges[x].rule;
@@ -1642,6 +1641,8 @@ struct TaskLexiconCount
     ngram_type bigram(2);
     
     const signature_type& __signature = signature_type::create(signature);
+
+    const weight_type log_unknown_threshold(unknown_threshold);
     
     const hypergraph_type* __treebank = 0;
     for (;;) {
@@ -1675,7 +1676,7 @@ struct TaskLexiconCount
 	trigram[1] = bigram[0];
 	trigram[2] = rule.rhs.front();
 	
-	const count_type count = scores[edge.id] / inside.back();
+	const weight_type count = scores[edge.id] / inside.back();
 	
 	counts[trigram] += count;
 	counts[ngram_type(trigram.begin() + 1, trigram.end())] += count;
@@ -1688,7 +1689,7 @@ struct TaskLexiconCount
 	if (witer == word_counts.end())
 	  throw std::runtime_error("invalid word???");
 	
-	if (witer->second <= unknown_threshold)
+	if (witer->second <= log_unknown_threshold)
 	  counts_unknown[bigram] += count;
       }
     }
@@ -1705,7 +1706,7 @@ struct TaskLexiconCount
 
 struct LexiconEstimate
 {
-  typedef std::vector<logprob_type, std::allocator<logprob_type> > logprob_set_type;
+  typedef std::vector<weight_type, std::allocator<weight_type> > logprob_set_type;
   
   typedef std::vector<const ngram_count_set_type::value_type*, std::allocator<const ngram_count_set_type::value_type*> > ngram_set_type;
   typedef google::dense_hash_map<ngram_type, ngram_set_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > ngram_count_map_type;
@@ -1726,13 +1727,15 @@ struct LexiconEstimate
     
     ngram_set_type ngrams_local;
     {
+      weight_type sum;
       ngram_count_set_type::const_iterator niter_end = counts.end();
       for (ngram_count_set_type::const_iterator niter = counts.begin(); niter != niter_end; ++ niter)
 	if (niter->first.size() == 1) {
-	  total += niter->second;
+	  sum += niter->second;
 	  ++ vocab_size;
 	  ngrams_local.push_back(&(*niter));
 	}
+      total = sum;
     }
     
     logprob_set_type logprobs_local(ngrams_local.size());
@@ -1742,18 +1745,19 @@ struct LexiconEstimate
     for (;;) {
       discount = 0.0;
       
-      double logprob_sum = boost::numeric::bounds<double>::lowest();
+      weight_type logprob_sum;
       const double lognorm = utils::mathop::digamma(prior_lexicon * vocab_size + total);
       
       logprob_set_type::iterator liter = logprobs_local.begin();
       ngram_set_type::const_iterator niter_end = ngrams_local.end();
       for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
-	logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	*liter = logprob;
+	const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
+	
+	logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	*liter = cicada::semiring::traits<weight_type>::exp(logprob);
       }
       
-      discount = - boost::math::expm1(logprob_sum, policy_type());
+      discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
       
       if (discount > 0.0) break;
       ++ total;
@@ -1767,11 +1771,11 @@ struct LexiconEstimate
 	model[(*niter)->first] = *liter;
     }
     
-    const double logprob_unk = utils::mathop::log(discount);
+    const weight_type logprob_unk(discount);
 
     ngram_count_map_type ngrams;
     ngrams.set_empty_key(ngram_type());
-        
+    
     for (int n = 2; n <= order; ++ n) {
       ngrams.clear();
       
@@ -1788,35 +1792,39 @@ struct LexiconEstimate
 	logprobs_local.resize(ngrams_local.size());
 	
 	double total = 0.0;
-	double logsum_lower = boost::numeric::bounds<double>::lowest();
+	weight_type logsum;
+	weight_type logsum_lower;
 	ngram_set_type::const_iterator niter_end = ngrams_local.end();
 	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter) {
-	  total += (*niter)->second;
+	  logsum += (*niter)->second;
 	  
 	  ngram_count_set_type::const_iterator liter = model.find(ngram_type((*niter)->first.end() - n + 1, (*niter)->first.end()));
 	  if (liter == model.end())
 	    throw std::runtime_error("invalid lower order count: " + utils::lexical_cast<std::string>((*niter)->first));
 	  
-	  logsum_lower = utils::mathop::logsum(logsum_lower, liter->second);
+	  logsum_lower += liter->second;
 	}
 	
-	const double discount_lower = - boost::math::expm1(logsum_lower, policy_type());
+	total = logsum;
+	
+	const double discount_lower = - boost::math::expm1(cicada::semiring::log(logsum_lower), policy_type());
 	double discount = 0.0;
 	
 	for (;;) {
 	  discount = 0.0;
-	
-	  double logprob_sum = boost::numeric::bounds<double>::lowest();
+	  
+	  weight_type logprob_sum;
 	  const double lognorm = utils::mathop::digamma(prior_lexicon * ngrams_local.size() + total);
 	  
 	  logprob_set_type::iterator liter = logprobs_local.begin();
 	  for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	    const double logprob = utils::mathop::digamma(prior_lexicon + (*niter)->second) - lognorm;
-	    logprob_sum = utils::mathop::logsum(logprob_sum, logprob);
-	    *liter = logprob;
+	    const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
+	    
+	    logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	    *liter = cicada::semiring::traits<weight_type>::exp(logprob);
 	  }
 	  
-	  discount = - boost::math::expm1(logprob_sum, policy_type());
+	  discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
 	  
 	  if (discount > 0.0) break;
 	  ++ total;
@@ -1827,11 +1835,11 @@ struct LexiconEstimate
 	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter)
 	  model[(*niter)->first] = *liter;
 	
-	backoff[citer->first] = utils::mathop::log(discount) -  utils::mathop::log(discount_lower);
+	backoff[citer->first] = discount -  discount_lower;
       }
     }
-
-    return logprob_unk;
+    
+    return cicada::semiring::log(logprob_unk);
   }
   
   const double prior;
@@ -1959,15 +1967,15 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   //
   // From lexicon, compute discounted mass in fully observed counts, that is (probably) available in lexicon...
   //
+  
+  // TODO handle weight_type, not mixed logprob/count etc..
 
   ngram_count_set_type model_tag;
   grammar_type::const_iterator liter_end = lexicon.end();
   for (grammar_type::const_iterator liter = lexicon.begin(); liter != liter_end; ++ liter) {
     const symbol_type& lhs = liter->first->lhs;
     
-    std::pair<ngram_count_set_type::iterator, bool> result = model_tag.insert(std::make_pair(ngram_type(1, lhs), liter->second));
-    if (! result.second)
-      result.first->second = utils::mathop::logsum(result.first->second, liter->second);
+    model_tag[ngram_type(1, lhs)] += liter->second;
   }
 
   ngram_type bigram(2);
@@ -2001,14 +2009,14 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
       if (siter == backoff.end())
 	throw std::runtime_error("invalid backoffs!");
       
-      const logprob_type score_backoff = utils::mathop::log(- boost::math::expm1(tag_iter->second, policy_type()));
-      const logprob_type score_bigram  = sig_iter->second;
-      const logprob_type score_trigram = biter->second + siter->second + logprob_unk;
+      const weight_type score_backoff = - boost::math::expm1(cicada::semiring::log(tag_iter->second), policy_type());
+      const weight_type score_bigram  = sig_iter->second;
+      const weight_type score_trigram = biter->second * siter->second * logprob_unk;
       
       //std::cerr << "backoff: " << score_backoff << " bigram: " << score_bigram << " trigram: " << score_trigram << std::endl;
       //std::cerr << "biter: " << biter->second << " siter: " << siter->second << std::endl;
-
-      const logprob_type score = score_trigram + score_bigram + score_backoff;
+      
+      const weight_type score = score_trigram * score_bigram * score_backoff;
       
       lexicon.insert(std::make_pair(rule_type::create(rule_type(bigram.front(), rule_type::symbol_set_type(1, bigram.back()))), score));
     }
@@ -2067,7 +2075,7 @@ struct TaskCharacterCount
 	
 	const rule_type& rule = *edge.rule;
 
-	const count_type count = scores[edge.id] / inside.back();
+	const weight_type count = scores[edge.id] / inside.back();
 	
 	// assume penntreebank style...
 	ngram[0] = __signature(rule.rhs.front());
@@ -2135,7 +2143,7 @@ void characters_learn(const hypergraph_set_type& treebanks,
   // estimate for tag-sig-word
   const double logprob_unk = LexiconEstimate(prior_character, 3)(counts, model, backoff);
   
-  model[ngram_type(1, vocab_type::UNK)] = logprob_unk;
+  model[ngram_type(1, vocab_type::UNK)] = cicada::semiring::traits<weight_type>::exp(logprob_unk);
 }
 
 
@@ -2261,7 +2269,7 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
 {
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
   
-  typedef std::pair<rule_ptr_type, logprob_type> rule_logprob_type;
+  typedef std::pair<rule_ptr_type, weight_type> rule_logprob_type;
 #ifdef HAVE_TR1_UNORDERED_MAP
   typedef std::tr1::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 				  std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
@@ -2326,7 +2334,7 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
     if (riter->second.first != rule_ptr_type())
       grammar.insert(riter->second);
   
-  const double logcutoff = utils::mathop::log(cutoff);
+  const weight_type logcutoff(cutoff);
   sorted_type sorted;
   
   count_set_type::const_iterator citer_end = counts.end();
@@ -2340,8 +2348,8 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
     
     std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
     
-    const double logprob_max = sorted.front()->second;
-    const double logprob_threshold = logprob_max + logcutoff;
+    const weight_type logprob_max = sorted.front()->second;
+    const weight_type logprob_threshold = logprob_max * logcutoff;
     
     sorted_type::const_iterator siter_end = sorted.end();
     for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
@@ -2360,7 +2368,7 @@ void lexicon_prune(grammar_type& grammar, const double cutoff)
   
   grammar.clear();
   
-  const double logcutoff = utils::mathop::log(cutoff);
+  const weight_type logcutoff = utils::mathop::log(cutoff);
   sorted_type sorted;
   
   count_set_type::const_iterator citer_end = counts.end();
@@ -2374,8 +2382,8 @@ void lexicon_prune(grammar_type& grammar, const double cutoff)
     
     std::sort(sorted.begin(), sorted.end(), greater_ptr_second<grammar_type::value_type>());
     
-    const double logprob_max = sorted.front()->second;
-    const double logprob_threshold = logprob_max + logcutoff;
+    const weight_type logprob_max = sorted.front()->second;
+    const weight_type logprob_threshold = logprob_max * logcutoff;
     
     sorted_type::const_iterator siter_end = sorted.end();
     for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end && (*siter)->second >= logprob_threshold; ++ siter)
