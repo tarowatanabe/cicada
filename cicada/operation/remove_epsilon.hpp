@@ -22,6 +22,8 @@ namespace cicada
   
       void operator()(data_type& data) const;
   
+      bool lattice_mode;
+      bool forest_mode;
       int debug;
     };
 

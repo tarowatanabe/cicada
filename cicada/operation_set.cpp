@@ -165,7 +165,9 @@ prune: pruning\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
 remove-annotation: remove latent annotation from forest\n\
-remove-epsilon: remove epsilon for lattice\n\
+remove-epsilon: remove epsilon\n\
+\tlattice=[true|false] remove epsilon for lattice\n\
+\tforest=[true|false] remove epsilon for forest\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 span-forest: annotate terminal span\n\
 ";
