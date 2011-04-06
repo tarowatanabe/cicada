@@ -128,7 +128,7 @@ namespace cicada
 	    bool invalid = false;
 	    int non_terminal_pos = 0;
 	    rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
-	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+	    for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
 	      if (riter->is_non_terminal()) {
 		const int __non_terminal_index = riter->non_terminal_index();
 		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
@@ -141,25 +141,29 @@ namespace cicada
 		  features += edge_antecedent.features;
 		  
 		  // special care is reqiured for gran-antecedents by converting indices....
-		  
-		  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge_antecedent.tails.end();
-		  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge_antecedent.tails.begin(); titer != titer_end; ++ titer) {
-		    invalid |= binarized[*titer];
-		    tails.push_back(*titer);
-		  }
-		  
+
+		  int pos = 0;
 		  rule_type::symbol_set_type::const_iterator aiter_end = edge_antecedent.rule->rhs.end();
-		  for (rule_type::symbol_set_type::const_iterator aiter = edge_antecedent.rule->rhs.begin(); aiter != aiter_end; ++ aiter)
-		    rhs.push_back(aiter->is_non_terminal() ? aiter->non_terminal() : *aiter);
-		  
+		  for (rule_type::symbol_set_type::const_iterator aiter = edge_antecedent.rule->rhs.begin(); aiter != aiter_end; ++ aiter) {
+		    if (aiter->is_non_terminal()) {
+		      const int __index = aiter->non_terminal_index();
+		      const int index = utils::bithack::branch(__index <= 0, pos, __index - 1);
+		      ++ pos;
+		      
+		      invalid |= binarized[edge_antecedent.tails[index]];
+		      tails.push_back(edge_antecedent.tails[index]);
+		      
+		      rhs.push_back(aiter->non_terminal());
+		    } else
+		      rhs.push_back(*aiter);
+		  }
 		} else {
 		  tails.push_back(edge.tails[antecedent_index]);
 		  rhs.push_back(riter->non_terminal());
 		}
-		
-		++ i;
 	      } else
 		rhs.push_back(*riter);
+	    }
 	    
 	    if (! invalid) {
 	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
