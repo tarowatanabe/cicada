@@ -2363,7 +2363,7 @@ void lexicon_prune(grammar_type& grammar, const double cutoff)
   
   grammar.clear();
   
-  const weight_type logcutoff = utils::mathop::log(cutoff);
+  const weight_type logcutoff(cutoff);
   sorted_type sorted;
   
   count_set_type::const_iterator citer_end = counts.end();
