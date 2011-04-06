@@ -1708,7 +1708,7 @@ struct LexiconEstimate
   
   LexiconEstimate(const double& __prior, const int __order) : prior(__prior), order(__order) {}
   
-  double operator()(const ngram_count_set_type& counts, ngram_count_set_type& model, ngram_count_set_type& backoff)
+  weight_type operator()(const ngram_count_set_type& counts, ngram_count_set_type& model, ngram_count_set_type& backoff)
   {
     using namespace boost::math::policies;
     typedef policy<domain_error<errno_on_error>,
@@ -1834,7 +1834,7 @@ struct LexiconEstimate
       }
     }
     
-    return cicada::semiring::log(logprob_unk);
+    return logprob_unk;
   }
   
   const double prior;
@@ -1942,12 +1942,12 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   ngram_count_set_type backoff_sig;
   
   // estimate for tag-sig-word
-  const double logprob_unk = LexiconEstimate(prior_lexicon, 3)(counts, model, backoff);
+  const weight_type logprob_unk = LexiconEstimate(prior_lexicon, 3)(counts, model, backoff);
   
   //std::cerr << "logprob-unk: " << logprob_unk << std::endl;
-
+  
   // estimate for tag-sig
-  const double logprob_unk_sig = LexiconEstimate(prior_signature, 2)(counts_sig, model_sig, backoff_sig);
+  const weight_type logprob_unk_sig = LexiconEstimate(prior_signature, 2)(counts_sig, model_sig, backoff_sig);
 
   //std::cerr << "logprob-unk-sig: " << logprob_unk_sig << std::endl;
   
@@ -2136,9 +2136,9 @@ void characters_learn(const hypergraph_set_type& treebanks,
   }
   
   // estimate for tag-sig-word
-  const double logprob_unk = LexiconEstimate(prior_character, 3)(counts, model, backoff);
+  const weight_type logprob_unk = LexiconEstimate(prior_character, 3)(counts, model, backoff);
   
-  model[ngram_type(1, vocab_type::UNK)] = cicada::semiring::traits<weight_type>::exp(logprob_unk);
+  model[ngram_type(1, vocab_type::UNK)] = logprob_unk;
 }
 
 
