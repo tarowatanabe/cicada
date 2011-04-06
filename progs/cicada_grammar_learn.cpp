@@ -1830,7 +1830,7 @@ struct LexiconEstimate
 	for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter)
 	  model[(*niter)->first] = *liter;
 	
-	backoff[citer->first] = discount -  discount_lower;
+	backoff[citer->first] = weight_type(discount) / weight_type(discount_lower);
       }
     }
     
@@ -1988,9 +1988,11 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
       // swap backoff context..!
       bigram[0] = biter->first[1];
       bigram[1] = biter->first[0];
-      
+
       // check if this is really unknown rule...
       if (counts_unknown.find(bigram) == counts_unknown.end()) continue;
+
+      //std::cerr << "bigram: " << bigram << std::endl;
       
       ngram_count_set_type::const_iterator tag_iter = model_tag.find(ngram_type(1, bigram.front()));
       if (tag_iter == model_tag.end())
