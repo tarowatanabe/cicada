@@ -118,6 +118,15 @@ public:
   
 public:
   Grammar() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
+
+  Grammar& operator+=(const Grammar& x)
+  {
+    count_set_type::const_iterator iter_end = x.end();
+    for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+      count_set_type::operator[](iter->first) += iter->second;
+    
+    return *this;
+  }
 };
 
 typedef Grammar grammar_type;
@@ -137,6 +146,15 @@ public:
   typedef google::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> > count_set_type;
 
   NGramCounts() : count_set_type() { count_set_type::set_empty_key(ngram_type()); }
+
+  NGramCounts& operator+=(const NGramCounts& x)
+  {
+    count_set_type::const_iterator iter_end = x.end();
+    for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+      count_set_type::operator[](iter->first) += iter->second;
+    
+    return *this;
+  }
 };
 typedef NGramCounts ngram_count_set_type;
 
@@ -146,6 +164,15 @@ public:
   typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > count_set_type;
 
   WordCounts() : count_set_type() { count_set_type::set_empty_key(symbol_type()); }
+
+  WordCounts& operator+=(const WordCounts& x)
+  {
+    count_set_type::const_iterator iter_end = x.end();
+    for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
+      count_set_type::operator[](iter->first) += iter->second;
+    
+    return *this;
+  }
 };
 typedef WordCounts word_count_set_type;
 typedef WordCounts label_count_set_type;
@@ -447,7 +474,7 @@ int main(int argc, char** argv)
       {
 	// for splitting, we will simply compute by maximization...
 	const utils::resource split_start;
-	grammar_split(treebanks, labels, grammar, iter, generator, Maximize());
+	grammar_split(treebanks, labels, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource split_end;
 	
 	if (debug)
@@ -481,7 +508,7 @@ int main(int argc, char** argv)
       // merge..
       {
 	const utils::resource merge_start;
-	grammar_merge(treebanks, labels, grammar, iter, generator, Maximize());
+	grammar_merge(treebanks, labels, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource merge_end;
 	
 	if (debug)
@@ -898,9 +925,11 @@ struct TaskMergeGrammar : public Annotator
   
   TaskMergeGrammar(const int __bits,
 		   const Merged& __merged,
+		   const label_count_set_type& __labels,
 		   queue_type& __queue)
     : Annotator(__bits),
       merged(__merged),
+      labels(__labels),
       queue(__queue) {}
 
   void operator()()
@@ -911,6 +940,10 @@ struct TaskMergeGrammar : public Annotator
       if (! ptr) break;
       
       const rule_ptr_type& rule = ptr->first;
+      
+      label_count_set_type::const_iterator liter = labels.find(rule->lhs);
+      if (liter == labels.end())
+	throw std::runtime_error("no lhs count...? " + static_cast<const std::string&>(rule->lhs));
       
       bool annotated = false;
       symbol_type lhs = rule->lhs;
@@ -929,13 +962,14 @@ struct TaskMergeGrammar : public Annotator
 	}
       
       if (annotated)
-	counts[lhs][rule_type::create(rule_type(lhs, symbols))] += ptr->second;
+	counts[lhs][rule_type::create(rule_type(lhs, symbols))] += ptr->second * liter->second;
       else
-	counts[rule->lhs][rule] += ptr->second;
+	counts[rule->lhs][rule] += ptr->second * liter->second;
     }
   }
   
   const Merged& merged;
+  const label_count_set_type& labels;
   queue_type& queue;
   count_set_type counts;
 };
@@ -1099,7 +1133,7 @@ void grammar_merge(hypergraph_set_type& treebanks,
   
   // MapReduce to merge grammar
   queue_grammar_type queue_grammar;
-  task_grammar_set_type tasks_grammar(threads, task_grammar_type(bits, merged, queue_grammar));
+  task_grammar_set_type tasks_grammar(threads, task_grammar_type(bits, merged, labels, queue_grammar));
   
   boost::thread_group workers_grammar;
   for (int i = 0; i != threads; ++ i)
@@ -1108,7 +1142,6 @@ void grammar_merge(hypergraph_set_type& treebanks,
   grammar_type::const_iterator giter_end = grammar.end();
   for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
     queue_grammar.push(&(*giter));
-  
   
   for (int i = 0; i != threads; ++ i)
     queue_grammar.push(0);
@@ -1122,13 +1155,8 @@ void grammar_merge(hypergraph_set_type& treebanks,
       counts.swap(tasks_grammar[i].counts);
     else {
       count_set_type::const_iterator citer_end = tasks_grammar[i].counts.end();
-      for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer) {
-	grammar_type& grammar = counts[citer->first];
-	
-	grammar_type::const_iterator giter_end = citer->second.end();
-	for (grammar_type::const_iterator giter = citer->second.begin(); giter != giter_end; ++ giter)
-	  grammar[giter->first] += giter->second;
-      }
+      for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer)
+	counts[citer->first] += citer->second;
     }
   }
   
@@ -1287,9 +1315,11 @@ struct TaskSplitGrammar : public Annotator
 
   TaskSplitGrammar(Generator __generator,
 		   const int& __bits,
+		   const label_count_set_type& __labels,
 		   queue_type& __queue)
     : Annotator(__bits),
       generator(__generator),
+      labels(__labels),
       queue(__queue) {}
 
   void operator()()
@@ -1304,11 +1334,17 @@ struct TaskSplitGrammar : public Annotator
     
     const grammar_type::value_type* ptr = 0;
     
+    grammar_type grammar_local;
+    
     for (;;) {
       queue.pop(ptr);
       if (! ptr) break;
       
       const rule_ptr_type& rule = ptr->first;
+
+      label_count_set_type::const_iterator liter = labels.find(rule->lhs);
+      if (liter == labels.end())
+	throw std::runtime_error("no lhs count...? " + static_cast<const std::string&>(rule->lhs));
       
       symbols.clear();
       symbols.push_back(rule->lhs);
@@ -1320,7 +1356,9 @@ struct TaskSplitGrammar : public Annotator
       j.clear();
       j.resize(rule->rhs.size() + 1, 0);
       j_end.resize(rule->rhs.size() + 1);
-    
+
+      grammar_local.clear();
+      
       for (size_t i = 0; i != symbols.size(); ++ i)
 	j_end[i] = utils::bithack::branch(symbols[i].is_non_terminal(), utils::bithack::branch(is_fixed_non_terminal(symbols[i]), 1, 2), 0);
     
@@ -1332,7 +1370,7 @@ struct TaskSplitGrammar : public Annotator
 	const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
 	
 	// we will add 1% of randomness...
-	counts[rule->lhs][rule] = ptr->second * weight_type(boost::uniform_real<double>(0.99, 1.01)(generator));
+	grammar_local[rule] = ptr->second;
 	
 	size_t index = 0;
 	for (/**/; index != j.size(); ++ index) 
@@ -1344,10 +1382,18 @@ struct TaskSplitGrammar : public Annotator
 	
 	if (index == j.size()) break;
       }
+      
+      // transform grammar_local to counts...
+      const weight_type count = liter->second * ptr->second / weight_type(grammar_local.size());
+      
+      grammar_type::const_iterator giter_end = grammar_local.end();
+      for (grammar_type::const_iterator giter = grammar_local.begin(); giter != giter_end; ++ giter)
+	counts[giter->first->lhs][giter->first] += count * weight_type(boost::uniform_real<double>(0.99, 1.01)(generator));
     }
   }
   
   Generator generator;
+  const label_count_set_type& labels;
   queue_type& queue;
   count_set_type counts;
 };
@@ -1369,7 +1415,7 @@ void grammar_split(hypergraph_set_type& treebanks,
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
   
   queue_grammar_type  queue_grammar;
-  task_grammar_set_type tasks_grammar(threads, task_grammar_type(generator, bits, queue_grammar));
+  task_grammar_set_type tasks_grammar(threads, task_grammar_type(generator, bits, labels, queue_grammar));
   
   boost::thread_group workers_grammar;
   for (int i = 0; i != threads; ++ i)
@@ -1392,13 +1438,8 @@ void grammar_split(hypergraph_set_type& treebanks,
       counts.swap(tasks_grammar[i].counts);
     else {
       count_set_type::const_iterator citer_end = tasks_grammar[i].counts.end();
-      for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer) {
-	grammar_type& grammar = counts[citer->first];
-	
-	grammar_type::const_iterator giter_end = citer->second.end();
-	for (grammar_type::const_iterator giter = citer->second.begin(); giter != giter_end; ++ giter)
-	  grammar[giter->first] += giter->second;
-      }
+      for (count_set_type::const_iterator citer = tasks_grammar[i].counts.begin(); citer != citer_end; ++ citer)
+	counts[citer->first] += citer->second;
     }
   }
 
@@ -1502,13 +1543,23 @@ struct TaskLearn
       
       logprob *= inside.back();
     }
+    
+    count_set_type::const_iterator liter_end = counts.end();
+    for (count_set_type::const_iterator liter = counts.begin(); liter != liter_end; ++ liter) {
+      weight_type& count = labels[liter->first];
+      
+      grammar_type::const_iterator giter_end = liter->second.end();
+      for (grammar_type::const_iterator giter = liter->second.begin(); giter != giter_end; ++ giter)
+	count += giter->second;
+    }
   }
   
   queue_type&    queue;
   Function       function;
   
-  weight_type    logprob;
-  count_set_type counts;
+  weight_type          logprob;
+  label_count_set_type labels;
+  count_set_type       counts;
 };
 
 template <typename Function, typename Maximizer>
@@ -1539,22 +1590,23 @@ double grammar_learn(const hypergraph_set_type& treebanks,
   workers.join_all();
   
   weight_type logprob(cicada::semiring::traits<weight_type>::one());
+  labels.clear();
   count_set_type counts;
   for (int i = 0; i != threads; ++ i) {
     logprob *= tasks[i].logprob;
-    
+
     if (counts.empty())
       counts.swap(tasks[i].counts);
     else {
       count_set_type::const_iterator liter_end = tasks[i].counts.end();
-      for (count_set_type::const_iterator liter = tasks[i].counts.begin(); liter != liter_end; ++ liter) {
-	grammar_type& grammar = counts[liter->first];
-
-	grammar_type::const_iterator giter_end = liter->second.end();
-	for (grammar_type::const_iterator giter = liter->second.begin(); giter != giter_end; ++ giter)
-	  grammar[giter->first] += giter->second;
-      }
+      for (count_set_type::const_iterator liter = tasks[i].counts.begin(); liter != liter_end; ++ liter)
+	counts[liter->first] += liter->second;
     }
+    
+    if (labels.empty())
+      labels.swap(tasks[i].labels);
+    else
+      labels += tasks[i].labels;
   }
   
   if (debug)
@@ -1896,11 +1948,8 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   for (int i = 0; i != threads; ++ i) {
     if (word_counts.empty())
       word_counts.swap(tasks_frequency[i].counts);
-    else {
-      word_count_set_type::const_iterator witer_end = tasks_frequency[i].counts.end();
-      for (word_count_set_type::const_iterator witer = tasks_frequency[i].counts.begin(); witer != witer_end; ++ witer)
-	word_counts[witer->first] += witer->second;
-    }
+    else
+      word_counts += tasks_frequency[i].counts;
   }
 
   queue_count_type queue_count;
@@ -1924,27 +1973,18 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   for (int i = 0; i != threads; ++ i) {
     if (counts.empty())
       counts.swap(tasks_count[i].counts);
-    else {
-      ngram_count_set_type::const_iterator niter_end = tasks_count[i].counts.end();
-      for (ngram_count_set_type::const_iterator niter = tasks_count[i].counts.begin(); niter != niter_end; ++ niter)
-	counts[niter->first] += niter->second;
-    }
+    else
+      counts += tasks_count[i].counts;
     
     if (counts_sig.empty())
       counts_sig.swap(tasks_count[i].counts_sig);
-    else {
-      ngram_count_set_type::const_iterator niter_end = tasks_count[i].counts_sig.end();
-      for (ngram_count_set_type::const_iterator niter = tasks_count[i].counts_sig.begin(); niter != niter_end; ++ niter)
-	counts_sig[niter->first] += niter->second;
-    }
+    else
+      counts_sig += tasks_count[i].counts_sig;
     
     if (counts_unknown.empty())
       counts_unknown.swap(tasks_count[i].counts_unknown);
-    else {
-      ngram_count_set_type::const_iterator niter_end = tasks_count[i].counts_unknown.end();
-      for (ngram_count_set_type::const_iterator niter = tasks_count[i].counts_unknown.begin(); niter != niter_end; ++ niter)
-	counts_unknown[niter->first] += niter->second;
-    }
+    else
+      counts_unknown += tasks_count[i].counts_unknown;
   }
 
   ngram_count_set_type model;
@@ -2142,11 +2182,8 @@ void characters_learn(const hypergraph_set_type& treebanks,
   for (int i = 0; i != threads; ++ i) {
     if (counts.empty())
       counts.swap(tasks[i].counts);
-    else {
-      ngram_count_set_type::const_iterator niter_end = tasks[i].counts.end();
-      for (ngram_count_set_type::const_iterator niter = tasks[i].counts.begin(); niter != niter_end; ++ niter)
-	counts[niter->first] += niter->second;
-    }
+    else
+      counts += tasks[i].counts;
   }
   
   // estimate for tag-sig-word
