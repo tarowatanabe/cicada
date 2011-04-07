@@ -109,7 +109,6 @@ public:
     
     buffer.clear();
     snappy::Compress(raw.c_str(), raw.size(), &buffer);
-    
 #else
     buffer.clear();
     {
