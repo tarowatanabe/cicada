@@ -41,6 +41,7 @@
 #include <boost/random.hpp>
 #include <boost/xpressive/xpressive.hpp>
 #include <boost/math/special_functions/expm1.hpp>
+#include <boost/tokenizer.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
@@ -52,6 +53,15 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
+
+#include "utils/mpi.hpp"
+#include "utils/mpi_device.hpp"
+#include "utils/mpi_device_bcast.hpp"
+#include "utils/mpi_stream.hpp"
+#include "utils/mpi_stream_simple.hpp"
+#include "utils/space_separator.hpp"
+#include "utils/piece.hpp"
+#include "utils/base64.hpp"
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -222,8 +232,6 @@ double cutoff_rule = 1e-30;
 double cutoff_lexicon = 1e-40;
 double cutoff_character = 0;
 
-int threads = 1;
-
 int debug = 0;
 
 template <typename Generator, typename Maximizer>
@@ -274,6 +282,7 @@ void write_grammar(const path_type& file,
 
 void read_treebank(const path_set_type& files,
 		   hypergraph_set_type& treebanks);
+void bcast_treebank(hypergraph_set_type& treebanks);
 
 void grammar_prune(grammar_type& grammar, const double cutoff);
 void lexicon_prune(grammar_type& grammar, const double cutoff);
@@ -436,11 +445,17 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
 
 int main(int argc, char** argv)
 {
+  utils::mpi_world mpi_world(argc, argv);
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
   try {
     options(argc, argv);
 
     if (signature_list) {
-      std::cout << signature_type::lists();
+      if (mpi_rank == 0)
+	std::cout << signature_type::lists();
       return 0;
     }
     
@@ -466,10 +481,10 @@ int main(int argc, char** argv)
     if (input_files.empty())
       input_files.push_back("-");
     
-    threads = utils::bithack::max(threads, 1);
-    
     hypergraph_set_type treebanks;
-    read_treebank(input_files, treebanks);
+    if (mpi_rank == 0)
+      read_treebank(input_files, treebanks);
+    bcast_treebank(treebanks);
     
     label_count_set_type labels;
     grammar_type grammar;
@@ -485,7 +500,7 @@ int main(int argc, char** argv)
     
     for (int iter = 0; iter < max_iteration; ++ iter) {
       
-      if (debug)
+      if (mpi_rank == 0 && debug)
 	std::cerr << "iteration: " << (iter + 1) << std::endl;
       
       // split...
@@ -495,17 +510,17 @@ int main(int argc, char** argv)
 	grammar_split(treebanks, labels, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource split_end;
 	
-	if (debug)
+	if (mpi_rank == 0 && debug)
 	  std::cerr << "split: " << "grammar size: " << grammar.size() << std::endl;
 
-	if (debug)
+	if (mpi_rank == 0 && debug)
 	  std::cerr << "cpu time: " << (split_end.cpu_time() - split_start.cpu_time())
 		    << " user time: " << (split_end.user_time() - split_start.user_time())
 		    << std::endl;
 	
 	double logprob = 0.0;
 	for (int i = 0; i < max_iteration_split; ++ i) {
-	  if (debug)
+	  if (mpi_rank == 0 && debug)
 	    std::cerr << "split iteration: " << (i + 1) << std::endl;
 	  
 	  const utils::resource learn_start;
@@ -529,24 +544,24 @@ int main(int argc, char** argv)
 	grammar_merge(treebanks, labels, grammar, iter, generator, MaximizeBayes(base));
 	const utils::resource merge_end;
 	
-	if (debug)
+	if (mpi_rank == 0 && debug)
 	  std::cerr << "merge: " << "grammar size: " << grammar.size() << std::endl;
 
-	if (debug)
+	if (mpi_rank == 0 && debug)
 	  std::cerr << "cpu time: " << (merge_end.cpu_time() - merge_start.cpu_time())
 		    << " user time: " << (merge_end.user_time() - merge_start.user_time())
 		    << std::endl;
 	
 	double logprob = 0.0;
 	for (int i = 0; i < max_iteration_merge; ++ i) {
-	  if (debug)
+	  if (mpi_rank == 0 && debug)
 	    std::cerr << "merge iteration: " << (i + 1) << std::endl;
 	  
 	  const utils::resource learn_start;
 	  const double logprob_curr = grammar_learn(treebanks, labels, grammar, weight_function(grammar), MaximizeBayes(base));
 	  const utils::resource learn_end;
 	  
-	  if (debug)
+	  if (mpi_rank == 0 && debug)
 	    std::cerr << "cpu time: " << (learn_end.cpu_time() - learn_start.cpu_time())
 		      << " user time: " << (learn_end.user_time() - learn_start.user_time())
 		      << std::endl;
@@ -603,6 +618,11 @@ int main(int argc, char** argv)
   }
   return 0;
 }
+
+enum {
+  treebank_tag = 5000,
+  rule_tag,
+};
 
 bool is_fixed_non_terminal(const symbol_type& symbol)
 { 
@@ -1584,54 +1604,74 @@ double grammar_learn(const hypergraph_set_type& treebanks,
 		     Maximizer maximizer)
 {
   typedef TaskLearn<Function> task_type;
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
   typedef typename task_type::queue_type queue_type;
+  
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
 
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
   queue_type queue;
-  task_set_type tasks(threads, task_type(queue, function));
-
-  boost::thread_group workers;
-  for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
-
+  task_type task(queue, function);
+  boost::thread worker(boost::ref(task));
+  
   hypergraph_set_type::const_iterator titer_end = treebanks.end();
   for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue.push(&(*titer));
+  queue.push(0);
+  worker.join();
   
-  for (int i = 0; i != threads; ++ i)
-    queue.push(0);
+  // merge logprob...
+  double logprob = cicada::semiring::log(task.logprob);
+  double logprob_accumulated = 0.0;
+  MPI::COMM_WORLD.Allreduce(&logprob, &logprob_accumulated, 1, MPI::DOUBLE, MPI::SUM);
+  logprob = logprob_accumulated;
   
-  workers.join_all();
-  
-  weight_type logprob(cicada::semiring::traits<weight_type>::one());
-  labels.clear();
-  count_set_type counts;
-  for (int i = 0; i != threads; ++ i) {
-    logprob *= tasks[i].logprob;
+  // merge label counts
+  labels = task.labels;
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    if (rank == mpi_rank) {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::gzip_compressor());
+      os.push(utils::mpi_device_bcast_sink(rank, 1024 * 1024));
+      
+      label_count_set_type::const_iterator liter_end = task.labels.end();
+      for (label_count_set_type::const_iterator liter = task.labels.begin(); liter != liter_end; ++ liter) {
+	os << liter->first << ' ';
+	utils::encode_base64(liter->second, std::ostream_iterator<char>(os));
+	os << '\n';
+      }
+    } else {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_device_bcast_source(rank, 1024 * 1024));
 
-    if (counts.empty())
-      counts.swap(tasks[i].counts);
-    else {
-      count_set_type::const_iterator liter_end = tasks[i].counts.end();
-      for (count_set_type::const_iterator liter = tasks[i].counts.begin(); liter != liter_end; ++ liter)
-	counts[liter->first] += liter->second;
+      std::string line;
+      
+      while (std::getline(is, line)) {
+	const utils::piece line_piece(line);
+	tokenizer_type tokenizer(line_piece);
+	
+	tokenizer_type::iterator iter = tokenizer.begin();
+	if (iter == tokenizer.end()) continue;
+	const utils::piece label = *iter;
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	
+	labels[label] += utils::decode_base64<weight_type>(*iter);
+      }
     }
-    
-    if (labels.empty())
-      labels.swap(tasks[i].labels);
-    else
-      labels += tasks[i].labels;
   }
   
-  if (debug)
+  if (debug && mpi_rank == 0)
     std::cerr << "log-likelihood: " << cicada::semiring::log(logprob)
-	      << " # of symbols: " << counts.size()
+	      << " # of symbols: " << labels.size()
 	      << std::endl;
   
   // maximization
   grammar_maximize(counts, grammar, maximizer);
   
-  return cicada::semiring::log(logprob);
+  return logprob;
 }
 
 template <typename Function>
@@ -1646,7 +1686,7 @@ struct TaskLexiconFrequency
 
   void operator()()
   {
-        typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
     
     weight_set_type inside;
     weight_set_type outside;
@@ -2255,30 +2295,125 @@ void grammar_maximize(const count_set_type& counts,
   typedef TaskMaximize<Maximizer> task_type;
   typedef typename task_type::queue_type queue_type;
   
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  // map counts...
+  count_set_type counts_mapped;
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    if (rank == mpi_rank) {
+	typedef boost::iostreams::filtering_istream stream_type;
+	typedef boost::shared_ptr<stream_type> stream_ptr_type;
+	typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+	
+	stream_ptr_set_type streams(mpi_size);
+	for (int rank = 1; rank != mpi_size; ++ rank) {
+	  streams[rank].reset(new stream_type());
+	  streams[rank]->push(boost::iostreams::gzip_compressor());
+	  streams[rank]->push(utils::mpi_deivice_sink(rank, rule_tag, 1024 * 1024));
+	}
+
+	utils::hashmurmur<uint64_t> hasher;
+	
+	count_set_type::const_iterator citer_end = counts.end();
+	for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+	  const int pos = hasher(citer->first.begin(), citer->first.end(), 0);
+	  
+	  std::ostream& os = *streams[pos];
+	  
+	  const grammar_type& grmmar = citer->second;
+	  grammar_type::const_iterator giter_end = grammar.end();
+	  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
+	    os << *(giter->first);
+	    os << " ||| ";
+	    utils::encode_base64(giter->second, std::ostream_iterator<char>(os));
+	    os << '\n';
+	  }
+	}
+    } else {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_device_source(rank, rule_tag, 1024 * 1024));
+      
+      rule_type rule;
+      
+      std::string line;
+      std::string value;
+      while (std::getline(is, line)) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
+	
+	if (! rule.assign(iter, end))
+	  throw std::runtime_error("invalid rule?");
+	
+	if (! qi::phrase_parse(iter, end, "|||" >> standard::string, standard::space, value))
+	  throw std::runtime_error("expected sep + base64");
+	
+	if (iter != end)
+	  throw std::runtime_error("invalid line?");
+	
+	counts_mapped[rule.lhs][rule_type::create(rule)] += utils::decode_base64<weight_type>(value);
+      }
+    }
+  }
   
   queue_type queue;
-  task_set_type tasks(threads, task_type(queue, maximizer));
+  task_type task(queue, maximizer);
+  boost::thread worker(boost::ref(task));
   
-  boost::thread_group workers;
-  for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
-  
-  count_set_type::const_iterator citer_end = counts.end();
-  for (count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+  count_set_type::const_iterator citer_end = counts_mapped.end();
+  for (count_set_type::const_iterator citer = counts_mapped.begin(); citer != citer_end; ++ citer)
     queue.push(&(*citer));
+  queue.push(0);
   
-  for (int i = 0; i != threads; ++ i)
-    queue.push(0);
+  worker.join();
   
-  workers.join_all();
-  
-  grammar.clear();
-  for (int i = 0; i != threads; ++ i) {
-    if (grammar.empty())
-      grammar.swap(tasks[i].grammar);
-    else
-      grammar.insert(tasks[i].grammar.begin(), tasks[i].grammar.end());
+  // reduce rules...
+  grammar = task.grammar;
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    if (rank == mpi_rank) {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::gzip_compressor());
+      os.push(utils::mpi_device_bcast_sink(rank, 1024 * 1024));
+      
+      grammar_type::const_iterator giter_end = task.grammar.end();
+      for (grammar_type::const_iterator giter = task.grammar.begin(); giter != giter_end; ++ giter) {
+	os << *(giter->first);
+	os << " ||| ";
+	utils::encode_base64(giter->second, std::ostream_iterator<char>(os));
+	os << '\n';
+      }
+    } else {
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_device_bcast_source(rank, 1024 * 1024));
+
+      rule_type rule;
+      
+      std::string line;
+      std::string value;
+      while (std::getline(is, line)) {
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
+	
+	if (! rule.assign(iter, end))
+	  throw std::runtime_error("invalid rule?");
+	
+	if (! qi::phrase_parse(iter, end, "|||" >> standard::string, standard::space, value))
+	  throw std::runtime_error("expected sep + base64");
+	
+	if (iter != end)
+	  throw std::runtime_error("invalid line?");
+	
+	grammar[rule_type::create(rule)] = utils::decode_base64<weight_type>(value);
+      }
+    }
   }
 }
 
@@ -2545,7 +2680,50 @@ void read_treebank(const path_set_type& files,
   
   if (debug)
     std::cerr << "# of treebank: " << treebanks.size() << std::endl;
+}
 
+
+void bcast_treebank(hypergraph_set_type& treebanks)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    typedef boost::iostreams::filtering_ostream stream_type;
+    typedef boost::shared_ptr<stream_type> stream_ptr_type;
+    typedef std::vector<stream_ptr_type, std::allocator<stream_ptr_type> > stream_ptr_set_type;
+  
+    stream_ptr_set_type streams(mpi_size);
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      streams[rank].reset(new stream_type());
+      streams[rank]->push(boost::iostreams::gzip_compressor());
+      streams[rank]->push(utils::mpi_deivice_sink(rank, treebank_tag, 1024 * 1024));
+    }
+    
+    hypergraph_set_type treebanks_root;
+    for (size_t i = 0; i != treebanks.size(); ++ i) {
+      if (i % mpi_size == 0) {
+	treebanks_root.push_back(hypergraph_type());
+	treebanks_root.swap(treebanks[i]);
+      } else
+	*streams[i % mpi_size] << treebanks[i] << '\n';
+    }
+    
+    treebanks.swap(treebanks_root);
+  } else {
+    treebanks.clear();
+    
+    boost::iostreams::filtering_istream is;
+    is.push(boost::iostreams::gzip_decompressor());
+    is.push(utils::mpi_device_source(0, treebank_tag, 1024 * 1024));
+    
+    hypergraph_type treebank;
+    
+    while (is >> treebank) {
+      treebanks.push_back(hypergraph_type());
+      treebanks.back().swap(treebank);
+    }
+  }
 }
 
 void options(int argc, char** argv)
@@ -2586,8 +2764,6 @@ void options(int argc, char** argv)
     
     ("signature",      po::value<std::string>(&signature), "signature for unknown word")
     ("signature-list", po::bool_switch(&signature_list),   "list of signatures")
-    
-    ("threads", po::value<int>(&threads), "# of threads")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
