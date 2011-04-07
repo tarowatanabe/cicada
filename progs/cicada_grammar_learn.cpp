@@ -87,11 +87,7 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 class Treebank
 {
 private:
-#ifdef HAVE_SNAPPY
-  typedef std::string buffer_type;
-#else
   typedef std::vector<char, std::allocator<char> > buffer_type;
-#endif
   
 public:
   Treebank() : buffer() {}
@@ -100,15 +96,19 @@ public:
   void encode(const hypergraph_type& treebank)
   {
 #ifdef HAVE_SNAPPY
-    std::string raw;
+    buffer.clear();
     {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::back_inserter(raw));
+      os.push(boost::iostreams::back_inserter(buffer));
       os << treebank;
     }
     
+    std::string compressed;
+    snappy::Compress(&(*buffer.begin()), buffer.size(), &compressed);
+    
     buffer.clear();
-    snappy::Compress(raw.c_str(), raw.size(), &buffer);
+    buffer.insert(buffer.end(), compressed.begin(), compressed.end());
+    buffer_type(buffer).swap(buffer);
 #else
     buffer.clear();
     {
@@ -127,7 +127,7 @@ public:
   {
 #ifdef HAVE_SNAPPY
     std::string uncompressed;
-    snappy::Uncompress(buffer.c_str(), buffer.size(), &uncompressed);
+    snappy::Uncompress(&(*buffer.begin()), buffer.size(), &uncompressed);
     
     std::string::const_iterator iter = uncompressed.begin();
     std::string::const_iterator end = uncompressed.end();
