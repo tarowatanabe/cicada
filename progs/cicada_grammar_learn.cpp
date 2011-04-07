@@ -42,7 +42,7 @@
 #include <boost/xpressive/xpressive.hpp>
 #include <boost/math/special_functions/expm1.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
 #include <boost/iostreams/device/back_inserter.hpp>
 #include <boost/iostreams/device/array.hpp>
 
@@ -93,7 +93,7 @@ public:
     buffer.clear();
     {
       boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::gzip_compressor());
+      os.push(boost::iostreams::zlib_compressor());
       os.push(boost::iostreams::back_inserter(buffer));
       
       os << treebank;
@@ -108,7 +108,7 @@ public:
     if (buffer.empty()) return;
     
     boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::gzip_decompressor());
+    is.push(boost::iostreams::zlib_decompressor());
     is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
     
     is >> treebank;
@@ -1386,7 +1386,6 @@ struct TaskSplitTreebank : public Annotator
       if (treebank_new.is_valid())
 	treebank_new.topologically_sort();
       
-
       __treebank->encode(treebank_new);
     }
   }
