@@ -139,7 +139,7 @@ AC_ARG_WITH(tcmalloc,
 	[AC_HELP_STRING([--with-tcmalloc=DIR], [tcmalloc in DIR])],
 	[tcmalloc_dir="${withval}"], [tcmalloc_dir=''])
 AC_ARG_ENABLE(tcmalloc,
-	[AC_HELP_STRING([--enable-tcmalloc], [enable profiling via google's libtcmalloc])],
+	[AC_HELP_STRING([--enable-tcmalloc], [enable tcmalloc])],
 	[ac_enable_tcmalloc=yes], [ac_enable_tcmalloc=no])
 
 if test "x$tcmalloc_dir" != "x"; then
