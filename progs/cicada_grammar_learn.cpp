@@ -87,7 +87,11 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 class Treebank
 {
 private:
+#ifdef HAVE_SNAPPY
+  typedef std::string buffer_type;
+#else
   typedef std::vector<char, std::allocator<char> > buffer_type;
+#endif
   
 public:
   Treebank() : buffer() {}
@@ -95,6 +99,18 @@ public:
   
   void encode(const hypergraph_type& treebank)
   {
+#ifdef HAVE_SNAPPY
+    std::string raw;
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::back_inserter(raw));
+      os << treebank;
+    }
+    
+    buffer.clear();
+    snappy::Compress(raw.c_str(), raw.size(), &buffer);
+    
+#else
     buffer.clear();
     {
       boost::iostreams::filtering_ostream os;
@@ -105,10 +121,21 @@ public:
     }
     
     buffer_type(buffer).swap(buffer);
+#endif
   }
   
   void decode(hypergraph_type& treebank) const
   {
+#ifdef HAVE_SNAPPY
+    std::string uncompressed;
+    snappy::Uncompress(buffer.c_str(), buffer.size(), &uncompressed);
+    
+    std::string::const_iterator iter = uncompressed.begin();
+    std::string::const_iterator end = uncompressed.end();
+    
+    if (! treebank.assign(iter, end))
+      throw std::runtime_error("error in parsing compressed treebank?");
+#else
     treebank.clear();
     if (buffer.empty()) return;
     
@@ -117,6 +144,7 @@ public:
     is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
     
     is >> treebank;
+#endif
   }
   
 private:
