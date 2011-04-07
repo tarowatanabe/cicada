@@ -16,7 +16,7 @@
 //    9.  EM-iterations
 //
 //
-// TODO: sample unknown word...
+// TODO: construct dedicated forest structure....
 // 
 
 #include <stdexcept>
@@ -333,9 +333,7 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   typedef utils::hashmurmur<size_t> hasher_type;
   
   MaximizeBayes(const grammar_type& __base) : base(__base) {}
-  
-  typedef std::vector<weight_type, std::allocator<weight_type> > logprob_set_type;
-  
+    
   struct Cache
   {
     symbol_type symbol;
@@ -364,9 +362,23 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     }
     return cache.coarse;
   }
+
+  class RuleCounts : public google::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> >
+  {
+  public:
+    typedef google::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> > count_set_type;
+  
+  public:
+    RuleCounts() : count_set_type() { count_set_type::set_empty_key(rule_ptr_type()); }
+  };
+
+  typedef std::vector<weight_type, std::allocator<weight_type> > logprob_set_type;
+  typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> > rule_ptr_set_type;
+  typedef RuleCounts rule_count_set_type;
   
   
   logprob_set_type  __logprobs;
+  rule_ptr_set_type __rules;
   cache_set_type caches;
   const grammar_type& base;
   
@@ -384,22 +396,27 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
     const double prior = (is_terminal ? prior_lexicon : prior_rule) * counts.size();
     const weight_type logprior(prior);
-
+    
     logprob_set_type& logprobs = const_cast<logprob_set_type&>(__logprobs);
+    rule_ptr_set_type& rules = const_cast<rule_ptr_set_type&>(__rules);
     
     logprobs.resize(counts.size());
-    
-    weight_type logprob_sum;
-    weight_type sum;
+    rules.resize(counts.size());
 
+    rule_count_set_type rule_counts;
+
+    weight_type sum;
+        
     logprob_set_type::iterator piter = logprobs.begin();
+    rule_ptr_set_type::iterator riter = rules.begin();
     grammar_type::const_iterator citer_end = counts.end();
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter, ++ riter) {
       const symbol_type lhs = coarse(citer->first->lhs);
+      
       symbol_set_type rhs(citer->first->rhs);
-      symbol_set_type::iterator riter_end = rhs.end();
-      for (symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
-	*riter = coarse(*riter);
+      symbol_set_type::iterator siter_end = rhs.end();
+      for (symbol_set_type::iterator siter = rhs.begin(); siter != siter_end; ++ siter)
+	*siter = coarse(*siter);
       
       const rule_ptr_type rule_coarse(rule_type::create(rule_type(lhs, rhs)));
       
@@ -408,12 +425,23 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
 	throw std::runtime_error("no base?");
       
       *piter = biter->second;
-      logprob_sum += *piter;
+      *riter = biter->first;
+      
       sum += citer->second;
+      ++ rule_counts[biter->first];
+    }
+    
+    weight_type logprob_sum;
+    
+    logprob_set_type::iterator piter_end = logprobs.end();
+    riter = rules.begin();
+    for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter, ++ riter) {
+      *piter /= weight_type(static_cast<double>(rule_counts.find(*riter)->second));
+      
+      logprob_sum += *piter;
     }
     
     double total = 0.0;
-    logprob_set_type::iterator piter_end = logprobs.end();
     for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter)
       sum += logprior * ((*piter) / logprob_sum);
     total = sum;
@@ -1244,25 +1272,25 @@ struct TaskSplitTreebank : public Annotator
 	  symbols.clear();
 	  symbols.push_back(rule->lhs);
 	  symbols.insert(symbols.end(), rule->rhs.begin(), rule->rhs.end());
-	
+	  
 	  symbols_new.clear();
 	  symbols_new.insert(symbols_new.end(), symbols.begin(), symbols.end());
-	
+	  
 	  j.clear();
 	  j.resize(rule->rhs.size() + 1, 0);
 	  j_end.resize(rule->rhs.size() + 1);
-	
+	  
 	  hypergraph_type::edge_type::node_set_type tails(edge.tails.size());
-	
+	  
 	  for (size_t i = 0; i != symbols.size(); ++ i)
 	    j_end[i] = utils::bithack::branch(symbols[i].is_non_terminal(), utils::bithack::branch(is_fixed_non_terminal(symbols[i]), 1, 2), 0);
-	
+	  
 	  for (;;) {
 	    // construct rule
 	    for (size_t i = 0; i != symbols.size(); ++ i)
 	      if (j_end[i])
 		symbols_new[i] = annotate(symbols[i], j[i]);
-
+	    
 	    rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
 	    grammar_type::const_iterator giter = grammar.find(rule);
 	    if (giter == grammar.end())
