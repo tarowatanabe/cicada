@@ -1808,7 +1808,7 @@ struct LexiconEstimate
     }
     
     logprob_set_type logprobs_local(ngrams_local.size());
-    const weight_type logprior_lexicon(prior_lexicon);
+    const weight_type logprior(prior);
     
     // we will loop, increment total until we have enough mass discounted...
     double discount = 0.0;
@@ -1816,18 +1816,18 @@ struct LexiconEstimate
       discount = 0.0;
       
       weight_type logprob_sum;
-      //const double lognorm = utils::mathop::digamma(prior_lexicon * vocab_size + total);
-      const weight_type lognorm(prior_lexicon * vocab_size + total);
+      //const double lognorm = utils::mathop::digamma(prior * vocab_size + total);
+      const weight_type lognorm(prior * vocab_size + total);
       
       logprob_set_type::iterator liter = logprobs_local.begin();
       ngram_set_type::const_iterator niter_end = ngrams_local.end();
       for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	//const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
+	//const double logprob = utils::mathop::digamma(prior + static_cast<double>((*niter)->second)) - lognorm;
 	
 	//logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
 	//*liter = cicada::semiring::traits<weight_type>::exp(logprob);
 	
-	const weight_type logprob = (logprior_lexicon + (*niter)->second) / lognorm;
+	const weight_type logprob = (logprior + (*niter)->second) / lognorm;
 	logprob_sum += logprob;
 	*liter = logprob;
       }
@@ -1882,7 +1882,7 @@ struct LexiconEstimate
 	
 	total = logsum;
 	
-	const weight_type logprior_lexicon(prior_lexicon);
+	const weight_type logprior(prior);
 	const double discount_lower = - boost::math::expm1(cicada::semiring::log(logsum_lower), policy_type());
 	double discount = 0.0;
 	
@@ -1890,17 +1890,17 @@ struct LexiconEstimate
 	  discount = 0.0;
 	  
 	  weight_type logprob_sum;
-	  //const double lognorm = utils::mathop::digamma(prior_lexicon * ngrams_local.size() + total);
-	  const weight_type lognorm(prior_lexicon * ngrams_local.size() + total);
+	  //const double lognorm = utils::mathop::digamma(prior * ngrams_local.size() + total);
+	  const weight_type lognorm(prior * ngrams_local.size() + total);
 	  
 	  logprob_set_type::iterator liter = logprobs_local.begin();
 	  for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	    //const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
+	    //const double logprob = utils::mathop::digamma(prior + static_cast<double>((*niter)->second)) - lognorm;
 	    
 	    //logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
 	    //*liter = cicada::semiring::traits<weight_type>::exp(logprob);
 	    
-	    const weight_type logprob = (logprior_lexicon + (*niter)->second) / lognorm;
+	    const weight_type logprob = (logprior + (*niter)->second) / lognorm;
 	    logprob_sum += logprob;
 	    *liter = logprob;
 	  }
