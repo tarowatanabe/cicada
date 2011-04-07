@@ -390,32 +390,32 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     logprobs.resize(counts.size());
     
     weight_type logprob_sum;
-    {
-      logprob_set_type::iterator piter = logprobs.begin();
-      grammar_type::const_iterator citer_end = counts.end();
-      for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
-	const symbol_type lhs = coarse(citer->first->lhs);
-	symbol_set_type rhs(citer->first->rhs);
-	symbol_set_type::iterator riter_end = rhs.end();
-	for (symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
-	  *riter = coarse(*riter);
-	
-	const rule_ptr_type rule_coarse(rule_type::create(rule_type(lhs, rhs)));
-	
-	grammar_type::const_iterator biter = base.find(rule_coarse);
-	if (biter == base.end())
-	  throw std::runtime_error("no base?");
-	
-	*piter = biter->second;
-	logprob_sum += *piter;
-      }
+    weight_type sum;
+
+    logprob_set_type::iterator piter = logprobs.begin();
+    grammar_type::const_iterator citer_end = counts.end();
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
+      const symbol_type lhs = coarse(citer->first->lhs);
+      symbol_set_type rhs(citer->first->rhs);
+      symbol_set_type::iterator riter_end = rhs.end();
+      for (symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
+	*riter = coarse(*riter);
+      
+      const rule_ptr_type rule_coarse(rule_type::create(rule_type(lhs, rhs)));
+      
+      grammar_type::const_iterator biter = base.find(rule_coarse);
+      if (biter == base.end())
+	throw std::runtime_error("no base?");
+      
+      *piter = biter->second;
+      logprob_sum += *piter;
+      sum += citer->second;
     }
     
     double total = 0.0;
-    weight_type sum;
     logprob_set_type::iterator piter_end = logprobs.end();
     for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter)
-      sum += citer->second + logprior * ((*piter) / logprob_sum);
+      sum += logprior * ((*piter) / logprob_sum);
     total = sum;
     
     for (;;) {
