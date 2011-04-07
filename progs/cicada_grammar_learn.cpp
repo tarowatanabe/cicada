@@ -1364,7 +1364,6 @@ struct TaskSplitGrammar : public Annotator
 	
 	const rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
 	
-	// we will add 1% of randomness...
 	grammar_local[rule] = ptr->second;
 	
 	size_t index = 0;
@@ -1382,6 +1381,7 @@ struct TaskSplitGrammar : public Annotator
       const weight_type count = liter->second * ptr->second;
       
       // random partition...
+      // we will add 1% of randomness...
       randoms.clear();
       for (size_t i = 0; i != grammar_local.size(); ++ i)
 	randoms.push_back(boost::uniform_real<double>(0.99, 1.01)(generator));
