@@ -174,6 +174,19 @@ public:
     
     return *this;
   }
+  
+  WordCounts& operator*=(const WordCounts& x)
+  {
+    count_set_type::const_iterator iter_end = x.end();
+    for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
+      std::pair<count_set_type::iterator, bool> result = insert(*iter);
+      if (! result.second)
+	result.first->second *= iter->second;
+    }
+    
+    return *this;
+  }
+  
 };
 typedef WordCounts word_count_set_type;
 typedef WordCounts label_count_set_type;
@@ -316,7 +329,7 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   
   MaximizeBayes(const grammar_type& __base) : base(__base) {}
   
-  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  typedef std::vector<weight_type, std::allocator<weight_type> > logprob_set_type;
   
   struct Cache
   {
@@ -348,7 +361,7 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   }
   
   
-  prob_set_type  __probs;
+  logprob_set_type  __logprobs;
   cache_set_type caches;
   const grammar_type& base;
   
@@ -365,13 +378,15 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     
     const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
     const double prior = (is_terminal ? prior_lexicon : prior_rule);
+    const weight_type logprior(prior);
 
-    prob_set_type& probs = const_cast<prob_set_type&>(__probs);
+    logprob_set_type& logprobs = const_cast<logprob_set_type&>(__logprobs);
     
-    probs.resize(counts.size());
+    logprobs.resize(counts.size());
     
-    double sum = 0.0;
-    prob_set_type::iterator piter = probs.begin();
+    double total = 0.0;
+    weight_type sum;
+    logprob_set_type::iterator piter = logprobs.begin();
     grammar_type::const_iterator citer_end = counts.end();
     for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
       const symbol_type lhs = coarse(citer->first->lhs);
@@ -387,25 +402,26 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
 	throw std::runtime_error("no base?");
       
       *piter = biter->second;
-      sum += static_cast<double>(citer->second) + prior * (*piter);
+      sum += citer->second + logprior * (*piter);
     }
+    total = sum;
     
     for (;;) {
-      weight_type logprob_sum;
-      const double logsum = utils::mathop::digamma(sum);
+      weight_type sum;
+      const double logsum = utils::mathop::digamma(total);
       
-      prob_set_type::iterator piter = probs.begin();
+      logprob_set_type::iterator piter = logprobs.begin();
       for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
-	const double logprob = utils::mathop::digamma(static_cast<double>(citer->second) + prior * (*piter)) - logsum;
+	const double logprob = utils::mathop::digamma(static_cast<double>(citer->second + logprior * (*piter))) - logsum;
 	
 	grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
-	logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	sum += cicada::semiring::traits<weight_type>::exp(logprob);
       }
       
-      const double discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
+      const double discount = - boost::math::expm1(cicada::semiring::log(sum), policy_type());
       if (discount > 0.0) break;
       
-      ++ sum;
+      ++ total;
     }
   }
 };
@@ -697,10 +713,7 @@ struct TaskMergeScale
 		 queue_type& __queue)
     : grammar(__grammar),
       queue(__queue),
-      scale()
-  {
-    scale.set_empty_key(symbol_type());
-  }
+      scale() {}
   
   void operator()()
   {
@@ -761,10 +774,7 @@ struct TaskMergeLoss : public Annotator
       grammar(__grammar),
       scale(__scale),
       queue(__queue),
-      loss()
-  {
-    loss.set_empty_key(symbol_type());
-  }
+      loss() {}
   
   void operator()()
   {
@@ -983,8 +993,8 @@ void grammar_merge(hypergraph_set_type& treebanks,
 		   Maximizer maximizer)
 {
   typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > merged_set_type;
-  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > scale_set_type;
-  typedef google::dense_hash_map<symbol_type, weight_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > loss_set_type;
+  typedef word_count_set_type scale_set_type;
+  typedef word_count_set_type loss_set_type;
 
   typedef TaskMergeScale<scale_set_type>               task_scale_type;
   typedef TaskMergeLoss<loss_set_type, scale_set_type> task_loss_type;
@@ -1022,16 +1032,12 @@ void grammar_merge(hypergraph_set_type& treebanks,
   workers_scale.join_all();
   
   scale_set_type scale;
-  scale.set_empty_key(symbol_type());
   
   for (int i = 0; i != threads; ++ i) {
     if (scale.empty())
       scale.swap(tasks_scale[i].scale);
-    else {
-      scale_set_type::const_iterator siter_end = tasks_scale[i].scale.end();
-      for (scale_set_type::const_iterator siter = tasks_scale[i].scale.begin(); siter != siter_end; ++ siter)
-	scale[siter->first] += siter->second;
-    }
+    else
+      scale += tasks_scale[i].scale;
   }
   
   // MapReduce to compute loss
@@ -1050,20 +1056,13 @@ void grammar_merge(hypergraph_set_type& treebanks,
   
   workers_loss.join_all();
   
-  loss_set_type      loss;
-  loss.set_empty_key(symbol_type());
-
+  loss_set_type loss;
+  
   for (int i = 0; i != threads; ++ i) {
     if (loss.empty())
       loss.swap(tasks_loss[i].loss);
-    else {
-      loss_set_type::const_iterator liter_end = tasks_loss[i].loss.end();
-      for (loss_set_type::const_iterator liter = tasks_loss[i].loss.begin(); liter != liter_end; ++ liter) {
-	std::pair<loss_set_type::iterator, bool> result = loss.insert(*liter);
-	if (! result.second)
-	  result.first->second *= liter->second;
-      }
-    }
+    else
+      loss *= tasks_loss[i].loss;
   }
   
   // sort wrt gain of merging == loss of splitting...
