@@ -2411,12 +2411,34 @@ void lexicon_prune(grammar_type& grammar, const double cutoff)
 {
   typedef std::vector<const grammar_type::value_type*, std::allocator<const grammar_type::value_type*> > sorted_type;
 
+  typedef std::pair<rule_ptr_type, weight_type> rule_logprob_type;
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+				  std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
+#else
+  typedef sgi::hash_map<symbol_type, rule_logprob_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
+			std::allocator<std::pair<const symbol_type, rule_logprob_type> > > reachable_set_type;
+#endif
+  
+  // compute reachables...
+  reachable_set_type reachables;
+  
   count_set_type counts;
   grammar_type::const_iterator giter_end = grammar.end();
-  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter)
+  for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
     counts[giter->first->lhs].insert(*giter);
+    
+    const symbol_type& terminal = giter->first->rhs.front();
+    std::pair<reachable_set_type::iterator, bool> result = reachables.insert(std::make_pair(terminal, *giter));
+    if (! result.second && giter->second > result.first->second.second)
+      result.first->second = *giter;
+  }
   
   grammar.clear();
+  reachable_set_type::const_iterator riter_end = reachables.end();
+  for (reachable_set_type::const_iterator riter = reachables.begin(); riter != riter_end; ++ riter)
+    if (riter->second.first != rule_ptr_type())
+      grammar.insert(riter->second);
   
   const weight_type logcutoff(cutoff);
   sorted_type sorted;
