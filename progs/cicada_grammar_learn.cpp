@@ -199,9 +199,9 @@ path_type     output_character_file;
 symbol_type goal = "[ROOT]";
 
 int max_iteration = 6;         // max split-merge iterations
-int max_iteration_split = 20;  // max EM-iterations for split
+int max_iteration_split = 50;  // max EM-iterations for split
 int max_iteration_merge = 20;  // max EM-iterations for merge
-int min_iteration_split = 15;  // max EM-iterations for split
+int min_iteration_split = 30;  // max EM-iterations for split
 int min_iteration_merge = 15;  // max EM-iterations for merge
 
 bool binarize_left = false;
