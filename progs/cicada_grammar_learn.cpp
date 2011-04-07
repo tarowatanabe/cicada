@@ -206,7 +206,7 @@ bool binarize_left = false;
 bool binarize_right = false;
 bool binarize_all = false;
 
-double prior_rule      = 0.1;
+double prior_rule      = 0.01;
 double prior_lexicon   = 0.01;
 double prior_signature = 0.01;
 double prior_character = 0.01;
@@ -410,14 +410,20 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     
     for (;;) {
       weight_type sum;
-      const double logsum = utils::mathop::digamma(total);
+      const weight_type logtotal(total);
+      //const double logsum = utils::mathop::digamma(total);
       
       logprob_set_type::iterator piter = logprobs.begin();
       for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
-	const double logprob = utils::mathop::digamma(static_cast<double>(citer->second + logprior * (*piter))) - logsum;
+	//const double logprob = utils::mathop::digamma(static_cast<double>(citer->second + logprior * (*piter))) - logsum;
 	
-	grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
-	sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	//grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
+	//sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	
+	const weight_type logprob = (citer->second + logprior * (*piter)) / logtotal;
+	
+	grammar[citer->first] = logprob;
+	sum += logprob;
       }
       
       const double discount = - boost::math::expm1(cicada::semiring::log(sum), policy_type());
@@ -1802,6 +1808,7 @@ struct LexiconEstimate
     }
     
     logprob_set_type logprobs_local(ngrams_local.size());
+    const weight_type logprior_lexicon(prior_lexicon);
     
     // we will loop, increment total until we have enough mass discounted...
     double discount = 0.0;
@@ -1809,15 +1816,20 @@ struct LexiconEstimate
       discount = 0.0;
       
       weight_type logprob_sum;
-      const double lognorm = utils::mathop::digamma(prior_lexicon * vocab_size + total);
+      //const double lognorm = utils::mathop::digamma(prior_lexicon * vocab_size + total);
+      const weight_type lognorm(prior_lexicon * vocab_size + total);
       
       logprob_set_type::iterator liter = logprobs_local.begin();
       ngram_set_type::const_iterator niter_end = ngrams_local.end();
       for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
+	//const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
 	
-	logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
-	*liter = cicada::semiring::traits<weight_type>::exp(logprob);
+	//logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	//*liter = cicada::semiring::traits<weight_type>::exp(logprob);
+	
+	const weight_type logprob = (logprior_lexicon + (*niter)->second) / lognorm;
+	logprob_sum += logprob;
+	*liter = logprob;
       }
       
       discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
@@ -1870,6 +1882,7 @@ struct LexiconEstimate
 	
 	total = logsum;
 	
+	const weight_type logprior_lexicon(prior_lexicon);
 	const double discount_lower = - boost::math::expm1(cicada::semiring::log(logsum_lower), policy_type());
 	double discount = 0.0;
 	
@@ -1877,14 +1890,19 @@ struct LexiconEstimate
 	  discount = 0.0;
 	  
 	  weight_type logprob_sum;
-	  const double lognorm = utils::mathop::digamma(prior_lexicon * ngrams_local.size() + total);
+	  //const double lognorm = utils::mathop::digamma(prior_lexicon * ngrams_local.size() + total);
+	  const weight_type lognorm(prior_lexicon * ngrams_local.size() + total);
 	  
 	  logprob_set_type::iterator liter = logprobs_local.begin();
 	  for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	    const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
+	    //const double logprob = utils::mathop::digamma(prior_lexicon + static_cast<double>((*niter)->second)) - lognorm;
 	    
-	    logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
-	    *liter = cicada::semiring::traits<weight_type>::exp(logprob);
+	    //logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	    //*liter = cicada::semiring::traits<weight_type>::exp(logprob);
+	    
+	    const weight_type logprob = (logprior_lexicon + (*niter)->second) / lognorm;
+	    logprob_sum += logprob;
+	    *liter = logprob;
 	  }
 	  
 	  discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
