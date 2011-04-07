@@ -208,10 +208,11 @@ bool binarize_left = false;
 bool binarize_right = false;
 bool binarize_all = false;
 
-double prior_rule      = 0.01;
-double prior_lexicon   = 0.01;
-double prior_signature = 0.01;
-double prior_character = 0.01;
+double prior_rule      = 1;
+double prior_lexicon   = 1;
+double prior_unknown   = 1;
+double prior_signature = 1;
+double prior_character = 1;
 
 double merge_ratio = 0.5;
 double unknown_ratio = 0.5;
@@ -381,7 +382,7 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     if (counts.empty()) return;
     
     const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
-    const double prior = (is_terminal ? prior_lexicon : prior_rule);
+    const double prior = (is_terminal ? prior_lexicon : prior_rule) * counts.size();
     const weight_type logprior(prior);
 
     logprob_set_type& logprobs = const_cast<logprob_set_type&>(__logprobs);
@@ -412,20 +413,20 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     
     for (;;) {
       weight_type sum;
-      const weight_type logtotal(total);
-      //const double logsum = utils::mathop::digamma(total);
+      //const weight_type logtotal(total);
+      const double logtotal = utils::mathop::digamma(total);
       
       logprob_set_type::iterator piter = logprobs.begin();
       for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
-	//const double logprob = utils::mathop::digamma(static_cast<double>(citer->second + logprior * (*piter))) - logsum;
+	const double logprob = utils::mathop::digamma(static_cast<double>(citer->second + logprior * (*piter))) - logtotal;
 	
-	//grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
-	//sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
+	sum += cicada::semiring::traits<weight_type>::exp(logprob);
 	
-	const weight_type logprob = (citer->second + logprior * (*piter)) / logtotal;
+	//const weight_type logprob = (citer->second + logprior * (*piter)) / logtotal;
 	
-	grammar[citer->first] = logprob;
-	sum += logprob;
+	//grammar[citer->first] = logprob;
+	//sum += logprob;
       }
       
       const double discount = - boost::math::expm1(cicada::semiring::log(sum), policy_type());
@@ -1827,20 +1828,20 @@ struct LexiconEstimate
       discount = 0.0;
       
       weight_type logprob_sum;
-      //const double lognorm = utils::mathop::digamma(prior * vocab_size + total);
-      const weight_type lognorm(prior * vocab_size + total);
+      const double lognorm = utils::mathop::digamma(prior * vocab_size + total);
+      //const weight_type lognorm(prior * vocab_size + total);
       
       logprob_set_type::iterator liter = logprobs_local.begin();
       ngram_set_type::const_iterator niter_end = ngrams_local.end();
       for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	//const double logprob = utils::mathop::digamma(prior + static_cast<double>((*niter)->second)) - lognorm;
+	const double logprob = utils::mathop::digamma(static_cast<double>(logprior + (*niter)->second)) - lognorm;
 	
-	//logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
-	//*liter = cicada::semiring::traits<weight_type>::exp(logprob);
+	logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	*liter = cicada::semiring::traits<weight_type>::exp(logprob);
 	
-	const weight_type logprob = (logprior + (*niter)->second) / lognorm;
-	logprob_sum += logprob;
-	*liter = logprob;
+	//const weight_type logprob = (logprior + (*niter)->second) / lognorm;
+	//logprob_sum += logprob;
+	//*liter = logprob;
       }
       
       discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
@@ -1901,19 +1902,19 @@ struct LexiconEstimate
 	  discount = 0.0;
 	  
 	  weight_type logprob_sum;
-	  //const double lognorm = utils::mathop::digamma(prior * ngrams_local.size() + total);
-	  const weight_type lognorm(prior * ngrams_local.size() + total);
+	  const double lognorm = utils::mathop::digamma(prior * ngrams_local.size() + total);
+	  //const weight_type lognorm(prior * ngrams_local.size() + total);
 	  
 	  logprob_set_type::iterator liter = logprobs_local.begin();
 	  for (ngram_set_type::const_iterator niter = ngrams_local.begin(); niter != niter_end; ++ niter, ++ liter) {
-	    //const double logprob = utils::mathop::digamma(prior + static_cast<double>((*niter)->second)) - lognorm;
+	    const double logprob = utils::mathop::digamma(static_cast<double>(logprior + (*niter)->second)) - lognorm;
 	    
-	    //logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
-	    //*liter = cicada::semiring::traits<weight_type>::exp(logprob);
+	    logprob_sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	    *liter = cicada::semiring::traits<weight_type>::exp(logprob);
 	    
-	    const weight_type logprob = (logprior + (*niter)->second) / lognorm;
-	    logprob_sum += logprob;
-	    *liter = logprob;
+	    //const weight_type logprob = (logprior + (*niter)->second) / lognorm;
+	    //logprob_sum += logprob;
+	    //*liter = logprob;
 	  }
 	  
 	  discount = - boost::math::expm1(cicada::semiring::log(logprob_sum), policy_type());
@@ -2027,7 +2028,7 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   ngram_count_set_type backoff_sig;
   
   // estimate for tag-sig-word
-  const weight_type logprob_unk = LexiconEstimate(prior_lexicon, 3)(counts, model, backoff);
+  const weight_type logprob_unk = LexiconEstimate(prior_unknown, 3)(counts, model, backoff);
   
   //std::cerr << "logprob-unk: " << logprob_unk << std::endl;
   
@@ -2581,6 +2582,7 @@ void options(int argc, char** argv)
     
     ("prior-rule",      po::value<double>(&prior_rule)->default_value(prior_rule),           "Dirichlet prior for rules")
     ("prior-lexicon",   po::value<double>(&prior_lexicon)->default_value(prior_lexicon),     "Dirichlet prior for lexical rule")
+    ("prior-unknown",   po::value<double>(&prior_unknown)->default_value(prior_unknown),     "Dirichlet prior for unknown")
     ("prior-signature", po::value<double>(&prior_signature)->default_value(prior_signature), "Dirichlet prior for signature")
     ("prior-character", po::value<double>(&prior_character)->default_value(prior_character), "Dirichlet prior for character")
 
