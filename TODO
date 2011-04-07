@@ -77,3 +77,5 @@ POS annotated sentence input:
   How to convert each POS into latent annotated POS?
 
 Add more tests
+
+Revive codec library? Include snappy, Google made fast lz?

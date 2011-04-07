@@ -56,6 +56,11 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
+#include <utils/config.hpp>
+
+#ifdef HAVE_SNAPPY
+#include <snappy.h>
+#endif
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
