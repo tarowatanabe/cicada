@@ -103,11 +103,12 @@ public:
       os << treebank;
     }
     
-    std::string compressed;
-    snappy::Compress(&(*buffer.begin()), buffer.size(), &compressed);
-    
-    buffer.clear();
-    buffer.insert(buffer.end(), compressed.begin(), compressed.end());
+    buffer_type compressed(snappy::MaxCompressedLength(buffer.size()));
+    size_t compressed_length = 0;
+    snappy::RawCompress(&(*buffer.begin()), buffer.size(), &(*compressed.begin()), &compressed_length);
+    compressed.resize(compressed_length);
+
+    buffer.swap(compressed);
     buffer_type(buffer).swap(buffer);
 #else
     buffer.clear();
