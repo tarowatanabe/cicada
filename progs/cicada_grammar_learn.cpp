@@ -196,6 +196,8 @@ path_type     output_grammar_file = "-";
 path_type     output_lexicon_file;
 path_type     output_character_file;
 
+symbol_type goal = "[ROOT]";
+
 int max_iteration = 6;         // max split-merge iterations
 int max_iteration_split = 20;  // max EM-iterations for split
 int max_iteration_merge = 20;  // max EM-iterations for merge
@@ -598,9 +600,7 @@ int main(int argc, char** argv)
 
 bool is_fixed_non_terminal(const symbol_type& symbol)
 { 
-  static const symbol_type root("[ROOT]");
-  
-  return symbol.is_non_terminal() && symbol == root;
+  return symbol.is_non_terminal() && symbol == goal;
 };
 
 symbol_type annotate_symbol(const symbol_type& symbol, const int bitpos, const bool bit)
@@ -2338,8 +2338,6 @@ void grammar_prune(grammar_type& grammar, const double cutoff)
   reachable_set_type reachables;
   reachable_set_type reachables_next;
   
-  const symbol_type goal("[ROOT]");
-  
   reachables[goal];
   
   for (;;) {
@@ -2539,6 +2537,8 @@ void options(int argc, char** argv)
     ("output-grammar",   po::value<path_type>(&output_grammar_file),   "output grammar")
     ("output-lexicon",   po::value<path_type>(&output_lexicon_file),   "output lexical rules")
     ("output-character", po::value<path_type>(&output_character_file), "output character model")
+
+    ("goal", po::value<symbol_type>(&goal)->default_value(goal), "goal")
     
     ("max-iteration",       po::value<int>(&max_iteration)->default_value(max_iteration),             "maximum split/merge iterations")
     ("max-iteration-split", po::value<int>(&max_iteration_split)->default_value(max_iteration_split), "maximum EM iterations after split")
