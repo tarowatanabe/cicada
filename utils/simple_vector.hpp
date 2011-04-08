@@ -17,7 +17,6 @@
 
 namespace utils {
   
-  
   template <typename _Alloc >
   struct __simple_vector_alloc_impl
   {
@@ -183,6 +182,12 @@ namespace utils {
 	__base.swap(__base_new);
 	utils::destroy_range(__base_new.begin(), __base_new.end());
       }
+    }
+    
+    void pop_back()
+    {
+      // nochecking...
+      resize(size() - 1);
     }
 
     void push_back(const Tp& __value)
