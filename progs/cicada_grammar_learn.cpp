@@ -127,11 +127,17 @@ public:
   void decode(hypergraph_type& treebank) const
   {
 #ifdef HAVE_SNAPPY
-    std::string uncompressed;
-    snappy::Uncompress(&(*buffer.begin()), buffer.size(), &uncompressed);
+    size_t uncompressed_length = 0;
+    if (! snappy::GetUncompressedLength(&(*buffer.begin()), buffer.size(), &uncompressed_length))
+      throw std::runtime_error("invalid compressed buffer");
     
-    std::string::const_iterator iter = uncompressed.begin();
-    std::string::const_iterator end = uncompressed.end();
+    buffer_type uncompressed(uncompressed_length);
+    
+    if (! snappy::RawUncompress(&(*buffer.begin()), buffer.size(), &(*uncompressed.begin())))
+      throw std::runtime_error("uncompress failed");
+    
+    std::string::const_iterator iter(&(*uncompressed.begin()));
+    std::string::const_iterator end(iter + uncompressed.size());
     
     if (! treebank.assign(iter, end))
       throw std::runtime_error("error in parsing compressed treebank?");
