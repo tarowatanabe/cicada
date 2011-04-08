@@ -23,6 +23,10 @@ Optional:
 	For Linux, you should install one of them for better memory performance
 	and to know how many bytes malloced.
 
+	snappy (http://code.google.com/p/snappy/)
+	   This is "optionally" used only in cicada_grammar_learn for faster compression/decompression
+
+
 Included libraries + licenses:
 
 ==========================================================
