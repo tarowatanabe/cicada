@@ -197,68 +197,68 @@ namespace utils {
       base_type __base_new(__size + 1);
       std::uninitialized_copy(__base.begin(), __base.end(), __base_new.begin());
       utils::construct_object(__base_new.begin() + __size, __value);
+      
       __base.swap(__base_new);
       utils::destroy_range(__base_new.begin(), __base_new.end());
     }
 
     iterator insert(iterator position, const Tp& x)
     {
-      typedef std::vector<Tp, Alloc> vector_type;
+      const size_type __n = position - begin();
       
-      vector_type vec(begin(), end());
-      typename vector_type::iterator viter = vec.insert(vec.begin() + std::distance(begin(), position), x);
+      base_type __base_new(size() + 1);
+      std::uninitialized_copy(begin(), position, __base_new.begin());
+      utils::construct_object(__base_new.begin() + __n, x);
+      std::uninitialized_copy(position, end(), __base_new.begin() + __n + 1);
       
-      base_type __base_new(vec.size());
-      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
       __base.swap(__base_new);
       utils::destroy_range(__base_new.begin(), __base_new.end());
       
-      return begin() + std::distance(vec.begin(), viter);
+      return begin() + __n;
     }
 
     template <typename Iterator>
     void insert(iterator position, Iterator first, Iterator last)
     {
-      typedef std::vector<Tp, Alloc> vector_type;
+      const size_type __n = position - begin();
+      const size_type __d = std::distance(first, last);
       
-      vector_type vec(begin(), end());
-      vec.insert(vec.begin() + std::distance(begin(), position), first, last);
+      base_type __base_new(size() + __d);
+      std::uninitialized_copy(begin(), position, __base_new.begin());
+      std::uninitialized_copy(first, last, __base_new.begin() + __n);
+      std::uninitialized_copy(position, end(), __base_new.begin() + __n + __d);
       
-      base_type __base_new(vec.size());
-      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
       __base.swap(__base_new);
       utils::destroy_range(__base_new.begin(), __base_new.end());
     }
 
     iterator erase(iterator position)
     {
-      typedef std::vector<Tp, Alloc> vector_type;
+      const size_type __n = position - begin();
       
-      vector_type vec(begin(), end());
-      typename vector_type::iterator viter = vec.erase(vec.begin() + std::distance(begin(), position));
+      base_type __base_new(size() - 1);
+      std::uninitialized_copy(begin(), position, __base_new.begin());
+      std::uninitialized_copy(position + 1, end(), __base_new.begin() + __n);
       
-      base_type __base_new(vec.size());
-      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
       __base.swap(__base_new);
       utils::destroy_range(__base_new.begin(), __base_new.end());
       
-      return begin() + std::distance(vec.begin(), viter);
+      return begin() + __n;
     }
 
     iterator erase(iterator first, iterator last)
     {
-      typedef std::vector<Tp, Alloc> vector_type;
+      const size_type __n = first - begin();
+      const size_type __d = last - first;
       
-      vector_type vec(begin(), end());
-      typename vector_type::iterator viter = vec.erase(vec.begin() + std::distance(begin(), first),
-						       vec.begin() + std::distance(begin(), last));
+      base_type __base_new(size() - __d);
+      std::uninitialized_copy(begin(), first, __base_new.begin());
+      std::uninitialized_copy(last, end(), __base_new.begin() + __n);
       
-      base_type __base_new(vec.size());
-      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
       __base.swap(__base_new);
       utils::destroy_range(__base_new.begin(), __base_new.end());
       
-      return begin() + std::distance(vec.begin(), viter);
+      return begin() + __n;
     }
     
   private:
