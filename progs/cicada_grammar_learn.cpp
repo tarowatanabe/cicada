@@ -158,10 +158,13 @@ public:
   Treebank& operator=(const hypergraph_type& treebank)
   {
     nodes.clear();
+    edges.clear();
+    node_set_type(nodes).swap(nodes);
+    edge_set_type(edges).swap(edges);
+    
     nodes.reserve(treebank.nodes.size());
     nodes.insert(nodes.end(), treebank.nodes.begin(), treebank.nodes.end());
     
-    edges.clear();
     edges.reserve(treebank.edges.size());
     edges.insert(edges.end(), treebank.edges.begin(), treebank.edges.end());
     
