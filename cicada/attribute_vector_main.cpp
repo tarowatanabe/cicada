@@ -51,5 +51,11 @@ int main(int argc, char** argv)
   std::cout << "sizeof attr-value: " << sizeof(attribute_set_type::data_type) << std::endl;
   
   std::cout << "attr1: " << attr1 << std::endl;
-  
+
+  attr1["bad"] = attribute_set_type::int_type(5);
+  std::cout << "attr1: " << attr1 << std::endl;
+  attr1.erase("bad");
+  std::cout << "attr1: " << attr1 << std::endl;
+  attr1["bad"] = 4.5;
+  std::cout << "attr1: " << attr1 << std::endl;
 }

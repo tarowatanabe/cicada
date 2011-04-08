@@ -86,184 +86,17 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 class Treebank
 {
-private:
-  typedef std::vector<char, std::allocator<char> > buffer_type;
-  typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> >           rule_ptr_map_type;
-  typedef std::vector<feature_set_type, std::allocator<feature_set_type> >     feature_set_map_type;
-  typedef std::vector<attribute_set_type, std::allocator<attribute_set_type> > attribute_set_map_type;
-  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > id_set_type;
-  
 public:
-  Treebank() {}
-  Treebank(const hypergraph_type& treebank) { encode(treebank); }
+  Treebank()  {}
+  Treebank(const hypergraph_type& __treebank) : treebank(__treebank) {}
   
-  void encode(const hypergraph_type& treebank)
-  {
-    buffer_nodes.clear();
-    buffer_edges.clear();
-    buffer_attrs.clear();
-    
-    {
-      boost::iostreams::filtering_ostream os_node;
-      boost::iostreams::filtering_ostream os_edge;
-      boost::iostreams::filtering_ostream os_attr;
-      os_node.push(boost::iostreams::zlib_compressor());
-      os_edge.push(boost::iostreams::zlib_compressor());
-      os_attr.push(boost::iostreams::zlib_compressor());
-      os_node.push(boost::iostreams::back_inserter(buffer_nodes));
-      os_edge.push(boost::iostreams::back_inserter(buffer_edges));
-      os_attr.push(boost::iostreams::back_inserter(buffer_attrs));
-      
-      hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
-	const hypergraph_type::id_type size = niter->edges.size();
-	
-	os_node.write((char*) &size, sizeof(hypergraph_type::id_type));
-	if (size)
-	  os_node.write((char*) &(*niter->edges.begin()), niter->edges.size() * sizeof(hypergraph_type::id_type));
-      }
-      
-      rules      = rule_ptr_map_type(treebank.edges.size());
-      goal       = treebank.goal;
-      
-      size_t i = 0;
-      hypergraph_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
-      for (hypergraph_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter, ++ i) {
-	rules[i]      = eiter->rule;
-	
-	os_attr << eiter->attributes << ' ';
-	
-	const hypergraph_type::id_type size = eiter->tails.size();
-	
-	os_edge.write((char*) &size, sizeof(hypergraph_type::id_type));
-	os_edge.write((char*) &(eiter->head), sizeof(hypergraph_type::id_type));
-	if (size)
-	  os_edge.write((char*) &(*eiter->tails.begin()), eiter->tails.size() * sizeof(hypergraph_type::id_type));
-      }
-    }
-    
-    buffer_type(buffer_edges).swap(buffer_edges);
-    buffer_type(buffer_nodes).swap(buffer_nodes);
-    buffer_type(buffer_attrs).swap(buffer_attrs);
-    
-#if 0
-#ifdef HAVE_SNAPPY
-    buffer.clear();
-    {
-      boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::back_inserter(buffer));
-      os << treebank;
-    }
-    
-    buffer_type compressed(snappy::MaxCompressedLength(buffer.size()));
-    size_t compressed_length = 0;
-    snappy::RawCompress(&(*buffer.begin()), buffer.size(), &(*compressed.begin()), &compressed_length);
-    compressed.resize(compressed_length);
+  operator hypergraph_type&() { return treebank; }
+  operator const hypergraph_type&() const { return treebank; } 
 
-    buffer.swap(compressed);
-    buffer_type(buffer).swap(buffer);
-#else
-    buffer.clear();
-    {
-      boost::iostreams::filtering_ostream os;
-      os.push(boost::iostreams::zlib_compressor());
-      os.push(boost::iostreams::back_inserter(buffer));
-      
-      os << treebank;
-    }
-    
-    buffer_type(buffer).swap(buffer);
-#endif
-#endif
-  }
-  
-  void decode(hypergraph_type& treebank) const
-  {
-    treebank.clear();
-    
-    treebank.goal = goal;
-    {
-      boost::iostreams::filtering_istream is_node;
-      is_node.push(boost::iostreams::zlib_decompressor());
-      is_node.push(boost::iostreams::array_source(&(*buffer_nodes.begin()), buffer_nodes.size()));
-      
-      hypergraph_type::id_type size;
-      while (is_node.read((char*) &size, sizeof(hypergraph_type::id_type))) {
-	hypergraph_type::node_type& node = treebank.add_node();
-	node.edges.reserve(size);
-	node.edges.resize(size);
-	if (size)
-	  is_node.read((char*) &(*node.edges.begin()), size * sizeof(hypergraph_type::id_type));
-      }
-    }
-    
-    {
-      boost::iostreams::filtering_istream is_edge;
-      boost::iostreams::filtering_istream is_attr;
-      is_edge.push(boost::iostreams::zlib_decompressor());
-      is_attr.push(boost::iostreams::zlib_decompressor());
-      is_edge.push(boost::iostreams::array_source(&(*buffer_edges.begin()), buffer_edges.size()));
-      is_attr.push(boost::iostreams::array_source(&(*buffer_attrs.begin()), buffer_attrs.size()));
-      
-      size_t id = 0;
-      hypergraph_type::id_type size;
-      while (is_edge.read((char*) &size, sizeof(hypergraph_type::id_type))) {
-	hypergraph_type::edge_type& edge = treebank.add_edge();
-	
-	is_edge.read((char*) &edge.head, sizeof(hypergraph_type::id_type));
-	
-	if (size) {
-	  edge.tails.resize(size);
-	  is_edge.read((char*) &(*edge.tails.begin()), size * sizeof(hypergraph_type::id_type));
-	}
-
-	is_attr >> edge.attributes;
-	
-	edge.rule = rules[id];
-	++ id;
-      }
-    }
-    
-    
-#if 0
-#ifdef HAVE_SNAPPY
-    size_t uncompressed_length = 0;
-    if (! snappy::GetUncompressedLength(&(*buffer.begin()), buffer.size(), &uncompressed_length))
-      throw std::runtime_error("invalid compressed buffer");
-    
-    buffer_type uncompressed(uncompressed_length);
-    
-    if (! snappy::RawUncompress(&(*buffer.begin()), buffer.size(), &(*uncompressed.begin())))
-      throw std::runtime_error("uncompress failed");
-    
-    std::string::const_iterator iter(&(*uncompressed.begin()));
-    std::string::const_iterator end(&(*uncompressed.end()));
-    
-    if (! treebank.assign(iter, end))
-      throw std::runtime_error("error in parsing compressed treebank?");
-#else
-    treebank.clear();
-    if (buffer.empty()) return;
-    
-    boost::iostreams::filtering_istream is;
-    is.push(boost::iostreams::zlib_decompressor());
-    is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
-    
-    is >> treebank;
-#endif
-#endif
-  }
-  
-private:
-  buffer_type buffer_edges;
-  buffer_type buffer_nodes;
-  buffer_type buffer_attrs;
-  
-  rule_ptr_map_type        rules;
-  hypergraph_type::id_type goal;
+  hypergraph_type treebank;
 };
 
- typedef Treebank treebank_type;
+typedef Treebank treebank_type;
 
 typedef std::deque<treebank_type, std::allocator<treebank_type> > treebank_set_type;
 
@@ -967,7 +800,7 @@ struct TaskMergeScale
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      __treebank->decode(treebank);
+      const hypergraph_type& treebank(*__treebank);
       
       inside.clear();
       outside.clear();
@@ -1034,7 +867,7 @@ struct TaskMergeLoss : public Annotator
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      __treebank->decode(treebank);
+      const hypergraph_type& treebank(*__treebank);
       
       inside.clear();
       outside.clear();
@@ -1132,7 +965,7 @@ struct TaskMergeTreebank
       queue.pop(__treebank);
       if (! __treebank) break;
 
-      __treebank->decode(treebank);
+      hypergraph_type& treebank(*__treebank);
       
       removed.clear();
       removed.resize(treebank.edges.size(), false);
@@ -1154,7 +987,7 @@ struct TaskMergeTreebank
       
       cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
       
-      __treebank->encode(treebank_new);
+      treebank = treebank_new;
     }
   }
   
@@ -1442,7 +1275,7 @@ struct TaskSplitTreebank : public Annotator
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      __treebank->decode(treebank);
+      hypergraph_type& treebank(*__treebank);
       treebank_new.clear();
       
       //
@@ -1532,7 +1365,7 @@ struct TaskSplitTreebank : public Annotator
       if (treebank_new.is_valid())
 	treebank_new.topologically_sort();
       
-      __treebank->encode(treebank_new);
+      treebank = treebank_new;
     }
   }
   
@@ -1776,7 +1609,7 @@ struct TaskLearn
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      __treebank->decode(treebank);
+      const hypergraph_type& treebank(*__treebank);
       
       inside.clear();
       outside.clear();
@@ -1897,7 +1730,7 @@ struct TaskLexiconFrequency
       queue.pop(__treebank);
       if (! __treebank) break;
 
-      __treebank->decode(treebank);
+      const hypergraph_type& treebank(*__treebank);
       
       inside.clear();
       outside.clear();
@@ -1961,7 +1794,7 @@ struct TaskLexiconCount
       queue.pop(__treebank);
       if (! __treebank) break;
 
-      __treebank->decode(treebank);
+      const hypergraph_type& treebank(*__treebank);
       
       inside.clear();
       outside.clear();
@@ -2372,7 +2205,7 @@ struct TaskCharacterCount
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      __treebank->decode(treebank);
+      const hypergraph_type& treebank(*__treebank);
       
       inside.clear();
       outside.clear();
