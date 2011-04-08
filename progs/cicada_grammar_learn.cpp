@@ -137,7 +137,7 @@ public:
       throw std::runtime_error("uncompress failed");
     
     std::string::const_iterator iter(&(*uncompressed.begin()));
-    std::string::const_iterator end(iter + uncompressed.size());
+    std::string::const_iterator end(&(*uncompressed.end()));
     
     if (! treebank.assign(iter, end))
       throw std::runtime_error("error in parsing compressed treebank?");

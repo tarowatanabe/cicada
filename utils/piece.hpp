@@ -79,9 +79,9 @@ namespace utils
     // construct by iterator
     basic_piece(const char* __first, const char* __last) : first_(__first), last_(__last) {}
     basic_piece(std::string::const_iterator __first, std::string::const_iterator __last)
-      : first_(&(*__first)), last_(&(*__first) + std::distance(__first, __last)) {}
+      : first_(&(*__first)), last_(&(*__last)) {}
     basic_piece(std::vector<char>::const_iterator __first, std::vector<char>::const_iterator __last)
-      : first_(&(*__first)), last_(&(*__first) + std::distance(__first, __last)) {}
+      : first_(&(*__first)), last_(&(*__last)) {}
     
     pointer data() const { return first_; }
     pointer c_str() const { return first_; }
@@ -147,7 +147,13 @@ namespace utils
     void assign(std::string::const_iterator __first, std::string::const_iterator __last)
     {
       first_ = &(*__first);
-      last_  = &(*__first) + std::distance(__first, __last);
+      last_  = &(*__last);
+    }
+
+    void assign(std::vector<char>::const_iterator __first, std::vector<char>::const_iterator __last)
+    {
+      first_ = &(*__first);
+      last_  = &(*__last);
     }
     
     reference operator[](size_type pos) const { return first_[pos]; }
