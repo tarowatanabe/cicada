@@ -36,6 +36,8 @@ void find_attrs(const cicada::AttributeVector& attrs, const std::string& attr)
 int main(int argc, char** argv)
 {
   typedef cicada::AttributeVector attribute_set_type;
+
+  std::cout << "size: " << sizeof(attribute_set_type) << " value: " << sizeof(attribute_set_type::value_type) << std::endl;
   
   attribute_set_type attr1("{\"good\":1,\"bad\":4.5,\"bad2\":1e-5, \"neutral\":\"bi\\u0020g\"}");
 

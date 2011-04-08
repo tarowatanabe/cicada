@@ -103,6 +103,9 @@ namespace utils {
 
     typedef typename base_type::iterator       iterator;
     typedef typename base_type::const_iterator const_iterator;
+
+    typedef       Tp* pointer;
+    typedef const Tp* const_pointer;
     
     typedef typename std::reverse_iterator<iterator>       reverse_iterator;
     typedef typename std::reverse_iterator<const_iterator> const_reverse_iterator;
@@ -191,6 +194,74 @@ namespace utils {
       utils::construct_object(__base_new.begin() + __size, __value);
       __base.swap(__base_new);
       utils::destroy_range(__base_new.begin(), __base_new.end());
+    }
+
+    iterator insert(iterator position, const Tp& x)
+    {
+      typedef std::vector<Tp, Alloc> vector_type;
+
+      const difference_type pos = std::distance(begin(), position);
+	
+      vector_type vec(begin(), end());
+      typename vector_type::iterator viter = vec.insert(vec.begin() + pos, x);
+      
+      base_type __base_new(vec.size());
+      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+      
+      return begin() + std::distance(vec.begin(), viter);
+    }
+
+    template <typename Iterator>
+    void insert(iterator position, Iterator first, Iterator last)
+    {
+      typedef std::vector<Tp, Alloc> vector_type;
+      
+      const difference_type pos = std::distance(begin(), position);
+      
+      vector_type vec(begin(), end());
+      vec.insert(vec.begin() + pos, first, last);
+      
+      base_type __base_new(vec.size());
+      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+    }
+
+    iterator erase(iterator position)
+    {
+      typedef std::vector<Tp, Alloc> vector_type;
+      
+      const difference_type pos = std::distance(begin(), position);
+      
+      vector_type vec(begin(), end());
+      typename vector_type::iterator viter = vec.erase(vec.begin() + pos);
+      
+      base_type __base_new(vec.size());
+      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+      
+      return begin() + std::distance(vec.begin(), viter);
+    }
+
+    iterator erase(iterator first, iterator last)
+    {
+      typedef std::vector<Tp, Alloc> vector_type;
+      
+      const difference_type pos_first = std::distance(begin(), first);
+      const difference_type pos_last  = std::distance(begin(), last);
+      
+      vector_type vec(begin(), end());
+      typename vector_type::iterator viter = vec.erase(vec.begin() + pos_first, vec.begin() + pos_last);
+      
+      base_type __base_new(vec.size());
+      std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+      
+      return begin() + std::distance(vec.begin(), viter);
     }
     
   private:

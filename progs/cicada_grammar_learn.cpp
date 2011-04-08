@@ -101,14 +101,18 @@ public:
   {
     buffer_nodes.clear();
     buffer_edges.clear();
+    buffer_attrs.clear();
     
     {
       boost::iostreams::filtering_ostream os_node;
       boost::iostreams::filtering_ostream os_edge;
+      boost::iostreams::filtering_ostream os_attr;
       os_node.push(boost::iostreams::zlib_compressor());
       os_edge.push(boost::iostreams::zlib_compressor());
+      os_attr.push(boost::iostreams::zlib_compressor());
       os_node.push(boost::iostreams::back_inserter(buffer_nodes));
       os_edge.push(boost::iostreams::back_inserter(buffer_edges));
+      os_attr.push(boost::iostreams::back_inserter(buffer_attrs));
       
       hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
@@ -120,16 +124,14 @@ public:
       }
       
       rules      = rule_ptr_map_type(treebank.edges.size());
-      features   = feature_set_map_type(treebank.edges.size());
-      attributes = attribute_set_map_type(treebank.edges.size());
       goal       = treebank.goal;
       
       size_t i = 0;
       hypergraph_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
       for (hypergraph_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter, ++ i) {
 	rules[i]      = eiter->rule;
-	features[i]   = eiter->features;
-	attributes[i] = eiter->attributes;
+	
+	os_attr << eiter->attributes << ' ';
 	
 	const hypergraph_type::id_type size = eiter->tails.size();
 	
@@ -142,6 +144,7 @@ public:
     
     buffer_type(buffer_edges).swap(buffer_edges);
     buffer_type(buffer_nodes).swap(buffer_nodes);
+    buffer_type(buffer_attrs).swap(buffer_attrs);
     
 #if 0
 #ifdef HAVE_SNAPPY
@@ -180,40 +183,43 @@ public:
     
     treebank.goal = goal;
     {
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::zlib_decompressor());
-      is.push(boost::iostreams::array_source(&(*buffer_nodes.begin()), buffer_nodes.size()));
+      boost::iostreams::filtering_istream is_node;
+      is_node.push(boost::iostreams::zlib_decompressor());
+      is_node.push(boost::iostreams::array_source(&(*buffer_nodes.begin()), buffer_nodes.size()));
       
       hypergraph_type::id_type size;
-      while (is.read((char*) &size, sizeof(hypergraph_type::id_type))) {
+      while (is_node.read((char*) &size, sizeof(hypergraph_type::id_type))) {
 	hypergraph_type::node_type& node = treebank.add_node();
 	node.edges.reserve(size);
 	node.edges.resize(size);
 	if (size)
-	  is.read((char*) &(*node.edges.begin()), size * sizeof(hypergraph_type::id_type));
+	  is_node.read((char*) &(*node.edges.begin()), size * sizeof(hypergraph_type::id_type));
       }
     }
     
     {
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::zlib_decompressor());
-      is.push(boost::iostreams::array_source(&(*buffer_edges.begin()), buffer_edges.size()));
+      boost::iostreams::filtering_istream is_edge;
+      boost::iostreams::filtering_istream is_attr;
+      is_edge.push(boost::iostreams::zlib_decompressor());
+      is_attr.push(boost::iostreams::zlib_decompressor());
+      is_edge.push(boost::iostreams::array_source(&(*buffer_edges.begin()), buffer_edges.size()));
+      is_attr.push(boost::iostreams::array_source(&(*buffer_attrs.begin()), buffer_attrs.size()));
       
       size_t id = 0;
       hypergraph_type::id_type size;
-      while (is.read((char*) &size, sizeof(hypergraph_type::id_type))) {
+      while (is_edge.read((char*) &size, sizeof(hypergraph_type::id_type))) {
 	hypergraph_type::edge_type& edge = treebank.add_edge();
 	
-	is.read((char*) &edge.head, sizeof(hypergraph_type::id_type));
+	is_edge.read((char*) &edge.head, sizeof(hypergraph_type::id_type));
 	
 	if (size) {
 	  edge.tails.resize(size);
-	  is.read((char*) &(*edge.tails.begin()), size * sizeof(hypergraph_type::id_type));
+	  is_edge.read((char*) &(*edge.tails.begin()), size * sizeof(hypergraph_type::id_type));
 	}
+
+	is_attr >> edge.attributes;
 	
-	edge.rule       = rules[id];
-	edge.features   = features[id];
-	edge.attributes = attributes[id];
+	edge.rule = rules[id];
 	++ id;
       }
     }
@@ -251,10 +257,9 @@ public:
 private:
   buffer_type buffer_edges;
   buffer_type buffer_nodes;
+  buffer_type buffer_attrs;
   
   rule_ptr_map_type        rules;
-  feature_set_map_type     features;
-  attribute_set_map_type   attributes;
   hypergraph_type::id_type goal;
 };
 
@@ -660,7 +665,7 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
-
+    
     if (signature_list) {
       std::cout << signature_type::lists();
       return 0;
@@ -1050,6 +1055,7 @@ struct TaskMergeLoss : public Annotator
 	attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
 	if (aiter == edge.attributes.end())
 	  throw std::runtime_error("no node attribute?");
+	
 	const int node_id_prev = boost::apply_visitor(attribute_integer(), aiter->second);
 	if (node_id_prev < 0)
 	  throw std::runtime_error("invalid node attribute?");
