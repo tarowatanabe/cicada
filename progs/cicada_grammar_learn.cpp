@@ -88,13 +88,62 @@ class Treebank
 {
 private:
   typedef std::vector<char, std::allocator<char> > buffer_type;
+  typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> >           rule_ptr_map_type;
+  typedef std::vector<feature_set_type, std::allocator<feature_set_type> >     feature_set_map_type;
+  typedef std::vector<attribute_set_type, std::allocator<attribute_set_type> > attribute_set_map_type;
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > id_set_type;
   
 public:
-  Treebank() : buffer() {}
-  Treebank(const hypergraph_type& treebank) : buffer() { encode(treebank); }
+  Treebank() {}
+  Treebank(const hypergraph_type& treebank) { encode(treebank); }
   
   void encode(const hypergraph_type& treebank)
   {
+    buffer_nodes.clear();
+    buffer_edges.clear();
+    
+    {
+      boost::iostreams::filtering_ostream os_node;
+      boost::iostreams::filtering_ostream os_edge;
+      os_node.push(boost::iostreams::zlib_compressor());
+      os_edge.push(boost::iostreams::zlib_compressor());
+      os_node.push(boost::iostreams::back_inserter(buffer_nodes));
+      os_edge.push(boost::iostreams::back_inserter(buffer_edges));
+      
+      hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::id_type size = niter->edges.size();
+	
+	os_node.write((char*) &size, sizeof(hypergraph_type::id_type));
+	if (size)
+	  os_node.write((char*) &(*niter->edges.begin()), niter->edges.size() * sizeof(hypergraph_type::id_type));
+      }
+      
+      rules      = rule_ptr_map_type(treebank.edges.size());
+      features   = feature_set_map_type(treebank.edges.size());
+      attributes = attribute_set_map_type(treebank.edges.size());
+      goal       = treebank.goal;
+      
+      size_t i = 0;
+      hypergraph_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter, ++ i) {
+	rules[i]      = eiter->rule;
+	features[i]   = eiter->features;
+	attributes[i] = eiter->attributes;
+	
+	const hypergraph_type::id_type size = eiter->tails.size();
+	
+	os_edge.write((char*) &size, sizeof(hypergraph_type::id_type));
+	os_edge.write((char*) &(eiter->head), sizeof(hypergraph_type::id_type));
+	if (size)
+	  os_edge.write((char*) &(*eiter->tails.begin()), eiter->tails.size() * sizeof(hypergraph_type::id_type));
+      }
+    }
+    
+    buffer_type(buffer_edges).swap(buffer_edges);
+    buffer_type(buffer_nodes).swap(buffer_nodes);
+    
+#if 0
 #ifdef HAVE_SNAPPY
     buffer.clear();
     {
@@ -122,10 +171,55 @@ public:
     
     buffer_type(buffer).swap(buffer);
 #endif
+#endif
   }
   
   void decode(hypergraph_type& treebank) const
   {
+    treebank.clear();
+    
+    treebank.goal = goal;
+    {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::zlib_decompressor());
+      is.push(boost::iostreams::array_source(&(*buffer_nodes.begin()), buffer_nodes.size()));
+      
+      hypergraph_type::id_type size;
+      while (is.read((char*) &size, sizeof(hypergraph_type::id_type))) {
+	hypergraph_type::node_type& node = treebank.add_node();
+	node.edges.reserve(size);
+	node.edges.resize(size);
+	if (size)
+	  is.read((char*) &(*node.edges.begin()), size * sizeof(hypergraph_type::id_type));
+      }
+    }
+    
+    {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::zlib_decompressor());
+      is.push(boost::iostreams::array_source(&(*buffer_edges.begin()), buffer_edges.size()));
+      
+      size_t id = 0;
+      hypergraph_type::id_type size;
+      while (is.read((char*) &size, sizeof(hypergraph_type::id_type))) {
+	hypergraph_type::edge_type& edge = treebank.add_edge();
+	
+	is.read((char*) &edge.head, sizeof(hypergraph_type::id_type));
+	
+	if (size) {
+	  edge.tails.resize(size);
+	  is.read((char*) &(*edge.tails.begin()), size * sizeof(hypergraph_type::id_type));
+	}
+	
+	edge.rule       = rules[id];
+	edge.features   = features[id];
+	edge.attributes = attributes[id];
+	++ id;
+      }
+    }
+    
+    
+#if 0
 #ifdef HAVE_SNAPPY
     size_t uncompressed_length = 0;
     if (! snappy::GetUncompressedLength(&(*buffer.begin()), buffer.size(), &uncompressed_length))
@@ -151,10 +245,17 @@ public:
     
     is >> treebank;
 #endif
+#endif
   }
   
 private:
-  buffer_type buffer;
+  buffer_type buffer_edges;
+  buffer_type buffer_nodes;
+  
+  rule_ptr_map_type        rules;
+  feature_set_map_type     features;
+  attribute_set_map_type   attributes;
+  hypergraph_type::id_type goal;
 };
 
  typedef Treebank treebank_type;
@@ -1377,10 +1478,10 @@ struct TaskSplitTreebank : public Annotator
 		symbols_new[i] = annotate(symbols[i], j[i]);
 	    
 	    rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
-	    //grammar_type::const_iterator giter = grammar.find(rule);
-	    //if (giter == grammar.end())
-	    //  throw std::runtime_error("no entry?");
-	    //rule = giter->first;
+	    grammar_type::const_iterator giter = grammar.find(rule);
+	    if (giter == grammar.end())
+	      throw std::runtime_error("no entry?");
+	    rule = giter->first;
 	  
 	    // construct edge
 	    std::pair<node_set_type::iterator, bool> head = node_map[edge.head].insert(std::make_pair(symbols_new.front(), 0));
