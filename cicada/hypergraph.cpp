@@ -111,9 +111,9 @@ namespace cicada
       node_set = ('[' >> -(node % ',') >> ']');
       
       hypergraph = ('{'
-		    >> qi::lit("\"rules\"") >> ':' >> rule_string_set >> ','
-		    >> qi::lit("\"nodes\"") >> ':' >> node_set >> ','
-		    >> qi::lit("\"goal\"")  >> ':' >> qi::uint_ [finish_graph(graph)]
+		    >> qi::lit("\"rules\"") >> ':' >> rule_string_set
+		    >> ',' >> qi::lit("\"nodes\"") >> ':' >> node_set
+		    >> -(',' >> qi::lit("\"goal\"")  >> ':' >> qi::uint_ [finish_graph(graph)])
 		    >> '}');
     }
     
@@ -544,12 +544,10 @@ namespace cicada
       os << ']';
     }
     
-    os << ", ";
+    // dump goal...
+    if (graph.is_valid())
+      os << ", \"goal\":" << graph.goal;
     
-    {
-      // dump goal...
-      os << "\"goal\":" << graph.goal;
-    }
     os << '}';
     
     return os;

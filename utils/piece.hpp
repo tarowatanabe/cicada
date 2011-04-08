@@ -149,6 +149,12 @@ namespace utils
       first_ = &(*__first);
       last_  = &(*__last);
     }
+
+    void assign(std::vector<char>::const_iterator __first, std::vector<char>::const_iterator __last)
+    {
+      first_ = &(*__first);
+      last_  = &(*__last);
+    }
     
     reference operator[](size_type pos) const { return first_[pos]; }
     

@@ -21,8 +21,8 @@
 
 #include <stdexcept>
 #include <vector>
-#include <deque>
 #include <numeric>
+#include <deque>
 
 #include <cicada/vocab.hpp>
 #include <cicada/hypergraph.hpp>
@@ -41,6 +41,10 @@
 #include <boost/random.hpp>
 #include <boost/xpressive/xpressive.hpp>
 #include <boost/math/special_functions/expm1.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/iostreams/device/back_inserter.hpp>
+#include <boost/iostreams/device/array.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/hashmurmur.hpp>
@@ -52,6 +56,15 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
+<<<<<<< HEAD
+#include <utils/tempfile.hpp>
+=======
+#include <utils/config.hpp>
+
+#ifdef HAVE_SNAPPY
+#include <snappy.h>
+#endif
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -72,12 +85,152 @@ typedef attribute_set_type::attribute_type attribute_type;
 typedef cicada::Signature signature_type;
 typedef cicada::Tokenizer tokenizer_type;
 
-typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
-
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
+class Treebank
+{
+private:
+  typedef std::vector<char, std::allocator<char> > buffer_type;
+  
+public:
+  Treebank() : buffer() {}
+  Treebank(const hypergraph_type& treebank) : buffer() { encode(treebank); }
+  
+  void encode(const hypergraph_type& treebank)
+  {
+#ifdef HAVE_SNAPPY
+    buffer.clear();
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::back_inserter(buffer));
+      os << treebank;
+    }
+    
+    buffer_type compressed(snappy::MaxCompressedLength(buffer.size()));
+    size_t compressed_length = 0;
+    snappy::RawCompress(&(*buffer.begin()), buffer.size(), &(*compressed.begin()), &compressed_length);
+    compressed.resize(compressed_length);
+
+    buffer.swap(compressed);
+    buffer_type(buffer).swap(buffer);
+#else
+    buffer.clear();
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::zlib_compressor());
+      os.push(boost::iostreams::back_inserter(buffer));
+      
+      os << treebank;
+    }
+    
+    buffer_type(buffer).swap(buffer);
+#endif
+  }
+  
+  void decode(hypergraph_type& treebank) const
+  {
+#ifdef HAVE_SNAPPY
+    size_t uncompressed_length = 0;
+    if (! snappy::GetUncompressedLength(&(*buffer.begin()), buffer.size(), &uncompressed_length))
+      throw std::runtime_error("invalid compressed buffer");
+    
+    buffer_type uncompressed(uncompressed_length);
+    
+    if (! snappy::RawUncompress(&(*buffer.begin()), buffer.size(), &(*uncompressed.begin())))
+      throw std::runtime_error("uncompress failed");
+    
+    std::string::const_iterator iter(&(*uncompressed.begin()));
+    std::string::const_iterator end(&(*uncompressed.end()));
+    
+    if (! treebank.assign(iter, end))
+      throw std::runtime_error("error in parsing compressed treebank?");
+#else
+    treebank.clear();
+    if (buffer.empty()) return;
+    
+    boost::iostreams::filtering_istream is;
+    is.push(boost::iostreams::zlib_decompressor());
+    is.push(boost::iostreams::array_source(&(*buffer.begin()), buffer.size()));
+    
+    is >> treebank;
+#endif
+  }
+  
+private:
+  buffer_type buffer;
+};
+
+ typedef Treebank treebank_type;
+
+typedef std::deque<treebank_type, std::allocator<treebank_type> > treebank_set_type;
+
 // use of google dense_map for holding const rule_type*, not rule_ptr_type!
+
+// disc treebank...
+class TreebankSet
+{
+public:
+  class Iterator
+  {
+  public:
+    Iterator(boost::shared_ptr<std::istream> __is) : treebank(new hypergraph_type()), is(__is) {}
+    Iterator() : treebank(), is() {}
+    
+    const hypergraph_type& operator*() const { return *treebank; }
+    const hypergraph_type* operator->() const { return &(*treebank); }
+    
+    Iterator& operator++()
+    {
+      if (*is >> *treebank)
+	return *this;
+      else {
+	treebank.reset();
+	is.reset();
+	return *this;
+      }
+    }
+    
+    friend
+    bool operator==(const Iterator& x, const Iterator& y)
+    {
+      return x.is == y.is;
+    }
+
+    friend
+    bool operator!=(const Iterator& x, const Iterator& y)
+    {
+      return x.is != y.is;
+    }
+    
+  private: 
+    boost::shared_ptr<hypergraph_type> treebank;
+    boost::shared_ptr<std::istream>    is;
+  };
+
+  typedef Iterator iterator;
+  typedef Iterator const_iterator;
+  
+  iterator begin() const
+  {
+    iterator iter(boost::shared_ptr<std::istream>(new utils::compress_istream(path, 1024 * 1024)));
+    ++ iter;
+    return iter;
+  }
+  
+  iterator end() const
+  {
+    return iterator();
+  }
+  
+  TreebankSet() {}
+  TreebankSet(const path_type& __path) : path(__path) {}
+  
+  path_type path;
+};
+
+typedef TreebankSet treebank_set_type;
+typedef std::vector<treebank_set_type, std::allocator<treebank_set_type> > treebank_map_type;
 
 template <typename Tp>
 struct ptr_hash : public boost::hash<Tp>
@@ -93,7 +246,6 @@ struct ptr_hash : public boost::hash<Tp>
   {
     return (x ? hasher_type::operator()(*x) : size_t(0));
   }
-
 };
 
 template <typename Tp>
@@ -230,7 +382,11 @@ int threads = 1;
 int debug = 0;
 
 template <typename Generator, typename Maximizer>
-void grammar_merge(hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void grammar_merge(treebank_map_type& treebanks,
+=======
+void grammar_merge(treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
@@ -238,7 +394,11 @@ void grammar_merge(hypergraph_set_type& treebanks,
 		   Maximizer maximizer);
 
 template <typename Generator, typename Maximizer>
-void grammar_split(hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void grammar_split(treebank_map_type& treebanks,
+=======
+void grammar_split(treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
@@ -246,19 +406,31 @@ void grammar_split(hypergraph_set_type& treebanks,
 		   Maximizer maximizer);
 
 template <typename Function, typename Maximizer>
-double grammar_learn(const hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+double grammar_learn(const treebank_map_type& treebanks,
+=======
+double grammar_learn(const treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		     label_count_set_type& labels,
 		     grammar_type& grammar,
 		     Function function,
 		     Maximizer maximier);
 
 template <typename Function>
-void lexicon_learn(const hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void lexicon_learn(const treebank_map_type& treebanks,
+=======
+void lexicon_learn(const treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		   grammar_type& lexicon,
 		   Function function);
 
 template <typename Function>
-void characters_learn(const hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void characters_learn(const treebank_map_type& treebanks,
+=======
+void characters_learn(const treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		      ngram_count_set_type& model,
 		      ngram_count_set_type& backoff,
 		      Function function);
@@ -276,7 +448,11 @@ void write_grammar(const path_type& file,
 		   const grammar_type& grammar);
 
 void read_treebank(const path_set_type& files,
-		   hypergraph_set_type& treebanks);
+<<<<<<< HEAD
+		   treebank_map_type& treebanks);
+=======
+		   treebank_set_type& treebanks);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 
 void grammar_prune(grammar_type& grammar, const double cutoff);
 void lexicon_prune(grammar_type& grammar, const double cutoff);
@@ -472,6 +648,7 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   }
 };
 
+
 int main(int argc, char** argv)
 {
   try {
@@ -487,12 +664,11 @@ int main(int argc, char** argv)
       
     if (int(binarize_left) + binarize_right + binarize_all > 1)
       throw std::runtime_error("specify either binarize-{left,right,all}");
-
-    if (min_iteration_split > max_iteration_split)
-      throw std::runtime_error("minimum iteration is larger than maximum iteration for split?");
-    if (min_iteration_merge > max_iteration_merge)
-      throw std::runtime_error("minimum iteration is larger than maximum iteration for merge?");
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
     const signature_type* sig = (! signature.empty() ? &signature_type::create(signature) : 0);
     
     if (! output_character_file.empty()) {
@@ -502,6 +678,9 @@ int main(int argc, char** argv)
       if (output_lexicon_file.empty())
 	throw std::runtime_error("we will dump character file, but no lexicon file");
     }
+
+    min_iteration_split = utils::bithack::min(min_iteration_split, max_iteration_split);
+    min_iteration_merge = utils::bithack::min(min_iteration_merge, max_iteration_merge);
     
     if (int(binarize_left) + binarize_right + binarize_all == 0)
       binarize_left = true;
@@ -511,7 +690,11 @@ int main(int argc, char** argv)
     
     threads = utils::bithack::max(threads, 1);
     
-    hypergraph_set_type treebanks;
+<<<<<<< HEAD
+    treebank_map_type treebanks(threads);
+=======
+    treebank_set_type treebanks;
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
     read_treebank(input_files, treebanks);
     
     label_count_set_type labels;
@@ -755,13 +938,16 @@ struct filter_pruned
 template <typename Scale>
 struct TaskMergeScale
 {
-  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+=======
+  typedef utils::lockfree_list_queue<const treebank_type*, std::allocator<const treebank_type*> > queue_type;
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   typedef Scale scale_set_type;
   
   TaskMergeScale(const grammar_type& __grammar,
-		 queue_type& __queue)
+		 const treebank_set_type& __treebanks)
     : grammar(__grammar),
-      queue(__queue),
+      treebanks(__treebanks),
       scale() {}
   
   void operator()()
@@ -772,13 +958,21 @@ struct TaskMergeScale
     
     weight_set_type inside;
     weight_set_type outside;
+
+    hypergraph_type treebank;
     
-    const hypergraph_type* __treebank = 0;
+<<<<<<< HEAD
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+=======
+    const treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      const hypergraph_type& treebank = *__treebank;
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       
       inside.clear();
       outside.clear();
@@ -802,7 +996,7 @@ struct TaskMergeScale
   }
   
   const grammar_type& grammar;
-  queue_type& queue;
+  const treebank_set_type& treebanks;
 
   scale_set_type scale;
 };
@@ -810,19 +1004,22 @@ struct TaskMergeScale
 template <typename Loss, typename Scale>
 struct TaskMergeLoss : public Annotator
 {
-  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+=======
+  typedef utils::lockfree_list_queue<const treebank_type*, std::allocator<const treebank_type*> > queue_type;
 
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   typedef Loss loss_set_type;
   typedef Scale scale_set_type;
-
+  
   TaskMergeLoss(const grammar_type& __grammar,
 		const scale_set_type& __scale,
 		const int& __bits,
-		queue_type& __queue)
+		const treebank_set_type& __treebanks)
     : Annotator(__bits),
       grammar(__grammar),
       scale(__scale),
-      queue(__queue),
+      treebanks(__treebanks),
       loss() {}
   
   void operator()()
@@ -837,13 +1034,21 @@ struct TaskMergeLoss : public Annotator
     symbol_id_map_type symbols;
     
     const attribute_type attr_node("node");
+
+<<<<<<< HEAD
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+=======
+    hypergraph_type treebank;
     
-    const hypergraph_type* __treebank = 0;
+    const treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      const hypergraph_type& treebank = *__treebank;
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       
       inside.clear();
       outside.clear();
@@ -914,7 +1119,7 @@ struct TaskMergeLoss : public Annotator
   const grammar_type& grammar;
   const scale_set_type& scale;
   
-  queue_type& queue;
+  const treebank_set_type& treebanks;
   
   loss_set_type loss;
 };
@@ -922,31 +1127,54 @@ struct TaskMergeLoss : public Annotator
 template <typename Merged>
 struct TaskMergeTreebank
 {
-  typedef utils::lockfree_list_queue<hypergraph_type*, std::allocator<hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+=======
+  typedef utils::lockfree_list_queue<treebank_type*, std::allocator<treebank_type*> > queue_type;
   
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   TaskMergeTreebank(const Merged& __merged,
-		    queue_type& __queue)
+		    treebank_set_type& __treebanks)
     : merged(__merged),
-      queue(__queue) {}
+      treebanks(__treebanks) {}
   
   void operator()()
   {
+<<<<<<< HEAD
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+    
+    const path_type path = utils::tempfile::file_name(tmp_dir / "treebank-XXXXXX");
+    utils::tempfile::insert(path);
+    
+    const path_type path_gz = path.string() + ".gz";
+    utils::tempfile::insert(path_gz);
+    
+    utils::compress_ostream os(path_gz, 1024 * 1024);
+
+    hypergraph_type treebank_new;
+    filter_pruned::removed_type removed;
+        
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+=======
+    hypergraph_type treebank;
     hypergraph_type treebank_new;
     filter_pruned::removed_type removed;
     
-    hypergraph_type* __treebank = 0;
+    treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
-      
-      hypergraph_type& treebank = *__treebank;
+
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       
       removed.clear();
       removed.resize(treebank.edges.size(), false);
       
-      hypergraph_type::edge_set_type::iterator eiter_end = treebank.edges.end();
-      for (hypergraph_type::edge_set_type::iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
-	hypergraph_type::edge_type& edge = *eiter;
+      hypergraph_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = *eiter;
 	
 	const symbol_type lhs = edge.rule->lhs;
 	if (merged.find(lhs) != merged.end())
@@ -961,14 +1189,21 @@ struct TaskMergeTreebank
       
       cicada::topologically_sort(treebank, treebank_new, filter_pruned(removed));
       
-      treebank.swap(treebank_new);
-      treebank_new.clear();
-      hypergraph_type(treebank).swap(treebank);
+<<<<<<< HEAD
+      os << treebank_new << '\n';
+=======
+      __treebank->encode(treebank_new);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
     }
+
+    if (boost::filesystem::exists(treebanks.path))
+      boost::filesystem::remove(treebanks.path);
+    
+    treebanks.path = path_gz;
   }
   
   const Merged& merged;
-  queue_type& queue;
+  treebank_set_type& treebanks;
 };
 
 template <typename Merged>
@@ -1034,7 +1269,11 @@ double round(double number)
 }
 
 template <typename Generator, typename Maximizer>
-void grammar_merge(hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void grammar_merge(treebank_map_type& treebanks,
+=======
+void grammar_merge(treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
@@ -1050,33 +1289,33 @@ void grammar_merge(hypergraph_set_type& treebanks,
   typedef TaskMergeTreebank<merged_set_type>           task_treebank_type;
   typedef TaskMergeGrammar<merged_set_type>            task_grammar_type;
   
-  typedef std::vector<task_scale_type, std::allocator<task_scale_type> >       task_scale_set_type;
-  typedef std::vector<task_loss_type, std::allocator<task_loss_type> >         task_loss_set_type;
-  typedef std::vector<task_treebank_type, std::allocator<task_treebank_type> > task_treebank_set_type;
-  typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> >   task_grammar_set_type;
+  typedef std::deque<task_scale_type, std::allocator<task_scale_type> >       task_scale_set_type;
+  typedef std::deque<task_loss_type, std::allocator<task_loss_type> >         task_loss_set_type;
+  typedef std::deque<task_treebank_type, std::allocator<task_treebank_type> > task_treebank_set_type;
+  typedef std::deque<task_grammar_type, std::allocator<task_grammar_type> >   task_grammar_set_type;
   
-  typedef typename task_scale_type::queue_type    queue_scale_type;
-  typedef typename task_loss_type::queue_type     queue_loss_type;
-  typedef typename task_treebank_type::queue_type queue_treebank_type;
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
   
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
-
-  // MapReduce to compute scaling
-  queue_scale_type queue_scale;
-  task_scale_set_type tasks_scale(threads, task_scale_type(grammar, queue_scale));
   
+  // MapReduce to compute scaling
+  task_scale_set_type tasks_scale;
   boost::thread_group workers_scale;
+<<<<<<< HEAD
+=======
   for (int i = 0; i != threads; ++ i)
     workers_scale.add_thread(new boost::thread(boost::ref(tasks_scale[i])));
   
-  hypergraph_set_type::iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+  treebank_set_type::iterator titer_end = treebanks.end();
+  for (treebank_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_scale.push(&(*titer));
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   
-  for (int i = 0; i != threads; ++ i)
-    queue_scale.push(0);
+  for (int i = 0; i != threads; ++ i) {
+    tasks_scale.push_back(task_scale_type(grammar, treebanks[i]));
+    workers_scale.add_thread(new boost::thread(boost::ref(tasks_scale[i])));
+  }
   
   workers_scale.join_all();
   
@@ -1090,18 +1329,21 @@ void grammar_merge(hypergraph_set_type& treebanks,
   }
   
   // MapReduce to compute loss
-  queue_loss_type queue_loss;
-  task_loss_set_type tasks_loss(threads, task_loss_type(grammar, scale, bits, queue_loss));
-  
+  task_loss_set_type tasks_loss;
   boost::thread_group workers_loss;
+<<<<<<< HEAD
+=======
   for (int i = 0; i != threads; ++ i)
     workers_loss.add_thread(new boost::thread(boost::ref(tasks_loss[i])));
   
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+  for (treebank_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_loss.push(&(*titer));
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   
-  for (int i = 0; i != threads; ++ i)
-    queue_loss.push(0);
+  for (int i = 0; i != threads; ++ i) {
+    tasks_loss.push_back(task_loss_type(grammar, scale, bits, treebanks[i]));
+    workers_loss.add_thread(new boost::thread(boost::ref(tasks_loss[i])));
+  }
   
   workers_loss.join_all();
   
@@ -1158,18 +1400,19 @@ void grammar_merge(hypergraph_set_type& treebanks,
     std::cerr << "merged: " << merged.size() << " split: " << (sorted.size() - merged.size()) << std::endl;
   
   // MapReduce to merge treeebanks
-  queue_treebank_type queue_treebank;
-
   boost::thread_group workers_treebank;
   for (int i = 0; i != threads; ++ i)
-    workers_treebank.add_thread(new boost::thread(task_treebank_type(merged, queue_treebank)));
+    workers_treebank.add_thread(new boost::thread(task_treebank_type(merged, treebanks[i])));
   
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+<<<<<<< HEAD
+=======
+  for (treebank_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_treebank.push(&(*titer));
   
   for (int i = 0; i != threads; ++ i)
     queue_treebank.push(0);
 
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   workers_treebank.join_all();
   
   // MapReduce to merge grammar
@@ -1209,16 +1452,17 @@ void grammar_merge(hypergraph_set_type& treebanks,
 
 struct TaskSplitTreebank : public Annotator
 {
-  typedef utils::lockfree_list_queue<hypergraph_type*, std::allocator<hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+=======
+  typedef utils::lockfree_list_queue<treebank_type*, std::allocator<treebank_type*> > queue_type;
   
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   typedef utils::hashmurmur<size_t> hasher_type;
   
   TaskSplitTreebank(const int __bits,
-		    queue_type& __queue,
-		    const grammar_type& __grammar)
+		    treebank_set_type& __treebanks)
     : Annotator(__bits),
-      queue(__queue),
-      grammar(__grammar)
+      treebanks(__treebanks)
   {}
   
   void operator()()
@@ -1235,7 +1479,18 @@ struct TaskSplitTreebank : public Annotator
 #endif
     typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
     
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+    
+    const path_type path = utils::tempfile::file_name(tmp_dir / "treebank-XXXXXX");
+    utils::tempfile::insert(path);
+    
+    const path_type path_gz = path.string() + ".gz";
+    utils::tempfile::insert(path_gz);
+    
+    utils::compress_ostream os(path_gz, 1024 * 1024);
+
     node_map_type   node_map;
+    hypergraph_type treebank;
     hypergraph_type treebank_new;
     
     index_set_type  j;
@@ -1245,12 +1500,19 @@ struct TaskSplitTreebank : public Annotator
     
     const attribute_type attr_node("node");
     
-    hypergraph_type* __treebank = 0;
+<<<<<<< HEAD
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+      
+=======
+    treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      hypergraph_type& treebank = *__treebank;
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       treebank_new.clear();
       
       //
@@ -1292,10 +1554,13 @@ struct TaskSplitTreebank : public Annotator
 		symbols_new[i] = annotate(symbols[i], j[i]);
 	    
 	    rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
-	    grammar_type::const_iterator giter = grammar.find(rule);
-	    if (giter == grammar.end())
-	      throw std::runtime_error("no entry?");
-	    rule = giter->first;
+<<<<<<< HEAD
+=======
+	    //grammar_type::const_iterator giter = grammar.find(rule);
+	    //if (giter == grammar.end())
+	    //  throw std::runtime_error("no entry?");
+	    //rule = giter->first;
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 	  
 	    // construct edge
 	    std::pair<node_set_type::iterator, bool> head = node_map[edge.head].insert(std::make_pair(symbols_new.front(), 0));
@@ -1336,18 +1601,22 @@ struct TaskSplitTreebank : public Annotator
 	  }
 	}   
       }
-
-      if (treebank_new.is_valid())
-	treebank_new.topologically_sort();
       
-      treebank.swap(treebank_new);
-      treebank_new.clear();
-      hypergraph_type(treebank).swap(treebank);
+<<<<<<< HEAD
+      // treebank_new!
+      os << treebank_new << '\n';
+=======
+      __treebank->encode(treebank_new);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
     }
+
+    if (boost::filesystem::exists(treebanks.path))
+      boost::filesystem::remove(treebanks.path);
+
+    treebanks.path = path_gz;
   }
-  
-  queue_type& queue;
-  const grammar_type& grammar;
+
+  treebank_set_type& treebanks;
 };
 
 template <typename Generator>
@@ -1452,7 +1721,11 @@ struct TaskSplitGrammar : public Annotator
 };
 
 template <typename Generator, typename Maximizer>
-void grammar_split(hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void grammar_split(treebank_map_type& treebanks,
+=======
+void grammar_split(treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		   label_count_set_type& labels,
 		   grammar_type& grammar,
 		   const int bits,
@@ -1462,9 +1735,8 @@ void grammar_split(hypergraph_set_type& treebanks,
   typedef TaskSplitTreebank           task_treebank_type;
   typedef TaskSplitGrammar<Generator> task_grammar_type;
 
-  typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> > task_grammar_set_type;
+  typedef std::deque<task_grammar_type, std::allocator<task_grammar_type> > task_grammar_set_type;
   
-  typedef typename task_treebank_type::queue_type queue_treebank_type;
   typedef typename task_grammar_type::queue_type  queue_grammar_type;
   
   queue_grammar_type  queue_grammar;
@@ -1506,21 +1778,20 @@ void grammar_split(hypergraph_set_type& treebanks,
   // maximization
   grammar_maximize(counts, grammar, maximizer);
   
-  counts.clear();
-  
-  queue_treebank_type queue_treebank;
-  
   boost::thread_group workers_treebank;
   for (int i = 0; i != threads; ++ i)
-    workers_treebank.add_thread(new boost::thread(task_treebank_type(bits, queue_treebank, grammar)));
+    workers_treebank.add_thread(new boost::thread(task_treebank_type(bits, treebanks[i])));
   
-  hypergraph_set_type::iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+<<<<<<< HEAD
+=======
+  treebank_set_type::iterator titer_end = treebanks.end();
+  for (treebank_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_treebank.push(&(*titer));
   
   for (int i = 0; i != threads; ++ i)
     queue_treebank.push(0);
 
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   workers_treebank.join_all();
 }
 
@@ -1528,10 +1799,14 @@ void grammar_split(hypergraph_set_type& treebanks,
 template <typename Function>
 struct TaskLearn
 {
-  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+=======
+  typedef utils::lockfree_list_queue<const treebank_type*, std::allocator<const treebank_type*> > queue_type;
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   
-  TaskLearn(queue_type& __queue, Function __function)
-    : queue(__queue),
+  TaskLearn(const treebank_set_type& __treebanks,
+	    Function __function)
+    : treebanks(__treebanks),
       function(__function),
       logprob(cicada::semiring::traits<weight_type>::one()),
       counts() {}
@@ -1578,13 +1853,21 @@ struct TaskLearn
     
     weight_set_type inside;
     weight_set_type outside;
+
+    hypergraph_type treebank;
     
-    const hypergraph_type* __treebank = 0;
+<<<<<<< HEAD
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+=======
+    const treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      const hypergraph_type& treebank = *__treebank;
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       
       inside.clear();
       outside.clear();
@@ -1611,7 +1894,8 @@ struct TaskLearn
     }
   }
   
-  queue_type&    queue;
+  const treebank_set_type& treebanks;
+  
   Function       function;
   
   weight_type          logprob;
@@ -1620,29 +1904,35 @@ struct TaskLearn
 };
 
 template <typename Function, typename Maximizer>
-double grammar_learn(const hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+double grammar_learn(const treebank_map_type& treebanks,
+=======
+double grammar_learn(const treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		     label_count_set_type& labels,
 		     grammar_type& grammar,
 		     Function function,
 		     Maximizer maximizer)
 {
   typedef TaskLearn<Function> task_type;
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-  typedef typename task_type::queue_type queue_type;
+  typedef std::deque<task_type, std::allocator<task_type> > task_set_type;
 
-  queue_type queue;
-  task_set_type tasks(threads, task_type(queue, function));
-
+  task_set_type tasks;
   boost::thread_group workers;
+<<<<<<< HEAD
+=======
   for (int i = 0; i != threads; ++ i)
     workers.add_thread(new boost::thread(boost::ref(tasks[i])));
 
-  hypergraph_set_type::const_iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+  treebank_set_type::const_iterator titer_end = treebanks.end();
+  for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue.push(&(*titer));
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   
-  for (int i = 0; i != threads; ++ i)
-    queue.push(0);
+  for (int i = 0; i != threads; ++ i) {
+    tasks.push_back(task_type(treebanks[i], function));
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  }
   
   workers.join_all();
   
@@ -1680,16 +1970,21 @@ double grammar_learn(const hypergraph_set_type& treebanks,
 template <typename Function>
 struct TaskLexiconFrequency
 {
-  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+  TaskLexiconFrequency(const treebank_set_type& __treebanks, Function __function)
+    : treebanks(__treebanks),
+=======
+  typedef utils::lockfree_list_queue<const treebank_type*, std::allocator<const treebank_type*> > queue_type;
 
   TaskLexiconFrequency(queue_type& __queue, Function __function)
     : queue(__queue),
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       function(__function),
       counts() { }
 
   void operator()()
   {
-        typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
     
     weight_set_type inside;
     weight_set_type outside;
@@ -1697,13 +1992,21 @@ struct TaskLexiconFrequency
     
     ngram_type trigram(3);
     ngram_type bigram(2);
+
+    hypergraph_type treebank;
     
-    const hypergraph_type* __treebank = 0;
+<<<<<<< HEAD
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+=======
+    const treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
-      
-      const hypergraph_type& treebank = *__treebank;
+
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       
       inside.clear();
       outside.clear();
@@ -1725,7 +2028,7 @@ struct TaskLexiconFrequency
     }
   }
   
-  queue_type&    queue;
+  const treebank_set_type& treebanks;
   Function       function;
   
   word_count_set_type counts;
@@ -1734,13 +2037,16 @@ struct TaskLexiconFrequency
 template <typename Function>
 struct TaskLexiconCount
 {
-  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+=======
+  typedef utils::lockfree_list_queue<const treebank_type*, std::allocator<const treebank_type*> > queue_type;
   
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   // we will collect, tag-signature-word, signature-word, word
   
-  TaskLexiconCount(const word_count_set_type& __word_counts, queue_type& __queue, Function __function)
+  TaskLexiconCount(const word_count_set_type& __word_counts, const treebank_set_type& __treebanks, Function __function)
     : word_counts(__word_counts),
-      queue(__queue),
+      treebanks(__treebanks),
       function(__function),
       counts(),
       counts_sig() { }
@@ -1759,13 +2065,21 @@ struct TaskLexiconCount
     const signature_type& __signature = signature_type::create(signature);
 
     const weight_type log_unknown_threshold(unknown_threshold);
+
+    hypergraph_type treebank;
     
-    const hypergraph_type* __treebank = 0;
+<<<<<<< HEAD
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+=======
+    const treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
-      
-      const hypergraph_type& treebank = *__treebank;
+
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       
       inside.clear();
       outside.clear();
@@ -1812,7 +2126,7 @@ struct TaskLexiconCount
   }
   
   const word_count_set_type& word_counts;
-  queue_type&    queue;
+  const treebank_set_type& treebanks;
   Function       function;
   
   ngram_count_set_type counts; // counts of tag-signature-word
@@ -1975,7 +2289,11 @@ struct LexiconEstimate
 };
 
 template <typename Function>
-void lexicon_learn(const hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void lexicon_learn(const treebank_map_type& treebanks,
+=======
+void lexicon_learn(const treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		   grammar_type& lexicon,
 		   Function function)
 {
@@ -1991,25 +2309,26 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
   typedef TaskLexiconFrequency<Function> task_frequency_type;
   typedef TaskLexiconCount<Function>     task_count_type;
   
-  typedef std::vector<task_frequency_type, std::allocator<task_frequency_type> > task_frequency_set_type;
-  typedef std::vector<task_count_type, std::allocator<task_count_type> >         task_count_set_type;
+  typedef std::deque<task_frequency_type, std::allocator<task_frequency_type> > task_frequency_set_type;
+  typedef std::deque<task_count_type, std::allocator<task_count_type> >         task_count_set_type;
   
-  typedef typename task_frequency_type::queue_type queue_frequency_type;
-  typedef typename task_count_type::queue_type     queue_count_type;
 
-  queue_frequency_type queue_frequency;
-  task_frequency_set_type tasks_frequency(threads, task_frequency_type(queue_frequency, function));
-  
+  task_frequency_set_type tasks_frequency;
   boost::thread_group workers_frequency;
-  for (int i = 0; i != threads; ++ i)
-    workers_frequency.add_thread(new boost::thread(boost::ref(tasks_frequency[i])));
   
-  hypergraph_set_type::const_iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+<<<<<<< HEAD
+  for (int i = 0; i != threads; ++ i) {
+    tasks_frequency.push_back(task_frequency_type(treebanks[i], function));
+    workers_frequency.add_thread(new boost::thread(boost::ref(tasks_frequency[i])));
+  }
+=======
+  treebank_set_type::const_iterator titer_end = treebanks.end();
+  for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_frequency.push(&(*titer));
   
   for (int i = 0; i != threads; ++ i)
     queue_frequency.push(0);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   
   workers_frequency.join_all();
   
@@ -2021,18 +2340,22 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
       word_counts += tasks_frequency[i].counts;
   }
 
-  queue_count_type queue_count;
-  task_count_set_type tasks_count(threads, task_count_type(word_counts, queue_count, function));
   
+  task_count_set_type tasks_count;
   boost::thread_group workers_count;
+<<<<<<< HEAD
+=======
   for (int i = 0; i != threads; ++ i)
     workers_count.add_thread(new boost::thread(boost::ref(tasks_count[i])));
   
-  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+  for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_count.push(&(*titer));
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   
-  for (int i = 0; i != threads; ++ i)
-    queue_count.push(0);
+  for (int i = 0; i != threads; ++ i) {
+    tasks_count.push_back(task_count_type(word_counts, treebanks[i], function));
+    workers_count.add_thread(new boost::thread(boost::ref(tasks_count[i])));
+  }
   
   workers_count.join_all();
   
@@ -2143,12 +2466,15 @@ void lexicon_learn(const hypergraph_set_type& treebanks,
 template <typename Function>
 struct TaskCharacterCount
 {
-  typedef utils::lockfree_list_queue<const hypergraph_type*, std::allocator<const hypergraph_type*> > queue_type;
+<<<<<<< HEAD
+=======
+  typedef utils::lockfree_list_queue<const treebank_type*, std::allocator<const treebank_type*> > queue_type;
   
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   // we will collect, tag-signature-word, signature-word, word
   
-  TaskCharacterCount(queue_type& __queue, Function __function)
-    : queue(__queue),
+  TaskCharacterCount(const treebank_set_type& __treebanks, Function __function)
+    : treebanks(__treebanks),
       function(__function),
       counts() { }
   
@@ -2168,13 +2494,21 @@ struct TaskCharacterCount
     
     const signature_type& __signature = signature_type::create(signature);
     const tokenizer_type& __tokenizer = tokenizer_type::create("character");
+
+    hypergraph_type treebank;
     
-    const hypergraph_type* __treebank = 0;
+<<<<<<< HEAD
+    treebank_set_type::const_iterator titer_end = treebanks.end();
+    for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer) {
+      const hypergraph_type& treebank = *titer;
+=======
+    const treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
       
-      const hypergraph_type& treebank = *__treebank;
+      __treebank->decode(treebank);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
       
       inside.clear();
       outside.clear();
@@ -2213,14 +2547,18 @@ struct TaskCharacterCount
     }
   }
   
-  queue_type&    queue;
+  const treebank_set_type& treebanks;
   Function       function;
   
   ngram_count_set_type counts; // counts of tag-signature-word
 };
 
 template <typename Function>
-void characters_learn(const hypergraph_set_type& treebanks,
+<<<<<<< HEAD
+void characters_learn(const treebank_map_type& treebanks,
+=======
+void characters_learn(const treebank_set_type& treebanks,
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 		      ngram_count_set_type& model,
 		      ngram_count_set_type& backoff,
 		      Function function)
@@ -2228,22 +2566,24 @@ void characters_learn(const hypergraph_set_type& treebanks,
   typedef cicada::Vocab vocab_type;
 
   typedef TaskCharacterCount<Function> task_type;
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
-  typedef typename task_type::queue_type queue_type;
+  typedef std::deque<task_type, std::allocator<task_type> > task_set_type;
 
-  queue_type queue;
-  task_set_type tasks(threads, task_type(queue, function));
-
+  task_set_type tasks;
   boost::thread_group workers;
-  for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
   
-  hypergraph_set_type::const_iterator titer_end = treebanks.end();
-  for (hypergraph_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
+<<<<<<< HEAD
+  for (int i = 0; i != threads; ++ i) {
+    tasks.push_back(task_type(treebanks[i], function));
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  }
+=======
+  treebank_set_type::const_iterator titer_end = treebanks.end();
+  for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue.push(&(*titer));
   
   for (int i = 0; i != threads; ++ i)
     queue.push(0);
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
   
   workers.join_all();
   
@@ -2298,7 +2638,7 @@ void grammar_maximize(const count_set_type& counts,
   typedef TaskMaximize<Maximizer> task_type;
   typedef typename task_type::queue_type queue_type;
   
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  typedef std::deque<task_type, std::allocator<task_type> > task_set_type;
   
   queue_type queue;
   task_set_type tasks(threads, task_type(queue, maximizer));
@@ -2561,19 +2901,40 @@ void write_grammar(const path_type& file,
   }
 }
 
-
 void read_treebank(const path_set_type& files,
-		   hypergraph_set_type& treebanks)
+<<<<<<< HEAD
+		   treebank_map_type& treebanks)
+=======
+		   treebank_set_type& treebanks)
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
 {
-  hypergraph_type treebank;
+  typedef boost::shared_ptr<std::ostream> ostream_ptr_type;
+  typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
+
+  const path_type tmp_dir = utils::tempfile::tmp_dir();
   
+  ostream_ptr_set_type streams(treebanks.size());
+  
+  for (size_t i = 0; i != treebanks.size(); ++ i) {
+    const path_type path = utils::tempfile::file_name(tmp_dir / "treebank-XXXXXX");
+    utils::tempfile::insert(path);
+    const path_type path_gz = path.string() + ".gz";
+    utils::tempfile::insert(path_gz);
+    treebanks[i].path = path_gz;
+    
+    streams[i].reset(new utils::compress_ostream(path_gz, 1024 * 1024));
+  }
+  
+  hypergraph_type treebank;
+
+  size_t id = 0;
   path_set_type::const_iterator fiter_end = files.end();
   for (path_set_type::const_iterator fiter = files.begin(); fiter != fiter_end; ++ fiter) {
     utils::compress_istream is(*fiter, 1024 * 1024);
     
     while (is >> treebank) {
       if (! treebank.is_valid()) continue;
-
+      
       if (binarize_left)
 	cicada::binarize_left(treebank, 0);
       else if (binarize_right)
@@ -2581,14 +2942,17 @@ void read_treebank(const path_set_type& files,
       else if (binarize_all)
 	cicada::binarize_all(treebank);
       
-      treebanks.push_back(hypergraph_type());
-      treebanks.back().swap(treebank);
+<<<<<<< HEAD
+      *streams[id % streams.size()] << treebank << '\n';
+      ++ id;
+=======
+      treebanks.push_back(treebank_type(treebank));
+>>>>>>> c49f0dd79441e0439b6288d846a50b2c009ccf6a
     }
   }
   
   if (debug)
-    std::cerr << "# of treebank: " << treebanks.size() << std::endl;
-
+    std::cerr << "# of treebank: " << id << std::endl;
 }
 
 void options(int argc, char** argv)
