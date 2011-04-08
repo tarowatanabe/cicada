@@ -199,11 +199,9 @@ namespace utils {
     iterator insert(iterator position, const Tp& x)
     {
       typedef std::vector<Tp, Alloc> vector_type;
-
-      const difference_type pos = std::distance(begin(), position);
-	
+      
       vector_type vec(begin(), end());
-      typename vector_type::iterator viter = vec.insert(vec.begin() + pos, x);
+      typename vector_type::iterator viter = vec.insert(vec.begin() + std::distance(begin(), position), x);
       
       base_type __base_new(vec.size());
       std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
@@ -218,10 +216,8 @@ namespace utils {
     {
       typedef std::vector<Tp, Alloc> vector_type;
       
-      const difference_type pos = std::distance(begin(), position);
-      
       vector_type vec(begin(), end());
-      vec.insert(vec.begin() + pos, first, last);
+      vec.insert(vec.begin() + std::distance(begin(), position), first, last);
       
       base_type __base_new(vec.size());
       std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
@@ -233,10 +229,8 @@ namespace utils {
     {
       typedef std::vector<Tp, Alloc> vector_type;
       
-      const difference_type pos = std::distance(begin(), position);
-      
       vector_type vec(begin(), end());
-      typename vector_type::iterator viter = vec.erase(vec.begin() + pos);
+      typename vector_type::iterator viter = vec.erase(vec.begin() + std::distance(begin(), position));
       
       base_type __base_new(vec.size());
       std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());
@@ -250,11 +244,9 @@ namespace utils {
     {
       typedef std::vector<Tp, Alloc> vector_type;
       
-      const difference_type pos_first = std::distance(begin(), first);
-      const difference_type pos_last  = std::distance(begin(), last);
-      
       vector_type vec(begin(), end());
-      typename vector_type::iterator viter = vec.erase(vec.begin() + pos_first, vec.begin() + pos_last);
+      typename vector_type::iterator viter = vec.erase(vec.begin() + std::distance(begin(), first),
+						       vec.begin() + std::distance(begin(), last));
       
       base_type __base_new(vec.size());
       std::uninitialized_copy(vec.begin(), vec.end(), __base_new.begin());

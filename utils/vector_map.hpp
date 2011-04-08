@@ -91,7 +91,13 @@ namespace utils
     const_reverse_iterator rbegin() const { return container.rbegin(); }
     reverse_iterator rend() { return container.rend(); }
     const_reverse_iterator rend() const { return container.rend(); }
-  
+    
+    // non-standard!
+    reference front() { return container.front(); }
+    const_reference front() const { return container.front(); }
+    reference back() { return container.back(); }
+    const_reference back() const { return container.back(); }
+    
     bool empty() const { return container.empty(); }
     size_type size() const { return container.size(); }
     

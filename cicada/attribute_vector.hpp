@@ -126,11 +126,15 @@ namespace cicada
     const_reverse_iterator rend() const { return __values.rend(); }
     reverse_iterator rend() { return __values.rend(); }
     
-    const_reference front() const { return *__values.begin(); }
-    reference front() { return *__values.begin(); }
+    const_reference front() const { return __values.front();}
+    reference front() { return __values.front();}
+    const_reference back() const { return __values.back();}
+    reference back() { return __values.back();}
     
-    const_reference back() const { return *(-- __values.end());}
-    reference back() { return *(-- __values.end());}
+    //const_reference front() const { return *__values.begin(); }
+    //reference front() { return *__values.begin(); }
+    //const_reference back() const { return *(-- __values.end());}
+    //reference back() { return *(-- __values.end());}
     
     void swap(AttributeVector& x) { __values.swap(x.__values); }
 
