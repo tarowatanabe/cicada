@@ -276,31 +276,6 @@ public:
     id_set_type     edges;
     offset_set_type offsets;
   };
-#if 0
-  struct Node
-  {
-    typedef utils::simple_vector<id_type, std::allocator<id_type> > edge_set_type;
-    
-    Node() {}
-    Node(const hypergraph_type::node_type& x)
-      : edges(x.edges.begin(), x.edges.end()), id(x.id) {}
-    
-    Node& operator=(const hypergraph_type::node_type& x)
-    {
-      edges.assign(x.edges.begin(), x.edges.end());
-      id = x.id;
-      return *this;
-    }
-
-    operator hypergraph_type::node_type() const
-    {
-      return hypergraph_type::node_type(hypergraph_type::node_type::edge_set_type(edges.begin(), edges.end()), id);
-    }
-    
-    edge_set_type edges;
-    id_type id;
-  };
-#endif
   
   struct Edge
   {
@@ -330,13 +305,10 @@ public:
     id_type id;
   };
   
-  //typedef hypergraph_type::node_type node_type;
-  typedef Edge edge_type;
-  
-  //typedef std::vector<node_type, std::allocator<node_type> > node_set_type;
-  
   typedef NodeSet node_set_type;
   typedef node_set_type::node_type node_type;
+
+  typedef Edge edge_type;
   typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
 
   Treebank()  {}
@@ -344,16 +316,14 @@ public:
     : nodes(treebank.nodes),
       edges(treebank.edges.begin(), treebank.edges.end()),
       goal(treebank.goal) {}
-
+  
   Treebank& operator=(const hypergraph_type& treebank)
   {
     nodes.assign(treebank.nodes);
-
-    edges.clear();
-    edge_set_type(edges).swap(edges);
     
-    edges.reserve(treebank.edges.size());
+    edges.clear();
     edges.insert(edges.end(), treebank.edges.begin(), treebank.edges.end());
+    edge_set_type(edges).swap(edges);
     
     goal = treebank.goal;
     
@@ -362,7 +332,6 @@ public:
   
   void assign(hypergraph_type& graph) const
   {
-    //graph.nodes = hypergraph_type::node_set_type(nodes.begin(), nodes.end());
     nodes.copy(graph.nodes);
     graph.edges = hypergraph_type::edge_set_type(edges.begin(), edges.end());
     graph.goal = goal;
@@ -376,7 +345,7 @@ public:
   node_set_type nodes;
   edge_set_type edges;
   id_type goal;
-
+  
   id_set_type   node_prev;
 };
 
