@@ -439,6 +439,13 @@ namespace utils
       __size = 0;
     }
 
+    void swap(packed_vector_mapped& x)
+    {
+      std::swap(__size, x.__size);
+      __data.swap(x.__data);
+      __index.swap(x.__index);
+    }
+
     static bool exists(const path_type& path)
     {
       if (! utils::repository::exists(path)) return false;
@@ -558,6 +565,14 @@ namespace utils
       __size = 0;
       __size_coded = 0;
     }
+
+    void swap(packed_vector& x)
+    {
+      std::swap(__size, x.__size);
+      std::swap(__size_coded, x.__size_coded);
+      __data.swap(x.__data);
+      __index.swap(x.__index);
+    }
     
     void build()
     {
@@ -608,6 +623,23 @@ namespace utils
     index_vector_type __index;
   };
   
+};
+
+namespace std
+{
+  template <typename T, typename A>
+  inline
+  void swap(utils::packed_vector_mapped<T,A>& x, utils::packed_vector_mapped<T,A>& y)
+  {
+    return x.swap(y);
+  }
+  template <typename T, typename A>
+  inline
+  void swap(utils::packed_vector<T,A>& x, utils::packed_vector<T,A>& y)
+  {
+    return x.swap(y);
+  }
+
 };
 
 #endif
