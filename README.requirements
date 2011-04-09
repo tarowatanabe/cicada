@@ -15,6 +15,8 @@ ICU               (http://site.icu-project.org/)
 google-sparsehash (http://code.google.com/p/google-sparsehash/)
 
 Optional:
+	snappy (http://code.google.com/p/snappy/)
+	
 	google-perftools (http://code.google.com/p/google-perftools/)
 	jemalloc (http://mxr.mozilla.org/mozilla-central/source/memory/jemalloc/)
 		 There is a different jemalloc (by the original author) from http://www.canonware.com/jemalloc/,
@@ -22,10 +24,6 @@ Optional:
 	
 	For Linux, you should install one of them for better memory performance
 	and to know how many bytes malloced.
-
-	snappy (http://code.google.com/p/snappy/)
-	   This is "optionally" used only in cicada_grammar_learn for faster compression/decompression
-
 
 Included libraries + licenses:
 
