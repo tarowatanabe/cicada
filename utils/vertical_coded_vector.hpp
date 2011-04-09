@@ -280,10 +280,9 @@ namespace utils
       compressed.swap(x.compressed);
       off.swap(x.off);
       
+      __cache.swap(x.__cache);
       std::swap(__mask_pos, x.__mask_pos);
       std::swap(__mask_value, x.__mask_value);
-
-      __cache.clear();
     }
     
     const_iterator begin() const { return const_iterator(size_type(0), this); }
