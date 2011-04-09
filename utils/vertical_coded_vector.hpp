@@ -515,6 +515,12 @@ namespace utils
     }
     
   public:
+    void freeze()
+    {
+      if (compressed.empty())
+	build();
+      raw.clear();
+    }
     
     void build()
     {
