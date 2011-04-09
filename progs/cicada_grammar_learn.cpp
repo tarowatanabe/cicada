@@ -57,6 +57,7 @@
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/vertical_coded_vector.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -83,8 +84,37 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 class Treebank
 {
 public:
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
   typedef hypergraph_type::id_type id_type;
   typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > id_set_type;
+
+  struct NodeSet
+  {
+    typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
+    typedef utils::vertical_coded_vector<size_type, std::allocator<size_type> > offset_set_type;
+    
+
+    NodeSet(const hypergraph_type::node_type& nodes) { assign(nodes); }
+
+    void assign(const hypergraph_type::node_type& nodes)
+    {
+      edges.clear();
+      offsets.clear();
+
+      offsets.push_back(0);
+      
+      hypergraph_type::node_set_type::const_iterator niter_end = nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
+	edges.insert(edges.end(), nodes.edges.begin(), nodes.edges.end());
+	offsets.push_back(edges.size());
+      }
+      
+    }
+
+    edge_set_type   edges;
+    offset_set_type offsets;
+  };
 
   struct Node
   {
