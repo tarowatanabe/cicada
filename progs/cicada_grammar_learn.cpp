@@ -88,6 +88,14 @@ public:
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   typedef hypergraph_type::id_type id_type;
+  
+  typedef std::vector<symbol_type, std::allocator<symbol_type> > label_set_type;
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
+
+  hypergraph_type treebank;
+  label_set_type  labels;
+  node_map_type   node_map;
+ 
   typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > id_set_type;
 
   struct NodeSet
@@ -444,42 +452,10 @@ public:
     offset_set_type   offsets;
   };
   
-#if 0
-  struct Edge
-  {
-    typedef hypergraph_type::edge_type::node_set_type node_set_type;
-
-    Edge() {}
-    Edge(const hypergraph_type::edge_type& x)
-      : head(x.head), tails(x.tails), rule(x.rule), id(x.id) {}
-
-    Edge& operator=(const hypergraph_type::edge_type& x)
-    {
-      head = x.head;
-      tails = x.tails;
-      rule = x.rule;
-      id = x.id;
-      return *this;
-    }
-
-    operator hypergraph_type::edge_type() const
-    {
-      return hypergraph_type::edge_type(head, tails, rule, id);
-    }
-    
-    id_type head;
-    node_set_type tails;
-    rule_ptr_type rule;
-    id_type id;
-  };
-#endif
   
   typedef NodeSet node_set_type;
   typedef node_set_type::node_type node_type;
-
-  //typedef Edge edge_type;
-  //typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
-
+  
   typedef EdgeSet edge_set_type;
   typedef edge_set_type::edge_type edge_type;
 
@@ -1095,6 +1071,139 @@ int main(int argc, char** argv)
   return 0;
 }
 
+#if 0
+
+template <typename Function>
+void treebank_apply(const treebank_type& treebank,
+		    Function function)
+{
+  typedef std::vector<int, std::allocator<int> > index_set_type;
+  
+  index_set_type  j;
+  index_set_type  j_end;
+  rule_ptr_type   rule_annotated(new rule_type());
+  
+  hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
+  for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
+    const hypergraph_type::node_type& node = *niter;
+    
+    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+      const hypergraph_type::edge_type& edge = treebank.treebank.edges[*eiter];
+      const rule_ptr_type& rule = edge.rule;
+      
+      j.clear();
+      j.resize(rule->rhs.size() + 1, 0);
+      j_end.resize(rule->rhs.size() + 1);
+      
+      rule_annotated->lhs = rule->lhs;
+      rule_annotated->rhs = rule->rhs;
+      
+      hypergraph_type::edge_type::node_set_type tails(edge.tails);
+      
+      j_end.front() = treebank.node_map[edge.head + 1] - treebank.node_map[edge.head];
+      size_t pos = 0;
+      for (size_t i = 1; i != j_end.size(); ++ i)
+	if (rule->rhs[i - 1].is_non_terminal()) {
+	  j_end[i] = treebank.node_map[edge.tails[pos] + 1] - treebank.node_map[edge.tails[pos]];
+	  ++ pos;
+	} else
+	  j_end[i] = 0;
+      
+      for (;;) {
+	const hypergraph_type::id_type head = treebank.node_map[edge.head] + j[0];
+	rule_annotated->lhs = treebank.labels[head];
+	size_t pos = 0;
+	for (size_t i = 1; i != j_end.size(); ++ i)
+	  if (j_end[i]) {
+	    const hypergraph_type::id_type tail = treebank.node_map[edge.tails[pos]] + j[i];
+	    rule_annotated->rhs[i - 1] = treebank.labels[tail];
+	    tails[pos] = tail;
+	    ++ pos;
+	  } 
+	
+	function(rule_annotated, head, tails);
+	
+	size_t index = 0;
+	for (/**/; index != j.size(); ++ index) 
+	  if (j_end[index]) {
+	    ++ j[index];
+	    if (j[index] < j_end[index]) break;
+	    j[index] = 0;
+	  }
+	
+	if (index == j.size()) break;
+      }
+    }
+  }
+}
+
+template <typename Weights, typename Function>
+struct InsideFunction
+{
+  typedef typename Weights::value_type weight_type;
+  
+  InsideFunction(Weights& __inside,
+		 Function __function)
+    : inside(__inside), function(__function) {}
+
+  template <typename Head, typename Tails>
+  void operator()(const rule_ptr_type& rule,
+		  const Head& head,
+		  const Tails& tails)
+  {
+    weight_type weight = function(rule);
+    
+    typename Tails::const_iterator titer_end = tails.end();
+    for (typename Tails::const_iterator titer = tails.begin(); titer != titer_end; ++ titer)
+      weight *= inside[*titer];
+    
+    inside[head] += weight;
+  }
+  
+  Weights& inside;
+  Function function;
+};
+
+template <typename Weights, typename Function>
+struct OutsideFunction
+{
+  InsideFunction(const Weights& __inside,
+		 Weights& __outside,
+		 Function __function)
+    : inside(__inside), outside(__outside), function(__function) {}
+  
+  template <typename Head, typename Tails>
+  void operator()(const rule_ptr_type& rule,
+		  const Head& head,
+		  const Tails& tails)
+  {
+    weight_type weight_outside = function(rule) * outside[head];
+    
+    typename Tails::const_iterator titer_begin = tails.begin();
+    typename Tails::const_iterator titer_end   = tails.end();
+    for (typename Tails::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+      weight_type weight = weight_outside;
+      
+      typename Tails::const_iterator niter_end = titer_end;
+      for (typename Tails::const_iterator niter = titer_begin niter != niter_end; ++ niter)
+	if (titer != niter)
+	  weight *= inside[*niter];
+      
+      outside[*titer] += weight;
+    }
+    
+    inside[head] += weight;
+  }
+
+  const Weights& inside;
+  Weights& outside;
+  Function function;
+};
+
+#endif
+
+
 bool is_fixed_non_terminal(const symbol_type& symbol)
 { 
   return symbol.is_non_terminal() && symbol == goal;
@@ -1157,6 +1266,7 @@ struct Annotator : public utils::hashmurmur<size_t>
   cache_set_type caches;
   const int bits;
 };
+
 
 struct attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
 {
