@@ -690,7 +690,7 @@ void treebank_apply(const treebank_type& treebank,
   
   index_set_type j;
   index_set_type j_end;
-  rule_type      rule_annotated;
+  rule_ptr_type  rule_annotated(new rule_type());
   
   hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
   for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
@@ -705,8 +705,8 @@ void treebank_apply(const treebank_type& treebank,
       j.resize(rule->rhs.size() + 1, 0);
       j_end.resize(rule->rhs.size() + 1);
       
-      rule_annotated.lhs = rule->lhs;
-      rule_annotated.rhs = rule->rhs;
+      rule_annotated->lhs = rule->lhs;
+      rule_annotated->rhs = rule->rhs;
       
       hypergraph_type::edge_type::node_set_type tails(edge.tails);
       
@@ -721,17 +721,17 @@ void treebank_apply(const treebank_type& treebank,
       
       for (;;) {
 	const hypergraph_type::id_type head = treebank.node_map[edge.head] + j[0];
-	rule_annotated.lhs = treebank.labels[head];
+	rule_annotated->lhs = treebank.labels[head];
 	size_t pos = 0;
 	for (size_t i = 1; i != j_end.size(); ++ i)
 	  if (j_end[i]) {
 	    const hypergraph_type::id_type tail = treebank.node_map[edge.tails[pos]] + j[i];
-	    rule_annotated.rhs[i - 1] = treebank.labels[tail];
+	    rule_annotated->rhs[i - 1] = treebank.labels[tail];
 	    tails[pos] = tail;
 	    ++ pos;
 	  } 
 	
-	function(rule_type::create(rule_annotated), head, tails);
+	function(rule_annotated, head, tails);
 	
 	size_t index = 0;
 	for (/**/; index != j.size(); ++ index) 
@@ -755,7 +755,7 @@ void treebank_apply_reverse(const treebank_type& treebank,
   
   index_set_type j;
   index_set_type j_end;
-  rule_type      rule_annotated;
+  rule_ptr_type  rule_annotated(new rule_type());
   
   hypergraph_type::node_set_type::const_reverse_iterator niter_end = treebank.treebank.nodes.rend();
   for (hypergraph_type::node_set_type::const_reverse_iterator niter = treebank.treebank.nodes.rbegin(); niter != niter_end; ++ niter) {
@@ -770,8 +770,8 @@ void treebank_apply_reverse(const treebank_type& treebank,
       j.resize(rule->rhs.size() + 1, 0);
       j_end.resize(rule->rhs.size() + 1);
       
-      rule_annotated.lhs = rule->lhs;
-      rule_annotated.rhs = rule->rhs;
+      rule_annotated->lhs = rule->lhs;
+      rule_annotated->rhs = rule->rhs;
       
       hypergraph_type::edge_type::node_set_type tails(edge.tails);
       
@@ -786,17 +786,17 @@ void treebank_apply_reverse(const treebank_type& treebank,
       
       for (;;) {
 	const hypergraph_type::id_type head = treebank.node_map[edge.head] + j[0];
-	rule_annotated.lhs = treebank.labels[head];
+	rule_annotated->lhs = treebank.labels[head];
 	size_t pos = 0;
 	for (size_t i = 1; i != j_end.size(); ++ i)
 	  if (j_end[i]) {
 	    const hypergraph_type::id_type tail = treebank.node_map[edge.tails[pos]] + j[i];
-	    rule_annotated.rhs[i - 1] = treebank.labels[tail];
+	    rule_annotated->rhs[i - 1] = treebank.labels[tail];
 	    tails[pos] = tail;
 	    ++ pos;
 	  } 
 	
-	function(rule_type::create(rule_annotated), head, tails);
+	function(rule_annotated, head, tails);
 	
 	size_t index = 0;
 	for (/**/; index != j.size(); ++ index) 
@@ -1697,7 +1697,7 @@ struct TaskLearn
       for (typename Tails::const_iterator titer = tails.begin(); titer != titer_end; ++ titer)
 	weight *= inside[*titer];
       
-      counts[rule->lhs][rule] += weight;
+      counts[rule->lhs][rule_type::create(*rule)] += weight;
     }
     
     const Weights& inside;
