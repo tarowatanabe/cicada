@@ -58,6 +58,7 @@
 #include <utils/array_power2.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/vertical_coded_vector.hpp>
+#include <utils/packed_vector.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -94,8 +95,7 @@ public:
     typedef std::vector<id_type, std::allocator<id_type> > id_set_type;
     typedef utils::vertical_coded_vector<size_type, std::allocator<size_type> > offset_set_type;
     typedef NodeSet node_set_type;
-
-
+    
     struct edge_set_type
     {
       typedef id_set_type::const_iterator const_iterator;
@@ -106,22 +106,17 @@ public:
       
       const_iterator begin() const
       {
-	return nodes->edges.begin() + nodes->offsets[id];
+	return const_iterator(nodes->edges.begin() + nodes->offsets[id]);
       }
       
       const_iterator end() const
       {
-	return nodes->edges.begin() + nodes->offsets[id + 1];
+	return const_iterator(nodes->edges.begin() + nodes->offsets[id + 1]);
       }
 
       const_reference front() const
       {
 	return *(begin());
-      }
-
-      const_reference back() const
-      {
-	return *(end() - 1);
       }
       
       const node_set_type* nodes;
@@ -243,19 +238,25 @@ public:
     
     void assign(const hypergraph_type::node_set_type& nodes)
     {
+      typedef std::vector<id_type, std::allocator<id_type> > id_sorted_type;
+      id_sorted_type edges_sorted;
+
       edges.clear();
       offsets.clear();
-
-      offsets.push_back(0);
       
+      offsets.push_back(0);
       hypergraph_type::node_set_type::const_iterator niter_end = nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	edges.insert(edges.end(), niter->edges.begin(), niter->edges.end());
+	edges_sorted.clear();
+	edges_sorted.insert(edges_sorted.end(), niter->edges.begin(), niter->edges.end());
+	std::sort(edges_sorted.begin(), edges_sorted.end());
+	
+	edges.insert(edges.end(), edges_sorted.begin(), edges_sorted.end());
 	offsets.push_back(edges.size());
       }
 
       offsets.freeze();
-
+      
       id_set_type(edges).swap(edges);
       offset_set_type(offsets).swap(offsets);
     }
@@ -268,8 +269,7 @@ public:
       for (const_iterator iter = begin(); iter != iter_end; ++ iter) {
 	const node_type& node = *iter;
 	
-	nodes.push_back(hypergraph_type::node_type(hypergraph_type::node_type::edge_set_type(node.edges.begin(), node.edges.end()),
-						   node.id));
+	nodes.push_back(hypergraph_type::node_type(hypergraph_type::node_type::edge_set_type(node.edges.begin(), node.edges.end()), node.id));
       }
     }
 
@@ -277,6 +277,174 @@ public:
     offset_set_type offsets;
   };
   
+  struct EdgeSet
+  {
+    // similar to node-set, but we need to store various information separately, head and rule.
+    typedef std::vector<id_type, std::allocator<id_type> > id_set_type;
+    typedef utils::vertical_coded_vector<size_type, std::allocator<size_type> > offset_set_type;
+    typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> > rule_ptr_set_type;
+    
+    typedef EdgeSet edge_set_type;
+    
+    struct node_set_type
+    {
+      typedef id_set_type::const_iterator const_iterator;
+      typedef id_set_type::const_reference const_reference;
+
+      node_set_type() : edges(0) {}
+      
+      node_set_type(const id_type& __id, const edge_set_type* __edges)
+	: edges(__edges), id(__id) {}
+      
+      const_iterator begin() const
+      {
+	return const_iterator(edges->nodes.begin() + edges->offsets[id]);
+      }
+      
+      const_iterator end() const
+      {
+	return const_iterator(edges->nodes.begin() + edges->offsets[id + 1]);
+      }
+      
+      const_reference operator[](size_type pos) const { return *(begin() + pos); }
+
+
+      bool empty() const { return size() == 0; }
+      size_type size() const { return edges->offsets[id + 1] - edges->offsets[id]; } 
+      
+      const edge_set_type* edges;
+      id_type id;
+    };
+    
+    struct edge_type
+    {
+      typedef EdgeSet::node_set_type node_set_type;
+
+      edge_type() {}
+      
+      edge_type(const id_type& __id, const edge_set_type* __edges)
+	: head(__edges->heads[__id]),
+	  tails(__id, __edges),
+	  rule(__edges->rules[__id]),
+	  id(__id)
+      {}
+      
+      id_type head;
+      node_set_type tails;
+      rule_ptr_type rule;
+      id_type id;
+    };
+    
+    struct const_iterator
+    {
+      const_iterator(const id_type& __id, const edge_set_type* __edges)
+	: edge(__id, __edges) {}
+      const_iterator()
+	: edge() {}
+      
+      const edge_type& operator*() const { return edge; }
+      const edge_type* operator->() const { return &edge; }
+      
+      const_iterator& operator++()
+      {
+	++ edge.id;
+	++ edge.tails.id;
+	
+	edge.head = edge.tails.edges->heads[edge.id];
+	edge.rule = edge.tails.edges->rules[edge.id];
+	
+	return *this;
+      }
+      
+      friend
+      bool operator==(const const_iterator& x, const const_iterator& y)
+      {
+	return x.edge.id == y.edge.id;
+      }
+      
+      friend
+      bool operator!=(const const_iterator& x, const const_iterator& y)
+      {
+	return x.edge.id != y.edge.id;
+      }
+      
+      edge_type edge;
+    };
+    
+    const_iterator begin() const
+    {
+      return const_iterator(0, this);
+    }
+    
+    const_iterator end() const
+    {
+      return const_iterator(offsets.size() - 1, this);
+    }
+    
+    const edge_type& operator[](size_type pos) const
+    {
+      const_cast<const_iterator&>(cref) = const_iterator(pos, this);
+      return *cref;
+    }
+
+    size_type size() const { return offsets.size() - 1; }
+    
+    void assign(const hypergraph_type::edge_set_type& edges)
+    {
+      rules.clear();
+      heads.clear();
+      nodes.clear();
+      offsets.clear();
+      
+      offsets.push_back(0);
+      hypergraph_type::edge_set_type::const_iterator eiter_end = edges.end();
+      for (hypergraph_type::edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
+	const hypergraph_type::edge_type& edge = *eiter;
+	rules.push_back(edge.rule);
+	heads.push_back(edge.head);
+	nodes.insert(nodes.end(), edge.tails.begin(), edge.tails.end());
+	offsets.push_back(nodes.size());
+      }
+      
+      offsets.freeze();
+      
+      // dummy!
+      heads.push_back(id_type(-1));
+      rules.push_back(rule_ptr_type());
+      
+      rule_ptr_set_type(rules).swap(rules);
+      id_set_type(heads).swap(heads);
+      id_set_type(nodes).swap(nodes);
+      offset_set_type(offsets).swap(offsets);
+    }
+    
+    void copy(hypergraph_type::edge_set_type& edges) const
+    {
+      edges.clear();
+      
+      const_iterator iter_end = end();
+      for (const_iterator iter = begin(); iter != iter_end; ++ iter) {
+	const edge_type& edge = *iter;
+	
+	edges.push_back(hypergraph_type::edge_type(edge.head,
+						   hypergraph_type::edge_type::node_set_type(edge.tails.begin(), edge.tails.end()),
+						   edge.rule,
+						   edge.id));
+      }
+    }
+    
+    EdgeSet(const hypergraph_type::edge_set_type& edges) { assign(edges); }
+    EdgeSet() {}
+
+    const_iterator cref;
+
+    rule_ptr_set_type rules;
+    id_set_type       heads;
+    id_set_type       nodes;
+    offset_set_type   offsets;
+  };
+  
+#if 0
   struct Edge
   {
     typedef hypergraph_type::edge_type::node_set_type node_set_type;
@@ -304,26 +472,31 @@ public:
     rule_ptr_type rule;
     id_type id;
   };
+#endif
   
   typedef NodeSet node_set_type;
   typedef node_set_type::node_type node_type;
 
-  typedef Edge edge_type;
-  typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
+  //typedef Edge edge_type;
+  //typedef std::vector<edge_type, std::allocator<edge_type> > edge_set_type;
+
+  typedef EdgeSet edge_set_type;
+  typedef edge_set_type::edge_type edge_type;
 
   Treebank()  {}
   Treebank(const hypergraph_type& treebank) 
     : nodes(treebank.nodes),
-      edges(treebank.edges.begin(), treebank.edges.end()),
+      edges(treebank.edges),
       goal(treebank.goal) {}
   
   Treebank& operator=(const hypergraph_type& treebank)
   {
     nodes.assign(treebank.nodes);
+    edges.assign(treebank.edges);
     
-    edges.clear();
-    edges.insert(edges.end(), treebank.edges.begin(), treebank.edges.end());
-    edge_set_type(edges).swap(edges);
+    //edges.clear();
+    //edges.insert(edges.end(), treebank.edges.begin(), treebank.edges.end());
+    //edge_set_type(edges).swap(edges);
     
     goal = treebank.goal;
     
@@ -333,9 +506,11 @@ public:
   void assign(hypergraph_type& graph) const
   {
     nodes.copy(graph.nodes);
-    graph.edges = hypergraph_type::edge_set_type(edges.begin(), edges.end());
+    edges.copy(graph.edges);
+    // graph.edges = hypergraph_type::edge_set_type(edges.begin(), edges.end());
     graph.goal = goal;
   }
+
   
   bool is_valid()
   {
@@ -1547,7 +1722,7 @@ struct TaskSplitTreebank : public Annotator
 	  j.resize(rule->rhs.size() + 1, 0);
 	  j_end.resize(rule->rhs.size() + 1);
 	  
-	  treebank_type::edge_type::node_set_type tails(edge.tails.size());
+	  hypergraph_type::edge_type::node_set_type tails(edge.tails.size());
 	  
 	  for (size_t i = 0; i != symbols.size(); ++ i)
 	    j_end[i] = utils::bithack::branch(symbols[i].is_non_terminal(), utils::bithack::branch(is_fixed_non_terminal(symbols[i]), 1, 2), 0);
