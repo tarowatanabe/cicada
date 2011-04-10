@@ -95,409 +95,22 @@ public:
   hypergraph_type treebank;
   label_set_type  labels;
   node_map_type   node_map;
- 
-  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > id_set_type;
-
-  struct NodeSet
+  
+  Treebank(const hypergraph_type& __treebank)
+    : treebank(__treebank),
+      labels(__treebank.nodes.size()),
+      node_map(__treebank.nodes.size() + 1)
   {
-    typedef std::vector<id_type, std::allocator<id_type> > id_set_type;
-    typedef utils::vertical_coded_vector<size_type, std::allocator<size_type> > offset_set_type;
-    typedef NodeSet node_set_type;
-    
-    struct edge_set_type
-    {
-      typedef id_set_type::const_iterator const_iterator;
-      typedef id_set_type::const_reference const_reference;
+    hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
+    for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
+      const hypergraph_type::node_type& node = *niter;
+      const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
       
-      edge_set_type(const id_type& __id, const node_set_type* __nodes)
-	: nodes(__nodes), id(__id) {}
-      
-      const_iterator begin() const
-      {
-	return const_iterator(nodes->edges.begin() + nodes->offsets[id]);
-      }
-      
-      const_iterator end() const
-      {
-	return const_iterator(nodes->edges.begin() + nodes->offsets[id + 1]);
-      }
-
-      const_reference front() const
-      {
-	return *(begin());
-      }
-      
-      const node_set_type* nodes;
-      id_type id;
-    };
-    
-    struct node_type
-    {
-      typedef NodeSet::edge_set_type edge_set_type;
-
-      node_type(const id_type& __id, const node_set_type* __nodes)
-	: edges(__id, __nodes), id(__id) {}
-      
-      edge_set_type edges;
-      id_type id;
-    };
-    
-    struct const_iterator
-    {
-      const_iterator(const id_type& __id, const node_set_type* __nodes)
-	: node(__id, __nodes) {}
-      
-      const node_type& operator*() const { return node; }
-      const node_type* operator->() const { return &node; }
-      
-      const_iterator& operator++()
-      {
-	++ node.id;
-	++ node.edges.id;
-	return *this;
-      }
-      
-      const_iterator& operator--()
-      {
-	-- node.id;
-	-- node.edges.id;
-	return *this;
-      }
-      
-      friend
-      bool operator==(const const_iterator& x, const const_iterator& y)
-      {
-	return x.node.id == y.node.id;
-      }
-      
-      friend
-      bool operator!=(const const_iterator& x, const const_iterator& y)
-      {
-	return x.node.id != y.node.id;
-      }
-      
-      node_type node;
-    };
-
-    struct const_reverse_iterator
-    {
-      const_reverse_iterator(const id_type& __id, const node_set_type* __nodes)
-	: node(__id, __nodes) {}
-      
-      const node_type& operator*() const { return node; }
-      const node_type* operator->() const { return &node; }
-      
-      const_reverse_iterator& operator++()
-      {
-	-- node.id;
-	-- node.edges.id;
-	return *this;
-      }
-      
-      const_reverse_iterator& operator--()
-      {
-	++ node.id;
-	++ node.edges.id;
-	return *this;
-      }
-      
-      friend
-      bool operator==(const const_reverse_iterator& x, const const_reverse_iterator& y)
-      {
-	return x.node.id == y.node.id;
-      }
-      
-      friend
-      bool operator!=(const const_reverse_iterator& x, const const_reverse_iterator& y)
-      {
-	return x.node.id != y.node.id;
-      }
-      
-      node_type node;
-    };
-    
-
-    typedef node_type value_type;
-    
-    NodeSet(const hypergraph_type::node_set_type& nodes) { assign(nodes); }
-    NodeSet() {}
-    
-    const_iterator begin() const
-    {
-      return const_iterator(0, this);
+      labels[node.id] = edge.rule->lhs;
+      node_map[node.id] = node.id;
     }
-    
-    const_iterator end() const
-    {
-      return const_iterator(offsets.size() - 1, this);
-    }
-
-    const_reverse_iterator rbegin() const
-    {
-      return const_reverse_iterator(offsets.size() - 2, this);
-    }
-    
-    const_reverse_iterator rend() const
-    {
-      return const_reverse_iterator(-1, this);
-    }
-    
-    size_type size() const { return offsets.size() - 1; }
-    
-    void assign(const hypergraph_type::node_set_type& nodes)
-    {
-      typedef std::vector<id_type, std::allocator<id_type> > id_sorted_type;
-      id_sorted_type edges_sorted;
-
-      edges.clear();
-      offsets.clear();
-      
-      offsets.push_back(0);
-      hypergraph_type::node_set_type::const_iterator niter_end = nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = nodes.begin(); niter != niter_end; ++ niter) {
-	edges_sorted.clear();
-	edges_sorted.insert(edges_sorted.end(), niter->edges.begin(), niter->edges.end());
-	std::sort(edges_sorted.begin(), edges_sorted.end());
-	
-	edges.insert(edges.end(), edges_sorted.begin(), edges_sorted.end());
-	offsets.push_back(edges.size());
-      }
-
-      offsets.freeze();
-      
-      id_set_type(edges).swap(edges);
-      offset_set_type(offsets).swap(offsets);
-    }
-
-    void copy(hypergraph_type::node_set_type& nodes) const
-    {
-      nodes.clear();
-      
-      const_iterator iter_end = end();
-      for (const_iterator iter = begin(); iter != iter_end; ++ iter) {
-	const node_type& node = *iter;
-	
-	nodes.push_back(hypergraph_type::node_type(hypergraph_type::node_type::edge_set_type(node.edges.begin(), node.edges.end()), node.id));
-      }
-    }
-
-    id_set_type     edges;
-    offset_set_type offsets;
-  };
-  
-  struct EdgeSet
-  {
-    // similar to node-set, but we need to store various information separately, head and rule.
-    typedef std::vector<id_type, std::allocator<id_type> > id_set_type;
-    typedef utils::vertical_coded_vector<size_type, std::allocator<size_type> > offset_set_type;
-    typedef std::vector<rule_ptr_type, std::allocator<rule_ptr_type> > rule_ptr_set_type;
-    
-    typedef EdgeSet edge_set_type;
-    
-    struct node_set_type
-    {
-      typedef id_set_type::const_iterator const_iterator;
-      typedef id_set_type::const_reference const_reference;
-
-      node_set_type() : edges(0) {}
-      
-      node_set_type(const id_type& __id, const edge_set_type* __edges)
-	: edges(__edges), id(__id) {}
-      
-      const_iterator begin() const
-      {
-	return const_iterator(edges->nodes.begin() + edges->offsets[id]);
-      }
-      
-      const_iterator end() const
-      {
-	return const_iterator(edges->nodes.begin() + edges->offsets[id + 1]);
-      }
-      
-      const_reference operator[](size_type pos) const { return *(begin() + pos); }
-
-
-      bool empty() const { return size() == 0; }
-      size_type size() const { return edges->offsets[id + 1] - edges->offsets[id]; } 
-      
-      const edge_set_type* edges;
-      id_type id;
-    };
-    
-    struct edge_type
-    {
-      typedef EdgeSet::node_set_type node_set_type;
-
-      edge_type() {}
-      
-      edge_type(const id_type& __id, const edge_set_type* __edges)
-	: head(__edges->heads[__id]),
-	  tails(__id, __edges),
-	  rule(__edges->rules[__id]),
-	  id(__id)
-      {}
-      
-      id_type head;
-      node_set_type tails;
-      rule_ptr_type rule;
-      id_type id;
-    };
-    
-    struct const_iterator
-    {
-      const_iterator(const id_type& __id, const edge_set_type* __edges)
-	: edge(__id, __edges) {}
-      const_iterator()
-	: edge() {}
-      
-      const edge_type& operator*() const { return edge; }
-      const edge_type* operator->() const { return &edge; }
-      
-      const_iterator& operator++()
-      {
-	++ edge.id;
-	++ edge.tails.id;
-	
-	edge.head = edge.tails.edges->heads[edge.id];
-	edge.rule = edge.tails.edges->rules[edge.id];
-	
-	return *this;
-      }
-      
-      friend
-      bool operator==(const const_iterator& x, const const_iterator& y)
-      {
-	return x.edge.id == y.edge.id;
-      }
-      
-      friend
-      bool operator!=(const const_iterator& x, const const_iterator& y)
-      {
-	return x.edge.id != y.edge.id;
-      }
-      
-      edge_type edge;
-    };
-    
-    const_iterator begin() const
-    {
-      return const_iterator(0, this);
-    }
-    
-    const_iterator end() const
-    {
-      return const_iterator(offsets.size() - 1, this);
-    }
-    
-    const edge_type& operator[](size_type pos) const
-    {
-      const_cast<const_iterator&>(cref) = const_iterator(pos, this);
-      return *cref;
-    }
-
-    size_type size() const { return offsets.size() - 1; }
-    
-    void assign(const hypergraph_type::edge_set_type& edges)
-    {
-      rules.clear();
-      heads.clear();
-      nodes.clear();
-      offsets.clear();
-      
-      offsets.push_back(0);
-      hypergraph_type::edge_set_type::const_iterator eiter_end = edges.end();
-      for (hypergraph_type::edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
-	const hypergraph_type::edge_type& edge = *eiter;
-	rules.push_back(edge.rule);
-	heads.push_back(edge.head);
-	nodes.insert(nodes.end(), edge.tails.begin(), edge.tails.end());
-	offsets.push_back(nodes.size());
-      }
-      
-      offsets.freeze();
-      
-      // dummy!
-      heads.push_back(id_type(-1));
-      rules.push_back(rule_ptr_type());
-      
-      rule_ptr_set_type(rules).swap(rules);
-      id_set_type(heads).swap(heads);
-      id_set_type(nodes).swap(nodes);
-      offset_set_type(offsets).swap(offsets);
-    }
-    
-    void copy(hypergraph_type::edge_set_type& edges) const
-    {
-      edges.clear();
-      
-      const_iterator iter_end = end();
-      for (const_iterator iter = begin(); iter != iter_end; ++ iter) {
-	const edge_type& edge = *iter;
-	
-	edges.push_back(hypergraph_type::edge_type(edge.head,
-						   hypergraph_type::edge_type::node_set_type(edge.tails.begin(), edge.tails.end()),
-						   edge.rule,
-						   edge.id));
-      }
-    }
-    
-    EdgeSet(const hypergraph_type::edge_set_type& edges) { assign(edges); }
-    EdgeSet() {}
-
-    const_iterator cref;
-
-    rule_ptr_set_type rules;
-    id_set_type       heads;
-    id_set_type       nodes;
-    offset_set_type   offsets;
-  };
-  
-  
-  typedef NodeSet node_set_type;
-  typedef node_set_type::node_type node_type;
-  
-  typedef EdgeSet edge_set_type;
-  typedef edge_set_type::edge_type edge_type;
-
-  Treebank()  {}
-  Treebank(const hypergraph_type& treebank) 
-    : nodes(treebank.nodes),
-      edges(treebank.edges),
-      goal(treebank.goal) {}
-  
-  Treebank& operator=(const hypergraph_type& treebank)
-  {
-    nodes.assign(treebank.nodes);
-    edges.assign(treebank.edges);
-    
-    //edges.clear();
-    //edges.insert(edges.end(), treebank.edges.begin(), treebank.edges.end());
-    //edge_set_type(edges).swap(edges);
-    
-    goal = treebank.goal;
-    
-    return *this;
+    node_map.back() = treebank.nodes.size();
   }
-  
-  void assign(hypergraph_type& graph) const
-  {
-    nodes.copy(graph.nodes);
-    edges.copy(graph.edges);
-    // graph.edges = hypergraph_type::edge_set_type(edges.begin(), edges.end());
-    graph.goal = goal;
-  }
-
-  
-  bool is_valid()
-  {
-    return goal != hypergraph_type::invalid;
-  }
-  
-  node_set_type nodes;
-  edge_set_type edges;
-  id_type goal;
-  
-  id_set_type   node_prev;
 };
 
 typedef Treebank treebank_type;
@@ -634,11 +247,11 @@ bool binarize_left = false;
 bool binarize_right = false;
 bool binarize_all = false;
 
-double prior_rule      = 0.01;
-double prior_lexicon   = 0.01;
-double prior_unknown   = 0.01;
-double prior_signature = 0.01;
-double prior_character = 0.01;
+double prior_rule      = 1;
+double prior_lexicon   = 1;
+double prior_unknown   = 1;
+double prior_signature = 1;
+double prior_character = 1;
 
 double merge_ratio = 0.5;
 double unknown_ratio = 0.5;
@@ -713,8 +326,7 @@ struct zero_function
 {
   typedef weight_type value_type;
   
-  template <typename Edge>
-  weight_type operator()(const Edge& edge) const
+  weight_type operator()(const rule_ptr_type& rule) const
   {
     return cicada::semiring::traits<weight_type>::exp(0.0);
   }
@@ -726,10 +338,9 @@ struct weight_function
 
   weight_function(const grammar_type& __grammar) : grammar(__grammar) {}
   
-  template <typename Edge>
-  weight_type operator()(const Edge& edge) const
+  weight_type operator()(const rule_ptr_type& rule) const
   {
-    grammar_type::const_iterator giter = grammar.find(edge.rule);
+    grammar_type::const_iterator giter = grammar.find(rule);
     if (giter == grammar.end())
       throw std::runtime_error("invalid rule");
     
@@ -1071,17 +682,15 @@ int main(int argc, char** argv)
   return 0;
 }
 
-#if 0
-
 template <typename Function>
 void treebank_apply(const treebank_type& treebank,
 		    Function function)
 {
   typedef std::vector<int, std::allocator<int> > index_set_type;
   
-  index_set_type  j;
-  index_set_type  j_end;
-  rule_ptr_type   rule_annotated(new rule_type());
+  index_set_type j;
+  index_set_type j_end;
+  rule_type      rule_annotated;
   
   hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
   for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
@@ -1096,8 +705,8 @@ void treebank_apply(const treebank_type& treebank,
       j.resize(rule->rhs.size() + 1, 0);
       j_end.resize(rule->rhs.size() + 1);
       
-      rule_annotated->lhs = rule->lhs;
-      rule_annotated->rhs = rule->rhs;
+      rule_annotated.lhs = rule->lhs;
+      rule_annotated.rhs = rule->rhs;
       
       hypergraph_type::edge_type::node_set_type tails(edge.tails);
       
@@ -1112,17 +721,82 @@ void treebank_apply(const treebank_type& treebank,
       
       for (;;) {
 	const hypergraph_type::id_type head = treebank.node_map[edge.head] + j[0];
-	rule_annotated->lhs = treebank.labels[head];
+	rule_annotated.lhs = treebank.labels[head];
 	size_t pos = 0;
 	for (size_t i = 1; i != j_end.size(); ++ i)
 	  if (j_end[i]) {
 	    const hypergraph_type::id_type tail = treebank.node_map[edge.tails[pos]] + j[i];
-	    rule_annotated->rhs[i - 1] = treebank.labels[tail];
+	    rule_annotated.rhs[i - 1] = treebank.labels[tail];
 	    tails[pos] = tail;
 	    ++ pos;
 	  } 
 	
-	function(rule_annotated, head, tails);
+	function(rule_type::create(rule_annotated), head, tails);
+	
+	size_t index = 0;
+	for (/**/; index != j.size(); ++ index) 
+	  if (j_end[index]) {
+	    ++ j[index];
+	    if (j[index] < j_end[index]) break;
+	    j[index] = 0;
+	  }
+	
+	if (index == j.size()) break;
+      }
+    }
+  }
+}
+
+template <typename Function>
+void treebank_apply_reverse(const treebank_type& treebank,
+			    Function function)
+{
+  typedef std::vector<int, std::allocator<int> > index_set_type;
+  
+  index_set_type j;
+  index_set_type j_end;
+  rule_type      rule_annotated;
+  
+  hypergraph_type::node_set_type::const_reverse_iterator niter_end = treebank.treebank.nodes.rend();
+  for (hypergraph_type::node_set_type::const_reverse_iterator niter = treebank.treebank.nodes.rbegin(); niter != niter_end; ++ niter) {
+    const hypergraph_type::node_type& node = *niter;
+    
+    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+      const hypergraph_type::edge_type& edge = treebank.treebank.edges[*eiter];
+      const rule_ptr_type& rule = edge.rule;
+      
+      j.clear();
+      j.resize(rule->rhs.size() + 1, 0);
+      j_end.resize(rule->rhs.size() + 1);
+      
+      rule_annotated.lhs = rule->lhs;
+      rule_annotated.rhs = rule->rhs;
+      
+      hypergraph_type::edge_type::node_set_type tails(edge.tails);
+      
+      j_end.front() = treebank.node_map[edge.head + 1] - treebank.node_map[edge.head];
+      size_t pos = 0;
+      for (size_t i = 1; i != j_end.size(); ++ i)
+	if (rule->rhs[i - 1].is_non_terminal()) {
+	  j_end[i] = treebank.node_map[edge.tails[pos] + 1] - treebank.node_map[edge.tails[pos]];
+	  ++ pos;
+	} else
+	  j_end[i] = 0;
+      
+      for (;;) {
+	const hypergraph_type::id_type head = treebank.node_map[edge.head] + j[0];
+	rule_annotated.lhs = treebank.labels[head];
+	size_t pos = 0;
+	for (size_t i = 1; i != j_end.size(); ++ i)
+	  if (j_end[i]) {
+	    const hypergraph_type::id_type tail = treebank.node_map[edge.tails[pos]] + j[i];
+	    rule_annotated.rhs[i - 1] = treebank.labels[tail];
+	    tails[pos] = tail;
+	    ++ pos;
+	  } 
+	
+	function(rule_type::create(rule_annotated), head, tails);
 	
 	size_t index = 0;
 	for (/**/; index != j.size(); ++ index) 
@@ -1168,9 +842,9 @@ struct InsideFunction
 template <typename Weights, typename Function>
 struct OutsideFunction
 {
-  InsideFunction(const Weights& __inside,
-		 Weights& __outside,
-		 Function __function)
+  OutsideFunction(const Weights& __inside,
+		  Weights& __outside,
+		  Function __function)
     : inside(__inside), outside(__outside), function(__function) {}
   
   template <typename Head, typename Tails>
@@ -1186,22 +860,18 @@ struct OutsideFunction
       weight_type weight = weight_outside;
       
       typename Tails::const_iterator niter_end = titer_end;
-      for (typename Tails::const_iterator niter = titer_begin niter != niter_end; ++ niter)
+      for (typename Tails::const_iterator niter = titer_begin; niter != niter_end; ++ niter)
 	if (titer != niter)
 	  weight *= inside[*niter];
       
       outside[*titer] += weight;
     }
-    
-    inside[head] += weight;
   }
 
   const Weights& inside;
   Weights& outside;
   Function function;
 };
-
-#endif
 
 
 bool is_fixed_non_terminal(const symbol_type& symbol)
@@ -1330,7 +1000,6 @@ struct TaskMergeScale
     
     weight_set_type inside;
     weight_set_type outside;
-
     
     const treebank_type* __treebank = 0;
     for (;;) {
@@ -1341,22 +1010,16 @@ struct TaskMergeScale
       
       inside.clear();
       outside.clear();
-      inside.resize(treebank.nodes.size());
-      outside.resize(treebank.nodes.size());
+      inside.resize(treebank.labels.size());
+      outside.resize(treebank.labels.size());
+      outside.back() = cicada::semiring::traits<weight_type>::one();
       
-      cicada::inside(treebank, inside, weight_function(grammar));
-      cicada::outside(treebank, inside, outside, weight_function(grammar));
+      treebank_apply(treebank, InsideFunction<weight_set_type, weight_function>(inside, weight_function(grammar)));
+      treebank_apply_reverse(treebank, OutsideFunction<weight_set_type, weight_function>(inside, outside, weight_function(grammar)));
       
       const weight_type weight_total = inside.back();
-
-      treebank_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
-      for (treebank_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
-	const treebank_type::node_type& node = *niter;
-	const treebank_type::edge_type& edge = treebank.edges[node.edges.front()];
-	const symbol_type lhs = edge.rule->lhs;
-	
-	scale[lhs] += inside[node.id] * outside[node.id] / weight_total;
-      }
+      for (size_t i = 0; i != treebank.labels.size(); ++ i)
+	scale[treebank.labels[i]] += inside[i] * outside[i] / weight_total;
     }
   }
   
@@ -1404,60 +1067,46 @@ struct TaskMergeLoss : public Annotator
       
       inside.clear();
       outside.clear();
-      inside.resize(treebank.nodes.size());
-      outside.resize(treebank.nodes.size());
+      inside.resize(treebank.labels.size());
+      outside.resize(treebank.labels.size());
+      outside.back() = cicada::semiring::traits<weight_type>::one();
     
-      cicada::inside(treebank, inside, weight_function(grammar));
-      cicada::outside(treebank, inside, outside, weight_function(grammar));
-    
-      symbols.clear();
-      treebank_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
-      for (treebank_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
-	const treebank_type::node_type& node = *niter;
-	const treebank_type::edge_type& edge = treebank.edges[node.edges.front()];
+      treebank_apply(treebank, InsideFunction<weight_set_type, weight_function>(inside, weight_function(grammar)));
+      treebank_apply_reverse(treebank, OutsideFunction<weight_set_type, weight_function>(inside, outside, weight_function(grammar)));
       
-	const symbol_type lhs = edge.rule->lhs;
-	const treebank_type::id_type node_id_prev = __treebank->node_prev[edge.id];
-	
-	if (node_id_prev >= symbols.size())
-	  symbols.resize(node_id_prev + 1);
-      
-	symbols[node_id_prev].push_back(symbol_id_type(lhs, node.id));
-      }
-    
-      // now, collect loss...
       const weight_type weight_total = inside.back();
       
-      symbol_id_map_type::const_iterator siter_end = symbols.end();
-      for (symbol_id_map_type::const_iterator siter = symbols.begin(); siter != siter_end; ++ siter) {
-	if (siter->size() == 2) {
-	  weight_type prob_split;
-	  weight_type inside_merge;
-	  weight_type outside_merge;
-	  weight_type scale_norm;
+      hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
+	
+	const size_t first = treebank.node_map[node.id];
+	const size_t last  = treebank.node_map[node.id + 1];
+	
+	if (last - first == 1) continue;
+	
+	for (size_t pos = first; pos < last; pos += 2) {
+	  // pos, pos + 1
 	  
-	  // is it correct?
-	  symbol_id_set_type::const_iterator iter_end = siter->end();
-	  for (symbol_id_set_type::const_iterator iter = siter->begin(); iter != iter_end; ++ iter) {
-	    
-	    typename scale_set_type::const_iterator witer = scale.find(iter->first);
-	    if (witer == scale.end())
-	      throw std::runtime_error("no scale? " + static_cast<const std::string&>(iter->first));
-	    
-	    prob_split += inside[iter->second] * outside[iter->second];
-	    inside_merge += inside[iter->second] * weight_type(witer->second);
-	    outside_merge += outside[iter->second];
-	    
-	    scale_norm += witer->second;
-	  }
+	  typename scale_set_type::const_iterator witer1 = scale.find(treebank.labels[pos]);
+	  typename scale_set_type::const_iterator witer2 = scale.find(treebank.labels[pos + 1]);
+	  
+	  if (witer1 == scale.end())
+	    throw std::runtime_error("no scale? " + static_cast<const std::string&>(treebank.labels[pos]));
+	  if (witer2 == scale.end())
+	    throw std::runtime_error("no scale? " + static_cast<const std::string&>(treebank.labels[pos + 1]));
+	  
+	  const weight_type prob_split    = inside[pos] * outside[pos] + inside[pos + 1] * outside[pos + 1];
+	  const weight_type inside_merge  = inside[pos] * witer1->second + inside[pos + 1] * witer2->second;
+	  const weight_type outside_merge = outside[pos] + outside[pos + 1];
+	  const weight_type scale_norm    = witer1->second + witer2->second;
 	  
 	  const weight_type loss_node = (inside_merge * outside_merge / scale_norm) / prob_split;
 	  
-	  std::pair<typename loss_set_type::iterator, bool> result = loss.insert(std::make_pair(annotate(siter->front().first, true), loss_node));
+	  std::pair<typename loss_set_type::iterator, bool> result = loss.insert(std::make_pair(treebank.labels[pos + 1], loss_node));
 	  if (! result.second)
 	    result.first->second *= loss_node;
-	} else if (siter->size() > 2)
-	  throw std::runtime_error("more than two splitting?");
+	}
       }
     }
   }
@@ -1482,40 +1131,44 @@ struct TaskMergeTreebank
   
   void operator()()
   {
-    hypergraph_type hypergraph;
-    hypergraph_type hypergraph_new;
-    filter_pruned::removed_type removed;
-    
     treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
       
       treebank_type& treebank(*__treebank);
-
-      treebank.assign(hypergraph);
       
-      removed.clear();
-      removed.resize(hypergraph.edges.size(), false);
+      treebank_type::label_set_type labels;
+      labels.reserve(treebank.labels.size());
       
-      hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
-      for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter) {
-	hypergraph_type::edge_type& edge = *eiter;
+      treebank_type::node_map_type  node_map(treebank.node_map);
+      node_map[0] = 0;
+      
+      hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
 	
-	const symbol_type lhs = edge.rule->lhs;
-	if (merged.find(lhs) != merged.end())
-	  removed[edge.id] = true;
+	const size_t first = treebank.node_map[node.id];
+	const size_t last  = treebank.node_map[node.id + 1];
+	
+	if (last - first == 1)
+	  labels.push_back(treebank.labels[first]);
 	else {
-	  symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
-	  for (symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
-	    if (riter->is_non_terminal() && merged.find(*riter) != merged.end())
-	      removed[edge.id] = true;
+	  for (size_t pos = first; pos < last; pos += 2) {
+	    const symbol_type& symbol = treebank.labels[pos + 1];
+	    
+	    labels.push_back(treebank.labels[pos]);
+	    if (merged.find(symbol) == merged.end())
+	      labels.push_back(treebank.labels[pos + 1]);
+	  }
 	}
+	
+	node_map[node.id + 1] = labels.size();
       }
       
-      cicada::topologically_sort(hypergraph, hypergraph_new, filter_pruned(removed));
-      
-      treebank = hypergraph_new;
+      treebank_type::label_set_type(labels).swap(labels);
+      treebank.labels.swap(labels);
+      treebank.node_map.swap(node_map);
     }
   }
   
@@ -1795,123 +1448,41 @@ struct TaskSplitTreebank : public Annotator
     symbol_set_type symbols;
     symbol_set_type symbols_new;
     
-    const attribute_type attr_node("node");
-    
     treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
       if (! __treebank) break;
       
       treebank_type& treebank(*__treebank);
-      hypergraph_new.clear();
       
-      //
-      // we will create node for original node-id + new-symbol
-      //
+      treebank_type::label_set_type labels;
+      labels.reserve(treebank.labels.size() * 2);
       
-      node_map.clear();
-      node_map.resize(treebank.nodes.size());
+      treebank_type::node_map_type  node_map(treebank.node_map);
+      node_map[0] = 0;
       
-      treebank_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
-      for (treebank_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
-	const treebank_type::node_type& node = *niter;
+      hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
+      for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
+	const hypergraph_type::node_type& node = *niter;
 	
-	treebank_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (treebank_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	  const treebank_type::edge_type& edge = treebank.edges[*eiter];
-	  const rule_ptr_type& rule = edge.rule;
+	const size_t first = treebank.node_map[node.id];
+	const size_t last  = treebank.node_map[node.id + 1];
 	
-	  symbols.clear();
-	  symbols.push_back(rule->lhs);
-	  symbols.insert(symbols.end(), rule->rhs.begin(), rule->rhs.end());
-	  
-	  symbols_new.clear();
-	  symbols_new.insert(symbols_new.end(), symbols.begin(), symbols.end());
-	  
-	  j.clear();
-	  j.resize(rule->rhs.size() + 1, 0);
-	  j_end.resize(rule->rhs.size() + 1);
-	  
-	  hypergraph_type::edge_type::node_set_type tails(edge.tails.size());
-	  
-	  for (size_t i = 0; i != symbols.size(); ++ i)
-	    j_end[i] = utils::bithack::branch(symbols[i].is_non_terminal(), utils::bithack::branch(is_fixed_non_terminal(symbols[i]), 1, 2), 0);
-	  
-	  for (;;) {
-	    // construct rule
-	    for (size_t i = 0; i != symbols.size(); ++ i)
-	      if (j_end[i])
-		symbols_new[i] = annotate(symbols[i], j[i]);
-	    
-	    rule_ptr_type rule = rule_type::create(rule_type(symbols_new.front(), symbols_new.begin() + 1, symbols_new.end()));
-	    grammar_type::const_iterator giter = grammar.find(rule);
-	    if (giter == grammar.end())
-	      throw std::runtime_error("no entry?");
-	    rule = giter->first;
-	  
-	    // construct edge
-	    std::pair<node_set_type::iterator, bool> head = node_map[edge.head].insert(std::make_pair(symbols_new.front(), 0));
-	    if (head.second) {
-	      head.first->second = hypergraph_new.add_node().id;
-	    
-	      // handling goal... assuming penntreebank style...
-	      if (node.id == treebank.goal)
-		hypergraph_new.goal = head.first->second;
-	    }
-	  
-	    size_t pos = 0;
-	    for (size_t i = 1; i != symbols_new.size(); ++ i)
-	      if (j_end[i]) {
-		node_set_type::const_iterator iter = node_map[edge.tails[pos]].find(symbols_new[i]);
-		if (iter == node_map[edge.tails[pos]].end())
-		  throw std::runtime_error("invalid node...?");
-	      
-		tails[pos] = iter->second;
-		++ pos;
-	      }
-	  
-	    hypergraph_type::edge_type& edge_new = hypergraph_new.add_edge(tails.begin(), tails.end());
-	    edge_new.rule = rule;
-	    edge_new.attributes[attr_node] = attribute_set_type::int_type(edge.head);
-	    
-	    hypergraph_new.connect_edge(edge_new.id, head.first->second);
-	  
-	    size_t index = 0;
-	    for (/**/; index != j.size(); ++ index) 
-	      if (j_end[index]) {
-		++ j[index];
-		if (j[index] < j_end[index]) break;
-		j[index] = 0;
-	      }
-	    
-	    if (index == j.size()) break;
+	if (node.id == treebank.treebank.goal)
+	  labels.push_back(treebank.labels[first]);
+	else {
+	  for (size_t pos = first; pos != last; ++ pos) {
+	    labels.push_back(annotate(treebank.labels[pos], false));
+	    labels.push_back(annotate(treebank.labels[pos], true));
 	  }
-	}   
-      }
-
-      if (hypergraph_new.is_valid())
-	hypergraph_new.topologically_sort();
-      
-      __treebank->node_prev.reserve(hypergraph_new.edges.size());
-      __treebank->node_prev.resize(hypergraph_new.edges.size());
-      hypergraph_type::edge_set_type::iterator eiter_end = hypergraph_new.edges.end();
-      for (hypergraph_type::edge_set_type::iterator eiter = hypergraph_new.edges.begin(); eiter != eiter_end; ++ eiter) {
-	hypergraph_type::edge_type& edge = *eiter;
+	}
 	
-	attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node);
-	if (aiter == edge.attributes.end())
-	  throw std::runtime_error("no attribute?");
-	
-	const int node_id_prev = boost::apply_visitor(attribute_integer(), aiter->second);
-	if (node_id_prev < 0)
-	  throw std::runtime_error("invalid id");
-	
-	__treebank->node_prev[edge.id] = node_id_prev;
-	
-	edge.attributes.clear();
+	node_map[node.id + 1] = labels.size();
       }
       
-      treebank = hypergraph_new;
+      treebank_type::label_set_type(labels).swap(labels);
+      treebank.labels.swap(labels);
+      treebank.node_map.swap(node_map);
     }
   }
   
@@ -2105,39 +1676,35 @@ struct TaskLearn
       logprob(cicada::semiring::traits<weight_type>::one()),
       counts() {}
   
-  struct accumulator_type
+  template <typename Weights>
+  struct Accumulated
   {
-    typedef weight_type value_type;
-
-    accumulator_type(const weight_type& __weight_total,
-		     const treebank_type& __treebank,
-		     count_set_type& __counts)
-      : weight_total(__weight_total), treebank(__treebank), counts(__counts) {}
-
-    struct Count
-    {
-      Count(weight_type& __count, const weight_type& __weight) : count(__count), weight(__weight) {}
-      
-      Count& operator+=(const weight_type& value)
-      {
-	count += value / weight;
-	return *this;
-      }
-      
-      weight_type& count;
-      const weight_type& weight;
-    };
+    Accumulated(const Weights& __inside,
+		const Weights& __outside,
+		const weight_type& __total,
+		count_set_type& __counts,
+		Function __function)
+      : inside(__inside), outside(__outside), total(__total), counts(__counts), function(__function) {}
     
-    Count operator[](const treebank_type::id_type& x)
+    template <typename Head, typename Tails>
+    void operator()(const rule_ptr_type& rule,
+		    const Head& head,
+		    const Tails& tails)
     {
-      const rule_ptr_type& rule = treebank.edges[x].rule;
+      weight_type weight = function(rule) * outside[head] / total;
       
-      return Count(counts[rule->lhs][rule], weight_total);
+      typename Tails::const_iterator titer_end = tails.end();
+      for (typename Tails::const_iterator titer = tails.begin(); titer != titer_end; ++ titer)
+	weight *= inside[*titer];
+      
+      counts[rule->lhs][rule] += weight;
     }
     
-    const weight_type& weight_total;
-    const treebank_type& treebank;
+    const Weights& inside;
+    const Weights& outside;
+    const weight_type total;
     count_set_type& counts;
+    Function function;
   };
 
 
@@ -2157,12 +1724,13 @@ struct TaskLearn
       
       inside.clear();
       outside.clear();
-      inside.resize(treebank.nodes.size());
-      outside.resize(treebank.nodes.size());
+      inside.resize(treebank.labels.size());
+      outside.resize(treebank.labels.size());
+      outside.back() = cicada::semiring::traits<weight_type>::one();
       
-      accumulator_type accumulator(inside.back(), treebank, counts);
-      
-      cicada::inside_outside(treebank, inside, outside, accumulator, function, function);
+      treebank_apply(treebank, InsideFunction<weight_set_type, Function>(inside, function));
+      treebank_apply_reverse(treebank, OutsideFunction<weight_set_type, Function>(inside, outside, function));
+      treebank_apply(treebank, Accumulated<weight_set_type>(inside, outside, inside.back(), counts, function));
       
       if (debug >= 3)
 	std::cerr << "inside: " << cicada::semiring::log(inside.back()) << std::endl;
@@ -2256,13 +1824,39 @@ struct TaskLexiconFrequency
       function(__function),
       counts() { }
 
+  template <typename Weights>
+  struct Accumulated
+  {
+    Accumulated(const Weights& __inside,
+		const Weights& __outside,
+		const weight_type& __total,
+		word_count_set_type& __counts,
+		Function __function)
+      : inside(__inside), outside(__outside), total(__total), counts(__counts), function(__function) {}
+    
+    template <typename Head, typename Tails>
+    void operator()(const rule_ptr_type& rule,
+		    const Head& head,
+		    const Tails& tails)
+    {
+      if (! tails.empty()) return;
+      
+      counts[rule->rhs.front()] += function(rule) * outside[head] / total;
+    }
+    
+    const Weights& inside;
+    const Weights& outside;
+    const weight_type total;
+    word_count_set_type& counts;
+    Function function;
+  };
+
   void operator()()
   {
-        typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
+    typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
     
     weight_set_type inside;
     weight_set_type outside;
-    weight_set_type scores;
     
     ngram_type trigram(3);
     ngram_type bigram(2);
@@ -2276,21 +1870,13 @@ struct TaskLexiconFrequency
       
       inside.clear();
       outside.clear();
-      inside.resize(treebank.nodes.size());
-      outside.resize(treebank.nodes.size());
+      inside.resize(treebank.labels.size());
+      outside.resize(treebank.labels.size());
+      outside.back() = cicada::semiring::traits<weight_type>::one();
       
-      scores.clear();
-      scores.resize(treebank.edges.size());
-      
-      cicada::inside_outside(treebank, inside, outside, scores, function, function);
-      
-      treebank_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
-      for (treebank_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const treebank_type::edge_type& edge = *eiter;
-	if (! edge.tails.empty()) continue;
-	
-	counts[edge.rule->rhs.front()] += scores[edge.id] / inside.back();
-      }
+      treebank_apply(treebank, InsideFunction<weight_set_type, Function>(inside, function));
+      treebank_apply_reverse(treebank, OutsideFunction<weight_set_type, Function>(inside, outside, function));
+      treebank_apply(treebank, Accumulated<weight_set_type>(inside, outside, inside.back(), counts, function));
     }
   }
   
@@ -2314,21 +1900,85 @@ struct TaskLexiconCount
       counts(),
       counts_sig() { }
   
+  template <typename Weights>
+  struct Accumulated
+  {
+    Accumulated(const word_count_set_type& __word_counts,
+		const Weights& __inside,
+		const Weights& __outside,
+		const weight_type& __total,
+		const weight_type& __threshold,
+		const signature_type& __signature,
+		ngram_count_set_type& __counts,
+		ngram_count_set_type& __counts_sig,
+		ngram_count_set_type& __counts_unknown,
+		Function __function)
+      : trigram(3), bigram(2),
+	word_counts(__word_counts),
+	inside(__inside), outside(__outside), total(__total), threshold(__threshold), 
+	signature(__signature),
+	counts(__counts), counts_sig(__counts_sig), counts_unknown(__counts_unknown),
+	function(__function) {}
+    
+    template <typename Head, typename Tails>
+    void operator()(const rule_ptr_type& rule,
+		    const Head& head,
+		    const Tails& tails)
+    {
+      if (! tails.empty()) return;
+      
+      bigram[0] = rule->lhs;
+      bigram[1] = signature(rule->rhs.front());
+      
+      trigram[0] = bigram[1];
+      trigram[1] = bigram[0];
+      trigram[2] = rule->rhs.front();
+      
+      const weight_type count = function(rule) * outside[head] / total;
+      
+      counts[trigram] += count;
+      counts[ngram_type(trigram.begin() + 1, trigram.end())] += count;
+      counts[ngram_type(trigram.begin() + 2, trigram.end())] += count;
+      
+      counts_sig[bigram] += count;
+      counts_sig[ngram_type(bigram.begin() + 1, bigram.end())] += count;
+      
+      word_count_set_type::const_iterator witer = word_counts.find(rule->rhs.front());
+      if (witer == word_counts.end())
+	throw std::runtime_error("invalid word???");
+      
+      if (witer->second <= threshold)
+	counts_unknown[bigram] += count;
+    }
+    
+    ngram_type trigram;
+    ngram_type bigram;
+    
+    const word_count_set_type& word_counts;
+
+    const Weights& inside;
+    const Weights& outside;
+    const weight_type total;
+    const weight_type threshold;
+    const signature_type& signature;
+    ngram_count_set_type& counts;
+    ngram_count_set_type& counts_sig;
+    ngram_count_set_type& counts_unknown;
+    Function function;
+  };
+  
+
   void operator()()
   {
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
     
     weight_set_type inside;
     weight_set_type outside;
-    weight_set_type scores;
-    
-    ngram_type trigram(3);
-    ngram_type bigram(2);
     
     const signature_type& __signature = signature_type::create(signature);
-
+    
     const weight_type log_unknown_threshold(unknown_threshold);
-
+    
     const treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
@@ -2338,45 +1988,17 @@ struct TaskLexiconCount
       
       inside.clear();
       outside.clear();
-      inside.resize(treebank.nodes.size());
-      outside.resize(treebank.nodes.size());
+      inside.resize(treebank.labels.size());
+      outside.resize(treebank.labels.size());
+      outside.back() = cicada::semiring::traits<weight_type>::one();
       
-      scores.clear();
-      scores.resize(treebank.edges.size());
-      
-      cicada::inside_outside(treebank, inside, outside, scores, function, function);
-      
-      treebank_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
-      for (treebank_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const treebank_type::edge_type& edge = *eiter;
-	if (! edge.tails.empty()) continue;
-	
-	const rule_type& rule = *edge.rule;
-	
-	// assume penntreebank style...
-	bigram[0] = rule.lhs;
-	bigram[1] = __signature(rule.rhs.front());
-
-	trigram[0] = bigram[1];
-	trigram[1] = bigram[0];
-	trigram[2] = rule.rhs.front();
-	
-	const weight_type count = scores[edge.id] / inside.back();
-	
-	counts[trigram] += count;
-	counts[ngram_type(trigram.begin() + 1, trigram.end())] += count;
-	counts[ngram_type(trigram.begin() + 2, trigram.end())] += count;
-	
-	counts_sig[bigram] += count;
-	counts_sig[ngram_type(bigram.begin() + 1, bigram.end())] += count;
-
-	word_count_set_type::const_iterator witer = word_counts.find(rule.rhs.front());
-	if (witer == word_counts.end())
-	  throw std::runtime_error("invalid word???");
-	
-	if (witer->second <= log_unknown_threshold)
-	  counts_unknown[bigram] += count;
-      }
+      treebank_apply(treebank, InsideFunction<weight_set_type, Function>(inside, function));
+      treebank_apply_reverse(treebank, OutsideFunction<weight_set_type, Function>(inside, outside, function));
+      treebank_apply(treebank, Accumulated<weight_set_type>(word_counts,
+							    inside, outside, inside.back(), log_unknown_threshold,
+							    __signature,
+							    counts, counts_sig, counts_unknown,
+							    function));
     }
   }
   
@@ -2721,19 +2343,71 @@ struct TaskCharacterCount
       function(__function),
       counts() { }
   
+  template <typename Weights>
+  struct Accumulated
+  {
+    typedef cicada::Sentence phrase_type;
+
+    Accumulated(const Weights& __inside,
+		const Weights& __outside,
+		const weight_type& __total,
+		const signature_type& __signature,
+		const tokenizer_type& __tokenizer,
+		ngram_count_set_type& __counts,
+		Function __function)
+      : ngram(3), phrase(1), tokenized(),
+	inside(__inside), outside(__outside), total(__total),
+	signature(__signature), tokenizer(__tokenizer),
+	counts(__counts), 
+	function(__function) {}
+    
+    template <typename Head, typename Tails>
+    void operator()(const rule_ptr_type& rule,
+		    const Head& head,
+		    const Tails& tails)
+    {
+      typedef cicada::Sentence phrase_type;
+      
+      if (! tails.empty()) return;
+      
+      const weight_type count = function(rule) * outside[head] / total;
+      
+      ngram[0] = signature(rule->rhs.front());
+      ngram[1] = rule->lhs;
+      
+      phrase.front() = rule->rhs.front();
+      
+      tokenizer(phrase, tokenized);
+      phrase_type::const_iterator titer_end = tokenized.end();
+      for (phrase_type::const_iterator titer = tokenized.begin(); titer != titer_end; ++ titer) {
+	ngram[2] = *titer;
+	
+	counts[ngram] += count;
+	counts[ngram_type(ngram.begin() + 1, ngram.end())] += count;
+	counts[ngram_type(ngram.begin() + 2, ngram.end())] += count;
+      }
+    }
+    
+    ngram_type ngram;
+    phrase_type phrase;
+    phrase_type tokenized;
+
+    const Weights& inside;
+    const Weights& outside;
+    const weight_type total;
+    const signature_type& signature;
+    const tokenizer_type& tokenizer;
+    ngram_count_set_type& counts;
+    Function function;
+  };
+
+  
   void operator()()
   {
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
-    typedef cicada::Sentence phrase_type;
     
     weight_set_type inside;
     weight_set_type outside;
-    weight_set_type scores;
-    
-    ngram_type ngram(3);
-
-    phrase_type phrase(1);
-    phrase_type tokenized;
     
     const signature_type& __signature = signature_type::create(signature);
     const tokenizer_type& __tokenizer = tokenizer_type::create("character");
@@ -2747,38 +2421,16 @@ struct TaskCharacterCount
       
       inside.clear();
       outside.clear();
-      inside.resize(treebank.nodes.size());
-      outside.resize(treebank.nodes.size());
+      inside.resize(treebank.labels.size());
+      outside.resize(treebank.labels.size());
+      outside.back() = cicada::semiring::traits<weight_type>::one();
       
-      scores.clear();
-      scores.resize(treebank.edges.size());
-      
-      cicada::inside_outside(treebank, inside, outside, scores, function, function);
-      
-      treebank_type::edge_set_type::const_iterator eiter_end = treebank.edges.end();
-      for (treebank_type::edge_set_type::const_iterator eiter = treebank.edges.begin(); eiter != eiter_end; ++ eiter) {
-	const treebank_type::edge_type& edge = *eiter;
-	if (! edge.tails.empty()) continue;
-	
-	const rule_type& rule = *edge.rule;
-
-	const weight_type count = scores[edge.id] / inside.back();
-	
-	// assume penntreebank style...
-	ngram[0] = __signature(rule.rhs.front());
-	ngram[1] = rule.lhs;
-	phrase.front() = rule.rhs.front();
-	
-	__tokenizer(phrase, tokenized);
-	phrase_type::const_iterator titer_end = tokenized.end();
-	for (phrase_type::const_iterator titer = tokenized.begin(); titer != titer_end; ++ titer) {
-	  ngram[2] = *titer;
-	  
-	  counts[ngram] += count;
-	  counts[ngram_type(ngram.begin() + 1, ngram.end())] += count;
-	  counts[ngram_type(ngram.begin() + 2, ngram.end())] += count;
-	}
-      }
+      treebank_apply(treebank, InsideFunction<weight_set_type, Function>(inside, function));
+      treebank_apply_reverse(treebank, OutsideFunction<weight_set_type, Function>(inside, outside, function));
+      treebank_apply(treebank, Accumulated<weight_set_type>(inside, outside, inside.back(),
+							    __signature, __tokenizer,
+							    counts, 
+							    function));
     }
   }
   
