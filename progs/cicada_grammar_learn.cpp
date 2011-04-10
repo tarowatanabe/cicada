@@ -90,16 +90,16 @@ public:
   typedef hypergraph_type::id_type id_type;
   
   typedef std::vector<symbol_type, std::allocator<symbol_type> > label_set_type;
-  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
+  typedef std::vector<size_type, std::allocator<size_type> > offset_set_type;
 
   hypergraph_type treebank;
   label_set_type  labels;
-  node_map_type   node_map;
+  offset_set_type offsets;
   
   Treebank(const hypergraph_type& __treebank)
     : treebank(__treebank),
       labels(__treebank.nodes.size()),
-      node_map(__treebank.nodes.size() + 1)
+      offsets(__treebank.nodes.size() + 1)
   {
     hypergraph_type::node_set_type::const_iterator niter_end = treebank.nodes.end();
     for (hypergraph_type::node_set_type::const_iterator niter = treebank.nodes.begin(); niter != niter_end; ++ niter) {
@@ -107,9 +107,9 @@ public:
       const hypergraph_type::edge_type& edge = treebank.edges[node.edges.front()];
       
       labels[node.id] = edge.rule->lhs;
-      node_map[node.id] = node.id;
+      offsets[node.id] = node.id;
     }
-    node_map.back() = treebank.nodes.size();
+    offsets.back() = treebank.nodes.size();
   }
 };
 
@@ -710,22 +710,22 @@ void treebank_apply(const treebank_type& treebank,
       
       hypergraph_type::edge_type::node_set_type tails(edge.tails);
       
-      j_end.front() = treebank.node_map[edge.head + 1] - treebank.node_map[edge.head];
+      j_end.front() = treebank.offsets[edge.head + 1] - treebank.offsets[edge.head];
       size_t pos = 0;
       for (size_t i = 1; i != j_end.size(); ++ i)
 	if (rule->rhs[i - 1].is_non_terminal()) {
-	  j_end[i] = treebank.node_map[edge.tails[pos] + 1] - treebank.node_map[edge.tails[pos]];
+	  j_end[i] = treebank.offsets[edge.tails[pos] + 1] - treebank.offsets[edge.tails[pos]];
 	  ++ pos;
 	} else
 	  j_end[i] = 0;
       
       for (;;) {
-	const hypergraph_type::id_type head = treebank.node_map[edge.head] + j[0];
+	const hypergraph_type::id_type head = treebank.offsets[edge.head] + j[0];
 	rule_annotated->lhs = treebank.labels[head];
 	size_t pos = 0;
 	for (size_t i = 1; i != j_end.size(); ++ i)
 	  if (j_end[i]) {
-	    const hypergraph_type::id_type tail = treebank.node_map[edge.tails[pos]] + j[i];
+	    const hypergraph_type::id_type tail = treebank.offsets[edge.tails[pos]] + j[i];
 	    rule_annotated->rhs[i - 1] = treebank.labels[tail];
 	    tails[pos] = tail;
 	    ++ pos;
@@ -775,22 +775,22 @@ void treebank_apply_reverse(const treebank_type& treebank,
       
       hypergraph_type::edge_type::node_set_type tails(edge.tails);
       
-      j_end.front() = treebank.node_map[edge.head + 1] - treebank.node_map[edge.head];
+      j_end.front() = treebank.offsets[edge.head + 1] - treebank.offsets[edge.head];
       size_t pos = 0;
       for (size_t i = 1; i != j_end.size(); ++ i)
 	if (rule->rhs[i - 1].is_non_terminal()) {
-	  j_end[i] = treebank.node_map[edge.tails[pos] + 1] - treebank.node_map[edge.tails[pos]];
+	  j_end[i] = treebank.offsets[edge.tails[pos] + 1] - treebank.offsets[edge.tails[pos]];
 	  ++ pos;
 	} else
 	  j_end[i] = 0;
       
       for (;;) {
-	const hypergraph_type::id_type head = treebank.node_map[edge.head] + j[0];
+	const hypergraph_type::id_type head = treebank.offsets[edge.head] + j[0];
 	rule_annotated->lhs = treebank.labels[head];
 	size_t pos = 0;
 	for (size_t i = 1; i != j_end.size(); ++ i)
 	  if (j_end[i]) {
-	    const hypergraph_type::id_type tail = treebank.node_map[edge.tails[pos]] + j[i];
+	    const hypergraph_type::id_type tail = treebank.offsets[edge.tails[pos]] + j[i];
 	    rule_annotated->rhs[i - 1] = treebank.labels[tail];
 	    tails[pos] = tail;
 	    ++ pos;
@@ -937,14 +937,6 @@ struct Annotator : public utils::hashmurmur<size_t>
   const int bits;
 };
 
-
-struct attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
-{
-  attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
-  attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
-  attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
-};
-
 template <typename Tp>
 struct greater_ptr_second
 {
@@ -977,8 +969,6 @@ struct filter_pruned
     return removed[edge.id];
   }
 };
-
-
 
 template <typename Scale>
 struct TaskMergeScale
@@ -1050,13 +1040,9 @@ struct TaskMergeLoss : public Annotator
   void operator()()
   {
     typedef std::vector<weight_type, std::allocator<weight_type> > weight_set_type;
-    typedef std::pair<symbol_type, hypergraph_type::id_type> symbol_id_type;
-    typedef std::vector<symbol_id_type, std::allocator<symbol_id_type> > symbol_id_set_type;
-    typedef std::vector<symbol_id_set_type, std::allocator<symbol_id_set_type> > symbol_id_map_type;
     
     weight_set_type inside;
     weight_set_type outside;
-    symbol_id_map_type symbols;
     
     const treebank_type* __treebank = 0;
     for (;;) {
@@ -1080,8 +1066,8 @@ struct TaskMergeLoss : public Annotator
       for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
 	
-	const size_t first = treebank.node_map[node.id];
-	const size_t last  = treebank.node_map[node.id + 1];
+	const size_t first = treebank.offsets[node.id];
+	const size_t last  = treebank.offsets[node.id + 1];
 	
 	if (last - first == 1) continue;
 	
@@ -1141,15 +1127,15 @@ struct TaskMergeTreebank
       treebank_type::label_set_type labels;
       labels.reserve(treebank.labels.size());
       
-      treebank_type::node_map_type  node_map(treebank.node_map);
-      node_map[0] = 0;
+      treebank_type::offset_set_type  offsets(treebank.offsets);
+      offsets[0] = 0;
       
       hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
 	
-	const size_t first = treebank.node_map[node.id];
-	const size_t last  = treebank.node_map[node.id + 1];
+	const size_t first = treebank.offsets[node.id];
+	const size_t last  = treebank.offsets[node.id + 1];
 	
 	if (last - first == 1)
 	  labels.push_back(treebank.labels[first]);
@@ -1163,12 +1149,12 @@ struct TaskMergeTreebank
 	  }
 	}
 	
-	node_map[node.id + 1] = labels.size();
+	offsets[node.id + 1] = labels.size();
       }
       
       treebank_type::label_set_type(labels).swap(labels);
       treebank.labels.swap(labels);
-      treebank.node_map.swap(node_map);
+      treebank.offsets.swap(offsets);
     }
   }
   
@@ -1416,8 +1402,6 @@ struct TaskSplitTreebank : public Annotator
 {
   typedef utils::lockfree_list_queue<treebank_type*, std::allocator<treebank_type*> > queue_type;
   
-  typedef utils::hashmurmur<size_t> hasher_type;
-  
   TaskSplitTreebank(const int __bits,
 		    queue_type& __queue,
 		    const grammar_type& __grammar)
@@ -1428,26 +1412,6 @@ struct TaskSplitTreebank : public Annotator
   
   void operator()()
   {
-    typedef std::vector<int, std::allocator<int> > index_set_type;
-    typedef std::vector<symbol_type, std::allocator<symbol_type> > symbol_set_type;
-    
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-      std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
-#else
-    typedef sgi::hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
-			std::allocator<std::pair<const symbol_type, hypergraph_type::id_type> > > node_set_type;
-#endif
-    typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
-    
-    node_map_type   node_map;
-    hypergraph_type hypergraph_new;
-    
-    index_set_type  j;
-    index_set_type  j_end;
-    symbol_set_type symbols;
-    symbol_set_type symbols_new;
-    
     treebank_type* __treebank = 0;
     for (;;) {
       queue.pop(__treebank);
@@ -1458,15 +1422,15 @@ struct TaskSplitTreebank : public Annotator
       treebank_type::label_set_type labels;
       labels.reserve(treebank.labels.size() * 2);
       
-      treebank_type::node_map_type  node_map(treebank.node_map);
-      node_map[0] = 0;
+      treebank_type::offset_set_type  offsets(treebank.offsets);
+      offsets[0] = 0;
       
       hypergraph_type::node_set_type::const_iterator niter_end = treebank.treebank.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = treebank.treebank.nodes.begin(); niter != niter_end; ++ niter) {
 	const hypergraph_type::node_type& node = *niter;
 	
-	const size_t first = treebank.node_map[node.id];
-	const size_t last  = treebank.node_map[node.id + 1];
+	const size_t first = treebank.offsets[node.id];
+	const size_t last  = treebank.offsets[node.id + 1];
 	
 	if (node.id == treebank.treebank.goal)
 	  labels.push_back(treebank.labels[first]);
@@ -1477,12 +1441,12 @@ struct TaskSplitTreebank : public Annotator
 	  }
 	}
 	
-	node_map[node.id + 1] = labels.size();
+	offsets[node.id + 1] = labels.size();
       }
       
       treebank_type::label_set_type(labels).swap(labels);
       treebank.labels.swap(labels);
-      treebank.node_map.swap(node_map);
+      treebank.offsets.swap(offsets);
     }
   }
   
