@@ -2389,27 +2389,26 @@ void lexicon_learn(const treebank_set_type& treebanks,
   typedef TaskLexiconFrequency<Function> task_frequency_type;
   typedef TaskLexiconCount<Function>     task_count_type;
   
-  typedef std::vector<task_frequency_type, std::allocator<task_frequency_type> > task_frequency_set_type;
-  typedef std::vector<task_count_type, std::allocator<task_count_type> >         task_count_set_type;
-  
   typedef typename task_frequency_type::queue_type queue_frequency_type;
   typedef typename task_count_type::queue_type     queue_count_type;
 
-  queue_frequency_type queue_frequency;
-  task_frequency_set_type tasks_frequency(threads, task_frequency_type(queue_frequency, function));
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  boost::thread_group workers_frequency;
-  for (int i = 0; i != threads; ++ i)
-    workers_frequency.add_thread(new boost::thread(boost::ref(tasks_frequency[i])));
+  queue_frequency_type queue_frequency;
+  task_frequency_type tasks_frequency(queue_frequency, function);
+  
+  boost::thread worker_frequency(boost::ref(task_frequency));
   
   treebank_set_type::const_iterator titer_end = treebanks.end();
   for (treebank_set_type::const_iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_frequency.push(&(*titer));
+  queue_frequency.push(0);
   
-  for (int i = 0; i != threads; ++ i)
-    queue_frequency.push(0);
+  worker_frequency.join();
+
+  // merge counts...
   
-  workers_frequency.join_all();
   
   word_count_set_type word_counts;
   for (int i = 0; i != threads; ++ i) {
