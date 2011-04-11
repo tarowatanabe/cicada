@@ -2,6 +2,7 @@
 Added coarse-to-fine parsing
 Added coarse grammar learning
 Added epsilon-removal for hypergraph
+Reworked attribute vector for smaller memory allocation (but slower for insert/erase)
 
 2011-3-28
 New grammar API: use --grammar and/or --tree-grammar only, and removed options, such as --grammar-static etc.
