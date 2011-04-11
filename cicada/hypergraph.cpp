@@ -61,7 +61,7 @@ namespace cicada
   typedef std::pair<std::string, attribute_data_type> attribute_parsed_type;
   typedef std::vector<attribute_parsed_type> attribute_parsed_set_type;
 
-  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, attribute_parsed_set_type, unsigned int, int, int> edge_parsed_type;
+  typedef boost::tuple<tail_node_set_type, feature_parsed_set_type, attribute_parsed_set_type, unsigned int> edge_parsed_type;
   
   typedef std::vector<edge_parsed_type> node_parsed_type;
   typedef std::vector<node_parsed_type> node_parsed_set_type;
@@ -99,8 +99,8 @@ namespace cicada
 	       >> -(qi::lit("\"feature\"")   >> ':' >> feature_set >> ',')
 	       >> -(qi::lit("\"attribute\"") >> ':' >> attribute_set >> ',')
 	       >> qi::lit("\"rule\"")        >> ':' >> qi::uint_
-	       >> -(',' >> qi::lit("\"first\"") >> ':' >> qi::int_) // backward compatibility
-	       >> -(',' >> qi::lit("\"last\"")  >> ':' >> qi::int_) // backward compatibility
+	       >> -(',' >> qi::lit("\"first\"") >> ':' >> qi::omit[qi::int_]) // backward compatibility
+	       >> -(',' >> qi::lit("\"last\"")  >> ':' >> qi::omit[qi::int_]) // backward compatibility
 	       >> '}');
       
       edge_action = edge [add_edge(graph, rules)];
