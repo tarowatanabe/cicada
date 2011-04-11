@@ -78,7 +78,6 @@ POS annotated sentence input:
 
 Add more tests
 
-Revive codec library? Include snappy, Google made fast lz?
-   Better on-the-fly hypergraph compression w/o dumping as a byte-stream
-   encode rules, features, attributes different from node's edge-id edge's tail-id
-   edge-id sequence and tail-id sequences are compressed...
+Add mert,decode,mbr,parse script?
+    Personally, I don't like a single script to handle many things, since 
+    that is usually not instructive....

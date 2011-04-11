@@ -5,5 +5,3 @@ though you can mix and give multiple outputs...
 
 You can treat the sequence of operations in SIMD (single-instruction multiple-data) fashion, 
 in which the same sequence of operations is applied to each data (potentially in parallel).
-
-
