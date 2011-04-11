@@ -19,6 +19,12 @@
 // TODO: construct dedicated forest structure....
 // 
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
 #include <stdexcept>
 #include <vector>
 #include <deque>
@@ -57,8 +63,7 @@
 #include <utils/lockfree_list_queue.hpp>
 #include <utils/array_power2.hpp>
 #include <utils/chunk_vector.hpp>
-#include <utils/vertical_coded_vector.hpp>
-#include <utils/packed_vector.hpp>
+#include <utils/base64.hpp>
 
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
@@ -174,6 +179,42 @@ public:
     
     return *this;
   }
+
+  friend
+  std::istream& operator>>(std::istream& is, Grammar& grammar)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+
+    std::string line;
+    std::string count;
+    rule_type   rule;
+    while (std::getline(is, line)) {
+      std::string::const_iterator iter = line.begin();
+      std::string::const_iterator end = line.end();
+      
+      if (! qi::phrase_parse(iter, end, standard::string, standard::space, count))
+	continue;
+      
+      if (! rule.assign(iter, end))
+	continue;
+      
+      grammar[rule_type::create(rule)] = utils::decode_base64<weight_type>(count);
+    }
+    return is;
+  }
+  
+  friend
+  std::ostream& operator<<(std::ostream& os, const Grammar& x)
+  {
+    count_set_type::const_iterator iter_end = x.end();
+    for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
+      utils::encode_base64(iter->second, std::ostream_iterator<char>(os));
+      os << ' ' << *(iter->first) << '\n';
+    }
+
+    return os;
+  }
 };
 
 typedef Grammar grammar_type;
@@ -185,6 +226,47 @@ typedef std::tr1::unordered_map<symbol_type, grammar_type, boost::hash<symbol_ty
 typedef sgi::hash_map<symbol_type, grammar_type, boost::hash<symbol_type>, std::equal_to<symbol_type>,
 		      std::allocator<std::pair<const symbol_type, grammar_type> > > count_set_type;
 #endif
+
+inline
+std::istream& operator>>(std::istream& is, count_set_type& counts)
+{
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  std::string line;
+  std::string count;
+  rule_type   rule;
+  while (std::getline(is, line)) {
+    std::string::const_iterator iter = line.begin();
+    std::string::const_iterator end = line.end();
+    
+    if (! qi::phrase_parse(iter, end, standard::string, standard::space, count))
+      continue;
+      
+    if (! rule.assign(iter, end))
+      continue;
+      
+    counts[rule.lhs][rule_type::create(rule)] = utils::decode_base64<weight_type>(count);
+  }
+  return is;
+}
+
+inline
+std::ostream& operator<<(std::ostream& os, const count_set_type& x)
+{
+  // we do not differentiate lhs!
+  count_set_type::const_iterator iter_end = x.end();
+  for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
+    const grammar_type& grammar = iter->second;
+    
+    grammar_type::const_iterator giter_end = grammar.end();
+    for (grammar_type::const_iterator giter = grammar.begin(); giter != giter_end; ++ giter) {
+      utils::encode_base64(giter->second, std::ostream_iterator<char>(os));
+      os << ' ' << *(giter->first) << '\n';
+    }
+  }
+  return os;
+}
 
 typedef symbol_set_type ngram_type;
 class NGramCounts : public google::dense_hash_map<ngram_type, weight_type, boost::hash<ngram_type>, std::equal_to<ngram_type> >
@@ -202,6 +284,39 @@ public:
     
     return *this;
   }
+
+  friend
+  std::istream& operator>>(std::istream& is, NGramCounts& counts)
+  {
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+    
+    std::string line;
+    while (std::getline(is, line)) {
+      const utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
+      
+      tokenizer_type::iterator iter = tokenizer.begin();
+      if (iter == tokenizer.end()) continue;
+      const utils::piece count = *iter;
+      ++ iter;
+      
+      counts[ngram_type(iter, tokenizer.end())] = utils::decode_base64<weight_type>(count);
+    }
+    
+    return is;
+  }
+  
+  friend
+  std::ostream& operator<<(std::ostream& os, const NGramCounts& x)
+  {
+    count_set_type::const_iterator iter_end = x.end();
+    for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
+      utils::encode_base64(iter->second, std::ostream_iterator<char>(os));
+      os << ' ' << iter->first << '\n';
+    }
+    return os;
+  };
+
 };
 typedef NGramCounts ngram_count_set_type;
 
@@ -232,7 +347,40 @@ public:
     
     return *this;
   }
+
+  friend
+  std::istream& operator>>(std::istream& is, WordCounts& counts)
+  {
+    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+    
+    std::string line;
+    while (std::getline(is, line)) {
+      const utils::piece line_piece(line);
+      tokenizer_type tokenizer(line_piece);
+      
+      tokenizer_type::iterator iter = tokenizer.begin();
+      if (iter == tokenizer.end()) continue;
+      const utils::piece count = *iter;
+      ++ iter;
+      if (iter == tokenizer.end()) continue;
+      const utils::piece word = *iter;
+
+      counts[word] = utils::decode_base64<weight_type>(count);
+    }
+    
+    return is;
+  }
   
+  friend
+  std::ostream& operator<<(std::ostream& os, const WordCounts& x)
+  {
+    count_set_type::const_iterator iter_end = x.end();
+    for (count_set_type::const_iterator iter = x.begin(); iter != iter_end; ++ iter) {
+      utils::encode_base64(iter->second, std::ostream_iterator<char>(os));
+      os << ' ' << iter->first << '\n';
+    }
+    return os;
+  }
 };
 typedef WordCounts word_count_set_type;
 typedef WordCounts label_count_set_type;
@@ -700,6 +848,7 @@ int main(int argc, char** argv)
 
 enum {
   treebank_tag = 5000,
+  scale_tag,
   rule_tag,
 };
 
@@ -1262,11 +1411,6 @@ void grammar_merge(treebank_set_type& treebanks,
   typedef TaskMergeTreebank<merged_set_type>           task_treebank_type;
   typedef TaskMergeGrammar<merged_set_type>            task_grammar_type;
   
-  typedef std::vector<task_scale_type, std::allocator<task_scale_type> >       task_scale_set_type;
-  typedef std::vector<task_loss_type, std::allocator<task_loss_type> >         task_loss_set_type;
-  typedef std::vector<task_treebank_type, std::allocator<task_treebank_type> > task_treebank_set_type;
-  typedef std::vector<task_grammar_type, std::allocator<task_grammar_type> >   task_grammar_set_type;
-  
   typedef typename task_scale_type::queue_type    queue_scale_type;
   typedef typename task_loss_type::queue_type     queue_loss_type;
   typedef typename task_treebank_type::queue_type queue_treebank_type;
@@ -1274,115 +1418,203 @@ void grammar_merge(treebank_set_type& treebanks,
   
   typedef std::vector<const loss_set_type::value_type*, std::allocator<const loss_set_type::value_type*> > sorted_type;
   
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
 
   // MapReduce to compute scaling
   queue_scale_type queue_scale;
-  task_scale_set_type tasks_scale(threads, task_scale_type(grammar, queue_scale));
+  task_scale_type  task_scale(grammar, queue_scale);
   
-  boost::thread_group workers_scale;
-  for (int i = 0; i != threads; ++ i)
-    workers_scale.add_thread(new boost::thread(boost::ref(tasks_scale[i])));
+  boost::thread worker_scale(boost::ref(task_scale));
   
   treebank_set_type::iterator titer_end = treebanks.end();
   for (treebank_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_scale.push(&(*titer));
+  queue_scale.push(0);
   
-  for (int i = 0; i != threads; ++ i)
-    queue_scale.push(0);
-  
-  workers_scale.join_all();
+  worker_scale.join();
   
   scale_set_type scale;
   
-  for (int i = 0; i != threads; ++ i) {
-    if (scale.empty())
-      scale.swap(tasks_scale[i].scale);
-    else
-      scale += tasks_scale[i].scale;
+  // reduce scale..
+  if (mpi_rank == 0) {
+    scale.swap(task_scale.scale);
+    
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+      
+      boost::iostreams::filtering_ostream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_deivice_source(rank, scale_tag, 1024 * 1024));
+
+      std::string line;
+      while (std::getline(is, line)) {
+	const utils::piece line_piece(line);
+	tokenizer_type tokenizer(line_piece);
+	
+	tokenizer_type::iterator iter = tokenizer.begin();
+	if (iter == tokenizer.end()) continue;
+	const utils::piece count = *iter;
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece word = *iter;
+	
+	scale[word] += utils::decode_base64<weight_type>(count);
+      }
+    }
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(utils::mpi_deivice_bcast_source(0, 1024 * 1024));
+    
+    os << scale;
+  } else {
+    {
+      boost::iostreams::filtering_ostream os;
+      os.push(boost::iostreams::gzip_compressor());
+      os.push(utils::mpi_deivice_sink(0, scale_tag, 1024 * 1024));
+      
+      os << task_scale.scale;
+    }
+    
+    boost::iostreams::filtering_istream is;
+    is.push(boost::iostreams::gzip_decompressor());
+    is.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
+    
+    is >> scale;
   }
   
   // MapReduce to compute loss
   queue_loss_type queue_loss;
-  task_loss_set_type tasks_loss(threads, task_loss_type(grammar, scale, bits, queue_loss));
+  task_loss_type  task_loss(grammar, scale, bits, queue_loss);
   
-  boost::thread_group workers_loss;
-  for (int i = 0; i != threads; ++ i)
-    workers_loss.add_thread(new boost::thread(boost::ref(tasks_loss[i])));
+  boost::thread worker_loss(boost::ref(task_loss));
   
   for (treebank_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_loss.push(&(*titer));
+  queue_loss.push(0);
   
-  for (int i = 0; i != threads; ++ i)
-    queue_loss.push(0);
-  
-  workers_loss.join_all();
+  worker_loss.join();
   
   loss_set_type loss;
-  for (int i = 0; i != threads; ++ i) {
-    if (loss.empty())
-      loss.swap(tasks_loss[i].loss);
-    else
-      loss *= tasks_loss[i].loss;
+  if (mpi_rank == 0) {
+    loss.swap(task_scale.loss);
+    
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+      
+      boost::iostreams::filtering_ostream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_deivice_source(rank, loss_tag, 1024 * 1024));
+
+      std::string line;
+      while (std::getline(is, line)) {
+	const utils::piece line_piece(line);
+	tokenizer_type tokenizer(line_piece);
+	
+	tokenizer_type::iterator iter = tokenizer.begin();
+	if (iter == tokenizer.end()) continue;
+	const utils::piece __count = *iter;
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece __word = *iter;
+	
+	const weight_type count = utils::decode_base64<weight_type>(__count);
+	const symbol_type word(__word);
+	
+	std::pair<loss_set_type::iterator, bool> result = loss.insert(std::make_pair(word, count));
+	if (! result.second)
+	  result.first->second *= count;
+      }
+    }
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(utils::mpi_deivice_sink(0, loss_tag, 1024 * 1024));
+    
+    os << task_scale.loss;
   }
   
   // sort wrt gain of merging == loss of splitting...
-  sorted_type sorted;
-  sorted.reserve(loss.size());
-  
-  loss_set_type::const_iterator liter_end = loss.end();
-  for (loss_set_type::const_iterator liter = loss.begin(); liter != liter_end; ++ liter)
-    sorted.push_back(&(*liter));
-  
-  const size_t sorted_size = utils::bithack::min(utils::bithack::max(size_t(1),
-								     size_t(round(merge_ratio * sorted.size()))),
-						 size_t(sorted.size() - 1));
-  std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
-  
-  const weight_type threshold = sorted[sorted_size]->second;
   
   merged_set_type merged;
   merged.set_empty_key(symbol_type());
   
-  if (debug >= 2)
-    std::cerr << "threshold: " << threshold << std::endl;
+  if (mpi_rank == 0) {
+    sorted_type sorted;
+    sorted.reserve(loss.size());
+    
+    loss_set_type::const_iterator liter_end = loss.end();
+    for (loss_set_type::const_iterator liter = loss.begin(); liter != liter_end; ++ liter)
+      sorted.push_back(&(*liter));
+    
+    const size_t sorted_size = utils::bithack::min(utils::bithack::max(size_t(1),
+								       size_t(round(merge_ratio * sorted.size()))),
+						   size_t(sorted.size() - 1));
+    std::nth_element(sorted.begin(), sorted.begin() + sorted_size, sorted.end(), greater_ptr_second<loss_set_type::value_type>());
   
-  // insert nth elements + label sharing the same threshold
-  sorted_type::const_iterator siter = sorted.begin();
-  sorted_type::const_iterator siter_end = sorted.end();
-  sorted_type::const_iterator siter_last = siter + sorted_size;
-
-  bool found_equal = false;
-  for (/**/; siter != siter_last; ++ siter) {
+    const weight_type threshold = sorted[sorted_size]->second;
+    
     if (debug >= 2)
-      std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
-    merged.insert((*siter)->first);
-
-    found_equal |= ((*siter)->second == threshold);
-  }
-  if (found_equal)
-    for (/**/; siter != siter_end && (*siter)->second == threshold; ++ siter) {
+      std::cerr << "threshold: " << threshold << std::endl;
+    
+    // insert nth elements + label sharing the same threshold
+    sorted_type::const_iterator siter = sorted.begin();
+    sorted_type::const_iterator siter_end = sorted.end();
+    sorted_type::const_iterator siter_last = siter + sorted_size;
+    
+    bool found_equal = false;
+    for (/**/; siter != siter_last; ++ siter) {
       if (debug >= 2)
 	std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
       merged.insert((*siter)->first);
+      
+      found_equal |= ((*siter)->second == threshold);
     }
+    if (found_equal)
+      for (/**/; siter != siter_end && (*siter)->second == threshold; ++ siter) {
+	if (debug >= 2)
+	  std::cerr << "merge: " << (*siter)->first << " gain: " << (*siter)->second << std::endl;
+	merged.insert((*siter)->first);
+      }
+    
+    if (debug)
+      std::cerr << "merged: " << merged.size() << " split: " << (sorted.size() - merged.size()) << std::endl;
+  }
   
-  if (debug)
-    std::cerr << "merged: " << merged.size() << " split: " << (sorted.size() - merged.size()) << std::endl;
+  // bcast merged...
+  if (mpi_rank == 0) {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(utils::mpi_deivice_bcast_source(0, 1024 * 1024));
+    
+    std::copy(merged.begin(), merged.end(), std::ostream_iterator<symbol_type>(os, " "));
+  } else {
+    boost::iostreams::filtering_istream is;
+    is.push(boost::iostreams::gzip_decompressor());
+    is.push(utils::mpi_device_bcast_source(0, 1024 * 1024));
+    
+    std::string token;
+    while (is >> token)
+      merged.insert(token);
+  }
   
   // MapReduce to merge treeebanks
   queue_treebank_type queue_treebank;
-
-  boost::thread_group workers_treebank;
-  for (int i = 0; i != threads; ++ i)
-    workers_treebank.add_thread(new boost::thread(task_treebank_type(merged, queue_treebank)));
+  
+  boost::thread worker_treebank(task_treebank_type(merged, queue_treebank));
   
   for (treebank_set_type::iterator titer = treebanks.begin(); titer != titer_end; ++ titer)
     queue_treebank.push(&(*titer));
+  queue_treebank.push(0);
   
-  for (int i = 0; i != threads; ++ i)
-    queue_treebank.push(0);
-
-  workers_treebank.join_all();
+  worker_treebank.join();
+  
+  // MapReduce to merge grammar...
+  // map grammar....
+  
+  
+  
   
   // MapReduce to merge grammar
   queue_grammar_type queue_grammar;
