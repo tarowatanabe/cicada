@@ -89,7 +89,7 @@ HYPERGRAPH
 {
  "rules" : [ RULE, RULE, ... ], (RULE position (one-based) is the rule-id inside this hypergraph. zero is reserved for no-rule (error?))
  "nodes" : [ NODE, NODE, ...],  (NODE positin (zero-based) is the node-id inside this hypergraph)
- "goal" : node-id-for-goal (usually pointing to the last-node. 0xffffffff (or unsigned int(-1)) == invalid graph)
+ "goal" : node-id-for-goal (usually pointing to the last-node. No goal implies an invalid graph)
 }
 
 RULE (rules are double quoted, thus you should perform proper escaping, i.e. " to \", \ to \\ etc.)

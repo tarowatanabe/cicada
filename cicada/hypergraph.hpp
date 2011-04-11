@@ -49,9 +49,10 @@ namespace cicada
       typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
       
       Node() : id(invalid) {}
+      Node(const edge_set_type& __edges, const id_type& __id)
+	: edges(__edges), id(__id) {}
       
       edge_set_type edges;
-      
       id_type id;
     };
     
@@ -61,11 +62,17 @@ namespace cicada
       typedef cicada::Rule rule_type;
       
       Edge()
-	: head(invalid), tails(), rule() {}
+	: head(invalid), tails(), rule(), id(invalid) {}
       
       template <typename Iterator>
       Edge(Iterator first, Iterator last)
-	: head(invalid), tails(first, last), rule() {}
+	: head(invalid), tails(first, last), rule(), id(invalid) {}
+      
+      Edge(const id_type& __head,
+	   const node_set_type& __tails,
+	   const rule_ptr_type& __rule,
+	   const id_type& __id)
+	: head(__head), tails(__tails), rule(__rule), id(__id) {}
       
       id_type       head;
       node_set_type tails;

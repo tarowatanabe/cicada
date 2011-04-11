@@ -711,7 +711,7 @@ namespace utils
     template <typename Iterator>
     void __copy(Iterator first, Iterator last, iterator iter)
     {
-      size_type __n = std::distance(first, last);
+      difference_type __n = std::distance(first, last);
       while (__n) {
 	const difference_type dist = std::min(__n, (iter.__first + impl_type::chunk_size) - iter.__curr);
 	Iterator mid = first;
@@ -730,7 +730,7 @@ namespace utils
     template <typename Iterator>
     void __uninitialized_copy(Iterator first, Iterator last, iterator iter)
     {
-      size_type __n = std::distance(first, last);
+      difference_type __n = std::distance(first, last);
       while (__n) {
 	const difference_type dist = std::min(__n, (iter.__first + impl_type::chunk_size) - iter.__curr);
 	Iterator mid = first;

@@ -6,9 +6,9 @@ The format is:
 {key: value, key: value, ...}
 
 where key is JASON string, " escaped string ", and value can take either integer, float or JASON string.
+See hypergraph format doc.
 
 Actual implementation relies on boost.variant, a compact union storage.
-
 
 The attributes can be associarted with each of the synchronous rules, like
 
@@ -18,5 +18,6 @@ for synchronous-CFG and
 
 source-xRS ||| target-xRS ||| features (||| attributes)
 
-if using tree-transducer. Attributes are treated as an optional meta-values from the grammar.
+if using tree-transducer. Attributes are specified as key=value format as in features format.
+Attributes are treated as an optional meta-values from the grammar.
 For instance, you can encode lexicalized-reordering rules in attributes for phrasal translations.

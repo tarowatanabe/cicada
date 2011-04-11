@@ -177,9 +177,24 @@ namespace utils
     void close() { pimpl.reset(); }
     void clear() { close(); }
     
+    void swap(map_file& x)
+    {
+      pimpl.swap(x.pimpl);
+    }
+
   private:
     boost::shared_ptr<impl_type> pimpl;
   };
+};
+
+namespace std
+{
+  template <typename T, typename A>
+  inline
+  void swap(utils::map_file<T,A>& x, utils::map_file<T,A>& y)
+  {
+    x.swap(y);
+  }
 };
 
 #endif

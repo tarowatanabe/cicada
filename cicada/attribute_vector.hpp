@@ -17,6 +17,7 @@
 #include <boost/variant.hpp>
 
 #include <utils/piece.hpp>
+#include <utils/vector_map.hpp>
 
 namespace cicada
 {
@@ -37,7 +38,8 @@ namespace cicada
     typedef std::pair<const attribute_type, data_type> value_type;
     
   public:
-    typedef std::map<key_type, data_type, std::less<key_type>, std::allocator<value_type> > attribute_vector_type;
+    //typedef std::map<key_type, data_type, std::less<key_type>, std::allocator<value_type> > attribute_vector_type;
+    typedef utils::vector_map<key_type, data_type, std::less<key_type>, std::allocator<value_type> > attribute_vector_type;
     typedef AttributeVector self_type;
     
   public:
@@ -124,11 +126,15 @@ namespace cicada
     const_reverse_iterator rend() const { return __values.rend(); }
     reverse_iterator rend() { return __values.rend(); }
     
-    const_reference front() const { return *__values.begin(); }
-    reference front() { return *__values.begin(); }
+    const_reference front() const { return __values.front();}
+    reference front() { return __values.front();}
+    const_reference back() const { return __values.back();}
+    reference back() { return __values.back();}
     
-    const_reference back() const { return *(-- __values.end());}
-    reference back() { return *(-- __values.end());}
+    //const_reference front() const { return *__values.begin(); }
+    //reference front() { return *__values.begin(); }
+    //const_reference back() const { return *(-- __values.end());}
+    //reference back() { return *(-- __values.end());}
     
     void swap(AttributeVector& x) { __values.swap(x.__values); }
 
