@@ -1961,7 +1961,6 @@ double grammar_learn(const treebank_set_type& treebanks,
   double logprob = 0.0;
   MPI::COMM_WORLD.Reduce(&task.logprob, &logprob, 1, MPI::DOUBLE, MPI::SUM, 0);
   
-  
   // merge labels...
   labels.clear();
   if (mpi_rank == 0) {
