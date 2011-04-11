@@ -342,7 +342,7 @@ struct weight_function
   {
     grammar_type::const_iterator giter = grammar.find(rule);
     if (giter == grammar.end())
-      throw std::runtime_error("invalid rule");
+      throw std::runtime_error("invalid rule: " + utils::lexical_cast<std::string>(*rule));
     
     return giter->second;
   }
