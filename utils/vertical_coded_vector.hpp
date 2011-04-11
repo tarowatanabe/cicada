@@ -274,6 +274,16 @@ namespace utils
       off.clear();
       __cache.clear();
     }
+
+    void swap(vertical_coded_vector_mapped& x)
+    {
+      compressed.swap(x.compressed);
+      off.swap(x.off);
+      
+      __cache.swap(x.__cache);
+      std::swap(__mask_pos, x.__mask_pos);
+      std::swap(__mask_value, x.__mask_value);
+    }
     
     const_iterator begin() const { return const_iterator(size_type(0), this); }
     const_iterator end() const { return const_iterator(size(), this); }
@@ -420,6 +430,13 @@ namespace utils
     uint64_t size_bytes() const { return size() * sizeof(Tp); }
     uint64_t size_compressed() const { return compressed.size() * sizeof(byte_type) + off.size() * sizeof(off_type); }
     uint64_t size_cache() const { return 0; }
+
+    void swap(vertical_coded_vector& x)
+    {
+      compressed.swap(x.compressed);
+      off.swap(x.off);
+      raw.swap(x.raw);
+    }
         
     void clear()
     {
@@ -498,6 +515,12 @@ namespace utils
     }
     
   public:
+    void freeze()
+    {
+      if (compressed.empty())
+	build();
+      raw.clear();
+    }
     
     void build()
     {
@@ -603,6 +626,24 @@ namespace utils
     raw_vector_type        raw;
   };
   
+};
+
+namespace std
+{
+  template <typename T, typename A>
+  inline
+  void swap(utils::vertical_coded_vector_mapped<T,A>& x, utils::vertical_coded_vector_mapped<T,A>& y)
+  {
+    x.swap(y);
+  }
+
+  template <typename T, typename A>
+  inline
+  void swap(utils::vertical_coded_vector<T,A>& x, utils::vertical_coded_vector<T,A>& y)
+  {
+    x.swap(y);
+  }
+
 };
 
 #endif

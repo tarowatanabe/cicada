@@ -178,8 +178,7 @@ cicada_grammar_coarse_SOURCES = cicada_grammar_coarse.cpp
 cicada_grammar_coarse_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_grammar_learn_SOURCES  = cicada_grammar_learn.cpp
-cicada_grammar_learn_CPPFLAGS = $(AM_CPPFLAGS) $(SNAPPY_CPPFLAGS)
-cicada_grammar_learn_LDADD    = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(SNAPPY_LDFLAGS)
+cicada_grammar_learn_LDADD    = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_index_cluster_SOURCES = cicada_index_cluster.cpp
 cicada_index_cluster_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

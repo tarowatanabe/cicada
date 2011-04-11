@@ -31,13 +31,13 @@
 namespace cicada
 {
   
-  template <typename Function>
+  template <typename _HyperGraph, typename Function>
   struct Inside
   {
-    typedef HyperGraph hypergraph_type;
+    typedef _HyperGraph hypergraph_type;
 
-    typedef hypergraph_type::node_type node_type;
-    typedef hypergraph_type::edge_type edge_type;
+    typedef typename hypergraph_type::node_type node_type;
+    typedef typename hypergraph_type::edge_type edge_type;
     
     Inside(Function __function) : function(__function) {}
 
@@ -47,19 +47,19 @@ namespace cicada
       typedef typename WeightSet::value_type weight_type;
       
       // visit in topological order... (we assume that the graph is "always" topologically ordered)
-      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+      typename hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (typename hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
 	const node_type& node = *niter;
 	
 	weight_type& weight = weights[node.id];
 	
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	typename node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (typename node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const edge_type& edge = graph.edges[*eiter];
 	  
 	  weight_type score = function(edge);
-	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	  typename edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	  for (typename edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	    score *= weights[*niter];
 	  
 	  weight += score;
@@ -70,13 +70,13 @@ namespace cicada
     Function function;
   };
 
-  template <typename Function>
+  template <typename _HyperGraph, typename Function>
   struct Outside
   {
-    typedef HyperGraph hypergraph_type;
+    typedef _HyperGraph hypergraph_type;
 
-    typedef hypergraph_type::node_type node_type;
-    typedef hypergraph_type::edge_type edge_type;
+    typedef typename hypergraph_type::node_type node_type;
+    typedef typename hypergraph_type::edge_type edge_type;
     
     Outside(Function __function) : function(__function) {}
     
@@ -91,26 +91,26 @@ namespace cicada
 	throw std::runtime_error("different inside/outside scores?");
     
       // visit in reversed topological order... (we assume that the graph is "always" topologically ordered)
-      hypergraph_type::node_set_type::const_reverse_iterator niter_end = graph.nodes.rend();
-      for (hypergraph_type::node_set_type::const_reverse_iterator niter = graph.nodes.rbegin(); niter != niter_end; ++ niter) {
+      typename hypergraph_type::node_set_type::const_reverse_iterator niter_end = graph.nodes.rend();
+      for (typename hypergraph_type::node_set_type::const_reverse_iterator niter = graph.nodes.rbegin(); niter != niter_end; ++ niter) {
 	const node_type& node = *niter;
 
 	const weight_type& score_head = weights_outside[node.id];
       
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	typename node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (typename node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	
 	  const edge_type& edge = graph.edges[*eiter];
 	
 	  weight_type score_head_edge = function(edge);
 	  score_head_edge *= score_head;
 	
-	  edge_type::node_set_type::const_iterator niter_begin = edge.tails.begin();
-	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator niter = niter_begin; niter != niter_end; ++ niter) {
+	  typename edge_type::node_set_type::const_iterator niter_begin = edge.tails.begin();
+	  typename edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	  for (typename edge_type::node_set_type::const_iterator niter = niter_begin; niter != niter_end; ++ niter) {
 	  
 	    weight_type score_outside = score_head_edge;
-	    for (edge_type::node_set_type::const_iterator iiter = niter_begin; iiter != niter_end; ++ iiter)
+	    for (typename edge_type::node_set_type::const_iterator iiter = niter_begin; iiter != niter_end; ++ iiter)
 	      if (iiter != niter)
 		score_outside *= weights_inside[*iiter];
 	  
@@ -123,13 +123,13 @@ namespace cicada
     Function function;
   };
   
-  template <typename KFunction, typename XFunction>
+  template <typename _HyperGraph, typename KFunction, typename XFunction>
   struct InsideOutside
   {
-    typedef HyperGraph hypergraph_type;
+    typedef _HyperGraph hypergraph_type;
 
-    typedef hypergraph_type::node_type node_type;
-    typedef hypergraph_type::edge_type edge_type;
+    typedef typename hypergraph_type::node_type node_type;
+    typedef typename hypergraph_type::edge_type edge_type;
 
     InsideOutside(KFunction __function_k,
 		  XFunction __function_x)
@@ -149,18 +149,18 @@ namespace cicada
       inside(graph, inside_k);
       outside(graph, inside_k, outside_k);
     
-      hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
-      for (hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
+      typename hypergraph_type::node_set_type::const_iterator niter_end = graph.nodes.end();
+      for (typename hypergraph_type::node_set_type::const_iterator niter = graph.nodes.begin(); niter != niter_end; ++ niter) {
 	const node_type& node = *niter;
       
-	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	typename node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	for (typename node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	  const edge_type& edge = graph.edges[*eiter];
 	
 	  KWeight score_k = outside_k[node.id];
 	
-	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
-	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	  typename edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	  for (typename edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
 	    score_k *= inside_k[*niter];
 	  
 	  x[edge.id] += function_x(edge) * score_k;
@@ -184,68 +184,70 @@ namespace cicada
       operator()(graph, inside_k, outside_k, x);
     }
     
-    Inside<KFunction>  inside;
-    Outside<KFunction> outside;
+    Inside<_HyperGraph, KFunction>  inside;
+    Outside<_HyperGraph, KFunction> outside;
     XFunction function_x;
   };
 
-  template <typename WeightSet, typename Function>
+  template <typename _HyperGraph, typename WeightSet, typename Function>
   inline
-  void inside(const HyperGraph& graph, WeightSet& weights, Function function)
+  void inside(const _HyperGraph& graph, WeightSet& weights, Function function)
   {
-    Inside<Function> __inside(function);
+    Inside<_HyperGraph, Function> __inside(function);
     
     __inside(graph, weights);
   };
   
-  template <typename WeightSet, typename WeightSetOutside, typename Function>
+  template <typename _HyperGraph, typename WeightSet, typename WeightSetOutside, typename Function>
   inline
-  void outside(const HyperGraph& graph, const WeightSet& weights_inside, WeightSetOutside& weights_outside, Function function)
+  void outside(const _HyperGraph& graph, const WeightSet& weights_inside, WeightSetOutside& weights_outside, Function function)
   {
-    Outside<Function> __outside(function);
+    Outside<_HyperGraph, Function> __outside(function);
     
     __outside(graph, weights_inside, weights_outside);
   }
 
-  template <typename XWeightSet, typename KFunction, typename XFunction>
+  template <typename _HyperGraph, typename XWeightSet, typename KFunction, typename XFunction>
   inline
-  void inside_outside(const HyperGraph& graph,
+  void inside_outside(const _HyperGraph& graph,
 		      XWeightSet& x,
 		      KFunction function_k,
 		      XFunction function_x)
   {
-    InsideOutside<KFunction, XFunction> __inside_outside(function_k, function_x);
+    InsideOutside<_HyperGraph, KFunction, XFunction> __inside_outside(function_k, function_x);
     
     std::vector<typename KFunction::value_type, std::allocator<typename KFunction::value_type> > inside_k(graph.nodes.size());
     
     __inside_outside(graph, inside_k, x);
   }
 
-  template <typename KWeightSet, typename XWeightSet,
+  template <typename _HyperGraph,
+	    typename KWeightSet, typename XWeightSet,
 	    typename KFunction, typename XFunction>
   inline
-  void inside_outside(const HyperGraph& graph,
+  void inside_outside(const _HyperGraph& graph,
 		      KWeightSet& inside_k,
 		      XWeightSet& x,
 		      KFunction function_k,
 		      XFunction function_x)
   {
-    InsideOutside<KFunction, XFunction> __inside_outside(function_k, function_x);
+    InsideOutside<_HyperGraph, KFunction, XFunction> __inside_outside(function_k, function_x);
     
     __inside_outside(graph, inside_k, x);
   }
   
-  template <typename KWeightSet, typename KWeightOutsideSet, typename XWeightSet,
+  template <typename _HyperGraph,
+	    typename KWeightSet, typename KWeightOutsideSet, typename XWeightSet,
 	    typename KFunction, typename XFunction>
   inline
-  void inside_outside(const HyperGraph& graph,
+  void inside_outside(const _HyperGraph& graph,
 		      KWeightSet& inside_k,
 		      KWeightOutsideSet& outside_k,
 		      XWeightSet& x,
 		      KFunction function_k,
 		      XFunction function_x)
   {
-    InsideOutside<KFunction, XFunction> __inside_outside(function_k, function_x);
+    InsideOutside<_HyperGraph, KFunction, XFunction> __inside_outside(function_k, function_x);
     
     __inside_outside(graph, inside_k, outside_k, x);
   }

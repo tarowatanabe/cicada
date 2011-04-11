@@ -17,7 +17,6 @@
 
 namespace utils {
   
-  
   template <typename _Alloc >
   struct __simple_vector_alloc_impl
   {
@@ -103,6 +102,9 @@ namespace utils {
 
     typedef typename base_type::iterator       iterator;
     typedef typename base_type::const_iterator const_iterator;
+
+    typedef       Tp* pointer;
+    typedef const Tp* const_pointer;
     
     typedef typename std::reverse_iterator<iterator>       reverse_iterator;
     typedef typename std::reverse_iterator<const_iterator> const_reverse_iterator;
@@ -181,6 +183,12 @@ namespace utils {
 	utils::destroy_range(__base_new.begin(), __base_new.end());
       }
     }
+    
+    void pop_back()
+    {
+      // nochecking...
+      resize(size() - 1);
+    }
 
     void push_back(const Tp& __value)
     {
@@ -189,8 +197,68 @@ namespace utils {
       base_type __base_new(__size + 1);
       std::uninitialized_copy(__base.begin(), __base.end(), __base_new.begin());
       utils::construct_object(__base_new.begin() + __size, __value);
+      
       __base.swap(__base_new);
       utils::destroy_range(__base_new.begin(), __base_new.end());
+    }
+
+    iterator insert(iterator position, const Tp& x)
+    {
+      const size_type __n = position - begin();
+      
+      base_type __base_new(size() + 1);
+      std::uninitialized_copy(begin(), position, __base_new.begin());
+      utils::construct_object(__base_new.begin() + __n, x);
+      std::uninitialized_copy(position, end(), __base_new.begin() + __n + 1);
+      
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+      
+      return begin() + __n;
+    }
+
+    template <typename Iterator>
+    void insert(iterator position, Iterator first, Iterator last)
+    {
+      const size_type __n = position - begin();
+      const size_type __d = std::distance(first, last);
+      
+      base_type __base_new(size() + __d);
+      std::uninitialized_copy(begin(), position, __base_new.begin());
+      std::uninitialized_copy(first, last, __base_new.begin() + __n);
+      std::uninitialized_copy(position, end(), __base_new.begin() + __n + __d);
+      
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+    }
+
+    iterator erase(iterator position)
+    {
+      const size_type __n = position - begin();
+      
+      base_type __base_new(size() - 1);
+      std::uninitialized_copy(begin(), position, __base_new.begin());
+      std::uninitialized_copy(position + 1, end(), __base_new.begin() + __n);
+      
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+      
+      return begin() + __n;
+    }
+
+    iterator erase(iterator first, iterator last)
+    {
+      const size_type __n = first - begin();
+      const size_type __d = last - first;
+      
+      base_type __base_new(size() - __d);
+      std::uninitialized_copy(begin(), first, __base_new.begin());
+      std::uninitialized_copy(last, end(), __base_new.begin() + __n);
+      
+      __base.swap(__base_new);
+      utils::destroy_range(__base_new.begin(), __base_new.end());
+      
+      return begin() + __n;
     }
     
   private:
