@@ -419,8 +419,6 @@ double cutoff_rule = 1e-30;
 double cutoff_lexicon = 1e-40;
 double cutoff_character = 0;
 
-int threads = 1;
-
 int debug = 0;
 
 template <typename Generator, typename Maximizer>
@@ -2408,6 +2406,7 @@ void lexicon_learn(const treebank_set_type& treebanks,
   worker_frequency.join();
 
   // merge counts...
+  
   
   
   word_count_set_type word_counts;
