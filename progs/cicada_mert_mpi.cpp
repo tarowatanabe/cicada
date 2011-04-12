@@ -912,7 +912,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
   path_set_type::const_iterator titer_end = tstset_files.end();
   for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
     
-    if (debug)
+    if (debug && mpi_rank == 0)
       std::cerr << "file: " << *titer << std::endl;
       
     if (boost::filesystem::is_directory(*titer)) {
@@ -948,7 +948,6 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	}
       }
     } else {
-      
       utils::compress_istream is(*titer, 1024 * 1024);
       
       int id;
