@@ -84,7 +84,7 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
       NGramImpl(const path_type& __path, const int __order)
-	: ngram(__path), order(__order), cluster(0), coarse(false)
+	: ngram(__path), order(__order), cluster(0), coarse(false), no_bos_eos(false)
       {
 	order = utils::bithack::min(order, ngram.index.order());
 	
@@ -95,7 +95,11 @@ namespace cicada
       }
 
       NGramImpl(const NGramImpl& x)
-	: ngram(x.ngram), order(x.order), cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0), coarse(x.coarse)
+	: ngram(x.ngram),
+	  order(x.order),
+	  cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0),
+	  coarse(x.coarse),
+	  no_bos_eos(x.no_bos_eos)
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -109,6 +113,7 @@ namespace cicada
 	order = x.order;
 	cluster = (x.cluster ? &cluster_type::create(x.cluster->path()) : 0);
 	coarse = x.coarse;
+	no_bos_eos = x.no_bos_eos;
 	
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -439,20 +444,28 @@ namespace cicada
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	buffer.clear();
 	
-	buffer.push_back(vocab_type::BOS);
-	buffer.insert(buffer.end(), context, context_star);
-	
-	double score = ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end());
-	
-	if (context_star != context_end) {
-	  buffer.clear();
-	  buffer.insert(buffer.end(), context_star + 1, context_end);
+	if (no_bos_eos) {
+	  buffer.insert(buffer.end(), context, context_star);
+
+	  return (! buffer.empty()
+		  ? ngram_score(buffer.begin(), buffer.begin() + (buffer.front() == vocab_type::BOS), buffer.end())
+		  : 0.0);
+	} else {
+	  buffer.push_back(vocab_type::BOS);
+	  buffer.insert(buffer.end(), context, context_star);
+	  
+	  double score = ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end());
+	  
+	  if (context_star != context_end) {
+	    buffer.clear();
+	    buffer.insert(buffer.end(), context_star + 1, context_end);
+	  }
+	  buffer.push_back(vocab_type::EOS);
+	  
+	  score += ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
+	 
+	  return score;
 	}
-	buffer.push_back(vocab_type::EOS);
-	
-	score += ngram_score(buffer.begin(), buffer.end() - 1, buffer.end());
-	
-	return score;
       }
       
       double ngram_estimate(const state_ptr_type& state) const
@@ -544,8 +557,9 @@ namespace cicada
       // cluster...
       cluster_type* cluster;
       
-      // yield/coarse
+      // coarse
       bool coarse;
+      bool no_bos_eos;
     };
     
     
@@ -562,10 +576,12 @@ namespace cicada
       path_type   path;
       int         order = 3;
       path_type   cluster_path;
+      bool        no_bos_eos = false;
       
       path_type   coarse_path;
       int         coarse_order = 0;
       path_type   coarse_cluster_path;
+      bool        coarse_no_bos_eos = false;
       
       std::string name;
 
@@ -576,12 +592,16 @@ namespace cicada
 	  cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "order")
 	  order = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "no-bos-eos")
+	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-file")
 	  coarse_path = piter->second;
 	else if (utils::ipiece(piter->first) == "coarse-order")
 	  coarse_order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-cluster")
 	  coarse_cluster_path = piter->second;
+	else if (utils::ipiece(piter->first) == "coarse-no-bos-eos")
+	  coarse_no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
@@ -599,8 +619,9 @@ namespace cicada
       if (! coarse_path.empty() && ! boost::filesystem::exists(coarse_path))
 	throw std::runtime_error("no coarse ngram language model? " + coarse_path.string());
       
-      
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
+
+      ngram_impl->no_bos_eos = no_bos_eos;
       
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
@@ -608,7 +629,6 @@ namespace cicada
 	
 	ngram_impl->cluster = &cicada::Cluster::create(cluster_path);
       }
-
       
       // two contexts (order - 1) for each edge, with two separator..
       base_type::__state_size = sizeof(symbol_type) * ngram_impl->order * 2;
@@ -624,6 +644,8 @@ namespace cicada
 	
 	if (! coarse_path.empty()) {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
+
+	  ngram_impl->no_bos_eos = coarse_no_bos_eos;
 	  
 	  if (! coarse_cluster_path.empty()) {
 	    if (! boost::filesystem::exists(coarse_cluster_path))
