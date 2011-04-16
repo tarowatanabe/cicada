@@ -186,26 +186,32 @@ namespace cicada
       template <typename Iterator>
       double ngram_estimate(Iterator first, Iterator last) const
       {
+	if (first == last) return 0.0;
+
 	const size_t cache_pos = hash_phrase(first, last) & (cache_estimate.size() - 1);
 	cache_ngram_type& cache = const_cast<cache_ngram_type&>(cache_estimate[cache_pos]);
 	  
 	if (! equal_phrase(first, last, cache.ngram)) {
 	  cache.ngram.assign(first, last);
 	  cache.logprob = 0.0;
-	    
+	  
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
-	    
+
+	  const bool is_bos = (vocab_type::BOS == *first);
+	  
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
+	    
+	    if (! is_bos || buffe_id.size() != 1) {
+	      bool estimated = false;
+	      double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
 	      
-	    bool estimated = false;
-	    double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
+	      if (! ngram.bound_exact && estimated && logbound < 0.0)
+		logbound *= decays[buffer_id.size()];
 	      
-	    if (! ngram.bound_exact && estimated && logbound < 0.0)
-	      logbound *= decays[buffer_id.size()];
-	      
-	    cache.logprob += logbound;
+	      cache.logprob += logbound;
+	    }
 	  }
 	}
 	  
