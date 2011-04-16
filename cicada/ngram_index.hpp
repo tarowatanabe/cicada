@@ -385,6 +385,16 @@ namespace cicada
     {
       return __shards[shard_index(first, last)].traverse(first, last, __vocab, shard_prev, pos_prev);
     }
+
+    bool is_bos(const id_type& id) const
+    {
+      return __vocab[vocab_type::BOS] == is;
+    }
+    
+    bool is_bos(const word_type& word) const
+    {
+      return vocab_type::BOS == word;
+    }
     
     inline const_reference operator[](size_type pos) const { return __shards[pos]; }
     inline       reference operator[](size_type pos)       { return __shards[pos]; }

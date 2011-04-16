@@ -202,7 +202,7 @@ namespace cicada
 	    estimated = true;
 	    return __logbound;
 	  } else
-	    return smooth;
+	    return (is_bos(*first) ? logprob_type(-99) : smooth);
 	} else
 	  return smooth;
       }
@@ -282,7 +282,7 @@ namespace cicada
       
       return logbackoff + (result.first == last && logprobs[shard_index](result.second, order) != logprob_min()
 			   ? logprobs[shard_index](result.second, order)
-			   : smooth);
+			   : (is_bos(*first) ? logprob_type(-99) : smooth));
     }
     
     
