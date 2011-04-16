@@ -163,13 +163,11 @@ int main(int argc, char** argv)
 	target.push_back(eos);
 	
 	alignment_new.clear();
-	alignment_new.push_back(std::make_pair(0, 0));
 	
+	alignment_new.push_back(std::make_pair(0, 0));
 	alignment_type::const_iterator aiter_end = alignment.end();
 	for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
 	  alignment_new.push_back(std::make_pair(aiter->source + 1, aiter->target + 1));
-	
-	alignment_new.clear();
 	alignment_new.push_back(std::make_pair(source.size() - 1, target.size() - 1));
 	
 	alignment_new.swap(alignment);
@@ -182,7 +180,7 @@ int main(int argc, char** argv)
 
       *os_align << alignment << '\n';
     }
-    if (siter != siter_end || titer != titer_end || (alignment_mode && *is_align))
+    if (siter != siter_end || titer != titer_end || (alignment_mode && *is_align >> alignment))
       throw std::runtime_error("# of lines do not match");
     
   }
