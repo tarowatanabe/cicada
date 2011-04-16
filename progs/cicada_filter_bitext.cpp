@@ -10,6 +10,7 @@
 #include <string>
 #include <algorithm>
 #include <iterator>
+#include <memory>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -23,12 +24,18 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
+#include <cicada/vocab.hpp>
+#include <cicada/alignment.hpp>
+
 #include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/subprocess.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/lexical_cast.hpp"
+
+typedef cicada::Vocab     vocab_type;
+typedef cicada::Alignment alignment_type;
 
 typedef boost::filesystem::path path_type;
 
@@ -69,12 +76,16 @@ struct sentence_generator : boost::spirit::karma::grammar<Iterator, sentence_typ
 
 path_type source_file = "-";
 path_type target_file = "-";
+path_type alignment_file;
 
 path_type output_source_file = "-";
 path_type output_target_file = "-";
+path_type output_alignment_file = "-";
 
 int max_length = 100;
 double max_fertility = 10;
+
+bool add_bos_eos = false;
 
 void options(int argc, char** argv);
 
@@ -82,15 +93,26 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+
+    if (! alignment_file.empty())
+      if (alignment_file != "-" && ! boost::filesystem::exists(alignment_file))
+	throw std::runtime_error("no alignment file? " + alignment_file.string());
+
+    const bool alignment_mode = ! alignment_file.empty();
+    
+    const std::string& bos = static_cast<const std::string&>(vocab_type::BOS);
+    const std::string& eos = static_cast<const std::string&>(vocab_type::EOS);
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);
+    std::auto_ptr<utils::compress_istream> is_align(alignment_mode ? new utils::compress_istream(alignment_file, 1024 * 1024) : 0);
 
     is_src.unsetf(std::ios::skipws);
     is_trg.unsetf(std::ios::skipws);
     
     utils::compress_ostream os_src(output_source_file, 1024 * 1024);
     utils::compress_ostream os_trg(output_target_file, 1024 * 1024);
+    std::auto_ptr<utils::compress_ostream> os_align(alignment_mode ? new utils::compress_ostream(output_alignment_file, 1024 * 1024) : 0);
     
     typedef boost::spirit::istream_iterator iiter_type;
     typedef std::ostream_iterator<char>     oiter_type;
@@ -105,15 +127,24 @@ int main(int argc, char** argv)
 
     sentence_type source;
     sentence_type target;
+    alignment_type alignment;
+    alignment_type alignment_new;
     
     for (size_t line_no = 0; siter != siter_end && titer != titer_end; ++ line_no) {
       source.clear();
       target.clear();
+      alignment.clear();
       
       if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser, boost::spirit::standard::blank, source))
 	throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
       if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
 	throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+      
+      if (alignment_mode) {
+	*is_align >> alignment;
+	if (! *is_align)
+	  throw std::runtime_error("no alignment?");
+      }
       
       const int source_size = source.size();
       const int target_size = target.size();
@@ -124,12 +155,34 @@ int main(int argc, char** argv)
       if (max_fertility > 0)
 	if (double(utils::bithack::max(source_size, target_size)) / double(utils::bithack::min(source_size, target_size)) >= max_fertility) continue;
       
+      if (add_bos_eos) {
+	source.insert(source.begin(), bos);
+	source.push_back(eos);
+	
+	target.insert(target.begin(), bos);
+	target.push_back(eos);
+	
+	alignment_new.clear();
+	alignment_new.push_back(std::make_pair(0, 0));
+	
+	alignment_type::const_iterator aiter_end = alignment.end();
+	for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
+	  alignment_new.push_back(std::make_pair(aiter->source + 1, aiter->target + 1));
+	
+	alignment_new.clear();
+	alignment_new.push_back(std::make_pair(source.size() - 1, target.size() - 1));
+	
+	alignment_new.swap(alignment);
+      }
+      
       if (! boost::spirit::karma::generate(oiter_type(os_src), generator, source))
 	throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
       if (! boost::spirit::karma::generate(oiter_type(os_trg), generator, target))
 	throw std::runtime_error("target sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
+
+      *os_align << alignment << '\n';
     }
-    if (siter != siter_end || titer != titer_end)
+    if (siter != siter_end || titer != titer_end || (alignment_mode && *is_align))
       throw std::runtime_error("# of lines do not match");
     
   }
@@ -147,14 +200,17 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("source", po::value<path_type>(&source_file)->default_value(source_file), "source file")
-    ("target", po::value<path_type>(&target_file)->default_value(target_file), "target file")
+    ("source",    po::value<path_type>(&source_file)->default_value(source_file),       "source file")
+    ("target",    po::value<path_type>(&target_file)->default_value(target_file),       "target file")
+    ("alignment", po::value<path_type>(&alignment_file)->default_value(alignment_file), "alignment file")
 
-    ("output-source", po::value<path_type>(&output_source_file)->default_value(output_source_file), "output source file")
-    ("output-target", po::value<path_type>(&output_target_file)->default_value(output_target_file), "output target file")
+    ("output-source",    po::value<path_type>(&output_source_file)->default_value(output_source_file),       "output source file")
+    ("output-target",    po::value<path_type>(&output_target_file)->default_value(output_target_file),       "output target file")
+    ("output-alignment", po::value<path_type>(&output_alignment_file)->default_value(output_alignment_file), "output alignment file")
     
     ("max-length",    po::value<int>(&max_length)->default_value(max_length),          "maximum length")
     ("max-fertility", po::value<double>(&max_fertility)->default_value(max_fertility), "maximum fertility")
+    ("add-bos-eos",   po::bool_switch(&add_bos_eos), "add BOS/EOS for each sentence")
         
     ("help", "help message");
   
