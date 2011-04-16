@@ -203,7 +203,7 @@ namespace cicada
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
 	    
-	    if (! is_bos || buffe_id.size() != 1) {
+	    if (! is_bos || buffer_id.size() != 1) {
 	      bool estimated = false;
 	      double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
 	      
