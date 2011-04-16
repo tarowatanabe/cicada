@@ -388,7 +388,7 @@ namespace cicada
 
     bool is_bos(const id_type& id) const
     {
-      return __vocab[vocab_type::BOS] == is;
+      return __vocab[vocab_type::BOS] == id;
     }
     
     bool is_bos(const word_type& word) const
