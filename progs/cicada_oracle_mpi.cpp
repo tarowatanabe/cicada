@@ -153,8 +153,7 @@ int main(int argc, char ** argv)
     if (tstset_files.empty())
       throw std::runtime_error("no test set?");
 
-    min_iteration = utils::bithack::max(min_iteration, max_iteration);
-
+    min_iteration = utils::bithack::min(min_iteration, max_iteration);
         
     // read reference set
     scorer_document_type   scorers(scorer_name);

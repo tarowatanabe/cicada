@@ -130,7 +130,7 @@ int main(int argc, char ** argv)
     options(argc, argv);
     
     threads = utils::bithack::max(threads, 1);
-    min_iteration = utils::bithack::max(min_iteration, max_iteration);
+    min_iteration = utils::bithack::min(min_iteration, max_iteration);
     
     // read reference set
     scorer_document_type   scorers(scorer_name);
