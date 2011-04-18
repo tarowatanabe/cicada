@@ -26,6 +26,7 @@ namespace cicada
       const weight_set_type*   weights_assigned;
   
       size_t kbest;
+      size_t edge;
       double beam;
       double density;
       double scale;
