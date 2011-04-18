@@ -99,7 +99,8 @@ bool forest_mode = false;
 bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
-int iteration = 10;
+int max_iteration = 10;
+int min_iteration = 5;
 bool apply_exact = false;
 int cube_size = 200;
 
@@ -358,7 +359,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
   
-  for (int iter = 0; iter < iteration; ++ iter) {
+  for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
 
@@ -397,7 +398,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
     if (debug)
       std::cerr << "oracle score: " << objective << std::endl;
     
-    if (objective <= objective_optimum) {
+    if (objective <= objective_optimum && iter >= min_iteration) {
       sentences.swap(sentences_optimum);
       forests.swap(forests_optimum);
       break;
@@ -554,7 +555,8 @@ void options(int argc, char** argv)
         
     ("scorer",    po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     
-    ("iteration", po::value<int>(&iteration), "# of hill-climbing iteration")
+    ("max-iteration", po::value<int>(&max_iteration), "# of hill-climbing iteration")
+    ("min-iteration", po::value<int>(&min_iteration), "# of hill-climbing iteration")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact application")
     ("cube-size", po::value<int>(&cube_size),      "cube-pruning size")

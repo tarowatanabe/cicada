@@ -116,7 +116,8 @@ bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
 
-int iteration = 10;
+int max_iteration = 10;
+int min_iteration = 5;
 bool apply_exact = false;
 int cube_size = 200;
 int debug = 0;
@@ -151,7 +152,10 @@ int main(int argc, char ** argv)
     // read test set
     if (tstset_files.empty())
       throw std::runtime_error("no test set?");
-    
+
+    min_iteration = utils::bithack::max(min_iteration, max_iteration);
+
+        
     // read reference set
     scorer_document_type   scorers(scorer_name);
     sentence_document_type sentences;
@@ -395,7 +399,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
   
-  for (int iter = 0; iter < iteration; ++ iter) {
+  for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
     
@@ -420,8 +424,8 @@ void compute_oracles(const hypergraph_set_type& graphs,
     const double objective = score_optimum->score() * score_factor;
     if (mpi_rank == 0 && debug)
       std::cerr << "oracle score: " << objective << std::endl;
-
-    int terminate = (objective <= objective_optimum);
+    
+    int terminate = (objective <= objective_optimum) && (iter >= min_iteration);
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) {
@@ -710,7 +714,8 @@ void options(int argc, char** argv)
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     
-    ("iteration", po::value<int>(&iteration), "# of hill-climbing iteration")
+    ("max-iteration", po::value<int>(&max_iteration), "# of hill-climbing iteration")
+    ("min-iteration", po::value<int>(&min_iteration), "# of hill-climbing iteration")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact application")
     ("cube-size", po::value<int>(&cube_size), "cube-pruning size")
