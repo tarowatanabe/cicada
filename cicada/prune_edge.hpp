@@ -111,7 +111,7 @@ namespace cicada
 	
 	if (found_equal) {
 	  for (/**/; siter != siter_end; ++ siter)
-	    removed[siter->second] = siter->first != threshold;
+	    removed[siter->second] = (siter->first != threshold);
 	} else {
 	  for (/**/; siter != siter_end; ++ siter)
 	    removed[siter->second] = true;
