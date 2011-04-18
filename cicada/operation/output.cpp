@@ -253,7 +253,7 @@ namespace cicada
 	
 	  if (value == "sentence" || value == "string")
 	    yield_string = true;
-	  if (value == "sentence-pos" || value == "terminal-pos")
+	  else if (value == "sentence-pos" || value == "terminal-pos")
 	    yield_terminal_pos = true;
 	  else if (value == "derivation" || value == "tree")
 	    yield_tree = true;
