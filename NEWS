@@ -1,8 +1,10 @@
-2011-4-X
+2011-4-18
 Added coarse-to-fine parsing
 Added coarse grammar learning
 Added epsilon-removal for hypergraph
+Added no-bos-eos option to ngram feature which will not score via <s> </s>, assuming <s> and </s> are used in grammar
 Reworked attribute vector for smaller memory allocation (but slower for insert/erase)
+Use -99 for unigram probability of <s> taken from SRILM
 
 2011-3-28
 New grammar API: use --grammar and/or --tree-grammar only, and removed options, such as --grammar-static etc.
