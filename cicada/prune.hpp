@@ -8,6 +8,7 @@
 
 #include <cicada/prune_beam.hpp>
 #include <cicada/prune_density.hpp>
+#include <cicada/prune_edge.hpp>
 #include <cicada/prune_kbest.hpp>
 
 #endif

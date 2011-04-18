@@ -290,6 +290,7 @@ permute.hpp \
 prune.hpp \
 prune_beam.hpp \
 prune_density.hpp \
+prune_edge.hpp \
 prune_kbest.hpp \
 quantizer.hpp \
 remove_annotation.hpp \
