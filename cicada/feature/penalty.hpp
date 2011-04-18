@@ -196,7 +196,7 @@ namespace cicada
       void apply_estimate(const edge_type& edge,
 			  feature_set_type& features) const
       {
-	int count = 0;
+	size_t count = 0;
 	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
 	  count += titer->is_non_terminal();
