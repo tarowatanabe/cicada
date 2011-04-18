@@ -402,6 +402,7 @@ bool unescape_terminal = false;
 bool remove_cycle = false;
 bool collapse = false;
 bool remove_bracket = false;
+bool add_bos_eos = false;
 std::string stemmer;
 
 bool leaf = false;
@@ -525,6 +526,13 @@ int main(int argc, char** argv)
 
       if (remove_bracket)
 	transform_bracket(parsed);
+
+      if (add_bos_eos && ! parsed.antecedents.empty()) {
+	parsed.antecedents.insert(parsed.antecedents.begin(), treebank_type("BOS"));
+	parsed.antecedents.insert(parsed.antecedents.end(), treebank_type("EOS"));
+	parsed.antecedents.front().antecedents.push_back(treebank_type("<s>"));
+	parsed.antecedents.back().antecedents.push_back(treebank_type("</s>"));
+      }
       
       if (leaf) {
 	sent.clear();
@@ -648,6 +656,7 @@ void options(int argc, char** argv)
     ("remove-cycle",   po::bool_switch(&remove_cycle),       "remove cycle unary rules")
     ("remove-bracket", po::bool_switch(&remove_bracket),     "remove bracket terminal (which may be confued with non-terminal!)")
     ("collapse",       po::bool_switch(&collapse),           "collapse unary rules")
+    ("add-bos-eos",    po::bool_switch(&add_bos_eos),        "add [BOS]/[EOS] and <s>/</s>")
     ("stemmer",        po::value<std::string>(&stemmer),     "stemming for terminals")
     
     ("leaf",      po::bool_switch(&leaf),    "collect leaf nodes only")
