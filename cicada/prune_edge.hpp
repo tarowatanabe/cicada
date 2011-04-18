@@ -6,7 +6,7 @@
 #ifndef __CICADA__PRUNE_EDGE__HPP__
 #define __CICADA__PRUNE_EDGE__HPP__ 1
 
-#include <map>
+#include <vector>
 
 #include <cicada/hypergraph.hpp>
 #include <cicada/semiring.hpp>
@@ -101,9 +101,9 @@ namespace cicada
 	
 	const weight_type threshold = sorted[size].first;
 	
-	sorted_type::const_iterator siter = sorted.begin();
-	sorted_type::const_iterator siter_end = sorted.end();
-	sorted_type::const_iterator siter_last = siter + size;
+	typename sorted_type::const_iterator siter = sorted.begin();
+	typename sorted_type::const_iterator siter_end = sorted.end();
+	typename sorted_type::const_iterator siter_last = siter + size;
 	
 	bool found_equal = false;
 	for (/**/; siter != siter_last; ++ siter)
