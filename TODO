@@ -81,3 +81,5 @@ Add more tests
 Add mert,decode,mbr,parse script?
     Personally, I don't like a single script to handle many things, since 
     that is usually not instructive....
+
+A unified framework to collect statistics... HOW?
