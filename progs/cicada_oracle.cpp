@@ -47,11 +47,11 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
-
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/random.hpp>
 
 #include <boost/thread.hpp>
 
@@ -115,11 +115,13 @@ void read_tstset(const path_set_type& files,
 void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
+template <typename Generator>
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers,
 		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests);
+		     hypergraph_set_type& forests,
+		     Generator& generator);
 
 
 void options(int argc, char** argv);
@@ -155,10 +157,13 @@ int main(int argc, char ** argv)
     
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
+
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
     
     sentence_set_type   oracles(sentences.size());
     hypergraph_set_type oracles_forest(sentences.size());
-    compute_oracles(graphs, features, scorers, oracles, oracles_forest);
+    compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
     
     if (directory_mode) {
       if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
@@ -337,11 +342,13 @@ struct TaskOracle
   score_ptr_set_type&                  scores;
 };
 
+template <typename Generator>
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers,
 		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests)
+		     hypergraph_set_type& forests,
+		     Generator& generator)
 {
   typedef TaskOracle            task_type;
   typedef task_type::queue_type queue_type;
@@ -349,7 +356,14 @@ void compute_oracles(const hypergraph_set_type& graphs,
   typedef boost::shared_ptr<task_type> task_ptr_type;
   typedef std::vector<task_ptr_type, std::allocator<task_ptr_type> > task_set_type;
   
+  typedef std::vector<size_t, std::allocator<size_t> > id_set_type;
+
   score_ptr_set_type scores(graphs.size());
+
+  id_set_type ids;
+  for (size_t id = 0; id != graphs.size(); ++ id)
+    if (graphs[id].is_valid())
+      ids.push_back(id);
 
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
@@ -367,7 +381,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
     sentences_optimum = sentences;
     forests_optimum = forests;
     
-    queue_type queue(graphs.size());
+    queue_type queue;
     
     task_set_type tasks(threads);
     for (int i = 0; i < threads; ++ i)
@@ -377,11 +391,15 @@ void compute_oracles(const hypergraph_set_type& graphs,
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(*tasks[i])));
     
-    for (size_t id = 0; id != graphs.size(); ++ id)
-      queue.push(id);
+    id_set_type::const_iterator iiter_end = ids.end();
+    for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter)
+      queue.push(*iiter);
     
     for (int i = 0; i < threads; ++ i)
       queue.push(-1);
+    
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(ids.begin(), ids.end(), gen);
     
     workers.join_all();
     

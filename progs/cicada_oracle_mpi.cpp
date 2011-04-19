@@ -59,6 +59,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/random.hpp>
 
 #include <boost/thread.hpp>
 
@@ -129,11 +130,13 @@ void read_tstset(const path_set_type& files,
 void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
+template <typename Generator>
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers,
 		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests);
+		     hypergraph_set_type& forests,
+		     Generator& generator);
 
 void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests);
 void bcast_weights(const int rank, weight_set_type& weights);
@@ -174,10 +177,13 @@ int main(int argc, char ** argv)
 
     if (mpi_rank == 0 && debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
+
+    boost::mt19937 generator;
+    generator.seed(time(0) * getpid());
     
     sentence_set_type oracles(sentences.size());
     hypergraph_set_type oracles_forest(sentences.size());
-    compute_oracles(graphs, features, scorers, oracles, oracles_forest);
+    compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
     
     if (mpi_rank == 0) {
       if (directory_mode) {
@@ -257,6 +263,7 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
+template <typename Generator>
 struct TaskOracle
 {
   TaskOracle(const hypergraph_set_type&           __graphs,
@@ -264,13 +271,15 @@ struct TaskOracle
 	     const scorer_document_type&          __scorers,
 	     score_ptr_set_type&                  __scores,
 	     sentence_set_type&                   __sentences,
-	     hypergraph_set_type&                 __forests)
+	     hypergraph_set_type&                 __forests,
+	     Generator&                           __generator)
     : graphs(__graphs),
       features(__features),
       scorers(__scorers),
       scores(__scores),
       sentences(__sentences),
-      forests(__forests)
+      forests(__forests),
+      generator(__generator)
   {
     score_optimum.reset();
     
@@ -302,9 +311,20 @@ struct TaskOracle
 				: - std::numeric_limits<double>::infinity());
 
     hypergraph_type graph_oracle;
+
+    typedef std::vector<size_t, std::allocator<size_t> > id_set_type;
+
+    id_set_type ids;
+    for (size_t id = 0; id != graphs.size(); ++ id)
+      if (graphs[id].is_valid())
+	ids.push_back(id);
     
-    for (size_t id = 0; id != graphs.size(); ++ id) {
-      if (! graphs[id].is_valid()) continue;
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(ids.begin(), ids.end(), gen);
+    
+    id_set_type::const_iterator iiter_end = ids.end();
+    for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
+      const size_t id = *iiter;
       
       score_ptr_type score_curr;
       if (score_optimum)
@@ -373,16 +393,18 @@ struct TaskOracle
   score_ptr_set_type&                  scores;
   sentence_set_type&                   sentences;
   hypergraph_set_type&                 forests;
+  Generator&                           generator;
 };
 
-
+template <typename Generator>
 void compute_oracles(const hypergraph_set_type& graphs,
 		     const feature_function_ptr_set_type& features,
 		     const scorer_document_type& scorers,
 		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests)
+		     hypergraph_set_type& forests,
+		     Generator& generator)
 {
-  typedef TaskOracle task_type;
+  typedef TaskOracle<Generator> task_type;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -405,7 +427,7 @@ void compute_oracles(const hypergraph_set_type& graphs,
     sentences_optimum = sentences;
     forests_optimum   = forests;
     
-    task_type(graphs, features, scorers, scores, sentences, forests)();
+    task_type(graphs, features, scorers, scores, sentences, forests, generator)();
 
     bcast_sentences(sentences, forests);
     
