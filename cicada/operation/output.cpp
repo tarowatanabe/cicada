@@ -196,7 +196,7 @@ namespace cicada
     }
 
     Output::Output(const std::string& parameter, output_data_type& __output_data, const int __debug)
-      : output_data(__output_data), file(), directory(), weights(0), weights_assigned(0), weights_one(false),
+      : output_data(__output_data), file(), directory(), weights(0), weights_assigned(0), weights_one(false), weights_fixed(false),
 	kbest_size(0), kbest_unique(false),
 	insertion_prefix(),
 	yield_string(false),
@@ -274,6 +274,10 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      
+      if (weights || weights_one)
+	weights_fixed = true;
+      
       if (! weights)
 	weights = &base_type::weights();
       
@@ -304,7 +308,8 @@ namespace cicada
 
     void Output::assign(const weight_set_type& __weights)
     {
-      weights_assigned = &__weights;
+      if (! weights_fixed)
+	weights_assigned = &__weights;
     }
 
     void Output::clear()

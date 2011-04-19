@@ -31,6 +31,7 @@ namespace cicada
       const weight_set_type*   weights_assigned;
       int size;
       bool weights_one;
+      bool weights_fixed;
   
       bool exact;
       bool prune;

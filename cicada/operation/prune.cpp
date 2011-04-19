@@ -19,7 +19,7 @@ namespace cicada
   namespace operation
   {
     Prune::Prune(const std::string& parameter, const int __debug)
-      : weights(0), weights_assigned(0), kbest(0), edge(0), beam(-1), density(0.0), scale(1.0), weights_one(false), 
+      : weights(0), weights_assigned(0), kbest(0), edge(0), beam(-1), density(0.0), scale(1.0), weights_one(false), weights_fixed(false),
 	semiring_tropical(false), semiring_logprob(false), semiring_log(false),
 	debug(__debug)
     {
@@ -76,6 +76,10 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      
+      if (weights || weights_one)
+	weights_fixed = true;
+      
       if (! weights)
 	weights = &base_type::weights();
     }
@@ -183,7 +187,8 @@ namespace cicada
     
     void Prune::assign(const weight_set_type& __weights)
     {
-      weights_assigned = &__weights;
+      if (! weights_fixed)
+	weights_assigned = &__weights;
     }
   };
 };

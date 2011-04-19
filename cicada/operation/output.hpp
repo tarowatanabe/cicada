@@ -35,6 +35,8 @@ namespace cicada
       const weights_path_type* weights;
       const weight_set_type*   weights_assigned;
       bool weights_one;
+      bool weights_fixed;
+      
       int  kbest_size;
       bool kbest_unique;
       

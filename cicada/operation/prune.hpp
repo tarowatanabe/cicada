@@ -32,6 +32,7 @@ namespace cicada
       double scale;
   
       bool weights_one;
+      bool weights_fixed;
 
       bool semiring_tropical;
       bool semiring_logprob;

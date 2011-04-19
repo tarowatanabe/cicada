@@ -22,7 +22,7 @@ namespace cicada
     Apply::Apply(const std::string& parameter,
 		 const model_type& __model,
 		 const int __debug)
-      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), exact(false), prune(false), grow(false), incremental(false), forced(false), debug(__debug)
+      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -63,6 +63,10 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      
+      if (weights || weights_one)
+	weights_fixed = true;
+
       if (! weights)
 	weights = &base_type::weights();
     }
@@ -135,7 +139,8 @@ namespace cicada
 
     void Apply::assign(const weight_set_type& __weights)
     {
-      weights_assigned = &__weights;
+      if (! weights_fixed)
+	weights_assigned = &__weights;
     }
   };
 };

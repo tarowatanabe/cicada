@@ -34,6 +34,7 @@ namespace cicada
       const weight_set_type*   weights_assigned;
       int size;
       bool weights_one;
+      bool weights_fixed;
       
       bool yield_source;
       bool treebank;
@@ -63,6 +64,7 @@ namespace cicada
       const weight_set_type*   weights_assigned;
       int size;
       bool weights_one;
+      bool weights_fixed;
       
       bool yield_source;
       bool treebank;
@@ -97,6 +99,7 @@ namespace cicada
       const weights_path_type* weights;
       const weight_set_type*   weights_assigned;
       bool weights_one;
+      bool weights_fixed;
       
       bool yield_source;
       bool treebank;

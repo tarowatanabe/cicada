@@ -20,7 +20,7 @@ namespace cicada
   namespace operation
   {
     ExpectedNGram::ExpectedNGram(const std::string& parameter, const int __debug)
-      : order(0), bos_eos(false), weights(0), weights_assigned(0), weights_one(false), scale(1.0), debug(__debug)
+      : order(0), bos_eos(false), weights(0), weights_assigned(0), weights_one(false),weights_fixed(false), scale(1.0), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -48,6 +48,10 @@ namespace cicada
     
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
+      
+      if (weights || weights_one)
+	weights_fixed = true;
+
       if (! weights)
 	weights = &base_type::weights();
     }
@@ -88,7 +92,8 @@ namespace cicada
 
     void ExpectedNGram::assign(const weight_set_type& __weights)
     {
-      weights_assigned = &__weights;
+      if (! weights_fixed)
+	weights_assigned = &__weights;
     }
     
   };
