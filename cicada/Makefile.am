@@ -292,6 +292,7 @@ prune_beam.hpp \
 prune_density.hpp \
 prune_edge.hpp \
 prune_kbest.hpp \
+push_bos_eos.hpp \
 quantizer.hpp \
 remove_annotation.hpp \
 remove_epsilon.hpp \
