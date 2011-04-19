@@ -86,13 +86,19 @@ namespace cicada
       kbest_derivations_type derivations(source, kbest_size, traversal(), function, kbest_filter());
       
       int derivation;
-      weight_type   weight;
-      for (size_type k = 0; k != kbest_size; ++ k) {
+      weight_type weight;
+      size_type   k = 0;
+      for (/**/; k != kbest_size; ++ k) {
 	weight_type weight_curr;
 	
 	if (! derivations(k, derivation, weight_curr))
 	  break;
 	weight = weight_curr;
+      }
+      
+      if (k != kbest_size) {
+	target = source;
+	return;
       }
       
       inside_type    inside(source.nodes.size());
