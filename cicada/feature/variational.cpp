@@ -60,7 +60,7 @@ namespace cicada
       
     public:
       VariationalImpl(const int __order)
-	: ngrams(symbol_type()), order(__order)
+	: ngrams(symbol_type()), order(__order), no_bos_eos(false)
       {
 	feature_names.resize(order);
 	for (int n = 0; n < order; ++ n)
@@ -230,18 +230,25 @@ namespace cicada
 	buffer_type& buffer = const_cast<buffer_type&>(buffer_impl);
 	buffer.clear();
 	
-	buffer.push_back(vocab_type::BOS);
-	buffer.insert(buffer.end(), context, context_star);
-	
-	ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end(), features);
-	
-	if (context_star != context_end) {
-	  buffer.clear();
-	  buffer.insert(buffer.end(), context_star + 1, context_end);
+	if (no_bos_eos) {
+	  buffer.insert(buffer.end(), context, context_star);
+	  
+	  if (! buffer.empty())
+	    ngram_score(buffer.begin(), buffer.begin() + (buffer.front() == vocab_type::BOS), buffer.end(), features);
+	} else {
+	  buffer.push_back(vocab_type::BOS);
+	  buffer.insert(buffer.end(), context, context_star);
+	  
+	  ngram_score(buffer.begin(), buffer.begin() + 1, buffer.end(), features);
+	  
+	  if (context_star != context_end) {
+	    buffer.clear();
+	    buffer.insert(buffer.end(), context_star + 1, context_end);
+	  }
+	  buffer.push_back(vocab_type::EOS);
+	  
+	  ngram_score(buffer.begin(), buffer.end() - 1, buffer.end(), features);
 	}
-	buffer.push_back(vocab_type::EOS);
-	
-	ngram_score(buffer.begin(), buffer.end() - 1, buffer.end(), features);
       }
       
       void clear()
@@ -264,6 +271,7 @@ namespace cicada
       
     public:
       int order;
+      bool no_bos_eos;
     };
     
     Variational::Variational(const std::string& parameter)
@@ -277,10 +285,13 @@ namespace cicada
 	throw std::runtime_error("is this variational feature?" + parameter);
       
       int order = 3;
+      bool no_bos_eos = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "order")
 	  order = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "no-bos-eos")
+	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for variational: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -292,6 +303,7 @@ namespace cicada
       base_type::__feature_name = "variational";
       
       pimpl = new impl_type(order);
+      pimpl->no_bos_eos = no_bos_eos;
     }
     
     Variational::~Variational() { std::auto_ptr<impl_type> tmp(pimpl); }

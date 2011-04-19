@@ -101,6 +101,7 @@ permute: permutation feature\n\
 span: lexical span feature\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
 word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
