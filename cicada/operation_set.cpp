@@ -26,6 +26,7 @@
 #include "operation/expected_ngram.hpp"
 #include "operation/parse.hpp"
 #include "operation/prune.hpp"
+#include "operation/push_bos_eos.hpp"
 #include "operation/remove_annotation.hpp"
 #include "operation/remove_epsilon.hpp"
 #include "operation/sort_tail.hpp"
@@ -165,6 +166,7 @@ prune: pruning\n\
 \tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialzied weight\n\
+push-bos-eos: push bos/eos\n\
 remove-annotation: remove latent annotation from forest\n\
 remove-epsilon: remove epsilon\n\
 \tlattice=[true|false] remove epsilon for lattice\n\
@@ -256,6 +258,8 @@ span-forest: annotate terminal span\n\
 	operations.push_back(operation_ptr_type(new operation::Intersect(*piter, debug)));
       else if (param_name == "normalize")
 	operations.push_back(operation_ptr_type(new operation::Normalize(*piter, debug)));
+      else if (param_name == "push-bos-eos")
+	operations.push_back(operation_ptr_type(new operation::PushBosEos(*piter, debug)));
       else if (param_name == "remove-annotation")
 	operations.push_back(operation_ptr_type(new operation::RemoveAnnotation(*piter, debug)));
       else if (param_name == "remove-epsilon")
