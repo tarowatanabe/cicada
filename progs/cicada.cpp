@@ -140,7 +140,10 @@ int main(int argc, char ** argv)
 	operations.clear();
       }
     }
-
+    
+    if (debug)
+      std::cerr << "statistics"<< '\n'
+		<< operations.get_statistics();
     
   }
   catch (const std::exception& err) {

@@ -41,6 +41,13 @@ namespace cicada
       second_type cpu_time;
       
       Stat() : count(0), node(0), edge(0), user_time(0), cpu_time(0) {}
+      Stat(const count_type& __count,
+	   const count_type& __node,
+	   const count_type& __edge,
+	   const second_type& __user_time,
+	   const second_type& __cpu_time)
+	: count(__count), node(__node), edge(__edge),
+	  user_time(__user_time), cpu_time(__cpu_time) {}
       
       Stat operator+() const
       {
@@ -106,6 +113,8 @@ namespace cicada
     std::pair<iterator, bool> insert(const value_type& x) { return stats.insert(x); }
     
     stat_type& operator[](const attribute_type& x) { return stats[x]; }
+
+    void clear() { stats.clear(); }
     
     bool empty() const { return stats.empty(); }
     size_type size() const { return stats.size(); }

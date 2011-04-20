@@ -12,14 +12,18 @@
 #include "cicada_impl.hpp"
 
 #include "utils/mpi.hpp"
+#include "utils/mpi_device.hpp"
 #include "utils/mpi_stream.hpp"
 #include "utils/mpi_stream_simple.hpp"
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/program_options.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/base64.hpp"
+#include "utils/space_separator.hpp"
 
 #include <boost/program_options.hpp>
+#include <boost/tokenizer.hpp>
 #include <boost/thread.hpp>
 
 typedef std::string op_type;
@@ -57,6 +61,7 @@ void options(int argc, char** argv);
 void cicada_stdout(operation_set_type& operations);
 void cicada_process(operation_set_type& operations);
 void synchronize();
+void merge_statistics(const operation_set_type& operations, operation_set_type::statistics_type& statistics);
 
 int main(int argc, char ** argv)
 {
@@ -150,6 +155,13 @@ int main(int argc, char ** argv)
     
     operations.clear();
     
+    operation_set_type::statistics_type statistics;
+    merge_statistics(operations, statistics);
+
+    if (mpi_rank == 0 && debug)
+      std::cerr << "statistics"<< '\n'
+		<< statistics;
+
     synchronize();
     
     ::sync();
@@ -165,6 +177,7 @@ enum {
   sample_tag = 1000,
   result_tag,
   notify_tag,
+  stat_tag,
 };
 
 inline
@@ -185,6 +198,84 @@ int loop_sleep(bool found, int non_found_iter)
     non_found_iter = 0;
   }
   return non_found_iter;
+}
+
+void merge_statistics(const operation_set_type& operations,
+		      operation_set_type::statistics_type& statistics)
+{
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+  typedef operation_set_type::statistics_type statistics_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  statistics.clear();
+  
+  if (mpi_rank == 0) {
+    
+    statistics = operations.get_statistics();
+
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_device_source(rank, stat_tag, 4096));
+      
+      std::string line;
+      while (std::getline(is, line)) {
+	const utils::piece line_piece(line);
+	tokenizer_type tokenizer(line_piece);
+	
+	tokenizer_type::iterator iter = tokenizer.begin();
+	if (iter == tokenizer.end()) continue;
+	const utils::piece name = *iter;
+	
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece count = *iter;
+	
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece node = *iter;
+	
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece edge = *iter;
+	
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece user_time = *iter;
+	
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece cpu_time = *iter;
+	
+	statistics[name] += statistics_type::statistic_type(utils::lexical_cast<statistics_type::count_type>(count),
+							    utils::lexical_cast<statistics_type::count_type>(node),
+							    utils::lexical_cast<statistics_type::count_type>(edge),
+							    utils::decode_base64<statistics_type::second_type>(user_time),
+							    utils::decode_base64<statistics_type::second_type>(cpu_time));
+      }
+    }
+    
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(utils::mpi_device_sink(0, stat_tag, 4096));
+    
+    statistics_type::const_iterator siter_end = operations.get_statistics().end();
+    for (statistics_type::const_iterator siter = operations.get_statistics().begin(); siter != siter_end; ++ siter) {
+      os << siter->first
+	 << ' ' << siter->second.count
+	 << ' ' << siter->second.node
+	 << ' ' << siter->second.edge;
+      os << ' ';
+      utils::encode_base64(siter->second.user_time, std::ostream_iterator<char>(os));
+      os << ' ';
+      utils::encode_base64(siter->second.cpu_time, std::ostream_iterator<char>(os));
+      os << '\n';
+    }
+    os << '\n';
+  }
 }
 
 
