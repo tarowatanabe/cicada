@@ -153,7 +153,7 @@ namespace cicada
 		  edge.rule = rule_type::create(rule_type(lhs, phrase.begin(), phrase.end()));
 		}
 	      } else {
-		const int __non_terminal_index = edge.rule->rhs.back().non_terminal_index();
+		const int __non_terminal_index = rhs.back().non_terminal_index();
 		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, static_cast<int>(edge.tails.size() - 1), __non_terminal_index - 1);
 	      
 		const id_type node_id = edge.tails[antecedent_index];
