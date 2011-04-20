@@ -17,7 +17,9 @@ namespace cicada
   
   std::ostream& operator<<(std::ostream& os, const Statistics& stats)
   {
-    
+    Statistics::const_iterator siter_end = stats.end();
+    for (Statistics::const_iterator siter = stats.begin(); siter != siter_end; ++ siter)
+      os << siter->first << ' ' << siter->second << '\n';
     
     return os;
   }
