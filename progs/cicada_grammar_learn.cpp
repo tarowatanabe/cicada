@@ -430,10 +430,6 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
     
   if (counts.empty()) return;
     
-  const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
-  const double prior = (is_terminal ? prior_lexicon : prior_rule);
-  const weight_type logprior(prior);
-    
   logprob_set_type& logprobs = const_cast<logprob_set_type&>(__logprobs);
   rule_ptr_set_type& rules = const_cast<rule_ptr_set_type&>(__rules);
     
@@ -477,7 +473,11 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
       
     logprob_sum += *piter;
   }
-    
+  
+  const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
+  const double prior = (is_terminal ? prior_lexicon : prior_rule) * rule_counts.size();
+  const weight_type logprior(prior);
+  
   double total = 0.0;
   for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter)
     sum += logprior * ((*piter) / logprob_sum);
