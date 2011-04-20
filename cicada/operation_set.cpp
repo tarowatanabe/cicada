@@ -377,7 +377,7 @@ span-forest: annotate terminal span\n\
       
       statistics_type::statistic_type& stat = data.statistics["input-lattice"];
       ++ stat.count;
-      stat.node = lattice.size();
+      stat.node = data.lattice.size();
 
     } else if (input_forest) {
       if (! data.hypergraph.assign(iter, end))
