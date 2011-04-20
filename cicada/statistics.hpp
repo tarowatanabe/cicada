@@ -21,6 +21,7 @@ namespace cicada
 {
   class Statistics
   {
+  public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     
