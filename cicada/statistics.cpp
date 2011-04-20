@@ -4,14 +4,14 @@
 namespace cicada
 {
   
-  std::ostream& operator<<(std::ostream& os, const Statitics::stat_type& stat)
+  std::ostream& operator<<(std::ostream& os, const Statistics::stat_type& stat)
   {
     
     
     return os;
   }
   
-  std::ostream& operator<<(std::ostream& os, const Statitics& stats)
+  std::ostream& operator<<(std::ostream& os, const Statistics& stats)
   {
     
     
