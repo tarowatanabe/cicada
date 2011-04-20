@@ -191,8 +191,12 @@ namespace cicada
       {
 	boost::uniform_01<double> uniform;
 
-	for (/**/; first != last; ++ first, ++ lower, ++ upper)
-	  *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
+	for (/**/; first != last; ++ first, ++ lower, ++ upper) {
+	  if (*lower == *upper)
+	    *first = 0.0;
+	  else
+	    *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
+	}
       }
 
       template <typename Iterator>
@@ -201,7 +205,7 @@ namespace cicada
 	int count_zero = 0;
 	int count = 0;
 	for (/**/; first != last; ++ first, ++ lower, ++ upper) {
-	  if (*first < *lower || *upper < *first)
+	  if (*lower != *upper && (*first < *lower || *upper < *first))
 	    return false;
 	  
 	  count_zero += (*first == 0.0);
