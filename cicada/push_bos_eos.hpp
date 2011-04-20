@@ -37,7 +37,8 @@ namespace cicada
     typedef hypergraph_type::rule_type rule_type;
 
     typedef Vocab  vocab_type;
-    typedef Symbol symbol_type;
+    typedef rule_type::symbol_type     symbol_type;
+    typedef rule_type::symbol_set_type symbol_set_type;
 
     typedef std::vector<id_type, std::allocator<id_type> > node_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > queue_type;
@@ -75,14 +76,19 @@ namespace cicada
 	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	      edge_type& edge = graph.edges[*eiter];
 	      
-	      if (edge.rule->rhs.front().is_terminal()) {
-		phrase.clear();
-		phrase.push_back(vocab_type::BOS);
-		phrase.insert(phrase.end(), edge.rule->rhs.begin(), edge.rule->rhs.end());
-		
-		edge.rule = rule_type::create(rule_type(edge.rule->lhs, phrase.begin(), phrase.end()));
+	      const symbol_type&     lhs = edge.rule->lhs;
+	      const symbol_set_type& rhs = edge.rule->rhs;
+	      
+	      if (rhs.front().is_terminal()) {
+		if (rhs.front() != vocab_type::BOS) {
+		  phrase.clear();
+		  phrase.push_back(vocab_type::BOS);
+		  phrase.insert(phrase.end(), rhs.begin(), rhs.end());
+		  
+		  edge.rule = rule_type::create(rule_type(lhs, phrase.begin(), phrase.end()));
+		}
 	      } else {
-		const int __non_terminal_index = edge.rule->rhs.front().non_terminal_index();
+		const int __non_terminal_index = rhs.front().non_terminal_index();
 		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, 0, __non_terminal_index - 1);
 	      
 		const id_type node_id = edge.tails[antecedent_index];
@@ -134,13 +140,18 @@ namespace cicada
 	    node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	    for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
 	      edge_type& edge = graph.edges[*eiter];
+
+	      const symbol_type&     lhs = edge.rule->lhs;
+	      const symbol_set_type& rhs = edge.rule->rhs;
 	    
-	      if (edge.rule->rhs.back().is_terminal()) {
-		phrase.clear();
-		phrase.insert(phrase.end(), edge.rule->rhs.begin(), edge.rule->rhs.end());
-		phrase.push_back(vocab_type::EOS);
-	      
-		edge.rule = rule_type::create(rule_type(edge.rule->lhs, phrase.begin(), phrase.end()));
+	      if (rhs.back().is_terminal()) {
+		if (rhs.back() != vocab_type::EOS) {
+		  phrase.clear();
+		  phrase.insert(phrase.end(), rhs.begin(), rhs.end());
+		  phrase.push_back(vocab_type::EOS);
+		  
+		  edge.rule = rule_type::create(rule_type(lhs, phrase.begin(), phrase.end()));
+		}
 	      } else {
 		const int __non_terminal_index = edge.rule->rhs.back().non_terminal_index();
 		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, static_cast<int>(edge.tails.size() - 1), __non_terminal_index - 1);
