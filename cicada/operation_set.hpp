@@ -36,6 +36,9 @@ namespace cicada
     typedef operation_type::sentence_type        sentence_type;
     typedef operation_type::sentence_set_type    sentence_set_type;
     typedef operation_type::ngram_count_set_type ngram_count_set_type;
+
+    typedef operation_type::attribute_type  attribute_type;
+    typedef operation_type::statistics_type statistics_type;
     
     typedef boost::shared_ptr<operation_type> operation_ptr_type;
     typedef std::vector<operation_ptr_type, std::allocator<operation_ptr_type> > operation_ptr_set_type;
@@ -94,6 +97,8 @@ namespace cicada
     const output_data_type& get_output_data() const { return output_data; }
     const data_type& get_data() const { return data; }
 
+    const statistics_type& get_statistics() const { return statistics; }
+
   private:
     void initialize(const parameter_set_type& parameters,
 		    const model_type& model,
@@ -122,6 +127,7 @@ namespace cicada
     data_type        data;
     
     operation_ptr_set_type operations;
+    statistics_type        statistics;
   };
 };
 

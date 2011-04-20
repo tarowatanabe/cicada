@@ -22,6 +22,8 @@
 #include <cicada/tree_grammar.hpp>
 #include <cicada/model.hpp>
 #include <cicada/vocab.hpp>
+#include <cicada/attribute.hpp>
+#include <cicada/statistics.hpp>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/shared_ptr.hpp>
@@ -52,6 +54,9 @@ namespace cicada
     typedef cicada::TreeGrammar     tree_grammar_type;
     typedef cicada::Model           model_type;
     typedef cicada::FeatureFunction feature_function_type;
+
+    typedef cicada::Attribute  attribute_type;
+    typedef cicada::Statistics statistics_type;
     
     typedef feature_function_type::feature_function_ptr_type feature_function_ptr_type;
     
@@ -71,13 +76,14 @@ namespace cicada
     struct Data
     {
       size_type id;
-            
+      
       hypergraph_type      hypergraph;
       lattice_type         lattice;
       span_set_type        spans;
       alignment_type       alignment;
       sentence_set_type    targets;
       ngram_count_set_type ngram_counts;
+      statistics_type      statistics;
     };
 
     struct OutputData
@@ -94,7 +100,8 @@ namespace cicada
     typedef Data       data_type;
     typedef OutputData output_data_type;
     
-    Operation() {}
+    Operation() : name() {}
+    Operation(const attribute_type& __name) : name(__name) {}
     virtual ~Operation() {}
     
     virtual void operator()(data_type& data) const = 0;
@@ -103,6 +110,9 @@ namespace cicada
     
     static const weights_path_type& weights();
     static const weights_path_type& weights(const path_type& path);
+    
+  protected:
+    attribute_type name;
   };
 };
 

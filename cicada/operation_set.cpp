@@ -409,5 +409,7 @@ span-forest: annotate terminal span\n\
     operation_ptr_set_type::const_iterator oiter_end = operations.end();
     for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
       (*oiter)->operator()(data);
+    
+    statistics += data.statistics;
   }
 };

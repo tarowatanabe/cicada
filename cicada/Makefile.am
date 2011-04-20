@@ -310,6 +310,7 @@ span_node.hpp \
 span_edge.hpp \
 span_forest.hpp \
 span_vector.hpp \
+statistics.hpp \
 stemmer.hpp \
 tokenizer.hpp \
 treebank.hpp \
