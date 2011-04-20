@@ -82,12 +82,13 @@ namespace cicada
       utils::resource ngram_end;
     
       if (debug)
-	std::cerr << "expected ngram cpu time: " << (ngram_end.cpu_time() - ngram_start.cpu_time())
+	std::cerr << name << ": " << data.id
+		  << " cpu time: " << (ngram_end.cpu_time() - ngram_start.cpu_time())
 		  << " user time: " << (ngram_end.user_time() - ngram_start.user_time())
 		  << std::endl;
       
       if (debug)
-	std::cerr << "expected ngram: " << data.id
+	std::cerr << name << ": " << data.id
 		  << " counts: size: " << ngram_counts.size() << std::endl;
     }
 

@@ -82,12 +82,13 @@ namespace cicada
       utils::resource end;
     
       if (debug)
-	std::cerr << "intersect cpu time: " << (end.cpu_time() - start.cpu_time())
+	std::cerr << name << ": " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
 		  << " user time: " << (end.user_time() - start.user_time())
 		  << std::endl;
 	
       if (debug)
-	std::cerr << "intersect: " << data.id
+	std::cerr << name << ": " << data.id
 		  << " # of nodes: " << intersected.nodes.size()
 		  << " # of edges: " << intersected.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(intersected.is_valid())

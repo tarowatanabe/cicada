@@ -557,7 +557,8 @@ namespace cicada
       utils::resource end;
 	
       if (debug)
-	std::cerr << "output cpu time: " << (end.cpu_time() - start.cpu_time())
+	std::cerr << name << ": " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
 		  << " user time: " << (end.user_time() - start.user_time())
 		  << std::endl;
       

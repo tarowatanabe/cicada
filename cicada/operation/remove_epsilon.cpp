@@ -60,12 +60,13 @@ namespace cicada
 	utils::resource end;
 	
 	if (debug)
-	  std::cerr << "remove epsilon cpu time: " << (end.cpu_time() - start.cpu_time())
+	  std::cerr << name << ": " << data.id
+		    << " cpu time: " << (end.cpu_time() - start.cpu_time())
 		    << " user time: " << (end.user_time() - start.user_time())
 		    << std::endl;
 	
 	if (debug)
-	  std::cerr << "remove epsilon: " << data.id
+	  std::cerr << name << ": " << data.id
 		    << " # of nodes: " << removed.size()
 		    << " shortest distance: " << removed.shortest_distance()
 		    << " longest distance: " << removed.longest_distance()
@@ -94,12 +95,13 @@ namespace cicada
 	utils::resource end;
 	
 	if (debug)
-	  std::cerr << "remove epsilon cpu time: " << (end.cpu_time() - start.cpu_time())
+	  std::cerr << name << ": " << data.id
+		    << " cpu time: " << (end.cpu_time() - start.cpu_time())
 		    << " user time: " << (end.user_time() - start.user_time())
 		    << std::endl;
 	
 	if (debug)
-	  std::cerr << "remove epsilon: " << data.id
+	  std::cerr << name << ": " << data.id
 		    << " # of nodes: " << removed.nodes.size()
 		    << " # of edges: " << removed.edges.size()
 		    << " valid? " << utils::lexical_cast<std::string>(removed.is_valid())
