@@ -77,10 +77,14 @@ namespace cicada
 	cpu_time  -= x.cpu_time;
 	return *this;
       }
+
+    public:
+      friend
+      std::ostream& operator<<(std::ostream& os, const Stat& stat);
     };
     
     typedef Stat stat_type;
-    
+    typedef Stat statistic_type;
     
   private:
     typedef google::dense_hash_map<attribute_type, stat_type, boost::hash<attribute_type>, std::equal_to<attribute_type> > stat_set_type;
@@ -127,7 +131,10 @@ namespace cicada
       
       return *this;
     }
-    
+
+  public:
+    friend
+    std::ostream& operator<<(std::ostream& os, const Statistics& stats);
     
   private:
     stat_set_type stats;

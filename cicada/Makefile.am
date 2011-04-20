@@ -355,6 +355,7 @@ sentence.cpp \
 sentence_vector.cpp \
 signature.cpp \
 span_vector.cpp \
+statistics.cpp \
 stemmer.cpp \
 tokenizer.cpp \
 treebank.cpp \
