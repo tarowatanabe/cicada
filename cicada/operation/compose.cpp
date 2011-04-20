@@ -95,6 +95,14 @@ namespace cicada
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
 	
       hypergraph.swap(composed);
     }
@@ -169,6 +177,14 @@ namespace cicada
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(composed);
     }
@@ -256,6 +272,14 @@ namespace cicada
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(composed);
     }
@@ -331,6 +355,14 @@ namespace cicada
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(composed);
     }
@@ -413,6 +445,14 @@ namespace cicada
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(composed);
     }
@@ -505,6 +545,14 @@ namespace cicada
 		  << " # of edges: " << composed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(composed);
     }

@@ -103,7 +103,7 @@ namespace cicada
       if (debug)
 	std::cerr << name << ": " << data.id << std::endl;
 	
-      utils::resource prune_start;
+      utils::resource start;
       
       if (weights_one) {
 	if (edge_mode) {
@@ -169,11 +169,11 @@ namespace cicada
 	  throw std::runtime_error("what pruning?");
       }
 	
-      utils::resource prune_end;
+      utils::resource end;
     
       if (debug)
-	std::cerr << "prune cpu time: " << (prune_end.cpu_time() - prune_start.cpu_time())
-		  << " user time: " << (prune_end.user_time() - prune_start.user_time())
+	std::cerr << "prune cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
 		  << std::endl;
     
       if (debug)
@@ -182,6 +182,14 @@ namespace cicada
 		  << " # of edges: " << pruned.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(pruned.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += pruned.nodes.size();
+      stat.edge += pruned.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(pruned);
 

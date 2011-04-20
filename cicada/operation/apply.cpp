@@ -132,7 +132,15 @@ namespace cicada
 		  << " # of edges: " << applied.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(applied.is_valid())
 		  << std::endl;
-	
+      
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += applied.nodes.size();
+      stat.edge += applied.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      
       hypergraph.swap(applied);
     }
 

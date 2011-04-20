@@ -49,6 +49,15 @@ namespace cicada
 	: count(__count), node(__node), edge(__edge),
 	  user_time(__user_time), cpu_time(__cpu_time) {}
       
+      void clear()
+      {
+	count = 0;
+	node = 0;
+	edge = 0;
+	user_time = 0;
+	cpu_time  = 0;
+      }
+      
       Stat operator+() const
       {
 	return *this;

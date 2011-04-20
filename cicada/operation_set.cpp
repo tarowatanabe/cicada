@@ -353,6 +353,7 @@ span-forest: annotate terminal span\n\
     data.alignment.clear();
     data.targets.clear();
     data.ngram_counts.clear();
+    data.statistics.clear();
     
     if (input_id) {
       if (! parse_id(data.id, iter, end))
@@ -373,9 +374,20 @@ span-forest: annotate terminal span\n\
     } else if (input_lattice) {
       if (! data.lattice.assign(iter, end))
 	throw std::runtime_error("invalid lattice format");
+      
+      statistics_type::statistic_type& stat = data.statistics["input-lattice"];
+      ++ stat.count;
+      stat.node = lattice.size();
+
     } else if (input_forest) {
       if (! data.hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
+
+      statistics_type::statistic_type& stat = data.statistics["input-forest"];
+      
+      ++ stat.count;
+      stat.node = data.hypergraph.nodes.size();
+      stat.edge = data.hypergraph.edges.size();
     }
     
     if (input_span) {

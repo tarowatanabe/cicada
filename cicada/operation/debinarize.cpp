@@ -60,6 +60,14 @@ namespace cicada
 		  << " valid? " << utils::lexical_cast<std::string>(debinarized.is_valid())
 		  << std::endl;
     
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += debinarized.nodes.size();
+      stat.edge += debinarized.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+
       hypergraph.swap(debinarized);
     }
 

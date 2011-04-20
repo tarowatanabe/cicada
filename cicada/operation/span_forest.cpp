@@ -59,6 +59,14 @@ namespace cicada
 		  << " # of edges: " << spanned.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(spanned.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+	
+	++ stat.count;
+	stat.node += spanned.nodes.size();
+	stat.edge += spanned.edges.size();
+	stat.user_time += (end.user_time() - start.user_time());
+	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(spanned);
     }

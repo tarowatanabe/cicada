@@ -142,6 +142,14 @@ namespace cicada
 		  << " # of edges: " << parsed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(parsed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += parsed.nodes.size();
+      stat.edge += parsed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(parsed);
     }
@@ -259,6 +267,14 @@ namespace cicada
 		  << " # of edges: " << parsed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(parsed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += parsed.nodes.size();
+      stat.edge += parsed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(parsed);
     }
@@ -425,6 +441,14 @@ namespace cicada
 		  << " # of edges: " << parsed.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(parsed.is_valid())
 		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += parsed.nodes.size();
+      stat.edge += parsed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     
       hypergraph.swap(parsed);
     }

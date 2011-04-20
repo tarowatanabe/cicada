@@ -95,7 +95,15 @@ namespace cicada
 		  << " # of edges: " << binarized.edges.size()
 		  << " valid? " << utils::lexical_cast<std::string>(binarized.is_valid())
 		  << std::endl;
-	
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += binarized.nodes.size();
+      stat.edge += binarized.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      
       data.hypergraph.swap(binarized);
     }
     
