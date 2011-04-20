@@ -39,6 +39,8 @@ namespace cicada
 	throw std::runtime_error("specify either lattice or forest");
       if (int(lattice_mode) + forest_mode == 0)
 	throw std::runtime_error("specify either lattice or forest");
+
+      name = std::string("remove-epsilon-") + (lattice_mode ? "lattice" : "forest");
     }
 
     void RemoveEpsilon::operator()(data_type& data) const
@@ -49,7 +51,7 @@ namespace cicada
 	lattice_type removed;
 	
 	if (debug)
-	  std::cerr << "remove epsilon: " << data.id << std::endl;
+	  std::cerr << name << ": " << data.id << std::endl;
 	
 	utils::resource start;
 	
@@ -76,7 +78,7 @@ namespace cicada
 	hypergraph_type removed;
 	
 	if (debug)
-	  std::cerr << "remove epsilon: " << data.id << std::endl;
+	  std::cerr << name << ": " << data.id << std::endl;
 	
 	utils::resource start;
 	

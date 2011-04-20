@@ -18,7 +18,7 @@ namespace cicada
   namespace operation
   {
     PushBosEos::PushBosEos(const std::string& parameter, const int __debug)
-      :  debug(__debug)
+      :  base_type("push-bos/eos"), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 	
@@ -38,7 +38,7 @@ namespace cicada
       hypergraph_type pushed;
       
       if (debug)
-	std::cerr << "push bos/eos: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
 	

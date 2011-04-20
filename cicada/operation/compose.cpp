@@ -23,7 +23,8 @@ namespace cicada
 			     const grammar_type& __grammar,
 			     const std::string& __goal,
 			     const int __debug)
-      : tree_grammar(__tree_grammar), grammar(__grammar),
+      : base_type("compose-tree"),
+	tree_grammar(__tree_grammar), grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
 	debug(__debug)
@@ -69,7 +70,7 @@ namespace cicada
       hypergraph_type composed;
 
       if (debug)
-	std::cerr << "compose tree: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
       const tree_grammar_type& tree_grammar_compose = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
@@ -102,7 +103,8 @@ namespace cicada
 				 const grammar_type& __grammar,
 				 const std::string& __goal,
 				 const int __debug)
-      : grammar(__grammar),
+      : base_type("compose-earley"),
+	grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
 	debug(__debug)
@@ -144,7 +146,7 @@ namespace cicada
       hypergraph_type composed;
     
       if (debug)
-	std::cerr << "compose earley: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
 
       const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 
@@ -175,7 +177,8 @@ namespace cicada
 			   const grammar_type& __grammar,
 			   const std::string& __goal,
 			   const int __debug)
-      : grammar(__grammar),
+      : base_type("compose-cky"),
+	grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
 	treebank(false),
@@ -230,7 +233,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "compose cky: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
 
       const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 
@@ -261,7 +264,8 @@ namespace cicada
 				   const grammar_type& __grammar,
 				   const std::string& __goal,
 				   const int __debug)
-      : grammar(__grammar),
+      : base_type("compose-grammar"),
+	grammar(__grammar),
 	goal(__goal),
 	yield_source(false),
 	debug(__debug)
@@ -304,7 +308,7 @@ namespace cicada
       if (! hypergraph.is_valid()) return;
       
       if (debug)
-	std::cerr << "compose grammar: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
 
       const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 
@@ -336,7 +340,8 @@ namespace cicada
 				 const grammar_type& __grammar,
 				 const std::string& __goal,
 				 const int __debug)
-      : grammar(__grammar),
+      : base_type("compose-phrase"),
+	grammar(__grammar),
 	goal(__goal),
 	distortion(0),
 	yield_source(false),
@@ -385,7 +390,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "compose phrase: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 
@@ -417,7 +422,8 @@ namespace cicada
 				       const grammar_type& __grammar,
 				       const std::string& __goal,
 				       const int __debug)
-      : grammar(__grammar),
+      : base_type("compose-alignment"),
+	grammar(__grammar),
 	goal(__goal),
 	lattice_mode(false),
 	forest_mode(false),
@@ -470,7 +476,7 @@ namespace cicada
 	target = lattice_type(data.targets.front());
 	
       if (debug)
-	std::cerr << "compose alignment: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
 	

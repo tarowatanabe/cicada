@@ -69,6 +69,8 @@ namespace cicada
 
       if (! weights)
 	weights = &base_type::weights();
+
+      name = std::string("apply-") + (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune")));
     }
     
     void Apply::operator()(data_type& data) const
@@ -91,10 +93,7 @@ namespace cicada
       const weight_set_type* weights_apply = (weights_assigned ? weights_assigned : &(weights->weights));
       
       if (debug)
-	std::cerr << "apply "
-		  << (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))) 
-		  << ": " << data.id
-		  << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
     
       utils::resource start;
     

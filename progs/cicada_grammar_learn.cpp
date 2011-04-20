@@ -249,9 +249,9 @@ bool binarize_all = false;
 
 double prior_rule      = 1;
 double prior_lexicon   = 1;
-double prior_unknown   = 1;
-double prior_signature = 1;
-double prior_character = 1;
+double prior_unknown   = 0.1;
+double prior_signature = 0.1;
+double prior_character = 0.1;
 
 double merge_ratio = 0.5;
 double unknown_ratio = 0.5;
@@ -431,7 +431,7 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   if (counts.empty()) return;
     
   const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
-  const double prior = (is_terminal ? prior_lexicon : prior_rule) * counts.size();
+  const double prior = (is_terminal ? prior_lexicon : prior_rule);
   const weight_type logprior(prior);
     
   logprob_set_type& logprobs = const_cast<logprob_set_type&>(__logprobs);

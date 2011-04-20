@@ -20,7 +20,8 @@ namespace cicada
   namespace operation
   {
     ExpectedNGram::ExpectedNGram(const std::string& parameter, const int __debug)
-      : order(0), bos_eos(false), weights(0), weights_assigned(0), weights_one(false),weights_fixed(false), scale(1.0), debug(__debug)
+      : base_type("xexpected-ngram"),
+	order(0), bos_eos(false), weights(0), weights_assigned(0), weights_one(false),weights_fixed(false), scale(1.0), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -69,7 +70,7 @@ namespace cicada
       const weight_set_type* weights_apply = (weights_assigned ? weights_assigned : &(weights->weights));
       
       if (debug)
-	std::cerr << "expected ngram: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
           
       utils::resource ngram_start;
     

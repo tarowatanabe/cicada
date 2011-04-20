@@ -18,7 +18,7 @@ namespace cicada
   namespace operation
   {
     Debinarize::Debinarize(const std::string& parameter, const int __debug)
-      : debug(__debug)
+      : base_type("debinarize"), debug(__debug)
     {
       typedef cicada::Parameter param_type;
       
@@ -40,7 +40,7 @@ namespace cicada
       hypergraph_type debinarized;
 
       if (debug)
-	std::cerr << "debinarize: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
       

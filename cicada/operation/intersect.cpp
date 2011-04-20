@@ -40,6 +40,9 @@ namespace cicada
 	
       if (! lattice_mode && ! target_mode)
 	target_mode = true;
+      
+      name = std::string("intersect-") + (lattice_mode ? "lattice" : "forest");
+
     }
 
     void Intersect::operator()(data_type& data) const
@@ -64,7 +67,7 @@ namespace cicada
       hypergraph_type intersected;
 
       if (debug)
-	std::cerr << "intersect: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
       

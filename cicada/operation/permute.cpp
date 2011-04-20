@@ -20,7 +20,8 @@ namespace cicada
   namespace operation
   {
     Permute::Permute(const std::string& parameter, const int __debug)
-      : excludes(), size(0), debug(__debug)
+      : base_type("permute"),
+	excludes(), size(0), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -48,7 +49,7 @@ namespace cicada
       hypergraph_type permuted;
     
       if (debug)
-	std::cerr << "permute: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
     
       utils::resource start;
 	

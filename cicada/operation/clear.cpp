@@ -19,7 +19,8 @@ namespace cicada
   {
     Clear::Clear(const std::string& parameter,
 		 const int __debug)
-      : clear_hypergraph(false),
+      : base_type("clear"),
+	clear_hypergraph(false),
 	clear_lattice(false),
 	clear_spans(false),
 	clear_alignment(false),
@@ -54,7 +55,7 @@ namespace cicada
     void Clear::operator()(data_type& data) const
     {
       if (debug)
-	std::cerr << "clear: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
 
       if (clear_hypergraph)
 	data.hypergraph.clear();

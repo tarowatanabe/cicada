@@ -30,7 +30,8 @@ namespace cicada
 		       const grammar_type& __grammar,
 		       const std::string& __goal,
 		       const int __debug)
-      : grammar(__grammar),
+      : base_type("parse-cky"),
+	grammar(__grammar),
 	goal(__goal), 
 	weights(0),
 	weights_assigned(0),
@@ -113,7 +114,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "parse cky: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
 
       const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
       
@@ -149,7 +150,8 @@ namespace cicada
 		       const grammar_type& __grammar,
 		       const std::string& __goal,
 		       const int __debug)
-      : grammar(__grammar),
+      : base_type("parse-agenda"),
+	grammar(__grammar),
 	goal(__goal),
 	weights(0),
 	weights_assigned(0),
@@ -229,7 +231,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "parse agenda: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
 
@@ -266,7 +268,8 @@ namespace cicada
 			     const grammar_type& __grammar,
 			     const std::string& __goal,
 			     const int __debug)
-      : grammars(), thresholds(), grammar(__grammar),
+      : base_type("parse-coarse"),
+	grammars(), thresholds(), grammar(__grammar),
 	goal(__goal),
 	weights(0),
 	weights_assigned(0),
@@ -388,7 +391,7 @@ namespace cicada
       if (lattice.empty()) return;
     
       if (debug)
-	std::cerr << "parse coarse: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
 

@@ -20,7 +20,7 @@ namespace cicada
   namespace operation
   {
     SortTail::SortTail(const std::string& parameter, const int __debug)
-      : debug(__debug)
+      : base_type("sort-tail"), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -40,7 +40,7 @@ namespace cicada
       hypergraph_type sorted;
 
       if (debug)
-	std::cerr << "sort tail: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
 

@@ -19,7 +19,8 @@ namespace cicada
     
     Normalize::Normalize(const std::string& parameter,
 			 const int __debug)
-      : debug(__debug)
+      : base_type("normalize"),
+	debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -44,7 +45,7 @@ namespace cicada
       hypergraph_type& hypergraph = data.hypergraph;
 
       if (debug)
-	std::cerr << "normalize: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
 
       utils::resource start;
 	

@@ -18,7 +18,8 @@ namespace cicada
   namespace operation
   {
     RemoveAnnotation::RemoveAnnotation(const std::string& parameter, const int __debug)
-      :  debug(__debug)
+      :  base_type("remove-annotation"),
+	 debug(__debug)
     {
       typedef cicada::Parameter param_type;
 	
@@ -38,7 +39,7 @@ namespace cicada
       hypergraph_type removed;
       
       if (debug)
-	std::cerr << "remove annotation: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
 	

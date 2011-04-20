@@ -82,6 +82,8 @@ namespace cicada
       
       if (! weights)
 	weights = &base_type::weights();
+      
+      name = std::string("prune-") + (edge_mode ? "edge" : (kbest_mode ? "kbest" : (beam_mode ? "beam" : "density")));
     }
     
     void Prune::operator()(data_type& data) const
@@ -99,7 +101,7 @@ namespace cicada
       const bool edge_mode = edge > 0;
 	
       if (debug)
-	std::cerr << "prune " << (edge_mode ? "edge" : (kbest_mode ? "kbest" : (beam_mode ? "beam" : "density"))) << ": " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
 	
       utils::resource prune_start;
       

@@ -22,7 +22,8 @@ namespace cicada
 				   const grammar_type& __grammar,
 				   const std::string& __goal,
 				   const int __debug)
-      : depth(0), width(0), debug(__debug)
+      : base_type("generate-earley"),
+	depth(0), width(0), debug(__debug)
     { 
       typedef cicada::Parameter param_type;
     
@@ -48,7 +49,7 @@ namespace cicada
       hypergraph_type generated;
     
       if (debug)
-	std::cerr << "generate earley: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
       

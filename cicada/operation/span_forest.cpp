@@ -20,7 +20,7 @@ namespace cicada
   namespace operation
   {
     SpanForest::SpanForest(const std::string& parameter, const int __debug)
-      : debug(__debug)
+      : base_type("span-forest"), debug(__debug)
     {
       typedef cicada::Parameter param_type;
     
@@ -40,7 +40,7 @@ namespace cicada
       hypergraph_type spanned;
 
       if (debug)
-	std::cerr << "span forest: " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
     
       utils::resource start;
 

@@ -54,6 +54,8 @@ namespace cicada
       
       if (int(left) + right + all + terminal + cyk > 1)
 	throw std::runtime_error("we do not binarization in many directions!");
+
+      name = std::string("binarize-") + (left ? "left" : (right ? "right" : (all ? "all" : (terminal ? "terminal" : "cyk"))));
     }
 
     void Binarize::operator()(data_type& data) const
@@ -63,9 +65,7 @@ namespace cicada
       hypergraph_type binarized;
       
       if (debug)
-	std::cerr << "binarize "
-		  << (left ? "left" : (right ? "right" : (all ? "all" : (terminal ? "terminal" : "cyk"))))
-		  << ": " << data.id << std::endl;
+	std::cerr << name << ": " << data.id << std::endl;
       
       utils::resource start;
     
