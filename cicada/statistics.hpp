@@ -32,15 +32,15 @@ namespace cicada
     
     struct Stat
     {
+      count_type  count;
+      
       count_type node;
       count_type edge;
-      
-      count_type  count;
       
       second_type user_time;
       second_type cpu_time;
       
-      Stat() : node(0), edge(0), count(0), user_time(0), cpu_time(0) {}
+      Stat() : count(0), node(0), edge(0), user_time(0), cpu_time(0) {}
       
       Stat operator+() const
       {
@@ -56,11 +56,9 @@ namespace cicada
       
       Stat& operator+=(const Stat& x)
       {
+	count += x.count;
 	node += x.node;
 	edge += x.edge;
-	
-	count += x.count;
-	
 	user_time += x.user_time;
 	cpu_time  += x.cpu_time;
 	return *this;
@@ -68,11 +66,9 @@ namespace cicada
       
       Stat& operator-=(const Stat& x)
       {
+	count -= x.count;
 	node -= x.node;
 	edge -= x.edge;
-	
-	count -= x.count;
-	
 	user_time -= x.user_time;
 	cpu_time  -= x.cpu_time;
 	return *this;
