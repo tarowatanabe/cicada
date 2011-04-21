@@ -19,7 +19,14 @@ void process(const cicada::Symbol& x, int index)
 	    << "non-terminal? " << x.non_terminal() << std::endl
 	    << "non-terminal index? " << x.non_terminal_index() << std::endl
 	    << "non-terminal index? " << x.non_terminal(index) << std::endl
-	    << "non-terminal strip? " << x.non_terminal_strip() << std::endl;
+	    << "non-terminal strip? " << x.non_terminal_strip() << std::endl
+	    << "annotate 1 true?" << x.annotate(1, true) << std::endl
+	    << "annotate 1 false?" << x.annotate(1, false) << std::endl
+	    << "annotate 2 true?" << x.annotate(2, true) << std::endl
+	    << "annotate 2 false?" << x.annotate(2, false) << std::endl
+	    << "coarse 1? " << x.coarse(1) << std::endl
+	    << "coarse 2? " << x.coarse(2) << std::endl
+	    << "coarse? " << x.coarse() << std::endl;
 }
 
 int main(int argc, char** argv)
@@ -38,6 +45,13 @@ int main(int argc, char** argv)
   process("[BAD,4]", 3);
   process("[GOOD,5]", 3);
 
+  process("[BAD@1]", 3);
+  process("[BAD@1,5]", 3);
+  process("[BAD@2]", 3);
+  process("[BAD@3]", 3);
+  process("[BAD@3,2]", 3);
+  process("[BAD@1,4]", 3);
+  
   std::cerr << "pos: " << symbol_type("Good/[ADJ]").pos() << " terminal: " << symbol_type("Good/[ADJ]").terminal() << std::endl;
   std::cerr << "pos: " << symbol_type("Good|[ADJ]").pos() << " terminal: " << symbol_type("Good|[ADJ]").terminal() << std::endl;
   std::cerr << "pos: " << symbol_type("Good\\[ADJ]").pos() << " terminal: " << symbol_type("Good\\[ADJ]").terminal() << std::endl;

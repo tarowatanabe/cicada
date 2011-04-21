@@ -327,43 +327,65 @@ namespace cicada
     if (! is_non_terminal()) return *this;
     
     namespace xpressive = boost::xpressive;
+    namespace qi = boost::spirit::qi;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
     
     typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
     typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
     
     static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
     
+    const int __non_terminal_index = non_terminal_index();
     const piece_type piece = non_terminal_strip();
     const int mask = 1 << pos;
+    
+    std::string generated;
+    std::back_insert_iterator<std::string> iter(generated);
     
     pmatch what;
     if (xpressive::regex_match(piece, what, re)) {
       const int value = (utils::lexical_cast<int>(what[2]) & (~mask)) | (-bit & mask);
-      return '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
+      karma::generate(iter, '[' << standard::string << '@' << karma::int_ << ']', utils::piece(what[1]), value);
     } else
-      return '[' + piece + '@' + utils::lexical_cast<std::string>(-bit & mask) + ']';
+      karma::generate(iter, '[' << standard::string << '@' << karma::int_ << ']', piece, -bit & mask);
+    
+    return Symbol(generated).non_terminal(__non_terminal_index);
   }
   
   Symbol Symbol::coarse(const int pos) const
   {
     if (! is_non_terminal()) return *this;
     
-    namespace xpressive = boost::xpressive;
+    // even coarser!
+    if (pos < 0) return coarse();
     
+    namespace xpressive = boost::xpressive;
+    namespace qi = boost::spirit::qi;
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+      
     typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
     typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
     
     static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (xpressive::s2= -+xpressive::_d);
     
+    const int __non_terminal_index = non_terminal_index();
     const piece_type piece = non_terminal_strip();
     const int mask = (1 << pos) - 1;
+
+    std::string generated;
+    std::back_insert_iterator<std::string> iter(generated);
     
     pmatch what;
     if (xpressive::regex_match(piece, what, re)) {
       const int value = (utils::lexical_cast<int>(what[2]) & mask);
-      return '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
+      
+      karma::generate(iter, '[' << standard::string << '@' << karma::int_ << ']', utils::piece(what[1]), value);
     } else
-      return '[' + piece + "@0]";
+      karma::generate(iter, '[' << standard::string << '@' << karma::int_ << ']', piece, 0);
+    
+    return Symbol(generated).non_terminal(__non_terminal_index);
   }
 
   Symbol Symbol::coarse() const
@@ -389,14 +411,14 @@ namespace cicada
     
     if (maps[__id] == id_type(-1)) {
       namespace xpressive = boost::xpressive;
-    
+      
       typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
       typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
       
       static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (-+xpressive::_d);
       
       const int __non_terminal_index = non_terminal_index();
-      const piece_type piece = non_terminal().non_terminal_strip();
+      const piece_type piece = non_terminal_strip();
       
       pmatch what;
       if (xpressive::regex_match(piece, what, re))
