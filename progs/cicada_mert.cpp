@@ -508,7 +508,7 @@ int main(int argc, char ** argv)
       normalize_l2(optimum_weights.begin(), optimum_weights.end(), std::sqrt(feature_type::allocated()));
     
     utils::compress_ostream os(output_file);
-    os.precision(10);
+    os.precision(20);
     os << optimum_weights;
   }
   catch (const std::exception& err) {
