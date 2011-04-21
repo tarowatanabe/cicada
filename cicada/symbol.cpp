@@ -364,7 +364,7 @@ namespace cicada
     namespace qi = boost::spirit::qi;
     namespace karma = boost::spirit::karma;
     namespace standard = boost::spirit::standard;
-      
+    
     typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
     typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
     
