@@ -184,7 +184,7 @@ int main(int argc, char** argv)
 	    found = true;
 	  }
 	
-	if (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg) && queue.size() < queue_size) {
+	if (! found && is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg) && queue.size() < queue_size) {
 	  while (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg)) {
 	    is_src >> bitext.source;
 	    is_trg >> bitext.target;
