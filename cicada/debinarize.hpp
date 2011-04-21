@@ -77,7 +77,7 @@ namespace cicada
 	const hypergraph_type::edge_type& edge = target.edges[node.edges.front()];
 	const symbol_type& lhs = edge.rule->lhs;
 	
-	if (lhs.non_terminal_strip().find('^') != symbol_type::piece_type::npos()) {
+	if (lhs.binarized()) {
 	  binarized[node.id] = true;
 	  
 	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
