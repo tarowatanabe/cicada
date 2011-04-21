@@ -12,6 +12,7 @@
 #include <cicada/operation.hpp>
 #include <cicada/parameter.hpp>
 #include <cicada/parse.hpp>
+#include <cicada/grammar_simple.hpp>
 #include <cicada/grammar_unknown.hpp>
 
 #include <cicada/operation/functional.hpp>
@@ -280,6 +281,16 @@ namespace cicada
     
       hypergraph.swap(parsed);
     }
+
+    template <typename GR, typename Iterator>
+    inline
+    bool has_grammar(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first) 
+	if (dynamic_cast<GR*>(&(*(*first))))
+	  return true;
+      return false;
+    }
     
     
     ParseCoarse::ParseCoarse(const std::string& parameter,
@@ -373,20 +384,31 @@ namespace cicada
       else
 	grammars.push_back(grammar);
       
-      // assign unknown grammar from the fine-grammar
+      // assign unknown/pos grammar from the fine-grammar
       if (grammars.back().size() >= 2) {
 	grammar_type::transducer_ptr_type unknown;
+	grammar_type::transducer_ptr_type pos;
 	
 	grammar_type::iterator giter_end = grammars.back().end();
-	for (grammar_type::iterator giter = grammars.back().begin(); giter != giter_end; ++ giter)
+	for (grammar_type::iterator giter = grammars.back().begin(); giter != giter_end; ++ giter) {
 	  if (dynamic_cast<GrammarUnknown*>(&(*(*giter))))
 	    unknown = *giter;
+	  else if (dynamic_cast<GrammarPOS*>(&(*(*giter))))
+	    pos = *giter;
+	}
 	
 	if (unknown) {
 	  grammar_set_type::iterator giter_end = grammars.end() - 1;
 	  for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
-	    if (giter->size() == 1)
+	    if (! has_grammar<GrammarUnknown>(giter->begin(), giter->end()))
 	      giter->push_back(unknown);
+	}
+	
+	if (pos) {
+	  grammar_set_type::iterator giter_end = grammars.end() - 1;
+	  for (grammar_set_type::iterator giter = grammars.begin(); giter != giter_end; ++ giter)
+	    if (! has_grammar<GrammarPOS>(giter->begin(), giter->end()))
+	      giter->push_back(pos);
 	}
       }
     }

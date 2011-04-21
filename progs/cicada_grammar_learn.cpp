@@ -233,6 +233,7 @@ typedef WordCounts label_count_set_type;
 path_set_type input_files;
 path_type     output_grammar_file = "-";
 path_type     output_lexicon_file;
+path_type     output_pos_file;
 path_type     output_character_file;
 
 symbol_type goal = "[ROOT]";
@@ -301,6 +302,8 @@ void characters_learn(const treebank_set_type& treebanks,
 		      ngram_count_set_type& model,
 		      ngram_count_set_type& backoff,
 		      Function function);
+void pos_learn(const label_count_set_type& labels,
+	       grammar_type& grammar_pos);
 
 template <typename Maximizer>
 void grammar_maximize(const count_set_type& counts,
@@ -534,7 +537,7 @@ int main(int argc, char** argv)
       if (output_lexicon_file.empty())
 	throw std::runtime_error("we will dump character file, but no lexicon file");
     }
-
+    
     min_iteration_split = utils::bithack::min(min_iteration_split, max_iteration_split);
     min_iteration_merge = utils::bithack::min(min_iteration_merge, max_iteration_merge);
     
@@ -648,6 +651,8 @@ int main(int argc, char** argv)
 	else
 	  rules.insert(*giter);
       }
+
+      
       
       if (! output_character_file.empty()) {
 	ngram_count_set_type model;
@@ -674,6 +679,15 @@ int main(int argc, char** argv)
       
       write_grammar(output_grammar_file, grammar);
     }
+    
+    if (! output_pos_file.empty()) {
+      grammar_type rules;
+      
+      pos_learn(labels, rules);
+      
+      write_grammar(output_pos_file, rules);
+    }
+    
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -2446,6 +2460,21 @@ void characters_learn(const treebank_set_type& treebanks,
   model[ngram_type(1, vocab_type::UNK)] = logprob_unk;
 }
 
+void pos_learn(const label_count_set_type& labels,
+	       grammar_type& grammar)
+{
+  // we use the estiamte of P(fine | coarse) for Pr(fine -> coarse)
+  count_set_type counts;
+  
+  label_count_set_type::const_iterator liter_end = labels.end();
+  for (label_count_set_type::const_iterator liter = labels.begin(); liter != liter_end; ++ liter) {
+    const symbol_type coarse = liter->first.coarse();
+    
+    counts[coarse][rule_type::create(rule_type(liter->first, &coarse, (&coarse) + 1))] += liter->second;
+  }
+
+  grammar_maximize(counts, grammar, Maximize());
+}
 
 template <typename Maximizer>
 struct TaskMaximize
@@ -2785,6 +2814,7 @@ void options(int argc, char** argv)
     ("input",  po::value<path_set_type>(&input_files), "input treebank")
     ("output-grammar",   po::value<path_type>(&output_grammar_file),   "output grammar")
     ("output-lexicon",   po::value<path_type>(&output_lexicon_file),   "output lexical rules")
+    ("output-pos",       po::value<path_type>(&output_pos_file),       "output pos rules")
     ("output-character", po::value<path_type>(&output_character_file), "output character model")
 
     ("goal", po::value<symbol_type>(&goal)->default_value(goal), "goal")
