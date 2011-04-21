@@ -202,8 +202,15 @@ int main(int argc, char** argv)
       if (debug)
 	std::cerr << "# of samples: " << num_samples << std::endl;
       
+      bool terminated = false;
+
       for (;;) {
 	bool found = false;
+	
+	if (! terminated) {
+	  terminated = queue.push(bitext_type(), true);
+	  found |= terminated;
+	}
 	
 	// flush streams...
 	for (int rank = 1; rank != mpi_size; ++ rank)
@@ -214,7 +221,7 @@ int main(int argc, char** argv)
 	
 	found |= utils::mpi_terminate_devices(stream, device);
 	
-	if (std::count(device.begin(), device.end(), odevice_ptr_type()) == mpi_size) break;
+	if (terminated && std::count(device.begin(), device.end(), odevice_ptr_type()) == mpi_size) break;
 	
 	non_found_iter = loop_sleep(found, non_found_iter);
       }
@@ -234,10 +241,11 @@ int main(int argc, char** argv)
       
       while (stream >> bitext)
 	queue.push_swap(bitext);
+      
+      // termination...
+      queue.push(bitext_type());
     }
     
-    // termination...
-    queue.push(bitext_type());
     worker.join();
     
     if (mpi_rank == 0) {
