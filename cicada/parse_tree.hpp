@@ -167,6 +167,72 @@ namespace cicada
     typedef Semiring score_type;
     
     typedef Function function_type;
+
+    struct RuleCandidate
+    {
+      score_type score;
+      
+      rule_ptr_type      rule;
+      
+      feature_set_type   features;
+      attribute_set_type attributes;
+      
+      RuleCandidate() : score(), rule(), features(), attributes() {}
+      RuleCandidate(const score_type& __score, const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
+	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
+    };
+
+    struct TreeRuleCandidate
+    {
+      score_type score;
+      
+      tree_rule_ptr_type      rule;
+      
+      feature_set_type   features;
+      attribute_set_type attributes;
+
+      TreeRuleCandidate() : score(), rule(), features(), attributes() {}
+      TreeRuleCandidate(const score_type& __score, const tree_rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
+	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
+    };
+
+    typedef RuleCandidate     rule_candidate_type;
+    typedef TreeRuleCandidate tree_rule_candidate_type;
+    
+    typedef utils::chunk_vector<rule_candidate_type, 4096 / sizeof(rule_candidate_type), std::allocator<rule_candidate_type> > rule_candidate_set_type;
+    typedef utils::chunk_vector<tree_rule_candidate_type, 4096 / sizeof(tree_rule_candidate_type), std::allocator<tree_rule_candidate_type> > tree_rule_candidate_set_type;
+    
+    typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
+    typedef std::vector<const tree_rule_candidate_type*, std::allocator<const tree_rule_candidate_type*> > tree_rule_candidate_ptr_set_type;
+    
+    
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+    typedef std::tr1::unordered_map<tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
+				    std::allocator<std::pair<const tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type> > > tree_rule_candidate_map_type;
+#else
+    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+    typedef sgi::hash_map<tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
+			  std::allocator<std::pair<const tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type> > > tree_rule_candidate_map_type;
+#endif
+    typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
+    typedef std::vector<tree_rule_candidate_map_type, std::allocator<tree_rule_candidate_map_type> > tree_rule_candidate_table_type;
+    
+    
+    struct Candidate
+    {
+      
+      typename rule_candidate_ptr_set_type::const_iterator first;
+      typename rule_candidate_ptr_set_type::const_iterator last;
+
+      typename tree_rule_candidate_ptr_set_type::const_iterator tree_first;
+      typename tree_rule_candidate_ptr_set_type::const_iterator tree_last;
+      
+      score_type score;
+    };
+    
     
     ParseTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
       : goal(__goal),
@@ -413,7 +479,7 @@ namespace cicada
 
 	    node_queue_type::const_iterator titer_end = nodes.end();
 	    for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	      const tree_transducer_type::size_type node_epsilon = transducer.next(*titer, edge_epsilon);
+	      const tree_transducer_type::id_type node_epsilon = transducer.next(*titer, edge_epsilon);
 	      if (node_epsilon != transducer.root()) {
 		frontier_type frontier(*fiter);
 		frontier.push_back(*niter);
@@ -430,7 +496,7 @@ namespace cicada
 		if (*eiter != tree_transducer_type::edge_type()) {
 		  const tree_transducer_type::edge_type& edge_id = *eiter;
 		  
-		  const tree_transducer_type::size_type node_edge = transducer.next(*titer, edge_id);
+		  const tree_transducer_type::id_type node_edge = transducer.next(*titer, edge_id);
 		  if (node_edge != transducer.root()) {
 		    const hypergraph_type::edge_type& edge = graph_in.edges[graph_in.nodes[*niter].edges[eiter - eiter_begin]];
 		    
@@ -467,7 +533,7 @@ namespace cicada
 	  
 	  node_queue_type::const_iterator titer_end = nodes.end();
 	  for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	    const tree_transducer_type::size_type node_none = transducer.next(*titer, edge_none);
+	    const tree_transducer_type::id_type node_none = transducer.next(*titer, edge_none);
 	    if (node_none == transducer.root()) continue;
 	    
 	    const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node_none);
