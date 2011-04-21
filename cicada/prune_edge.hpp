@@ -64,7 +64,6 @@ namespace cicada
   
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
-      
       target.clear();
       
       if (! source.is_valid())
@@ -91,7 +90,7 @@ namespace cicada
 	
 	std::nth_element(sorted.begin(), sorted.begin() + size, sorted.end(), greater_first<value_type>());
 	
-	const weight_type threshold = sorted[size].first;
+	const weight_type cutoff = sorted[size].first;
 	
 	typename sorted_type::const_iterator siter = sorted.begin();
 	typename sorted_type::const_iterator siter_end = sorted.end();
@@ -99,11 +98,11 @@ namespace cicada
 	
 	bool found_equal = false;
 	for (/**/; siter != siter_last; ++ siter)
-	  found_equal |= (siter->first == threshold);
+	  found_equal |= (siter->first == cutoff);
 	
 	if (found_equal) {
 	  for (/**/; siter != siter_end; ++ siter)
-	    removed[siter->second] = (siter->first != threshold);
+	    removed[siter->second] = (siter->first != cutoff);
 	} else {
 	  for (/**/; siter != siter_end; ++ siter)
 	    removed[siter->second] = true;

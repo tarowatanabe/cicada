@@ -63,20 +63,17 @@ namespace cicada
       : function(__function),
 	threshold(__threshold),
 	validate(__validate) {}
+
+    typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
+    typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
     
+    typedef hypergraph_type::id_type id_type;
+
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
-      typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
-      typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
-
-      typedef hypergraph_type::id_type id_type;
-      
-      typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
-      
-      if (source.goal == hypergraph_type::invalid)
-	throw std::runtime_error("invalid graph");
-      
       target.clear();
+      if (! source.is_valid())
+	return;
       
       weight_type viterbi_weight;
       int         viterbi_length;
@@ -97,7 +94,7 @@ namespace cicada
       posterior_type sorted(posterior);
       
       std::nth_element(sorted.begin(), sorted.begin() + prune_size, sorted.end(), std::greater<weight_type>());
-
+      
       const weight_type cutoff = sorted[prune_size];
       
       removed_type removed(source.edges.size(), false);
