@@ -467,8 +467,7 @@ namespace cicada
 	      
 	      tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(riter->source->label,
-			   yield_source ? *riter->source : *riter->target,
+		apply_rule(yield_source ? *riter->source : *riter->target,
 			   id,
 			   *fiter,
 			   riter->features + *siter,
@@ -486,8 +485,7 @@ namespace cicada
     }
     
     
-    void apply_rule(const symbol_type& root_label,
-		    const tree_rule_type& rule,
+    void apply_rule(const tree_rule_type& rule,
 		    const hypergraph_type::id_type root_in,
 		    const frontier_type& frontiers,
 		    const feature_set_type& features,
@@ -505,6 +503,8 @@ namespace cicada
       //
       
       //std::cerr << "apply rule pair: " << *rule_pair.source << " ||| " << *rule_pair.target << std::endl;
+      
+      const symbol_type& root_label = graph_in.edges[graph_in.nodes[root_in].edges.front()].rule->lhs;
       
       std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
       if (result.second)
