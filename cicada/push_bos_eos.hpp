@@ -94,14 +94,14 @@ namespace cicada
 		const id_type node_id = edge.tails[antecedent_index];
 	      
 		if (node_map_bos[node_id] == id_type(-1)) {
-		  const id_type node_bos_id = graph.add_node().id;
+		  node_type& node_bos = graph.add_node();
 		
-		  node_map_bos[node_id] = node_bos_id;
+		  node_map_bos[node_id] = node_bos.id;
 		
-		  queue_new.push_back(node_bos_id);
+		  queue_new.push_back(node_bos.id);
 		
 		  // we will create edges from node_id
-		  graph.nodes[node_bos_id].edges.reserve(graph.nodes[node_id].edges.size());
+		  node_bos.edges.reserve(graph.nodes[node_id].edges.size());
 		
 		  node_type::edge_set_type::const_iterator aiter_end = graph.nodes[node_id].edges.end();
 		  for (node_type::edge_set_type::const_iterator aiter = graph.nodes[node_id].edges.begin(); aiter != aiter_end; ++ aiter) {
@@ -109,7 +109,7 @@ namespace cicada
 		  
 		    edge_type& edge_new = graph.add_edge(edge_antecedent);
 		  
-		    graph.connect_edge(edge_new.id, node_bos_id);
+		    graph.connect_edge(edge_new.id, node_bos.id);
 		  }
 		}
 	      
@@ -160,14 +160,14 @@ namespace cicada
 		const id_type node_id = edge.tails[antecedent_index];
 	      
 		if (node_map_eos[node_id] == id_type(-1)) {
-		  const id_type node_eos_id = graph.add_node().id;
+		  node_type& node_eos = graph.add_node();
 		
-		  node_map_eos[node_id] = node_eos_id;
+		  node_map_eos[node_id] = node_eos.id;
 		
-		  queue_new.push_back(node_eos_id);
+		  queue_new.push_back(node_eos.id);
 		  
 		  // we will create edges from node_id
-		  graph.nodes[node_eos_id].edges.reserve(graph.nodes[node_id].edges.size());
+		  node_eos.edges.reserve(graph.nodes[node_id].edges.size());
 		
 		  node_type::edge_set_type::const_iterator aiter_end = graph.nodes[node_id].edges.end();
 		  for (node_type::edge_set_type::const_iterator aiter = graph.nodes[node_id].edges.begin(); aiter != aiter_end; ++ aiter) {
@@ -175,7 +175,7 @@ namespace cicada
 		  
 		    edge_type& edge_new = graph.add_edge(edge_antecedent);
 		  
-		    graph.connect_edge(edge_new.id, node_eos_id);
+		    graph.connect_edge(edge_new.id, node_eos.id);
 		  }
 		}
 	      
