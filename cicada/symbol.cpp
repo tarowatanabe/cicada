@@ -32,6 +32,7 @@ namespace cicada
     typedef std::vector<Symbol::id_type, std::allocator<Symbol::id_type> > non_terminal_symbol_map_type;
     typedef std::vector<Symbol::id_type, std::allocator<Symbol::id_type> > pos_symbol_map_type;
     typedef std::vector<Symbol::id_type, std::allocator<Symbol::id_type> > terminal_symbol_map_type;
+    typedef std::vector<Symbol::id_type, std::allocator<Symbol::id_type> > coarse_symbol_map_type;
   };
   
   Symbol::mutex_type    Symbol::__mutex_index;
@@ -45,6 +46,7 @@ namespace cicada
   static __thread SymbolImpl::non_terminal_symbol_map_type* non_terminal_symbol_maps_tls = 0;
   static __thread SymbolImpl::pos_symbol_map_type*          pos_symbol_maps_tls = 0;
   static __thread SymbolImpl::terminal_symbol_map_type*     terminal_symbol_maps_tls = 0;
+  static __thread SymbolImpl::coarse_symbol_map_type*       coarse_symbol_maps_tls = 0;
 
   static boost::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
   static boost::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
@@ -52,6 +54,7 @@ namespace cicada
   static boost::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
   static boost::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
   static boost::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
+  static boost::thread_specific_ptr<SymbolImpl::coarse_symbol_map_type>       coarse_symbol_maps;
 #else
   static utils::thread_specific_ptr<SymbolImpl::symbol_map_type>              symbol_maps;
   static utils::thread_specific_ptr<SymbolImpl::index_map_type>               index_maps;
@@ -59,6 +62,7 @@ namespace cicada
   static utils::thread_specific_ptr<SymbolImpl::non_terminal_symbol_map_type> non_terminal_symbol_maps;
   static utils::thread_specific_ptr<SymbolImpl::pos_symbol_map_type>          pos_symbol_maps;
   static utils::thread_specific_ptr<SymbolImpl::terminal_symbol_map_type>     terminal_symbol_maps;
+  static utils::thread_specific_ptr<SymbolImpl::coarse_symbol_map_type>       coarse_symbol_maps;
 #endif
 
 
@@ -360,6 +364,47 @@ namespace cicada
       return '[' + what[1] + '@' + utils::lexical_cast<std::string>(value) + ']';
     } else
       return '[' + piece + "@0]";
+  }
+
+  Symbol Symbol::coarse() const
+  {
+    if (! is_non_terminal()) return *this;
+
+#ifdef HAVE_TLS
+    if (! coarse_symbol_maps_tls) {
+      coarse_symbol_maps.reset(new SymbolImpl::coarse_symbol_map_type());
+      coarse_symbol_maps_tls = coarse_symbol_maps.get();
+    }
+    
+    SymbolImpl::coarse_symbol_map_type& maps = *coarse_symbol_maps_tls;
+#else
+    if (! coarse_symbol_maps.get())
+      coarse_symbol_maps.reset(new SymbolImpl::coarse_symbol_map_type());
+    
+    SymbolImpl::coarse_symbol_map_type& maps = *coarse_symbol_maps;
+#endif
+    
+    if (__id >= maps.size())
+      maps.resize(__id + 1, id_type(-1));
+    
+    if (maps[__id] == id_type(-1)) {
+      namespace xpressive = boost::xpressive;
+    
+      typedef xpressive::basic_regex<utils::piece::const_iterator> pregex;
+      typedef xpressive::match_results<utils::piece::const_iterator> pmatch;
+      
+      static pregex re = (xpressive::s1= +(~xpressive::_s)) >> '@' >> (-+xpressive::_d);
+      
+      const int __non_terminal_index = non_terminal_index();
+      const piece_type piece = non_terminal().non_terminal_strip();
+      
+      pmatch what;
+      if (xpressive::regex_match(piece, what, re))
+	maps[__id] = Symbol('[' + what[1] + ']').non_terminal(__non_terminal_index).id();
+      else
+	maps[__id] = __id;
+    }
+    return maps[__id];
   }
   
   void Symbol::write(const path_type& path)

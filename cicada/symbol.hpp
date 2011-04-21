@@ -118,6 +118,7 @@ namespace cicada
     // latent-annotation
     Symbol annotation(const int pos, const bool bit) const;
     Symbol coarse(const int pos) const;
+    Symbol coarse() const;
     
     
   public:

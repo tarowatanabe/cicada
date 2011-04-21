@@ -37,7 +37,7 @@ namespace cicada
 	target.clear();
 	return;
       }
-
+      
       target = source;
       
       hypergraph_type::edge_set_type::iterator eiter_end = target.edges.end();
@@ -45,27 +45,16 @@ namespace cicada
 	edge_type& edge = *eiter;
 	const rule_type& rule = *edge.rule;
 	
-	const symbol_type lhs = remove_annotation(rule.lhs);
+	const symbol_type lhs = rule.lhs.coarse();
 	symbol_set_type rhs(rule.rhs);
 	
 	symbol_set_type::iterator riter_end = rhs.end();
 	for (symbol_set_type::iterator riter = rhs.begin(); riter != riter_end; ++ riter)
 	  if (riter->is_non_terminal())
-	    *riter = remove_annotation(*riter);
+	    *riter = riter->coarse();
 	
 	edge.rule = rule_type::create(rule_type(lhs, rhs));
       }
-    }
-    
-    symbol_type remove_annotation(const symbol_type& symbol)
-    {
-      const utils::piece piece = symbol.non_terminal().non_terminal_strip();
-      
-      utils::piece::size_type pos = piece.find('@');
-      if (pos != utils::piece::npos())
-	return '[' + piece.substr(0, pos) + ']';
-      else
-	return symbol.non_terminal();
     }
   };
   
