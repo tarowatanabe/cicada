@@ -223,15 +223,37 @@ namespace cicada
     
     struct Candidate
     {
-      
       typename rule_candidate_ptr_set_type::const_iterator first;
       typename rule_candidate_ptr_set_type::const_iterator last;
-
+      
       typename tree_rule_candidate_ptr_set_type::const_iterator tree_first;
       typename tree_rule_candidate_ptr_set_type::const_iterator tree_last;
       
-      score_type score;
+      score_type    score;
+      frontier_type frontiers;
+
+      score_type candidate_score() const
+      {
+	return (first != last ? first->score : tree_first->score) * score;
+      }
+      
+      Candidate() : first(), last(), tree_first(), tree_last(), score(), frontiers() {}
     };
+
+    typedef Candidate candidate_type;
+    typedef utils::chunk_vector<candidate_type, 1024 * 8 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
+    
+    struct compare_heap_type
+    {
+      // we use less, so that when popped from heap, we will grab "greater" in back...
+      bool operator()(const candidate_type* x, const candidate_type* y) const
+      {
+	return x->candidate_score() < y->candidate_score();
+      }
+    };
+    
+    typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
+    typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
     
     
     ParseTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
@@ -261,8 +283,11 @@ namespace cicada
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
+	candidates.clear();
+	heap.clear();
+	
 	match_tree(id, graph_in, graph_out);
-
+	
 	if (! grammar.empty())
 	  match_phrase(id, graph_in, graph_out);
       }
@@ -283,6 +308,7 @@ namespace cicada
       
       node_map.clear();
     }
+    
 
     void match_phrase(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
@@ -543,7 +569,13 @@ namespace cicada
 	      
 	      tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	      for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(*riter, id, *fiter, *siter, *aiter, graph_in, graph_out);
+		apply_rule(yield_source ? *riter->source : *riter->target,
+			   id,
+			   *fiter,
+			   riter->features + *siter,
+			   riter->attributes + *aiter,
+			   graph_in,
+			   graph_out);
 	    }
 	    
 	    queue.push_back(state_type(*fiter, node_none));
@@ -555,7 +587,7 @@ namespace cicada
     }
     
     
-    void apply_rule(const tree_rule_pair_type& rule_pair,
+    void apply_rule(const tree_rule_type& rule,
 		    const hypergraph_type::id_type root_in,
 		    const frontier_type& frontiers,
 		    const feature_set_type& features,
@@ -571,12 +603,8 @@ namespace cicada
       //
       // construct graph_out in pre-order...
       //
-      
-      //std::cerr << "apply rule pair: " << *rule_pair.source << " ||| " << *rule_pair.target << std::endl;
-      
-      const symbol_type& root_label = rule_pair.source->label;
-      
-      const tree_rule_type& rule = (yield_source ? *rule_pair.source : *rule_pair.target);
+
+      const symbol_type& root_label = graph_in.edges[graph_in.nodes[root_in].edges.front()].rule->lhs;
       
       std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
       if (result.second)
@@ -586,11 +614,8 @@ namespace cicada
       
       const hypergraph_type::id_type edge_id = construct_graph(rule, result.first->second, frontiers, graph_in, graph_out, non_terminal_pos);
       
-      graph_out.edges[edge_id].features   += features;
-      graph_out.edges[edge_id].attributes += attributes;
-      
-      graph_out.edges[edge_id].features   += rule_pair.features;
-      graph_out.edges[edge_id].attributes += rule_pair.attributes;
+      graph_out.edges[edge_id].features   = features;
+      graph_out.edges[edge_id].attributes = attributes;
       
       // root-label is assigned to source-root attribute
       graph_out.edges[edge_id].attributes[attr_source_root] = static_cast<const std::string&>(root_label);
