@@ -74,10 +74,12 @@ namespace cicada
 	int count = 0;
 	rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
 	for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer)
-	  count -= (titer->is_terminal() && *titer != vocab_type::EPSILON && *titer != vocab_type::BOS && *titer != vocab_type::EOS);
+	  count += (titer->is_terminal() && *titer != vocab_type::EPSILON && *titer != vocab_type::BOS && *titer != vocab_type::EOS);
 	
 	if (count)
-	  features[feature_name()] = count;
+	  features[feature_name()] = -count;
+	else
+	  features.erase(feature_name());
       }
     };
 
