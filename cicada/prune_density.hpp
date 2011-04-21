@@ -67,8 +67,6 @@ namespace cicada
     typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
     typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
     
-    typedef hypergraph_type::id_type id_type;
-
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       target.clear();
