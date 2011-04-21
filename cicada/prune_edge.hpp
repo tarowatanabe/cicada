@@ -51,8 +51,7 @@ namespace cicada
 	validate(__validate) {}
     
     typedef std::vector<weight_type, std::allocator<weight_type> > inside_type;
-    typedef std::vector<weight_type, std::allocator<weight_type> > posterior_type;
-
+    
     typedef std::pair<weight_type, id_type> value_type;
     typedef std::vector<value_type, std::allocator<value_type> > sorted_type;
     
@@ -65,15 +64,10 @@ namespace cicada
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       target.clear();
-      
       if (! source.is_valid())
 	return;
       
-      inside_type    inside(source.nodes.size());
-      posterior_type posterior(source.edges.size());
-      
-      inside_outside(source, inside, posterior, function, function);
-      
+      inside_type  inside(source.nodes.size());
       removed_type removed(source.edges.size(), false);
       sorted_type  sorted;
       
@@ -81,12 +75,23 @@ namespace cicada
       for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
 	const node_type& node = *niter;
 	
-	if (node.edges.size() <= size) continue;
+	weight_type& weight = inside[node.id];
 	
 	sorted.clear();
 	node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
-	  sorted.push_back(std::make_pair(posterior[*eiter], *eiter));
+	for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+	  const edge_type& edge = source.edges[*eiter];
+	  
+	  weight_type score = function(edge);
+	  edge_type::node_set_type::const_iterator niter_end = edge.tails.end();
+	  for (edge_type::node_set_type::const_iterator niter = edge.tails.begin(); niter != niter_end; ++ niter)
+	    score *= inside[*niter];
+	  
+	  weight += score;
+	  sorted.push_back(std::make_pair(score, *eiter));
+	}
+	
+	if (node.edges.size() <= size) continue;
 	
 	std::nth_element(sorted.begin(), sorted.begin() + size, sorted.end(), greater_first<value_type>());
 	
