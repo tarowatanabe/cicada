@@ -3,8 +3,8 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__COMPOSE_TREE__HPP__
-#define __CICADA__COMPOSE_TREE__HPP__ 1
+#ifndef __CICADA__PARSE_TREE__HPP__
+#define __CICADA__PARSE_TREE__HPP__ 1
 
 #include <vector>
 #include <deque>
@@ -64,7 +64,8 @@
 namespace cicada
 {
   
-  struct ComposeTree
+  template <typename Semiring, typename Function>
+  struct ParseTree
   {
     typedef Symbol symbol_type;
     typedef Vocab  vocab_type;
@@ -161,8 +162,13 @@ namespace cicada
 
     typedef NodeMap node_map_type;
     typedef std::vector<node_map_type, std::allocator<node_map_type> > node_map_set_type;
+
+    typedef Semiring semiring_type;
+    typedef Semiring score_type;
     
-    ComposeTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
+    typedef Function function_type;
+    
+    ParseTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
       : goal(__goal),
 	tree_grammar(__tree_grammar), 
 	grammar(__grammar),
@@ -599,10 +605,10 @@ namespace cicada
   
   
   inline
-  void compose_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
+  void parse_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
   {
-    ComposeTree __composer(goal, tree_grammar, grammar, yield_source);
-    __composer(graph_in, graph_out);
+    ParseTree __parser(goal, tree_grammar, grammar, yield_source);
+    __parser(graph_in, graph_out);
   }
 };
 

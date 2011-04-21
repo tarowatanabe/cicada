@@ -222,11 +222,18 @@ int main(int argc, char** argv)
       if (debug)
 	std::cerr << "# of samples: " << num_samples << std::endl;
       
-      for (int rank = 1; rank != mpi_size; ++ rank)
-	stream[rank].reset();
-      
       for (;;) {
-	const bool found = utils::mpi_terminate_devices(stream, device);
+	bool found = false;
+	
+	// flush streams...
+	for (int rank = 1; rank != mpi_size; ++ rank)
+	  if (stream[rank] && device[rank]->test()) {
+	    stream[rank].reset();
+	    found = true;
+	  }
+	
+	// termnate streams
+	found |= utils::mpi_terminate_devices(stream, device);
 	
 	if (std::count(device.begin(), device.end(), odevice_ptr_type()) == mpi_size) break;
 	
