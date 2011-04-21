@@ -322,7 +322,15 @@ namespace cicada
     return non_terminal_strip().find('^') != piece_type::npos();
   }
 
-  Symbol Symbol::annotation(const int pos, const bool bit) const
+
+  bool Symbol::annotated() const
+  {
+    if (! is_non_terminal()) return false;
+    
+    return non_terminal_strip().find('@') != piece_type::npos();
+  }
+
+  Symbol Symbol::annotate(const int pos, const bool bit) const
   {
     if (! is_non_terminal()) return *this;
     
@@ -391,6 +399,7 @@ namespace cicada
   Symbol Symbol::coarse() const
   {
     if (! is_non_terminal()) return *this;
+    if (! annotated()) return *this;
 
 #ifdef HAVE_TLS
     if (! coarse_symbol_maps_tls) {

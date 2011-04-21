@@ -116,10 +116,10 @@ namespace cicada
     bool binarized() const;
 
     // latent-annotation
-    Symbol annotation(const int pos, const bool bit) const;
+    bool annotated() const;
+    Symbol annotate(const int pos, const bool bit) const;
     Symbol coarse(const int pos) const;
     Symbol coarse() const;
-    
     
   public:
     // boost hash
