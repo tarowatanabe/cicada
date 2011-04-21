@@ -75,7 +75,8 @@ namespace cicada
 	statistics_type::statistic_type& stat = data.statistics[name];
 	
 	++ stat.count;
-	stat.node += removed.size();
+	stat.node += removed.node_size();
+	stat.edge += removed.edge_size();
 	stat.user_time += (end.user_time() - start.user_time());
 	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
 	

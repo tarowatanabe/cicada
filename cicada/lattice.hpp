@@ -87,10 +87,10 @@ namespace cicada
     typedef lattice_type::const_iterator const_iterator;
     
   public:
-    Lattice() : lattice(), dist_short(), dist_long() {}
-    Lattice(size_type size) : lattice(size), dist_short(), dist_long() {}
+    Lattice() : lattice(), dist_short(), dist_long(), num_edge(0) {}
+    Lattice(size_type size) : lattice(size), dist_short(), dist_long(), num_edge(0) {}
     Lattice(const utils::piece& x) { assign(x); }
-    Lattice(const Sentence& x) : lattice(x.size()), dist_short(), dist_long()
+    Lattice(const Sentence& x) : lattice(x.size()), dist_short(), dist_long(), num_edge(0)
     {
       iterator liter = lattice.begin();
       Sentence::const_iterator iter_end = x.end();
@@ -106,9 +106,12 @@ namespace cicada
     size_type size() const { return lattice.size(); }
     bool empty() const { return lattice.empty(); }
     
+    size_type node_size() const { return lattice.size() + 1; }
+    size_type edge_size() const { return (dist_short.empty() ? lattice.size() : num_edge); }
+    
     inline const_reference operator[](size_type x) const { return lattice[x]; }
     inline       reference operator[](size_type x)       { return lattice[x]; }
-
+    
     inline const_reference front() const { return lattice.front(); }
     inline       reference front()       { return lattice.front(); }
 
@@ -150,9 +153,10 @@ namespace cicada
       lattice.swap(x.lattice);
       dist_short.swap(x.dist_short);
       dist_long.swap(x.dist_long);
+      std::swap(num_edge, x.num_edge);
     }
 
-    void clear() { lattice.clear(); dist_short.clear(); dist_long.clear(); }
+    void clear() { lattice.clear(); dist_short.clear(); dist_long.clear(); num_edge = 0; }
 
     void initialize_distance();
     
@@ -165,9 +169,10 @@ namespace cicada
     std::istream& operator>>(std::istream& is, Lattice& x);
         
   private:
-    lattice_type lattice;
+    lattice_type  lattice;
     distance_type dist_short;
     distance_type dist_long;
+    size_type     num_edge;
   };
   
 };

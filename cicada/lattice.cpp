@@ -69,7 +69,10 @@ namespace cicada
     
     closure_set_type closure(lattice.size() + 1);
     
+    num_edge = 0;
     for (int node = lattice.size() - 1; node >= 0; -- node) {
+      num_edge += lattice[node].size();
+      
       arc_set_type::const_iterator aiter_end = lattice[node].end();
       for (arc_set_type::const_iterator aiter = lattice[node].begin(); aiter != aiter_end; ++ aiter) {
 	const int last = node + aiter->distance;

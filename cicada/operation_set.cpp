@@ -376,9 +376,11 @@ span-forest: annotate terminal span\n\
 	throw std::runtime_error("invalid lattice format");
       
       statistics_type::statistic_type& stat = data.statistics["input-lattice"];
+      
       ++ stat.count;
-      stat.node = data.lattice.size();
-
+      stat.node += data.lattice.node_size();
+      stat.edge += data.lattice.edge_size();
+      
     } else if (input_forest) {
       if (! data.hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
@@ -386,8 +388,8 @@ span-forest: annotate terminal span\n\
       statistics_type::statistic_type& stat = data.statistics["input-forest"];
       
       ++ stat.count;
-      stat.node = data.hypergraph.nodes.size();
-      stat.edge = data.hypergraph.edges.size();
+      stat.node += data.hypergraph.nodes.size();
+      stat.edge += data.hypergraph.edges.size();
     }
     
     if (input_span) {
