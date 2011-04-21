@@ -126,8 +126,12 @@ void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper, Ge
 {
   boost::uniform_01<double> uniform;
   
-  for (/**/; first != last; ++ first, ++ lower, ++ upper)
-    *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
+  for (/**/; first != last; ++ first, ++ lower, ++ upper) {
+    if (*lower == *upper)
+      *first = 0.0;
+    else
+      *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
+  }
 }
 
 template <typename Iterator>
@@ -156,7 +160,7 @@ inline
 bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundIterator upper)
 {
   for (/**/; first != last; ++ first, ++ lower, ++ upper)
-    if (*first < *lower || *upper < *first)
+    if (*lower != *upper && (*first < *lower || *upper < *first))
       return false;
   return true;
 }
@@ -418,7 +422,6 @@ int main(int argc, char ** argv)
     generator.seed(time(0) * getpid());
     
     if (mpi_rank == 0) {
-
       double          optimum_objective = std::numeric_limits<double>::infinity();
       weight_set_type optimum_weights;
       
@@ -474,23 +477,23 @@ int main(int argc, char ** argv)
 	if (debug)
 	  std::cerr << "cpu time: " << (opt_end.cpu_time() - opt_start.cpu_time()) << '\n'
 		    << "user time: " << (opt_end.user_time() - opt_start.user_time()) << '\n';
-      
+	
 	if (debug)
 	  std::cerr << "sample: " << (sample + 1) << " objective: " << sample_objective << std::endl
 		    << sample_weights;
-      
+	
 	if ((moved && sample_objective < optimum_objective) || optimum_objective == std::numeric_limits<double>::infinity()) {
 	  optimum_objective = sample_objective;
 	  optimum_weights = sample_weights;
 	}
       }
-    
+      
       for (/**/; sample < static_cast<int>(samples_restarts + weights.size()); ++ sample) {
 	typedef cicada::optimize::LineSearch line_search_type;
-      
+	
 	double          sample_objective = std::numeric_limits<double>::infinity();
 	weight_set_type sample_weights = weights.back();
-      
+	
 	if (sample > 0 && mpi_rank == 0) {
 	  // perform randomize...
 	  sample_weights = optimum_weights;
@@ -502,10 +505,16 @@ int main(int argc, char ** argv)
 	      normalize_l1(sample_weights.begin(), sample_weights.end(), 1.0);
 	    else
 	      normalize_l2(sample_weights.begin(), sample_weights.end(), 1.0);
-	  
+	    
 	    if (valid_bounds(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin()))
 	      break;
 	  }
+	  
+	  // re-assign original weights...
+	  for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	    if (! feature_type(id).empty())
+	      if (bound_lower[feature_type(id)] == bound_upper[feature_type(id)])
+		sample_weights[feature_type(id)] = optimum_weights[feature_type(id)];
 	}
       
 	utils::resource opt_start;

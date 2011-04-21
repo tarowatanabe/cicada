@@ -85,7 +85,7 @@ namespace cicada
 	direction_set_type directions;
 	
 	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	  if (! feature_type(id).empty()) {
+	  if (! feature_type(id).empty() && bound_lower[feature_type(id)] != bound_upper[feature_type(id)]) {
 	    direction_type direction;
 	    
 	    direction[feature_type(id)] = 1.0;
@@ -247,9 +247,12 @@ namespace cicada
 	  if (is_valid_direction(direction.begin(), direction.end(), bound_lower.begin(), bound_upper.begin())) break;
 	}
 	
-	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
-	  if (id != feature_none.id())
+	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id) {
+	  if (id == feature_none.id() || bound_lower[feature_type(id)] == bound_upper[feature_type(id)])
+	    direction[feature_type(id)] = 0.0;
+	  else
 	    direction[feature_type(id)] -= weights[feature_type(id)];
+	}
 	
 	return direction;
       }

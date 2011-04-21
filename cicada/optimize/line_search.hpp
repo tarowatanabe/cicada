@@ -521,13 +521,15 @@ namespace cicada
 	    const double dir = direction[feature];
 	    const double low = bound_lower[feature];
 	    const double upp = bound_upper[feature];
-
-	    if (dir > 0.0) {
-	      maximum = std::min(maximum, (upp - ori) / dir);
-	      minimum = std::max(minimum, (low - ori) / dir);
-	    } else if (dir < 0.0) {
-	      maximum = std::min(maximum, (low - ori) / dir);
-	      minimum = std::max(minimum, (upp - ori) / dir);
+	    
+	    if (low != upp) {
+	      if (dir > 0.0) {
+		maximum = std::min(maximum, (upp - ori) / dir);
+		minimum = std::max(minimum, (low - ori) / dir);
+	      } else if (dir < 0.0) {
+		maximum = std::min(maximum, (low - ori) / dir);
+		minimum = std::max(minimum, (upp - ori) / dir);
+	      }
 	    }
 	  }
 	

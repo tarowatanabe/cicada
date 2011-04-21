@@ -109,14 +109,19 @@ int threads = 4;
 
 int debug = 0;
 
+
 template <typename Iterator, typename Generator>
 inline
 void randomize(Iterator first, Iterator last, Iterator lower, Iterator upper, Generator& generator)
 {
   boost::uniform_01<double> uniform;
 
-  for (/**/; first != last; ++ first, ++ lower, ++ upper)
-    *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
+  for (/**/; first != last; ++ first, ++ lower, ++ upper) {
+    if (*lower == *upper)
+      *first = 0.0;
+    else
+      *first = *lower + uniform(generator) * std::min(double(*upper - *lower), 1.0);
+  }
 }
 
 template <typename Iterator>
@@ -145,7 +150,7 @@ inline
 bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundIterator upper)
 {
   for (/**/; first != last; ++ first, ++ lower, ++ upper)
-    if (*first < *lower || *upper < *first)
+    if (*lower != *upper && (*first < *lower || *upper < *first))
       return false;
   return true;
 }
@@ -433,6 +438,12 @@ int main(int argc, char ** argv)
 	  if (valid_bounds(sample_weights.begin(), sample_weights.end(), bound_lower.begin(), bound_upper.begin()))
 	    break;
 	}
+	
+	// re-assign original weights...
+	for (feature_type::id_type id = 0; id < feature_type::allocated(); ++ id)
+	  if (! feature_type(id).empty())
+	    if (bound_lower[feature_type(id)] == bound_upper[feature_type(id)])
+	      sample_weights[feature_type(id)] = optimum_weights[feature_type(id)];
       }
       
       utils::resource opt_start;
