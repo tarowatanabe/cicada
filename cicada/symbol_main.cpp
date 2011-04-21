@@ -20,10 +20,10 @@ void process(const cicada::Symbol& x, int index)
 	    << "non-terminal index? " << x.non_terminal_index() << std::endl
 	    << "non-terminal index? " << x.non_terminal(index) << std::endl
 	    << "non-terminal strip? " << x.non_terminal_strip() << std::endl
-	    << "annotate 1 true?" << x.annotate(1, true) << std::endl
-	    << "annotate 1 false?" << x.annotate(1, false) << std::endl
-	    << "annotate 2 true?" << x.annotate(2, true) << std::endl
-	    << "annotate 2 false?" << x.annotate(2, false) << std::endl
+	    << "annotation 1 true?" << x.annotation(1, true) << std::endl
+	    << "annotation 1 false?" << x.annotation(1, false) << std::endl
+	    << "annotation 2 true?" << x.annotation(2, true) << std::endl
+	    << "annotation 2 false?" << x.annotation(2, false) << std::endl
 	    << "coarse 1? " << x.coarse(1) << std::endl
 	    << "coarse 2? " << x.coarse(2) << std::endl
 	    << "coarse? " << x.coarse() << std::endl;
