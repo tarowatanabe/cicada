@@ -101,6 +101,7 @@ namespace cicada
 		  queue_new.push_back(node_bos_id);
 		
 		  // we will create edges from node_id
+		  graph.nodes[node_bos_id].edges.reserve(graph.nodes[node_id].edges.size());
 		
 		  node_type::edge_set_type::const_iterator aiter_end = graph.nodes[node_id].edges.end();
 		  for (node_type::edge_set_type::const_iterator aiter = graph.nodes[node_id].edges.begin(); aiter != aiter_end; ++ aiter) {
@@ -164,8 +165,9 @@ namespace cicada
 		  node_map_eos[node_id] = node_eos_id;
 		
 		  queue_new.push_back(node_eos_id);
-		
+		  
 		  // we will create edges from node_id
+		  graph.nodes[node_eos_id].edges.reserve(graph.nodes[node_id].edges.size());
 		
 		  node_type::edge_set_type::const_iterator aiter_end = graph.nodes[node_id].edges.end();
 		  for (node_type::edge_set_type::const_iterator aiter = graph.nodes[node_id].edges.begin(); aiter != aiter_end; ++ aiter) {
