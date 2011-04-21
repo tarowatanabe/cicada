@@ -212,8 +212,6 @@ namespace cicada
     {
       typedef std::deque<phrase_type, std::allocator<phrase_type> >  buffer_type;
 
-      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > lhs_set_type;
-
       if (graph_in.nodes[id].edges.empty()) return;
       
       // first, construct prases
@@ -262,13 +260,6 @@ namespace cicada
       
       const symbol_type& root_label = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
 
-      lhs_set_type lhss;
-      lhss.set_empty_key(symbol_type());
-      
-      node_map_type::const_iterator niter_end = node_map[id].end();
-      for (node_map_type::const_iterator niter = node_map[id].begin(); niter != niter_end; ++ niter)
-	lhss.insert(niter->first);
-      
       for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
 	const transducer_type& transducer = grammar[grammar_id];
 	
@@ -295,23 +286,19 @@ namespace cicada
 	    
 	    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
 	    
-	    if (lhss.find(rule->lhs) == lhss.end()) {
-	      // we will try all the combination of lhs in lhss...
+	    if (node_map[id].find(rule->lhs) == node_map[id].end()) {
+	      // we will try all the combination of lhs in node_map[id]
 	      
-	      lhs_set_type::const_iterator liter_end = lhss.end();
-	      for (lhs_set_type::const_iterator liter = lhss.begin(); liter != liter_end; ++ liter) {
+	      node_map_type::const_iterator liter_end = node_map[id].end();
+	      for (node_map_type::const_iterator liter = node_map[id].begin(); liter != liter_end; ++ liter) {
 		hypergraph_type::edge_type& edge = graph_out.add_edge();
-		edge.rule = rule_type::create(rule_type(*liter, rule->rhs.begin(), rule->rhs.end()));
+		edge.rule = rule_type::create(rule_type(liter->first, rule->rhs.begin(), rule->rhs.end()));
 		edge.features = riter->features;
 		edge.attributes = riter->attributes;
-
+		
 		edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
 		
-		std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
-		if (result.second)
-		  result.first->second = graph_out.add_node().id;
-		
-		graph_out.connect_edge(edge.id, result.first->second);
+		graph_out.connect_edge(edge.id, liter->second);
 	      }
 	    }
 	    
