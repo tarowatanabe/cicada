@@ -403,7 +403,7 @@ namespace cicada
 
 	    node_queue_type::const_iterator titer_end = nodes.end();
 	    for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	      const tree_transducer_type::size_type node_epsilon = transducer.next(*titer, edge_epsilon);
+	      const tree_transducer_type::id_type node_epsilon = transducer.next(*titer, edge_epsilon);
 	      if (node_epsilon != transducer.root()) {
 		frontier_type frontier(*fiter);
 		frontier.push_back(*niter);
@@ -420,7 +420,7 @@ namespace cicada
 		if (*eiter != tree_transducer_type::edge_type()) {
 		  const tree_transducer_type::edge_type& edge_id = *eiter;
 		  
-		  const tree_transducer_type::size_type node_edge = transducer.next(*titer, edge_id);
+		  const tree_transducer_type::id_type node_edge = transducer.next(*titer, edge_id);
 		  if (node_edge != transducer.root()) {
 		    const hypergraph_type::edge_type& edge = graph_in.edges[graph_in.nodes[*niter].edges[eiter - eiter_begin]];
 		    
@@ -457,7 +457,7 @@ namespace cicada
 	  
 	  node_queue_type::const_iterator titer_end = nodes.end();
 	  for (node_queue_type::const_iterator titer = nodes.begin(); titer != titer_end; ++ titer, ++ fiter, ++ siter, ++ aiter) {
-	    const tree_transducer_type::size_type node_none = transducer.next(*titer, edge_none);
+	    const tree_transducer_type::id_type node_none = transducer.next(*titer, edge_none);
 	    if (node_none == transducer.root()) continue;
 	    
 	    const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node_none);
