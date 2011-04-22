@@ -374,35 +374,6 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   
   MaximizeBayes(const grammar_type& __base) : base(__base) {}
     
-  struct Cache
-  {
-    symbol_type symbol;
-    symbol_type coarse;
-    
-    Cache() : symbol(), coarse() {}
-  };
-  typedef Cache cache_type;
-  typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
-
-  const symbol_type& coarse(const symbol_type& symbol) const
-  {
-    if (symbol.is_terminal()) return symbol;
-
-    const size_t cache_pos = hasher_type::operator()(symbol.id()) & (caches.size() - 1);
-    cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
-    if (cache.symbol != symbol) {
-      cache.symbol = symbol;
-      
-      const std::string str = symbol.non_terminal_strip();
-      std::string::size_type pos = str.rfind('@');
-      if (pos != std::string::npos)
-	cache.coarse = '[' + str.substr(0, pos) + ']';
-      else
-	cache.coarse = symbol;
-    }
-    return cache.coarse;
-  }
-
   class RuleCounts : public google::dense_hash_map<rule_ptr_type, int, ptr_hash<rule_type>, ptr_equal<rule_type> >
   {
   public:
@@ -419,7 +390,6 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   
   logprob_set_type  __logprobs;
   rule_ptr_set_type __rules;
-  cache_set_type caches;
   const grammar_type& base;
   
   void operator()(const grammar_type& counts, grammar_type& grammar) const
@@ -447,12 +417,12 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   rule_ptr_set_type::iterator riter = rules.begin();
   grammar_type::const_iterator citer_end = counts.end();
   for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter, ++ riter) {
-    const symbol_type lhs = coarse(citer->first->lhs);
+    const symbol_type lhs = citer->first->lhs.coarse();
       
     symbol_set_type rhs(citer->first->rhs);
     symbol_set_type::iterator siter_end = rhs.end();
     for (symbol_set_type::iterator siter = rhs.begin(); siter != siter_end; ++ siter)
-      *siter = coarse(*siter);
+      *siter = siter->coarse();
       
     const rule_ptr_type rule_coarse(rule_type::create(rule_type(lhs, rhs)));
       
@@ -2470,7 +2440,8 @@ void pos_learn(const label_count_set_type& labels,
   for (label_count_set_type::const_iterator liter = labels.begin(); liter != liter_end; ++ liter) {
     const symbol_type coarse = liter->first.coarse();
     
-    counts[coarse][rule_type::create(rule_type(liter->first, &coarse, (&coarse) + 1))] += liter->second;
+    if (coarse != liter->first)
+      counts[coarse][rule_type::create(rule_type(liter->first, &coarse, (&coarse) + 1))] += liter->second;
   }
 
   grammar_maximize(counts, grammar, Maximize());

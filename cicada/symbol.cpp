@@ -40,8 +40,8 @@ namespace cicada
     typedef std::vector<id_type, std::allocator<id_type> > terminal_symbol_map_type;
     typedef std::vector<id_type, std::allocator<id_type> > coarse_symbol_map_type;
 
-    typedef utils::simple_vector<id_type, std::allocator<id_type> > coarse_set_type;
-    typedef std::vector<coarse_set_type, std::allocator<coarse_set_type> > coarser_symbol_map_type;
+    typedef utils::simple_vector<id_type, std::allocator<id_type> > id_set_type;
+    typedef std::vector<id_set_type, std::allocator<id_set_type> >  coarser_symbol_map_type;
   };
   
   Symbol::mutex_type    Symbol::__mutex_index;
@@ -467,7 +467,7 @@ namespace cicada
       
 	karma::generate(iter, '[' << standard::string << '@' << karma::int_ << ']', utils::piece(what[1]), value);
       } else
-	karma::generate(iter, '[' << standard::string << '@' << karma::int_(0) << ']', piece);
+	karma::generate(iter, '[' << standard::string << '@' << karma::int_ << ']', piece, 0);
       
       maps[__non_terminal_id][pos] = Symbol(generated).non_terminal(__non_terminal_index).id();
     }
