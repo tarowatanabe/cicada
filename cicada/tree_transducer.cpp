@@ -18,7 +18,7 @@ namespace cicada
   {
     static const char* desc ="\
 file-name: indexed tree grammar or plain text tree grammar\n\
-\tmax-span=[int] maximum span\n\
+\tcky|cyk=[true|false] indexing for CKY|CYK parsing/composition\n\
 \tfeature0=[feature-name]\n\
 \tfeature1=[feature-name]\n\
 \t...\n\

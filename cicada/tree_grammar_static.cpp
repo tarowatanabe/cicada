@@ -164,7 +164,7 @@ namespace cicada
     typedef utils::array_power2<cache_rule_pair_set_type, 1024 * 16, std::allocator<cache_rule_pair_set_type> > cache_rule_pair_map_type;
     typedef utils::array_power2<cache_rule_type,          1024 *  8, std::allocator<cache_rule_type> >          cache_rule_set_type;
 
-    TreeGrammarStaticImpl(const std::string& parameter) { read(parameter); }
+    TreeGrammarStaticImpl(const std::string& parameter) : cky(false) { read(parameter); }
     TreeGrammarStaticImpl(const TreeGrammarStaticImpl& x)
       : edge_db(x.edge_db), 
 	rule_db(x.rule_db),
@@ -175,7 +175,8 @@ namespace cicada
 	attr_db(x.attr_db),
 	vocab(x.vocab),
 	feature_names(x.feature_names),
-	attribute_names(x.attribute_names) {}
+	attribute_names(x.attribute_names),
+	cky(x.cky) {}
 
     TreeGrammarStaticImpl& operator=(const TreeGrammarStaticImpl& x)
     {
@@ -191,6 +192,7 @@ namespace cicada
       vocab         = x.vocab;
       feature_names = x.feature_names;
       attribute_names = x.attribute_names;
+      cky = x.cky;
       
       return *this;
     }
@@ -207,6 +209,8 @@ namespace cicada
       vocab.clear();
       feature_names.clear();
       attribute_names.clear();
+
+      cky = false;
 
       cache_rule.clear();
       cache_source.clear();
@@ -402,6 +406,8 @@ namespace cicada
     
     feature_name_set_type   feature_names;
     attribute_name_set_type attribute_names;
+
+    bool cky;
     
     // caching..
     cache_rule_pair_map_type cache_rule;
@@ -610,6 +616,7 @@ namespace cicada
     
     rep["feature-size"] = utils::lexical_cast<std::string>(feature_size);
     rep["attribute-size"] = utils::lexical_cast<std::string>(attribute_size);
+    rep["cky"] = utils::lexical_cast<std::string>(cky);
   }
   
   
@@ -629,12 +636,16 @@ namespace cicada
     target_db.open(rep.path("target"));
     
     vocab.open(rep.path("vocab"));
+
+    repository_type::const_iterator citer = rep.find("cky");
+    if (citer != rep.end())
+      cky = utils::lexical_cast<bool>(citer->second);
     
     repository_type::const_iterator iter = rep.find("feature-size");
     if (iter == rep.end())
       throw std::runtime_error("no feature size?");
 
-    const size_type feature_size = utils::lexical_cast<size_type>(iter->second.c_str());
+    const size_type feature_size = utils::lexical_cast<size_type>(iter->second);
     
     feature_names.reserve(feature_size);
     feature_names.resize(feature_size);
@@ -824,6 +835,25 @@ namespace cicada
     }
   }
   
+  template <typename Buffer>
+  struct StaticFrontierIterator
+  {
+    typedef Buffer buffer_type;
+    StaticFrontierIterator(buffer_type& __buffer) : buffer(__buffer) {}
+    
+    template <typename Value>
+    StaticFrontierIterator& operator=(const Value& value)
+    {
+      buffer.push_back(value.non_terminal().id());
+      return *this;
+    }
+    
+    StaticFrontierIterator& operator*() { return *this; }
+    StaticFrontierIterator& operator++() { return *this; }
+    
+    buffer_type& buffer;
+  };
+
   
   // how do we store single-tree...? use raw string? perform compression? (quicklz etc. ... currently NO...)
   
@@ -835,6 +865,13 @@ namespace cicada
     
     const parameter_type param(parameter);
     const path_type path = param.name();
+    
+    {
+      parameter_type::const_iterator citer = param.find("cky");
+      if (citer != param.end())
+	cky = utils::lexical_cast<bool>(citer->second);
+    }
+
     
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > symbol_map_type;
     typedef succinctdb::succinct_hash<byte_type, std::allocator<byte_type> > rule_map_type;
@@ -939,10 +976,14 @@ namespace cicada
 						      hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
 	  
 	  encode_tree_options(rule_options, buffer_options, id_source);
-	  
-	  source_prev.hyperpath(hyperpath);
-	  
-	  encode_path(hyperpath, buffer_index, edge_map);
+
+	  if (cky) {
+	    buffer_index.clear();
+	    source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
+	  } else {
+	    source_prev.hyperpath(hyperpath);
+	    encode_path(hyperpath, buffer_index, edge_map);
+	  }
 	  
 	  rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
 	}
@@ -1004,10 +1045,14 @@ namespace cicada
 						  hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
       
       encode_tree_options(rule_options, buffer_options, id_source);
-            
-      source_prev.hyperpath(hyperpath);
-      
-      encode_path(hyperpath, buffer_index, edge_map);
+
+      if (cky) {
+	buffer_index.clear();
+	source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
+      } else {
+	source_prev.hyperpath(hyperpath);
+	encode_path(hyperpath, buffer_index, edge_map);
+      }
       
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }

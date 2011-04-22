@@ -18,6 +18,7 @@ Basically, we have four distinct structures:
 
 Translation/parsing can be carried out by:
    - A lattice (or sentence) is composed with a grammar, generating a hypergraph [2,24].
+   - A lattice (or sentence) is composed with a tree-grammar, generating a hypergraph [27].
    - A lattice (or sentence) is composed with a phrasal grammar, generating a phrasal hypergraph [4].
    - A hypergraph/forest (or parse-tree) is composed with a phrasal grammar, generating another hypergraph [3].
    - A hypergraph/forest (or parse-tree) is composed with a tree grammar, generating another hypergraph [4]. (experimental)
@@ -61,7 +62,7 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
    - A conventional phrase extract algorithm in Moses
    - A conventional hierarchical phrase extraction algorithm in Hiero
       + syntax augmented rule extraction is also supported [15]
-   - Tree-to-string/strint-to-tree extractin from forest [16]
+   - Tree-to-string/strint-to-tree extractin from forest [16,27]
    - Tree-to-tree rule extraction from forest [17] (TODO!)
    
    - After count extraction, you can perform map/reduce to compute model scores [19]
@@ -411,4 +412,17 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {404--411},
   url       = {http://www.aclweb.org/anthology/N/N07/N07-1051}
+}
+
+[27]
+@inproceedings{galley-EtAl:2004:HLTNAACL,
+  author    = {Galley, Michel  and  Hopkins, Mark  and  Knight, Kevin  and  Marcu, Daniel},
+  title     = {What's in a translation rule?},
+  booktitle = {HLT-NAACL 2004: Main Proceedings },
+  editor = {Susan Dumais, Daniel Marcu and Salim Roukos},
+  year      = 2004,
+  month     = {May 2 - May 7},
+  address   = {Boston, Massachusetts, USA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {273--280}
 }

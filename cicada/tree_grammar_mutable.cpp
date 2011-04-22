@@ -88,10 +88,10 @@ namespace cicada
     typedef std::vector<attribute_type, std::allocator<attribute_type> > attribute_name_set_type;
     
     TreeGrammarMutableImpl(const std::string& parameter)
-      : trie(edge_id_type(-1)), edges(symbol_type()) { read(parameter); }
+      : trie(edge_id_type(-1)), edges(symbol_type()), cky(false) { read(parameter); }
 
     TreeGrammarMutableImpl()
-      : trie(edge_id_type(-1)), edges(symbol_type()) {  }
+      : trie(edge_id_type(-1)), edges(symbol_type()), cky(false) {  }
     
     edge_id_type edge(const symbol_type* first, const symbol_type* last) const
     {
@@ -116,6 +116,8 @@ namespace cicada
 
     feature_name_set_type   feature_names_default;
     attribute_name_set_type attribute_names_default;
+
+    bool cky;
   };
   
   //
@@ -169,7 +171,6 @@ namespace cicada
   void TreeGrammarMutableImpl::read(const std::string& parameter)
   {
     typedef std::vector<feature_type, std::allocator<feature_type> > feature_name_set_type;
-    
 
     typedef cicada::Parameter parameter_type;
 	  
@@ -183,7 +184,6 @@ namespace cicada
     attribute_name_set_type attribute_names;
     parameter_type::iterator piter_end = param.end();
     for (parameter_type::iterator piter = param.begin(); piter != piter_end; ++ piter) {
-      
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       namespace phoenix = boost::phoenix;
@@ -219,7 +219,10 @@ namespace cicada
 	}
       }
       
-      throw std::runtime_error("unsupported key: " + piter->first);
+      if (utils::ipiece(piter->first) == "cky" || utils::ipiece(piter->first) == "cyk")
+	cky = true;
+      else
+	throw std::runtime_error("unsupported key: " + piter->first);
     }
 
     typedef tree_rule_scores_parser_mutable<std::string::const_iterator> scores_parser_type;
@@ -442,22 +445,49 @@ namespace cicada
     return id;
   }
 
+  template <typename Trie>
+  struct MutableFrontierIterator
+  {
+    typedef Trie trie_type;
+    typedef typename trie_type::id_type id_type;
+    
+    MutableFrontierIterator(trie_type& __trie) : trie(__trie), id(__trie.root()) {}
+    
+    template <typename Value>
+    MutableFrontierIterator& operator=(const Value& value)
+    {
+      id = trie.insert(id, value.non_terminal().id());
+      return *this;
+    }
+    
+    MutableFrontierIterator& operator*() { return *this; }
+    MutableFrontierIterator& operator++() { return *this; }
+    
+    trie_type& trie;
+    id_type id;
+  };
+
   void TreeGrammarMutableImpl::insert(const rule_pair_type& rule_pair)
   {
-    typedef std::vector<symbol_type, std::allocator<symbol_type> > node_type;
-    typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
-    
-    hyperpath_type hyperpath;
-
-
-    rule_pair.source->hyperpath(hyperpath);
-
-    //std::cerr << "source: " << *(rule_pair.source) << std::endl;
-    
-    const id_type id = encode_path(hyperpath, edges, trie);
-    
-    trie[id].push_back(rule_pair);
-    
+    if (cky) {
+      MutableFrontierIterator<trie_type> iter(trie);
+      rule_pair.source->frontier(iter);
+      
+      trie[iter.id].push_back(rule_pair);
+    } else {
+      typedef std::vector<symbol_type, std::allocator<symbol_type> > node_type;
+      typedef std::vector<node_type, std::allocator<node_type> > hyperpath_type;
+      
+      hyperpath_type hyperpath;
+      
+      rule_pair.source->hyperpath(hyperpath);
+      
+      //std::cerr << "source: " << *(rule_pair.source) << std::endl;
+      
+      const id_type id = encode_path(hyperpath, edges, trie);
+      
+      trie[id].push_back(rule_pair);
+    }
   }
 
   TreeGrammarMutable::TreeGrammarMutable()

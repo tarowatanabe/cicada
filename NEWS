@@ -1,3 +1,8 @@
+2011-5-x
+Added a sample grammar file to support zone/wall in moses.
+Added compose-tree-cky and parse-tree-cky for string-to-tree translation!
+Support cky-style indexing in tree-transducer for string-to-tree translation.
+
 2011-4-22
 Added push-bos-eos which annotates forests with <s> </s>. Use with no-bos-eos options for ngram/variational features.
 Added prune-edge which prunes forests wrt # of edges for each node.
