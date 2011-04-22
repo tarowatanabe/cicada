@@ -1,0 +1,2 @@
+[x] ||| <zone> [x,1] </zone> ||| [x,1] ||| zone-penalty=-1
+[x] ||| [x,1] <wall/> [x,2] ||| [x,1] [x,2] ||| wall-penalty=-1
