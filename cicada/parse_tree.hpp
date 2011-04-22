@@ -275,8 +275,8 @@ namespace cicada
       scores_min.clear();
       scores_max.reserve(graph_in.nodes.size());
       scores_min.reserve(graph_in.nodes.size());
-      scores_max.resize(graph_in.nodes.size());
-      scores_min.resize(graph_in.nodes.size());
+      scores_max.resize(graph_in.nodes.size(), semiring::traits<score_type>::min());
+      scores_min.resize(graph_in.nodes.size(), semiring::traits<score_type>::max());
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
@@ -322,7 +322,7 @@ namespace cicada
 	
 	// update scores...
 	scores_max[id] = std::max(scores_max[id], score);
-	scores_min[id] = (scores_min[id] == score_type() ? score : std::min(scores_min[id], score));
+	scores_min[id] = std::min(scores_min[id], score);
 	
 	apply_rule(rule.rule,
 		   id,

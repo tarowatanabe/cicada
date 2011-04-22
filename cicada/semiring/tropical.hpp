@@ -158,6 +158,8 @@ namespace cicada
       static inline Tropical<Tp> exp(const Tp& x) { return Tropical<Tp>::exp(x); }
       static inline Tropical<Tp> zero() { return Tropical<Tp>::zero();  }
       static inline Tropical<Tp> one()  { return Tropical<Tp>::one(); }
+      static inline Tropical<Tp> max()  { return Tropical<Tp>::max(); }
+      static inline Tropical<Tp> min()  { return Tropical<Tp>::min(); }
     };
 
   };

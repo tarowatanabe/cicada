@@ -226,6 +226,8 @@ namespace cicada
       static inline Log<Tp> exp(const Tp& x) { return Log<Tp>::exp(x, false); }
       static inline Log<Tp> zero() { return Log<Tp>::zero();  }
       static inline Log<Tp> one()  { return Log<Tp>::one(); }
+      static inline Log<Tp> max()  { return Log<Tp>::max(); }
+      static inline Log<Tp> min()  { return Log<Tp>::min(); }
     };
   };
 };

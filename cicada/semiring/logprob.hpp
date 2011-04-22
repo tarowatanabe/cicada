@@ -194,6 +194,8 @@ namespace cicada
       static inline Logprob<Tp> exp(const Tp& x) { return Logprob<Tp>::exp(x); }
       static inline Logprob<Tp> zero() { return Logprob<Tp>::zero();  }
       static inline Logprob<Tp> one()  { return Logprob<Tp>::one(); }
+      static inline Logprob<Tp> max()  { return Logprob<Tp>::max(); }
+      static inline Logprob<Tp> min()  { return Logprob<Tp>::min(); }
     };
 
   };
