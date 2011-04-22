@@ -167,79 +167,55 @@ namespace cicada
     typedef Semiring score_type;
     
     typedef Function function_type;
-
+    
     struct RuleCandidate
     {
       score_type score;
       
-      rule_ptr_type      rule;
+      tree_rule_ptr_type rule;
       
       feature_set_type   features;
       attribute_set_type attributes;
-      
+
       RuleCandidate() : score(), rule(), features(), attributes() {}
-      RuleCandidate(const score_type& __score, const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
+      RuleCandidate(const score_type& __score, const tree_rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
 	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
     };
 
-    struct TreeRuleCandidate
-    {
-      score_type score;
-      
-      tree_rule_ptr_type      rule;
-      
-      feature_set_type   features;
-      attribute_set_type attributes;
-
-      TreeRuleCandidate() : score(), rule(), features(), attributes() {}
-      TreeRuleCandidate(const score_type& __score, const tree_rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
-	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
-    };
-
-    typedef RuleCandidate     rule_candidate_type;
-    typedef TreeRuleCandidate tree_rule_candidate_type;
+    typedef RuleCandidate rule_candidate_type;
     
     typedef utils::chunk_vector<rule_candidate_type, 4096 / sizeof(rule_candidate_type), std::allocator<rule_candidate_type> > rule_candidate_set_type;
-    typedef utils::chunk_vector<tree_rule_candidate_type, 4096 / sizeof(tree_rule_candidate_type), std::allocator<tree_rule_candidate_type> > tree_rule_candidate_set_type;
-    
     typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
-    typedef std::vector<const tree_rule_candidate_type*, std::allocator<const tree_rule_candidate_type*> > tree_rule_candidate_ptr_set_type;
-    
     
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
 				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
-    typedef std::tr1::unordered_map<tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
-				    std::allocator<std::pair<const tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type> > > tree_rule_candidate_map_type;
 #else
     typedef sgi::hash_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
 			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
-    typedef sgi::hash_map<tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
-			  std::allocator<std::pair<const tree_transducer_type::id_type, tree_rule_candidate_ptr_set_type> > > tree_rule_candidate_map_type;
 #endif
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
-    typedef std::vector<tree_rule_candidate_map_type, std::allocator<tree_rule_candidate_map_type> > tree_rule_candidate_table_type;
-    
-    
+
     struct Candidate
     {
       typename rule_candidate_ptr_set_type::const_iterator first;
       typename rule_candidate_ptr_set_type::const_iterator last;
       
-      typename tree_rule_candidate_ptr_set_type::const_iterator tree_first;
-      typename tree_rule_candidate_ptr_set_type::const_iterator tree_last;
-      
       score_type    score;
-      frontier_type frontiers;
-
+      
+      frontier_type frontier;
+      
+      feature_set_type   features;
+      attribute_set_type attributes;
+      
       score_type candidate_score() const
       {
-	return (first != last ? first->score : tree_first->score) * score;
+	return first->score * score;
       }
       
-      Candidate() : first(), last(), tree_first(), tree_last(), score(), frontiers() {}
+      Candidate() : first(), last(), score(), frontier() {}
     };
-
+    
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 1024 * 8 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
     
@@ -286,8 +262,11 @@ namespace cicada
 	candidates.clear();
 	heap.clear();
 	
-	match_tree(id, graph_in, graph_out);
+	match_tree(id, graph_in);
+
+	enumerate_tree(id, graph_in, graph_out);
 	
+	// we will do exact phrase-matching...
 	if (! grammar.empty())
 	  match_phrase(id, graph_in, graph_out);
       }
@@ -308,14 +287,38 @@ namespace cicada
       
       node_map.clear();
     }
-    
 
+    void enumerate_tree(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
+    {
+      for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; ++ num_pop) {
+	const candidate_type* item = heap.top();
+	heap.pop();
+	
+	const rule_candidate_type& rule = *(*(item->first));
+	const score_type score = item->score * rule.score;
+	
+	// update scores...
+	scores_max[id] = std::max(scores_max[id], score);
+	scores_min[id] = (scores_min[id] == score_type() ? score : std::min(scores_min[id], score));
+	
+	apply_rule(rule.rule,
+		   id,
+		   item->frontier,
+		   rule.features + item->features,
+		   rule.attributes + item->attributes,
+		   graph_in, graph_out);
+	
+	// next queue!
+	++ const_cast<candidate_type*>(item)->first;
+	if (item->first != item->last)
+	  heap.push(item);
+      }
+    }
+    
     void match_phrase(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
       typedef std::deque<phrase_type, std::allocator<phrase_type> >  buffer_type;
-
-      typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > lhs_set_type;
-
+      
       if (graph_in.nodes[id].edges.empty()) return;
       
       // first, construct prases
@@ -364,13 +367,6 @@ namespace cicada
       
       const symbol_type& root_label = graph_in.edges[graph_in.nodes[id].edges.front()].rule->lhs;
 
-      lhs_set_type lhss;
-      lhss.set_empty_key(symbol_type());
-      
-      node_map_type::const_iterator niter_end = node_map[id].end();
-      for (node_map_type::const_iterator niter = node_map[id].begin(); niter != niter_end; ++ niter)
-	lhss.insert(niter->first);
-      
       for (size_t grammar_id = 0; grammar_id != grammar.size(); ++ grammar_id) {
 	const transducer_type& transducer = grammar[grammar_id];
 	
@@ -395,25 +391,28 @@ namespace cicada
 	  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	    
+	    const score_type score = function(rtier->features);
+	    
+	    // we do not include bad phrases
+	    if (score < score_min[id]) continue;
+	    
+	    score_max[id] = std::max(score_max[id], score);
+	    
 	    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
 	    
-	    if (lhss.find(rule->lhs) == lhss.end()) {
-	      // we will try all the combination of lhs in lhss...
+	    if (node_map[id].find(rule->lhs) == node_map[id].end()) {
+	      // we will try all the combination of lhs in node_map[id]
 	      
-	      lhs_set_type::const_iterator liter_end = lhss.end();
-	      for (lhs_set_type::const_iterator liter = lhss.begin(); liter != liter_end; ++ liter) {
+	      node_map_type::const_iterator liter_end = node_map[id].end();
+	      for (node_map_type::const_iterator liter = node_map[id].begin(); liter != liter_end; ++ liter) {
 		hypergraph_type::edge_type& edge = graph_out.add_edge();
-		edge.rule = rule_type::create(rule_type(*liter, rule->rhs.begin(), rule->rhs.end()));
+		edge.rule = rule_type::create(rule_type(liter->first, rule->rhs.begin(), rule->rhs.end()));
 		edge.features = riter->features;
 		edge.attributes = riter->attributes;
-
+		
 		edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
 		
-		std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
-		if (result.second)
-		  result.first->second = graph_out.add_node().id;
-		
-		graph_out.connect_edge(edge.id, result.first->second);
+		graph_out.connect_edge(edge.id, liter->second);
 	      }
 	    }
 	    
@@ -562,23 +561,30 @@ namespace cicada
 	    const tree_transducer_type::id_type node_none = transducer.next(*titer, edge_none);
 	    if (node_none == transducer.root()) continue;
 	    
-	    const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node_none);
-	    
-	    if (! rules.empty()) {
-	      // try match with rules with *fiter == frontier-nodes and generate graph_out!
-	      
-	      tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	      for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(yield_source ? *riter->source : *riter->target,
-			   id,
-			   *fiter,
-			   riter->features + *siter,
-			   riter->attributes + *aiter,
-			   graph_in,
-			   graph_out);
-	    }
-	    
 	    queue.push_back(state_type(*fiter, node_none));
+	    
+	    const rule_candidate_ptr_set_type& rules = cands(grammar_id, node_none);
+	    
+	    if (rules.empty()) continue;
+	    
+	    // compute frontier scores
+	    score_type score = semiring::traits<score_type>::one();
+	    frontier_type::const_iterator iter_end = fiter->end();
+	    for (frontier_type::const_iterator iter = fiter->begin(); iter != iter_end; ++ iter)
+	      score *= scores_max[*iter];
+	    
+	    candidates.push_back(candidate_type());
+	    candidate_type& cand = candidates.back();
+	    cand.first  = rules.begin();
+	    cand.second = rules.end();
+	    
+	    cand.score = score;
+	    
+	    cand.frontier   = *fiter;
+	    cand.features   = *siter;
+	    cand.attributes = *aiter;
+	    
+	    heap.push(&cand);
 	  }
 	  
 	  queue.pop_front();

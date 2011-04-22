@@ -447,23 +447,22 @@ namespace cicada
 	    const tree_transducer_type::id_type node_none = transducer.next(*titer, edge_none);
 	    if (node_none == transducer.root()) continue;
 	    
+	    queue.push_back(state_type(*fiter, node_none));
+	    
 	    const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node_none);
 	    
-	    if (! rules.empty()) {
-	      // try match with rules with *fiter == frontier-nodes and generate graph_out!
-	      
-	      tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-	      for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
-		apply_rule(yield_source ? *riter->source : *riter->target,
-			   id,
-			   *fiter,
-			   riter->features + *siter,
-			   riter->attributes + *aiter,
-			   graph_in,
-			   graph_out);
-	    }
+	    if (rules.empty()) continue;
 	    
-	    queue.push_back(state_type(*fiter, node_none));
+	    // try match with rules with *fiter == frontier-nodes and generate graph_out!
+	    tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+	    for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	      apply_rule(yield_source ? *riter->source : *riter->target,
+			 id,
+			 *fiter,
+			 riter->features + *siter,
+			 riter->attributes + *aiter,
+			 graph_in,
+			 graph_out);
 	  }
 	  
 	  queue.pop_front();
