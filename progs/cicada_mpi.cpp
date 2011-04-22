@@ -153,8 +153,6 @@ int main(int argc, char ** argv)
     else
       cicada_process(operations);
     
-    operations.clear();
-    
     operation_set_type::statistics_type statistics;
     merge_statistics(operations, statistics);
 
@@ -391,10 +389,11 @@ struct TaskStdout
       
       queue_os.push(utils::lexical_cast<std::string>(operations.get_data().id) + ' ' + operations.get_output_data().buffer);
     }
-
+    
+    operations.clear();
+    
     queue_os.push(std::string());
   }
-  
   
   queue_type&   queue_is;
   queue_type&   queue_os;
@@ -655,6 +654,8 @@ struct Task
       
       operations(line);
     }
+    
+    operations.clear();
   }
   
   queue_type&   queue;
