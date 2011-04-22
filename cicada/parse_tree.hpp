@@ -293,7 +293,7 @@ namespace cicada
       }
       
       // goal node... the goal must be mapped goal...
-      node_map_type::const_iterator niter = node_map[graph_in.goal].find(goal.non_terminal());
+      typename node_map_type::const_iterator niter = node_map[graph_in.goal].find(goal.non_terminal());
       if (niter != node_map[graph_in.goal].end()) {
 	// goal node...
 	graph_out.goal = graph_out.add_node().id;
@@ -414,20 +414,20 @@ namespace cicada
 	  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 	  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 	    
-	    const score_type score = function(rtier->features);
+	    const score_type score = function(riter->features);
 	    
 	    // we do not include bad phrases
-	    if (score < score_min[id]) continue;
+	    if (score < scores_min[id]) continue;
 	    
-	    score_max[id] = std::max(score_max[id], score);
+	    scores_max[id] = std::max(scores_max[id], score);
 	    
 	    const rule_ptr_type rule = (yield_source ? riter->source : riter->target);
 	    
 	    if (node_map[id].find(rule->lhs) == node_map[id].end()) {
 	      // we will try all the combination of lhs in node_map[id]
 	      
-	      node_map_type::const_iterator liter_end = node_map[id].end();
-	      for (node_map_type::const_iterator liter = node_map[id].begin(); liter != liter_end; ++ liter) {
+	      typename node_map_type::const_iterator liter_end = node_map[id].end();
+	      for (typename node_map_type::const_iterator liter = node_map[id].begin(); liter != liter_end; ++ liter) {
 		hypergraph_type::edge_type& edge = graph_out.add_edge();
 		edge.rule = rule_type::create(rule_type(liter->first, rule->rhs.begin(), rule->rhs.end()));
 		edge.features = riter->features;
@@ -446,7 +446,7 @@ namespace cicada
 	    
 	    edge.attributes[attr_source_root] = static_cast<const std::string&>(root_label);
 	    
-	    std::pair<node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
+	    std::pair<typename node_map_type::iterator, bool> result = node_map[id].insert(std::make_pair(edge.rule->lhs, 0));
 	    if (result.second)
 	      result.first->second = graph_out.add_node().id;
 	    
@@ -635,7 +635,7 @@ namespace cicada
 
       const symbol_type& root_label = graph_in.edges[graph_in.nodes[root_in].edges.front()].rule->lhs;
       
-      std::pair<node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
+      std::pair<typename node_map_type::iterator, bool> result = node_map[root_in].insert(std::make_pair(rule.label.non_terminal(), 0));
       if (result.second)
 	result.first->second = graph_out.add_node().id;
       
@@ -677,7 +677,7 @@ namespace cicada
 	    
 	    const hypergraph_type::id_type node = frontiers[non_terminal_index];
 	    
-	    std::pair<node_map_type::iterator, bool> result = node_map[node].insert(std::make_pair(aiter->label.non_terminal(), 0));
+	    std::pair<typename node_map_type::iterator, bool> result = node_map[node].insert(std::make_pair(aiter->label.non_terminal(), 0));
 	    if (result.second)
 	      result.first->second = graph_out.add_node().id;
 	    
@@ -720,9 +720,9 @@ namespace cicada
     
     const rule_candidate_ptr_set_type& cands(const int grammar_id, const tree_transducer_type::id_type& node)
     {
-      typename rule_candidate_map_type::iterator riter = rule_tables[table].find(node);
-      if (riter == rule_tables[table].end()) {
-	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_ptr_set_type())).first;
+      typename rule_candidate_map_type::iterator riter = rule_tables[grammar_id].find(node);
+      if (riter == rule_tables[grammar_id].end()) {
+	riter = rule_tables[grammar_id].insert(std::make_pair(node, rule_candidate_ptr_set_type())).first;
 	
 	const tree_transducer_type::rule_pair_set_type& rules = tree_grammar[grammar_id].rules(node);
 
@@ -776,7 +776,7 @@ namespace cicada
   inline
   void parse_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const Function& function, const HyperGraph& graph_in, HyperGraph& graph_out, const int size, const bool yield_source=false)
   {
-    ParseTree __parser(goal, tree_grammar, grammar, function, size, yield_source);
+    ParseTree<typename Function::value_type, Function> __parser(goal, tree_grammar, grammar, function, size, yield_source);
     __parser(graph_in, graph_out);
   }
 };
