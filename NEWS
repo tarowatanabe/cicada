@@ -1,6 +1,7 @@
-2011-4-xx
+2011-4-22
 Added push-bos-eos which annotates forests with <s> </s>. Use with no-bos-eos options for ngram/variational features.
 Added prune-edge which prunes forests wrt # of edges for each node.
+Added parse-tree which is an approximated beam variant of compose-tree
 Randomize hill-climbing for oracle computation.
 Incompatible change: word-penalty feature do not count <s> </s> as a "word"
 Bugfix: when assigned weights or weights-one, do not perform "assign"
