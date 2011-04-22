@@ -235,6 +235,12 @@ namespace cicada
     {
       return rule_db.find(&id, 1, node);
     }
+
+    size_type find(const symbol_type& symbol, size_type node) const
+    {
+      const word_type::id_type id = vocab[symbol];
+      return rule_db.find(&id, 1, node);
+    }
     
     bool is_valid_edge(size_type node) const { return edge_db.is_valid(node); }
     bool has_children_edge(size_type node) const { return edge_db.has_children(node); }
@@ -1199,6 +1205,14 @@ namespace cicada
     
     return (pimpl->is_valid(pos) ? id_type(pos) : id_type(0));
   }
+
+  TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const symbol_type& symbol) const
+  {
+    const impl_type::size_type pos = pimpl->find(symbol.non_terminal(), node);
+    
+    return (pimpl->is_valid(pos) ? id_type(pos) : id_type(0));
+  }
+  
   
   bool TreeGrammarStatic::has_next(const id_type& node) const
   {

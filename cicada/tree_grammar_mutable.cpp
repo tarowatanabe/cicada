@@ -512,6 +512,12 @@ namespace cicada
   {
     return pimpl->root();
   }
+
+  TreeGrammarMutable::id_type TreeGrammarMutable::next(const id_type& node, const symbol_type& symbol) const
+  {
+    return pimpl->next(node, symbol.non_terminal().id());
+  }
+  
   
   TreeGrammarMutable::id_type TreeGrammarMutable::next(const id_type& node, const edge_type& edge) const
   {
