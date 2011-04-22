@@ -5,6 +5,8 @@ Do we allow state-less features applied during composition???
 
 	State-less features are sometimes related to composition algorithm,
 	such as shift-reduce etc.
+	
+	We have "parse" variant of "compose". Do we allow stateless features during "parsing" ????
 
 Better MIRA training
     Optimized online training by combining MERT procedure to select better update ratio.... (does it work?)
@@ -15,7 +17,8 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     Simply convert source side into a flat structure and parse via CKY
     	   + additional checking for target-side!
     Allow special encoding in tree-grammar...
-    
+    Use ComposeTreeCKY and ParseTreeCKY with an option to support grammar encoding
+    using "frontiers" as our key for indexing in tree-transducer.
 
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
@@ -56,9 +59,6 @@ Added binarization to cicada-extract, or use cicada tool for binarization?
 Cutting-plane learning under cicada_maxlike{,_mpi}...
 	We need to merge feature vector...
 
-Flexible MERT:
-  Allow arbitrary yield function to envelope semiring
-
 Implement scalable training by L1 regularized feature selection:
   1. Collect features.. it is the hardest part...
      Decode-and-extract features
@@ -71,10 +71,10 @@ Implement scalable training by L1 regularized feature selection:
      or, 
      features requing complex hidden variables...?
 
-A unified framework to output verbose informaiton... HOW?
-
 POS annotated sentence input:
   How to convert each POS into latent annotated POS?
+  Solution 1. Implemenet GrammarUnknownPOS which will give annotated POS when already in the
+  model. Otherwise use POS as a "hint"?
 
 Add more tests
 
@@ -82,4 +82,5 @@ Add mert,decode,mbr,parse script?
     Personally, I don't like a single script to handle many things, since 
     that is usually not instructive....
 
-A unified framework to collect statistics... HOW?
+A unified framework to collect statistics: Do we need stats from features?
+    We have a support to collect stats from operations, but not from individual features..
