@@ -64,7 +64,7 @@ namespace cicada
   public:
     void swap(Feature& x) { std::swap(__id, x.__id); }
     
-    const id_type   id() const { return __id; }
+    id_type id() const { return __id; }
     operator const feature_type&() const { return feature(); }
     operator utils::piece() const { return feature(); }
     

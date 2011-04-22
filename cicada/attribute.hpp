@@ -64,7 +64,7 @@ namespace cicada
   public:
     void swap(Attribute& x) { std::swap(__id, x.__id); }
     
-    const id_type   id() const { return __id; }
+    id_type id() const { return __id; }
     operator const attribute_type&() const { return attribute(); }
     operator utils::piece() const { return attribute(); }
     

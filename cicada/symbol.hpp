@@ -70,7 +70,7 @@ namespace cicada
   public:
     void swap(Symbol& x) { std::swap(__id, x.__id); }
     
-    const id_type   id() const { return __id; }
+    id_type id() const { return __id; }
     operator const symbol_type&() const { return symbol(); }
     operator utils::piece() const { return symbol(); }
     
@@ -98,6 +98,8 @@ namespace cicada
     
     size_type size() const { return symbol().size(); }
     bool empty() const { return symbol().empty(); }
+    
+    id_type non_terminal_id() const;
     
     bool is_terminal() const { return ! is_non_terminal(); }
     bool is_non_terminal() const;

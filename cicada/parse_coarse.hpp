@@ -84,28 +84,8 @@ namespace cicada
       
       symbol_type operator()(const symbol_type& symbol) const
       {
-	if (! symbol.is_non_terminal()) return symbol;
-	
-	const size_t cache_pos = hash_value(symbol) & (caches.size() - 1);
-	cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
-	if (cache.symbol != symbol) {
-	  cache.symbol = symbol;
-	  cache.coarse = symbol.coarse(bits);
-	}
-	return cache.coarse;
+	return symbol.coarse(bits);
       }
-      
-      struct Cache
-      {
-	symbol_type symbol;
-	symbol_type coarse;
-	
-	Cache() : symbol(), coarse() {}
-      };
-      typedef Cache cache_type;
-      typedef utils::array_power2<cache_type, 1024 * 4, std::allocator<cache_type> > cache_set_type;
-      
-      cache_set_type caches;
       int bits;
     };
     
