@@ -210,7 +210,7 @@ namespace cicada
       
       score_type candidate_score() const
       {
-	return first->score * score;
+	return (*first)->score * score;
       }
       
       Candidate() : first(), last(), score(), frontier(), features(), attributes() {}
@@ -324,12 +324,13 @@ namespace cicada
 	scores_max[id] = std::max(scores_max[id], score);
 	scores_min[id] = std::min(scores_min[id], score);
 	
-	apply_rule(rule.rule,
+	apply_rule(*rule.rule,
 		   id,
 		   item->frontier,
 		   rule.features + item->features,
 		   rule.attributes + item->attributes,
-		   graph_in, graph_out);
+		   graph_in,
+		   graph_out);
 	
 	// next queue!
 	++ const_cast<candidate_type*>(item)->first;
@@ -456,7 +457,7 @@ namespace cicada
       }
     }
     
-    void match_tree(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
+    void match_tree(const int id, const hypergraph_type& graph_in)
     {
       if (graph_in.nodes[id].edges.empty()) return;
       
@@ -598,8 +599,8 @@ namespace cicada
 	    
 	    candidates.push_back(candidate_type());
 	    candidate_type& cand = candidates.back();
-	    cand.first  = rules.begin();
-	    cand.second = rules.end();
+	    cand.first = rules.begin();
+	    cand.last  = rules.end();
 	    
 	    cand.score = score;
 	    
