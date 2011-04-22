@@ -213,7 +213,7 @@ namespace cicada
 	return first->score * score;
       }
       
-      Candidate() : first(), last(), score(), frontier() {}
+      Candidate() : first(), last(), score(), frontier(), features(), attributes() {}
     };
     
     typedef Candidate candidate_type;
@@ -230,12 +230,21 @@ namespace cicada
     
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
+
+    typedef std::vector<score_type,  std::allocator<score_type> >  score_set_type;
     
     
-    ParseTree(const symbol_type& __goal, const tree_grammar_type& __tree_grammar, const grammar_type& __grammar, const bool __yield_source)
+    ParseTree(const symbol_type& __goal,
+	      const tree_grammar_type& __tree_grammar,
+	      const grammar_type& __grammar,
+	      const function_type& __function,
+	      const int __beam_size,
+	      const bool __yield_source)
       : goal(__goal),
 	tree_grammar(__tree_grammar), 
 	grammar(__grammar),
+	function(__function),
+	beam_size(__beam_size),
 	yield_source(__yield_source),
 	attr_source_root("source-root")
     {  
@@ -256,6 +265,18 @@ namespace cicada
       phrase_map.clear();
       phrase_map.reserve(graph_in.nodes.size());
       phrase_map.resize(graph_in.nodes.size());
+      
+      rule_candidates.clear();
+      rule_tables.clear();
+      rule_tables.reserve(tree_grammar.size());
+      rule_tables.resize(tree_grammar.size());
+      
+      scores_max.clear();
+      scores_min.clear();
+      scores_max.reserve(graph_in.nodes.size());
+      scores_min.reserve(graph_in.nodes.size());
+      scores_max.resize(graph_in.nodes.size());
+      scores_min.resize(graph_in.nodes.size());
       
       // bottom-up topological order
       for (size_t id = 0; id != graph_in.nodes.size(); ++ id) {
@@ -287,6 +308,8 @@ namespace cicada
       
       node_map.clear();
     }
+
+  private:
 
     void enumerate_tree(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
     {
@@ -686,25 +709,74 @@ namespace cicada
       return edge_id;
     }
 
+    template <typename Tp>
+    struct greater_ptr_score
+    {
+      bool operator()(const Tp* x, const Tp* y) const
+      {
+	return x->score > y->score;
+      }
+    };
+    
+    const rule_candidate_ptr_set_type& cands(const int grammar_id, const tree_transducer_type::id_type& node)
+    {
+      typename rule_candidate_map_type::iterator riter = rule_tables[table].find(node);
+      if (riter == rule_tables[table].end()) {
+	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_ptr_set_type())).first;
+	
+	const tree_transducer_type::rule_pair_set_type& rules = tree_grammar[grammar_id].rules(node);
+
+	riter->second.reserve(rules.size());
+	
+	tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
+	  rule_candidates.push_back(rule_candidate_type(function(iter->features),
+							yield_source ? iter->source : iter->target,
+							iter->features,
+							iter->attributes));
+	  riter->second.push_back(&(rule_candidates.back()));
+	}
+	
+	std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
+      }
+      
+      return riter->second;
+    }
+    
+  private:
+
     node_map_set_type node_map;
     
     phrase_map_type phrase_map;
+    
+    candidate_set_type    candidates;
+    candidate_heap_type   heap;
+    
+    rule_candidate_set_type   rule_candidates;
+    rule_candidate_table_type rule_tables;
+    
+    score_set_type        scores_max;
+    score_set_type        scores_min;
 
     rule_ptr_type goal_rule;
     
     symbol_type goal;
     const tree_grammar_type& tree_grammar;
     const grammar_type& grammar;
+    const function_type& function;
+    
+    const int beam_size;
     const bool yield_source;
     
     attribute_type attr_source_root;
   };
   
-  
+  template <typename Function>
   inline
-  void parse_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const HyperGraph& graph_in, HyperGraph& graph_out, const bool yield_source=false)
+  void parse_tree(const Symbol& goal, const TreeGrammar& tree_grammar, const Grammar& grammar, const Function& function, const HyperGraph& graph_in, HyperGraph& graph_out, const int size, const bool yield_source=false)
   {
-    ParseTree __parser(goal, tree_grammar, grammar, yield_source);
+    ParseTree __parser(goal, tree_grammar, grammar, function, size, yield_source);
     __parser(graph_in, graph_out);
   }
 };
