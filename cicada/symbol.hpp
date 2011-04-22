@@ -99,6 +99,8 @@ namespace cicada
     size_type size() const { return symbol().size(); }
     bool empty() const { return symbol().empty(); }
     
+    bool is_sgml_tag() const;
+    
     id_type non_terminal_id() const;
     
     bool is_terminal() const { return ! is_non_terminal(); }

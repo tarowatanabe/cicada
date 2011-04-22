@@ -103,6 +103,13 @@ namespace cicada
 #endif
   }
 
+  bool Symbol::is_sgml_tag() const
+  {
+    const symbol_type& __str = static_cast<const symbol_type&>(*this);
+    
+    return ! __str.empty() && __str[0] == '<' && __str[__str.size() - 1] == '>';
+  }
+
   bool Symbol::is_non_terminal() const
   {
 #ifdef HAVE_TLS
