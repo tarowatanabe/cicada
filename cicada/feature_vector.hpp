@@ -14,6 +14,8 @@
 
 #include <cicada/feature.hpp>
 
+#include <utils/vector_map.hpp>
+
 namespace cicada
 {
   
@@ -33,135 +35,331 @@ namespace cicada
     typedef std::pair<const feature_type, data_type> value_type;
     
   private:
-    typedef typename Alloc::template rebind<value_type>::other alloc_type;
-    typedef std::map<key_type, data_type, std::less<key_type>, alloc_type> feature_vector_type;
+    typedef typename Alloc::template rebind<value_type>::other sparse_alloc_type;
+    typedef std::map<key_type, data_type, std::less<key_type>, sparse_alloc_type> sparse_vector_type;
+    
+    typedef std::pair<feature_type, data_type> dense_value_type;
+    typedef typename Alloc::template rebind<dense_value_type>::other dense_alloc_type;
+    typedef utils::vector_map<key_type, data_type, std::less<key_type>,  dense_alloc_type> dense_vector_type;
+    
     typedef FeatureVector<Tp, Alloc> self_type;
     
   public:
-    typedef typename feature_vector_type::size_type       size_type;
-    typedef typename feature_vector_type::difference_type difference_type;
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
     
-    typedef typename feature_vector_type::const_iterator  const_iterator;
-    typedef typename feature_vector_type::iterator        iterator;
-    typedef typename feature_vector_type::const_reference const_reference;
-    typedef typename feature_vector_type::reference       reference;
+    template <typename DIterator, typename SIterator, typename Ref, typename Ptr>
+    struct __iterator
+    {
+      typedef std::bidirectional_iterator_tag iterator_category;
+      
+      typedef std::pair<const key_type, data_type> value_type;
+      typedef Ref       reference;
+      typedef Ptr       pointer;
+      typedef size_t    size_type;
+      typedef ptrdiff_t difference_type;
+      
+      __iterator() : diter(0), siter() {}
+      __iterator(const DIterator& __diter) : diter(__diter), siter() {}
+      __iterator(const SIterator& __siter) : diter(0), siter(__siter) {}
+      
+      reference operator*() const
+      {
+	return (diter ? *((pointer) &(*diter)) : *siter);
+      }
+      
+      pointer operator->() const
+      {
+	return (diter ? ((pointer) &(*diter)) : &(*siter));
+      }
+
+      __iterator& operator++()
+      {
+	if (diter)
+	  ++ diter;
+	else
+	  ++ siter;
+	return *this;
+      }
+      
+      __iterator& operator--()
+      {
+	if (diter)
+	  -- diter;
+	else
+	  -- siter;
+	return *this;
+      }
+      
+      __iterator operator++(int)
+      {
+	__iterator tmp = *this;
+	++ *this;
+	return tmp;
+      }
+
+      __iterator operator--(int)
+      {
+	__iterator tmp = *this;
+	-- *this;
+	return tmp;
+      }
+      
+      friend
+      bool operator==(const __iterator& x, const __iterator& y)
+      {
+	return x.diter == y.diter && x.siter == y.siter;
+      }
+      
+      friend
+      bool operator!=(const __iterator& x, const __iterator& y)
+      {
+	return x.diter != y.diter || x.siter != y.siter;
+      }
+      
+      DIterator diter;
+      SIterator siter;
+    };
+    
+    typedef __iterator<typename dense_vector_type::const_iterator,
+		       typename sparse_vector_type::const_iterator,
+		       const value_type&,
+		       const value_type*> const_iterator;
+    typedef __iterator<typename dense_vector_type::iterator,
+		       typename sparse_vector_type::iterator,
+		       value_type&,
+		       value_type*> iterator;
+    
+    typedef const value_type& const_reference;
+    typedef       value_type& reference;
+    typedef       value_type* pointer;
+    
+  private:
+    static const size_type __dense_size = 16;
     
   public:
-    FeatureVector() {}
-    FeatureVector(const FeatureVector& x) : __values(x.__values) {}
+    FeatureVector() : __dense(), __sparse(0) {}
+    FeatureVector(const FeatureVector& x) : __dense(x.__dense), __sparse(x.__sparse ? new sparse_vector_type(*x.__sparse) : 0) {}
     template <typename Iterator>
-    FeatureVector(Iterator first, Iterator last) : __values(first, last) { }
+    FeatureVector(Iterator first, Iterator last) : __dense(), __sparse(0) { assign(first, last); }
+    
+    template <typename T, typename A>
+    FeatureVector& operator=(const FeatureVector<T, A>& x)
+    {
+      assign(x);
+      
+      return *this;
+    }
+
+    ~FeatureVector() { if (__sparse) delete __sparse; }
     
   public:
     template <typename T, typename A>
     void assign(const FeatureVector<T,A>& x)
     {
-      __values.clear();
-      __values.insert(x.begin(), x.end());
+      __dense.assign(x.__dense.begin(), x.__dense.end());
+      if (x.__sparse) {
+	if (__sparse) 
+	  __sparse->assign(x.__sparse->begin(), x.__sparse->end());
+	else
+	  __sparse = new sparse_vector_type(x.__sparse->begin(), x.__sparse->end());
+      } else if (__sparse) {
+	delete __sparse;
+	__sparse = 0;
+      }
     }
 
     template <typename Iterator>
     void assign(Iterator first, Iterator last)
     {
-      __values.clear();
-      __values.insert(first, last);
+      const size_type __n = std::distance(first, last);
+      
+      if (__n > __dense_size) {
+	__dense.clear();
+	if (__sparse)
+	  __sparse->assign(first, last);	  
+	else
+	  __sparse = new sparse_vector_type(first, last);
+      } else {
+	if (__sparse) {
+	  delete __sparse;
+	  __sparse = 0;
+	}
+	__dense.assign(first, last);
+      }
     }
-
+    
     template <typename Iterator>
     void insert(Iterator first, Iterator last)
     {
-      __values.insert(first, last);
+      if (__sparse)
+	__sparse->insert(first, last);
+      else {
+	for (/**/; first != last; ++ first)
+	  insert(*first);
+      }
     }
     
-    template <typename Iterator>
-    void insert(Iterator iter, const value_type& x)
+    void insert(iterator iter, const value_type& x)
     {
-      if (x.second != 0.0)
-	__values[x.first] += x.second;
+      if (x.second == Tp()) return;
+      
+      if (__sparse)
+	__sparse->insert(iter.siter, x);
+      else {
+	__dense.insert(iter.diter, x);
+	
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
+      }
+    }
+    
+    void insert(const value_type& x)
+    {
+      if (x.second == Tp()) return;
+      
+      if (__sparse)
+	__sparse->insert(x);
+      else {
+	__dense.insert(x);
+	
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
+      }
     }
 
-    size_type size() const { return __values.size(); }
-    bool empty() const { return __values.empty(); }
+    size_type size() const { return (__sparse ? __sparse->size() : __dense.size()); }
+    bool empty() const { return (__sparse ? __sparse->empty() : __dense.empty()); }
+    bool sparse() const { return __sparse; }
 
     void reserve(size_type x) { }
     
-    void clear() { __values.clear(); }
-
+    void clear()
+    {
+      __dense.clear();
+      
+      if (__sparse) {
+	delete __sparse;
+	__sparse = 0;
+      }
+    }
+    
     Tp operator[](const key_type& x) const
     {
-      const_iterator iter = find(x);
-      return (iter == end() ? Tp() : iter->second);
+      if (__sparse) {
+	typename sparse_vector_type::const_iterator iter = __sparse->find(x);
+	return (iter == __sparse->end() ? Tp() : iter->second);
+      } else {
+	typename dense_vector_type::const_iterator iter = __dense.find(x);
+	return (iter == __dense.end() ? Tp() : iter->second);
+      }
     }
     
     Tp& operator[](const key_type& x)
     {
-      return __values[x];
+      if (__sparse)
+	return __sparse->operator[](x);
+      else {
+	std::pair<typename dense_vector_type::iterator, bool> result = __dense.insert(std::make_pair(x, Tp()));
+	if (! result.second || __dense.size() <= __dense_size)
+	  return result.first->second;
+	
+	__sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	__dense.clear();
+	return __sparse->operator[](x);
+      }
     }
+    
+    const_reference front() const { return (__sparse ? *__sparse->begin() : *((const value_type*) (&(*__dense.begin())))); }
+    reference front() { return (__sparse ? *__sparse->begin() : *((value_type*) (&(*__dense.begin())))); }
+    
+    const_reference back() const { return (__sparse ? *(-- __sparse->end()) : *((const value_type*) (&(*(__dense.end() - 1))))); }
+    reference back() { return (__sparse ? *(-- __sparse->end()) : *((value_type*) (&(*(__dense.end() - 1)))));}
+
     
     const_iterator find(const key_type& x) const
     {
-      return __values.find(x);
+      return (__sparse ? const_iterator(__sparse->find(x)) : const_iterator(__dense.find(x)));
     }
     
     iterator find(const key_type& x)
     {
-      return __values.find(x);
+      return (__sparse ? iterator(__sparse->find(x)) : iterator(__dense.find(x)));
     }
 
     const_iterator lower_bound(const key_type& x) const
     {
-      return __values.lower_bound(x);
+      return (__sparse ? const_iterator(__sparse->lower_bound(x)) : const_iterator(__dense.lower_bound(x)));
     }
     
     iterator lower_bound(const key_type& x)
     {
-      return __values.lower_bound(x);
+      return (__sparse ? iterator(__sparse->lower_bound(x)) : iterator(__dense.lower_bound(x)));
     }
 
     const_iterator upper_bound(const key_type& x) const
     {
-      return __values.upper_bound(x);
+      return (__sparse ? const_iterator(__sparse->upper_bound(x)) : const_iterator(__dense.upper_bound(x)));
     }
     
     iterator upper_bound(const key_type& x)
     {
-      return __values.upper_bound(x);
+      return (__sparse ? iterator(__sparse->upper_bound(x)) : iterator(__dense.upper_bound(x)));
     }
     
     
     void erase(const key_type& x)
     {
-      __values.erase(x);
+      if (__sparse)
+	__sparse->erase(x);
+      else {
+	typename dense_vector_type::iterator iter = __dense.find(x);
+	if (iter != __dense.end())
+	  iter->second = Tp();
+      }
     }
 
     void erase(iterator x)
     {
-      __values.erase(x);
+      if (__sparse)
+	__sparse->erase(x.siter);
+      else
+	__dense.erase(x.diter);
     }
     
     template <typename Prefix>
     void erase_prefix(const Prefix& prefix)
     {
-      for (iterator fiter = begin(); fiter != end(); /**/)
-	if (fiter->first.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), fiter->first.begin()))
-	  erase(fiter ++);
-	else
-	  ++ fiter;
+      if (__sparse) {
+	for (typename sparse_vector_type::iterator fiter = __sparse->begin(); fiter != __sparse->end(); /**/)
+	  if (fiter->first.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), fiter->first.begin()))
+	    __sparse->erase(fiter ++);
+	  else
+	    ++ fiter;
+      } else {
+	for (typename dense_vector_type::iterator fiter = __dense.begin(); fiter != __dense.end(); /**/)
+	  if (fiter->first.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), fiter->first.begin()))
+	    fiter->second = Tp();
+      }
     }
     
-    const_iterator begin() const { return __values.begin(); }
-    iterator begin() { return __values.begin(); }
-    const_iterator end() const { return __values.end(); }
-    iterator end() { return __values.end(); }
-    
-    const_reference front() const { return *__values.begin(); }
-    reference front() { return *__values.begin(); }
-    
-    const_reference back() const { return *(-- __values.end());}
-    reference back() { return *(-- __values.end());}
-    
-    void swap(FeatureVector& x) { __values.swap(x.__values); }
+    const_iterator begin() const { return (__sparse ? const_iterator(__sparse->begin()) : const_iterator(__dense.begin())); }
+    iterator begin() { return (__sparse ? iterator(__sparse->begin()) : iterator(__dense.begin())); }
 
+    const_iterator end() const { return (__sparse ? const_iterator(__sparse->end()) : const_iterator(__dense.end())); }
+    iterator end() { return (__sparse ? iterator(__sparse->end()) : iterator(__dense.end())); }
+    
+    
+    void swap(FeatureVector& x)
+    { 
+      __dense.swap(x.__dense);
+      std::swap(__sparse, x.__sparse);
+    }
+    
     Tp sum() const
     {
       Tp __sum = Tp();
@@ -289,37 +487,37 @@ namespace cicada
     friend
     bool operator==(const FeatureVector& x, const FeatureVector& y)
     {
-      return x.__values == y.__values;
+      return (x.__sparse && x.__sparse && *x.__sparse == *y.__sparse) || (x.__sparse == 0 && y.__sparse == 0 && x.__dense == y.__dense);
     }
 
     friend
     bool operator!=(const FeatureVector& x, const FeatureVector& y)
     {
-      return x.__values != y.__values;
+      return ! (x == y);
     }
 
     friend
     bool operator<(const FeatureVector& x, const FeatureVector& y)
     {
-      return x.__values < y.__values;
+      return true;
     }
 
     friend
     bool operator<=(const FeatureVector& x, const FeatureVector& y)
     {
-      return x.__values <= y.__values;
+      return ! (y < x);
     }
 
     friend
     bool operator>(const FeatureVector& x, const FeatureVector& y)
     {
-      return x.__values > y.__values;
+      return y < x;
     }
 
     friend
     bool operator>=(const FeatureVector& x, const FeatureVector& y)
     {
-      return x.__values >= y.__values;
+      return ! (x < y);
     }
 
 
@@ -477,7 +675,8 @@ namespace cicada
     FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVector<T2,A2>& y);
     
   private:
-    feature_vector_type __values;
+    dense_vector_type   __dense;
+    sparse_vector_type* __sparse;
   };
   
   template <typename T1, typename A1, typename T2>

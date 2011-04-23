@@ -62,4 +62,24 @@ int main(int argc, char** argv)
     }
   }
 
+  vec_map.clear();
+  {
+    for (map_map_type::const_iterator miter = map_map.begin(); miter != map_map.end(); ++ miter)
+      vec_map.insert(vec_map.end(), *miter);
+  }
+
+  std::cerr << "map size: " << map_map.size() << std::endl
+	    << "vec size: " << vec_map.size() << std::endl;
+  
+  {
+    map_map_type::const_iterator miter = map_map.begin();
+    for (vec_map_type::const_iterator viter = vec_map.begin(); viter != vec_map.end(); ++ viter, ++ miter) {
+      if (viter->first != miter->first || viter->second != miter->second)
+	std::cerr << "differ?"
+		  << "\tmap: " << miter->first << ": " << miter->second << std::endl
+		  << "\tvec: " << viter->first << ": " << viter->second << std::endl;
+    }
+  }
+  
+
 }

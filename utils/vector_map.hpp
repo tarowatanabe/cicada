@@ -139,13 +139,13 @@ namespace utils
     
     iterator insert(iterator position, const value_type& x)
     {
-      return insert(x).first;
-#if 0
-      // actuall, we need to check the position!
-      if (position != container.end() && (! compare_type::operator()(x, *position)))
-	return position;
-      return container.insert(position, x);
-#endif
+      if (position == end()) {
+	if (! container.empty() && compare_type::operator()(*(position - 1), x))
+	  return container.insert(position, x);
+	else
+	  return insert(x).first;
+      } else
+	return insert(x).first;
     }
     template <typename InputIterator>
     void insert(InputIterator first, InputIterator last)
@@ -172,11 +172,23 @@ namespace utils
 
     iterator lower_bound(const key_type& x)
     {
-      return std::lower_bound(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
+      if (container.size() < 16) {
+	iterator iter = container.begin();
+	iterator end = container.end();
+	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
+	return iter;
+      } else
+	return std::lower_bound(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
     }
     const_iterator lower_bound(const key_type& x) const
     {
-      return std::lower_bound(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
+      if (container.size() < 16) {
+	const_iterator iter = container.begin();
+	const_iterator end = container.end();
+	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
+	return iter;
+      } else
+	return std::lower_bound(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
     }
   
     iterator upper_bound(const key_type& x)
