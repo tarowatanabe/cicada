@@ -51,8 +51,15 @@ namespace cicada
     FeatureVector(const FeatureVector& x) : __values(x.__values) {}
     template <typename Iterator>
     FeatureVector(Iterator first, Iterator last) : __values(first, last) { }
-
+    
   public:
+    template <typename T, typename A>
+    void assign(const FeatureVector<T,A>& x)
+    {
+      __values.clear();
+      __values.insert(x.begin(), x.end());
+    }
+
     template <typename Iterator>
     void assign(Iterator first, Iterator last)
     {
@@ -190,13 +197,11 @@ namespace cicada
       
       if (empty() || x.empty()) return Tp();
       
-      const_iterator iter1     = __values.lower_bound(x.begin()->first);
-      const_iterator iter1_end = __values.end();
+      const_iterator iter1     = lower_bound(x.begin()->first);
+      const_iterator iter1_end = end();
       
-      typename another_type::const_iterator iter2     = (iter1 != iter1_end
-							 ? x.__values.lower_bound(iter1->first)
-							 : x.__values.begin());
-      typename another_type::const_iterator iter2_end = x.__values.end();
+      typename another_type::const_iterator iter2     = (iter1 != iter1_end ? x.lower_bound(iter1->first) : x.begin());
+      typename another_type::const_iterator iter2_end = x.end();
       
       Tp sum = Tp();
       
@@ -363,7 +368,7 @@ namespace cicada
     self_type& operator*=(const T& x)
     { 
       if (x == T())
-	__values.clear();
+	clear();
       else
 	std::for_each(begin(), end(), __apply_unary<std::multiplies<Tp>, T>(x));
       return *this;
@@ -383,14 +388,14 @@ namespace cicada
       
       typename another_type::const_iterator iter2_end = x.end();
       for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	iterator iter1 = __values.lower_bound(iter2->first);
+	iterator iter1 = lower_bound(iter2->first);
 	
-	if (iter1 == __values.end() || iter1->first != iter2->first)
-	  __values.insert(iter1, *iter2);
+	if (iter1 == end() || iter1->first != iter2->first)
+	  insert(iter1, *iter2);
 	else {
 	  iter1->second += iter2->second;
 	  if (iter1->second == Tp())
-	    __values.erase(iter1);
+	    erase(iter1);
 	}
       }
       
@@ -404,14 +409,14 @@ namespace cicada
       
       typename another_type::const_iterator iter2_end = x.end();
       for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	iterator iter1 = __values.lower_bound(iter2->first);
+	iterator iter1 = lower_bound(iter2->first);
 	
-	if (iter1 == __values.end() || iter1->first != iter2->first)
-	  __values.insert(iter1, std::make_pair(iter2->first, - Tp(iter2->second)));
+	if (iter1 == end() || iter1->first != iter2->first)
+	  insert(iter1, std::make_pair(iter2->first, - Tp(iter2->second)));
 	else {
 	  iter1->second -= iter2->second;
 	  if (iter1->second == Tp())
-	    __values.erase(iter1);
+	    erase(iter1);
 	}
       }
       
@@ -430,13 +435,11 @@ namespace cicada
 
       self_type features;
       
-      const_iterator iter1     = __values.lower_bound(x.begin()->first);
-      const_iterator iter1_end = __values.end();
+      const_iterator iter1     = lower_bound(x.begin()->first);
+      const_iterator iter1_end = end();
       
-      typename another_type::const_iterator iter2     = (iter1 != iter1_end
-							 ? x.__values.lower_bound(iter1->first)
-							 : x.__values.begin());
-      typename another_type::const_iterator iter2_end = x.__values.end();
+      typename another_type::const_iterator iter2     = (iter1 != iter1_end ? x.lower_bound(iter1->first) : x.begin());
+      typename another_type::const_iterator iter2_end = x.end();
       
       while (iter1 != iter1_end && iter2 != iter2_end) {
 	if (iter1->first < iter2->first)
@@ -446,14 +449,14 @@ namespace cicada
 	else {
 	  const Tp value = iter1->second * iter2->second;
 	  if (value != Tp())
-	    features.__values.insert(features.__values.end(), std::make_pair(iter1->first, value));
+	    features.insert(features.end(), std::make_pair(iter1->first, value));
 	  
 	  ++ iter1;
 	  ++ iter2;
 	}
       }
       
-      __values.swap(features.__values);
+      features.swap(*this);
       
       return *this;
     }
@@ -572,13 +575,11 @@ namespace cicada
     
     left_type features;
     
-    typename left_type::const_iterator iter1     = x.__values.lower_bound(y.begin()->first);
-    typename left_type::const_iterator iter1_end = x.__values.end();
+    typename left_type::const_iterator iter1     = x.lower_bound(y.begin()->first);
+    typename left_type::const_iterator iter1_end = x.end();
 
-    typename right_type::const_iterator iter2     = (iter1 != iter1_end
-						     ? y.__values.lower_bound(iter1->first)
-						     : y.__values.begin());
-    typename right_type::const_iterator iter2_end = y.__values.end();
+    typename right_type::const_iterator iter2     = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.begin());
+    typename right_type::const_iterator iter2_end = y.end();
     
     while (iter1 != iter1_end && iter2 != iter2_end) {
       if (iter1->first < iter2->first)
@@ -588,7 +589,7 @@ namespace cicada
       else {
 	const T1 value = iter1->second * iter2->second;
 	if (value != T1())
-	  features.__values.insert(features.__values.end(), std::make_pair(iter1->first, value));
+	  features.insert(features.end(), std::make_pair(iter1->first, value));
 	
 	++ iter1;
 	++ iter2;
@@ -605,7 +606,8 @@ namespace cicada
   {
     typename FeatureVector<T,A>::const_iterator iter_end = x.end();
     for (typename FeatureVector<T,A>::const_iterator iter = x.begin(); iter != iter_end; ++ iter)
-      os << iter->first << ' ' << iter->second << '\n';
+      if (! iter->first.empty() && iter->second != T())
+	os << iter->first << ' ' << iter->second << '\n';
     
     return os;
   }
@@ -619,7 +621,8 @@ namespace cicada
     std::string feature;
     T value;
     while ((is >> feature) && (is >> value))
-      x[feature] = value;
+      if (value != T())
+	x[feature] = value;
     
     return is;
   }

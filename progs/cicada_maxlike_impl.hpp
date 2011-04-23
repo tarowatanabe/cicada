@@ -663,8 +663,8 @@ struct OptimizerMarginBase
     cicada::inside_outside(graph_reward,  counts_reward,  accumulated_reward,  count_function(), feature_count_function());
     cicada::inside_outside(graph_penalty, counts_penalty, accumulated_penalty, count_function(), feature_count_function());
     
-    features_reward.assign(accumulated_reward.accumulated.begin(),   accumulated_reward.accumulated.end());
-    features_penalty.assign(accumulated_penalty.accumulated.begin(), accumulated_penalty.accumulated.end());
+    features_reward.assign(accumulated_reward.accumulated);
+    features_penalty.assign(accumulated_penalty.accumulated);
     
     features_reward  *= (1.0 / double(counts_reward.back()));
     features_penalty *= (1.0 / double(counts_penalty.back()));
