@@ -36,7 +36,7 @@ namespace cicada
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
     typedef std::map<key_type, data_type, std::less<key_type>, alloc_type> feature_vector_type;
     typedef FeatureVector<Tp, Alloc> self_type;
-
+    
   public:
     typedef typename feature_vector_type::size_type       size_type;
     typedef typename feature_vector_type::difference_type difference_type;

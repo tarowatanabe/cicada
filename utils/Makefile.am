@@ -95,9 +95,6 @@ sgi_hash_map.hpp \
 sgi_hash_set.hpp \
 simple_vector.hpp \
 space_separator.hpp \
-sparse_hashtable.hpp \
-sparse_map.hpp \
-sparse_set.hpp \
 spinlock.hpp \
 static_allocator.hpp \
 std_heap.hpp \
@@ -143,7 +140,6 @@ sample_packed_vector \
 sample_piece \
 sample_program_options \
 sample_simple_vector \
-sample_sparse_map \
 sample_static_allocator \
 sample_subprocess \
 sample_succinct_vector \
@@ -258,11 +254,6 @@ sample_program_options_LDADD = $(BOOST_PROGRAM_OPTIONS_LDFLAGS) $(BOOST_PROGRAM_
 sample_simple_vector_SOURCES = sample_simple_vector.cpp
 sample_simple_vector_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 sample_simple_vector_LDADD = $(BOOST_THREAD_LIBS)
-
-sample_sparse_map_SOURCES = sample_sparse_map.cpp
-sample_sparse_map_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
-sample_sparse_map_LDADD = $(BOOST_THREAD_LIBS)
-
 
 sample_static_allocator_SOURCES = sample_static_allocator.cpp
 sample_static_allocator_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
