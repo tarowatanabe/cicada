@@ -135,7 +135,7 @@ namespace cicada
     typedef       value_type* pointer;
     
   private:
-    static const size_type __dense_size = 8;
+    static const size_type __dense_size = 16;
     
   public:
     FeatureVector() : __dense(), __sparse(0) {}
