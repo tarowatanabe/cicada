@@ -230,8 +230,12 @@ namespace cicada
       if (__sparse)
 	__sparse->insert(first, last);
       else {
-	for (/**/; first != last; ++ first)
-	  insert(*first);
+	__dense.insert(first, last);
+	
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
       }
     }
     
