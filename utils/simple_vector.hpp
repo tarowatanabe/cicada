@@ -67,11 +67,11 @@ namespace utils {
 
     static inline size_type capacity(const size_type& size)
     {
-      return bithack::branch(size * sizeof(value_type) + sizeof(size_type) > 256,
-			     size,
-			     bithack::branch(bithack::is_power2(size),
-					     size,
-					     static_cast<size_type>(bithack::next_largest_power2(size))));
+      const size_t power2 = bithack::branch(bithack::is_power2(size),
+					    size,
+					    static_cast<size_type>(bithack::next_largest_power2(size)));
+      
+      return bithack::branch(power2 * sizeof(value_type) + sizeof(size_type) > 256, size, power2);
     }
     
     bool empty() const { return size() == 0; }
