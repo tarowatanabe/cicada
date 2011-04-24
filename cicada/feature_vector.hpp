@@ -377,7 +377,7 @@ namespace cicada
 	  else
 	    ++ fiter;
       } else {
-	for (typename dense_vector_type::iterator fiter = __dense.begin(); fiter != __dense.end(); /**/)
+	for (typename dense_vector_type::iterator fiter = __dense.begin(); fiter != __dense.end(); ++ fiter)
 	  if (fiter->first.size() >= prefix.size() && std::equal(prefix.begin(), prefix.end(), fiter->first.begin()))
 	    fiter->second = Tp();
       }

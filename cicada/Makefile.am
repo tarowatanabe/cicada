@@ -402,6 +402,7 @@ alignment_main \
 attribute_vector_main \
 cluster_main \
 eval_main \
+feature_vector_main \
 grammar_mutable_main \
 grammar_static_main \
 grammar_unknown_main \
@@ -432,6 +433,9 @@ cluster_main_LDADD = libcicada.la
 
 eval_main_SOURCES = eval_main.cpp
 eval_main_LDADD = libcicada.la
+
+feature_vector_main_SOURCES = feature_vector_main.cpp
+feature_vector_main_LDADD = libcicada.la
 
 grammar_mutable_main_SOURCES = grammar_mutable_main.cpp
 grammar_mutable_main_LDADD = libcicada.la
