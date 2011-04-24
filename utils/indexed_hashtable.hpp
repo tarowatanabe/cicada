@@ -27,12 +27,12 @@ namespace utils
   public:
     typedef uint32_t index_type;
     typedef size_t   size_type;
-        
+    
   public:
     
     inline size_type power_of_two(size_type n)
     {
-      return bithack::is_power2(n) ? n : bithack::next_largest_power2(n);
+      return bithack::branch(bithack::is_power2(n), n, static_cast<size_type>(bithack::next_largest_power2(n)));
     }
   };
   

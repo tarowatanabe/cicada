@@ -10,6 +10,12 @@
 
 int main(int argc, char** argv)
 {
+  std::cout << utils::bithack::is_power2(0) << ' ' << utils::bithack::next_largest_power2(0) << std::endl;
+  std::cout << utils::bithack::is_power2(1) << ' ' << utils::bithack::next_largest_power2(1) << std::endl;
+  std::cout << utils::bithack::is_power2(2) << ' ' << utils::bithack::next_largest_power2(2) << std::endl;
+  std::cout << utils::bithack::is_power2(3) << ' ' << utils::bithack::next_largest_power2(3) << std::endl;
+  std::cout << utils::bithack::is_power2(4) << ' ' << utils::bithack::next_largest_power2(4) << std::endl;
+
   std::cout << utils::bithack::min(-56, 72) << std::endl;
   std::cout << utils::bithack::max(-56, 72) << std::endl;
   

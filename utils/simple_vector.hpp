@@ -14,6 +14,7 @@
 #include <boost/type_traits.hpp>
 
 #include <utils/memory.hpp>
+#include <utils/bithack.hpp>
 
 namespace utils {
   
@@ -50,7 +51,7 @@ namespace utils {
 	if (__base) {
 	  const size_type __size = *(reinterpret_cast<size_type*>(__base));
 	  if (__size)
-	    allocator().deallocate(__base, __size * sizeof(value_type) + sizeof(size_type));
+	    allocator().deallocate(__base, capacity(__size) * sizeof(value_type) + sizeof(size_type));
 	}
       }
     
@@ -63,18 +64,29 @@ namespace utils {
     inline       iterator begin()       { return reinterpret_cast<iterator>(__base + sizeof(size_type)); }
     inline const_iterator end() const { return begin() + size(); }
     inline       iterator end()       { return begin() + size(); }
+
+    static inline size_type capacity(const size_type& size)
+    {
+      return bithack::branch(size * sizeof(value_type) + sizeof(size_type) > 256,
+			     size,
+			     bithack::branch(bithack::is_power2(size),
+					     size,
+					     static_cast<size_type>(bithack::next_largest_power2(size))));
+    }
     
     bool empty() const { return size() == 0; }
     size_type size() const { return *(reinterpret_cast<size_type*>(__base)); }
+    size_type& size() { return *(reinterpret_cast<size_type*>(__base)); }
+    size_type capacity() const { return capacity(size());}
     
     void initialize_vector(size_type __n)
     {
       static size_type __zero = 0;
-
+      
       if (__n == 0)
 	__base = reinterpret_cast<pointer>(&__zero);
       else {
-	__base = allocator().allocate(__n * sizeof(value_type) + sizeof(size_type));
+	__base = allocator().allocate(capacity(__n) * sizeof(value_type) + sizeof(size_type));
 	*(reinterpret_cast<size_type*>(__base)) = __n;
       }
     }
@@ -171,16 +183,26 @@ namespace utils {
       const size_type __size = size();
       
       if (__n < __size) {
-	base_type __base_new(__n);
-	std::uninitialized_copy(__base.begin(), __base.begin() + __n, __base_new.begin());
-	__base.swap(__base_new);
-	utils::destroy_range(__base_new.begin(), __base_new.end());
+	if (base_type::capacity(__n) == __base.capacity()) {
+	  utils::destroy_range(__base.begin() + __n, __base.begin() + __size);
+	  __base.size() = __n;
+	} else {
+	  base_type __base_new(__n);
+	  std::uninitialized_copy(__base.begin(), __base.begin() + __n, __base_new.begin());
+	  __base.swap(__base_new);
+	  utils::destroy_range(__base_new.begin(), __base_new.end());
+	}
       } else if (__n > __size) {
-	base_type __base_new(__n);
-	std::uninitialized_copy(__base.begin(), __base.end(), __base_new.begin());
-	std::uninitialized_fill(__base_new.begin() + __size, __base_new.end(), __value);
-	__base.swap(__base_new);
-	utils::destroy_range(__base_new.begin(), __base_new.end());
+	if (__n <= __base.capacity()) {
+	  std::uninitialized_fill(__base.begin() + __size, __base.begin() + __n, __value);
+	  __base.size() = __n;
+	} else {
+	  base_type __base_new(__n);
+	  std::uninitialized_copy(__base.begin(), __base.end(), __base_new.begin());
+	  std::uninitialized_fill(__base_new.begin() + __size, __base_new.end(), __value);
+	  __base.swap(__base_new);
+	  utils::destroy_range(__base_new.begin(), __base_new.end());
+	}
       }
     }
     
@@ -194,25 +216,43 @@ namespace utils {
     {
       const size_type __size = size();
       
-      base_type __base_new(__size + 1);
-      std::uninitialized_copy(__base.begin(), __base.end(), __base_new.begin());
-      utils::construct_object(__base_new.begin() + __size, __value);
-      
-      __base.swap(__base_new);
-      utils::destroy_range(__base_new.begin(), __base_new.end());
+      if (__size < __base.capacity()) {
+	utils::construct_object(__base.begin() + __size, __value);
+	++ __base.size();
+      } else {
+	base_type __base_new(__size + 1);
+	std::uninitialized_copy(__base.begin(), __base.end(), __base_new.begin());
+	utils::construct_object(__base_new.begin() + __size, __value);
+	
+	__base.swap(__base_new);
+	utils::destroy_range(__base_new.begin(), __base_new.end());
+      }
     }
 
     iterator insert(iterator position, const Tp& x)
     {
       const size_type __n = position - begin();
-      
-      base_type __base_new(size() + 1);
-      std::uninitialized_copy(begin(), position, __base_new.begin());
-      utils::construct_object(__base_new.begin() + __n, x);
-      std::uninitialized_copy(position, end(), __base_new.begin() + __n + 1);
-      
-      __base.swap(__base_new);
-      utils::destroy_range(__base_new.begin(), __base_new.end());
+      const size_type __size = size();
+
+      if (__size < __base.capacity()) {
+	if (__n == __size) {
+	  utils::construct_object(position, x);
+	  ++ __base.size();
+	} else {
+	  utils::construct_object(end(), back());
+	  ++ __base.size();
+	  std::copy_backward(position, end() - 2, end() - 1);
+	  *position = x;
+	}
+      } else {
+	base_type __base_new(__size + 1);
+	std::uninitialized_copy(begin(), position, __base_new.begin());
+	utils::construct_object(__base_new.begin() + __n, x);
+	std::uninitialized_copy(position, end(), __base_new.begin() + __n + 1);
+	
+	__base.swap(__base_new);
+	utils::destroy_range(__base_new.begin(), __base_new.end());
+      }
       
       return begin() + __n;
     }
@@ -222,26 +262,40 @@ namespace utils {
     {
       const size_type __n = position - begin();
       const size_type __d = std::distance(first, last);
+      const size_type __size = size();
       
-      base_type __base_new(size() + __d);
-      std::uninitialized_copy(begin(), position, __base_new.begin());
-      std::uninitialized_copy(first, last, __base_new.begin() + __n);
-      std::uninitialized_copy(position, end(), __base_new.begin() + __n + __d);
-      
-      __base.swap(__base_new);
-      utils::destroy_range(__base_new.begin(), __base_new.end());
+      if (__n == __size && __size + __d <= __base.capacity()) {
+	std::uninitialized_copy(first, last, __base.end());
+	__base.size() += __d;
+      } else {
+	base_type __base_new(__size + __d);
+	std::uninitialized_copy(begin(), position, __base_new.begin());
+	std::uninitialized_copy(first, last, __base_new.begin() + __n);
+	std::uninitialized_copy(position, end(), __base_new.begin() + __n + __d);
+	
+	__base.swap(__base_new);
+	utils::destroy_range(__base_new.begin(), __base_new.end());
+      }
     }
 
     iterator erase(iterator position)
     {
       const size_type __n = position - begin();
-      
-      base_type __base_new(size() - 1);
-      std::uninitialized_copy(begin(), position, __base_new.begin());
-      std::uninitialized_copy(position + 1, end(), __base_new.begin() + __n);
-      
-      __base.swap(__base_new);
-      utils::destroy_range(__base_new.begin(), __base_new.end());
+      const size_type __size = size();
+
+      if (__base.capacity() == base_type::capacity(__size - 1)) {
+	if (__n + 1 != __size)
+	  std::copy(position + 1, end(), position);
+	-- __base.size();
+	utils::destroy_object(end());
+      } else {
+	base_type __base_new(__size - 1);
+	std::uninitialized_copy(begin(), position, __base_new.begin());
+	std::uninitialized_copy(position + 1, end(), __base_new.begin() + __n);
+	
+	__base.swap(__base_new);
+	utils::destroy_range(__base_new.begin(), __base_new.end());
+      }
       
       return begin() + __n;
     }
@@ -250,8 +304,9 @@ namespace utils {
     {
       const size_type __n = first - begin();
       const size_type __d = last - first;
+      const size_type __size = size();
       
-      base_type __base_new(size() - __d);
+      base_type __base_new(__size - __d);
       std::uninitialized_copy(begin(), first, __base_new.begin());
       std::uninitialized_copy(last, end(), __base_new.begin() + __n);
       
