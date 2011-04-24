@@ -53,15 +53,30 @@ namespace cicada
     {
       typedef std::bidirectional_iterator_tag iterator_category;
       
-      typedef std::pair<const key_type, data_type> value_type;
       typedef Ref       reference;
       typedef Ptr       pointer;
       typedef size_t    size_type;
       typedef ptrdiff_t difference_type;
-      
+
+      typedef std::pair<const feature_type, data_type> value_type;
+
       __iterator() : diter(0), siter() {}
-      __iterator(const DIterator& __diter) : diter(__diter), siter() {}
-      __iterator(const SIterator& __siter) : diter(0), siter(__siter) {}
+      __iterator(const typename dense_vector_type::const_iterator& __diter) : diter(__diter), siter() {}
+      __iterator(const typename dense_vector_type::iterator& __diter) : diter(__diter), siter() {}
+      __iterator(const typename sparse_vector_type::const_iterator& __siter) : diter(0), siter(__siter) {}
+      __iterator(const typename sparse_vector_type::iterator& __siter) : diter(0), siter(__siter) {}
+      
+      template <typename D, typename S, typename R, typename P>
+      __iterator(const __iterator<D,S,R,P>& x) : diter(x.diter), siter(x.siter) {}
+      __iterator(const __iterator<DIterator,SIterator,Ref,Ptr>& x) : diter(x.diter), siter(x.siter) {}
+
+      template <typename D, typename S, typename R, typename P>
+      __iterator& operator=(const __iterator<D,S,R,P>& x)
+      {
+	diter = x.diter;
+	siter = x.siter;
+	return *this;
+      }
       
       reference operator*() const
       {
@@ -105,14 +120,16 @@ namespace cicada
 	return tmp;
       }
       
+      template <typename D, typename S, typename R, typename P>
       friend
-      bool operator==(const __iterator& x, const __iterator& y)
+      bool operator==(const __iterator<DIterator,SIterator,Ref,Ptr>& x, const __iterator<D,S,R,P>& y)
       {
 	return x.diter == y.diter && x.siter == y.siter;
       }
       
+      template <typename D, typename S, typename R, typename P>
       friend
-      bool operator!=(const __iterator& x, const __iterator& y)
+      bool operator!=(const __iterator<DIterator,SIterator,Ref,Ptr>& x, const __iterator<D,S,R,P>& y)
       {
 	return x.diter != y.diter || x.siter != y.siter;
       }
@@ -154,14 +171,30 @@ namespace cicada
     ~FeatureVector() { if (__sparse) delete __sparse; }
     
   public:
+    void assign(const FeatureVector<Tp,Alloc>& x)
+    {
+      __dense = x.__dense;
+      if (x.__sparse) {
+	if (__sparse)
+	  *__sparse = *x.__sparse;
+	else
+	  __sparse = new sparse_vector_type(*x.__sparse);
+      } else if (__sparse) {
+	delete __sparse;
+	__sparse = 0;
+      }
+    }
+
     template <typename T, typename A>
     void assign(const FeatureVector<T,A>& x)
     {
-      __dense.assign(x.__dense.begin(), x.__dense.end());
+      __dense.clear();
+      __dense.insert(x.__dense.begin(), x.__dense.end());
       if (x.__sparse) {
-	if (__sparse) 
-	  __sparse->assign(x.__sparse->begin(), x.__sparse->end());
-	else
+	if (__sparse) {
+	  __sparse->clear();
+	  __sparse->insert(x.__sparse->begin(), x.__sparse->end());
+	} else
 	  __sparse = new sparse_vector_type(x.__sparse->begin(), x.__sparse->end());
       } else if (__sparse) {
 	delete __sparse;
@@ -176,16 +209,18 @@ namespace cicada
       
       if (__n > __dense_size) {
 	__dense.clear();
-	if (__sparse)
-	  __sparse->assign(first, last);	  
-	else
+	if (__sparse) {
+	  __sparse->clear();
+	  __sparse->insert(first, last);
+	} else
 	  __sparse = new sparse_vector_type(first, last);
       } else {
 	if (__sparse) {
 	  delete __sparse;
 	  __sparse = 0;
 	}
-	__dense.assign(first, last);
+	__dense.clear();
+	__dense.insert(first, last);
       }
     }
     
@@ -316,11 +351,8 @@ namespace cicada
     {
       if (__sparse)
 	__sparse->erase(x);
-      else {
-	typename dense_vector_type::iterator iter = __dense.find(x);
-	if (iter != __dense.end())
-	  iter->second = Tp();
-      }
+      else
+	__dense.erase(x);
     }
 
     void erase(iterator x)
@@ -674,7 +706,7 @@ namespace cicada
     friend
     FeatureVector<T1,A1> operator*(const FeatureVector<T1,A1>& x, const FeatureVector<T2,A2>& y);
     
-  private:
+  public:
     dense_vector_type   __dense;
     sparse_vector_type* __sparse;
   };
