@@ -305,13 +305,20 @@ namespace utils {
       const size_type __n = first - begin();
       const size_type __d = last - first;
       const size_type __size = size();
-      
-      base_type __base_new(__size - __d);
-      std::uninitialized_copy(begin(), first, __base_new.begin());
-      std::uninitialized_copy(last, end(), __base_new.begin() + __n);
-      
-      __base.swap(__base_new);
-      utils::destroy_range(__base_new.begin(), __base_new.end());
+
+      if (__base.capacity() == base_type::capacity(__size - __d)) {
+	if (last != end())
+	  std::copy(last, end(), first);
+	utils::destroy_range(end() - __d, end());
+	__base.size() -= __d;
+      } else {
+	base_type __base_new(__size - __d);
+	std::uninitialized_copy(begin(), first, __base_new.begin());
+	std::uninitialized_copy(last, end(), __base_new.begin() + __n);
+	
+	__base.swap(__base_new);
+	utils::destroy_range(__base_new.begin(), __base_new.end());
+      }
       
       return begin() + __n;
     }

@@ -387,9 +387,9 @@ namespace succinctdb
       __size = 0;
       __offset = 0;
       
-      const size_type bin_size_power2 = (utils::bithack::is_power2(bin_size)
-					 ? bin_size
-					 : size_type(utils::bithack::next_largest_power2(bin_size)));
+      const size_type bin_size_power2 = utils::bithack::branch(utils::bithack::is_power2(bin_size),
+							       bin_size,
+							       size_type(utils::bithack::next_largest_power2(bin_size)));
       
       bins.clear();
       bins.reserve(bin_size_power2);
@@ -487,7 +487,7 @@ namespace succinctdb
     
   public:
     succinct_hash(size_type __bucket_size = 1024 * 1024 * 4)
-      : bins(utils::bithack::is_power2(__bucket_size) ? __bucket_size : utils::bithack::next_largest_power2(__bucket_size), 0),
+      : bins(utils::bithack::branch(utils::bithack::is_power2(__bucket_size), __bucket_size, static_cast<size_type>(utils::bithack::next_largest_power2(__bucket_size))), 0),
 	nexts(), keys(), offs() { clear(); }
     
 

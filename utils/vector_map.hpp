@@ -52,7 +52,9 @@ namespace utils
     
   private:
     typedef typename __vector_map_compare_impl<Key,Data,Compare>::compare compare_type;
-    typedef utils::simple_vector<value_type, Alloc> container_type;
+    
+    typedef typename Alloc::template rebind<value_type>::other alloc_type;
+    typedef utils::simple_vector<value_type, alloc_type> container_type;
     
   public:
     typedef typename container_type::pointer pointer;
