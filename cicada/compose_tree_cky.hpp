@@ -32,7 +32,7 @@
 //
 // CFG parsing over lattice
 //
-// HOT TO HANDLE OOV????
+// HOW TO HANDLE OOV????
 //
 // Insertion rule + glue rule...?
 //
@@ -263,92 +263,6 @@ namespace cicada
 	    }
 	  }
 	  
-	  // handle unary rules...
-	  if (! passives(first, last).empty()) {
-	    //std::cerr << "closure from passives: " << passives(first, last).size() << std::endl;
-	    
-	    passive_set_type& passive_arcs = passives(first, last);
-	    
-	    size_t passive_first = 0;
-	    
-	    // initialize closure..
-	    closure.clear();
-	    passive_set_type::const_iterator piter_end = passive_arcs.end();
-	    for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter)
-	      closure[non_terminals[*piter]] = 0;
-
-	    edge_type::node_set_type tails(1);
-	    
-	    int unary_loop = 0;
-	    for (;;) {
-	      const size_t passive_size = passive_arcs.size();
-	      const size_t closure_size = closure.size();
-	      
-	      closure_head.clear();
-	      closure_tail.clear();
-	      
-	      for (size_t table = 0; table != tree_grammar.size(); ++ table) {
-		const tree_transducer_type& transducer = tree_grammar[table];
-		
-		for (size_t p = passive_first; p != passive_size; ++ p) {
-		  const symbol_type non_terminal = non_terminals[passive_arcs[p]];
-		  
-		  const tree_transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
-		  if (node == transducer.root()) continue;
-		  
-		  const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node);
-		  
-		  if (rules.empty()) continue;
-		  
-		  closure_tail.insert(non_terminal);
-		  
-		  tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-		  for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-		    const tree_rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-		    const symbol_type& lhs = rule->label;
-		    
-		    closure_level_type::const_iterator citer = closure.find(lhs);
-		    const int level = (citer != closure.end() ? citer->second : 0);
-		    
-		    closure_head.insert(lhs);
-		    
-		    tails.front() = passive_arcs[p];
-		    
-		    // apply rule...
-		    apply_rule(rule, riter->features, riter->attributes, tails, 
-			       passive_arcs, graph, first, last, level + 1);
-		    
-		  }
-		}
-	      }
-
-	      if (passive_size == passive_arcs.size()) break;
-	      
-	      passive_first = passive_size;
-	      
-	      // we use level-one, that is the label assigned for new-lhs!
-	      closure_type::const_iterator hiter_end = closure_head.end();
-	      for (closure_type::const_iterator hiter = closure_head.begin(); hiter != hiter_end; ++ hiter)
-		closure.insert(std::make_pair(*hiter, 1));
-	      
-	      // increment non-terminal level when used as tails...
-	      closure_type::const_iterator titer_end = closure_tail.end();
-	      for (closure_type::const_iterator titer = closure_tail.begin(); titer != titer_end; ++ titer)
-		++ closure[*titer];
-	      
-	      if (closure_size != closure.size())
-		unary_loop = 0;
-	      else
-		++ unary_loop;
-	      
-	      // 4 iterations
-	      if (unary_loop == 4) break;
-	    }
-	  }
-	  
-	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
-	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
-	  
 	  // TODO: how to handle OOV???
 	  // if we use grammar-insertion, phrases cannot be instantiated...
 	  // if we use generic POS symbol, then, we need to modify the symbol for the translational hypergraph...
@@ -420,12 +334,137 @@ namespace cicada
 		  edge.rule = rule_type::create(rule_type(lhs, rule->rhs));
 		  edge.features   = riter->features;
 		  edge.attributes = riter->attributes;
-		    
+		  
 		  graph.connect_edge(edge.id, *piter);
 		}
 	      }
 	    }
 	  }
+	  
+	  // handle unary rules...
+	  // TODO: handle unary rules both for tree-grammar and grammar!!!!
+	  if (! passives(first, last).empty()) {
+	    //std::cerr << "closure from passives: " << passives(first, last).size() << std::endl;
+	    
+	    passive_set_type& passive_arcs = passives(first, last);
+	    
+	    size_t passive_first = 0;
+	    
+	    // initialize closure..
+	    closure.clear();
+	    passive_set_type::const_iterator piter_end = passive_arcs.end();
+	    for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter)
+	      closure[non_terminals[*piter]] = 0;
+
+	    edge_type::node_set_type tails(1);
+	    
+	    int unary_loop = 0;
+	    for (;;) {
+	      const size_t passive_size = passive_arcs.size();
+	      const size_t closure_size = closure.size();
+	      
+	      closure_head.clear();
+	      closure_tail.clear();
+	      
+	      for (size_t table = 0; table != tree_grammar.size(); ++ table) {
+		const tree_transducer_type& transducer = tree_grammar[table];
+		
+		for (size_t p = passive_first; p != passive_size; ++ p) {
+		  const symbol_type non_terminal = non_terminals[passive_arcs[p]];
+		  
+		  const tree_transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
+		  if (node == transducer.root()) continue;
+		  
+		  const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+		  
+		  if (rules.empty()) continue;
+		  
+		  closure_tail.insert(non_terminal);
+		  
+		  tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+		  for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+		    const tree_rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
+		    const symbol_type& lhs = rule->label;
+		    
+		    closure_level_type::const_iterator citer = closure.find(lhs);
+		    const int level = (citer != closure.end() ? citer->second : 0);
+		    
+		    closure_head.insert(lhs);
+		    
+		    tails.front() = passive_arcs[p];
+		    
+		    // apply rule...
+		    apply_rule(rule, riter->features, riter->attributes, tails, 
+			       passive_arcs, graph, first, last, level + 1);
+		    
+		  }
+		}
+	      }
+
+	      for (size_t table = 0; table != grammar.size(); ++ table) {
+		const transducer_type& transducer = grammar[table];
+		
+		if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+		
+		for (size_t p = passive_first; p != passive_size; ++ p) {
+		  const symbol_type non_terminal = non_terminals[passive_arcs[p]];
+		  
+		  const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
+		  if (node == transducer.root()) continue;
+		  
+		  const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+		  
+		  if (rules.empty()) continue;
+		  
+		  // passive_arcs "MAY" be modified!
+		  
+		  closure_tail.insert(non_terminal);
+		  
+		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
+		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+		    const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
+		    const symbol_type& lhs = rule->lhs;
+		    
+		    closure_level_type::const_iterator citer = closure.find(lhs);
+		    const int level = (citer != closure.end() ? citer->second : 0);
+		    
+		    closure_head.insert(lhs);
+		    
+		    tails.front() = passive_arcs[p];
+		    
+		    apply_rule(rule, riter->features, riter->attributes, tails,
+			       passive_arcs, graph, first, last, level + 1);
+		  }
+		}
+	      }
+	      
+	      if (passive_size == passive_arcs.size()) break;
+	      
+	      passive_first = passive_size;
+	      
+	      // we use level-one, that is the label assigned for new-lhs!
+	      closure_type::const_iterator hiter_end = closure_head.end();
+	      for (closure_type::const_iterator hiter = closure_head.begin(); hiter != hiter_end; ++ hiter)
+		closure.insert(std::make_pair(*hiter, 1));
+	      
+	      // increment non-terminal level when used as tails...
+	      closure_type::const_iterator titer_end = closure_tail.end();
+	      for (closure_type::const_iterator titer = closure_tail.begin(); titer != titer_end; ++ titer)
+		++ closure[*titer];
+	      
+	      if (closure_size != closure.size())
+		unary_loop = 0;
+	      else
+		++ unary_loop;
+	      
+	      // 4 iterations
+	      if (unary_loop == 4) break;
+	    }
+	  }
+	  
+	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
+	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
+	  
 	  	  
 	  // extend root with passive items at [first, last)
 	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
