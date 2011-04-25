@@ -112,7 +112,7 @@ namespace cicada
     
     iterator_type iter(os);
     
-    if (! karma::generate(iter, karma::int_ << '-' << karma::int_ << -karma::buffer[':' << standard::string], x))
+    if (! karma::generate(iter, karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_], x))
       throw std::runtime_error("span generation failed...?");
     
     return os;
@@ -127,7 +127,7 @@ namespace cicada
     
     iterator_type iter(os);
     
-    if (! karma::generate(iter, -((karma::int_ << '-' << karma::int_ << -karma::buffer[':' << standard::string]) % ' '), x))
+    if (! karma::generate(iter, -((karma::int_ << '-' << karma::int_ << -karma::buffer[':' << +standard::char_]) % ' '), x))
       throw std::runtime_error("span vector generation failed...?");
     
     return os;
