@@ -556,12 +556,11 @@ namespace cicada
       graph_out.connect_edge(edge_id, root);
       
       tails_type::const_iterator titer = tails.begin();
-      for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter) {
+      for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
 	if (aiter->label.is_non_terminal() && ! aiter->antecedents.empty()) {
 	  construct_graph(*aiter, *titer, frontiers, graph_in, graph_out, non_terminal_pos);
 	  ++ titer;
 	}
-      }
       
       return edge_id;
     }
