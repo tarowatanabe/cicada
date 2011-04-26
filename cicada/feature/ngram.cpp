@@ -587,7 +587,6 @@ namespace cicada
       path_type   coarse_path;
       int         coarse_order = 0;
       path_type   coarse_cluster_path;
-      bool        coarse_no_bos_eos = false;
       
       std::string name;
 
@@ -606,8 +605,6 @@ namespace cicada
 	  coarse_order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-cluster")
 	  coarse_cluster_path = piter->second;
-	else if (utils::ipiece(piter->first) == "coarse-no-bos-eos")
-	  coarse_no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
@@ -651,7 +648,7 @@ namespace cicada
 	if (! coarse_path.empty()) {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
 
-	  ngram_impl->no_bos_eos = coarse_no_bos_eos;
+	  ngram_impl->no_bos_eos = no_bos_eos;
 	  
 	  if (! coarse_cluster_path.empty()) {
 	    if (! boost::filesystem::exists(coarse_cluster_path))
