@@ -88,7 +88,6 @@ Add mert,decode,mbr,parse script?
 A unified framework to collect statistics: Do we need stats from features?
     We have a support to collect stats from operations, but not from individual features..
 
-
-Cube summing????
-   I'm still not sure how to accumulate residual counts. It seems to be 
-   an approximated counts...?????
+Cube summing?
+     I'm still not sure how to efficiently collect residuals... Do we include state-less features
+     to serve as residual counts?
