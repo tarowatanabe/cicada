@@ -188,10 +188,10 @@ namespace cicada
 
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
-				    std::pair<const symbol_level_pair_type, unary_rule_set_type> > unary_rule_map_type;
+				    std::allocator< std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
 #else
     typedef sgi::hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
-			  std::pair<const symbol_level_pair_type, unary_rule_set_type> > unary_rule_map_type;
+			  std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
 
 #endif
     
