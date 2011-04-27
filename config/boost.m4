@@ -22,7 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 m4_define([_BOOST_SERIAL], [m4_translit([
-# serial 15
+# serial 16
 ], [#
 ], [])])
 
@@ -403,7 +403,7 @@ dnl generated only once above (before we start the for loops).
       LDFLAGS=$boost_save_LDFLAGS
       LIBS=$boost_save_LIBS
       if test x"$Boost_lib" = xyes; then
-        Boost_lib_LDFLAGS="-L$boost_ldpath"
+        Boost_lib_LDFLAGS="-L$boost_ldpath -Wl,-R$boost_ldpath"
         Boost_lib_LDPATH="$boost_ldpath"
         break 6
       else
@@ -627,6 +627,20 @@ BOOST_DEFUN([Optional],
 # Look for Boost.Preprocessor
 BOOST_DEFUN([Preprocessor],
 [BOOST_FIND_HEADER([boost/preprocessor/repeat.hpp])])
+
+
+# BOOST_UNORDERED()
+# -----------------
+# Look for Boost.Unordered
+BOOST_DEFUN([Unordered],
+[BOOST_FIND_HEADER([boost/unordered_map.hpp])])
+
+
+# BOOST_UUID()
+# ------------
+# Look for Boost.Uuid
+BOOST_DEFUN([Uuid],
+[BOOST_FIND_HEADER([boost/uuid/uuid.hpp])])
 
 
 # BOOST_PROGRAM_OPTIONS([PREFERRED-RT-OPT])
