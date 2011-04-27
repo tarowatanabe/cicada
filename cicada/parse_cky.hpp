@@ -90,7 +90,6 @@ namespace cicada
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
       
-      unary_map.set_empty_key(symbol_level_pair_type(symbol_level_type(), symbol_level_type()));
       node_map.set_empty_key(symbol_level_type());
     }
     
@@ -187,7 +186,14 @@ namespace cicada
     
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
 
-    typedef google::dense_hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type> > unary_rule_map_type;
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
+				    std::pair<const symbol_level_pair_type, unary_rule_set_type> > unary_rule_map_type;
+#else
+    typedef sgi::hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
+			  std::pair<const symbol_level_pair_type, unary_rule_set_type> > unary_rule_map_type;
+
+#endif
     
     struct Candidate
     {
