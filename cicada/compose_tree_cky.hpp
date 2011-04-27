@@ -68,8 +68,6 @@ namespace cicada
     typedef hypergraph_type::rule_type        rule_type;
     typedef hypergraph_type::rule_ptr_type    rule_ptr_type;
     
-    typedef tree_transducer_type::rule_pair_set_type tree_rule_pair_set_type;
-    typedef tree_transducer_type::rule_pair_type     tree_rule_pair_type;
     typedef tree_transducer_type::rule_type          tree_rule_type;
     typedef tree_transducer_type::rule_ptr_type      tree_rule_ptr_type;
     
@@ -85,6 +83,7 @@ namespace cicada
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
       
       node_map.set_empty_key(symbol_level_type());
+      node_map_local.set_empty_key(symbol_level_type());
       closure.set_empty_key(symbol_type());
       closure_head.set_empty_key(symbol_type());
       closure_tail.set_empty_key(symbol_type());
@@ -367,6 +366,8 @@ namespace cicada
 	      }
 	    }
 	  }
+
+	  node_map_local = node_map;
 	  
 	  // handle unary rules...
 	  // TODO: handle unary rules both for tree-grammar and grammar!!!!
@@ -493,6 +494,7 @@ namespace cicada
 	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
 	  
 	  // extend root with passive items at [first, last)
+	  // we need to do this for simple transducers, also...
 	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
 	    const tree_transducer_type& transducer = tree_grammar[table];
 	    
@@ -502,6 +504,63 @@ namespace cicada
 	    active_tree_set_type& cell = actives_tree[table](first, last);
 	    
 	    extend_actives(transducer, active_arcs, passive_arcs, cell);
+	  }
+	  
+	  for (size_t table = 0; table != grammar.size(); ++ table) {
+	    const transducer_type& transducer = grammar[table];
+	    
+	    const active_rule_set_type& active_arcs  = actives_rule[table](first, first);
+	    const passive_set_type&     passive_arcs = passives(first, last);
+	    
+	    active_rule_set_type& cell = actives_rule[table](first, last);
+	    
+	    extend_actives(transducer, active_arcs, passive_arcs, cell);
+	  }
+	  
+	  // final patch work...
+	  //
+	  // From the pool of actives in actives_rule[table](first, last)
+	  // find phrasal rule, and try match with existing forest if not already used!
+	  // we will be flexible in adjusting the lhs symbol so that we can match it with non-temrinals in the forest.
+	  
+	  for (size_t table = 0; table != grammar.size(); ++ table) {
+	    const transducer_type& transducer = grammar[table];
+	    
+	    active_rule_set_type&  cell         = actives_rule[table](first, last);
+	    passive_set_type&      passive_arcs = passives(first, last);
+	    
+	    // we will collect only phrasal rules...
+	    active_rule_set_type::const_iterator citer_end = cell.end();
+	    for (active_rule_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) 
+	      if (citer->tails.empty()) {
+		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
+		
+		if (rules.empty()) continue;
+		
+		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
+		transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
+		
+		for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
+		  const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
+
+		  if (node_map_local.find(rule->lhs) != node_map_local.end()) continue;
+		  
+		  node_map_type::const_iterator liter_end = node_map_local.end();
+		  for (node_map_type::const_iterator liter = node_map_local.begin(); liter != liter_end; ++ liter) 
+		    if (liter->first != rule->lhs) {
+		      const symbol_type& lhs = liter->first;
+		      
+		      // create new rule
+		      edge_type& edge_new = graph.add_edge();
+		      edge_new.rule = rule_type::create(rule_type(lhs, rule->rhs));
+		      edge_new.features   = riter->features;
+		      edge_new.attributes = riter->attributes;
+		      
+		      edge.attributes[attr_span_first] = attribute_set_type::int_type(first);
+		      edge.attributes[attr_span_last]  = attribute_set_type::int_type(last);
+		    }
+		}
+	      }
 	  }
 	}
       
@@ -729,6 +788,7 @@ namespace cicada
     passive_chart_type         passives;
 
     node_map_type         node_map;
+    node_map_type         node_map_local;
     closure_level_type    closure;
     closure_type          closure_head;
     closure_type          closure_tail;
