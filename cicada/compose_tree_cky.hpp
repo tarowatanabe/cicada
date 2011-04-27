@@ -589,7 +589,7 @@ namespace cicada
     {
       hypergraph_type::edge_type& edge = graph.add_edge(frontier);
       edge.rule = rule;
-      edge.features = features;
+      edge.features   = features;
       edge.attributes = attributes;
       
       // assign metadata...

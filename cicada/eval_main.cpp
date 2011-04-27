@@ -32,9 +32,9 @@ void process(const std::string& name, const sentence_set_type& refset, const sen
 
 int main(int argc, char** argv)
 {
-  sentence_set_type refset("aaa bbb ccc ddd ||| aaa ccc");
-  sentence_type     tstset("aaa ccc ddd");
-
+  sentence_set_type refset("export of high-tech products in guangdong in first two months this year reached 3.76 billion us dollars ||| guangdong's export of new high technology products amounts to us $ 3.76 billion in first two months of this year ||| guangdong exports us $ 3.76 billion worth of high technology products in the first two months of this year ||| in the first 2 months this year , the export volume of new hi-tech products in guangdong province reached 3.76 billion us dollars .");
+  sentence_type     tstset("one guangdong province will next export us $ 3.76 high-tech product two months first this year 3.76 billion us dollars");
+  
   process("bleu", refset, tstset);
   process("ter", refset, tstset);
   process("wer", refset, tstset);

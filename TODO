@@ -19,6 +19,9 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     Allow special encoding in tree-grammar...
     Use ComposeTreeCKY and ParseTreeCKY with an option to support grammar encoding
     using "frontiers" as our key for indexing in tree-transducer.
+    How to handle OOV..???
+    	tree sequence model: [s] ||| [ROOT], [s] ||| [s] [ROOT], [s] ||| [x], [x] ||| (hierarchical) phrase
+	phrase insertion: [any] ||| phrase (still, we cannnot handle OOV, since lhs is unknown before construction!)
 
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
