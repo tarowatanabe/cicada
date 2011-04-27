@@ -275,7 +275,6 @@ namespace cicada
 		// apply tree-rule
 		apply_rule(rule, riter->features + citer->features, riter->attributes + citer->attributes, citer->tails, 
 			   passive_arcs, graph, first, last);
-		
 	      }
 	    }
 	  }
@@ -542,7 +541,7 @@ namespace cicada
 		
 		for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
 		  const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-
+		  
 		  if (node_map_local.find(rule->lhs) != node_map_local.end()) continue;
 		  
 		  node_map_type::const_iterator liter_end = node_map_local.end();
