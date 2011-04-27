@@ -90,6 +90,7 @@ namespace cicada
     {
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
       
+      unary_map.set_empty_key(symbol_level_pair_type(symbol_level_type(), symbol_level_type()));
       node_map.set_empty_key(symbol_level_type());
     }
     
@@ -185,15 +186,8 @@ namespace cicada
     typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
     
     typedef std::pair<symbol_level_type, symbol_level_type> symbol_level_pair_type;
-    
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
-				    std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
-#else
-    typedef sgi::hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type>,
-			  std::allocator<std::pair<const symbol_level_pair_type, unary_rule_set_type> > > unary_rule_map_type;
-  
-#endif
+
+    typedef google::dense_hash_map<symbol_level_pair_type, unary_rule_set_type, utils::hashmurmur<size_t>, std::equal_to<symbol_level_pair_type> > unary_rule_map_type;
     
     struct Candidate
     {
@@ -432,7 +426,7 @@ namespace cicada
 	      
 	      unary_rule_set_type& unaries = unary_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 	      
-	      if (unaries.find(*(item->first)) != unaries.end()) {
+	      if (! unaries.insert(*(item->first)).second) {
 		typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
@@ -441,13 +435,10 @@ namespace cicada
 		node_passive.second = score > scores[niter->second];
 		
 		scores[niter->second] = std::max(scores[niter->second], score);
-	      } else {
+	      } else
 		node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
 					  active.tails.begin(), active.tails.end(), passive_arcs, graph,
 					  first, last, utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level));
-		
-		unaries.insert(*(item->first));
-	      }
 	    } else
 	      node_passive = apply_rule(score, rule.rule, active.features + rule.features, active.attributes + rule.attributes,
 					active.tails.begin(), active.tails.end(), passive_arcs, graph,
