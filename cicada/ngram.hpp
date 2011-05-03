@@ -93,7 +93,7 @@ namespace cicada
     
   public:
     static const logprob_type logprob_min() { return boost::numeric::bounds<logprob_type>::lowest(); }
-    static const logprob_type logprob_bos() { return -99.0 * std::log(10.0); }
+    static const logprob_type logprob_bos() { return -99.0 * M_LN10; }
     
   public:
     template <typename Iterator>
