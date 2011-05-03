@@ -198,20 +198,18 @@ namespace cicada
 	  buffer_id_type& buffer_id = const_cast<buffer_id_type&>(buffer_id_impl);
 	  buffer_id.clear();
 
-	  const bool is_bos = (vocab_type::BOS == *first);
-	  
 	  for (/**/; first != last; ++ first) {
 	    buffer_id.push_back(ngram.index.vocab()[*first]);
 	    
-	    if (! is_bos || buffer_id.size() != 1) {
-	      bool estimated = false;
-	      double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
-	      
-	      if (! ngram.bound_exact && estimated && logbound < 0.0)
-		logbound *= decays[buffer_id.size()];
-	      
-	      cache.logprob += logbound;
-	    }
+	    if (buffer_id.size() == 1 && vocab_type::BOS == *first) continue;
+	    
+	    bool estimated = false;
+	    double logbound = ngram.logbound(buffer_id.begin(), buffer_id.end(), estimated);
+	    
+	    if (! ngram.bound_exact && estimated && logbound < 0.0)
+	      logbound *= decays[buffer_id.size()];
+	    
+	    cache.logprob += logbound;
 	  }
 	}
 	  

@@ -93,7 +93,7 @@ namespace cicada
     
   public:
     static const logprob_type logprob_min() { return boost::numeric::bounds<logprob_type>::lowest(); }
-    
+    static const logprob_type logprob_bos() { return -99.0 * std::log(10.0); }
     
   public:
     template <typename Iterator>
@@ -202,7 +202,7 @@ namespace cicada
 	    estimated = true;
 	    return __logbound;
 	  } else
-	    return (index.is_bos(*first) ? logprob_type(-99) : smooth);
+	    return (index.is_bos(*first) ? logprob_bos() : smooth);
 	} else
 	  return smooth;
       }
@@ -282,7 +282,7 @@ namespace cicada
       
       return logbackoff + (result.first == last && logprobs[shard_index](result.second, order) != logprob_min()
 			   ? logprobs[shard_index](result.second, order)
-			   : (index.is_bos(*first) ? logprob_type(-99) : smooth));
+			   : (index.is_bos(*first) ? logprob_bos() : smooth));
     }
     
     
