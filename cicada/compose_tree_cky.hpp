@@ -82,8 +82,6 @@ namespace cicada
     {  
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
       
-      node_map.set_empty_key(symbol_level_type());
-      node_map_local.set_empty_key(symbol_level_type());
       closure.set_empty_key(symbol_type());
       closure_head.set_empty_key(symbol_type());
       closure_tail.set_empty_key(symbol_type());
@@ -149,12 +147,31 @@ namespace cicada
       }
     };
     
-    typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
+    class NodeMap : public google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> >
+    {
+    public:
+      typedef google::dense_hash_map<symbol_level_type, hypergraph_type::id_type, symbol_level_hash, std::equal_to<symbol_level_type> > node_map_type;
+      
+    public:
+      NodeMap() : node_map_type() { node_map_type::set_empty_key(symbol_level_type(symbol_type(), -1)); }
+    };
+    typedef NodeMap node_map_type;
+
+    class NodeSet : public google::dense_hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> >
+    {
+    public:
+      typedef google::dense_hash_map<symbol_type, hypergraph_type::id_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > node_set_type;
+      
+    public:
+      NodeSet() : node_set_type() { node_set_type::set_empty_key(symbol_type()); }
+    };
+    typedef NodeSet node_set_type;
+    
+    typedef utils::chunk_vector<node_set_type, 4096 / sizeof(node_set_type), std::allocator<node_set_type> > node_graph_type;
+    typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     
     typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
     typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
-    
-    typedef std::vector<symbol_type, std::allocator<symbol_type> > non_terminal_set_type;
     
     struct less_non_terminal
     {
@@ -179,10 +196,15 @@ namespace cicada
       actives_tree.clear();
       actives_rule.clear();
       passives.clear();
+      
+      node_map.clear();
+      goal_id = hypergraph_type::invalid;
       non_terminals.clear();
       
       actives_tree.resize(tree_grammar.size(), active_tree_chart_type(lattice.size() + 1));
       actives_rule.resize(grammar.size(), active_rule_chart_type(lattice.size() + 1));
+      
+      passives.reserve(lattice.size() + 1);
       passives.resize(lattice.size() + 1);
       
       // initialize active chart
@@ -365,8 +387,6 @@ namespace cicada
 	      }
 	    }
 	  }
-
-	  node_map_local = node_map;
 	  
 	  // handle unary rules...
 	  // TODO: handle unary rules both for tree-grammar and grammar!!!!
@@ -566,6 +586,7 @@ namespace cicada
       // final...
       
       // we will clear node map so that we will always create new node..
+      
       node_map.clear();
       
       if (unique_goal) {
@@ -590,7 +611,7 @@ namespace cicada
 	  }
       }
     }
-
+    
     template <typename Transducer, typename Actives>
     bool extend_actives(const Transducer& transducer,
 			const Actives& actives, 
@@ -634,7 +655,8 @@ namespace cicada
     }
     
     
-    void apply_rule(const rule_ptr_type& rule,
+    void apply_rule(const symbol_type& lhs,
+		    const rule_ptr_type& rule,
 		    const feature_set_type& features,
 		    const attribute_set_type& attributes,
 		    const hypergraph_type::edge_type::node_set_type& frontier,
@@ -676,7 +698,8 @@ namespace cicada
       }
     }
     
-    void apply_rule(const tree_rule_type& rule,
+    void apply_rule(const symbol_type& lhs,
+		    const tree_rule_type& rule,
 		    const feature_set_type& features,
 		    const attribute_set_type& attributes,
 		    const hypergraph_type::edge_type::node_set_type& frontier,
@@ -687,7 +710,6 @@ namespace cicada
 		    const int level = 0,
 		    const bool is_goal = false)
     {
-      
       hypergrap_type::id_type root_id = hypergraph_type::invalid;
       if (is_goal) {
 	if (! graph.is_valid()) {
@@ -785,13 +807,15 @@ namespace cicada
     active_tree_chart_set_type actives_tree;
     active_rule_chart_set_type actives_rule;
     passive_chart_type         passives;
-
-    node_map_type         node_map;
-    node_map_type         node_map_local;
+    
     closure_level_type    closure;
     closure_type          closure_head;
     closure_type          closure_tail;
-    non_terminal_set_type non_terminals;
+    
+    node_map_type           node_map;
+    node_graph_type         graph_source;
+    hypegraph_type::id_type graph_goal;
+    non_terminal_set_type   non_terminals;
   };
   
   
