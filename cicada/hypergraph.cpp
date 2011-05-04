@@ -345,10 +345,10 @@ namespace cicada
   typedef std::vector<feature_gen_type, std::allocator<feature_gen_type> > feature_generated_type;
 
   template <typename Iterator>
-  struct features_generator : boost::spirit::karma::grammar<Iterator, feature_generated_type()>
+  struct features_generator : boost::spirit::karma::grammar<Iterator, cicada::HyperGraph::feature_set_type()>
   {
-    //typedef cicada::HyperGraph::feature_set_type feature_set_type;
-    typedef feature_generated_type feature_set_type;
+    typedef cicada::HyperGraph::feature_set_type feature_set_type;
+    //typedef feature_generated_type feature_set_type;
     
     features_generator() : features_generator::base_type(features)
     {
@@ -499,7 +499,7 @@ namespace cicada
       
       hypergraph_feature_generator_impl::grammar_type& grammar = hypergraph_feature_generator_impl::instance();
 
-      feature_generated_type features;
+      //feature_generated_type features;
       
       // dump nodes...
       bool initial_node = true;
@@ -531,15 +531,17 @@ namespace cicada
 	    os << "],";
 	  }
 	  
+#if 0
 	  features.clear();
 	  hypergraph_type::feature_set_type::const_iterator fiter_end = edge.features.end();
 	  for (hypergraph_type::feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 	    if (fiter->second != 0.0 && ! fiter->first.empty())
 	      features.push_back(*fiter);
+#endif
 	  
-	  if (! features.empty()) {
+	  if (! edge.features.empty()) {
 	    os << "\"feature\":{";
-	    karma::generate(hypergraph_feature_generator_impl::iterator_type(os), grammar, features);
+	    karma::generate(hypergraph_feature_generator_impl::iterator_type(os), grammar, edge.features);
 	    os << "},";
 	  }
 	  
