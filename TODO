@@ -23,6 +23,11 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     	tree sequence model: [s] ||| [ROOT], [s] ||| [s] [ROOT], [s] ||| [x], [x] ||| (hierarchical) phrase
 	phrase insertion: [any] ||| phrase (still, we cannnot handle OOV, since lhs is unknown before construction!)
 
+    Handling source side lhs and target side lhs: How
+        Basically, we perform parsing only the source source rules, then, collect projected target side on the fly.
+	Thus, we need to keep track of the list of lhs for target side and the "virtual node id" of source side lhs.
+	
+
 Systematic symbols:
   - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
     I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
