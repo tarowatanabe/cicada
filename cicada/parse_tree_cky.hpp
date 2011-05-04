@@ -316,6 +316,24 @@ namespace cicada
       
       const non_terminal_set_type& non_terminals;
     };
+
+    struct VerifyNone
+    {
+      template <typename Transducer>
+      bool operator()(const Transducer& transducer, const size_t first, const size_t last, const size_t distance) const
+      {
+	return true;
+      }
+    };
+    
+    struct VerifySpan
+    {
+      template <typename Transducer>
+      bool operator()(const Transducer& transducer, const size_t first, const size_t last, const size_t distance) const
+      {
+	return transducer.valid_span(first, last, distance);
+      }
+    };
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
@@ -373,96 +391,8 @@ namespace cicada
 	  	  
 	  //std::cerr << "span: " << first << ".." << last << " distance: " << lattice.shortest_distance(first, last) << std::endl;
 	  
-	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
-	    const tree_transducer_type& transducer = tree_grammar[table];
-	    
-	    // first, extend active items...
-	    active_tree_set_type& cell = actives_tree[table](first, last);
-	    
-	    for (size_t middle = first + 1; middle < last; ++ middle) {
-	      const active_tree_set_type&  active_arcs  = actives_tree[table](first, middle);
-	      const passive_set_type& passive_arcs = passives(middle, last);
-	      
-	      extend_actives(transducer, active_arcs, passive_arcs, cell);
-	    }
-	    
-	    // then, advance by terminal(s) at lattice[last - 1];
-	    const active_tree_set_type&       active_arcs  = actives_tree[table](first, last - 1);
-	    const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
-	    
-	    typename active_tree_set_type::const_iterator aiter_begin = active_arcs.begin();
-	    typename active_tree_set_type::const_iterator aiter_end = active_arcs.end();
-	    
-	    if (aiter_begin == aiter_end) continue;
-	    
-	    lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
-	    for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-	      const symbol_type& terminal = piter->label;
-	      
-	      active_tree_set_type& cell = actives_tree[table](first, last - 1 + piter->distance);
-	      
-	      // handling of EPSILON tree...
-	      if (terminal == vocab_type::EPSILON) {
-		for (typename active_tree_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-		  cell.push_back(active_tree_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-	      } else {
-		for (typename active_tree_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		  if (node == transducer.root()) continue;
-		  
-		  cell.push_back(active_tree_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		}
-	      }
-	    }
-	  }
-	  
-	  for (size_t table = 0; table != grammar.size(); ++ table) {
-	    const transducer_type& transducer = grammar[table];
-	    
-	    // we will advance active spans, but constrained by transducer's valid span
-	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
-	    
-	    // advance dots....
-	    
-	    // first, extend active items...
-	    active_rule_set_type& cell = actives_rule[table](first, last);
-	    
-	    for (size_t middle = first + 1; middle < last; ++ middle) {
-	      const active_rule_set_type& active_arcs  = actives_rule[table](first, middle);
-	      const passive_set_type&     passive_arcs = passives(middle, last);
-	      
-	      extend_actives(transducer, active_arcs, passive_arcs, cell);
-	    }
-	    
-	    // then, advance by terminal(s) at lattice[last - 1];
-	    const active_rule_set_type&       active_arcs  = actives_rule[table](first, last - 1);
-	    const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
-	    
-	    typename active_rule_set_type::const_iterator aiter_begin = active_arcs.begin();
-	    typename active_rule_set_type::const_iterator aiter_end = active_arcs.end();
-	    
-	    if (aiter_begin == aiter_end) continue;
-	    
-	    lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
-	    for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-	      const symbol_type& terminal = piter->label;
-	      
-	      active_rule_set_type& cell = actives_rule[table](first, last - 1 + piter->distance);
-	      
-	      // handling of EPSILON rule...
-	      if (terminal == vocab_type::EPSILON) {
-		for (typename active_rule_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-		  cell.push_back(active_rule_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-	      } else {
-		for (typename active_rule_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		  const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		  if (node == transducer.root()) continue;
-		  
-		  cell.push_back(active_rule_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		}
-	      }
-	    }
-	  }
+	  extend_actives(first, last, lattice, tree_grammar, actives_tree, passives, VerifyNone());
+	  extend_actives(first, last, lattice, grammar, actives_rule, passives, VerifySpan());
 	  
 	  // complete active items if possible... The active items may be created from child span due to the
 	  // lattice structure...
@@ -723,24 +653,76 @@ namespace cicada
       }
     }
     
-    bool extend_actives(const transducer_type& transducer,
-			const active_set_type& actives, 
-			const passive_set_type& passives,
-			active_set_type& cell)
+    template <typename Transducers, typename Actives, typename Verify>
+    void extend_actives(const size_t first,
+			const size_t last,
+			const lattice_type& lattice,
+			const Transducers& transducers,
+			Actives& actives,
+			const passive_chart_type& passives,
+			Verify verify)
     {
-      typename active_set_type::const_iterator aiter_begin = actives.begin();
-      typename active_set_type::const_iterator aiter_end   = actives.end();
+      typedef typename Actives::value_type::value_type active_set_type;
+
+      for (size_t table = 0; table != transducers.size(); ++ table) {
+	
+	if (! verify(transducers[table], first, last, lattice.shortest_distance(first, last))) continue;
+	
+	active_set_type& cell = actives[table](first, last);
+	
+	for (size_t middle = first + 1; middle < last; ++ middle)
+	  extend_actives(transducers[table], actives[table](first, middle), passives(middle, last), cell);
+	
+	// then, advance by terminal(s) at lattice[last - 1];
+	const active_set_type&            active_arcs  = actives[table](first, last - 1);
+	const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
+	
+	typename active_set_type::const_iterator aiter_begin = active_arcs.begin();
+	typename active_set_type::const_iterator aiter_end   = active_arcs.end();
+	
+	if (aiter_begin == aiter_end) continue;
+	
+	lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+	for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+	  const symbol_type& terminal = piter->label;
+	  
+	  active_set_type& cell = actives[table](first, last - 1 + piter->distance);
+	  
+	  // handling of EPSILON tree...
+	  if (terminal == vocab_type::EPSILON) {
+	    for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	      cell.push_back(typename active_set_type::value_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+	  } else {
+	    for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+	      const transducer_type::id_type node = transducers[table].next(aiter->node, terminal);
+	      if (node == transducer.root()) continue;
+	      
+	      cell.push_back(typename active_set_type::value_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
+	    }
+	  }
+	}
+      }
+    }
+    
+    template <typename Transducer, typename Actives>
+    bool extend_actives(const Transducer& transducer,
+			const Actives& actives, 
+			const passive_set_type& passives,
+			Actives& cell)
+    {
+      typename Actives::const_iterator aiter_begin = actives.begin();
+      typename Actives::const_iterator aiter_end   = actives.end();
       
       passive_set_type::const_iterator piter_begin = passives.begin();
       passive_set_type::const_iterator piter_end   = passives.end();
-
+      
       bool found = false;
       
       if (piter_begin != piter_end)
-	for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	for (typename Actives::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
 	  if (transducer.has_next(aiter->node)) {
 	    symbol_type label;
-	    transducer_type::id_type node = transducer.root();
+	    typename Transducer::id_type node = transducer.root();
 	    
 	    hypergraph_type::edge_type::node_set_type tails(aiter->tails.size() + 1);
 	    std::copy(aiter->tails.begin(), aiter->tails.end(), tails.begin());
@@ -755,7 +737,7 @@ namespace cicada
 	      if (node == transducer.root()) continue;
 	      
 	      tails.back() = *piter;
-	      cell.push_back(active_type(node, tails, aiter->features, aiter->attributes));
+	      cell.push_back(typename Actives::value_type(node, tails, aiter->features, aiter->attributes));
 	      
 	      found = true;
 	    }

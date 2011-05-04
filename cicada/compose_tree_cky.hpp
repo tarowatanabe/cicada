@@ -186,6 +186,24 @@ namespace cicada
       const non_terminal_set_type& non_terminals;
     };
     
+    struct VerifyNone
+    {
+      template <typename Transducer>
+      bool operator()(const Transducer& transducer, const size_t first, const size_t last, const size_t distance) const
+      {
+	return true;
+      }
+    };
+    
+    struct VerifySpan
+    {
+      template <typename Transducer>
+      bool operator()(const Transducer& transducer, const size_t first, const size_t last, const size_t distance) const
+      {
+	return transducer.valid_span(first, last, distance);
+      }
+    };
+
     void operator()(const lattice_type& lattice, hypergraph_type& graph)
     {
       graph.clear();
@@ -281,7 +299,7 @@ namespace cicada
 	    // complete active items if possible... The active items may be created from child span due to the
 	    // lattice structure...
 	    // apply rules on actives at [first, last)
-
+	    
 	    active_tree_set_type&  cell         = actives_tree[table](first, last);
 	    passive_set_type&      passive_arcs = passives(first, last);
 	    
