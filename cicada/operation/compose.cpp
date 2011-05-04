@@ -18,6 +18,100 @@ namespace cicada
 {
   namespace operation
   {
+    ComposeTreeCKY::ComposeTreeCKY(const std::string& parameter,
+				   const tree_grammar_type& __tree_grammar,
+				   const grammar_type& __grammar,
+				   const std::string& __goal,
+				   const int __debug)
+      : base_type("compose-tree-cky"),
+	tree_grammar(__tree_grammar), grammar(__grammar),
+	goal(__goal),
+	yield_source(false),
+	unique_goal(false), 
+	debug(__debug)
+    {
+      typedef cicada::Parameter param_type;
+	
+      param_type param(parameter);
+      if (utils::ipiece(param.name()) != "compose-tree-cky" && utils::ipiece(param.name()) != "compose-tree-cyk")
+	throw std::runtime_error("this is not a Tree composer");
+	
+      bool source = false;
+      bool target = false;
+	
+      for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
+	    source = true;
+	  else if (utils::ipiece(piter->second) == "target")
+	    target = true;
+	  else
+	    throw std::runtime_error("unknown yield: " + piter->second);
+	} else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "tree-grammar")
+	  tree_grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
+	  unique_goal = utils::lexical_cast<bool>(piter->second);
+	else
+	  std::cerr << "WARNING: unsupported parameter for Tree composer: " << piter->first << "=" << piter->second << std::endl;
+      }
+	
+      if (source && target)
+	throw std::runtime_error("Tree composer can work either source or target yield");
+	
+      yield_source = source;
+    }
+
+    void ComposeTreeCKY::operator()(data_type& data) const
+    {
+      if (! data.hypergraph.is_valid()) return;
+
+      const lattice_type& lattice = data.lattice;
+      hypergraph_type& hypergraph = data.hypergraph;
+      hypergraph_type composed;
+
+      if (debug)
+	std::cerr << name << ": " << data.id << std::endl;
+      
+      const grammar_type& grammar_compose = (grammar_local.empty() ? grammar : grammar_local);
+      const tree_grammar_type& tree_grammar_compose = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
+	
+      utils::resource start;
+
+      grammar_compose.assign(lattice);
+      tree_grammar_compose.assign(lattice);
+      
+      cicada::compose_tree_cky(goal, tree_grammar_compose, grammar_compose, lattice, composed, yield_source, unique_goal);
+	
+      utils::resource end;
+    
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
+		  << std::endl;
+      
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " # of nodes: " << composed.nodes.size()
+		  << " # of edges: " << composed.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(composed.is_valid())
+		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += composed.nodes.size();
+      stat.edge += composed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      
+      hypergraph.swap(composed);
+    }
+
     ComposeTree::ComposeTree(const std::string& parameter,
 			     const tree_grammar_type& __tree_grammar,
 			     const grammar_type& __grammar,

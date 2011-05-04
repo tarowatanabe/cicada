@@ -12,5 +12,6 @@
 #include <cicada/compose_grammar.hpp>
 #include <cicada/compose_phrase.hpp>
 #include <cicada/compose_tree.hpp>
+#include <cicada/compose_tree_cky.hpp>
 
 #endif

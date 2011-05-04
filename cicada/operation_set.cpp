@@ -92,6 +92,12 @@ compose-tree: composition from tree with tree grammar\n\
 \tgoal=[goal symbol]\n\
 \tgrammar=[grammar spec] grammar\n\
 \ttree-grammar=[grammar spec] tree grammar\n\
+compose-tree-cky: composition from tree with tree grammar\n\
+\tyield=[source|target] use source or target yield for rule\n\
+\tgoal=[goal symbol]\n\
+\tgrammar=[grammar spec] grammar\n\
+\ttree-grammar=[grammar spec] tree grammar\n\
+\tunique-goal=[true|false] unique goal\n\
 debinarize: de-binarize forest\n\
 expected-ngram: expected ngram computation\n\
 \torder=<ngram order>\n\
@@ -236,6 +242,8 @@ span-forest: annotate terminal span\n\
 	operations.push_back(operation_ptr_type(new operation::Clear(*piter, debug)));
       else if (param_name == "compose-tree")
 	operations.push_back(operation_ptr_type(new operation::ComposeTree(*piter, tree_grammar, grammar, goal, debug)));
+      else if (param_name == "compose-tree-cky" || param_name == "compose-tree-cyk")
+	operations.push_back(operation_ptr_type(new operation::ComposeTreeCKY(*piter, tree_grammar, grammar, goal, debug)));
       else if (param_name == "compose-earley")
 	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, debug)));
       else if (param_name == "compose-cky" || param_name == "compose-cyk")

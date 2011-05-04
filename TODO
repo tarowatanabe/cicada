@@ -23,9 +23,9 @@ Use source side tree-fragment as a rule, and parse "lattice" (or, string-to-tree
     	tree sequence model: [s] ||| [ROOT], [s] ||| [s] [ROOT], [s] ||| [x], [x] ||| (hierarchical) phrase
 	phrase insertion: [any] ||| phrase (still, we cannnot handle OOV, since lhs is unknown before construction!)
 
-    Handling source side lhs and target side lhs: How
-        Basically, we perform parsing only the source source rules, then, collect projected target side on the fly.
-	Thus, we need to keep track of the list of lhs for target side and the "virtual node id" of source side lhs.
+    Handling source side lhs and target side lhs:
+       We will construct source-hypergrpah using only the source-side rules.
+       Then, perform projection into target side to construct translational forest.
 	
 
 Systematic symbols:

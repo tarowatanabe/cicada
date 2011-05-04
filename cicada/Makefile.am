@@ -252,6 +252,7 @@ compose_earley.hpp \
 compose_grammar.hpp \
 compose_phrase.hpp \
 compose_tree.hpp \
+compose_tree_cky.hpp \
 debinarize.hpp \
 dot_product.hpp \
 edit_distance_forest.hpp \
