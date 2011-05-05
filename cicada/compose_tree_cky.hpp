@@ -464,8 +464,6 @@ namespace cicada
       }
       
       // final goal assignment...
-      
-      // we will clear node map so that we will always create new node..
       if (unique_goal) {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p) {
