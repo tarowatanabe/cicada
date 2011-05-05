@@ -106,8 +106,8 @@ expected-ngram: expected ngram computation\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tscale=scaling for score\n\
 generate-earley: re-generation from tree\n\
-\tdepth: depth of rule pattern \n\
-\twidth: width of rule pattern \n\
+\tdepth: depth of rule pattern (= vertial Markovization + 1. <= 0 for infinity)\n\
+\twidth: width of rule pattern (= horitonzal Markovization. < 0 for infinity)\n\
 intersect: compute intersection\n\
 \tlattice=[true|false] intersect with lattice\n\
 \ttarget=[true|false] intersect with one of target\n\
@@ -179,7 +179,7 @@ parse-tree-cky: parsing for tree-matching\n\
 \tunique-goal=[true|false] unique goal\n\
 permute: permute tree (monolingual tree only)\n\
 \tsize=permute size\n\
-\texclude=[a non-terminal] to prohibit permutation. You can supply multiple\n\
+\texclude=[a non-terminal] to prohibit permutation.\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
