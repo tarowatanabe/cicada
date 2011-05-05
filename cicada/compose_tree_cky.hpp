@@ -71,7 +71,8 @@ namespace cicada
 	yield_source(__yield_source),
 	unique_goal(__unique_goal),
 	attr_span_first("span-first"),
-	attr_span_last("span-last")
+	attr_span_last("span-last"),
+	attr_glue_tree(__grammar.empty() ? "" : "glue-tree")
     {  
       goal_rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, goal.non_terminal())));
       
@@ -185,6 +186,24 @@ namespace cicada
       
       const non_terminal_set_type& non_terminals;
     };
+
+    struct ExtractTreeLHS
+    {
+      template <typename RulePair>
+      const symbol_type& operator()(const RulePair& rule_pair) const
+      {
+	return rule_pair.source->label;
+      }
+    };
+    
+    struct ExtractRuleLHS
+    {
+      template <typename RulePair>
+      const symbol_type& operator()(const RulePair& rule_pair) const
+      {
+	return rule_pair.source->lhs;
+      }
+    };
     
     struct VerifyNone
     {
@@ -217,7 +236,8 @@ namespace cicada
       passives.clear();
       
       node_map.clear();
-      node_graph.clear();
+      node_graph_tree.clear();
+      node_graph_rule.clear();
       non_terminals.clear();
       
       actives_tree.resize(tree_grammar.size(), active_tree_chart_type(lattice.size() + 1));
@@ -248,167 +268,11 @@ namespace cicada
 	  
 	  node_map.clear();
 	  
-	  // tree-rules composed via CKY
-	  for (size_t table = 0; table != tree_grammar.size(); ++ table) {
-	    const tree_transducer_type& transducer = tree_grammar[table];
-	    
-	    // do we check by valid span...?
-	    
-	    // first, extend active items...
-	    {
-	      active_tree_set_type& cell = actives_tree[table](first, last);
-	      for (size_t middle = first + 1; middle < last; ++ middle) {
-		const active_tree_set_type&  active_arcs  = actives_tree[table](first, middle);
-		const passive_set_type& passive_arcs = passives(middle, last);
-		
-		extend_actives(transducer, active_arcs, passive_arcs, cell);
-	      }
-	    }
-	    
-	    // then, advance by terminal(s) at lattice[last - 1];
-	    {
-	      const active_tree_set_type&       active_arcs  = actives_tree[table](first, last - 1);
-	      const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
-	      
-	      active_tree_set_type::const_iterator aiter_begin = active_arcs.begin();
-	      active_tree_set_type::const_iterator aiter_end   = active_arcs.end();
-	      
-	      if (aiter_begin != aiter_end) {
-		lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
-		for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-		  const symbol_type& terminal = piter->label;
-		  
-		  active_tree_set_type& cell = actives_tree[table](first, last - 1 + piter->distance);
-		  
-		  // handling of EPSILON rule...
-		  if (terminal == vocab_type::EPSILON) {
-		    for (active_tree_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-		      cell.push_back(active_tree_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		  } else {
-		    for (active_tree_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		      const tree_transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		      if (node == transducer.root()) continue;
-		      
-		      cell.push_back(active_tree_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
-		    }
-		  }
-		}
-	      }
-	    }
-	      
-	    // complete active items if possible... The active items may be created from child span due to the
-	    // lattice structure...
-	    // apply rules on actives at [first, last)
-	    
-	    active_tree_set_type&  cell         = actives_tree[table](first, last);
-	    passive_set_type&      passive_arcs = passives(first, last);
-	    
-	    active_tree_set_type::const_iterator citer_end = cell.end();
-	    for (active_tree_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      const tree_transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
-	      
-	      if (rules.empty()) continue;
-	      
-	      tree_transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
-	      tree_transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
-	      
-	      for (tree_transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
-		const tree_rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-		const symbol_type& lhs = riter->source->label;
-		
-		// apply tree-rule
-		apply_rule(lhs,
-			   *rule,
-			   riter->features + citer->features,
-			   riter->attributes + citer->attributes,
-			   citer->tails, 
-			   passive_arcs,
-			   graph,
-			   first, 
-			   last);
-	      }
-	    }
-	  }
+	  extend_actives(first, last, lattice, grammar,      actives_rule, VerifySpan());
+	  extend_actives(first, last, lattice, tree_grammar, actives_tree, VerifyNone());
 	  
-	  for (size_t table = 0; table != grammar.size(); ++ table) {
-	    const transducer_type& transducer = grammar[table];
-	      
-	    // we will advance active spans, but constrained by transducer's valid span
-	    // Here, we use only phrasal composition!
-	    if (transducer.valid_span(first, last, lattice.shortest_distance(first, last))) {
-	      
-	      // first, extend active items...
-	      active_rule_set_type& cell = actives_rule[table](first, last);
-	      for (size_t middle = first + 1; middle < last; ++ middle) {
-		const active_rule_set_type&  active_arcs  = actives_rule[table](first, middle);
-		const passive_set_type& passive_arcs = passives(middle, last);
-		
-		extend_actives(transducer, active_arcs, passive_arcs, cell);
-	      }
-	      
-	      // then, advance by terminal(s) at lattice[last - 1];
-	      const active_rule_set_type&  active_arcs  = actives_rule[table](first, last - 1);
-	      const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
-	      
-	      active_rule_set_type::const_iterator aiter_begin = active_arcs.begin();
-	      active_rule_set_type::const_iterator aiter_end = active_arcs.end();
-	      
-	      if (aiter_begin != aiter_end) {
-		lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
-		for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-		  const symbol_type& terminal = piter->label;
-		  
-		  active_rule_set_type& cell = actives_rule[table](first, last - 1 + piter->distance);
-		  
-		  // handling of EPSILON rule...
-		  if (terminal == vocab_type::EPSILON) {
-		    for (active_rule_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-		      cell.push_back(active_rule_type(aiter->node, aiter->features + piter->features, aiter->attributes));
-		  } else {
-		    for (active_rule_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
-		      const transducer_type::id_type node = transducer.next(aiter->node, terminal);
-		      if (node == transducer.root()) continue;
-		      
-		      cell.push_back(active_rule_type(node, aiter->features + piter->features, aiter->attributes));
-		    }
-		  }
-		}
-	      }
-	    }
-	    
-	    // complete...active items...
-	    // when we found rules, we try all possible combination of lhs already used for this span!
-	    
-	    active_rule_set_type&  cell         = actives_rule[table](first, last);
-	    passive_set_type&      passive_arcs = passives(first, last);
-
-	    // when passive_arcs is empty, we have no span...! How to handle this case...???
-	    
-	    active_rule_set_type::const_iterator citer_end = cell.end();
-	    for (active_rule_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
-	      
-	      if (rules.empty()) continue;
-	      
-	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
-	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
-	      
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
-		const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-		const symbol_type& lhs = riter->source->lhs;
-		
-		apply_rule(lhs,
-			   rule,
-			   riter->features + citer->features,
-			   riter->attributes + citer->attributes,
-			   citer->tails,
-			   passive_arcs,
-			   graph,
-			   first,
-			   last);
-	      }
-	    }
-	  }
+	  complete_actives(first, last, grammar,      actives_rule, graph, ExtractRuleLHS());
+	  complete_actives(first, last, tree_grammar, actives_tree, graph, ExtractTreeLHS());
 	  
 	  // handle unary rules...
 	  // TODO: handle unary rules both for tree-grammar and grammar!!!!
@@ -453,7 +317,7 @@ namespace cicada
 		  tree_transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 		  for (tree_transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 		    const tree_rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-		    const symbol_type& lhs = riter->source->label;
+		    const symbol_type& lhs = rule->label;
 		    
 		    closure_level_type::const_iterator citer = closure.find(lhs);
 		    const int level = (citer != closure.end() ? citer->second : 0);
@@ -462,8 +326,8 @@ namespace cicada
 		    
 		    tails.front() = passive_arcs[p];
 		    
-		    apply_rule(lhs,
-			       *rule,
+		    apply_rule(riter->source->label,
+			       rule,
 			       riter->features,
 			       riter->attributes,
 			       tails, 
@@ -498,7 +362,7 @@ namespace cicada
 		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
 		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
 		    const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-		    const symbol_type& lhs = riter->source->lhs;
+		    const symbol_type& lhs = rule->lhs;
 		    
 		    closure_level_type::const_iterator citer = closure.find(lhs);
 		    const int level = (citer != closure.end() ? citer->second : 0);
@@ -507,7 +371,7 @@ namespace cicada
 		    
 		    tails.front() = passive_arcs[p];
 		    
-		    apply_rule(lhs,
+		    apply_rule(riter->source->lhs,
 			       rule,
 			       riter->features,
 			       riter->attributes,
@@ -576,56 +440,28 @@ namespace cicada
       //
       // final patch work..
       //
-      // we will iterate again and try perform instantiate phrasal rules
+      // we will connect node_graph_rule into node_graph_tree
       //
-      for (size_t length = 1; length <= lattice.size(); ++ length)
-	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
-	  const size_t last = first + length;
-	  
-	  for (size_t table = 0; table != grammar.size(); ++ table) {
-	    const transducer_type& transducer = grammar[table];
+      for (size_t node_id = 0; node_id != node_graph_tree.size(); ++ node_id) {
+	const node_set_type& node_set_tree = node_graph_tree[node_id];
+	const node_set_type& node_set_rule = node_graph_rule[node_id];
+
+	if (node_set_tree.empty() || node_set_rule.empty()) continue;
+
+	node_set_type::const_iterator citer_begin = node_set_rule.begin();
+	node_set_type::const_iterator citer_end   = node_set_rule.end();
+
+	node_set_type::const_iterator piter_end = node_set_tree.end();
+	for (node_set_type::const_iterator piter = node_set_tree.begin(); piter != piter_end; ++ piter)
+	  for (node_set_type::const_iterator citer = citer_begin; citer != citer_end; ++ citer) {
+	    hypergraph_type::edge_type& edge = graph.add_edge(&(citer->second), &(citer->second) + 1);
 	    
-	    if (! transducer.valid_span(first, last, lattice.shortest_distance(first, last))) continue;
+	    edge.rule = rule_type::create(rule_type(piter->first, &(citer->first), &(citer->first) + 1));
+	    edge.attributes[attr_glue_tree] = attribute_set_type::int_type(1);
 	    
-	    const active_rule_set_type&  cell         = actives_rule[table](first, last);
-	    const passive_set_type&      passive_arcs = passives(first, last);
-	    
-	    active_rule_set_type::const_iterator citer_end = cell.end();
-	    for (active_rule_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) 
-	      if (citer->tails.empty()) {
-		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
-		
-		if (rules.empty()) continue;
-		
-		transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
-		transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
-		
-		passive_set_type::const_iterator piter_end = passive_arcs.end();
-		for (passive_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
-		  const node_set_type& node_set = node_graph[*piter];
-		  
-		  node_set_type::const_iterator niter_end = node_set.end();
-		  for (node_set_type::const_iterator niter = node_set.begin(); niter != niter_end; ++ niter)
-		    for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
-		      const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
-		      
-		      if (rule->lhs == niter->first) continue;
-		      
-		      // try connect this rule...!
-		      hypergraph_type::edge_type& edge = graph.add_edge();
-		      edge.rule = rule;
-		      edge.features   = citer->features   + riter->features;
-		      edge.attributes = citer->attributes + riter->attributes;
-		      
-		      edge.attributes[attr_span_first] = attribute_set_type::int_type(first);
-		      edge.attributes[attr_span_last]  = attribute_set_type::int_type(last);
-		      
-		      graph.connect_edge(edge.id, niter->second);
-		    }
-		}
-	      }
+	    graph.connect_edge(edge.id, piter->second);
 	  }
-	}
+      }
       
       // final goal assignment...
       
@@ -633,7 +469,7 @@ namespace cicada
       if (unique_goal) {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p) {
-	  const node_set_type& node_set = node_graph[passive_arcs[p]];
+	  const node_set_type& node_set = node_graph_tree[passive_arcs[p]];
 
 	  node_set_type::const_iterator giter = node_set.find(goal);
 	  if (giter != node_set.end()) {
@@ -647,7 +483,7 @@ namespace cicada
       } else {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p) {
-	  const node_set_type& node_set = node_graph[passive_arcs[p]];
+	  const node_set_type& node_set = node_graph_tree[passive_arcs[p]];
 	  
 	  node_set_type::const_iterator giter = node_set.find(goal);
 	  if (giter == node_set.end()) continue;
@@ -661,6 +497,96 @@ namespace cicada
 	    graph.goal = graph.add_node().id;
 	  
 	  graph.connect_edge(edge.id, graph.goal);
+	}
+      }
+    }
+    
+    template <typename Transducers, typename Actives, typename ExtractLHS>
+    void complete_actives(const size_t first,
+			  const size_t last,
+			  const Transducers& transducers,
+			  const Actives& actives,
+			  hypergraph_type& graph,
+			  ExtractLHS extract_lhs)
+    {
+      typedef typename Actives::value_type::value_type active_set_type;
+      typedef typename Transducers::transducer_type transducer_type;
+
+      for (size_t table = 0; table != grammar.size(); ++ table) {
+	const transducer_type& transducer = transducers[table];
+	
+	const active_set_type&  cell         = actives[table](first, last);
+	passive_set_type&       passive_arcs = passives(first, last);
+	
+	typename active_set_type::const_iterator citer_end = cell.end();
+	for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
+	  const typename transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
+	  
+	  if (rules.empty()) continue;
+	  
+	  typename transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
+	  for (typename transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
+	    apply_rule(extract_lhs(*riter),
+		       yield_source ? riter->source : riter->target,
+		       riter->features + citer->features,
+		       riter->attributes + citer->attributes,
+		       citer->tails, 
+		       passive_arcs,
+		       graph,
+		       first, 
+		       last);
+	}
+      }
+    }
+    
+    
+    template <typename Transducers, typename Actives, typename Verify>
+    void extend_actives(const size_t first,
+			const size_t last,
+			const lattice_type& lattice,
+			const Transducers& transducers,
+			Actives& actives,
+			Verify verify)
+    {
+      typedef typename Actives::value_type::value_type active_set_type;
+      typedef typename Transducers::transducer_type transducer_type;
+      
+      for (size_t table = 0; table != grammar.size(); ++ table) {
+	const transducer_type& transducer = transducers[table];
+	
+	if (! verify(transducer, first, last, lattice.shortest_distance(first, last))) continue;
+	
+	active_set_type& cell = actives[table](first, last);
+	for (size_t middle = first + 1; middle < last; ++ middle)
+	  extend_actives(transducers[table], actives[table](first, middle), passives(middle, last), cell);
+	
+	// then, advance by terminal(s) at lattice[last - 1];
+	const active_set_type&            active_arcs  = actives[table](first, last - 1);
+	const lattice_type::arc_set_type& passive_arcs = lattice[last - 1];
+	
+	typename active_set_type::const_iterator aiter_begin = active_arcs.begin();
+	typename active_set_type::const_iterator aiter_end   = active_arcs.end();
+	
+	if (aiter_begin == aiter_end) continue;
+	
+	lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
+	for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
+	  const symbol_type& terminal = piter->label;
+	  
+	  active_set_type& cell = actives[table](first, last - 1 + piter->distance);
+	  
+	  // handling of EPSILON rule...
+	  if (terminal == vocab_type::EPSILON) {
+	    for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	      cell.push_back(typename active_set_type::value_type(aiter->node, aiter->features + piter->features, aiter->attributes));
+	  } else {
+	    for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
+	      const typename transducer_type::id_type node = transducer.next(aiter->node, terminal);
+	      if (node == transducer.root()) continue;
+	      
+	      cell.push_back(typename active_set_type::value_type(node, aiter->features + piter->features, aiter->attributes));
+	    }
+	  }
 	}
       }
     }
@@ -734,7 +660,7 @@ namespace cicada
 	    const int non_terminal_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 	    ++ non_terminal_pos;
 	    
-	    node_set_type& node_set = node_graph[frontier[non_terminal_index]];
+	    node_set_type& node_set = node_graph_rule[frontier[non_terminal_index]];
 	    std::pair<node_set_type::iterator, bool> result = node_set.insert(std::make_pair(riter->non_terminal(), 0));
 	    if (result.second)
 	      result.first->second = graph.add_node().id;
@@ -758,14 +684,15 @@ namespace cicada
       // source lhs
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, cat_level), 0));
       if (result.second) {
-	result.first->second = node_graph.size();
+	result.first->second = node_graph_tree.size();
 	non_terminals.push_back(lhs);
-	passives.push_back(node_graph.size());
-	node_graph.resize(node_graph.size() + 1);
+	passives.push_back(node_graph_tree.size());
+	node_graph_tree.resize(node_graph_tree.size() + 1);
+	node_graph_rule.resize(node_graph_rule.size() + 1);
       }
       
       // projected lhs
-      std::pair<node_set_type::iterator, bool> result_mapped = node_graph[result.first->second].insert(std::make_pair(rule->lhs, 0));
+      std::pair<node_set_type::iterator, bool> result_mapped = node_graph_rule[result.first->second].insert(std::make_pair(rule->lhs, 0));
       if (result_mapped.second)
 	result_mapped.first->second = graph.add_node().id;
       
@@ -773,7 +700,7 @@ namespace cicada
     }
     
     void apply_rule(const symbol_type& lhs,
-		    const tree_rule_type& rule,
+		    const tree_rule_ptr_type& rule,
 		    const feature_set_type& features,
 		    const attribute_set_type& attributes,
 		    const hypergraph_type::edge_type::node_set_type& frontier,
@@ -789,14 +716,15 @@ namespace cicada
       // source lhs
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, cat_level), 0));
       if (result.second) {
-	result.first->second = node_graph.size();
+	result.first->second = node_graph_tree.size();
 	non_terminals.push_back(lhs);
-	passives.push_back(node_graph.size());
-	node_graph.resize(node_graph.size() + 1);
+	passives.push_back(node_graph_tree.size());
+	node_graph_tree.resize(node_graph_tree.size() + 1);
+	node_graph_rule.resize(node_graph_rule.size() + 1);
       }
       
       // projected lhs
-      std::pair<node_set_type::iterator, bool> result_mapped = node_graph[result.first->second].insert(std::make_pair(rule.label, 0));
+      std::pair<node_set_type::iterator, bool> result_mapped = node_graph_tree[result.first->second].insert(std::make_pair(rule->label, 0));
       if (result_mapped.second)
 	result_mapped.first->second = graph.add_node().id;
       
@@ -804,7 +732,7 @@ namespace cicada
       
       int non_terminal_pos = 0;
       
-      const hypergraph_type::id_type edge_id = construct_graph(rule, root_id, frontier, graph, non_terminal_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos);
       
       graph.edges[edge_id].features   = features;
       graph.edges[edge_id].attributes = attributes;
@@ -838,7 +766,7 @@ namespace cicada
 	    if (non_terminal_index >= static_cast<int>(frontiers.size()))
 	      throw std::runtime_error("non-terminal index exceeds frontier size");
 	    
-	    node_set_type& node_set = node_graph[frontiers[non_terminal_index]];
+	    node_set_type& node_set = node_graph_tree[frontiers[non_terminal_index]];
 	    std::pair<node_set_type::iterator, bool> result = node_set.insert(std::make_pair(aiter->label.non_terminal(), 0));
 	    if (result.second)
 	      result.first->second = graph.add_node().id;
@@ -878,6 +806,7 @@ namespace cicada
     
     attribute_type attr_span_first;
     attribute_type attr_span_last;
+    attribute_type attr_glue_tree;
     
     rule_ptr_type goal_rule;
     
@@ -890,7 +819,8 @@ namespace cicada
     closure_type          closure_tail;
     
     node_map_type         node_map;
-    node_graph_type       node_graph;
+    node_graph_type       node_graph_tree;
+    node_graph_type       node_graph_rule;
     non_terminal_set_type non_terminals;
   };
   
