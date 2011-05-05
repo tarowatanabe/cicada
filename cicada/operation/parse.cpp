@@ -26,6 +26,133 @@ namespace cicada
 {
   namespace operation
   {
+    ParseTreeCKY::ParseTreeCKY(const std::string& parameter,
+			       const tree_grammar_type& __tree_grammar,
+			       const grammar_type& __grammar,
+			       const std::string& __goal,
+			       const int __debug)
+      : base_type("parse-tree-cky"),
+	tree_grammar(__tree_grammar), grammar(__grammar),
+	goal(__goal),
+	weights(0),
+	weights_assigned(0),
+	size(200),
+	weights_one(false),
+	weights_fixed(false),
+	yield_source(false),
+	unique_goal(false),
+	debug(__debug)
+    {
+      typedef cicada::Parameter param_type;
+	
+      param_type param(parameter);
+      if (utils::ipiece(param.name()) != "parse-tree-cky" && utils::ipiece(param.name()) != "parse-tree-cyk")
+	throw std::runtime_error("this is not a Tree parser");
+	
+      bool source = false;
+      bool target = false;
+      
+      for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "size")
+	  size = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "weights")
+	  weights = &base_type::weights(piter->second);
+	else if (utils::ipiece(piter->first) == "weights-one")
+	  weights_one = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "yield") {
+	  if (utils::ipiece(piter->second) == "source")
+	    source = true;
+	  else if (utils::ipiece(piter->second) == "target")
+	    target = true;
+	  else
+	    throw std::runtime_error("unknown yield: " + piter->second);
+	} else if (utils::ipiece(piter->first) == "goal")
+	  goal = piter->second;
+	else if (utils::ipiece(piter->first) == "grammar")
+	  grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "tree-grammar")
+	  tree_grammar_local.push_back(piter->second);
+	else if (utils::ipiece(piter->first) == "unique" || utils::ipiece(piter->first) == "unique-goal")
+	  unique_goal = utils::lexical_cast<bool>(piter->second);
+	else
+	  std::cerr << "WARNING: unsupported parameter for Tree parser: " << piter->first << "=" << piter->second << std::endl;
+      }
+	
+      if (source && target)
+	throw std::runtime_error("Tree parser can work either source or target yield");
+	
+      yield_source = source;
+
+      if (weights && weights_one)
+	throw std::runtime_error("you have weights, but specified all-one parameter");
+      
+      if (weights || weights_one)
+	weights_fixed = true;
+      
+      if (! weights)
+	weights = &base_type::weights();
+    }
+    
+    
+    void ParseTreeCKY::assign(const weight_set_type& __weights)
+    {
+      if (! weights_fixed)
+	weights_assigned = &__weights;
+    }
+    
+    void ParseTreeCKY::operator()(data_type& data) const
+    {
+      typedef cicada::semiring::Logprob<double> weight_type;
+
+      if (! data.hypergraph.is_valid()) return;
+
+      const lattice_type& lattice = data.lattice;
+      hypergraph_type& hypergraph = data.hypergraph;
+      hypergraph_type parsed;
+      
+      if (debug)
+	std::cerr << name << ": " << data.id << std::endl;
+      
+      const weight_set_type* weights_parse = (weights_assigned ? weights_assigned : &(weights->weights));
+      
+      const grammar_type& grammar_parse = (grammar_local.empty() ? grammar : grammar_local);
+      const tree_grammar_type& tree_grammar_parse = (tree_grammar_local.empty() ? tree_grammar : tree_grammar_local);
+	
+      utils::resource start;
+
+      grammar_parse.assign(lattice);
+      tree_grammar_parse.assign(lattice);
+      
+      if (weights_one)
+	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function_one<weight_type>(), lattice, parsed, size, yield_source, unique_goal);
+      else
+	cicada::parse_tree_cky(goal, tree_grammar_parse, grammar_parse, weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, unique_goal);
+	
+      utils::resource end;
+    
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " cpu time: " << (end.cpu_time() - start.cpu_time())
+		  << " user time: " << (end.user_time() - start.user_time())
+		  << std::endl;
+      
+      if (debug)
+	std::cerr << name << ": " << data.id
+		  << " # of nodes: " << parsed.nodes.size()
+		  << " # of edges: " << parsed.edges.size()
+		  << " valid? " << utils::lexical_cast<std::string>(parsed.is_valid())
+		  << std::endl;
+
+      statistics_type::statistic_type& stat = data.statistics[name];
+      
+      ++ stat.count;
+      stat.node += parsed.nodes.size();
+      stat.edge += parsed.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+	
+      hypergraph.swap(parsed);
+    }
 
     ParseTree::ParseTree(const std::string& parameter,
 			 const tree_grammar_type& __tree_grammar,

@@ -290,6 +290,7 @@ parse_agenda.hpp \
 parse_cky.hpp \
 parse_coarse.hpp \
 parse_tree.hpp \
+parse_tree_cky.hpp \
 permute.hpp \
 prune.hpp \
 prune_beam.hpp \

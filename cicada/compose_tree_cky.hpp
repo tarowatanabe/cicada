@@ -497,6 +497,9 @@ namespace cicada
 	  graph.connect_edge(edge.id, graph.goal);
 	}
       }
+      
+      // we will sort to remove unreachable nodes......
+      graph.topologically_sort();
     }
     
     template <typename Transducers, typename Actives, typename ExtractLHS>

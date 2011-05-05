@@ -10,5 +10,6 @@
 #include <cicada/parse_cky.hpp>
 #include <cicada/parse_coarse.hpp>
 #include <cicada/parse_tree.hpp>
+#include <cicada/parse_tree_cky.hpp>
 
 #endif

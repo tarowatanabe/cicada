@@ -463,6 +463,7 @@ namespace cicada
 	    if (! node_passive.second) continue;
 	    
 	    const symbol_type& non_terminal = non_terminals[node_passive.first];
+	    const score_type score_antecedent = scores[node_passive.first];
 	    
 	    for (size_t table = 0; table != grammar.size(); ++ table) {
 	      const transducer_type& transducer = grammar[table];
@@ -477,8 +478,6 @@ namespace cicada
 	      if (rules.empty()) continue;
 	      
 	      //std::cerr << "unary rule: " << non_terminal << " size: " << rules.size() << std::endl;
-	      
-	      const score_type score_antecedent = scores[node_passive.first];
 	      
 	      actives_unary.push_back(active_type());
 	      actives_unary.back().tails = hypergraph_type::edge_type::node_set_type(1, node_passive.first);
