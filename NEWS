@@ -1,5 +1,5 @@
 2011-5-x
-Added a sample grammar file to support zone/wall in moses.
+Added a sample grammar file to support zone/wall found in moses.
 Added experimental compose-tree-cky and parse-tree-cky for string-to-tree translation!
 Support cky-style indexing in tree-transducer for string-to-tree translation.
 More compact representation for feature vectors
