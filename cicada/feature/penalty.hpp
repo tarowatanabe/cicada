@@ -218,6 +218,79 @@ namespace cicada
       
       feature_name_set_type names;
     };
+
+    class GlueTreePenalty : public FeatureFunction
+    {
+    public:
+      GlueTreePenalty() : FeatureFunction(0, "glue-tree-penalty"), attr_glue_tree("glue-tree") { }
+      
+      void apply(state_ptr_type& state,
+		 const state_ptr_set_type& states,
+		 const edge_type& edge,
+		 feature_set_type& features,
+		 feature_set_type& estimates,
+		 const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      void apply_coarse(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			feature_set_type& features,
+			feature_set_type& estimates,
+			const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      
+      void apply_predict(state_ptr_type& state,
+			 const state_ptr_set_type& states,
+			 const edge_type& edge,
+			 feature_set_type& features,
+			 feature_set_type& estimates,
+			 const bool final) const
+      {
+	apply_estimate(edge, features);
+      }
+      
+      void apply_scan(state_ptr_type& state,
+		      const state_ptr_set_type& states,
+		      const edge_type& edge,
+		      const int dot,
+		      feature_set_type& features,
+		      feature_set_type& estimates,
+		      const bool final) const {}
+      
+      void apply_complete(state_ptr_type& state,
+			  const state_ptr_set_type& states,
+			  const edge_type& edge,
+			  feature_set_type& features,
+			  feature_set_type& estimates,
+			  const bool final) const {}
+
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new GlueTreePenalty(*this)); }
+      
+    private:
+      
+      struct __glue_tree : public boost::static_visitor<bool>
+      {
+	bool operator()(const attribute_set_type::int_type& x) const { return x; }
+	template <typename Tp>
+	bool operator()(const Tp& x) const { return false; }
+      };
+      
+      void apply_estimate(const edge_type& edge,
+			  feature_set_type& features) const
+      {
+	attribute_set_type::const_iterator aiter = edge.attributes.find(attr_glue_tree);
+	if (aiter != edge.attributes.end() && boost::apply_visitor(__glue_tree(), aiter->second))
+	  features[feature_name()] = -1;
+	else
+	  features.erase(feature_name());
+      }
+
+      attribute_set_type::attribute_type attr_glue_tree;
+    };
     
   };
 };
