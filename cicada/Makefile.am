@@ -123,6 +123,7 @@ feature/neighbours.cpp \
 feature/ngram.cpp \
 feature/ngram_tree.cpp \
 feature/parent.cpp \
+feature/penalty.cpp \
 feature/permute.cpp \
 feature/span.cpp \
 feature/variational.cpp

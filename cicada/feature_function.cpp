@@ -105,6 +105,7 @@ word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
 glue-tree-penalty: glue tree penalty feature\n\
+non-latin-penalty: non-latin word penalty feature\n\
 relative-position: relative alignment feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
@@ -169,6 +170,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::ArityPenalty());
     else if (param_name == "glue-tree-penalty")
       return feature_function_ptr_type(new feature::GlueTreePenalty());
+    else if (param_name == "non-latin-penalty")
+      return feature_function_ptr_type(new feature::NonLatinPenalty());
     else if (param_name == "relative-position")
       return feature_function_ptr_type(new feature::RelativePosition(parameter));
     else if (param_name == "null-path")
