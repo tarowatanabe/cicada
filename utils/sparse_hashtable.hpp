@@ -74,7 +74,7 @@ namespace utils
     public:
       typedef const_iterator_base_type base_type;
       typedef typename base_type::iterator_category iterator_category;
-      typedef typename base_type::difeference_type   difference_type;
+      typedef typename base_type::difference_type   difference_type;
       typedef Value       value_type;
       typedef value_type* pointer;
       

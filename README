@@ -426,3 +426,16 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {273--280}
 }
+
+[28]
+@InProceedings{mauser-hasan-ney:2009:EMNLP,
+  author    = {Mauser, Arne  and  Hasan, Sa{\v{s}}a  and  Ney, Hermann},
+  title     = {Extending Statistical Machine Translation with Discriminative and Trigger-Based Lexicon Models},
+  booktitle = {Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing},
+  month     = {August},
+  year      = {2009},
+  address   = {Singapore},
+  publisher = {Association for Computational Linguistics},
+  pages     = {210--218},
+  url       = {http://www.aclweb.org/anthology/D/D09/D09-1022}
+}
