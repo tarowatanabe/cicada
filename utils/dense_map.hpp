@@ -1,4 +1,7 @@
 // -*- mode: c++ -*-
+//
+//  Copyright(C) 2009-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #ifndef __UTILS__DENSE_MAP__H__
 #define __UTILS__DENSE_MAP__H__ 1
