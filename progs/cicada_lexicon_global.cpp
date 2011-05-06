@@ -27,6 +27,7 @@ path_type target_file = "-";
 
 path_type output_file;
 
+int    vocab_size = 10000;
 int    max_iteration = 100;
 bool   regularize_l1 = false;
 bool   regularize_l2 = false;
@@ -79,7 +80,7 @@ int main(int argc, char** argv)
     word_set_type   vocab;
     
     // read bitexts...
-    read_bitexts(source_file, target_file, bitexts, vocab);
+    read_bitexts(source_file, target_file, bitexts, vocab, vocab_size);
     
     // learn... do we dump parameters at the same time? (in single presision float?)
     learn(output_file, bitexts, vocab);
@@ -185,6 +186,8 @@ int getoptions(int argc, char** argv)
     ("target", po::value<path_type>(&target_file), "target language corpus")
     
     ("output", po::value<path_type>(&output_file), "output model")
+    
+    ("vocab", po::value<int>(&vocab_size), "vocabulary size")
 
     ("learn-maxent", po::bool_switch(&learn_maxent),  "maximum entropy (default)")
     ("learn-sgd",    po::bool_switch(&learn_sgd),     "SGD (Pegasos for L2, FOBOS-cummulative for L1)")

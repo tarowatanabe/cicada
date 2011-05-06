@@ -25,6 +25,8 @@
 
 #include "lbfgs.h"
 
+#include <google/dense_hash_map>
+#include <google/dense_hash_set>
 
 typedef boost::filesystem::path path_type;
 
@@ -54,23 +56,32 @@ extern double C;
 
 extern int debug;
 
+template <typename Tp>
+struct greater_second
+{
+  bool operator()(const Tp& x, const Tp& y) const
+  {
+    return x.second > y.second;
+  }
+};
+
 void read_bitexts(const path_type& path_source,
 		  const path_type& path_target,
 		  bitext_set_type& bitexts,
-		  word_set_type& vocab)
+		  word_set_type& vocab,
+		  const int kbest)
 {
-#ifdef HAVE_TR1_UNORDERED_SET
-  typedef std::tr1::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type > > word_unique_set_type;
-#else
-  typedef sgi::hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type > > word_unique_set_type;
-#endif
+  typedef google::dense_hash_map<word_type, size_t, boost::hash<word_type>, std::equal_to<word_type> > word_count_set_type;
+  typedef std::vector<std::pair<word_type, size_t>, std::allocator<std::pair<word_type, size_t> > > word_count_sorted_type;
   
   typedef std::set<word_type, std::less<word_type>, std::allocator<word_type> > word_sorted_set_type;
 
   bitexts.clear();
   
-  word_unique_set_type uniques;
+  word_count_set_type  counts;
   word_sorted_set_type uniques_source;
+
+  counts.set_empty_key(word_type());
   
   utils::compress_istream is_src(path_source, 1024 * 1024);
   utils::compress_istream is_trg(path_target, 1024 * 1024);
@@ -90,16 +101,44 @@ void read_bitexts(const path_type& path_source,
     uniques_source.insert(source.begin(), source.end());
     
     bitexts.push_back(bitext_type(sentence_type(uniques_source.begin(), uniques_source.end()), target));
-    uniques.insert(target.begin(), target.end());
+    
+    sentence_type::const_iterator titer_end = target.end();
+    for (sentence_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
+      ++ counts[*titer];
   }
   if (is_src || is_trg)
     throw std::runtime_error("# of sentences does not match...");
   
   bitext_set_type(bitexts).swap(bitexts);
-  
+
   vocab.clear();
-  vocab.reserve(uniques.size());
-  vocab.insert(vocab.end(), uniques.begin(), uniques.end());
+  if (kbest <= 0 || static_cast<int>(counts.size()) <= kbest) {
+    word_count_set_type::const_iterator citer_end = counts.end();
+    for (word_count_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer)
+      vocab.push_back(citer->first);
+  } else {
+    word_count_sorted_type sorted(counts.begin(), counts.end());
+    
+    std::nth_element(sorted.begin(), sorted.begin() + kbest, sorted.end(), greater_second<word_count_sorted_type::value_type>());
+    
+    const size_t cutoff = sorted[kbest].second;
+    
+    word_count_sorted_type::const_iterator siter      = sorted.begin();
+    word_count_sorted_type::const_iterator siter_end  = sorted.end();
+    word_count_sorted_type::const_iterator siter_last = sorted.begin() + kbest;
+    
+    bool found_equal = false;
+    for (/**/; siter != siter_last; ++ siter) {
+      vocab.push_back(siter->first);
+      found_equal |= (siter->second == cutoff);
+    }
+    
+    if (found_equal)
+      for (/**/; siter != siter_end && siter->second == cutoff; ++ siter)
+	vocab.push_back(siter->first);
+  }
+  
+  word_set_type(vocab).swap(vocab);
 }
 
 struct Optimizer
