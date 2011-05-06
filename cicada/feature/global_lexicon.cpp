@@ -7,7 +7,8 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/piece.hpp"
-#include "utils/sgi_hash_set.hpp"
+
+#include <google/dense_hash_set>
 
 namespace cicada
 {
@@ -42,15 +43,15 @@ namespace cicada
       
       typedef symbol_type word_type;
       
-#ifdef HAVE_TR1_UNORDERED_SET
-      typedef std::tr1::unordered_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type > > word_set_type;
-#else
-      typedef sgi::hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type > > word_set_type;
-#endif
-
+      typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
+      
+      typedef std::vector<double, std::allocator<double> > cache_set_type;
       
       GlobalLexiconImpl(const path_type& __path)
-	: lexicon(__path) {}
+	: lexicon(__path)
+      {
+	words.set_empty_key(symbol_type());
+      }
       
       double global_lexicon_score(const edge_type& edge)
       {
@@ -61,13 +62,14 @@ namespace cicada
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
 	  if (*piter != vocab_type::EPSILON && *piter != vocab_type::BOS && *piter != vocab_type::EOS && piter->is_terminal())
-	    score += lexicon(*piter, words.begin(), words.end());
+	    score += score_lexicon(*piter);
 	
 	return score;
       }
 
       void assign(const lattice_type& lattice)
       {
+	caches.clear();
 	words.clear();
 	
 	lattice_type::const_iterator liter_end = lattice.end();
@@ -81,6 +83,7 @@ namespace cicada
       
       void assign(const hypergraph_type& forest)
       {
+	caches.clear();
 	words.clear();
 	
 	hypergraph_type::edge_set_type::const_iterator eiter_end = forest.edges.end();
@@ -94,9 +97,21 @@ namespace cicada
 		words.insert(*siter);
 	  }
       }
+
+      double score_lexicon(const symbol_type& word)
+      {
+	if (word.id() >= caches.size())
+	  caches.resize(word.id() + 1, 0.0);
+	
+	if (caches[word.id()] == 0.0)
+	  caches[word.id()] = lexicon(word, words.begin(), words.end());
+	
+	return caches[word.id()];
+      }
       
-      word_set_type words;
-      lexicon_type  lexicon;
+      word_set_type  words;
+      lexicon_type   lexicon;
+      cache_set_type caches;
     };
   
   
