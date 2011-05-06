@@ -55,14 +55,14 @@ namespace cicada
       double global_lexicon_score(const edge_type& edge)
       {
 	const phrase_type& phrase = edge.rule->rhs;
-
+	
 	double score = 0.0;
-
+	
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter)
-	  if (*piter != vocab_type::EPSILON && piter->is_terminal())
+	  if (*piter != vocab_type::EPSILON && *piter != vocab_type::BOS && *piter != vocab_type::EOS && piter->is_terminal())
 	    score += lexicon(*piter, words.begin(), words.end());
-
+	
 	return score;
       }
 
