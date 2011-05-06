@@ -74,8 +74,25 @@ namespace cicada
 	for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
 	  lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
 	  for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	    words.insert(aiter->label);
+	    if (aiter->label != vocab_type::EPSILON)
+	      words.insert(aiter->label);
 	}
+      }
+      
+      void assign(const hypergraph_type& forest)
+      {
+	words.clear();
+	
+	hypergraph_type::edge_set_type::const_iterator eiter_end = forest.edges.end();
+	for (hypergraph_type::edge_set_type::const_iterator eiter = forest.edges.begin(); eiter != eiter_end; ++ eiter)
+	  if (eiter->rule) {
+	    const rule_type& rule = *(eiter->rule);
+	    
+	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+	    for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
+	      if (siter->is_terminal() && *siter != vocab_type::EPSILON && *siter != vocab_type::BOS && *siter != vocab_type::EOS)
+		words.insert(*siter);
+	  }
       }
       
       word_set_type words;
@@ -190,7 +207,12 @@ namespace cicada
 			       const sentence_set_type& targets,
 			       const ngram_count_set_type& ngram_counts)
     {
-      pimpl->assign(lattice);
+      pimpl->words.clear();
+      
+      if (! lattice.empty())
+	pimpl->assign(lattice);
+      else if (hypergraph.is_valid())
+	pimpl->assign(hypergraph);
     }
 
   };
