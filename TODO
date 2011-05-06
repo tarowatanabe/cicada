@@ -86,3 +86,5 @@ Better parse-tree:
     Currently, we will add phrasal rules after computing tree-matched translational forest.
     Do we put phrasal rules into heap and collect k-best phrases, then, perform translational forest
     creation afterwards.
+
+Global lexicon learning performed only for frequent words
