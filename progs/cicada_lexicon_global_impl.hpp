@@ -484,11 +484,14 @@ struct OptimizeSGD : public Optimizer
 	for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	  margin += x[siter->id()];
 
-	const double objective_correct   = boost::math::log1p(utils::mathop::exp(- 1.0 * margin));
-	const double objective_incorrect = boost::math::log1p(utils::mathop::exp(  1.0 * margin));
+	const double exp_margin = utils::mathop::exp(margin);
+	const double inv_exp_margin = 1.0 / exp_margin;
 	
-	const double gradient_correct   =   1.0 / (1.0 + utils::mathop::exp(  1.0 * margin));
-	const double gradient_incorrect = - 1.0 / (1.0 + utils::mathop::exp(- 1.0 * margin));
+	const double objective_correct   = boost::math::log1p(inv_exp_margin);
+	const double objective_incorrect = boost::math::log1p(exp_margin);
+	
+	const double gradient_correct   =   1.0 / (1.0 + exp_margin);
+	const double gradient_incorrect = - 1.0 / (1.0 + inv_exp_margin);
 	
 	const size_t num_correct   = std::count(bitext.target.begin(), bitext.target.end(), word);
 	const size_t num_incorrect = bitext.target.size() - num_correct;
@@ -587,11 +590,14 @@ struct OptimizeSGD : public Optimizer
 	  margin += x[siter->id()];
 	margin *= weight_scale;
 
-	const double objective_correct   = boost::math::log1p(utils::mathop::exp(- 1.0 * margin));
-	const double objective_incorrect = boost::math::log1p(utils::mathop::exp(  1.0 * margin));
+	const double exp_margin = utils::mathop::exp(margin);
+	const double inv_exp_margin = 1.0 / exp_margin;
+
+	const double objective_correct   = boost::math::log1p(inv_exp_margin);
+	const double objective_incorrect = boost::math::log1p(exp_margin);
 	
-	const double gradient_correct   =   1.0 / (1.0 + utils::mathop::exp(  1.0 * margin));
-	const double gradient_incorrect = - 1.0 / (1.0 + utils::mathop::exp(- 1.0 * margin));
+	const double gradient_correct   =   1.0 / (1.0 + exp_margin);
+	const double gradient_incorrect = - 1.0 / (1.0 + inv_exp_margin);
 	
 	const size_t num_correct   = std::count(bitext.target.begin(), bitext.target.end(), word);
 	const size_t num_incorrect = bitext.target.size() - num_correct;
@@ -696,12 +702,15 @@ struct OptimizeLBFGS : public Optimizer
       double margin = x[id_bias];
       for (sentence_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter)
 	margin += x[siter->id()];
+
+      const double exp_margin = utils::mathop::exp(margin);
+      const double inv_exp_margin = 1.0 / exp_margin;
       
-      const double objective_correct   = boost::math::log1p(utils::mathop::exp(- 1.0 * margin));
-      const double objective_incorrect = boost::math::log1p(utils::mathop::exp(  1.0 * margin));
+      const double objective_correct   = boost::math::log1p(inv_exp_margin);
+      const double objective_incorrect = boost::math::log1p(exp_margin);
       
-      const double gradient_correct   = - 1.0 / (1.0 + utils::mathop::exp(  1.0 * margin));
-      const double gradient_incorrect =   1.0 / (1.0 + utils::mathop::exp(- 1.0 * margin));
+      const double gradient_correct   = - 1.0 / (1.0 + exp_margin);
+      const double gradient_incorrect =   1.0 / (1.0 + inv_exp_margin);
       
       const size_t num_correct   = std::count(biter->target.begin(), biter->target.end(), optimizer.word);
       const size_t num_incorrect = biter->target.size() - num_correct;
