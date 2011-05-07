@@ -145,13 +145,38 @@ struct Optimizer
 {
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
   
-  const bitext_set_type& bitexts;
+  const bitext_set_type bitexts;
   const word_type word;
   
   Optimizer(const bitext_set_type& __bitexts,
 	    const word_type& __word)
-    : bitexts(__bitexts),
-      word(__word) {}
+    : bitexts(__bitexts.size()),
+      word(__word)
+  {
+    typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> >  word_set_type;
+    
+    word_set_type cooc;
+    cooc.set_empty_key(word_type());
+    
+    bitext_set_type::const_iterator biter_end = __bitexts.end();
+    for (bitext_set_type::const_iterator biter = __bitexts.begin(); biter != biter_end; ++ biter)
+      if (std::find(biter->target.begin(), biter->target.end(), word) != biter->target.end())
+	cooc.insert(biter->source.begin(), biter->source.end());
+    
+    sentence_type source;
+    bitext_set_type& bitexts_cooc = const_cast<bitext_set_type&>(bitexts);
+    
+    bitexts_cooc.clear();
+    for (bitext_set_type::const_iterator biter = __bitexts.begin(); biter != biter_end; ++ biter) {
+      source.clear();
+      sentence_type::const_iterator siter_end = biter->source.end();
+      for (sentence_type::const_iterator siter = biter->source.begin(); siter != siter_end; ++ siter)
+	if (cooc.find(*siter) != cooc.end())
+	  source.push_back(*siter);
+      
+      bitexts_cooc.push_back(bitext_type(source, biter->target));
+    }
+  }
 };
 
 struct OptimizeAROW : public Optimizer
