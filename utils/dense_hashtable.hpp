@@ -34,14 +34,14 @@ namespace utils
     {
       size_t operator()(const value_type* x) const
       {
-	return Hash::operator()(ExtractKey::operator()(*x));
+	return ! x ? size_t(0) : Hash::operator()(ExtractKey::operator()(*x));
       }
     };
     struct equal : public Equal, public ExtractKey
     {
       bool operator()(const value_type* x, const value_type* y) const
       {
-	return Equal::operator()(ExtractKey::operator()(*x), ExtractKey::operator()(*y));
+	return x == y || (x && y && Equal::operator()(ExtractKey::operator()(*x), ExtractKey::operator()(*y)));
       }
     };
 
