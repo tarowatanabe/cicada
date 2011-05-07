@@ -95,8 +95,13 @@ namespace cicada
       {
 	if (! symbol.is_non_terminal()) return symbol;
 	
-	return (symbol.binarized() ? "[x^]" : "[x]");
+	return (symbol.binarized() ? binarized : non_binarized);
       }
+      
+      CoarseSimple() : binarized("[x^]"), non_binarized("[x]") {}
+      
+      const symbol_type binarized;
+      const symbol_type non_binarized;
     };
     
     template <typename Coarser>
