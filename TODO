@@ -81,3 +81,6 @@ A unified framework to collect statistics: Do we need stats from features?
 Cube summing?
      I'm still not sure how to efficiently collect residuals... Do we include state-less features
      to serve as residual counts?
+
+Faster global lexicon training:
+   Before running training, filter-out words that will not affect training
