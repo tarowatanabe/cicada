@@ -121,7 +121,7 @@ namespace utils
   public:
     // we assume aligned malloc, and the malloc of address 1 will not happen... is it true?
     dense_hashtable() : hashtable() {  hashtable.set_empty_key(0); hashtable.set_deleted_key(__deleted_key()); }
-    dense_hashtable(const dense_hashtable& x) : hashtable() { hashtable.set_empty_key(0); hash_table.set_deleted_key(__deleted_key()); assign(x); }
+    dense_hashtable(const dense_hashtable& x) : hashtable() { hashtable.set_empty_key(0); hashtable.set_deleted_key(__deleted_key()); assign(x); }
     ~dense_hashtable() { clear(); }
     dense_hashtable& operator=(const dense_hashtable& x)
     {

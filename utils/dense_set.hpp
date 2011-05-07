@@ -20,7 +20,7 @@ namespace utils
   template <typename Key,
 	    typename Hash=boost::hash<Key>,
 	    typename Equal=std::equal_to<Key>,
-	    typename Alloc=std::allocator<std::pair<const Key, Data> > >
+	    typename Alloc=std::allocator<Key > >
   class dense_set
   {
   public:

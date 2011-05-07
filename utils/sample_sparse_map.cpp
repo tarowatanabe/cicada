@@ -2,7 +2,12 @@
 #include <string>
 #include <iostream>
 
+#include <utils/sparse_set.hpp>
 #include <utils/sparse_map.hpp>
+
+#include <utils/dense_set.hpp>
+#include <utils/dense_map.hpp>
+
 #include <map>
 
 int main(int argc, char** argv)
