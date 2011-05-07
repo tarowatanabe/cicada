@@ -375,12 +375,10 @@ namespace cicada
 	const candidate_type* item = heap.top();
 	heap.pop();
 	
+	scores[id] = std::max(scores[id], item->score * rule.score);
+	
 	if (item->is_tree()) {
 	  const tree_candidate_type& rule = *(*(item->tree_first));
-	  const score_type score = item->score * rule.score;
-	  
-	  // update scores...
-	  scores[id] = std::max(scores[id], score);
 	  
 	  apply_rule(*rule.rule,
 		     id,
