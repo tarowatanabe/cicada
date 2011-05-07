@@ -375,10 +375,10 @@ namespace cicada
 	const candidate_type* item = heap.top();
 	heap.pop();
 	
-	scores[id] = std::max(scores[id], item->score * rule.score);
-	
 	if (item->is_tree()) {
 	  const tree_candidate_type& rule = *(*(item->tree_first));
+	  
+	  scores[id] = std::max(scores[id], item->score * rule.score);
 	  
 	  apply_rule(*rule.rule,
 		     id,
@@ -393,6 +393,10 @@ namespace cicada
 	  if (item->tree_first != item->tree_last)
 	    heap.push(item);
 	} else {
+	  const rule_candidate_type& rule = *(*(item->rule_first));
+	  
+	  scores[id] = std::max(scores[id], item->score * rule.score);
+
 	  rules_enumerated.push_back(*(item->rule_first));
 	  
 	  ++ const_cast<candidate_type*>(item)->rule_first;
