@@ -81,8 +81,3 @@ A unified framework to collect statistics: Do we need stats from features?
 Cube summing?
      I'm still not sure how to efficiently collect residuals... Do we include state-less features
      to serve as residual counts?
-
-Better parse-tree:
-    Currently, we will add phrasal rules after computing tree-matched translational forest.
-    Do we put phrasal rules into heap and collect k-best phrases, then, perform translational forest
-    creation afterwards.
