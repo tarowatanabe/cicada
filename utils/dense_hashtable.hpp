@@ -71,10 +71,9 @@ namespace utils
       typedef Value* pointer;
       
       iterator(const base_type& x) : base(x) {}
-      iterator(const const_iterator_base_type& x) : base(x) {}
       
       value_type& operator*() { return *(*base); }
-      value_type* operator->() { return &(*base); }
+      value_type* operator->() { return &(*(*base)); }
 
       iterator& operator++() { ++ base; return *this; }
       iterator operator++(int) { iterator tmp(*this); ++ base; return tmp; }
@@ -103,13 +102,12 @@ namespace utils
       typedef const Value* pointer;
       
       const_iterator(const base_type& x) : base(x) {}
-      cont_iterator(const iterator_base_type& x) : base(x) {}
       
       const value_type& operator*() { return *(*base); }
-      const value_type* operator->() { return &(*base); }
+      const value_type* operator->() { return &(*(*base)); }
 
       const_iterator& operator++() { ++ base; return *this; }
-      const_iterator operator++(int) { iterator tmp(*this); ++ base; return tmp; }
+      const_iterator operator++(int) { const_iterator tmp(*this); ++ base; return tmp; }
       
       friend
       bool operator==(const const_iterator& x, const const_iterator& y) { return x.base == y.base; }
