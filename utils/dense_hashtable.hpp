@@ -55,7 +55,8 @@ namespace utils
     typedef typename hashtable_type::size_type       size_type;
     typedef typename hashtable_type::difference_type difference_type;
     
-    class iterator : public iterator_base_type
+    
+    class iterator
     {
     private:
       typedef iterator_base_type base_type;
@@ -63,28 +64,60 @@ namespace utils
     public:
       typedef typename base_type::iterator_category iterator_category;
       typedef typename base_type::difference_type   difference_type;
-      typedef Value       value_type;
-      typedef value_type* pointer;
+      typedef typename base_type::size_type         size_type;
       
-      iterator(const base_type& x) : base_type(x) {}
+      typedef Value  value_type;
+      typedef Value& reference;
+      typedef Value* pointer;
       
-      value_type& operator*() { return (*base_type::operator*()); }
-      value_type* operator->() { return &(*base_type::operator*()); }
+      iterator(const base_type& x) : base(x) {}
+      iterator(const const_iterator_base_type& x) : base(x) {}
+      
+      value_type& operator*() { return *(*base); }
+      value_type* operator->() { return &(*base); }
+
+      iterator& operator++() { ++ base; return *this; }
+      iterator operator++(int) { iterator tmp(*this); ++ base; return tmp; }
+      
+      friend
+      bool operator==(const iterator& x, const iterator& y) { return x.base == y.base; }
+      friend
+      bool operator!=(const iterator& x, const iterator& y) { return x.base != y.base; }
+      
+    private:
+      base_type base;
     };
     
-    class const_iterator : public const_iterator_base_type
+    class const_iterator
     {
-    public:
+    private:
       typedef const_iterator_base_type base_type;
+      
+    public:
       typedef typename base_type::iterator_category iterator_category;
       typedef typename base_type::difference_type   difference_type;
-      typedef Value       value_type;
-      typedef value_type* pointer;
+      typedef typename base_type::size_type         size_type;
       
-      const_iterator(const base_type& x) : base_type(x) {}
+      typedef Value  value_type;
+      typedef const Value& reference;
+      typedef const Value* pointer;
       
-      const value_type& operator*() { return (*base_type::operator*()); }
-      const value_type* operator->() { return &(*base_type::operator*()); }
+      const_iterator(const base_type& x) : base(x) {}
+      cont_iterator(const iterator_base_type& x) : base(x) {}
+      
+      const value_type& operator*() { return *(*base); }
+      const value_type* operator->() { return &(*base); }
+
+      const_iterator& operator++() { ++ base; return *this; }
+      const_iterator operator++(int) { iterator tmp(*this); ++ base; return tmp; }
+      
+      friend
+      bool operator==(const const_iterator& x, const const_iterator& y) { return x.base == y.base; }
+      friend
+      bool operator!=(const const_iterator& x, const const_iterator& y) { return x.base != y.base; }
+      
+    private:
+      base_type base;
     };
     
   public:
