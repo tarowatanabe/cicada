@@ -27,7 +27,7 @@ path_type target_file = "-";
 
 path_type output_file;
 
-int    vocab_size = 10000;
+int    vocab_size = 0;
 int    max_iteration = 100;
 bool   regularize_l1 = false;
 bool   regularize_l2 = false;
