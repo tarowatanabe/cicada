@@ -2,6 +2,7 @@
 Added a sample grammar file to support zone/wall found in moses.
 Added experimental compose-tree-cky and parse-tree-cky for string-to-tree translation!
 Support cky-style indexing in tree-transducer for string-to-tree translation.
+Better global lexicon learning by limiting the source word features
 More compact representation for feature vectors
 Bugfix: use base10 -99 for Pr(<s>)
 
