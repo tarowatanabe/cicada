@@ -106,6 +106,7 @@ feature/ngram_tree.hpp \
 feature/parent.hpp \
 feature/penalty.hpp \
 feature/permute.hpp \
+feature/rule_shape.hpp \
 feature/span.hpp \
 feature/variational.hpp
 
@@ -125,6 +126,7 @@ feature/ngram_tree.cpp \
 feature/parent.cpp \
 feature/penalty.cpp \
 feature/permute.cpp \
+feature/rule_shape.cpp \
 feature/span.cpp \
 feature/variational.cpp
 

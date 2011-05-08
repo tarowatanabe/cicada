@@ -21,6 +21,7 @@
 #include "feature/parent.hpp"
 #include "feature/penalty.hpp"
 #include "feature/permute.hpp"
+#include "feature/rule_shape.hpp"
 #include "feature/span.hpp"
 #include "feature/variational.hpp"
 
@@ -106,6 +107,7 @@ rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
 glue-tree-penalty: glue tree penalty feature\n\
 non-latin-penalty: non-latin word penalty feature\n\
+rule-shape: rule shape feature\n\
 relative-position: relative alignment feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
@@ -180,6 +182,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::TargetBigram(parameter));
     else if (param_name == "word-pair")
       return feature_function_ptr_type(new feature::WordPair(parameter));
+    else if (param_name == "rule-shape")
+      return feature_function_ptr_type(new feature::RuleShape(parameter));
     else
       throw std::runtime_error("unknown featuer: " + parameter);
     
