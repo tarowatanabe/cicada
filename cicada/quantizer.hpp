@@ -57,9 +57,10 @@ namespace cicada
       }
 
       // high..
-      {
-	typename Counts::iterator citer = counts.begin();
-	if (citer != counts.end() && citer->first >= boost::numeric::bounds<logprob_type>::highest()) {
+      if (! counts.empty()) {
+	typename Counts::iterator citer = counts.end();
+	-- citer;
+	if (citer->first >= boost::numeric::bounds<logprob_type>::highest()) {
 	  quantized.insert(std::make_pair(citer->second, logprob_set_type(1, *citer)));
 	  counts.erase(citer);
 	  -- num_center;
