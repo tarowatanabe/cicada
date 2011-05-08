@@ -37,9 +37,9 @@ namespace cicada
       
       
       // zeros...
-      {
+      if (! counts.empty()) {
 	typename Counts::iterator citer = counts.begin();
-	if (citer != counts.end() && citer->first <= boost::numeric::bounds<logprob_type>::lowest()) {
+	if (citer->first <= boost::numeric::bounds<logprob_type>::lowest()) {
 	  quantized.insert(std::make_pair(citer->second, logprob_set_type(1, *citer)));
 	  counts.erase(citer);
 	  -- num_center;
@@ -47,7 +47,7 @@ namespace cicada
       }
       
       // ones...?
-      {
+      if (! counts.empty()) {
 	typename Counts::iterator citer = counts.find(0.0);
 	if (citer != counts.end()) {
 	  quantized.insert(std::make_pair(citer->second, logprob_set_type(1, *citer)));
