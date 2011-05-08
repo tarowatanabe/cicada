@@ -24,6 +24,7 @@
 #include "feature/rule_shape.hpp"
 #include "feature/span.hpp"
 #include "feature/variational.hpp"
+#include "feature/vocabulary.hpp"
 
 #include "utils/piece.hpp"
 
@@ -108,6 +109,10 @@ arity-penalty: rule arity penalty feature\n\
 glue-tree-penalty: glue tree penalty feature\n\
 non-latin-penalty: non-latin word penalty feature\n\
 rule-shape: rule shape feature\n\
+vocabulary: vocabulary feature\n\
+\tfile=[vocabulary file]\n\
+\toov=[true|false] oov penalty mode\n\
+\tname=feature-name (default: vocabulary)\n\
 relative-position: relative alignment feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\

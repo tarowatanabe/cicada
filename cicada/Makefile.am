@@ -108,7 +108,8 @@ feature/penalty.hpp \
 feature/permute.hpp \
 feature/rule_shape.hpp \
 feature/span.hpp \
-feature/variational.hpp
+feature/variational.hpp \
+feature/vocabulary.hpp
 
 libcicada_feature_la_SOURCES = \
 feature/alignment.cpp \
@@ -128,7 +129,8 @@ feature/penalty.cpp \
 feature/permute.cpp \
 feature/rule_shape.cpp \
 feature/span.cpp \
-feature/variational.cpp
+feature/variational.cpp \
+feature/vocabulary.cpp
 
 libcicada_feature_la_CPPFLAGS = $(AM_CPPFLAGS)
 

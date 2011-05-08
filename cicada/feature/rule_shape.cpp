@@ -113,7 +113,6 @@ namespace cicada
       
       base_type::__state_size = 0;
       base_type::__feature_name = "rule-shape";
-      base_type::__sparse_feature = true;
       
       pimpl = rule_shape_impl.release();
     }
@@ -140,8 +139,6 @@ namespace cicada
 			  feature_set_type& estimates,
 			  const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-      
       pimpl->rule_shape_score(edge, features);
     }
 
@@ -152,7 +149,7 @@ namespace cicada
 				 feature_set_type& estimates,
 				 const bool final) const
     {
-      
+      apply(state, states, edge, features, estimates, final);
     }
     
     void RuleShape::apply_predict(state_ptr_type& state,
@@ -161,7 +158,9 @@ namespace cicada
 				  feature_set_type& features,
 				  feature_set_type& estimates,
 				  const bool final) const
-    {}
+    {
+      apply(state, states, edge, features, estimates, final);
+    }
     
     void RuleShape::apply_scan(state_ptr_type& state,
 			       const state_ptr_set_type& states,
@@ -178,9 +177,6 @@ namespace cicada
 				   feature_set_type& features,
 				   feature_set_type& estimates,
 				   const bool final) const
-    {
-      apply(state, states, edge, features, estimates, final);
-    }
-    
+    {}
   };
 };
