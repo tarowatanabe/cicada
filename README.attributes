@@ -3,10 +3,10 @@ Attributes in hypergraph
 In addition to features, each edge in hypergraph can hold "attributes," meta data.
 The format is:
 
-{key: value, key: value, ...}
+key=value key=value
 
-where key is JASON string, " escaped string ", and value can take either integer, float or JASON string.
-See hypergraph format doc.
+where key is non-space string, and value can take either integer, float or JASON string (or an instance of double quoted string).
+See hypergraph format doc for possible values.
 
 Actual implementation relies on boost.variant, a compact union storage.
 
