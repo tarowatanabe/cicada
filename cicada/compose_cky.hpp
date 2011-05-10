@@ -172,6 +172,9 @@ namespace cicada
       actives.clear();
       passives.clear();
       non_terminals.clear();
+
+      actives.reserve(grammar.size());
+      passives.reserve(lattice.size() + 1);
       
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
@@ -377,6 +380,7 @@ namespace cicada
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
+	  passive_set_type(passives(first, last)).swap(passives(first, last));
 	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
 
 	  //std::cerr << "span: " << first << ".." << last << " passives: " << passives(first, last).size() << std::endl;

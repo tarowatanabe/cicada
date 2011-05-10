@@ -410,6 +410,7 @@ namespace cicada
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
+	  passive_set_type(passives(first, last)).swap(passives(first, last));
 	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
 	  
 	  // extend root with passive items at [first, last)
