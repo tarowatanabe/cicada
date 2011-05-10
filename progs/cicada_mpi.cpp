@@ -153,16 +153,16 @@ int main(int argc, char ** argv)
     else
       cicada_process(operations);
     
-    operation_set_type::statistics_type statistics;
-    merge_statistics(operations, statistics);
-
-    if (mpi_rank == 0 && debug)
-      std::cerr << "statistics"<< '\n'
-		<< statistics;
-
     synchronize();
     
     ::sync();
+    
+    operation_set_type::statistics_type statistics;
+    merge_statistics(operations, statistics);
+    
+    if (mpi_rank == 0 && debug)
+      std::cerr << "statistics"<< '\n'
+		<< statistics;
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
