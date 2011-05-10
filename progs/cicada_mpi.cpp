@@ -317,8 +317,30 @@ void synchronize()
       non_found_iter = loop_sleep(found, non_found_iter);
     }
   } else {
-    MPI::COMM_WORLD.Send(0, 0, MPI::INT, 0, notify_tag);
-    MPI::COMM_WORLD.Recv(0, 0, MPI::INT, 0, notify_tag);
+    MPI::Request request_send = MPI::COMM_WORLD.Isend(0, 0, MPI::INT, 0, notify_tag);
+    MPI::Request request_recv = MPI::COMM_WORLD.Irecv(0, 0, MPI::INT, 0, notify_tag);
+    
+    bool terminated_send = false;
+    bool terminated_recv = false;
+    
+    int non_found_iter = 0;
+    for (;;) {
+      bool found = false;
+      
+      if (! terminated_send && request_send.Test()) {
+	terminated_send = true;
+	found = true;
+      }
+      
+      if (! terminated_recv && request_recv.Test()) {
+	terminated_recv = true;
+	found = true;
+      }
+      
+      if (terminated_send && terminated_recv) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
   }
 }
 
