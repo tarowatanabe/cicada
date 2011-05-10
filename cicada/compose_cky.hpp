@@ -108,6 +108,32 @@ namespace cicada
     typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
     typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
 
+    struct RuleCandidate
+    {
+      rule_ptr_type rule;
+      
+      feature_set_type   features;
+      attribute_set_type attributes;
+      
+      RuleCandidate() : rule(), features(), attributes() {}
+      RuleCandidate(const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
+	: rule(__rule), features(__features), attributes(__attributes) {}
+    };
+    
+    typedef RuleCandidate rule_candidate_type;
+    typedef utils::chunk_vector<rule_candidate_type, 4096 / sizeof(rule_candidate_type), std::allocator<rule_candidate_type> > rule_candidate_set_type;
+
+    typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+#else
+    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+#endif
+    typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
+
+
     typedef std::pair<symbol_type, int> symbol_level_type;
     
     struct symbol_level_hash : public utils::hashmurmur<size_t>
@@ -178,6 +204,11 @@ namespace cicada
       
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
+
+      rule_candidates.clear();
+      rule_tables.clear();
+      rule_tables.reserve(grammar.size());
+      rule_tables.resize(grammar.size());
       
       // initialize active chart
       for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -277,20 +308,20 @@ namespace cicada
 	    
 	    active_set_type::const_iterator citer_end = cell.end();
 	    for (active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
+	      const rule_candidate_ptr_set_type& rules = candidate_rules(table, citer->node);
 	      
 	      if (rules.empty()) continue;
 	      
-	      transducer_type::rule_pair_set_type::const_iterator riter_begin = rules.begin();
-	      transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
+	      rule_candidate_ptr_set_type::const_iterator riter_begin = rules.begin();
+	      rule_candidate_ptr_set_type::const_iterator riter_end   = rules.end();
 	      
-	      for (transducer_type::rule_pair_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
-		const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
+	      for (rule_candidate_ptr_set_type::const_iterator riter = riter_begin; riter != riter_end; ++ riter) {
+		const rule_ptr_type& rule = (*riter)->rule;
 		const symbol_type& lhs = rule->lhs;
 		
 		if (pruner(first, last, lhs)) continue;
 		
-		apply_rule(rule, riter->features + citer->features, riter->attributes + citer->attributes,
+		apply_rule(rule, (*riter)->features + citer->features, (*riter)->attributes + citer->attributes,
 			   citer->tails.begin(), citer->tails.end(), passive_arcs, graph,
 			   first, last);
 	      }
@@ -328,7 +359,7 @@ namespace cicada
 		  const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
 		  if (node == transducer.root()) continue;
 		  
-		  const transducer_type::rule_pair_set_type& rules = transducer.rules(node);
+		  const rule_candidate_ptr_set_type& rules = candidate_rules(table, node);
 		  
 		  if (rules.empty()) continue;
 		  
@@ -336,9 +367,9 @@ namespace cicada
 		  
 		  closure_tail.insert(non_terminal);
 		  
-		  transducer_type::rule_pair_set_type::const_iterator riter_end = rules.end();
-		  for (transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
-		    const rule_ptr_type& rule = (yield_source ? riter->source : riter->target);
+		  rule_candidate_ptr_set_type::const_iterator riter_end   = rules.end();
+		  for (rule_candidate_ptr_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter) {
+		    const rule_ptr_type& rule = (*riter)->rule;
 		    const symbol_type& lhs = rule->lhs;
 
 		    if (pruner(first, last, lhs)) continue;
@@ -348,7 +379,7 @@ namespace cicada
 		    
 		    closure_head.insert(lhs);
 		    
-		    apply_rule(rule, riter->features, riter->attributes,
+		    apply_rule(rule, (*riter)->features, (*riter)->attributes,
 			       &passive_arcs[p], (&passive_arcs[p]) + 1, passive_arcs, graph,
 			       first, last, level + 1);
 		  }
@@ -533,6 +564,31 @@ namespace cicada
       
       return found;
     }
+
+  private:
+    const rule_candidate_ptr_set_type& candidate_rules(const size_type& table, const transducer_type::id_type& node)
+    {
+      rule_candidate_map_type::iterator riter = rule_tables[table].find(node);
+      if (riter == rule_tables[table].end()) {
+	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_ptr_set_type())).first;
+	
+	const transducer_type::rule_pair_set_type& rules = grammar[table].rules(node);
+	
+	riter->second.reserve(rules.size());
+	
+	transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
+	  rule_candidates.push_back(rule_candidate_type(yield_source ? iter->source : iter->target,
+							iter->features,
+							iter->attributes));
+	  
+	  riter->second.push_back(&(rule_candidates.back()));
+	}
+      }
+      return riter->second;
+    }
+
     
   private:
     const symbol_type goal;
@@ -548,6 +604,9 @@ namespace cicada
 
     active_chart_set_type  actives;
     passive_chart_type     passives;
+
+    rule_candidate_set_type   rule_candidates;
+    rule_candidate_table_type rule_tables;
 
     node_map_type         node_map;
     closure_level_type    closure;
