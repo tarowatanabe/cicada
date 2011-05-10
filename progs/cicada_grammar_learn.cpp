@@ -396,91 +396,91 @@ struct MaximizeBayes : public utils::hashmurmur<size_t>
   {
     using namespace boost::math::policies;
     typedef policy<domain_error<errno_on_error>,
-		   pole_error<errno_on_error>,
-		   overflow_error<errno_on_error>,
-		   rounding_error<errno_on_error>,
-		   evaluation_error<errno_on_error> > policy_type;
+      pole_error<errno_on_error>,
+      overflow_error<errno_on_error>,
+      rounding_error<errno_on_error>,
+      evaluation_error<errno_on_error> > policy_type;
     
-  if (counts.empty()) return;
+    if (counts.empty()) return;
     
-  logprob_set_type& logprobs = const_cast<logprob_set_type&>(__logprobs);
-  rule_ptr_set_type& rules = const_cast<rule_ptr_set_type&>(__rules);
+    logprob_set_type& logprobs = const_cast<logprob_set_type&>(__logprobs);
+    rule_ptr_set_type& rules = const_cast<rule_ptr_set_type&>(__rules);
     
-  logprobs.resize(counts.size());
-  rules.resize(counts.size());
+    logprobs.resize(counts.size());
+    rules.resize(counts.size());
 
-  rule_count_set_type rule_counts;
+    rule_count_set_type rule_counts;
 
-  weight_type sum;
-        
-  logprob_set_type::iterator piter = logprobs.begin();
-  rule_ptr_set_type::iterator riter = rules.begin();
-  grammar_type::const_iterator citer_end = counts.end();
-  for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter, ++ riter) {
-    const symbol_type lhs = citer->first->lhs.coarse();
-      
-    symbol_set_type rhs(citer->first->rhs);
-    symbol_set_type::iterator siter_end = rhs.end();
-    for (symbol_set_type::iterator siter = rhs.begin(); siter != siter_end; ++ siter)
-      *siter = siter->coarse();
-      
-    const rule_ptr_type rule_coarse(rule_type::create(rule_type(lhs, rhs)));
-      
-    grammar_type::const_iterator biter = base.find(rule_coarse);
-    if (biter == base.end())
-      throw std::runtime_error("no base?");
-      
-    *piter = biter->second;
-    *riter = biter->first;
-      
-    sum += citer->second;
-    ++ rule_counts[biter->first];
-  }
-    
-  weight_type logprob_sum;
-    
-  logprob_set_type::iterator piter_end = logprobs.end();
-  riter = rules.begin();
-  for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter, ++ riter) {
-    *piter /= weight_type(static_cast<double>(rule_counts.find(*riter)->second));
-      
-    logprob_sum += *piter;
-  }
-  
-  const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
-  const double prior = (is_terminal ? prior_lexicon : prior_rule) * counts.size();
-  const weight_type logprior(prior);
-  
-  double total = 0.0;
-  for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter)
-    sum += logprior * ((*piter) / logprob_sum);
-  total = sum;
-    
-  for (;;) {
     weight_type sum;
-    //const weight_type logtotal(total);
-    const double logtotal = utils::mathop::digamma(total);
-      
+        
     logprob_set_type::iterator piter = logprobs.begin();
-    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
-      const double logprob = utils::mathop::digamma(static_cast<double>(citer->second + logprior * (*piter) / logprob_sum)) - logtotal;
-	
-      grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
-      sum += cicada::semiring::traits<weight_type>::exp(logprob);
-	
-      //const weight_type logprob = (citer->second + logprior * (*piter)) / logtotal;
-	
-      //grammar[citer->first] = logprob;
-      //sum += logprob;
+    rule_ptr_set_type::iterator riter = rules.begin();
+    grammar_type::const_iterator citer_end = counts.end();
+    for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter, ++ riter) {
+      const symbol_type lhs = citer->first->lhs.coarse();
+      
+      symbol_set_type rhs(citer->first->rhs);
+      symbol_set_type::iterator siter_end = rhs.end();
+      for (symbol_set_type::iterator siter = rhs.begin(); siter != siter_end; ++ siter)
+	*siter = siter->coarse();
+      
+      const rule_ptr_type rule_coarse(rule_type::create(rule_type(lhs, rhs)));
+      
+      grammar_type::const_iterator biter = base.find(rule_coarse);
+      if (biter == base.end())
+	throw std::runtime_error("no base?");
+      
+      *piter = biter->second;
+      *riter = biter->first;
+      
+      sum += citer->second;
+      ++ rule_counts[biter->first];
     }
+    
+    weight_type logprob_sum;
+    
+    logprob_set_type::iterator piter_end = logprobs.end();
+    riter = rules.begin();
+    for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter, ++ riter) {
+      *piter /= weight_type(static_cast<double>(rule_counts.find(*riter)->second));
       
-    const double discount = - boost::math::expm1(cicada::semiring::log(sum), policy_type());
-    if (discount > 0.0) break;
+      logprob_sum += *piter;
+    }
+  
+    const bool is_terminal = counts.begin()->first->rhs.front().is_terminal();
+    const double prior = (is_terminal ? prior_lexicon : prior_rule) * counts.size();
+    const weight_type logprior(prior);
+  
+    double total = 0.0;
+    for (logprob_set_type::iterator piter = logprobs.begin(); piter != piter_end; ++ piter)
+      sum += logprior * ((*piter) / logprob_sum);
+    total = sum;
+    
+    for (;;) {
+      weight_type sum;
+      //const weight_type logtotal(total);
+      const double logtotal = utils::mathop::digamma(total);
       
-    ++ total;
+      logprob_set_type::iterator piter = logprobs.begin();
+      for (grammar_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ piter) {
+	const double logprob = utils::mathop::digamma(static_cast<double>(citer->second + logprior * (*piter) / logprob_sum)) - logtotal;
+	
+	grammar[citer->first] = cicada::semiring::traits<weight_type>::exp(logprob);
+	sum += cicada::semiring::traits<weight_type>::exp(logprob);
+	
+	//const weight_type logprob = (citer->second + logprior * (*piter)) / logtotal;
+	
+	//grammar[citer->first] = logprob;
+	//sum += logprob;
+      }
+      
+      const double discount = - boost::math::expm1(cicada::semiring::log(sum), policy_type());
+      if (discount > 0.0) break;
+      
+      ++ total;
+    }
   }
-}
-  };
+};
 
 int main(int argc, char** argv)
 {
