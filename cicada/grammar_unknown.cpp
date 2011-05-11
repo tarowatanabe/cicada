@@ -143,11 +143,16 @@ namespace cicada
     if (node != base_type::root()) return;
     
     // word is oov
-    const symbol_type sig = signature->operator()(word);
+    symbol_type sig = signature->operator()(word);
     node = base_type::next(base_type::root(), sig);
-    if (node == base_type::root())
-      throw std::runtime_error("invalid signature? " + static_cast<const std::string&>(sig)
-			       + " word: " + static_cast<const std::string&>(word));
+    if (node == base_type::root()) {
+      sig = "<UNK>";
+      node = base_type::next(base_type::root(), sig);
+      
+      if (node == base_type::root())
+	throw std::runtime_error("invalid signature? " + static_cast<const std::string&>(signature->operator()(word))
+				 + " word: " + static_cast<const std::string&>(word));
+    }
     
     const rule_pair_set_type& __rules = base_type::rules(node);
     if (__rules.empty())
