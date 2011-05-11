@@ -126,6 +126,8 @@ namespace utils
   public:
     // we assume aligned malloc, and the malloc of address 1 will not happen... is it true?
     dense_hashtable() : hashtable() {  hashtable.set_empty_key(0); hashtable.set_deleted_key(__deleted_key()); }
+    template <typename Iterator>
+    dense_hashtable(Iterator first, Iterator last) { hashtable.set_empty_key(0); hashtable.set_deleted_key(__deleted_key()); insert(first, last); } 
     dense_hashtable(const dense_hashtable& x) : hashtable() { hashtable.set_empty_key(0); hashtable.set_deleted_key(__deleted_key()); assign(x); }
     ~dense_hashtable() { clear(); }
     dense_hashtable& operator=(const dense_hashtable& x)
@@ -160,6 +162,13 @@ namespace utils
     inline const_iterator find(const value_type& x) const { return hashtable.find(const_cast<value_type*>(&x)); }
     inline       iterator find(const value_type& x)       { return hashtable.find(const_cast<value_type*>(&x)); }
 
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first)
+	insert(*first);
+    }
+    
     std::pair<iterator, bool> insert(const value_type& x)
     {
       typename hashtable_type::iterator iter = hashtable.find(const_cast<value_type*>(&x));

@@ -119,6 +119,9 @@ namespace utils
     
   public:
     sparse_hashtable() : hashtable() {  hashtable.set_deleted_key(0); }
+
+    template <typename Iterator>
+    sparse_hashtable(Iterator first, Iterator last)  { hashtable.set_deleted_key(0); insert(first, last); }
     sparse_hashtable(const sparse_hashtable& x) : hashtable() { hashtable.set_deleted_key(0); assign(x); }
     ~sparse_hashtable() { clear(); }
     sparse_hashtable& operator=(const sparse_hashtable& x)
@@ -145,7 +148,14 @@ namespace utils
     inline       iterator end()       { return hashtable.end(); }
     inline const_iterator find(const value_type& x) const { return hashtable.find(const_cast<value_type*>(&x)); }
     inline       iterator find(const value_type& x)       { return hashtable.find(const_cast<value_type*>(&x)); }
-
+    
+    template <typename Iterator>
+    void insert(Iterator first, Iterator last)
+    {
+      for (/**/; first != last; ++ first)
+	insert(*first);
+    }
+    
     std::pair<iterator, bool> insert(const value_type& x)
     {
       typename hashtable_type::iterator iter = hashtable.find(const_cast<value_type*>(&x));
