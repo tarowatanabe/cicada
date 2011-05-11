@@ -55,8 +55,13 @@ namespace utils
     typedef typename hashtable_type::size_type       size_type;
     typedef typename hashtable_type::difference_type difference_type;
     
+    class const_iterator;
+
     class iterator
     {
+    private:
+      friend class const_iterator;
+      
     private:
       typedef iterator_base_type base_type;
       
@@ -70,6 +75,7 @@ namespace utils
       typedef Value* pointer;
       
       iterator(const base_type& x) : base(x) {}
+      iterator(const const_iterator& x) : base(x.base) {}
       
       value_type& operator*() { return *(*base); }
       value_type* operator->() { return &(*(*base)); }
@@ -81,6 +87,11 @@ namespace utils
       bool operator==(const iterator& x, const iterator& y) { return x.base == y.base; }
       friend
       bool operator!=(const iterator& x, const iterator& y) { return x.base != y.base; }
+
+      friend
+      bool operator==(const iterator& x, const const_iterator& y) { return x == iterator(y); }
+      friend
+      bool operator!=(const iterator& x, const const_iterator& y) { return x != iterator(y); }
       
     private:
       base_type base;
@@ -88,6 +99,9 @@ namespace utils
     
     class const_iterator
     {
+    private:
+      friend class iterator;
+
     private:
       typedef const_iterator_base_type base_type;
       
@@ -101,10 +115,11 @@ namespace utils
       typedef const Value* pointer;
       
       const_iterator(const base_type& x) : base(x) {}
+      const_iterator(const iterator& x) : base(x.base) {}
       
       const value_type& operator*() { return *(*base); }
       const value_type* operator->() { return &(*(*base)); }
-
+      
       const_iterator& operator++() { ++ base; return *this; }
       const_iterator operator++(int) { const_iterator tmp(*this); ++ base; return tmp; }
       
@@ -112,6 +127,11 @@ namespace utils
       bool operator==(const const_iterator& x, const const_iterator& y) { return x.base == y.base; }
       friend
       bool operator!=(const const_iterator& x, const const_iterator& y) { return x.base != y.base; }
+
+      friend
+      bool operator==(const const_iterator& x, const iterator& y) { return x == const_iterator(y); }
+      friend
+      bool operator!=(const const_iterator& x, const iterator& y) { return x != const_iterator(y); }
       
     private:
       base_type base;
@@ -153,12 +173,10 @@ namespace utils
     void insert(Iterator first, Iterator last)
     {
       for (/**/; first != last; ++ first) {
-	value_type* p = alloc().allocate(1);
-	utils::construct_object(p, *first);
-	
-	if (! hashtable.insert(p).second) {
-	  utils::destroy_object(p);
-	  alloc().deallocate(p, 1);
+	std::pair<typename hashtable_type::iterator, bool> result = hashtable.insert(const_cast<value_type*>(&(*first)));
+	if (result.second) {
+	  const_cast<value_type*&>(*result.first) = alloc().allocate(1);
+	  utils::construct_object(*result.first, *first);
 	}
       }
     }
@@ -232,15 +250,4 @@ namespace utils
 
 namespace std
 {
-  template <typename K, typename V, typename X, typename H, typename E, typename A>
-  inline
-  void swap(utils::sparse_hashtable<K,V,X,H,E,A>& x,
-	    utils::sparse_hashtable<K,V,X,H,E,A>& y)
-  {
-    x.swap(y);
-  }
-};
-
-
-#endif
-
+  template 

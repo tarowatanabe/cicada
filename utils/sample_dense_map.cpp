@@ -43,4 +43,23 @@ int main(int argc, char** argv)
   
   if (! densemap.empty())
     std::cerr << "after erasing, not empty!" << std::endl;
+
+  densemap.insert(stdmap.begin(), stdmap.end());
+  for (std::map<std::string, int>::const_iterator iter = stdmap.begin(); iter != iter_end; ++ iter) {
+    
+    utils::dense_map<std::string, int>::iterator siter = densemap.find(iter->first);
+    if (siter == densemap.end())
+      std::cerr << "no key? " << iter->first << std::endl;
+    else if (iter->second != siter->second)
+      std::cerr << "different data ? " << iter->second << ' ' << siter->second << std::endl;
+  }
+
+  stdmap.clear();
+  {
+    for (utils::dense_map<std::string, int>::const_iterator iter = densemap.begin(); iter != densemap.end(); ++ iter) {
+      std::string data = iter->first;
+      
+    }
+  }
+
 }
