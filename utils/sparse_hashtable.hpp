@@ -250,4 +250,15 @@ namespace utils
 
 namespace std
 {
-  template 
+  template <typename K, typename V, typename X, typename H, typename E, typename A>
+  inline
+  void swap(utils::sparse_hashtable<K,V,X,H,E,A>& x,
+	    utils::sparse_hashtable<K,V,X,H,E,A>& y)
+  {
+    x.swap(y);
+  }
+};
+
+
+#endif
+
