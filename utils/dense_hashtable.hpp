@@ -30,18 +30,23 @@ namespace utils
     typedef Alloc allocator_type;
     
   private:
+    typedef dense_hashtable<Key,Value,ExtractKey,Hash,Equal,Alloc> self_type;
+
     struct hasher : public Hash, public ExtractKey
     {
       size_t operator()(const value_type* x) const
       {
-	return ! x ? size_t(0) : Hash::operator()(ExtractKey::operator()(*x));
+	return (x == 0 || x == self_type::__deleted_key()) ? size_t(0) : Hash::operator()(ExtractKey::operator()(*x));
       }
     };
     struct equal : public Equal, public ExtractKey
     {
       bool operator()(const value_type* x, const value_type* y) const
       {
-	return x == y || (x && y && Equal::operator()(ExtractKey::operator()(*x), ExtractKey::operator()(*y)));
+	return (x == y
+		|| (x && y
+		    && x != self_type::__deleted_key() && y != self_type::__deleted_key()
+		    && Equal::operator()(ExtractKey::operator()(*x), ExtractKey::operator()(*y))));
       }
     };
 
@@ -130,7 +135,7 @@ namespace utils
     }
     
   private:
-    const value_type* __deleted_key()
+    static const value_type* __deleted_key()
     {
       static const value_type __value;
       return &__value;
