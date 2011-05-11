@@ -281,6 +281,35 @@ void transform_stemmer(treebank_type& treebank, const stemmer_type& stemmer)
       transform_stemmer(*aiter, stemmer);
 }
 
+void transform_terminals(treebank_type& treebank)
+{
+  if (treebank.antecedents.empty()) return;
+  
+  treebank_type::antecedents_type antecedents;
+  
+  std::string cat;
+  for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter) {
+    if (aiter->antecedents.empty())
+      cat += aiter->cat;
+    else {
+      if (! cat.empty()) {
+	antecedents.push_back(treebank_type(cat));
+	cat.clear();
+      }
+      antecedents.push_back(*aiter);
+    }
+  }
+  
+  if (! cat.empty()) {
+    antecedents.push_back(treebank_type(cat));
+    cat.clear();
+  }
+  
+  treebank.antecedents.swap(antecedents);
+  for (treebank_type::antecedents_type::iterator aiter = treebank.antecedents.begin(); aiter != treebank.antecedents.end(); ++ aiter)
+    transform_terminals(*aiter);
+}
+
 void transform_remove_none(treebank_type& treebank)
 {
   if (treebank.cat == "-NONE-") {
@@ -403,6 +432,7 @@ bool remove_cycle = false;
 bool collapse = false;
 bool remove_bracket = false;
 bool add_bos_eos = false;
+bool fix_terminal = false;
 std::string stemmer;
 
 bool leaf = false;
@@ -506,6 +536,9 @@ int main(int argc, char** argv)
       if (! root_symbol.empty())
 	parsed.cat = root_symbol;
 
+      if (fix_terminal)
+	transform_terminals(parsed);
+      
       if (remove_none)
 	transform_remove_none(parsed);
       
@@ -649,6 +682,7 @@ void options(int argc, char** argv)
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     ("map",       po::value<path_type>(&map_file)->default_value(map_file), "map terminal symbols")
     
+    ("fix-terminal",   po::bool_switch(&fix_terminal),       "fix fragmented terminals")
     ("replace-root",   po::value<std::string>(&root_symbol), "replace root symbol")
     ("unescape",       po::bool_switch(&unescape_terminal),  "unescape terminal symbols, such as -LRB-, \\* etc.")
     ("normalize",      po::bool_switch(&normalize),          "normalize category, such as [,] [.] etc.")
