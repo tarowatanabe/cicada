@@ -183,14 +183,12 @@ namespace utils
     
     std::pair<iterator, bool> insert(const value_type& x)
     {
-      typename hashtable_type::iterator iter = hashtable.find(const_cast<value_type*>(&x));
-      if (iter != hashtable.end())
-	return std::make_pair(iter, false);
-      else {
-	value_type* p = alloc().allocate(1);
-	utils::construct_object(p, x);
-	return hashtable.insert(p);
+      std::pair<typename hashtable_type::iterator, bool> result = hashtable.insert(const_cast<value_type*>(&x));
+      if (result.second) {
+	const_cast<value_type*&>(*result.first) = alloc().allocate(1);
+	utils::construct_object(*result.first, x);
       }
+      return result;
     }
     
     void erase(const value_type& x)
