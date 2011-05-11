@@ -35,7 +35,7 @@ namespace cicada
       int count = 0;
       rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
       for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer) 
-	if (titer->is_terminal()) {
+	if (titer->is_terminal() && *titer != vocab_type::BOS && *titer != vocab_type::EOS) {
 	  const symbol_type& word = *titer;
 	  const size_t pos_scan = (word.id() << 1);
 	  const size_t pos_flag = (word.id() << 1) + 1;

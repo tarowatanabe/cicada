@@ -51,7 +51,7 @@ namespace cicada
 	if (oov_penalty) {
 	  rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
-	    if (riter->is_terminal()) {
+	    if (riter->is_terminal() && *riter != cicada::Vocab::BOS && *riter != cicada::Vocab::EOS) {
 	      const symbol_type::id_type id = riter->id();
 	      
 	      if (id >= vocab.size() || ! vocab[id])
@@ -65,7 +65,7 @@ namespace cicada
 	} else {
 	  rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
-	    if (riter->is_terminal()) {
+	    if (riter->is_terminal() && *riter != cicada::Vocab::BOS && *riter != cicada::Vocab::EOS) {
 	      const symbol_type::id_type id = riter->id();
 	      
 	      if (id < vocab.size() && vocab[id])
