@@ -519,9 +519,6 @@ namespace cicada
       // finally, collect all the parsed rules, and proceed to [goal] rule...
       // passive arcs will not be updated!
       
-      // we will clear node map so that we will always create new node..
-      node_map.clear();
-
       if (unique_goal) {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p)
@@ -537,9 +534,18 @@ namespace cicada
 	  if (non_terminals[passive_arcs[p]] == goal) {
 	    //std::cerr << "goal node: " << passive_arcs[p] << std::endl;
 	    
-	    apply_rule(score_type(), goal_rule, feature_set_type(), attribute_set_type(), &(passive_arcs[p]), (&passive_arcs[p]) + 1, passive_arcs, graph,
-		       0, lattice.size(),
-		       0, true);
+	    hypergraph_type::edge_type& edge = graph.add_edge(&(passive_arcs[p]), (&passive_arcs[p]) + 1);
+	    edge.rule = goal_rule;
+	    
+	    edge.attributes[attr_span_first] = attribute_set_type::int_type(0);
+	    edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice.size());
+	    
+	    if (! graph.is_valid()) {
+	      graph.goal = graph.add_node().id;
+	      non_terminals.push_back(goal_rule->lhs);
+	    }
+	    
+	    graph.connect_edge(edge.id, graph.goal);
 	  }
       }
       
@@ -560,8 +566,7 @@ namespace cicada
 							 hypergraph_type& graph,
 							 const int lattice_first,
 							 const int lattice_last,
-							 const int level = 0,
-							 const bool is_goal = false)
+							 const int level = 0)
     {
       //std::cerr << "rule: " << *rule << std::endl;
 
@@ -574,38 +579,27 @@ namespace cicada
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
 
-      if (is_goal) {
-	if (! graph.is_valid()) {
-	  graph.goal = graph.add_node().id;
-	  non_terminals.push_back(rule->lhs);
-	}
-	
-	graph.connect_edge(edge.id, graph.goal);
-	
-	return std::make_pair(graph.goal, false);
-      } else {
-	bool unary_next = false;
+      bool unary_next = false;
 
-	std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
-	if (result.second) {
-	  hypergraph_type::node_type& node = graph.add_node();
+      std::pair<typename node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(rule->lhs, level), 0));
+      if (result.second) {
+	hypergraph_type::node_type& node = graph.add_node();
 	  
-	  non_terminals.push_back(rule->lhs);
-	  passives.push_back(node.id);
-	  scores.push_back(score);
+	non_terminals.push_back(rule->lhs);
+	passives.push_back(node.id);
+	scores.push_back(score);
 	  
-	  result.first->second = node.id;
+	result.first->second = node.id;
 	  
-	  unary_next = true;
-	} else
-	  unary_next = score > scores[result.first->second];
-	
-	scores[result.first->second] = std::max(scores[result.first->second], score);
-	
-	graph.connect_edge(edge.id, result.first->second);
-	
-	return std::make_pair(result.first->second, unary_next);
-      }
+	unary_next = true;
+      } else
+	unary_next = score > scores[result.first->second];
+      
+      scores[result.first->second] = std::max(scores[result.first->second], score);
+      
+      graph.connect_edge(edge.id, result.first->second);
+      
+      return std::make_pair(result.first->second, unary_next);
     }
     
     bool extend_actives(const transducer_type& transducer,

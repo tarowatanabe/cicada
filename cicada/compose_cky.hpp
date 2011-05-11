@@ -403,9 +403,6 @@ namespace cicada
       // finally, collect all the parsed rules, and proceed to [goal] rule...
       // passive arcs will not be updated!
       
-      // we will clear node map so that we will always create new node..
-      node_map.clear();
-
       if (unique_goal) {
 	passive_set_type& passive_arcs = passives(0, lattice.size());
 	for (size_t p = 0; p != passive_arcs.size(); ++ p)
