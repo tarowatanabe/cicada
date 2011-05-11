@@ -45,8 +45,7 @@ namespace utils
       }
     };
 
-    typedef typename Alloc::template rebind<value_type*>::other map_alloc_type;
-    typedef google::sparse_hash_set<value_type*, hasher, equal, map_alloc_type> hashtable_type;
+    typedef google::sparse_hash_set<value_type*, hasher, equal> hashtable_type;
     
     typedef typename hashtable_type::iterator       iterator_base_type;
     typedef typename hashtable_type::const_iterator const_iterator_base_type;
