@@ -165,8 +165,15 @@ namespace utils
     template <typename Iterator>
     void insert(Iterator first, Iterator last)
     {
-      for (/**/; first != last; ++ first)
-	insert(*first);
+      for (/**/; first != last; ++ first) {
+	value_type* p = alloc().allocate(1);
+	utils::construct_object(p, *first);
+	
+	if (! hashtable.insert(p).second) {
+	  utils::destroy_object(p);
+	  alloc().deallocate(p, 1);
+	}
+      }
     }
     
     std::pair<iterator, bool> insert(const value_type& x)
