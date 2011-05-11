@@ -116,10 +116,10 @@ namespace cicada
 
       bool operator()(const int first, const int last) const
       {
-	if (prunes(first, last).empty()) return true;
-	
 	const label_score_set_type& labels = prunes(first, last);
 
+	if (labels.empty()) return true;
+	
 	bool no_prune = false;
 	typename label_score_set_type::const_iterator liter_end = labels.end();
 	for (typename label_score_set_type::const_iterator liter = labels.begin(); liter != liter_end; ++ liter)
@@ -130,9 +130,9 @@ namespace cicada
       
       bool operator()(const int first, const int last, const symbol_type& label) const
       {
-	if (prunes(first, last).empty()) return true;
-	
 	const label_score_set_type& labels = prunes(first, last);
+	
+	if (labels.empty()) return true;
 	
 	typename label_score_set_type::const_iterator liter = labels.find(label);
 	if (liter != labels.end())
