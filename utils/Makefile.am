@@ -132,6 +132,7 @@ sample_byte_aligned_code \
 sample_byte_aligned_vector \
 sample_chunk_vector \
 sample_compress_stream \
+sample_dense_map \
 sample_filesystem \
 sample_group_aligned_code \
 sample_icu_filter \
@@ -215,6 +216,9 @@ sample_chunk_vector_LDADD = $(BOOST_THREAD_LIBS)
 
 sample_compress_stream_SOURCES = sample_compress_stream.cpp
 sample_compress_stream_LDADD = $(LIBUTILS)
+
+sample_dense_map_SOURCES = sample_dense_map.cpp
+sample_dense_map_LDADD = $(LIBUTILS)
 
 sample_filesystem_SOURCES = sample_filesystem.cpp
 sample_filesystem_LDADD = $(LIBUTILS)

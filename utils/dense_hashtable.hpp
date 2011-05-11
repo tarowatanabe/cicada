@@ -135,9 +135,9 @@ namespace utils
     }
     
   private:
-    static const value_type* __deleted_key()
+    static value_type* __deleted_key()
     {
-      static const value_type __value;
+      static value_type __value;
       return &__value;
     }
     
