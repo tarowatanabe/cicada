@@ -74,7 +74,7 @@ namespace utils
     
     template <typename Iterator>
     void insert(Iterator first, Iterator last) { hashtable.insert(first, last); }
-    void insert(const value_type& x) { return hashtable.insert(x); }
+    std::pair<iterator, bool> insert(const value_type& x) { return hashtable.insert(x); }
     
     void erase(const key_type& x) { hashtable.erase(value_type(x, data_type())); }
     void erase(iterator x) { hashtable.erase(x); }

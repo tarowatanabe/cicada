@@ -65,6 +65,7 @@ namespace utils
     {
     private:
       friend class const_iterator;
+      friend class dense_hashtable;
       
     private:
       typedef iterator_base_type base_type;
@@ -105,6 +106,7 @@ namespace utils
     {
     private:
       friend class iterator;
+      friend class dense_hashtable;
 
     private:
       typedef const_iterator_base_type base_type;
@@ -219,7 +221,7 @@ namespace utils
     {
       value_type* p = &(*x);
       
-      hashtable.erase(x);
+      hashtable.erase(x.base);
       
       utils::destroy_object(p);
       alloc().deallocate(p, 1);

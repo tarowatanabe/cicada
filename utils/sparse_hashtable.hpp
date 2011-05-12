@@ -30,6 +30,8 @@ namespace utils
     typedef Alloc allocator_type;
     
   private:
+    typedef sparse_hashtable<Key,Value,ExtractKey,Hash,Equal,Alloc> self_type;
+    
     struct hasher : public Hash, public ExtractKey
     {
       size_t operator()(const value_type* x) const
@@ -60,6 +62,7 @@ namespace utils
     {
     private:
       friend class const_iterator;
+      friend class sparse_hashtable;
       
     private:
       typedef iterator_base_type base_type;
@@ -100,6 +103,7 @@ namespace utils
     {
     private:
       friend class iterator;
+      friend class sparse_hashtable;
 
     private:
       typedef const_iterator_base_type base_type;
@@ -207,7 +211,7 @@ namespace utils
     {
       value_type* p = &(*x);
       
-      hashtable.erase(x);
+      hashtable.erase(x.base);
       
       utils::destroy_object(p);
       alloc().deallocate(p, 1);
