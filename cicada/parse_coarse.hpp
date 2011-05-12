@@ -207,7 +207,7 @@ namespace cicada
       typedef Edge edge_type;
       typedef UnaryEdge unary_edge_type;
       
-      typedef std::deque<edge_type, std::allocator<edge_type> >              edge_set_type;
+      typedef utils::chunk_vector<edge_type, 512 / sizeof(edge_type), std::allocator<edge_type> > edge_set_type;
       typedef std::vector<unary_edge_type, std::allocator<unary_edge_type> > unary_edge_set_type;
       
       struct Active
