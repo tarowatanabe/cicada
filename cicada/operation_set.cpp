@@ -35,6 +35,7 @@
 #include "operation/normalize.hpp"
 #include "operation/output.hpp"
 
+#include "utils/resource.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/sgi_hash_map.hpp"
 #include "utils/compress_stream.hpp"
@@ -392,33 +393,64 @@ span-forest: annotate terminal span\n\
 
 
     if (input_lattice && input_forest) {
-      if (! data.lattice.assign(iter, end))
-	throw std::runtime_error("invalid lattice format");
+      {
+	utils::resource start;
+	if (! data.lattice.assign(iter, end))
+	  throw std::runtime_error("invalid lattice format");
+	utils::resource end;
+
+	statistics_type::statistic_type& stat = data.statistics["input-lattice"];
+	
+	++ stat.count;
+	stat.node += data.lattice.node_size();
+	stat.edge += data.lattice.edge_size();
+	stat.user_time += (end.user_time() - start.user_time());
+	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      }
 
       if (! parse_separator(iter, end))
 	throw std::runtime_error("invalid lattice/hypergraph format (separator)");
       
-      if (! data.hypergraph.assign(iter, end))
-	throw std::runtime_error("invalid hypergraph format");
+      {
+	utils::resource start;
+	if (! data.hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid hypergraph format");
+	utils::resource end;
+	
+	statistics_type::statistic_type& stat = data.statistics["input-forest"];
+	
+	++ stat.count;
+	stat.node += data.hypergraph.nodes.size();
+	stat.edge += data.hypergraph.edges.size();
+	stat.user_time += (end.user_time() - start.user_time());
+	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
+      }
     } else if (input_lattice) {
+      utils::resource start;
       if (! data.lattice.assign(iter, end))
 	throw std::runtime_error("invalid lattice format");
+      utils::resource end;
       
       statistics_type::statistic_type& stat = data.statistics["input-lattice"];
       
       ++ stat.count;
       stat.node += data.lattice.node_size();
       stat.edge += data.lattice.edge_size();
-      
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     } else if (input_forest) {
+      utils::resource start;
       if (! data.hypergraph.assign(iter, end))
 	throw std::runtime_error("invalid hypergraph format");
+      utils::resource end;
 
       statistics_type::statistic_type& stat = data.statistics["input-forest"];
       
       ++ stat.count;
       stat.node += data.hypergraph.nodes.size();
       stat.edge += data.hypergraph.edges.size();
+      stat.user_time += (end.user_time() - start.user_time());
+      stat.cpu_time  += (end.cpu_time() - start.cpu_time());
     }
     
     if (input_span) {

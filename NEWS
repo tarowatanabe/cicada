@@ -1,3 +1,6 @@
+2011-5-x
+Bugfix for spurious memory allocation in compose-cky, parse-cky and parse-coarse
+
 2011-5-9
 Added a sample grammar file to support zone/wall found in moses.
 Added experimental compose-tree-cky and parse-tree-cky for string-to-tree translation!
