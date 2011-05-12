@@ -315,7 +315,7 @@ namespace cicada
       const size_type  num_nodes_removed = dfs(removed, 0, positions_removed);
 
       if (positions_removed.back() != 0)
-	std::cerr << "WARNING: DFS resulted in wron lattice (1st step)" << std::endl;
+	std::cerr << "WARNING: DFS resulted in wrong lattice (1st step)" << std::endl;
       
       // after dfs, positons_removed is numberd by post-traversal order... thus,
       // we can automatically transpose the graph!
@@ -340,7 +340,7 @@ namespace cicada
       const size_type num_nodes_transposed = dfs(transposed, 0, positions_transposed);
 
       if (positions_transposed.back() != 0)
-	std::cerr << "WARNING: DFS resulted in wron lattice (2nd step)" << std::endl;
+	std::cerr << "WARNING: DFS resulted in wrong lattice (2nd step)" << std::endl;
       
       // after dfs, positons_transposed is numberd by post-traversal order... thus,
       // we can automatically transpose the graph... combined with the previous transposition,
