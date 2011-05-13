@@ -246,6 +246,12 @@ namespace cicada
 	template <typename Label, typename Score>
 	Unary(const std::pair<Label, Score>& x)
 	  : id(x.first), score(x.second) {}
+	
+	friend
+	bool operator<(const Unary& x, const Unary& y)
+	{
+	  return x.id < y.id;
+	}
       };
       
       typedef Active       active_type;
@@ -261,7 +267,7 @@ namespace cicada
       typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
       typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
       
-      typedef utils::chunk_vector<passive_unary_type, 4096 / sizeof(passive_unary_type), std::allocator<passive_unary_type> > passive_unary_set_type;
+      typedef std::vector<passive_unary_type, std::allocator<passive_unary_type> > passive_unary_set_type;
       typedef utils::chart<passive_unary_set_type, std::allocator<passive_unary_set_type> > passive_unary_chart_type;
             
       typedef std::vector<unary_type, std::allocator<unary_type> > unary_set_type;
@@ -280,7 +286,7 @@ namespace cicada
 	InsideOutsideScore() : inside(), outside() {}
       };
       typedef InsideOutsideScore score_pair_type;
-      typedef utils::chunk_vector<score_pair_type, 4096 / sizeof(score_pair_type), std::allocator<score_pair_type> > score_pair_set_type;
+      typedef std::vector<score_pair_type, std::allocator<score_pair_type> > score_pair_set_type;
       typedef utils::chart<score_pair_set_type, std::allocator<score_pair_set_type> > score_pair_chart_type;
       
     public:
@@ -471,6 +477,10 @@ namespace cicada
 
 	    // check pruning!
 	    if (pruner(first, last)) continue;
+
+	    score_pair_set_type& scores_inside = inside_outside(first, last);
+
+	    scores_inside.reserve(symbol_map.size());
 	    
 	    for (size_t table = 0; table != grammar.size(); ++ table) {
 	      const transducer_type& transducer = grammar[table];
@@ -546,8 +556,8 @@ namespace cicada
 	      
 	      active_set_type&     cell          = actives[table](first, last);
 	      passive_set_type&    passive_arcs  = passives(first, last);
-	      score_pair_set_type& scores_inside = inside_outside(first, last);
 	      
+
 	      typename active_set_type::const_iterator citer_end = cell.end();
 	      for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
 		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
@@ -586,28 +596,33 @@ namespace cicada
 	      // unary rules...
 	      const passive_set_type& passive = passives(first, last);
 	      passive_unary_set_type& passive_unary = passives_unary(first, last);
-	      score_pair_set_type&    scores_inside = inside_outside(first, last);
+
+	      passive_unary.reserve(symbol_map.size());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
 		  // child to parent...
 		  const unary_set_type& closure = unary_closure(id);
 		  const score_type score_tail = scores_inside[id].inside;
+
+		  if (closure.empty()) continue;
+
+		  if (closure.back().id >= static_cast<id_type>(passive_unary.size()))
+		    passive_unary.resize(closure.back().id + 1);
+		  if (closure.back().id >= static_cast<id_type>(scores_inside.size()))
+		    scores_inside.resize(closure.back().id + 1);
 		  
 		  typename unary_set_type::const_iterator citer_end = closure.end();
 		  for (typename unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
 		    // check pruning!
 		    if (pruner(first, last, symbol_map[citer->id])) continue;
-
-		    if (citer->id >= static_cast<id_type>(passive_unary.size()))
-		      passive_unary.resize(citer->id + 1);
-		    if (citer->id >= static_cast<id_type>(scores_inside.size()))
-		      scores_inside.resize(citer->id + 1);
 		    
 		    passive_unary[citer->id].edges.push_back(unary_edge_type(id, citer->score));
 		    scores_inside[citer->id].inside = std::max(scores_inside[citer->id].inside, score_tail * citer->score);
 		  }
 		}
+
+	      passive_unary_set_type(passive_unary).swap(passive_unary);
 	    }
 	    
 	    // final unary rules
@@ -615,7 +630,8 @@ namespace cicada
 	      // unary rules...
 	      const passive_unary_set_type& passive = passives_unary(first, last);
 	      passive_unary_set_type& passive_final = passives_final(first, last);
-	      score_pair_set_type&    scores_inside = inside_outside(first, last);
+	      
+	      passive_final.reserve(symbol_map.size());
 	      
 	      for (id_type id = 0; id != static_cast<id_type>(passive.size()); ++ id) 
 		if (! passive[id].edges.empty()) {
@@ -623,22 +639,25 @@ namespace cicada
 		  const unary_set_type& closure = unary_closure(id);
 		  const score_type score_tail = scores_inside[id].inside;
 		  
+		  if (closure.empty()) continue;
+		  
+		  if (closure.back().id >= static_cast<id_type>(passive_final.size()))
+		    passive_final.resize(closure.back().id + 1);
+		  if (closure.back().id >= static_cast<id_type>(scores_inside.size()))
+		    scores_inside.resize(closure.back().id + 1);
+		  
 		  typename unary_set_type::const_iterator citer_end = closure.end();
 		  for (typename unary_set_type::const_iterator citer = closure.begin(); citer != citer_end; ++ citer) {
 		    // check pruning!
 		    if (pruner(first, last, symbol_map[citer->id])) continue;
-
-		    if (citer->id >= static_cast<id_type>(passive_final.size()))
-		      passive_final.resize(citer->id + 1);
-		    if (citer->id >= static_cast<id_type>(scores_inside.size()))
-		      scores_inside.resize(citer->id + 1);
 		    
 		    passive_final[citer->id].edges.push_back(unary_edge_type(id, citer->score));
 		    scores_inside[citer->id].inside = std::max(scores_inside[citer->id].inside, score_tail * citer->score);
 		  }
 		}
+	      
+	      passive_unary_set_type(passive_final).swap(passive_final);
 	    }
-	    
 	    
 	    // extend root with passive items at [first, last)
 	    for (size_t table = 0; table != grammar.size(); ++ table) {
@@ -653,8 +672,19 @@ namespace cicada
 	      
 	      extend_actives(transducer, active_arcs, passive_arcs, first, last, cell);
 	    }
+	    
+	    score_pair_set_type(scores_inside).swap(scores_inside);
 	  }
       }
+      
+      template <typename Tp>
+      struct less_id
+      {
+	bool operator()(const Tp& x, const Tp& y) const
+	{
+	  return x.id < y.id;
+	}
+      };
       
       const unary_set_type& unary_closure(const id_type& child)
       {
@@ -719,6 +749,7 @@ namespace cicada
 	  }
 	  
 	  unaries[child] = unary_set_type(closure.begin(), closure.end());
+	  std::sort(unaries[child].begin(), unaries[child].end());
 	}
 	return unaries[child];
       }
