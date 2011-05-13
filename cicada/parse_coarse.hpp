@@ -693,9 +693,11 @@ namespace cicada
 	// given this child state, compute closure...
 	// we do not allow cycle, and keep only max-rules
 	//
-
-	unaries.resize(symbol_map.size());
-	unaries_computed.resize(symbol_map.size(), false);
+	
+	if (symbol_map.size() > unaries.size())
+	  unaries.resize(symbol_map.size());
+	if (symbol_map.size() > unaries_computed.size())
+	  unaries_computed.resize(symbol_map.size(), false);
 	
 	if (! unaries_computed[child]) {
 	  unaries_computed[child] = true;
