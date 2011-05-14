@@ -47,9 +47,9 @@ void options(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
-  options(argc, argv);
-
   try {
+    options(argc, argv);
+
     if (locale.empty())
       throw std::runtime_error("no locale?");
     
