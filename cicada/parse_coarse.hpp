@@ -264,7 +264,7 @@ namespace cicada
       typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
       typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
       
-      typedef std::vector<passive_type, std::allocator<passive_type> > passive_set_type;
+      typedef utils::chunk_vector<passive_type, 4096 / sizeof(passive_type), std::allocator<passive_type> > passive_set_type;
       typedef utils::chart<passive_set_type, std::allocator<passive_set_type> > passive_chart_type;
       
       typedef std::vector<passive_unary_type, std::allocator<passive_unary_type> > passive_unary_set_type;
@@ -557,7 +557,6 @@ namespace cicada
 	      active_set_type&     cell          = actives[table](first, last);
 	      passive_set_type&    passive_arcs  = passives(first, last);
 	      
-
 	      typename active_set_type::const_iterator citer_end = cell.end();
 	      for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
 		const transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
