@@ -8,10 +8,32 @@
 #include <unicode/rbnf.h>
 #include <unicode/unistr.h>
 #include <unicode/locid.h>
+#include <unicode/bytestream.h>
 
+#include "utils/compress_stream.hpp"
+
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
 typedef boost::filesystem::path path_type;
+
+struct ostream_sink : public ByteSink
+{
+  
+  ostream_sink(std::ostream& _os) : os(_os) {}
+  
+  virtual void Append(const char* data, int32_t n) 
+  {
+    os.write((char*) data, n);
+  }
+  
+  void write(char c)
+  {
+    os.write((char*) & c, sizeof(c));
+  }
+  
+  std::ostream& os;
+};
 
 path_type input_file = "-";
 path_type output_file = "-";
@@ -19,12 +41,16 @@ path_type output_file = "-";
 std::string locale;
 std::string rule;
 
+int debug = 0;
+
+void options(int argc, char** argv);
+
 int main(int argc, char** argv)
 {
   options(argc, argv);
 
   try {
-    if (local.empty())
+    if (locale.empty())
       throw std::runtime_error("no locale?");
     
     Locale loc(locale.c_str());
@@ -33,10 +59,47 @@ int main(int argc, char** argv)
       throw std::runtime_error("invlaid ocale: " + locale);
     
     UErrorCode status = U_ZERO_ERROR;
-    std::auto_ptr<RuleBasedNumberFormat> parser_rule_spell(new RuleBasedNumberFormat(URBNF_SPELLOUT, loc, status));
+    std::auto_ptr<RuleBasedNumberFormat> formatter(new RuleBasedNumberFormat(URBNF_SPELLOUT, loc, status));
     if (U_FAILURE(status))
       throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+
+    if (! rule.empty()) {
+      UErrorCode status = U_ZERO_ERROR;
+      formatter->setDefaultRuleSet(UnicodeString(rule.c_str()), status);
+      
+      if (U_FAILURE(status)) {
+	std::cerr << "# of rules: " << formatter->getNumberOfRuleSetNames() << std::endl;
+	for (int i = 0; i < formatter->getNumberOfRuleSetNames(); ++ i) {
+	  std::string name;
+	  formatter->getRuleSetName(i).toUTF8String(name);
+	  
+	  std::cerr << "rule set: " << name << std::endl;
+	}
+	
+	throw std::runtime_error("unsupported rule set: " + rule);
+      }
+    }
+
     
+	
+    
+    const bool flush_output = (output_file == "-"
+                               || (boost::filesystem::exists(output_file)
+                                   && ! boost::filesystem::is_regular_file(output_file)));
+    
+    utils::compress_istream is(input_file);
+    utils::compress_ostream os(output_file, 4096 * (! flush_output));
+    ostream_sink sink(os);
+    
+    int64_t integer;
+    UnicodeString formatted;
+    while (is >> integer) {
+      FieldPosition pos;
+      formatted.remove();
+      formatter->format(integer, formatted, pos);
+      formatted.toUTF8(sink);
+      sink.write('\n');
+    }
     
   }
   catch (const std::exception& err) {

@@ -176,7 +176,7 @@ cicada_filter_weights_SOURCES = cicada_filter_weights.cpp
 cicada_filter_weights_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_format_rbnf_SOURCES = cicada_format_rbnf.cpp
-cicada_format_rbnf_LDADD   = $(LIBUTILS) $(ICU_LDFLAGS)
+cicada_format_rbnf_LDADD   = $(LIBUTILS) $(ICU_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_grammar_coarse_SOURCES = cicada_grammar_coarse.cpp
 cicada_grammar_coarse_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
