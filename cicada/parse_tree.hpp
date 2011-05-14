@@ -363,6 +363,9 @@ namespace cicada
       }
       
       node_map.clear();
+      
+      if (graph_out.is_valid())
+	graph_out.topologically_sort();
     }
 
   private:

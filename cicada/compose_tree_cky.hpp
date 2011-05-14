@@ -507,7 +507,8 @@ namespace cicada
       }
       
       // we will sort to remove unreachable nodes......
-      graph.topologically_sort();
+      if (graph.is_valid())
+	graph.topologically_sort();
     }
     
     template <typename Transducers, typename Actives, typename ExtractLHS>

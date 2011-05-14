@@ -206,6 +206,9 @@ namespace cicada
       }
       
       node_map.clear();
+      
+      if (graph_out.is_valid())
+	graph_out.topologically_sort();
     }
 
     void match_phrase(const int id, const hypergraph_type& graph_in, hypergraph_type& graph_out)
