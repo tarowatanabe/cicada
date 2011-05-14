@@ -246,12 +246,6 @@ namespace cicada
 	template <typename Label, typename Score>
 	Unary(const std::pair<Label, Score>& x)
 	  : id(x.first), score(x.second) {}
-	
-	friend
-	bool operator<(const Unary& x, const Unary& y)
-	{
-	  return x.id < y.id;
-	}
       };
       
       typedef Active       active_type;
@@ -750,7 +744,7 @@ namespace cicada
 	  }
 	  
 	  unaries[child] = unary_set_type(closure.begin(), closure.end());
-	  std::sort(unaries[child].begin(), unaries[child].end());
+	  std::sort(unaries[child].begin(), unaries[child].end(), less_id<unary_type>());
 	}
 	return unaries[child];
       }
