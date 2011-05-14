@@ -1,5 +1,7 @@
 2011-5-x
 Bugfix for spurious memory allocation in compose-cky, parse-cky and parse-coarse
+Bugfix for topological sort after compose-tree and parse-tree
+Better memory management in compose/parse operations
 
 2011-5-9
 Added a sample grammar file to support zone/wall found in moses.
