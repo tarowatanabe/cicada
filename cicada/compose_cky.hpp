@@ -379,10 +379,14 @@ namespace cicada
 	    }
 	  }
 	  
-	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
-	  passive_set_type(passives(first, last)).swap(passives(first, last));
-	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
-
+	  {
+	    // sort passives at passives(first, last) wrt non-terminal label in non_terminals
+	    passive_set_type& passive_arcs = passives(first, last);
+	    
+	    passive_set_type(passive_arcs).swap(passive_arcs);
+	    std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals));
+	  }
+	    
 	  //std::cerr << "span: " << first << ".." << last << " passives: " << passives(first, last).size() << std::endl;
 	  
 	  // extend root with passive items at [first, last)
