@@ -240,6 +240,9 @@ namespace cicada
       node_graph_rule.clear();
       non_terminals.clear();
       
+      actives_tree.reserve(tree_grammar.size());
+      actives_rule.reserve(grammar.size());
+      
       actives_tree.resize(tree_grammar.size(), active_tree_chart_type(lattice.size() + 1));
       actives_rule.resize(grammar.size(), active_rule_chart_type(lattice.size() + 1));
       
@@ -410,8 +413,12 @@ namespace cicada
 	  }
 	  
 	  // sort passives at passives(first, last) wrt non-terminal label in non_terminals
-	  passive_set_type(passives(first, last)).swap(passives(first, last));
-	  std::sort(passives(first, last).begin(), passives(first, last).end(), less_non_terminal(non_terminals));
+	  {
+	    passive_set_type& passive_arcs = passives(first, last);
+	    
+	    passive_set_type(passive_arcs).swap(passive_arcs);
+	    std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals));
+	  }
 	  
 	  // extend root with passive items at [first, last)
 	  // we need to do this for simple transducers, also...
