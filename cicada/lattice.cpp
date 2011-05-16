@@ -229,7 +229,7 @@ namespace cicada
       namespace standard = boost::spirit::standard;
 
       // json grammar...
-      lattice_score %= label_double_quote << ": " << karma::double_;
+      lattice_score %= label_double_quote << ':' << double10;
       
       lattice_arc %= '[' << label_double_quote << ", " << '{' << -(lattice_score % ',') << '}' << ", " << karma::int_ << ']';
       lattice_set %= '[' << -(lattice_arc % ", ") << ']';
@@ -237,6 +237,17 @@ namespace cicada
     }
     
     utils::json_string_generator<Iterator> label_double_quote;
+    
+    struct real_precision : boost::spirit::karma::real_policies<double>
+    {
+      static unsigned int precision(double) 
+      { 
+        return 10;
+      }
+    };
+    
+    boost::spirit::karma::real_generator<double, real_precision> double10;
+
 
     boost::spirit::karma::rule<Iterator, std::pair<std::string, double >()> lattice_score;
     boost::spirit::karma::rule<Iterator, Lattice::arc_type()> lattice_arc;
