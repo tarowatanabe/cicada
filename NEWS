@@ -1,4 +1,4 @@
-2011-5-x
+2011-5-16
 Bugfix for spurious memory allocation in compose-cky, parse-cky and parse-coarse
 Bugfix for topological sort after compose-tree and parse-tree
 Better memory management in compose/parse operations
