@@ -456,21 +456,23 @@ struct ExtractTree
   
   typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> >  rule_pair_list_type;
   typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
+
+  typedef utils::simple_vector<id_type, std::allocator<id_type> > edge_set_local_type;
   
   struct node_set_hash : public utils::hashmurmur<size_t>
   {
-    size_t operator()(const edge_set_type& edges) const
+    size_t operator()(const edge_set_local_type& edges) const
     {
       return utils::hashmurmur<size_t>::operator()(edges.begin(), edges.end(), 0);
     }
   };
 
 #ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<edge_set_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_type>,
-				  std::allocator<std::pair<const edge_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+  typedef std::tr1::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
+				  std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
 #else
-  typedef sgi::hash_map<edge_set_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_type>,
-			std::allocator<std::pair<const edge_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+  typedef sgi::hash_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
+			std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
 #endif
   
   struct DerivationGraph
