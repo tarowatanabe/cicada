@@ -161,11 +161,16 @@ namespace cicada
     template <typename Iterator>
     FeatureVector(Iterator first, Iterator last) : __dense(), __sparse(0) { assign(first, last); }
     
+    FeatureVector& operator=(const FeatureVector<Tp,Alloc>& x)
+    {
+      assign(x);
+      return *this;
+    }
+    
     template <typename T, typename A>
     FeatureVector& operator=(const FeatureVector<T, A>& x)
     {
       assign(x);
-      
       return *this;
     }
 
