@@ -246,7 +246,7 @@ namespace cicada
       if (__sparse)
 	__sparse->insert(iter.siter, x);
       else {
-	__dense.insert(iter.diter, x);
+	__dense.insert(x);
 	
 	if (__dense.size() > __dense_size) {
 	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());

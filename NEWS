@@ -1,3 +1,6 @@
+2011-6-17
+Serious bugfix for simple vector, wrt resize/insert/erase, which affect feature-vectors.
+
 2011-5-16
 Bugfix for spurious memory allocation in compose-cky, parse-cky and parse-coarse
 Bugfix for topological sort after compose-tree and parse-tree
