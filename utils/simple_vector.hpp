@@ -193,7 +193,7 @@ namespace utils {
 	  utils::destroy_range(__base_new.begin(), __base_new.end());
 	}
       } else if (__n > __size) {
-	if (__n <= __base.capacity()) {
+	if (base_type::capacity(__n) == __base.capacity()) {
 	  std::uninitialized_fill(__base.begin() + __size, __base.begin() + __n, __value);
 	  __base.size() = __n;
 	} else {
@@ -216,7 +216,7 @@ namespace utils {
     {
       const size_type __size = size();
       
-      if (__size < __base.capacity()) {
+      if (base_type::capacity(__size + 1) == __base.capacity()) {
 	utils::construct_object(__base.begin() + __size, __value);
 	++ __base.size();
       } else {
@@ -228,13 +228,13 @@ namespace utils {
 	utils::destroy_range(__base_new.begin(), __base_new.end());
       }
     }
-
+    
     iterator insert(iterator position, const Tp& x)
     {
       const size_type __n = position - begin();
       const size_type __size = size();
 
-      if (__size < __base.capacity()) {
+      if (base_type::capacity(__size + 1) == __base.capacity()) {
 	if (__n == __size) {
 	  utils::construct_object(position, x);
 	  ++ __base.size();
@@ -264,7 +264,7 @@ namespace utils {
       const size_type __d = std::distance(first, last);
       const size_type __size = size();
       
-      if (__n == __size && __size + __d <= __base.capacity()) {
+      if (__n == __size && base_type::capacity(__size + __d) == __base.capacity()) {
 	std::uninitialized_copy(first, last, __base.end());
 	__base.size() += __d;
       } else {
