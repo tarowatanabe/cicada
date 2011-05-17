@@ -142,12 +142,21 @@ namespace utils
     iterator insert(iterator position, const value_type& x)
     {
       if (position == end()) {
-	if (! container.empty() && compare_type::operator()(*(position - 1), x))
+	if (! empty() && compare_type::operator()(*(position - 1), x))
 	  return container.insert(position, x);
 	else
 	  return insert(x).first;
-      } else
-	return insert(x).first;
+      } else if (position == begin()) {
+	if (! empty() && compare_type::operator()(x, *position))
+	  return container.insert(position, x);
+	else
+	  return insert(x).first;
+      } else {
+	if (compare_type::operator()(*(position - 1), x) && compare_type::operator()(x, *position))
+	  return container.insert(position, x);
+	else
+	  return insert(x).first;
+      }
     }
     template <typename InputIterator>
     void insert(InputIterator first, InputIterator last)
