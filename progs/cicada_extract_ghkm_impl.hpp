@@ -434,7 +434,7 @@ struct ExtractGHKM
   typedef std::vector<bool, std::allocator<bool> > covered_type;
   typedef std::vector<int, std::allocator<int> > point_set_type;
   typedef std::vector<point_set_type, std::allocator<point_set_type> > alignment_map_type;
-  typedef std::vector<rule_pair_type, std::allocator<rule_pair_type> >  rule_pair_list_type;
+  typedef std::deque<rule_pair_type, std::allocator<rule_pair_type> >  rule_pair_list_type;
   typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
   
   typedef std::pair<range_type, int> range_pos_type;
