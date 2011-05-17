@@ -17,6 +17,8 @@ namespace cicada
     {
       // first, copy...
       target = source;
+
+      if (! source.is_valid()) return;
       
       phrase_type       binarized(2);
       hypergraph_type::edge_type::node_set_type tails(2);

@@ -20,6 +20,8 @@ namespace cicada
       // first, copy...
       target = source;
       
+      if (! source.is_valid()) return;
+      
       phrase_type binarized;
       tails_type  tails;
       

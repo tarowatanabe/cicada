@@ -30,6 +30,8 @@ namespace cicada
     {
       // first, copy...
       target = source;
+
+      if (! source.is_valid()) return;
       
       context_type context;
       phrase_type binarized(2);
