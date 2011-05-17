@@ -1066,7 +1066,7 @@ struct PhrasePairModifyMapper
     modified_type counts;
     
     int iter = 0;
-    const int iteration_mask = (1 << 10) - 1;
+    const int iteration_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     
@@ -1352,7 +1352,7 @@ struct PhrasePairModifyReducer
 
     int num_termination = 0;
     
-    const size_type iteration_mask = (1 << 5) - 1;
+    const size_type iteration_mask = (1 << 4) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     for (size_type iteration = 0; /**/; ++ iteration) {
@@ -1913,7 +1913,7 @@ struct PhrasePairScoreMapper
     phrase_pair_type counts;
     
     int iter = 0;
-    const int iteration_mask = (1 << 8) - 1;
+    const int iteration_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
 

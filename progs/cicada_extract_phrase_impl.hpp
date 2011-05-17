@@ -528,6 +528,7 @@ struct Task
     
     for (int iter = 0;/**/; ++ iter) {
       queue.pop_swap(bitext);
+      
       if (bitext.source.empty()) break;
       
       extractor(bitext.source, bitext.target, bitext.alignment, phrase_pairs);

@@ -1604,7 +1604,7 @@ struct Task
     bitext_type bitext;
     rule_pair_set_type rule_pairs;
     
-    const int iteration_mask = (1 << 6) - 1;
+    const int iteration_mask = (1 << 3) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     
     for (int iter = 0;/**/; ++ iter) {
