@@ -7,6 +7,7 @@
 #define __CICADA__FEATURE_VECTOR__HPP__ 1
 
 #include <map>
+#include <memory>
 #include <utility>
 #include <algorithm>
 #include <iterator>
@@ -168,7 +169,13 @@ namespace cicada
       return *this;
     }
 
-    ~FeatureVector() { if (__sparse) delete __sparse; }
+    ~FeatureVector()
+    {
+      if (__sparse) {
+	delete __sparse;
+	__sparse = 0;
+      }
+    }
     
   public:
     void assign(const FeatureVector<Tp,Alloc>& x)
