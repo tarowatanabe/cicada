@@ -1,4 +1,4 @@
-2011-6-17
+2011-5-17
 Serious bugfix for simple vector, wrt resize/insert/erase, which affect feature-vectors.
 
 2011-5-16
