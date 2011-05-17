@@ -440,20 +440,22 @@ struct ExtractGHKM
   typedef std::pair<range_type, int> range_pos_type;
   typedef std::vector<range_pos_type, std::allocator<range_pos_type> > range_pos_set_type;
 
+  typedef utils::simple_vector<id_type, std::allocator<id_type> > edge_set_local_type;
+
   struct node_set_hash : public utils::hashmurmur<size_t>
   {
-    size_t operator()(const edge_set_type& edges) const
+    size_t operator()(const edge_set_local_type& edges) const
     {
       return utils::hashmurmur<size_t>::operator()(edges.begin(), edges.end(), 0);
     }
   };
 
 #ifdef HAVE_TR1_UNORDERED_MAP
-  typedef std::tr1::unordered_map<edge_set_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_type>,
-				  std::allocator<std::pair<const edge_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+  typedef std::tr1::unordered_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
+				  std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
 #else
-  typedef sgi::hash_map<edge_set_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_type>,
-			std::allocator<std::pair<const edge_set_type, rule_pair_list_type> > > rule_pair_set_local_type;
+  typedef sgi::hash_map<edge_set_local_type, rule_pair_list_type, node_set_hash, std::equal_to<edge_set_local_type>,
+			std::allocator<std::pair<const edge_set_local_type, rule_pair_list_type> > > rule_pair_set_local_type;
 #endif
   
   
@@ -653,7 +655,7 @@ struct ExtractGHKM
 	// construct rule pair and insert into rule pair list
 	construct_rule_pair(graph, sentence, node, edge_composed.edges, edge_composed.tails, rule_pair);
 	
-	rule_pairs_local[edge_composed.edges].push_back(rule_pair);
+	rule_pairs_local[edge_set_local_type(edge_composed.edges.begin(), edge_composed.edges.end())].push_back(rule_pair);
 	
 	if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
 	  derivation_edges_new.push_back(edge_composed);
