@@ -48,6 +48,12 @@ namespace cicada
   public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
+
+    typedef typename sparse_vector_type::const_iterator const_sparse_iterator;
+    typedef typename sparse_vector_type::iterator             sparse_iterator;
+
+    typedef typename dense_vector_type::const_iterator const_dense_iterator;
+    typedef typename dense_vector_type::iterator             dense_iterator;
     
     template <typename DIterator, typename SIterator, typename Ref, typename Ptr>
     struct __iterator
@@ -403,11 +409,21 @@ namespace cicada
       }
     }
     
-    const_iterator begin() const { return (__sparse ? const_iterator(__sparse->begin()) : const_iterator(__dense.begin())); }
-    iterator begin() { return (__sparse ? iterator(__sparse->begin()) : iterator(__dense.begin())); }
-
-    const_iterator end() const { return (__sparse ? const_iterator(__sparse->end()) : const_iterator(__dense.end())); }
-    iterator end() { return (__sparse ? iterator(__sparse->end()) : iterator(__dense.end())); }
+    inline const_iterator begin() const { return (__sparse ? const_iterator(__sparse->begin()) : const_iterator(__dense.begin())); }
+    inline       iterator begin()       { return (__sparse ? iterator(__sparse->begin()) : iterator(__dense.begin())); }
+    
+    inline const_iterator end() const { return (__sparse ? const_iterator(__sparse->end()) : const_iterator(__dense.end())); }
+    inline       iterator end()       { return (__sparse ? iterator(__sparse->end()) : iterator(__dense.end())); }
+    
+    inline const_sparse_iterator sbegin() const { return __sparse->begin(); }
+    inline       sparse_iterator sbegin()       { return __sparse->begin(); }
+    inline const_sparse_iterator send() const { return __sparse->end(); }
+    inline       sparse_iterator send()       { return __sparse->end(); }
+    
+    inline const_dense_iterator dbegin() const { return __dense.begin(); }
+    inline       dense_iterator dbegin()       { return __dense.begin(); }
+    inline const_dense_iterator dend() const { return __dense.end(); }
+    inline       dense_iterator dend()       { return __dense.end(); }
     
     
     void swap(FeatureVector& x)
