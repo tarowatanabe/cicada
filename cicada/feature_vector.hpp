@@ -156,10 +156,16 @@ namespace cicada
     static const size_type __dense_size = 16;
     
   public:
-    FeatureVector() : __dense(), __sparse(0) {}
-    FeatureVector(const FeatureVector& x) : __dense(x.__dense), __sparse(x.__sparse ? new sparse_vector_type(*x.__sparse) : 0) {}
+    FeatureVector()
+      : __dense(), __sparse(0) {}
+    FeatureVector(const FeatureVector<Tp,Alloc>& x)
+      : __dense(x.__dense), __sparse(x.__sparse ? new sparse_vector_type(*x.__sparse) : 0) {}
+    template <typename T, typename A>
+    FeatureVector(const FeatureVector<T,A>& x)
+      : __dense(x.__dense.begin(), x.__dense.end()), __sparse(x.__sparse ? new sparse_vector_type(x.__sparse->begin(), x.__sparse->end()) : 0) { }
     template <typename Iterator>
-    FeatureVector(Iterator first, Iterator last) : __dense(), __sparse(0) { assign(first, last); }
+    FeatureVector(Iterator first, Iterator last)
+      : __dense(), __sparse(0) { assign(first, last); }
     
     FeatureVector& operator=(const FeatureVector<Tp,Alloc>& x)
     {
@@ -893,7 +899,7 @@ namespace cicada
     if (y.empty())
       return x;
     else if (x.empty())
-      return left_type(y.begin(), y.end());
+      return y;
     else {
       left_type features(x);
       

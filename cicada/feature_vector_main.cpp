@@ -39,6 +39,9 @@ int main(int argc, char** argv)
   std::cout << "feature2" << std::endl;
   std::cout << features2;
 
+  std::cout << "feature3" << std::endl;
+  std::cout << features3;
+
   std::cout << "feature1 + feature2" << std::endl;
   std::cout << features1 + features2;
   
