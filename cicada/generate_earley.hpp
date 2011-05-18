@@ -420,12 +420,12 @@ namespace cicada
     // find passives that can extend the active
     void complete_active(const edge_type& active)
     {
+      // find passives whose first match with active's last
+
       if (active.depth + 1 == edges_passive.size()) return;
 
       const grammar_node_type& dot = *(active.dot);
-      
-      // find passives whose first match with active's last
-      
+            
       edge_ptr_set_type::const_iterator piter_end = edges_passive[active.depth + 1].end();
       for (edge_ptr_set_type::const_iterator piter = edges_passive[active.depth + 1].begin(); piter != piter_end; ++ piter) {
 	const edge_type& passive = *(*piter);
