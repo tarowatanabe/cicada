@@ -75,4 +75,45 @@ int main(int argc, char** argv)
   }
 
   verify(stdset, vecset);
+
+  for (int i = 0; i != vecset.size(); ++ i) {
+    const int value = *(vecset.begin() + i);
+    
+    if (vecset.lower_bound(value) != vecset.equal_range(value).first)
+      std::cerr << "different lower bound?" << std::endl;
+    if (vecset.upper_bound(value) != vecset.equal_range(value).second)
+      std::cerr << "different upper bound?" << std::endl;
+  }
+
+  {
+    const size_t size_small = 10;
+    while (vecset.size() > size_small) {
+      vec_set_type::iterator viter = vecset.begin() + gen(vecset.size());
+      const int value = *viter;
+      
+      vecset.erase(viter);
+      stdset.erase(value);
+    }
+  }
+
+  verify(stdset, vecset);
+
+  for (int i = 0; i != vecset.size(); ++ i) {
+    const int value = *(vecset.begin() + i);
+    
+    if (vecset.lower_bound(value) != vecset.equal_range(value).first)
+      std::cerr << "different lower bound?" << std::endl;
+    if (vecset.upper_bound(value) != vecset.equal_range(value).second)
+      std::cerr << "different upper bound?" << std::endl;
+  }
+  
+  boost::uniform_int<int> gen_int(vecset.front(), vecset.back());
+  for (int i = 0; i != 1024 * 8; ++ i) {
+    const int value = gen_int(generator);
+
+    if (vecset.lower_bound(value) != vecset.equal_range(value).first)
+      std::cerr << "different lower bound?" << std::endl;
+    if (vecset.upper_bound(value) != vecset.equal_range(value).second)
+      std::cerr << "different upper bound?" << std::endl;
+  }
 }
