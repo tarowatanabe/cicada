@@ -71,13 +71,13 @@ namespace utils {
 					    size,
 					    static_cast<size_type>(bithack::next_largest_power2(size)));
       
-      return bithack::branch(power2 * sizeof(value_type) + sizeof(size_type) > 256, size, power2);
+      return bithack::branch((power2 * sizeof(value_type) + sizeof(size_type) > 256) || size == 0, size, power2);
     }
     
     bool empty() const { return size() == 0; }
     size_type size() const { return *(reinterpret_cast<size_type*>(__base)); }
     size_type& size() { return *(reinterpret_cast<size_type*>(__base)); }
-    size_type capacity() const { return capacity(size());}
+    size_type capacity() const { return capacity(size()); }
     
     void initialize_vector(size_type __n)
     {
@@ -286,8 +286,8 @@ namespace utils {
       if (__base.capacity() == base_type::capacity(__size - 1)) {
 	if (__n + 1 != __size)
 	  std::copy(position + 1, end(), position);
+	utils::destroy_object(end() - 1);
 	-- __base.size();
-	utils::destroy_object(end());
       } else {
 	base_type __base_new(__size - 1);
 	std::uninitialized_copy(begin(), position, __base_new.begin());
