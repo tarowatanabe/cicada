@@ -634,37 +634,132 @@ namespace cicada
     {
       typedef FeatureVector<T,A> another_type;
       
-      typename another_type::const_iterator iter2_end = x.end();
-      for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	iterator iter1 = lower_bound(iter2->first);
+      if (x.empty())
+	return *this;
+      else if (empty()) {
+	assign(x);
+	return *this;
+      }
+      
+      if (__sparse || x.sparse()) {
+	if (! __sparse) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
 	
-	if (iter1 == end() || iter1->first != iter2->first)
-	  insert(iter1, *iter2);
-	else {
-	  iter1->second += iter2->second;
-	  if (iter1->second == Tp())
-	    erase(iter1);
+	typename another_type::const_iterator iter2_end = x.end();
+	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
+	  typename sparse_vector_type::iterator iter1 = __sparse->lower_bound(iter2->first);
+	  
+	  if (iter1 == __sparse->end() || iter1->first != iter2->first)
+	    __sparse->insert(iter1, *iter2);
+	  else {
+	    iter1->second += iter2->second;
+	    if (iter1->second == Tp())
+	      __sparse->erase(iter1);
+	  }
+	}
+      } else {
+	dense_vector_type dense_new;
+
+	typename dense_vector_type::const_iterator iter1     = __dense.begin();
+	typename dense_vector_type::const_iterator iter1_end = __dense.end();
+	
+	typename another_type::dense_vector_type::const_iterator iter2     = x.__dense.begin();
+	typename another_type::dense_vector_type::const_iterator iter2_end = x.__dense.end();
+
+	while (iter1 != iter1_end && iter2 != iter2_end) {
+	  if (iter1->first < iter2->first) {
+	    dense_new.insert(dense_new.end(), *iter1);
+	    ++ iter1;
+	  } else if (iter2->first < iter1->first) {
+	    dense_new.insert(dense_new.end(), *iter2);
+	    ++ iter2;
+	  } else {
+	    const Tp value = iter1->second + iter2->second;
+	    if (value != Tp())
+	      dense_new.insert(dense_new.end(), std::make_pair(iter1->first, value));
+	    ++ iter1;
+	    ++ iter2;
+	  }
+	}
+	
+	if (iter1 != iter1_end)
+	  dense_new.insert(iter1, iter1_end);
+	if (iter2 != iter2_end)
+	  dense_new.insert(iter2, iter2_end);
+	
+	__dense.swap(dense_new);
+
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
 	}
       }
       
       return *this;
     }
-
+    
     template <typename T, typename A>
     self_type& operator-=(const FeatureVector<T,A>& x)
     {
       typedef FeatureVector<T,A> another_type;
       
-      typename another_type::const_iterator iter2_end = x.end();
-      for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	iterator iter1 = lower_bound(iter2->first);
+      if (x.empty()) return *this;
+      
+      if (__sparse || x.sparse()) {
+	if (! __sparse) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
+	}
 	
-	if (iter1 == end() || iter1->first != iter2->first)
-	  insert(iter1, std::make_pair(iter2->first, - Tp(iter2->second)));
-	else {
-	  iter1->second -= iter2->second;
-	  if (iter1->second == Tp())
-	    erase(iter1);
+	typename another_type::const_iterator iter2_end = x.end();
+	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
+	  typename sparse_vector_type::iterator iter1 = __sparse->lower_bound(iter2->first);
+	  
+	  if (iter1 == __sparse->end() || iter1->first != iter2->first)
+	    __sparse->insert(iter1, std::make_pair(iter2->first, - Tp(iter2->second)));
+	  else {
+	    iter1->second -= iter2->second;
+	    if (iter1->second == Tp())
+	      __sparse->erase(iter1);
+	  }
+	}
+      } else {
+	dense_vector_type dense_new;
+
+	typename dense_vector_type::const_iterator iter1     = __dense.begin();
+	typename dense_vector_type::const_iterator iter1_end = __dense.end();
+	
+	typename another_type::dense_vector_type::const_iterator iter2     = x.__dense.begin();
+	typename another_type::dense_vector_type::const_iterator iter2_end = x.__dense.end();
+
+	while (iter1 != iter1_end && iter2 != iter2_end) {
+	  if (iter1->first < iter2->first) {
+	    dense_new.insert(dense_new.end(), *iter1);
+	    ++ iter1;
+	  } else if (iter2->first < iter1->first) {
+	    dense_new.insert(dense_new.end(), std::make_pair(iter2->first, -Tp(iter2->second)));
+	    ++ iter2;
+	  } else {
+	    const Tp value = iter1->second - iter2->second;
+	    if (value != Tp())
+	      dense_new.insert(dense_new.end(), std::make_pair(iter1->first, value));
+	    ++ iter1;
+	    ++ iter2;
+	  }
+	}
+	
+	if (iter1 != iter1_end)
+	  dense_new.insert(iter1, iter1_end);
+	for (/**/; iter2 != iter2_end; ++ iter2)
+	  dense_new.insert(dense_new.end(), std::make_pair(iter2->first, -Tp(iter2->second)));
+	
+	__dense.swap(dense_new);
+	
+	if (__dense.size() > __dense_size) {
+	  __sparse = new sparse_vector_type(__dense.begin(), __dense.end());
+	  __dense.clear();
 	}
       }
       
