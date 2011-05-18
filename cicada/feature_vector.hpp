@@ -865,7 +865,7 @@ namespace cicada
 	features.insert(features.end(), *iter1);
 	++ iter1;
       } else if (iter2->first < iter1->first) {
-	features.insert(features.end(), std::make_pair(iter2->fisrt, - T1(iter2->second)));
+	features.insert(features.end(), std::make_pair(iter2->first, - T1(iter2->second)));
 	++ iter2;
       } else {
 	const T1 value = iter1->second - iter2->second;
@@ -880,7 +880,7 @@ namespace cicada
     for (/**/; iter1 != iter1_end; ++ iter1)
       features.insert(features.end(), *iter1);
     for (/**/; iter2 != iter2_end; ++ iter2)
-      features.insert(features.end(), std::make_pair(iter2->fisrt, - T1(iter2->second)));
+      features.insert(features.end(), std::make_pair(iter2->first, - T1(iter2->second)));
     
     return features;
   }
