@@ -155,6 +155,7 @@ sample_succinct_vector \
 sample_tempfile \
 sample_json_string \
 sample_vector_map \
+sample_vector_set \
 sample_vector2 \
 sample_vertical_coded_vector
 
@@ -291,6 +292,8 @@ sample_json_string_SOURCES = sample_json_string.cpp
 sample_vector2_SOURCES = sample_vector2.cpp
 
 sample_vector_map_SOURCES = sample_vector_map.cpp
+
+sample_vector_set_SOURCES = sample_vector_set.cpp
 
 sample_vertical_coded_vector_SOURCES = sample_vertical_coded_vector.cpp
 sample_vertical_coded_vector_LDFLAGS = $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_THREAD_LDFLAGS)

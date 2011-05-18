@@ -255,7 +255,7 @@ namespace utils
 
   template <typename T, typename C, typename A>
   inline
-  bool operator<(const, vector_set<T,C,A>& x, const vector_set<T,C,A>& y)
+  bool operator<(const vector_set<T,C,A>& x, const vector_set<T,C,A>& y)
   {
     return x.container < y.container;
   }
