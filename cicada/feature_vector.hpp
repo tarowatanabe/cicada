@@ -418,30 +418,54 @@ namespace cicada
     
     Tp sum() const
     {
+      if (__sparse)
+	return __sum_aux(__sparse->begin(), __sparse->end());
+      else
+	return __sum_aux(__dense.begin(), __dense.end());
+    }
+
+    template <typename Iterator>
+    Tp __sum_aux(Iterator first, Iterator last) const
+    {
       Tp __sum = Tp();
-      const_iterator iter_end = end();
-      for (const_iterator iter = begin(); iter != iter_end; ++ iter)
-	__sum += iter->second;
+      for (/**/; first != last; ++ first)
+	__sum += first->second;
       return __sum;
     }
     
     Tp dot() const
     {
-      Tp sum = Tp();
-      const_iterator iter_end = end();
-      for (const_iterator iter = begin(); iter != iter_end; ++ iter)
-	sum += iter->second * iter->second;
-      return sum;
+      if (__sparse)
+	return __dot_aux(__sparse->begin(), __sparse->end());
+      else
+	return __dot_aux(__dense.begin(), __dense.end());
+    }
+
+    template <typename Iterator>
+    Tp __dot_aux(Iterator first, Iterator last) const
+    {
+      Tp __dot = Tp();
+      for (/**/; first != last; ++ first)
+	__dot += first->second * first->second;
+      return __dot;
     }
 
     template <typename T, typename A>
     Tp dot(const WeightVector<T,A>& x) const
     {
-      Tp sum = Tp();
-      const_iterator iter_end = end();
-      for (const_iterator iter = begin(); iter != iter_end; ++ iter)
-	sum += iter->second * x[iter->first];
-      return sum;
+      if (__sparse)
+	return __dot_aux(__sparse->begin(), __sparse->end(), x);
+      else
+	return __dot_aux(__dense.begin(), __dense.end(), x);
+    }
+    
+    template <typename Iterator, typename T, typename A>
+    Tp __dot_aux(Iterator first, Iterator last, const WeightVector<T,A>& x) const
+    {
+      Tp __dot = Tp();
+      for (/**/; first != last; ++ first)
+	__dot += first->second * x[first->first];
+      return __dot;
     }
     
     template <typename T, typename A>
