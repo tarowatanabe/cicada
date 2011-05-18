@@ -217,7 +217,7 @@ struct RulePairGenerator
 
   typedef std::ostream_iterator<char> iterator_type;
   
-  std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair)
+  std::ostream& operator()(std::ostream& os, const phrase_pair_type& phrase_pair) const
   {
     iterator_type iter(os);
     
@@ -486,29 +486,32 @@ struct ExtractSCFG
     }
   };
   
+  template <typename Dumper>
   void operator()(const sentence_type& source,
 		  const sentence_type& target,
 		  const alignment_type& alignment,
 		  const span_set_type& spans_source,
 		  const span_set_type& spans_target,
-		  rule_pair_set_type& rule_pairs)
+		  rule_pair_set_type& rule_pairs,
+		  const Dumper& dumper)
   {
     compute_spans(source, target, alignment);
     
     if (! spans_source.empty())
-      extract_rules(source, target, alignment, rule_pairs, ExtractCategorySource(source, spans_source));
+      extract_rules(source, target, alignment, rule_pairs, ExtractCategorySource(source, spans_source), dumper);
     else if (! spans_target.empty())
-      extract_rules(source, target, alignment, rule_pairs, ExtractCategoryTarget(target, spans_target));
+      extract_rules(source, target, alignment, rule_pairs, ExtractCategoryTarget(target, spans_target), dumper);
     else
-      extract_rules(source, target, alignment, rule_pairs, ExtractCategory());
+      extract_rules(source, target, alignment, rule_pairs, ExtractCategory(), dumper);
   }
   
-  template <typename Category>
+  template <typename Category, typename Dumper>
   void extract_rules(const sentence_type& source,
 		     const sentence_type& target,
 		     const alignment_type& alignment,
 		     rule_pair_set_type& rule_pairs,
-		     const Category& category)
+		     const Category& category,
+		     const Dumper& dumper)
   {
     typedef utils::chunk_vector<rule_pair_type, 4096 / sizeof(rule_pair_type), std::allocator<rule_pair_type> > rule_pair_list_type;
 
@@ -665,10 +668,12 @@ struct ExtractSCFG
 	  rule_pair_list_type::const_iterator riter_end = sentential_pair_list.end();
 	  for (rule_pair_list_type::const_iterator riter = sentential_pair_list.begin(); riter != riter_end; ++ riter)
 	    const_cast<rule_pair_type&>(*(rule_pairs.insert(*riter).first)).count += count;
-
+	  
 	  sentential_pair_list.clear();
 	}
       }
+      
+      dumper(rule_pairs);
     }
   }
   
@@ -1109,6 +1114,7 @@ struct Task
   
   typedef utils::lockfree_list_queue<bitext_type, std::allocator<bitext_type> > queue_type;
   
+  
   Task(queue_type& __queue,
        const path_type& __output,
        const int max_length,
@@ -1129,71 +1135,88 @@ struct Task
   path_set_type paths;
   
   ExtractSCFG extractor;
-  RulePairGenerator generator;
   
   double max_malloc;
-  
-  template <typename Tp>
-  struct less_ptr
+
+  struct Dumper
   {
-    bool operator()(const Tp* x, const Tp* y) const
+    void operator()(rule_pair_set_type& rule_pairs) const
     {
-      return *x < *y;
+      if (rule_pairs.empty() || utils::malloc_stats::used() <= malloc_threshold) return;
+      
+      dump(rule_pairs);
+      rule_pairs.clear();
     }
-  };
-  
-  void dump(const rule_pair_set_type& rule_pairs)
-  {
+
     typedef std::vector<const rule_pair_type*, std::allocator<const rule_pair_type*> > sorted_type;
     
-    // sorting...
-    sorted_type sorted(rule_pairs.size());
+    template <typename Tp>
+    struct less_ptr
     {
-      sorted_type::iterator siter = sorted.begin();
-      rule_pair_set_type::const_iterator citer_end = rule_pairs.end();
-      for (rule_pair_set_type::const_iterator citer = rule_pairs.begin(); citer != citer_end; ++ citer, ++ siter)
-	*siter = &(*citer);
+      bool operator()(const Tp* x, const Tp* y) const
+      {
+	return *x < *y;
+      }
+    };
+        
+    void dump(const rule_pair_set_type& rule_pairs) const
+    {
+      if (rule_pairs.empty()) return;
+      
+      // sorting...
+      sorted_type sorted(rule_pairs.size());
+      {
+	sorted_type::iterator siter = sorted.begin();
+	rule_pair_set_type::const_iterator citer_end = rule_pairs.end();
+	for (rule_pair_set_type::const_iterator citer = rule_pairs.begin(); citer != citer_end; ++ citer, ++ siter)
+	  *siter = &(*citer);
+      }
+      std::sort(sorted.begin(), sorted.end(), less_ptr<rule_pair_type>());
+      
+      const path_type path_tmp = utils::tempfile::file_name(output / "counts-XXXXXX");
+      utils::tempfile::insert(path_tmp);
+      const path_type path = path_tmp.string() + ".gz";
+      utils::tempfile::insert(path);
+      
+      utils::compress_ostream os(path, 1024 * 1024);
+      sorted_type::const_iterator siter_end = sorted.end();
+      for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+	generator(os, *(*siter)) << '\n';
+      
+      const_cast<path_set_type&>(paths).push_back(path);
     }
-    std::sort(sorted.begin(), sorted.end(), less_ptr<rule_pair_type>());
+
+    Dumper(const path_type& __output,
+	   path_set_type& __paths,
+	   const size_t __malloc_threshold)
+      : output(__output),
+	paths(__paths),
+	malloc_threshold(__malloc_threshold) {}
     
-    const path_type path_tmp = utils::tempfile::file_name(output / "counts-XXXXXX");
-    utils::tempfile::insert(path_tmp);
-    const path_type path = path_tmp.string() + ".gz";
-    utils::tempfile::insert(path);
-    
-    utils::compress_ostream os(path, 1024 * 1024);
-    sorted_type::const_iterator siter_end = sorted.end();
-    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
-      generator(os, *(*siter)) << '\n';
-    
-    paths.push_back(path);
-  }
+    const path_type& output;
+    path_set_type& paths;
+    const size_t malloc_threshold;
+
+    RulePairGenerator generator;
+  };
+
   
   void operator()()
   {
     bitext_type bitext;
     rule_pair_set_type rule_pairs;
     
-    const int iteration_mask = (1 << 2) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    Dumper dumper(output, paths, max_malloc * 1024 * 1024 * 1024);
     
-    for (int iter = 0;/**/; ++ iter) {
+    for (;;) {
       queue.pop_swap(bitext);
       
       if (bitext.source.empty()) break;
       
-      extractor(bitext.source, bitext.target, bitext.alignment, bitext.spans_source, bitext.spans_target, rule_pairs);
-      
-      if (((iter & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
-	dump(rule_pairs);
-	rule_pairs.clear();
-      }
+      extractor(bitext.source, bitext.target, bitext.alignment, bitext.spans_source, bitext.spans_target, rule_pairs, dumper);
     }
     
-    if (! rule_pairs.empty()) {
-      dump(rule_pairs);
-      rule_pairs.clear();
-    }
+    dumper.dump(rule_pairs);
   }
 };
 
