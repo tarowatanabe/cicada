@@ -119,6 +119,10 @@ namespace cicada
       // backptr to source hypergraph's edge
       hypergraph_type::id_type edge;
       
+      // default...
+      Edge()
+	: lhs(), dot(0), depth(0), active(0), passive(0), edge() {}
+      
       // created by predict...
       Edge(const symbol_type& __lhs, const grammar_node_type& __dot,
 	   const int& __depth)
