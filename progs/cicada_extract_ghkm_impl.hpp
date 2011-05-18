@@ -723,8 +723,8 @@ struct ExtractGHKM
 		  
 		candidate_type& item = candidates.back();
 		  
-		item.edge_composed.edges.swap(edges_new);
-		item.edge_composed.tails.swap(tails_new);
+		item.edge_composed.edges = edges_new;
+		item.edge_composed.tails = tails_new;
 		item.edge_composed.height = rule_stat.first;
 		item.edge_composed.internal = rule_stat.second;
 		  
