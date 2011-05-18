@@ -231,7 +231,7 @@ namespace cicada
       // json grammar...
       lattice_score %= label_double_quote << ':' << double10;
       
-      lattice_arc %= '[' << label_double_quote << ", " << '{' << -(lattice_score % ',') << '}' << ", " << karma::int_ << ']';
+      lattice_arc %= '[' << label_double_quote << ", " << '{' << -(lattice_score % ", ") << '}' << ", " << karma::int_ << ']';
       lattice_set %= '[' << -(lattice_arc % ", ") << ']';
       lattice_grammar %= '[' << -(lattice_set % ", ") << ']';
     }
