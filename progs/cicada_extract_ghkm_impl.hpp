@@ -44,6 +44,7 @@
 #include <utils/chunk_vector.hpp>
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
+#include <utils/vector_set.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -309,7 +310,8 @@ struct ExtractGHKM
 
   struct Span
   {
-    typedef std::set<int, std::less<int>, std::allocator<int> > span_type;
+    //typedef std::set<int, std::less<int>, std::allocator<int> > span_type;
+    typedef utils::vector_set<int, std::less<int>, std::allocator<int> > span_type;
     
     typedef span_type::const_iterator const_iterator;
     typedef span_type::iterator       iterator;
@@ -337,7 +339,8 @@ struct ExtractGHKM
       if (span.empty())
 	return std::make_pair(0, 0);
       else
-	return std::make_pair(*(span.begin()), *(-- span.end()) + 1);
+	return std::make_pair(span.front(), span.back() + 1);
+      //return std::make_pair(*(span.begin()), *(-- span.end()) + 1);
     }
   
     void set(int i)

@@ -254,7 +254,7 @@ namespace utils
       iterator iter1 = container.begin();
       iterator iter2 = container.begin();
       while (iter2 != container.end()) {
-	iterator bound = std::upper_bound(iter2, container.end(), iter2->first, static_cast<const compare_type&>(*this));
+	iterator bound = std::upper_bound(iter2, container.end(), *iter2, static_cast<const compare_type&>(*this));
 	if (iter1 != iter2)
 	  *iter1 = *iter2;
 	++ iter1;

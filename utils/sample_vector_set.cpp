@@ -61,6 +61,9 @@ int main(int argc, char** argv)
     stdset.insert(value);
     vecset.insert(value);
   }
+
+  verify(stdset, vecset);
+
   
 
   {
