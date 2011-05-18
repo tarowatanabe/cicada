@@ -1,3 +1,6 @@
+2011-5-x
+Less memory consumption in scfg/ghkm/tree extraction by frequently checking memory usage (and slightly slower)
+
 2011-5-18
 Serious bugfix for generate-earley. We will now check the depth of all the passive/active edges to be extended.
 
