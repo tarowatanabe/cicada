@@ -818,7 +818,7 @@ namespace cicada
       } else {
 	const T1 value = iter1->second + iter2->second;
 	if (value != T1())
-	  features.insert(featrues.end(), std::make_pair(iter1->first, value));
+	  features.insert(features.end(), std::make_pair(iter1->first, value));
 	
 	++ iter1;
 	++ iter2;
