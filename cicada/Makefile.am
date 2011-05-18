@@ -441,8 +441,9 @@ cluster_main_LDADD = libcicada.la
 eval_main_SOURCES = eval_main.cpp
 eval_main_LDADD = libcicada.la
 
-feature_vector_main_SOURCES = feature_vector_main.cpp
-feature_vector_main_LDADD = libcicada.la
+feature_vector_main_SOURCES = feature_vector_main.cpp symbol.cpp vocab.cpp feature.cpp
+feature_vector_main_CPPFLAGS = $(AM_CPPFLAGS)
+feature_vector_main_LDADD = $(LIBUTILS)
 
 grammar_mutable_main_SOURCES = grammar_mutable_main.cpp
 grammar_mutable_main_LDADD = libcicada.la
