@@ -1,3 +1,6 @@
+2011-5-18
+Serious bugfix for generate-earley. We will now check the depth of all the passive/active edges to be extended.
+
 2011-5-17
 Serious bugfix for simple vector, wrt resize/insert/erase, which affect feature-vectors.
 
