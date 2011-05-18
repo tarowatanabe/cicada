@@ -1424,8 +1424,7 @@ struct ExtractTree
 	}
       }
       
-      if (id & 0x7 == 0x7)
-	dumper(rule_pairs);
+      dumper(rule_pairs);
     }
   }
   

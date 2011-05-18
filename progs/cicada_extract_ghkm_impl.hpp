@@ -735,8 +735,7 @@ struct ExtractGHKM
       }
       rule_pairs_local.clear();
       
-      if (id & 0x7 == 0x7)
-	dumper(rule_pairs);
+      dumper(rule_pairs);
     }
   }
 
