@@ -255,7 +255,6 @@ namespace cicada
       }
     };
     
-    
     struct edge_node_hash_type : public utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
@@ -395,6 +394,8 @@ namespace cicada
     {
       // we will try find actives whose last match with passive's first
       // do we group by passive's lhs?
+
+      if (passive.depth == 0) return;
       
       edge_ptr_set_type::const_iterator aiter_end = edges_active[passive.depth - 1].end();
       for (edge_ptr_set_type::const_iterator aiter = edges_active[passive.depth - 1].begin(); aiter != aiter_end; ++ aiter) {
@@ -419,6 +420,8 @@ namespace cicada
     // find passives that can extend the active
     void complete_active(const edge_type& active)
     {
+      if (active.depth + 1 == edges_passive.size()) return;
+
       const grammar_node_type& dot = *(active.dot);
       
       // find passives whose first match with active's last
