@@ -839,9 +839,49 @@ namespace cicada
   {
     typedef FeatureVector<T1,A1> left_type;
     typedef FeatureVector<T2,A2> right_type;
+
+    if (y.empty())
+      return x;
+    else if (x.empty()) {
+      left_type features;
+      
+      typename right_type::const_iterator iter2_end = y.end();
+      for (typename right_type::const_iterator iter2 = y.begin(); iter2 != iter2_end; ++ iter2)
+	features.insert(features.end(), std::make_pair(iter2->first, - T1(iter2->second)));
+      
+      return features;
+    }
     
-    left_type features(x);
-    features -= y;
+    left_type features;
+    
+    typename left_type::const_iterator iter1     = x.begin();
+    typename left_type::const_iterator iter1_end = x.end();
+    
+    typename right_type::const_iterator iter2     = y.begin();
+    typename right_type::const_iterator iter2_end = y.end();
+    
+    while (iter1 != iter1_end && iter2 != iter2_end) {
+      if (iter1->first < iter2->first) {
+	features.insert(features.end(), *iter1);
+	++ iter1;
+      } else if (iter2->first < iter1->first) {
+	features.insert(features.end(), std::make_pair(iter2->fisrt, - T1(iter2->second)));
+	++ iter2;
+      } else {
+	const T1 value = iter1->second - iter2->second;
+	if (value != T1())
+	  features.insert(features.end(), std::make_pair(iter1->first, value));
+	
+	++ iter1;
+	++ iter2;
+      }
+    }
+    
+    for (/**/; iter1 != iter1_end; ++ iter1)
+      features.insert(features.end(), *iter1);
+    for (/**/; iter2 != iter2_end; ++ iter2)
+      features.insert(features.end(), std::make_pair(iter2->fisrt, - T1(iter2->second)));
+    
     return features;
   }
 
