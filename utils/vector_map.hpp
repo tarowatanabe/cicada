@@ -227,11 +227,27 @@ namespace utils
   
     std::pair<iterator, iterator> equal_range(const key_type& x)
     {
-      return std::equal_range(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
+      if (container.size() < 16) {
+	iterator iter = container.begin();
+	iterator end = container.end();
+	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
+	iterator first = iter;
+	for (/**/; iter != end && ! static_cast<const compare_type&>(*this)(x, *iter); ++ iter);
+	return std::make_pair(first, iter);
+      } else
+	return std::equal_range(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
     }
     std::pair<const_iterator, const_iterator> equal_range(const key_type& x) const
     {
-      return std::equal_range(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
+      if (container.size() < 16) {
+	const_iterator iter = container.begin();
+	const_iterator end = container.end();
+	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
+	const_iterator first = iter;
+	for (/**/; iter != end && ! static_cast<const compare_type&>(*this)(x, *iter); ++ iter);
+	return std::make_pair(first, iter);
+      } else
+	return std::equal_range(container.begin(), container.end(), x, static_cast<const compare_type&>(*this));
     }
 
   public:
