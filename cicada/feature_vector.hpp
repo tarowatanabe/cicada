@@ -325,11 +325,11 @@ namespace cicada
       }
     }
     
-    const_reference front() const { return (__sparse ? *__sparse->begin() : *((const value_type*) (&(*__dense.begin())))); }
-    reference front() { return (__sparse ? *__sparse->begin() : *((value_type*) (&(*__dense.begin())))); }
+    const_reference front() const { return (__sparse ? *__sparse->begin() : *((const value_type*) &__dense.front())); }
+    reference front() { return (__sparse ? *__sparse->begin() : *((value_type*) &__dense.front())); }
     
-    const_reference back() const { return (__sparse ? *(-- __sparse->end()) : *((const value_type*) (&(*(__dense.end() - 1))))); }
-    reference back() { return (__sparse ? *(-- __sparse->end()) : *((value_type*) (&(*(__dense.end() - 1)))));}
+    const_reference back() const { return (__sparse ? *__sparse->rbegin() : *((const value_type*) &__dense.back())); }
+    reference back() { return (__sparse ? *__sparse->rbegin() : *((value_type*) &__dense.back()));}
 
     
     const_iterator find(const key_type& x) const
