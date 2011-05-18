@@ -81,7 +81,7 @@ namespace cicada
       
       reference operator*() const
       {
-	return (diter ? *((pointer) &(*diter)) : *siter);
+	return *(diter ? ((pointer) &(*diter)) : &(*siter));
       }
       
       pointer operator->() const
