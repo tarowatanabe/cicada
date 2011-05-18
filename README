@@ -3,7 +3,7 @@ cicada
 A statistical machine translation toolkit based on a semiring parsing framework[1].
 Based on the generic framework, we can
    - learn model(s): tree-to-string, string-to-tree, string-to-string (with or without latent tree), word alignment, grammar for parsing
-   - translate sentence, lattice and/or parse tree
+   - translate sentence, lattice and/or parsed tree
    - align between {hypergraph,lattice}-to-lattice (currently, we assume penn-treebank style hypergraph and sentence-like lattice)
    - parse lattices (or sentences)
    - analyze forest/tree/lattice
