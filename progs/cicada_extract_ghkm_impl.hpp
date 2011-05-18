@@ -501,6 +501,31 @@ struct ExtractGHKM
 
   weight_set_type weights_inside;
   weight_set_type weights_outside;
+
+  void clear()
+  {
+    span_edges.clear();
+    
+    ranges.clear();
+    spans.clear();
+    complements.clear();
+    
+    node_map.clear();
+
+    weights_inside.clear();
+    weights_outside.clear();
+    
+    range_set_type(span_edges).swap(span_edges);
+    
+    range_set_type(ranges).swap(ranges);
+    span_set_type(spans).swap(spans);
+    span_set_type(complements).swap(complements);
+    
+    node_map_type(node_map).swap(node_map);
+    
+    weight_set_type(weights_inside).swap(weights_inside);
+    weight_set_type(weights_outside).swap(weights_outside);
+  }
   
   template <typename Dumper>
   void operator()(const hypergraph_type& graph,
@@ -1420,6 +1445,7 @@ struct ExtractGHKM
     
     alignment_source_target.clear();
     alignment_target_source.clear();
+    alignment_target_source.reserve(sentence.size());
     alignment_target_source.resize(sentence.size());
     
     if (inverse) {
@@ -1618,12 +1644,16 @@ struct Task
     
     Dumper dumper(output, paths, max_malloc * 1024 * 1024 * 1024);
     
-    for (;;) {
+    for (int iter = 0;/**/; ++ iter) {
       queue.pop_swap(bitext);
       
       if (! bitext.source.is_valid()) break;
       
       extractor(bitext.source, bitext.target, bitext.alignment, rule_pairs, dumper);
+      
+      // shrink-wrap every 16 iterations...
+      if (iter & 0x15 == 0x15)
+	extractor.clear();
     }
     
     dumper.dump(rule_pairs);
