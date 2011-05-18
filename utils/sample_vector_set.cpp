@@ -64,7 +64,10 @@ int main(int argc, char** argv)
 
   verify(stdset, vecset);
 
+  vecset.clear();
+  vecset.insert(stdset.begin(), stdset.end());
   
+  verify(stdset, vecset);
 
   {
     const size_t size_half = vecset.size() >> 1;
