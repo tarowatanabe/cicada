@@ -93,30 +93,30 @@ namespace cicada
       node_map.set_empty_key(symbol_level_type());
     }
     
-    struct ActiveItem
+    struct Active
     {
-      ActiveItem(const transducer_type::id_type& __node,
-		 const hypergraph_type::edge_type::node_set_type& __tails,
-		 const feature_set_type& __features,
-		 const attribute_set_type& __attributes)
+      Active(const transducer_type::id_type& __node,
+	     const hypergraph_type::edge_type::node_set_type& __tails,
+	     const feature_set_type& __features,
+	     const attribute_set_type& __attributes)
 	: node(__node),
 	  tails(__tails),
 	  features(__features),
 	  attributes(__attributes) {}
-      ActiveItem(const transducer_type::id_type& __node,
-		 const feature_set_type& __features,
-		 const attribute_set_type& __attributes)
+      Active(const transducer_type::id_type& __node,
+	     const feature_set_type& __features,
+	     const attribute_set_type& __attributes)
 	: node(__node),
 	  tails(),
 	  features(__features),
 	  attributes(__attributes) {}
-      ActiveItem(const transducer_type::id_type& __node)
+      Active(const transducer_type::id_type& __node)
 	: node(__node),
 	  tails(),
 	  features(),
 	  attributes() {}
       
-      ActiveItem()
+      Active()
 	: node(),
 	  tails(),
 	  features(),
@@ -128,7 +128,7 @@ namespace cicada
       attribute_set_type                        attributes;
     };
     
-    typedef ActiveItem active_type;
+    typedef Active active_type;
     typedef utils::chunk_vector<active_type, 4096 / sizeof(active_type), std::allocator<active_type> > active_set_type;
 
     typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
