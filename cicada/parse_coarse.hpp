@@ -688,7 +688,6 @@ namespace cicada
 	    }
 	    
 	    score_pair_set_type(scores_inside).swap(scores_inside);
-	    
 	  }
       }
       
