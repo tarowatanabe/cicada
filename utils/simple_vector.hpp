@@ -260,6 +260,13 @@ namespace utils {
     template <typename Iterator>
     void insert(iterator position, Iterator first, Iterator last)
     {
+      typedef typename std::iterator_traits<Iterator>::iterator_category __category;
+      __range_insert(position, first, last, __category());
+    }
+
+    template <typename Iterator>
+    void __range_insert(iterator position, Iterator first, Iterator last, std::forward_iterator_tag)
+    {
       const size_type __n = position - begin();
       const size_type __d = std::distance(first, last);
       const size_type __size = size();
@@ -276,6 +283,13 @@ namespace utils {
 	__base.swap(__base_new);
 	utils::destroy_range(__base_new.begin(), __base_new.end());
       }
+    }
+
+    template <typename Iterator>
+    void __range_insert(iterator position, Iterator first, Iterator last, std::input_iterator_tag)
+    {
+      std::vector<Tp, Alloc> vec(first, last);
+      __range_insert(position, vec.begin(), vec.end(), std::forward_iterator_tag());
     }
 
     iterator erase(iterator position)
