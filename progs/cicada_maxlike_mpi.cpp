@@ -354,20 +354,6 @@ struct OptimizeLBFGS
       gradient_type gradient;
     };
 
-    struct bleu_weight_function
-    {
-      typedef cicada::semiring::Tropical<double> value_type;
-      
-      bleu_weight_function(const weight_set_type& __weights) : weights(__weights) {}
-
-      template <typename Edge>
-      value_type operator()(const Edge& edge) const
-      {
-	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
-      }
-      
-      const weight_set_type& weights;
-    };
 
     struct weight_set_function
     {
@@ -536,7 +522,11 @@ struct OptimizeLBFGS
 	  bleus_inside.resize(graph.nodes.size());
 	  bleus_inside_outside.resize(graph.edges.size());
 
-	  cicada::inside_outside(graph, bleus_inside, bleus_inside_outside, bleu_weight_function(weights_bleu), bleu_weight_function(weights_bleu));
+	  cicada::inside_outside(graph,
+				 bleus_inside,
+				 bleus_inside_outside,
+				 cicada::operation::weight_function<bleu_weight_type >(weights_bleu),
+				 cicada::operation::weight_function<bleu_weight_type >(weights_bleu));
 	
 	  const bleu_weight_type bleu_max = *std::max_element(bleus_inside_outside.begin(), bleus_inside_outside.end());
 	
