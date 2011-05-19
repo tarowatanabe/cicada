@@ -343,6 +343,13 @@ namespace cicada
 	passives.clear();
 	passives_unary.clear();
 	passives_final.clear();
+
+	score_pair_chart_type(inside_outside).swap(inside_outside);
+	
+	active_chart_set_type(actives).swap(actives);
+	passive_chart_type(passives).swap(passives);
+	passive_unary_chart_type(passives_unary).swap(passives_unary);
+	passive_unary_chart_type(passives_final).swap(passives_final);
 	
 	return has_goal;
       }

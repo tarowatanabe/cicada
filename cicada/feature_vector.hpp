@@ -356,6 +356,16 @@ namespace cicada
       return (__sparse ? iterator(__sparse->find(x)) : iterator(__dense.find(x)));
     }
 
+    inline const_sparse_iterator sparse_lower_bound(const key_type& x) const { return __sparse->lower_bound(x); }
+    inline       sparse_iterator sparse_lower_bound(const key_type& x)       { return __sparse->lower_bound(x); }
+    inline const_dense_iterator dense_lower_bound(const key_type& x) const { return __dense.lower_bound(x); }
+    inline       dense_iterator dense_lower_bound(const key_type& x)       { return __dense.lower_bound(x); }
+
+    inline const_sparse_iterator sparse_upper_bound(const key_type& x) const { return __sparse->upper_bound(x); }
+    inline       sparse_iterator sparse_upper_bound(const key_type& x)       { return __sparse->upper_bound(x); }
+    inline const_dense_iterator dense_upper_bound(const key_type& x) const { return __dense.upper_bound(x); }
+    inline       dense_iterator dense_upper_bound(const key_type& x)       { return __dense.upper_bound(x); }
+    
     const_iterator lower_bound(const key_type& x) const
     {
       return (__sparse ? const_iterator(__sparse->lower_bound(x)) : const_iterator(__dense.lower_bound(x)));
@@ -434,10 +444,9 @@ namespace cicada
     
     Tp sum() const
     {
-      if (__sparse)
-	return __sum_aux(__sparse->begin(), __sparse->end());
-      else
-	return __sum_aux(__dense.begin(), __dense.end());
+      return (__sparse
+	      ? __sum_aux(__sparse->begin(), __sparse->end())
+	      : __sum_aux(__dense.begin(), __dense.end()));
     }
 
     template <typename Iterator>
@@ -451,10 +460,9 @@ namespace cicada
     
     Tp dot() const
     {
-      if (__sparse)
-	return __dot_aux(__sparse->begin(), __sparse->end());
-      else
-	return __dot_aux(__dense.begin(), __dense.end());
+      return (__sparse
+	      ? __dot_aux(__sparse->begin(), __sparse->end())
+	      : __dot_aux(__dense.begin(), __dense.end()));
     }
 
     template <typename Iterator>
@@ -469,10 +477,9 @@ namespace cicada
     template <typename T, typename A>
     Tp dot(const WeightVector<T,A>& x) const
     {
-      if (__sparse)
-	return __dot_aux(__sparse->begin(), __sparse->end(), x);
-      else
-	return __dot_aux(__dense.begin(), __dense.end(), x);
+      return (__sparse
+	      ? __dot_aux(__sparse->begin(), __sparse->end(), x)
+	      : __dot_aux(__dense.begin(), __dense.end(), x));
     }
     
     template <typename Iterator, typename T, typename A>
@@ -487,95 +494,118 @@ namespace cicada
     template <typename T, typename A>
     Tp dot(const FeatureVector<T,A>& x) const
     {
-      typedef FeatureVector<T,A> another_type;
-      
-      if (empty() || x.empty()) return Tp();
-      
-      const_iterator iter1     = lower_bound(x.begin()->first);
-      const_iterator iter1_end = end();
-      
-      typename another_type::const_iterator iter2     = (iter1 != iter1_end ? x.lower_bound(iter1->first) : x.begin());
-      typename another_type::const_iterator iter2_end = x.end();
-      
-      Tp sum = Tp();
-      
-      while (iter1 != iter1_end && iter2 != iter2_end) {
-	if (iter1->first < iter2->first)
-	  ++ iter1;
-	else if (iter2->first < iter1->first)
-	  ++ iter2;
-	else {
-	  sum += iter1->second * iter2->second;
-	  
-	  ++ iter1;
-	  ++ iter2;
-	}
-      }
-      
-      return sum;
-    }
-
-    template <typename T, typename A, typename BinaryOp>
-    Tp dot(const FeatureVector<T,A>& x, BinaryOp op) const
-    {
-      return dot(x.begin(), x.end(), op);
+      if (__sparse)
+	return (x.__sparse
+		? __dot_aux_container(*__sparse, *x.__sparse)
+		: __dot_aux_container(*__sparse, x.__dense));
+      else
+	return (x.__sparse
+		? __dot_aux_container(__dense, *x.__sparse)
+		: __dot_aux_container(__dense, x.__dense));
     }
     
     template <typename Iterator>
     Tp dot(Iterator first, Iterator last) const
     {
-      const_iterator iter1 = begin();
-      const_iterator iter1_end = end();
-      
-      Tp sum = Tp();
-      
-      while (iter1 != iter1_end && first != last) {
-	if (iter1->first < first->first)
-	  ++ iter1;
-	else if (first->first < iter1->first)
-	  ++ first;
-	else {
-	  sum += iter1->second * first->second;
-	  
-	  ++ iter1;
-	  ++ first;
-	}
-      }
-      
-      return sum;
+      return (__sparse
+	      ? __dot_aux_container(*__sparse, first, last)
+	      : __dot_aux_container(__dense, first, last));
     }
     
-    template <typename Iterator, typename BinaryOp>
-    Tp dot(Iterator first, Iterator last, BinaryOp op) const
+    template <typename T, typename A, typename BinaryOp>
+    Tp dot(const FeatureVector<T,A>& x, BinaryOp op) const
     {
-      typedef typename std::iterator_traits<Iterator>::value_type value2_type;
+      if (__sparse)
+	return (x.__sparse
+		? __dot_aux_container(*__sparse, *x.__sparse, op)
+		: __dot_aux_container(*__sparse, x.__dense, op));
+      else
+	return (x.__sparse
+		? __dot_aux_container(__dense, *x.__sparse, op)
+		: __dot_aux_container(__dense, x.__dense, op));
+    }
 
-      const_iterator iter1 = begin();
-      const_iterator iter1_end = end();
-
-      Tp sum = Tp();
+  private:
+    template <typename Container1, typename Iterator2>
+    Tp __dot_aux_container(const Container1& x, Iterator2 first2, Iterator2 last2) const
+    {
+      if (x.empty() || first2 == last2) return Tp();
       
-      while (iter1 != iter1_end && first != last) {
-	if (iter1->first < first->first) {
-	  sum += op(iter1->second, typename value2_type::second_type());
-	  ++ iter1;
-	} else if (first->first < iter1->first) {
-	  sum += op(Tp(), first->second);
-	  ++ first;
-	} else {
-	  sum += op(iter1->second, first->second);
+      typename Container1::const_iterator iter1     = x.lower_bound(first2->first);
+      typename Container1::const_iterator iter1_end = x.end();
+      
+      return __dot_aux_iterator(iter1, iter1_end, first2, last2);
+    }
+    
+    template <typename Container1, typename Container2>
+    Tp __dot_aux_container(const Container1& x, const Container2& y) const
+    {
+      if (x.empty() || y.empty()) return Tp();
+      
+      typename Container1::const_iterator iter1     = x.lower_bound(y.begin()->first);
+      typename Container1::const_iterator iter1_end = x.end();
+      typename Container2::const_iterator iter2     = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.begin());
+      typename Container2::const_iterator iter2_end = y.end();
+      
+      return __dot_aux_iterator(iter1, iter1_end, iter2, iter2_end);
+    }
+    
+    template <typename Container1, typename Container2, typename BinaryOp>
+    Tp __dot_aux_container(const Container1& x, const Container2& y, BinaryOp op) const
+    {
+      return __dot_aux_iterator(x.begin(), x.end(), y.begin(), y.end(), op);
+    }
+    
+    template <typename Iterator1, typename Iterator2>
+    Tp __dot_aux_iterator(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2) const
+    {
+      Tp __dot = Tp();
+      
+      while (first1 != last1 && first2 != last2) {
+	if (first1->first < first2->first)
+	  ++ first1;
+	else if (first2->first < first1->first)
+	  ++ first2;
+	else {
+	  __dot += first1->second * first2->second;
 	  
-	  ++ iter1;
-	  ++ first;
+	  ++ first1;
+	  ++ first2;
 	}
       }
       
-      for (/**/; iter1 != iter1_end; ++ iter1)
-	sum += op(iter1->second, typename value2_type::second_type());
-      for (/**/; first != last; ++ first)
-	sum += op(Tp(), first->second);
+      return __dot;
+    }
+    
+    template <typename Iterator1, typename Iterator2, typename BinaryOp>
+    Tp __dot_aux_iterator(Iterator1 first1, Iterator1 last1, Iterator2 first2, Iterator2 last2, BinaryOp op) const
+    {
+      typedef typename std::iterator_traits<Iterator1>::value_type::second_type value1_type;
+      typedef typename std::iterator_traits<Iterator2>::value_type::second_type value2_type;
+
+      value1_type __dot = value1_type();
       
-      return sum;
+      while (first1 != last1 && first2 != last2) {
+	if (first1->first < first2->first) {
+	  __dot += op(first1->second, value2_type());
+	  ++ first1;
+	} else if (first2->first < first1->first) {
+	  __dot += op(value1_type(), first2->second);
+	  ++ first2;
+	} else {
+	  __dot += op(first1->second, first2->second);
+	  
+	  ++ first1;
+	  ++ first2;
+	}
+      }
+
+      for (/**/; first1 != last1; ++ first1)
+	__dot += op(first1->second, value2_type());
+      for (/**/; first2 != last2; ++ first2)
+	__dot += op(value1_type(), first2->second);
+      
+      return __dot;
     }
 
   public:
@@ -647,14 +677,20 @@ namespace cicada
     template <typename T>
     self_type& operator+=(const T& x)
     { 
-      std::for_each(begin(), end(), __apply_unary<std::plus<Tp>, T>(x));
+      if (__sparse)
+	std::for_each(__sparse->begin(), __sparse->end(), __apply_unary<std::plus<Tp>, T>(x));
+      else
+	std::for_each(__dense.begin(), __dense.end(), __apply_unary<std::plus<Tp>, T>(x));
       return *this;
     }
 
     template <typename T>
     self_type& operator-=(const T& x)
     { 
-      std::for_each(begin(), end(), __apply_unary<std::minus<Tp>, T>(x));
+      if (__sparse)
+	std::for_each(__sparse->begin(), __sparse->end(), __apply_unary<std::minus<Tp>, T>(x));
+      else
+	std::for_each(__dense.begin(), __dense.end(), __apply_unary<std::minus<Tp>, T>(x));
       return *this;
     }
     
@@ -663,15 +699,20 @@ namespace cicada
     { 
       if (x == T())
 	clear();
+      else if (__sparse)
+	std::for_each(__sparse->begin(), __sparse->end(), __apply_unary<std::multiplies<Tp>, T>(x));
       else
-	std::for_each(begin(), end(), __apply_unary<std::multiplies<Tp>, T>(x));
+	std::for_each(__dense.begin(), __dense.end(), __apply_unary<std::multiplies<Tp>, T>(x));
       return *this;
     }
     
     template <typename T>
     self_type& operator/=(const T& x)
     {
-      std::for_each(begin(), end(), __apply_unary<std::divides<Tp>, T>(x));
+      if (__sparse)
+	std::for_each(__sparse->begin(), __sparse->end(), __apply_unary<std::divides<Tp>, T>(x));
+      else
+	std::for_each(__dense.begin(), __dense.end(), __apply_unary<std::divides<Tp>, T>(x));
       return *this;
     }
     
@@ -695,14 +736,13 @@ namespace cicada
 	
 	typename another_type::const_iterator iter2_end = x.end();
 	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	  typename sparse_vector_type::iterator iter1 = __sparse->lower_bound(iter2->first);
+	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(*iter2);
 	  
-	  if (iter1 == __sparse->end() || iter1->first != iter2->first)
-	    __sparse->insert(iter1, *iter2);
-	  else {
-	    iter1->second += iter2->second;
-	    if (iter1->second == Tp())
-	      __sparse->erase(iter1);
+	  if (! result.second) {
+	    result.first->second += iter2->second;
+	    
+	    if (result.first->second == Tp())
+	      __sparse->erase(result.first);
 	  }
 	}
       } else {
@@ -761,14 +801,12 @@ namespace cicada
 	
 	typename another_type::const_iterator iter2_end = x.end();
 	for (typename another_type::const_iterator iter2 = x.begin(); iter2 != iter2_end; ++ iter2) {
-	  typename sparse_vector_type::iterator iter1 = __sparse->lower_bound(iter2->first);
-	  
-	  if (iter1 == __sparse->end() || iter1->first != iter2->first)
-	    __sparse->insert(iter1, std::make_pair(iter2->first, - Tp(iter2->second)));
-	  else {
-	    iter1->second -= iter2->second;
-	    if (iter1->second == Tp())
-	      __sparse->erase(iter1);
+	  std::pair<typename sparse_vector_type::iterator, bool> result = __sparse->insert(std::make_pair(iter2->first, -Tp(iter2->second)));
+	  if (! result.second) {
+	    result.first->second -= iter2->second;
+	    
+	    if (result.first->second == Tp())
+	      __sparse->erase(result.first);
 	  }
 	}
       } else {
