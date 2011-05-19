@@ -255,7 +255,7 @@ namespace cicada
       typedef PassiveUnary passive_unary_type;
       typedef Unary        unary_type;
       
-      typedef utils::chunk_vector<active_type, 4096 / sizeof(active_type), std::allocator<active_type> > active_set_type;
+      typedef std::vector<active_type, std::allocator<active_type> > active_set_type;
       
       typedef utils::chart<active_set_type, std::allocator<active_set_type> > active_chart_type;
       typedef std::vector<active_chart_type, std::allocator<active_chart_type> > active_chart_set_type;
@@ -683,9 +683,12 @@ namespace cicada
 	      active_set_type& cell = actives[table](first, last);
 	      
 	      extend_actives(transducer, active_arcs, passive_arcs, first, last, cell);
+	      
+	      active_set_type(cell).swap(cell);
 	    }
 	    
 	    score_pair_set_type(scores_inside).swap(scores_inside);
+	    
 	  }
       }
       
