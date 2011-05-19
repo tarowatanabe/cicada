@@ -70,8 +70,8 @@ namespace cicada
   Tp1 dot_product(const FeatureVector<Tp1, Alloc1>& x, const WeightVector<Tp2, Alloc2>& y)
   {
     return (x.sparse()
-	    ? dot_product(x.sbegin(), x.send(), y, Tp1())
-	    : dot_product(x.dbegin(), x.dend(), y, Tp1()));
+	    ? dot_product(x.sparse_begin(), x.sparse_end(), y, Tp1())
+	    : dot_product(x.dense_begin(), x.dense_end(), y, Tp1()));
   }
   
   template <typename Tp1, typename Alloc1, typename Tp2, typename Alloc2>
@@ -79,8 +79,8 @@ namespace cicada
   Tp1 dot_product(const WeightVector<Tp1, Alloc1>& x, const FeatureVector<Tp2, Alloc2>& y)
   {
     return (y.sparse()
-	    ? dot_product(x, y.sbegin(), y.send(), Tp1())
-	    : dot_product(x, y.dbegin(), y.dend(), Tp1()));
+	    ? dot_product(x, y.sparse_begin(), y.sparse_end(), Tp1())
+	    : dot_product(x, y.dense_begin(), y.dense_end(), Tp1()));
   }
 
   template <typename Iterator1, typename Iterator2, typename Tp>
@@ -162,8 +162,8 @@ namespace cicada
     // if the same address, we are identical!
     if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
       return (x.sparse()
-	      ? __dot_product(x.sbegin(), x.send(), Tp1())
-	      : __dot_product(x.dbegin(), x.dend(), Tp1()));
+	      ? __dot_product(x.sparse_begin(), x.sparse_end(), Tp1())
+	      : __dot_product(x.dense_begin(), x.dense_end(), Tp1()));
     
     if (x.sparse()) {
       typename feature_vector1_type::const_sparse_iterator iter1     = x.lower_bound(y.begin()->first);
@@ -207,17 +207,17 @@ namespace cicada
     
     if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
       return (x.sparse()
-	      ? __dot_product(x.sbegin(), x.send(), Tp1(), op)
-	      : __dot_product(x.dbegin(), x.dend(), Tp1(), op));
+	      ? __dot_product(x.sparse_begin(), x.sparse_end(), Tp1(), op)
+	      : __dot_product(x.dense_begin(), x.dense_end(), Tp1(), op));
     
     if (x.sparse())
       return (y.sparse()
-	      ? dot_product(x.sbegin(), x.send(), y.sbegin(), y.send(), Tp1(), op)
-	      : dot_product(x.sbegin(), x.send(), y.sdegin(), y.dend(), Tp1(), op));
+	      ? dot_product(x.sparse_begin(), x.sparse_end(), y.sparse_begin(), y.sparse_end(), Tp1(), op)
+	      : dot_product(x.sparse_begin(), x.sparse_end(), y.dense_begin(), y.dense_end(), Tp1(), op));
     else
       return (y.sparse()
-	      ? dot_product(x.dbegin(), x.dend(), y.sbegin(), y.send(), Tp1(), op)
-	      : dot_product(x.dbegin(), x.dend(), y.sdegin(), y.dend(), Tp1(), op));
+	      ? dot_product(x.dense_begin(), x.dense_end(), y.sparse_begin(), y.sparse_end(), Tp1(), op)
+	      : dot_product(x.dense_begin(), x.dense_end(), y.dense_begin(), y.dense_end(), Tp1(), op));
   }
   
   template <typename Iterator, typename Tp1, typename Alloc1, typename Tp>
@@ -260,8 +260,8 @@ namespace cicada
     
     if (static_cast<const void*>(&x) == static_cast<const void*>(&y))
       return (x.sparse()
-	      ? __dot_product(x.sbegin(), x.send(), w, Tp1())
-	      : __dot_product(x.dbegin(), x.dend(), w, Tp1()));
+	      ? __dot_product(x.sparse_begin(), x.sparse_end(), w, Tp1())
+	      : __dot_product(x.dense_begin(),  x.dense_end(), w, Tp1()));
     
     if (x.sparse()) {
       typename feature_vector1_type::const_sparse_iterator iter1     = x.lower_bound(y.begin()->first);

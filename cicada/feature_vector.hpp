@@ -418,15 +418,15 @@ namespace cicada
     inline const_iterator end() const { return (__sparse ? const_iterator(__sparse->end()) : const_iterator(__dense.end())); }
     inline       iterator end()       { return (__sparse ? iterator(__sparse->end()) : iterator(__dense.end())); }
     
-    inline const_sparse_iterator sbegin() const { return __sparse->begin(); }
-    inline       sparse_iterator sbegin()       { return __sparse->begin(); }
-    inline const_sparse_iterator send() const { return __sparse->end(); }
-    inline       sparse_iterator send()       { return __sparse->end(); }
+    inline const_sparse_iterator sparse_begin() const { return __sparse->begin(); }
+    inline       sparse_iterator sparse_begin()       { return __sparse->begin(); }
+    inline const_sparse_iterator sparse_end() const { return __sparse->end(); }
+    inline       sparse_iterator sparse_end()       { return __sparse->end(); }
     
-    inline const_dense_iterator dbegin() const { return __dense.begin(); }
-    inline       dense_iterator dbegin()       { return __dense.begin(); }
-    inline const_dense_iterator dend() const { return __dense.end(); }
-    inline       dense_iterator dend()       { return __dense.end(); }
+    inline const_dense_iterator dense_begin() const { return __dense.begin(); }
+    inline       dense_iterator dense_begin()       { return __dense.begin(); }
+    inline const_dense_iterator dense_end() const { return __dense.end(); }
+    inline       dense_iterator dense_end()       { return __dense.end(); }
     
     
     void swap(FeatureVector& x)
