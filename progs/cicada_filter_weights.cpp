@@ -114,7 +114,7 @@ int main(int argc, char** argv)
 	weights *= 1.0 / std::sqrt(sum);
       
     } else if (normalize_l2) {
-      const double sum = cicada::dot_product(weights);
+      const double sum = cicada::dot_product(weights, weights);
       
       if (sum != 0.0)
 	weights *= 1.0 / std::sqrt(sum);
