@@ -82,6 +82,3 @@ Cube summing?
      I'm still not sure how to efficiently collect residuals... Do we include state-less features
      to serve as residual counts?
 
-
-Better memory management in parse-coarse:
-  Use chunk-vector for tail vector management in passive-chart
