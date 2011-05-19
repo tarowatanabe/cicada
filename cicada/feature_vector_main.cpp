@@ -8,6 +8,8 @@
 #include <iostream>
 
 #include "feature_vector.hpp"
+#include "dot_product.hpp"
+
 #include "utils/lexical_cast.hpp"
 
 typedef cicada::FeatureVector<double> feature_set_type;
@@ -47,6 +49,9 @@ int main(int argc, char** argv)
   
   std::cout << "feature1 * feature2" << std::endl;
   std::cout << features1 * features2;
+
+  std::cout << "dot_product(feature1, feature2)" << std::endl;
+  std::cout << dot_product(features1, features2) << std::endl;
   
   std::cout << "feature1 - feature3" << std::endl;
   std::cout << features1 - features3;
@@ -73,6 +78,9 @@ int main(int argc, char** argv)
   
   std::cout << "feature1 * feature2" << std::endl;
   std::cout << features1 * features2;
+  
+  std::cout << "dot_product(feature1, feature2)" << std::endl;
+  std::cout << dot_product(features1, features2) << std::endl;
   
   std::cout << "feature1 - feature3" << std::endl;
   std::cout << features1 - features3;

@@ -166,32 +166,32 @@ namespace cicada
 	      : __dot_product(x.dbegin(), x.dend(), Tp1()));
     
     if (x.sparse()) {
-      typename feature_vector1_type::const_sparse_iterator iter1     = x.sparse_lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_sparse_iterator iter1_end = x.send();
+      typename feature_vector1_type::const_sparse_iterator iter1     = x.lower_bound(y.begin()->first);
+      typename feature_vector1_type::const_sparse_iterator iter1_end = x.end();
       
       if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.sparse_lower_bound(iter1->first) : y.send());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.send();
+	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
       } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.dense_lower_bound(iter1->first) : y.dend());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.dend();
+	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
       }
     } else {
-      typename feature_vector1_type::const_dense_iterator iter1     = x.dense_lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_dense_iterator iter1_end = x.dend();
+      typename feature_vector1_type::const_dense_iterator iter1     = x.lower_bound(y.begin()->first);
+      typename feature_vector1_type::const_dense_iterator iter1_end = x.end();
       
       if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.sparse_lower_bound(iter1->first) : y.send());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.send();
+	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
       } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.dense_lower_bound(iter1->first) : y.dend());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.dend();
+	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, iter2, iter2_end, Tp1());
       }
@@ -264,32 +264,32 @@ namespace cicada
 	      : __dot_product(x.dbegin(), x.dend(), w, Tp1()));
     
     if (x.sparse()) {
-      typename feature_vector1_type::const_sparse_iterator iter1     = x.sparse_lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_sparse_iterator iter1_end = x.send();
+      typename feature_vector1_type::const_sparse_iterator iter1     = x.lower_bound(y.begin()->first);
+      typename feature_vector1_type::const_sparse_iterator iter1_end = x.end();
       
       if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.sparse_lower_bound(iter1->first) : y.send());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.send();
+	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
       } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.dense_lower_bound(iter1->first) : y.dend());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.dend();
+	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
       }
     } else {
-      typename feature_vector1_type::const_dense_iterator iter1     = x.dense_lower_bound(y.begin()->first);
-      typename feature_vector1_type::const_dense_iterator iter1_end = x.dend();
+      typename feature_vector1_type::const_dense_iterator iter1     = x.lower_bound(y.begin()->first);
+      typename feature_vector1_type::const_dense_iterator iter1_end = x.end();
       
       if (y.sparse()) {
-	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.sparse_lower_bound(iter1->first) : y.send());
-	typename feature_vector2_type::const_sparse_iterator iter2_end = y.send();
+	typename feature_vector2_type::const_sparse_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_sparse_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
       } else {
-	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.dense_lower_bound(iter1->first) : y.dend());
-	typename feature_vector2_type::const_dense_iterator iter2_end = y.dend();
+	typename feature_vector2_type::const_dense_iterator iter2 = (iter1 != iter1_end ? y.lower_bound(iter1->first) : y.end());
+	typename feature_vector2_type::const_dense_iterator iter2_end = y.end();
 	
 	return dot_product(iter1, iter1_end, w, iter2, iter2_end, Tp1());
       }

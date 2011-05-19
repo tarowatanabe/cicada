@@ -76,6 +76,9 @@ namespace cicada
       template <typename D, typename S, typename R, typename P>
       __iterator(const __iterator<D,S,R,P>& x) : diter(x.diter), siter(x.siter) {}
       __iterator(const __iterator<DIterator,SIterator,Ref,Ptr>& x) : diter(x.diter), siter(x.siter) {}
+      
+      operator const DIterator() const { return diter; }
+      operator const SIterator() const { return siter; }
 
       template <typename D, typename S, typename R, typename P>
       __iterator& operator=(const __iterator<D,S,R,P>& x)
@@ -355,16 +358,6 @@ namespace cicada
     {
       return (__sparse ? iterator(__sparse->find(x)) : iterator(__dense.find(x)));
     }
-
-    inline const_sparse_iterator sparse_lower_bound(const key_type& x) const { return __sparse->lower_bound(x); }
-    inline       sparse_iterator sparse_lower_bound(const key_type& x)       { return __sparse->lower_bound(x); }
-    inline const_dense_iterator dense_lower_bound(const key_type& x) const { return __dense.lower_bound(x); }
-    inline       dense_iterator dense_lower_bound(const key_type& x)       { return __dense.lower_bound(x); }
-
-    inline const_sparse_iterator sparse_upper_bound(const key_type& x) const { return __sparse->upper_bound(x); }
-    inline       sparse_iterator sparse_upper_bound(const key_type& x)       { return __sparse->upper_bound(x); }
-    inline const_dense_iterator dense_upper_bound(const key_type& x) const { return __dense.upper_bound(x); }
-    inline       dense_iterator dense_upper_bound(const key_type& x)       { return __dense.upper_bound(x); }
     
     const_iterator lower_bound(const key_type& x) const
     {
