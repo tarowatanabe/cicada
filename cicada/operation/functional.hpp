@@ -8,6 +8,7 @@
 
 #include <cicada/operation.hpp>
 #include <cicada/semiring.hpp>
+#include <cicada/dot_product.hpp>
 
 namespace cicada
 {
@@ -97,13 +98,13 @@ namespace cicada
   
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::exp(x.features.dot(weights) * scale);
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x.features, weights) * scale);
       }
       
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::exp(x.dot(weights) * scale);
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x, weights) * scale);
       }
     };
 
@@ -146,13 +147,13 @@ namespace cicada
 
       value_type operator()(const hypergraph_type::edge_type& x) const
       {
-	return cicada::semiring::traits<value_type>::exp(x.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x.features, weights));
       }
   
       template <typename FeatureSet>
       value_type operator()(const FeatureSet& x) const
       {
-	return cicada::semiring::traits<value_type>::exp(x.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x, weights));
       }
     };
 

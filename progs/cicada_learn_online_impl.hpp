@@ -32,6 +32,7 @@
 #include "cicada/inside_outside.hpp"
 #include "cicada/prune.hpp"
 #include "cicada/feature_function.hpp"
+#include "cicada/dot_product.hpp"
 
 #include "cicada/operation/functional.hpp"
 #include "cicada/operation/traversal.hpp"
@@ -699,7 +700,7 @@ struct OptimizeCP
 
     double operator()(int i, int j) const
     {
-      return labels[i] * labels[j] * features[i].dot(features[j]);
+      return labels[i] * labels[j] * cicada::dot_product(features[i], features[j]);
     }
     
     const LabelSet& labels;
@@ -720,7 +721,7 @@ struct OptimizeCP
     for (size_t i = 0; i != __labels.size(); ++ i) {
       if (__margins[i] <= 0) continue;
       
-      const double margin = __labels[i] * __features[i].dot(weights);
+      const double margin = __labels[i] * cicada::dot_product(__features[i], weights);
       const double grad = __margins[i] - margin;
       
       // we have reached better error bound
@@ -754,7 +755,7 @@ struct OptimizeCP
     // 
     for (int i = 0; i < static_cast<int>(model_size); ++ i)
       for (int j = (i >= static_cast<int>(model_size_prev) ? size_type(0) : model_size_prev); j < static_cast<int>(model_size); ++ j)
-	H(i, j) = labels[i] * labels[j] * features[i].dot(features[j]);
+	H(i, j) = labels[i] * labels[j] * cicada::dot_product(features[i], features[j]);
     
     alpha.resize(model_size, 0.0);
     
@@ -1057,7 +1058,7 @@ struct OptimizeCP
     error_bound.clear();
     error_bound.resize(objective.size(), - std::numeric_limits<double>::infinity());
     for (size_t i = 0; i != labels.size(); ++ i)
-      error_bound[ids[i]] = std::max(error_bound[ids[i]], margins[i] - labels[i] * features[i].dot(weights));
+      error_bound[ids[i]] = std::max(error_bound[ids[i]], margins[i] - labels[i] * cicada::dot_product(features[i], weights));
   }
 
   LineSearch line_search;
@@ -1161,7 +1162,7 @@ struct OptimizeMIRA
 
     double operator()(int i, int j) const
     {
-      return labels[i] * labels[j] * features[i].dot(features[j]);
+      return labels[i] * labels[j] * cicada::dot_product(features[i], features[j]);
     }
     
     const LabelSet& labels;
@@ -1194,7 +1195,7 @@ struct OptimizeMIRA
     
     size_t num_instance = 0;
     for (size_t i = 0; i != labels.size(); ++ i) {
-      gradient[i] = margins[i] - labels[i] * features[i].dot(weights);
+      gradient[i] = margins[i] - labels[i] * cicada::dot_product(features[i], weights);
       
       const bool skipping = (gradient[i] <= 0 || margins[i] <= 0);
       

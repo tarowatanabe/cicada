@@ -325,7 +325,7 @@ struct OptimizeLBFGS
       template <typename Edge>
       value_type operator()(const Edge& edge) const
       {
-	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
       }
       
       const weight_set_type& weights;
@@ -342,7 +342,7 @@ struct OptimizeLBFGS
       
       value_type operator()(const feature_set_type& x) const
       {
-	return cicada::semiring::traits<value_type>::exp(x.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(x, weights));
       }
     };
 
@@ -359,7 +359,7 @@ struct OptimizeLBFGS
       value_type operator()(const Edge& edge) const
       {
 	// p_e
-	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
       }
     };
 
@@ -381,7 +381,7 @@ struct OptimizeLBFGS
 	if (log(max_bleu) - log(bleus[edge.id]) >= 1e-4)
 	  return value_type();
 	else
-	  return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
+	  return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
       }
     };
 
@@ -397,7 +397,7 @@ struct OptimizeLBFGS
 	// p_e r_e
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -426,7 +426,7 @@ struct OptimizeLBFGS
 
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)

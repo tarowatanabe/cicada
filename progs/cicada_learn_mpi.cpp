@@ -216,7 +216,7 @@ struct OptimizeOnline
     value_type operator()(const Edge& edge) const
     {
       // p_e
-      return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights) * scale);
+      return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights) * scale);
     }
       
     const weight_set_type& weights;
@@ -235,7 +235,7 @@ struct OptimizeOnline
       // p_e r_e
       gradient_type grad;
 	
-      const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights) * scale);
+      const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
 	
       feature_set_type::const_iterator fiter_end = edge.features.end();
       for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -334,7 +334,7 @@ struct OptimizeOnlineMargin
     value_type operator()(const Edge& edge) const
     {
       // p_e
-      return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights) * scale);
+      return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights) * scale);
     }
       
     const weight_set_type& weights;
@@ -353,7 +353,7 @@ struct OptimizeOnlineMargin
       // p_e r_e
       gradient_type grad;
 	
-      const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights) * scale);
+      const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
 	
       feature_set_type::const_iterator fiter_end = edge.features.end();
       for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
@@ -601,7 +601,7 @@ struct OptimizeLBFGS
       value_type operator()(const Edge& edge) const
       {
 	// p_e
-	return cicada::semiring::traits<value_type>::exp(edge.features.dot(weights));
+	return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights));
       }
       
       const weight_set_type& weights;
@@ -620,7 +620,7 @@ struct OptimizeLBFGS
 	// p_e r_e
 	gradient_type grad;
 	
-	const weight_type weight = cicada::semiring::traits<weight_type>::exp(edge.features.dot(weights));
+	const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights));
 	
 	feature_set_type::const_iterator fiter_end = edge.features.end();
 	for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)

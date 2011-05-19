@@ -13,6 +13,7 @@
 
 #include "cicada/feature_function.hpp"
 #include "cicada/weight_vector.hpp"
+#include "cicada/dot_product.hpp"
 #include "cicada/semiring.hpp"
 
 typedef boost::filesystem::path path_type;

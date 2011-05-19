@@ -26,6 +26,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/sentence.hpp>
 #include <cicada/feature_vector.hpp>
+#include <cicada/dot_product.hpp>
 
 #include <utils/simple_vector.hpp>
 
@@ -129,8 +130,8 @@ namespace cicada
       template <typename Edge>
       Envelope operator()(const Edge& edge) const
       {
-	const double m = edge.features.dot(direction);
-	const double y = edge.features.dot(origin);
+	const double m = cicada::dot_product(edge.features, direction);
+	const double y = cicada::dot_product(edge.features, origin);
 	
 	return Envelope(boost::shared_ptr<line_type>(new line_type(m, y, edge)));
       }
