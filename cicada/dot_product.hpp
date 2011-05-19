@@ -225,7 +225,6 @@ namespace cicada
       return (y.sparse()
 	      ? dot_product(x.dbegin(), x.dend(), y.sbegin(), y.send(), Tp1(), op)
 	      : dot_product(x.dbegin(), x.dend(), y.sdegin(), y.dend(), Tp1(), op));
-    
   }
 
   
