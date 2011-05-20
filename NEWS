@@ -1,5 +1,5 @@
 2011-5-x
-Less memory consumption in scfg/ghkm/tree extraction by frequently checking memory usage (and slightly slower)
+Less memory consumption in scfg/ghkm/tree extraction by frequently checking memory usage (+ slightly slower)
 Less memory consumption in parse-coarse
 Better feature-vector implementation with smaller storage
 Removed "dot" and use separate "dot_product" in dot_product.hpp
