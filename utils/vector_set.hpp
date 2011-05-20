@@ -26,8 +26,6 @@ namespace utils
   private:
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
     typedef utils::simple_vector<value_type, alloc_type> container_type;
-
-    static const size_type __linear_size = 16;
     
   public:
     typedef typename container_type::pointer pointer;
@@ -40,6 +38,9 @@ namespace utils
     typedef typename container_type::const_reverse_iterator const_reverse_iterator;
     typedef typename container_type::size_type size_type;
     typedef typename container_type::difference_type difference_type;
+
+  private:
+    static const size_type __linear_size = 16;
     
   public:
     vector_set() : container() {}

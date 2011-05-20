@@ -55,9 +55,7 @@ namespace utils
     
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
     typedef utils::simple_vector<value_type, alloc_type> container_type;
-    
-    static const size_type __linear_size = 16;
-    
+        
   public:
     typedef typename container_type::pointer pointer;
     typedef typename container_type::const_pointer const_pointer;
@@ -70,6 +68,8 @@ namespace utils
     typedef typename container_type::size_type size_type;
     typedef typename container_type::difference_type difference_type;
 
+  private:
+    static const size_type __linear_size = 16;
     
   public:
     vector_map() : container() {}
