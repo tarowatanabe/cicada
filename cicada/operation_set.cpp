@@ -34,6 +34,7 @@
 #include "operation/intersect.hpp"
 #include "operation/normalize.hpp"
 #include "operation/output.hpp"
+#include "operation/viterbi.hpp"
 
 #include "utils/resource.hpp"
 #include "utils/hashmurmur.hpp"
@@ -197,6 +198,10 @@ remove-epsilon: remove epsilon\n\
 \tforest=[true|false] remove epsilon for forest\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 span-forest: annotate terminal span\n\
+viterbi: compute viterbi tree\n\
+\tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialzied weight\n\
 ";
     return desc;
   }
@@ -280,6 +285,8 @@ span-forest: annotate terminal span\n\
 	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
       else if (param_name == "prune")
 	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
+      else if (param_name == "viterbi")
+	operations.push_back(operation_ptr_type(new operation::Viterbi(*piter, debug)));
       else if (param_name == "span-forest")
 	operations.push_back(operation_ptr_type(new operation::SpanForest(*piter, debug)));
       else if (param_name == "sort-tail")

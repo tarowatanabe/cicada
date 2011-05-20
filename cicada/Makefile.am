@@ -207,7 +207,8 @@ operation/remove_annotation.hpp \
 operation/remove_epsilon.hpp \
 operation/sort_tail.hpp \
 operation/span_forest.hpp \
-operation/traversal.hpp
+operation/traversal.hpp \
+operation/viterbi.hpp
 
 libcicada_operation_la_SOURCES = \
 operation/apply.cpp \
@@ -227,7 +228,8 @@ operation/push_bos_eos.cpp \
 operation/remove_annotation.cpp \
 operation/remove_epsilon.cpp \
 operation/sort_tail.cpp \
-operation/span_forest.cpp 
+operation/span_forest.cpp \
+operation/viterbi.cpp
 libcicada_operation_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 
