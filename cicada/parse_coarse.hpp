@@ -867,6 +867,28 @@ namespace cicada
       if (thresholds.size() + 1 != grammars.size())
 	throw std::runtime_error("do we have enough threshold parameters for grammars?");
     }
+
+    template <typename Grammars, typename Thresholds>
+    ParseCoarse(const symbol_type& __goal,
+		const Grammars& __grammars,
+		const Thresholds& __thresholds,
+		const function_type& __function,
+		const bool __yield_source=false,
+		const bool __treebank=false,
+		const bool __pos_mode=false)
+      : goal(__goal),
+	grammars(__grammars.begin(), __grammars.end()),
+	thresholds(__thresholds.begin(), __thresholds.end()),
+	function(__function),
+	yield_source(__yield_source),
+	treebank(__treebank),
+	pos_mode(__pos_mode)
+    {
+      if (grammars.empty())
+	throw std::runtime_error("no grammar?");
+      if (thresholds.size() + 1 != grammars.size())
+	throw std::runtime_error("do we have enough threshold parameters for grammars?");
+    }
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
@@ -959,6 +981,20 @@ namespace cicada
     ParseCoarse<typename Function::value_type, Function>(goal, gfirst, glast, tfirst, tlast, function, yield_source, treebank, pos_mode)(lattice, graph);
   }
   
+  template <typename Grammars, typename Thresholds, typename Function>
+  inline
+  void parse_coarse(const Symbol& goal, 
+		    const Grammars& grammars,
+		    const Thresholds& thresholds,
+		    const Function& function,
+		    const Lattice& lattice,
+		    HyperGraph& graph,
+		    const bool yield_source=false,
+		    const bool treebank=false,
+		    const bool pos_mode=false)
+  {
+    ParseCoarse<typename Function::value_type, Function>(goal, grammars, thresholds, function, yield_source, treebank, pos_mode)(lattice, graph);
+  }
   
 };
 
