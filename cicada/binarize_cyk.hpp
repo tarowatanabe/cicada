@@ -105,8 +105,10 @@ namespace cicada
 	  if (edge.tails.size() <= 1) {
 	    hypergraph_type::edge_type& edge_new = target.add_edge(edge.tails.begin(), edge.tails.end());
 	    edge_new.rule       = edge.rule;
-	    edge_new.features   = edge.features;
-	    edge_new.attributes = edge.attributes;
+	    
+	    // what features to assign...?
+	    //edge_new.features   = edge.features;
+	    //edge_new.attributes = edge.attributes;
 	    
 	    target.connect_edge(edge_new.id, i);
 	  }
