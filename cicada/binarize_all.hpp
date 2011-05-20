@@ -132,7 +132,7 @@ namespace cicada
 	      const size_t last = first + length;
 	      
 	      const symbol_set_type subrhs(rhs_removed.begin() + positions[first], rhs_removed.begin() + positions[last - 1] + 1);
-	      const tail_set_type   subtails(tails.begin() + first, tails.begin() + last);
+	      const tail_set_type   subtails(edge_source.tails.begin() + first, edge_source.tails.begin() + last);
 	      
 	      std::pair<label_map_type::iterator, bool> result_label = label_map.insert(std::make_pair(subtails, symbol_type()));
 	      if (result_label.second) {
