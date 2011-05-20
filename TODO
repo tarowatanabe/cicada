@@ -47,8 +47,6 @@ Reimplement cicada-learn-online:
   
   or, implement as cicada_learn_online_static{,_mpi} ?? since we will pre-demine spliting...
 
-Added binarization to cicada-extract, or use cicada tool for binarization?
-
 Cutting-plane learning under cicada_maxlike{,_mpi}...
 	We need to merge feature vector...
 
@@ -81,4 +79,4 @@ A unified framework to collect statistics: Do we need stats from features?
 Cube summing?
      I'm still not sure how to efficiently collect residuals... Do we include state-less features
      to serve as residual counts?
-
+   

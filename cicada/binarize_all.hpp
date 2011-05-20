@@ -8,10 +8,54 @@
 
 #include <cicada/binarize_base.hpp>
 
+#include <utils/sgi_hash_map.hpp>
+#include <utils/hashmurmur.hpp>
+
 namespace cicada
 {
   struct BinarizeAll : public BinarizeBase
   {
+    
+    //
+    // sub-tails to label_sequence + label mapping
+    // sub-tails + sub-symbols to node-id mapping
+    //
+
+    typedef rule_type::symbol_set_type                 symbol_set_type;
+    typedef hypergraph_type::edge_type::node_set_type  tail_set_type;
+    typedef std::pair<tail_set_type, symbol_set_type > tail_symbol_pair_type;
+
+    struct tail_set_hash : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      size_t operator()(const tail_set_type& x) const {
+	return hasher_type::operator()(x.begin(), x.end(), 0);
+      }
+    };
+
+    struct tail_symbol_pair_hash : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+      
+      size_t operator()(const tail_symbol_pair_type& x) const {
+	return hasher_type::operator()(x.first.begin(), x.first.end(), hasher_type::operator()(x.second.begin(), x.second.end(), 0));
+      }
+    };
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+      typedef std::tr1::unordered_map<tail_set_type, symbol_type, tail_set_hash, std::equal_to<tail_set_type>,
+				      std::allocator<std::pair<const tail_set_type, symbol_type> > > label_map_type;
+      typedef std::tr1::unordered_map<tail_symbol_pair_type, hypergraph_type::id_type, tail_symbol_pair_hash, std::equal_to<tail_symbol_pair_type>,
+				      std::allocator<std::pair<const tail_symbol_pair_type, hypergraph_type::id_type> > > node_map_type;
+#else
+      typedef sgi::hash_map<tail_set_type, symbol_type, tail_set_hash, std::equal_to<tail_set_type>,
+			    std::allocator<std::pair<const tail_set_type, symbol_type> > > label_map_type;
+      typedef sgi::hash_map<tail_symbol_pair_type, hypergraph_type::id_type, tail_symbol_pair_hash, std::equal_to<tail_symbol_pair_type>,
+			    std::allocator<std::pair<const tail_symbol_pair_type, hypergraph_type::id_type> > > node_map_type;
+#endif
+
+    label_map_type label_map;
+    node_map_type node_map;
     
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
@@ -19,7 +63,7 @@ namespace cicada
       target = source;
 
       if (! source.is_valid()) return;
-      
+
       phrase_type       binarized(2);
       hypergraph_type::edge_type::node_set_type tails(2);
       
@@ -29,6 +73,9 @@ namespace cicada
       position_set_type positions;
       node_chart_type   node_chart;
       label_chart_type  label_chart;
+      
+      label_map.clear();
+      node_map.clear();
       
       hypergraph_type::node_set_type::const_iterator niter_end = source.nodes.end();
       for (hypergraph_type::node_set_type::const_iterator niter = source.nodes.begin(); niter != niter_end; ++ niter) {
@@ -44,7 +91,8 @@ namespace cicada
 	  
 	  // we will create nodes in a chart structure, and exhaustively enumerate edges
 
-	  const rule_type::symbol_set_type& rhs = edge_source.rule->rhs;
+	  const symbol_set_type& rhs = edge_source.rule->rhs;
+	  symbol_set_type rhs_removed(rhs);
 	  
 	  // first, compute non-terminal spans...
 	  positions.clear();
@@ -52,6 +100,8 @@ namespace cicada
 	  for (size_t i = 0; i != rhs.size(); ++ i)
 	    if (rhs[i].is_non_terminal()) {
 	      const symbol_type& non_terminal = rhs[i];
+	      
+	      rhs_removed[i] = non_terminal.non_terminal();
 	      
 	      // we will check non-terminal-index here...
 	      const int non_terminal_index = non_terminal.non_terminal_index();
@@ -77,56 +127,101 @@ namespace cicada
 	    label_chart(i, i + 1) = rhs[positions[i]].non_terminal();
 	  }
 	  
-	  const symbol_type lhs_binarized = '[' + edge_source.rule->lhs.non_terminal_strip() + "^]";
-	  
-	  for (size_t length = 2; length <= positions.size(); ++ length)
+	  for (size_t length = 2; length < positions.size(); ++ length)
 	    for (size_t first = 0; first + length <= positions.size(); ++ first) {
-	      const bool is_root = length == positions.size();
 	      const size_t last = first + length;
 	      
-	      const hypergraph_type::id_type head = (is_root ? node_source.id : target.add_node().id);
-	      const symbol_type& lhs = (is_root ? edge_source.rule->lhs : lhs_binarized);
+	      const symbol_set_type subrhs(rhs_removed.begin() + positions[first], rhs_removed.begin() + positions[last - 1] + 1);
+	      const tail_set_type   subtails(tails.begin() + first, tails.begin() + last);
+	      
+	      std::pair<label_map_type::iterator, bool> result_label = label_map.insert(std::make_pair(subtails, symbol_type()));
+	      if (result_label.second) {
+		const symbol_type::piece_type left = label_chart(first, last - 1).non_terminal_strip();
+		const symbol_type::piece_type right = label_chart(last - 1, last).non_terminal_strip();
+
+		if (length > 2)
+		  result_label.first->second = '[' + std::string(left.begin(), left.end() - 1) + '+' + std::string(right) + "^]";
+		else
+		  result_label.first->second = '[' + std::string(left) + '+' + std::string(right) + "^]";
+	      }
+	      
+	      std::pair<node_map_type::iterator, bool> result_node = node_map.insert(std::make_pair(tail_symbol_pair_type(subtails, subrhs), 0));
+	      if (result_node.second)
+		result_node.first->second = target.add_node().id;
+	      
+	      const symbol_type lhs = result_label.first->second;
+	      const hypergraph_type::id_type head = result_node.first->second;
 	      
 	      node_chart(first, last) = head;
 	      label_chart(first, last) = lhs;
 	      
-	      for (size_t middle = first + 1; middle != last; ++ middle) {
-		// [first, middle) and [middle, last)
-		
-		tails.front() = node_chart(first, middle);
-		tails.back()  = node_chart(middle, last);
-		
-		binarized.clear();
-		
-		const size_t prefix_first = (is_root ? 0 : positions[first]);
-		const size_t prefix_last  = positions[first];
-		
-		binarized.insert(binarized.end(), rhs.begin() + prefix_first, rhs.begin() + prefix_last);
-		binarized.push_back(label_chart(first, middle));
-		
-		const size_t middle_first = positions[middle - 1] + 1;
-		const size_t middle_last  = positions[middle];
-		
-		binarized.insert(binarized.end(), rhs.begin() + middle_first, rhs.begin() + middle_last);
-		binarized.push_back(label_chart(middle, last));
-		
-		const size_t suffix_first = positions[last - 1] + 1;
-		const size_t suffix_last  = (is_root ? static_cast<int>(rhs.size()) : positions[last - 1] + 1);
-		
-		binarized.insert(binarized.end(), rhs.begin() + suffix_first, rhs.begin() + suffix_last);
-		
-		hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
-		edge_new.rule = rule_type::create(rule_type(lhs, binarized.begin(), binarized.end()));
-		
-		target.connect_edge(edge_new.id, head);
-
-		// assign features...
-		if (is_root) {
-		  edge_new.features   = edge_source.features;
-		  edge_new.attributes = edge_source.attributes;
+	      // if newly created, then, create edges
+	      if (result_node.second)
+		for (size_t middle = first + 1; middle != last; ++ middle) {
+		  // [first, middle) and [middle, last)
+		  
+		  tails.front() = node_chart(first, middle);
+		  tails.back()  = node_chart(middle, last);
+		  
+		  const size_t middle_first = positions[middle - 1] + 1;
+		  const size_t middle_last  = positions[middle];
+		  
+		  binarized.clear();
+		  binarized.push_back(label_chart(first, middle));
+		  binarized.insert(binarized.end(), rhs.begin() + middle_first, rhs.begin() + middle_last);
+		  binarized.push_back(label_chart(middle, last));
+		  
+		  hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
+		  edge_new.rule = rule_type::create(rule_type(lhs, binarized.begin(), binarized.end()));
+		  
+		  target.connect_edge(edge_new.id, head);
 		}
-	      }
 	    }
+	  
+	  // root...
+	  {
+	    const size_t first = 0;
+	    const size_t last = positions.size();
+	    
+	    const hypergraph_type::id_type head = node_source.id;
+	    const symbol_type& lhs = edge_source.rule->lhs;
+	    
+	    node_chart(first, last) = head;
+	    label_chart(first, last) = lhs;
+	    
+	    for (size_t middle = first + 1; middle != last; ++ middle) {
+	      // [first, middle) and [middle, last)
+	      
+	      tails.front() = node_chart(first, middle);
+	      tails.back()  = node_chart(middle, last);
+	      
+	      binarized.clear();
+	      
+	      const size_t prefix_first = 0;
+	      const size_t prefix_last  = positions[first];
+	      
+	      binarized.insert(binarized.end(), rhs.begin() + prefix_first, rhs.begin() + prefix_last);
+	      binarized.push_back(label_chart(first, middle));
+	      
+	      const size_t middle_first = positions[middle - 1] + 1;
+	      const size_t middle_last  = positions[middle];
+	      
+	      binarized.insert(binarized.end(), rhs.begin() + middle_first, rhs.begin() + middle_last);
+	      binarized.push_back(label_chart(middle, last));
+	      
+	      const size_t suffix_first = positions[last - 1] + 1;
+	      const size_t suffix_last  = rhs.size();
+	      
+	      binarized.insert(binarized.end(), rhs.begin() + suffix_first, rhs.begin() + suffix_last);
+	      
+	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
+	      edge_new.rule       = rule_type::create(rule_type(lhs, binarized.begin(), binarized.end()));
+	      edge_new.features   = edge_source.features;
+	      edge_new.attributes = edge_source.attributes;
+	      
+	      target.connect_edge(edge_new.id, head);
+	    }
+	  }
 	}
       }
       
