@@ -590,7 +590,7 @@ struct ExtractTree
 	  if (! item->composed || ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))) {
 	    derivations_new[id].edges.push_back(edge_composed);
 	    
-	    if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
+	    if ((max_height <= 0 || edge_composed.height <= max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
 	      derivations_next[id].edges.push_back(edge_composed);
 	  }
 	  

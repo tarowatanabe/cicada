@@ -689,7 +689,7 @@ struct ExtractGHKM
 	
 	rule_pairs_local[edge_set_local_type(edge_composed.edges.begin(), edge_composed.edges.end())].push_back(rule_pair);
 	
-	if ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
+	if ((max_height <= 0 || edge_composed.height <= max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
 	  derivation_edges_new.push_back(edge_composed);
 	
 	// push-successor...
@@ -1174,12 +1174,6 @@ struct ExtractGHKM
 	
 	const range_type range_max(riter_first == complements[id].begin() ? 0 : *(-- riter_first) + 1,
 				   riter_last != complements[id].end() ? *riter_last : static_cast<int>(sentence.size()));
-
-#if 0
-	std::cerr << "range min: " << range_min.first << ".." << range_min.second
-		  << " range max: " << range_max.first << ".." << range_max.second
-		  << std::endl;
-#endif
 	
 	const bool is_goal(id == graph.goal);
 	
@@ -1208,24 +1202,6 @@ struct ExtractGHKM
 	  const frontier_type& frontier = queue.front();
 	  
 	  if (frontier.second.empty()) {
-#if 0
-	    std::cerr << "completed frontier: ";
-	    std::copy(frontier.first.begin(), frontier.first.end(), std::ostream_iterator<int>(std::cerr, " "));
-	    std::cerr << std::endl;
-	    {
-	      edge_set_type::const_iterator eiter_end = frontier.first.end();
-	      for (edge_set_type::const_iterator eiter = frontier.first.begin(); eiter != eiter_end; ++ eiter) {
-		const hypergraph_type::edge_type& edge = graph.edges[*eiter];
-		
-		std::cerr << "rule: " << *(edge.rule)
-			  << " head: " << edge.head
-			  << " tails: ";
-		std::copy(edge.tails.begin(), edge.tails.end(), std::ostream_iterator<int>(std::cerr, " "));
-		std::cerr << std::endl;
-	      }
-	    }
-#endif
-	    
 	    // construct rule from "fragment", frontier.first
 	    // by enumerating edge and its tails in depth-first manner...
 	    // use recursive call for simplicity...
@@ -1237,23 +1213,14 @@ struct ExtractGHKM
 	    edge_set_type::const_iterator eiter_end = frontier.first.end();
 	    const std::pair<int, int> rule_stat = construct_tails(graph, eiter, eiter_end, tails);
 	    
-	    
-#if 0
-	    std::cerr << "tails: ";
-	    std::copy(tails.begin(), tails.end(), std::ostream_iterator<int>(std::cerr, " "));
-	    std::cerr << std::endl;
-#endif
-	    
 	    // iterate over tails and compute span...
 	    // code taken from apply_exact...
 	    
 	    index_set_type j_ends(tails.size(), 0);
 	    index_set_type j(tails.size(), 0);
 	    
-	    for (size_t i = 0; i != tails.size(); ++ i) {
+	    for (size_t i = 0; i != tails.size(); ++ i)
 	      j_ends[i] = node_map[tails[i]].size();
-	      //std::cerr << "tail: " << tails[i] << " node size: " << j_ends[i] << std::endl;
-	    }
 	    
 	    node_set_type tails_next(tails.size());
 
@@ -1286,15 +1253,6 @@ struct ExtractGHKM
 	      }
 	      
 	      if (is_valid) {
-		// our tail-ranges are valid... and we will consider alternatives from range to range_max...
-		
-#if 0
-		std::cerr << "re-computed range min: " << range.first << ".." << range.second
-			  << " range max: " << range_max.first << ".." << range_max.second
-			  << std::endl;
-#endif
-
-		
 		if (is_goal) {
 		  if (goal_node == size_t(-1)) {
 		    goal_node = derivations.size();
@@ -1305,7 +1263,6 @@ struct ExtractGHKM
 		    derivations.back().range = range_type(0, sentence.size());
 		  }
 		  
-		  
 		  derivations[goal_node].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
 		} else {
 		  // we will compute all possible ranges...
@@ -1314,8 +1271,6 @@ struct ExtractGHKM
 		    for (int first = range_max.first; first <= range.first; ++ first)
 		      for (int last = range.second; last <= range_max.second; ++ last) {
 			const range_type range_next(first, last);
-			
-			//std::cerr << "constructing for range: " << first << ".." << last << std::endl;
 			
 			range_node_map_type::iterator biter = buf.find(range_next);
 			if (biter == buf.end()) {
@@ -1333,8 +1288,6 @@ struct ExtractGHKM
 		      }
 		  } else {
 		    const range_type& range_next = range;
-		    
-		    //std::cerr << "constructing for range: " << range_next.first << ".." << range_next.second << std::endl;
 		    
 		    range_node_map_type::iterator biter = buf.find(range_next);
 		    if (biter == buf.end()) {
@@ -1365,31 +1318,65 @@ struct ExtractGHKM
 	    }
 	    
 	  } else {
-	    // incomplete... futher expand!
-	    const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
+	    edge_set_type::const_iterator eiter = frontier.first.begin();
+	    edge_set_type::const_iterator eiter_end = frontier.first.end();
 	    
-	    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+	    const std::pair<int, int> rule_stat = rule_statistics(graph, eiter, eiter_end);
+	    
+	    // thresholding!
+	    if ((max_height <= 0 || rule_stat.first <= max_height) && (max_nodes <= 0 || rule_stat.second < max_nodes)) {
+	    
+	      // incomplete... futher expand!
+	      const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
 	      
-	      queue.resize(queue.size() + 1);
-	      frontier_type& frontier_next = queue.back();
-	      
-	      frontier_next.first = frontier.first;
-	      frontier_next.first.push_back(*eiter);
-	      
-	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-		if (! admissibles[*titer])
-		  frontier_next.second.push_back(*titer);
-	      
-	      frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
+	      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+		const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+		
+		queue.resize(queue.size() + 1);
+		frontier_type& frontier_next = queue.back();
+		
+		frontier_next.first = frontier.first;
+		frontier_next.first.push_back(*eiter);
+		
+		hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+		for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+		  if (! admissibles[*titer])
+		    frontier_next.second.push_back(*titer);
+		
+		frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
+	      }
 	    }
 	  }
 	  
 	  queue.pop_front();
 	}
       }
+  }
+
+  template <typename Iterator>
+  std::pair<int, int> rule_statistics(const hypergraph_type& graph,
+				      Iterator& iter,
+				      Iterator last)
+  {
+    if (iter == last) return std::make_pair(0, 0);
+    
+    const hypergraph_type::edge_type& edge = graph.edges[*iter];
+    ++ iter;
+    
+    int max_height = 1;
+    int num_tails = edge.tails.size();
+    
+    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+      if (iter != last && *titer == graph.edges[*iter].head) {
+	const std::pair<int, int> result = rule_statistics(graph, iter, last);
+	
+	max_height = utils::bithack::max(max_height, result.first + 1);
+	num_tails += result.second;
+      }
+    
+    return std::make_pair(max_height, num_tails);
   }
     
   template <typename Iterator, typename Tails>
