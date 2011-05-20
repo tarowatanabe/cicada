@@ -18,6 +18,8 @@
 
 namespace cicada
 {
+  const Signature::symbol_type Signature::FALLBACK = Signature::symbol_type("<UNK>");
+  
   const char* Signature::lists()
   {
     static const char* desc = "\

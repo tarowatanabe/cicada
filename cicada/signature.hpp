@@ -27,6 +27,9 @@ namespace cicada
     
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
+
+  public:
+    static const symbol_type FALLBACK;
     
   public:
     Signature() {}

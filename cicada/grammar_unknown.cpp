@@ -146,7 +146,7 @@ namespace cicada
     symbol_type sig = signature->operator()(word);
     node = base_type::next(base_type::root(), sig);
     if (node == base_type::root()) {
-      sig = "<UNK>";
+      sig =  signature_type::FALLBACK;
       node = base_type::next(base_type::root(), sig);
       
       if (node == base_type::root())
