@@ -1292,8 +1292,8 @@ struct ExtractTree
     graph_target.construct_derivations(target, graph_source, exhaustive);
     
     // prune...
-    graph_source.prune_derivations();
-    graph_target.prune_derivations();
+    //graph_source.prune_derivations();
+    //graph_target.prune_derivations();
     
     // construct subtrees...
     graph_source.construct_subtrees(source, max_nodes, max_height);

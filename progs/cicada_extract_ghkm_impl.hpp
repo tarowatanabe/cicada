@@ -311,8 +311,8 @@ struct ExtractGHKM
 
   struct Span
   {
-    //typedef std::set<int, std::less<int>, std::allocator<int> > span_type;
-    typedef utils::vector_set<int, std::less<int>, std::allocator<int> > span_type;
+    typedef std::set<int, std::less<int>, std::allocator<int> > span_type;
+    //typedef utils::vector_set<int, std::less<int>, std::allocator<int> > span_type;
     
     typedef span_type::const_iterator const_iterator;
     typedef span_type::iterator       iterator;
@@ -340,8 +340,8 @@ struct ExtractGHKM
       if (span.empty())
 	return std::make_pair(0, 0);
       else
-	return std::make_pair(span.front(), span.back() + 1);
-      //return std::make_pair(*(span.begin()), *(-- span.end()) + 1);
+	return std::make_pair(*(span.begin()), *(-- span.end()) + 1);
+      //return std::make_pair(span.front(), span.back() + 1);
     }
   
     void set(int i)
@@ -374,8 +374,8 @@ struct ExtractGHKM
   
   typedef hypergraph_type::id_type id_type;
   
-  typedef utils::simple_vector<id_type, std::allocator<id_type> > edge_set_type;
-  typedef utils::simple_vector<id_type, std::allocator<id_type> > node_set_type;
+  typedef std::vector<id_type, std::allocator<id_type> > edge_set_type;
+  typedef std::vector<id_type, std::allocator<id_type> > node_set_type;
 
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
 
@@ -572,7 +572,7 @@ struct ExtractGHKM
     // compute reachable nodes and edges from root...
 
     //std::cerr << "prune derivations" << std::endl;
-    prune_derivations();
+    //prune_derivations();
         
     // perform compounds extraction
     extract_composed(graph, sentence, alignment, rules, dumper);
@@ -653,6 +653,7 @@ struct ExtractGHKM
     edge_set_type edges_new;
     node_set_type tails_new;
 
+    //std::cerr << "derivations size: " << derivations.size() << std::endl;
     
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
@@ -688,6 +689,8 @@ struct ExtractGHKM
 	construct_rule_pair(graph, sentence, node, edge_composed.edges, edge_composed.tails, rule_pair);
 	
 	rule_pairs_local[edge_set_local_type(edge_composed.edges.begin(), edge_composed.edges.end())].push_back(rule_pair);
+
+	//std::cerr << rule_pair.source << " ||| " << rule_pair.target << std::endl;
 	
 	if ((max_height <= 0 || edge_composed.height <= max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
 	  derivation_edges_new.push_back(edge_composed);
@@ -695,48 +698,60 @@ struct ExtractGHKM
 	// push-successor...
 
 	const derivation_edge_type& edge = *(item->edge);
-	  
+	
 	candidate_type query(item->j);
 	index_set_type& j = query.j;
 	query.edge = item->edge;
+
+	//std::cerr << "edge: " << edge.tails.size() << std::endl;
 	  
-	for (size_t i = 0; i != j.size(); ++ i) {
-	  ++ j[i];
+	for (size_t i = 0; i != j.size(); ++ i) 
+	  if (! derivations[edge.tails[i]].edges.empty()) {
+	    ++ j[i];
+
+	    //std::cerr << "i = " << i << " j[i] = " << j[i] << std::endl;
 	    
-	  if (j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size()) && cand_unique.find(&query) == cand_unique.end()) {
-	    edges_new.clear();
-	    tails_new.clear();
+	    if (j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size()) && cand_unique.find(&query) == cand_unique.end()) {
 	      
-	    const std::pair<int, bool> composed_stat = compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
+	      edges_new.clear();
+	      tails_new.clear();
+
+	      //std::cerr << "compose tails" << std::endl;
 	      
-	    if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
-	      index_set_type::const_iterator jiter_begin = j.begin();
-	      index_set_type::const_iterator jiter_end   = j.end();
-	      node_set_type::const_iterator  titer_begin = edge.tails.begin();
-	      edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
-	      edge_set_type::const_iterator  eiter_end   = edge.edges.end();
+	      const std::pair<int, bool> composed_stat = compose_tails(j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new);
+	      
+	      if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
+		index_set_type::const_iterator jiter_begin = j.begin();
+		index_set_type::const_iterator jiter_end   = j.end();
+		node_set_type::const_iterator  titer_begin = edge.tails.begin();
+		edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
+		edge_set_type::const_iterator  eiter_end   = edge.edges.end();
+
+		//std::cerr << "compose edges" << std::endl;
 		
-	      const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
+		const std::pair<int, int> rule_stat = compose_edges(graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
 	      
-	      if (max_height <= 0 || rule_stat.first <= max_height) {
-		candidates.push_back(candidate_type(edge, j, true));
+		if (max_height <= 0 || rule_stat.first <= max_height) {
+		  candidates.push_back(candidate_type(edge, j, true));
 		  
-		candidate_type& item = candidates.back();
+		  candidate_type& item = candidates.back();
 		  
-		item.edge_composed.edges = edges_new;
-		item.edge_composed.tails = tails_new;
-		item.edge_composed.height = rule_stat.first;
-		item.edge_composed.internal = rule_stat.second;
+		  item.edge_composed.edges = edges_new;
+		  item.edge_composed.tails = tails_new;
+		  item.edge_composed.height = rule_stat.first;
+		  item.edge_composed.internal = rule_stat.second;
 		  
-		cand.push(&item);
-		cand_unique.insert(&item);
+		  cand.push(&item);
+		  cand_unique.insert(&item);
+		}
 	      }
 	    }
+	    
+	    -- j[i];
 	  }
-	  
-	  -- j[i];
-	}
       }
+
+      //std::cerr << "finished" << std::endl;
       
       // allocate new derivations!
       node.edges.swap(derivation_edges_new);
@@ -764,6 +779,8 @@ struct ExtractGHKM
       rule_pairs_local.clear();
       
       dumper(rule_pairs);
+
+      //std::cerr << "dumped" << std::endl;
     }
   }
 
@@ -1157,11 +1174,15 @@ struct ExtractGHKM
     // construc derivations wrt non-aligned words...
 
     size_t goal_node = size_t(-1);
+
+    queue_type queue;
+    range_node_map_type buf;
+    buf.set_empty_key(range_type(0, 0));
     
     for (size_t id = 0; id != graph.nodes.size(); ++ id) 
       if (admissibles[id]) {
 	const hypergraph_type::node_type& node = graph.nodes[id];
-
+	
 	//std::cerr << "admissible node: " << id << std::endl;
 	//
 	// compute minimal range and maximum outer-range
@@ -1177,10 +1198,8 @@ struct ExtractGHKM
 	
 	const bool is_goal(id == graph.goal);
 	
-	range_node_map_type buf;
-	buf.set_empty_key(range_type(0, 0));
-	
-	queue_type queue;
+	queue.clear();
+	buf.clear();
 	
 	// construct initial frontiers...
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -1197,6 +1216,8 @@ struct ExtractGHKM
 	    if (! admissibles[*titer])
 	      frontier.second.push_back(*titer);
 	}
+
+	bool constructed = false;
 
 	while (! queue.empty()) {
 	  const frontier_type& frontier = queue.front();
@@ -1253,6 +1274,8 @@ struct ExtractGHKM
 	      }
 	      
 	      if (is_valid) {
+		constructed = true;
+		
 		if (is_goal) {
 		  if (goal_node == size_t(-1)) {
 		    goal_node = derivations.size();
@@ -1318,15 +1341,14 @@ struct ExtractGHKM
 	    }
 	    
 	  } else {
+	    // incomplete... futher expand!
+	    
 	    edge_set_type::const_iterator eiter = frontier.first.begin();
 	    edge_set_type::const_iterator eiter_end = frontier.first.end();
-	    
 	    const std::pair<int, int> rule_stat = rule_statistics(graph, eiter, eiter_end);
-	    
-	    // thresholding!
-	    if ((max_height <= 0 || rule_stat.first <= max_height) && (max_nodes <= 0 || rule_stat.second < max_nodes)) {
-	    
-	      // incomplete... futher expand!
+
+	    if (! constructed || ((max_height <= 0 || rule_stat.first <= (max_height << 1)) && (max_nodes <= 0 || rule_stat.second < (max_nodes << 1)))) {
+
 	      const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
 	      
 	      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
