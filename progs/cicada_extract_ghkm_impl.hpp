@@ -1366,8 +1366,9 @@ struct ExtractGHKM
 		
 		queue.resize(queue.size() + 1);
 		frontier_type& frontier_next = queue.back();
-
-		frontier_next.first = frontier.first;
+		
+		frontier_next.first.reserve(frontier.first.size() + 1);
+		frontier_next.first.insert(frontier_next.first.end(), frontier.first.begin(), frontier.first.end());
 		frontier_next.first.push_back(*eiter);
 		
 		hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
@@ -1377,7 +1378,6 @@ struct ExtractGHKM
 		
 		frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
 		
-		edge_set_type(frontier_next.first).swap(frontier_next.first);
 		node_set_type(frontier_next.second).swap(frontier_next.second);
 	      }
 	    }
