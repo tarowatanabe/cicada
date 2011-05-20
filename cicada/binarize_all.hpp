@@ -140,9 +140,9 @@ namespace cicada
 		const symbol_type::piece_type right = label_chart(last - 1, last).non_terminal_strip();
 
 		if (length > 2)
-		  result_label.first->second = '[' + std::string(left.begin(), left.end() - 1) + '+' + std::string(right) + "^]";
+		  result_label.first->second = '[' + std::string(left.begin(), left.end() - 1) + '+' + right + "^]";
 		else
-		  result_label.first->second = '[' + std::string(left) + '+' + std::string(right) + "^]";
+		  result_label.first->second = '[' + std::string(left) + '+' + right + "^]";
 	      }
 	      
 	      std::pair<node_map_type::iterator, bool> result_node = node_map.insert(std::make_pair(tail_symbol_pair_type(subtails, subrhs), 0));
