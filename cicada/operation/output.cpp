@@ -70,10 +70,13 @@ namespace cicada
       typedef typename Function::value_type weight_type;
 
       typedef google::dense_hash_map<id_type, id_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > node_map_type;
+
+      typedef std::vector<id_type, std::allocator<id_type> > head_set_type;
       
       derivation_type derivation;
       weight_type     weight;
       node_map_type   node_maps;
+      head_set_type   heads;
       hypergraph_type graph_kbest;
       
       node_maps.set_empty_key(id_type(-1));
@@ -85,18 +88,27 @@ namespace cicada
 	  break;
     
 	const edge_set_type& edges = boost::get<0>(derivation);
+	
+	heads.clear();
 	node_maps.clear();
 	graph_kbest.clear();
+
+	heads.reserve(edges.size());
     
 	id_type node_id = 0;
 	edge_set_type::const_iterator eiter_end = edges.end();
-	for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter)
-	  node_id += node_maps.insert(std::make_pair(graph.edges[*eiter].head, node_id)).second;
+	for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
+	  std::pair<typename node_map_type::iterator, bool> result = node_maps.insert(std::make_pair(graph.edges[*eiter].head, node_id));
+	  
+	  heads.push_back(result.first->second);
+	  node_id += result.second;
+	}
     
 	for (id_type node = 0; node != node_id; ++ node)
 	  graph_kbest.add_node();
-    
-	for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter) {
+	
+	id_type edge_id = 0;
+	for (edge_set_type::const_iterator eiter = edges.begin(); eiter != eiter_end; ++ eiter, ++ edge_id) {
 	  const typename hypergraph_type::edge_type& edge = graph.edges[*eiter];
       
 	  tails.clear();
@@ -114,7 +126,7 @@ namespace cicada
 	  edge_kbest.features = edge.features;
 	  edge_kbest.attributes = edge.attributes;
       
-	  graph_kbest.connect_edge(edge_kbest.id, node_maps[edge.head]);
+	  graph_kbest.connect_edge(edge_kbest.id, heads[edge_id]);
 	}
     
 	typename node_map_type::const_iterator niter = node_maps.find(graph.goal);
