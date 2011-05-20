@@ -26,6 +26,8 @@ namespace utils
   private:
     typedef typename Alloc::template rebind<value_type>::other alloc_type;
     typedef utils::simple_vector<value_type, alloc_type> container_type;
+
+    static const size_type __linear_size = 16;
     
   public:
     typedef typename container_type::pointer pointer;
@@ -145,7 +147,7 @@ namespace utils
 
     iterator lower_bound(const value_type& x)
     {
-      if (container.size() < 16) {
+      if (container.size() <= __linear_size) {
 	iterator iter = container.begin();
 	iterator end = container.end();
 	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
@@ -155,7 +157,7 @@ namespace utils
     }
     const_iterator lower_bound(const value_type& x) const
     {
-      if (container.size() < 16) {
+      if (container.size() <= __linear_size) {
 	const_iterator iter = container.begin();
 	const_iterator end = container.end();
 	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
@@ -166,7 +168,7 @@ namespace utils
   
     iterator upper_bound(const value_type& x)
     {
-      if (container.size() < 16) {
+      if (container.size() <= __linear_size) {
 	iterator iter = container.begin();
 	iterator end = container.end();
 	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
@@ -177,7 +179,7 @@ namespace utils
     }
     const_iterator upper_bound(const value_type& x) const
     {
-      if (container.size() < 16) {
+      if (container.size() <= __linear_size) {
 	const_iterator iter = container.begin();
 	const_iterator end = container.end();
 	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
@@ -189,7 +191,7 @@ namespace utils
   
     std::pair<iterator, iterator> equal_range(const value_type& x)
     {
-      if (container.size() < 16) {
+      if (container.size() <= __linear_size) {
 	iterator iter = container.begin();
 	iterator end = container.end();
 	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
@@ -201,7 +203,7 @@ namespace utils
     }
     std::pair<const_iterator, const_iterator> equal_range(const value_type& x) const
     {
-      if (container.size() < 16) {
+      if (container.size() <= __linear_size) {
 	const_iterator iter = container.begin();
 	const_iterator end = container.end();
 	for (/**/; iter != end && static_cast<const compare_type&>(*this)(*iter, x); ++ iter);
