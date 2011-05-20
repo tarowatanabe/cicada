@@ -518,19 +518,20 @@ namespace cicada
 		      lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
 		      for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
 			const symbol_type terminal = piter->label.terminal();
+			const score_type score_arc = function(piter->features);
 			
 			active_set_type& cell = actives[table](first, last - 1 + piter->distance);
 			
 			// handling of EPSILON rule...
 			if (terminal == vocab_type::EPSILON) {
 			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score * function(piter->features))));
+			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score * score_arc)));
 			} else {
 			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 			    if (node == transducer.root()) continue;
 			    
-			    cell.push_back(active_type(node, edge_type(aiter->edge.tails, aiter->edge.score * function(piter->features))));
+			    cell.push_back(active_type(node, edge_type(aiter->edge.tails, aiter->edge.score * score_arc)));
 			  }
 			}
 		      }
@@ -538,19 +539,20 @@ namespace cicada
 		      lattice_type::arc_set_type::const_iterator piter_end = passive_arcs.end();
 		      for (lattice_type::arc_set_type::const_iterator piter = passive_arcs.begin(); piter != piter_end; ++ piter) {
 			const symbol_type& terminal = piter->label;
+			const score_type score_arc = function(piter->features);
 			
 			active_set_type& cell = actives[table](first, last - 1 + piter->distance);
 			
 			// handling of EPSILON rule...
 			if (terminal == vocab_type::EPSILON) {
 			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score * function(piter->features))));
+			    cell.push_back(active_type(aiter->node, edge_type(aiter->edge.tails, aiter->edge.score * score_arc)));
 			} else {
 			  for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 			    const transducer_type::id_type node = transducer.next(aiter->node, terminal);
 			    if (node == transducer.root()) continue;
 			    
-			    cell.push_back(active_type(node, edge_type(aiter->edge.tails, aiter->edge.score * function(piter->features))));
+			    cell.push_back(active_type(node, edge_type(aiter->edge.tails, aiter->edge.score * score_arc)));
 			  }
 			}
 		      }
