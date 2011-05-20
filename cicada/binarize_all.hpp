@@ -92,7 +92,8 @@ namespace cicada
 	  // we will create nodes in a chart structure, and exhaustively enumerate edges
 
 	  const symbol_set_type& rhs = edge_source.rule->rhs;
-	  symbol_set_type rhs_removed(rhs);
+	  symbol_set_type rhs_sorted(rhs);
+	  tail_set_type   tails_sorted(edge_source.tails);
 	  
 	  // first, compute non-terminal spans...
 	  positions.clear();
@@ -101,15 +102,16 @@ namespace cicada
 	    if (rhs[i].is_non_terminal()) {
 	      const symbol_type& non_terminal = rhs[i];
 	      
-	      rhs_removed[i] = non_terminal.non_terminal();
+	      rhs_sorted[i] = non_terminal.non_terminal();
 	      
 	      // we will check non-terminal-index here...
 	      const int non_terminal_index = non_terminal.non_terminal_index();
-	      if (non_terminal_index > 0 && non_terminal_index - 1 != pos)
-		throw std::runtime_error("hypergraph is not tail-sorted!");
-	      ++ pos;
+	      
+	      tails_sorted[pos] = edge_source.tails[utils::bithack::branch(non_terminal_index == 0, pos, non_terminal_index - 1)];
 	      
 	      positions.push_back(i);
+	      
+	      ++ pos;
 	    }
 	  
 	  if (positions.size() != edge_source.tails.size())
@@ -123,16 +125,16 @@ namespace cicada
 	  label_chart.resize(positions.size() + 1);
 	  
 	  for (size_t i = 0; i != positions.size(); ++ i) {
-	    node_chart(i, i + 1) = edge_source.tails[i];
-	    label_chart(i, i + 1) = rhs[positions[i]].non_terminal();
+	    node_chart(i, i + 1) = tails_sorted[i];
+	    label_chart(i, i + 1) = rhs_sorted[positions[i]];
 	  }
 	  
 	  for (size_t length = 2; length < positions.size(); ++ length)
 	    for (size_t first = 0; first + length <= positions.size(); ++ first) {
 	      const size_t last = first + length;
 	      
-	      const symbol_set_type subrhs(rhs_removed.begin() + positions[first], rhs_removed.begin() + positions[last - 1] + 1);
-	      const tail_set_type   subtails(edge_source.tails.begin() + first, edge_source.tails.begin() + last);
+	      const symbol_set_type subrhs(rhs_sorted.begin() + positions[first], rhs_sorted.begin() + positions[last - 1] + 1);
+	      const tail_set_type   subtails(tails_sorted.begin() + first, tails_sorted.begin() + last);
 	      
 	      std::pair<label_map_type::iterator, bool> result_label = label_map.insert(std::make_pair(subtails, symbol_type()));
 	      if (result_label.second) {
@@ -168,7 +170,7 @@ namespace cicada
 		  
 		  binarized.clear();
 		  binarized.push_back(label_chart(first, middle));
-		  binarized.insert(binarized.end(), rhs.begin() + middle_first, rhs.begin() + middle_last);
+		  binarized.insert(binarized.end(), rhs_sorted.begin() + middle_first, rhs_sorted.begin() + middle_last);
 		  binarized.push_back(label_chart(middle, last));
 		  
 		  hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
@@ -200,19 +202,19 @@ namespace cicada
 	      const size_t prefix_first = 0;
 	      const size_t prefix_last  = positions[first];
 	      
-	      binarized.insert(binarized.end(), rhs.begin() + prefix_first, rhs.begin() + prefix_last);
+	      binarized.insert(binarized.end(), rhs_sorted.begin() + prefix_first, rhs_sorted.begin() + prefix_last);
 	      binarized.push_back(label_chart(first, middle));
 	      
 	      const size_t middle_first = positions[middle - 1] + 1;
 	      const size_t middle_last  = positions[middle];
 	      
-	      binarized.insert(binarized.end(), rhs.begin() + middle_first, rhs.begin() + middle_last);
+	      binarized.insert(binarized.end(), rhs_sorted.begin() + middle_first, rhs_sorted.begin() + middle_last);
 	      binarized.push_back(label_chart(middle, last));
 	      
 	      const size_t suffix_first = positions[last - 1] + 1;
-	      const size_t suffix_last  = rhs.size();
+	      const size_t suffix_last  = rhs_sorted.size();
 	      
-	      binarized.insert(binarized.end(), rhs.begin() + suffix_first, rhs.begin() + suffix_last);
+	      binarized.insert(binarized.end(), rhs_sorted.begin() + suffix_first, rhs_sorted.begin() + suffix_last);
 	      
 	      hypergraph_type::edge_type& edge_new = target.add_edge(tails.begin(), tails.end());
 	      edge_new.rule       = rule_type::create(rule_type(lhs, binarized.begin(), binarized.end()));
