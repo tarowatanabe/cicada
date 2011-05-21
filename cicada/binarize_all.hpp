@@ -90,24 +90,20 @@ namespace cicada
 	  removed[edge_source.id] = true;
 	  
 	  // we will create nodes in a chart structure, and exhaustively enumerate edges
-
-	  const symbol_set_type& rhs = edge_source.rule->rhs;
-	  symbol_set_type rhs_sorted(rhs);
+	  
+	  symbol_set_type rhs_sorted(edge_source.rule->rhs);
 	  tail_set_type   tails_sorted(edge_source.tails);
 	  
 	  // first, compute non-terminal spans...
 	  positions.clear();
 	  int pos = 0;
-	  for (size_t i = 0; i != rhs.size(); ++ i)
-	    if (rhs[i].is_non_terminal()) {
-	      const symbol_type& non_terminal = rhs[i];
-	      
-	      rhs_sorted[i] = non_terminal.non_terminal();
-	      
-	      // we will check non-terminal-index here...
-	      const int non_terminal_index = non_terminal.non_terminal_index();
+	  for (size_t i = 0; i != rhs_sorted.size(); ++ i)
+	    if (rhs_sorted[i].is_non_terminal()) {
+	      const int non_terminal_index = rhs_sorted[i].non_terminal_index();
 	      
 	      tails_sorted[pos] = edge_source.tails[utils::bithack::branch(non_terminal_index == 0, pos, non_terminal_index - 1)];
+	      
+	      rhs_sorted[i] = rhs_sorted[i].non_terminal();
 	      
 	      positions.push_back(i);
 	      
