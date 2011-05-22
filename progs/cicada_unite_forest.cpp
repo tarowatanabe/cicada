@@ -105,7 +105,7 @@ int main(int argc, char ** argv)
 		break;
 	    
 	    if (! hypergraph.assign(iter, end)) continue;
-	    if (! hypergrpah.is_valid()) continue;
+	    if (! hypergraph.is_valid()) continue;
 	    
 	    const double conf = 1.0 / (1.0 + rank);
 	      
