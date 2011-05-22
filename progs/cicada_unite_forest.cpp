@@ -99,42 +99,40 @@ int main(int argc, char ** argv)
 	  std::string::const_iterator iter = line.begin();
 	  std::string::const_iterator end = line.end();
 	  
-	  while (iter != end) {
+	  for (/**/; iter != end; ++ id, ++ rank) {
 	    if (id != 0)
 	      if (! qi::phrase_parse(iter, end, "|||", standard::space))
-		throw std::runtime_error("no separator?");
+		break;
 	    
-	    if (hypergraph.assign(iter, end) && hypergrpah.is_valid()) {
-	      const double conf = 1.0 / (1.0 + rank);
+	    if (! hypergraph.assign(iter, end)) continue;
+	    if (! hypergrpah.is_valid()) continue;
+	    
+	    const double conf = 1.0 / (1.0 + rank);
 	      
-	      feature_set_type features;
+	    feature_set_type features;
 	      
-	      if (! features_confidence.empty()) {
-		if (id >= static_cast<int>(features_confidence.size()))
-		  throw std::runtime_error("# of confidence features do not match");
-		features[features_confidence[id]] = conf;
-	      }
-	      if (! features_count.empty()) {
-		if (id >= static_cast<int>(features_count.size()))
-		  throw std::runtime_error("# of count features do not match");
-		features[features_count[id]] = count_weight;
-	      }
-	      if (! feature_confidence.empty())
-		features[feature_confidence] = conf;
-	      if (! feature_count.empty())
-		features[feature_count] = count_weight;
+	    if (! features_confidence.empty()) {
+	      if (id >= static_cast<int>(features_confidence.size()))
+		throw std::runtime_error("# of confidence features do not match");
+	      features[features_confidence[id]] = conf;
+	    }
+	    if (! features_count.empty()) {
+	      if (id >= static_cast<int>(features_count.size()))
+		throw std::runtime_error("# of count features do not match");
+	      features[features_count[id]] = count_weight;
+	    }
+	    if (! feature_confidence.empty())
+	      features[feature_confidence] = conf;
+	    if (! feature_count.empty())
+	      features[feature_count] = count_weight;
 	      
-	      if (! features.empty()) {
-		hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
-		for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
-		  eiter->features += features;
-	      }
-	      
-	      merged.unite(hypergraph);
+	    if (! features.empty()) {
+	      hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
+	      for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
+		eiter->features += features;
 	    }
 	    
-	    ++ id;
-	    ++ rank;
+	    merged.unite(hypergraph);
 	  }
 	  
 	  os << merged << '\n';
