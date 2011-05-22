@@ -63,6 +63,10 @@ int main(int argc, char ** argv)
       while (is >> feature)
 	features_count.push_back(feature);
     }
+
+    const bool flush_output = (output_file == "-"
+                               || (boost::filesystem::exists(output_file)
+                                   && ! boost::filesystem::is_regular_file(output_file)));
     
     hypergraph_type merged;
     hypergraph_type hypergraph;
@@ -78,6 +82,8 @@ int main(int argc, char ** argv)
       
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
+
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
       for (path_set_type::const_iterator iter = input_files.begin(); iter != input_files.end(); ++ iter) {
 	utils::compress_istream is(input_files.front(), 1024 * 1024);
@@ -98,10 +104,40 @@ int main(int argc, char ** argv)
 	      if (! qi::phrase_parse(iter, end, "|||", standard::space))
 		throw std::runtime_error("no separator?");
 	    
-	    if (! hypergraph.assign(iter, end))
-	      throw std::runtime_error("no forest?");
+	    if (hypergraph.assign(iter, end) && hypergrpah.is_valid()) {
+	      const double conf = 1.0 / (1.0 + rank);
+	      
+	      feature_set_type features;
+	      
+	      if (! features_confidence.empty()) {
+		if (id >= static_cast<int>(features_confidence.size()))
+		  throw std::runtime_error("# of confidence features do not match");
+		features[features_confidence[id]] = conf;
+	      }
+	      if (! features_count.empty()) {
+		if (id >= static_cast<int>(features_count.size()))
+		  throw std::runtime_error("# of count features do not match");
+		features[features_count[id]] = count_weight;
+	      }
+	      if (! feature_confidence.empty())
+		features[feature_confidence] = conf;
+	      if (! feature_count.empty())
+		features[feature_count] = count_weight;
+	      
+	      if (! features.empty()) {
+		hypergraph_type::edge_set_type::iterator eiter_end = hypergraph.edges.end();
+		for (hypergraph_type::edge_set_type::iterator eiter = hypergraph.edges.begin(); eiter != eiter_end; ++ eiter)
+		  eiter->features += features;
+	      }
+	      
+	      merged.unite(hypergraph);
+	    }
 	    
+	    ++ id;
+	    ++ rank;
 	  }
+	  
+	  os << merged << '\n';
 	}
       }
     } else if (input_files.size() == 1) {
@@ -144,7 +180,7 @@ int main(int argc, char ** argv)
 	merged.unite(hypergraph);
       }
       
-      utils::compress_ostream os(output_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
       os << merged << '\n';
       
@@ -165,7 +201,7 @@ int main(int argc, char ** argv)
       for (size_t i = 0; i != input_files.size(); ++ i)
 	istreams[i] = new utils::compress_istream(input_files[i], 1024 * 1024);
       
-      utils::compress_ostream os(output_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
       std::string line;
       
