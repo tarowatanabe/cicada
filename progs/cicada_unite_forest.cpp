@@ -82,9 +82,7 @@ int main(int argc, char ** argv)
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end = line.end();
 	
-	if (! hypergraph.assign(iter, end))
-	  throw std::runtime_error("invalid hypergraph format");
-	
+	if (! hypergraph.assign(iter, end)) continue;
 	if (! hypergraph.is_valid()) continue;
 	
 	const double conf = 1.0 / (1.0 + rank);
@@ -154,9 +152,7 @@ int main(int argc, char ** argv)
 	    std::string::const_iterator iter = line.begin();
 	    std::string::const_iterator end = line.end();
 	    
-	    if (! hypergraph.assign(iter, end))
-	      throw std::runtime_error("invalid hypergraph format");
-	    
+	    if (! hypergraph.assign(iter, end)) continue;
 	    if (! hypergraph.is_valid()) continue;
 	    
 	    const double conf = 1.0 / (1.0 + rank);
