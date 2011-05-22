@@ -78,10 +78,10 @@ int main(int argc, char ** argv)
       input_files.push_back("-");
     
     if (multiple_mode) {
-      // forest ||| forest ||| forest
-      
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
+      
+      // forest ||| forest ||| forest
 
       utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
@@ -104,7 +104,8 @@ int main(int argc, char ** argv)
 	      if (! qi::phrase_parse(iter, end, "|||", standard::space))
 		break;
 	    
-	    if (! hypergraph.assign(iter, end)) continue;
+	    if (! hypergraph.assign(iter, end))
+	      throw std::runtime_error("invalid hypergraph format");
 	    if (! hypergraph.is_valid()) continue;
 	    
 	    const double conf = 1.0 / (1.0 + rank);
@@ -148,7 +149,8 @@ int main(int argc, char ** argv)
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end = line.end();
 	
-	if (! hypergraph.assign(iter, end)) continue;
+	if (! hypergraph.assign(iter, end))
+	  throw std::runtime_error("invalid hypergraph format");
 	if (! hypergraph.is_valid()) continue;
 	
 	const double conf = 1.0 / (1.0 + rank);
@@ -215,7 +217,8 @@ int main(int argc, char ** argv)
 	    std::string::const_iterator iter = line.begin();
 	    std::string::const_iterator end = line.end();
 	    
-	    if (! hypergraph.assign(iter, end)) continue;
+	    if (! hypergraph.assign(iter, end))
+	      throw std::runtime_error("invalid hypergraph format");
 	    if (! hypergraph.is_valid()) continue;
 	    
 	    const double conf = 1.0 / (1.0 + rank);
