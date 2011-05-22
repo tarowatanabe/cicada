@@ -231,7 +231,7 @@ int main(int argc, char ** argv)
 	lattice.clear();
 	
 	size_t num_failed = 0;
-	for (int id = 0; id != istreams.size(); ++ id, ++ rank) {
+	for (size_t id = 0; id != istreams.size(); ++ id, ++ rank) {
 	  if (std::getline(*istreams[id], line)) {
 	    std::string::const_iterator iter = line.begin();
 	    std::string::const_iterator end = line.end();
@@ -246,12 +246,12 @@ int main(int argc, char ** argv)
 	    feature_set_type features;
 	    
 	    if (! features_confidence.empty()) {
-	      if (id >= static_cast<int>(features_confidence.size()))
+	      if (id >= features_confidence.size())
 		throw std::runtime_error("# of confidence features do not match");
 	      features[features_confidence[id]] = conf;
 	    }
 	    if (! features_count.empty()) {
-	      if (id >= static_cast<int>(features_count.size()))
+	      if (id >= features_count.size())
 		throw std::runtime_error("# of count features do not match");
 	      features[features_count[id]] = count_weight;
 	    }
