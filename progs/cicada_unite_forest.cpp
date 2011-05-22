@@ -7,8 +7,9 @@
 #include <string>
 #include <stdexcept>
 
+#include <boost/spirit/include/qi.hpp>
+
 #include "cicada_impl.hpp"
-#include "cicada/graphviz.hpp"
 
 #include "utils/program_options.hpp"
 
@@ -28,7 +29,7 @@ std::string confidence;
 std::string count;
 double count_weight = 1.0;
 
-bool output_graphviz = false;
+bool multiple_mode = false;
 
 int debug = 0;
 
@@ -72,7 +73,38 @@ int main(int argc, char ** argv)
     if (input_files.empty())
       input_files.push_back("-");
     
-    if (input_files.size() == 1) {
+    if (multiple_mode) {
+      // forest ||| forest ||| forest
+      
+      namespace qi = boost::spirit::qi;
+      namespace standard = boost::spirit::standard;
+      
+      for (path_set_type::const_iterator iter = input_files.begin(); iter != input_files.end(); ++ iter) {
+	utils::compress_istream is(input_files.front(), 1024 * 1024);
+	std::string line;
+	
+	while (std::getline(is, line)) {
+	  int rank = 1;
+	  int id = 0;
+	  
+	  merged.clear();
+	  hypergraph.clear();
+	  
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  while (iter != end) {
+	    if (id != 0)
+	      if (! qi::phrase_parse(iter, end, "|||", standard::space))
+		throw std::runtime_error("no separator?");
+	    
+	    if (! hypergraph.assign(iter, end))
+	      throw std::runtime_error("no forest?");
+	    
+	  }
+	}
+      }
+    } else if (input_files.size() == 1) {
       utils::compress_istream is(input_files.front(), 1024 * 1024);
       std::string line;
       
@@ -114,10 +146,7 @@ int main(int argc, char ** argv)
       
       utils::compress_ostream os(output_file, 1024 * 1024);
       
-      if (output_graphviz)
-	cicada::graphviz(os, merged) << '\n';
-      else
-	os << merged << '\n';
+      os << merged << '\n';
       
     } else {
       // we will handle multiple files!
@@ -184,10 +213,7 @@ int main(int argc, char ** argv)
 	  break;
 	}
 	
-	if (output_graphviz)
-	  cicada::graphviz(os, merged) << '\n';
-	else
-	  os << merged << '\n';
+	os << merged << '\n';
       }
       
       for (size_t i = 0; i != istreams.size(); ++ i)
@@ -220,7 +246,7 @@ void options(int argc, char** argv)
     ("count",        po::value<std::string>(&count),         "add count weight feature name")
     ("count-weight", po::value<double>(&count_weight),       "count weight")
 
-    ("graphviz", po::bool_switch(&output_graphviz), "output in graphviz format")
+    ("multiple", po::bool_switch(&multiple_mode), "multiple forest in one line")
 
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
