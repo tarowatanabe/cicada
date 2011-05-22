@@ -231,7 +231,7 @@ int main(int argc, char ** argv)
 	lattice.clear();
 	
 	size_t num_failed = 0;
-	for (size_t id = 0; id != istreams.size(); ++ id, ++ rank) {
+	for (int id = 0; id != istreams.size(); ++ id, ++ rank) {
 	  if (std::getline(*istreams[id], line)) {
 	    std::string::const_iterator iter = line.begin();
 	    std::string::const_iterator end = line.end();
