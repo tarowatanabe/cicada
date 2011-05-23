@@ -766,7 +766,9 @@ namespace cicada
 	    if (equilibrate) break;
 	  }
 	  
-	  unaries[child] = unary_set_type(closure.begin(), closure.end());
+	  unaries[child].clear();
+	  unaries[child].reserve(closure.sizse());
+	  unaries[child].insert(unaries[child].end(), closure.begin(), closure.end());
 	  std::sort(unaries[child].begin(), unaries[child].end(), less_id<unary_type>());
 	}
 	return unaries[child];
