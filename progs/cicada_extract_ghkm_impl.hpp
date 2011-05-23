@@ -1201,6 +1201,17 @@ struct ExtractGHKM
 	queue.clear();
 	buf.clear();
 	
+	{
+	  // insert minimum...
+	  buf.insert(std::make_pair(range_min, derivations.size()));
+	  node_map[id].push_back(derivations.size());
+	  
+	  derivations.resize(derivations.size() + 1);
+	  
+	  derivations.back().node = id;
+	  derivations.back().range = range_min;
+	}
+	
 	// construct initial frontiers...
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
@@ -1294,36 +1305,32 @@ struct ExtractGHKM
 		      for (int last = range.second; last <= range_max.second; ++ last) {
 			const range_type range_next(first, last);
 			
-			range_node_map_type::iterator biter = buf.find(range_next);
-			if (biter == buf.end()) {
+			std::pair<range_node_map_type::iterator, bool> result = buf.insert(std::make_pair(range_next, derivations.size()));
+			if (result.second) {
+			  node_map[id].push_back(result.first->second);
+			  
 			  derivations.resize(derivations.size() + 1);
 			  
 			  derivations.back().node = id;
 			  derivations.back().range = range_next;
-			  
-			  node_map[id].push_back(derivations.size() - 1);
-			  
-			  biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
 			}
 			
-			derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
+			derivations[result.first->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
 		      }
 		  } else {
 		    const range_type& range_next = range;
 		    
-		    range_node_map_type::iterator biter = buf.find(range_next);
-		    if (biter == buf.end()) {
+		    std::pair<range_node_map_type::iterator, bool> result = buf.insert(std::make_pair(range_next, derivations.size()));
+		    if (result.second) {
+		      node_map[id].push_back(result.first->second);
+		      
 		      derivations.resize(derivations.size() + 1);
 		      
 		      derivations.back().node = id;
 		      derivations.back().range = range_next;
-		      
-		      node_map[id].push_back(derivations.size() - 1);
-		      
-		      biter = buf.insert(std::make_pair(range_next, derivations.size() - 1)).first;
 		    }
 		    
-		    derivations[biter->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
+		    derivations[result.first->second].edges.push_back(derivation_edge_type(frontier.first, tails_next, rule_stat.first, rule_stat.second));
 		  }
 		}
 	      }
@@ -1341,28 +1348,35 @@ struct ExtractGHKM
 	    
 	  } else {
 	    // incomplete... futher expand!
-	    
-	    const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
+
+	    edge_set_type::const_iterator eiter     = frontier.first.begin();
+	    edge_set_type::const_iterator eiter_end = frontier.first.end();
+	    const std::pair<int, int> rule_stat = rule_statistics(graph, eiter, eiter_end);
+
+	    if ((max_height <= 0 || rule_stat.first <= max_height) && (max_nodes <= 0 || rule_stat.second <= max_nodes)) {
 	      
-	    hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
-	    for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
-	      const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+	      const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
+	      
+	      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+	      for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+		const hypergraph_type::edge_type& edge = graph.edges[*eiter];
 		
-	      queue.resize(queue.size() + 1);
-	      frontier_type& frontier_next = queue.back();
+		queue.resize(queue.size() + 1);
+		frontier_type& frontier_next = queue.back();
 		
-	      frontier_next.first.reserve(frontier.first.size() + 1);
-	      frontier_next.first.insert(frontier_next.first.end(), frontier.first.begin(), frontier.first.end());
-	      frontier_next.first.push_back(*eiter);
+		frontier_next.first.reserve(frontier.first.size() + 1);
+		frontier_next.first.insert(frontier_next.first.end(), frontier.first.begin(), frontier.first.end());
+		frontier_next.first.push_back(*eiter);
 		
-	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
-	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
-		if (! admissibles[*titer])
-		  frontier_next.second.push_back(*titer);
+		hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+		for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+		  if (! admissibles[*titer])
+		    frontier_next.second.push_back(*titer);
 		
-	      frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
+		frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
 		
-	      node_set_type(frontier_next.second).swap(frontier_next.second);
+		node_set_type(frontier_next.second).swap(frontier_next.second);
+	      }
 	    }
 	  }
 	}
