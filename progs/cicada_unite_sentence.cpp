@@ -848,6 +848,7 @@ void merge_sentences_all(const sentence_set_type& sentences,
       const double conf = 1.0 / (1.0 + rank);
 	
       feature_set_type features;
+      
       if (! features_confidence.empty())
 	features[features_confidence[sent]] = conf;
       if (! features_count.empty())
@@ -882,6 +883,7 @@ void merge_sentences_all(const sentence_set_type& sentences,
 	const double conf = 1.0 / (1.0 + rank);
 	    
 	feature_set_type features;
+	
 	if (! features_confidence.empty())
 	  features[features_confidence[id]] = conf;
 	if (! features_count.empty())
@@ -975,6 +977,7 @@ void merge_sentences(const sentence_set_type& sentences,
     const double conf = 1.0 / (1.0 + rank);
     
     feature_set_type features;
+    
     if (! features_confidence.empty())
       features[features_confidence[id]] = conf;
     if (! features_count.empty())
