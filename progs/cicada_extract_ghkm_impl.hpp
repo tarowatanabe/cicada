@@ -1353,7 +1353,7 @@ struct ExtractGHKM
 	    edge_set_type::const_iterator eiter_end = frontier.first.end();
 	    const std::pair<int, int> rule_stat = rule_statistics(graph, eiter, eiter_end);
 
-	    if ((max_height <= 0 || rule_stat.first <= max_height) && (max_nodes <= 0 || rule_stat.second <= max_nodes)) {
+	    if ((max_height <= 0 || rule_stat.first <= (max_height << 1)) && (max_nodes <= 0 || rule_stat.second <= (max_nodes << 1))) {
 	      
 	      const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
 	      
