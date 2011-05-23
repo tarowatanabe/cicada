@@ -80,3 +80,6 @@ Cube summing?
      I'm still not sure how to efficiently collect residuals... Do we include state-less features
      to serve as residual counts?
    
+
+Node sharing in {compose,parse}_{tree,tree_cky}
+    For better search, we can potentially share "internal nodes" by checking its sub-frontiers and sub-strings.

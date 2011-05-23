@@ -4,6 +4,7 @@ Less memory consumption in parse-coarse
 Better feature-vector implementation with smaller storage
 Removed "dot" and use separate "dot_product" in dot_product.hpp
 Binarize-all now shares binarized nodes in a forest
+added --multiple option for cicada_unite_*
 
 2011-5-18
 Serious bugfix for generate-earley. We will now check the depth of all the passive/active edges to be extended.
