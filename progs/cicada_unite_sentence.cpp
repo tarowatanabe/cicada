@@ -10,7 +10,6 @@
 #include <map>
 
 #include "cicada_impl.hpp"
-#include "cicada/graphviz.hpp"
 
 #include "cicada/stemmer.hpp"
 #include "cicada/matcher.hpp"
@@ -791,7 +790,7 @@ std::string confidence;
 std::string count;
 double count_weight = 1.0;
 
-bool output_graphviz = false;
+bool multiple_mode = false;
 
 int debug = 0;
 
@@ -1032,13 +1031,44 @@ int main(int argc, char ** argv)
 	features_count.push_back(feature);
     }
 
+    const bool flush_output = (output_file == "-"
+                               || (boost::filesystem::exists(output_file)
+                                   && ! boost::filesystem::is_regular_file(output_file)));
+
     cicada::Feature feature_confidence(confidence);
     cicada::Feature feature_count(count);
     
     if (input_files.empty())
       input_files.push_back("-");
     
-    if (input_files.size() == 1) {
+    if (multiple_mode) {
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+      
+      lattice_type merged;
+      
+      sentence_set_type sentences;
+      
+      for (path_set_type::const_iterator iter = input_files.begin(); iter != input_files.end(); ++ iter) {
+	utils::compress_istream is(input_files.front(), 1024 * 1024);
+	std::string line;
+	
+	while (std::getline(is, line)) {
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  if (! sentences.assign(iter, end))
+	    throw std::runtime_error("invalid sentence set");
+	  
+	  if (merge_all)
+	    merge_sentences_all(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
+	  else
+	    merge_sentences(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
+	  
+	  os << merged << '\n';
+	}
+      }
+      
+    } else if (input_files.size() == 1) {
       
       sentence_set_type sentences;
       {
@@ -1064,12 +1094,9 @@ int main(int argc, char ** argv)
       else
 	merge_sentences(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
       
-      utils::compress_ostream os(output_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
-      if (output_graphviz)
-	cicada::graphviz(os, merged) << '\n';
-      else
-	os << merged << '\n';
+      os << merged << '\n';
     } else {
       if (! features_confidence.empty())
 	if (input_files.size() != features_confidence.size())
@@ -1085,7 +1112,7 @@ int main(int argc, char ** argv)
       for (size_t i = 0; i != input_files.size(); ++ i)
 	istreams[i] = new utils::compress_istream(input_files[i], 1024 * 1024);
       
-      utils::compress_ostream os(output_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
       lattice_type merged;
 
@@ -1122,10 +1149,7 @@ int main(int argc, char ** argv)
 	else
 	  merge_sentences(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
 	
-	if (output_graphviz)
-	  cicada::graphviz(os, merged) << '\n';
-	else
-	  os << merged << '\n';
+	os << merged << '\n';
       }
       
       for (size_t i = 0; i != istreams.size(); ++ i)
@@ -1168,7 +1192,7 @@ void options(int argc, char** argv)
     ("count",        po::value<std::string>(&count),         "add count weight feature name")
     ("count-weight", po::value<double>(&count_weight),       "count weight")
 
-    ("graphviz", po::bool_switch(&output_graphviz), "output in graphviz format")
+    ("multiple", po::bool_switch(&multiple_mode), "multiple forest in one line")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
