@@ -1053,11 +1053,7 @@ int main(int argc, char ** argv)
 	std::string line;
 	
 	while (std::getline(is, line)) {
-	  std::string::const_iterator iter = line.begin();
-	  std::string::const_iterator end = line.end();
-	  
-	  if (! sentences.assign(iter, end))
-	    throw std::runtime_error("invalid sentence set");
+	  sentences.assign(line);
 	  
 	  if (merge_all)
 	    merge_sentences_all(sentences, features_confidence, features_count, feature_confidence, feature_count, merged);
