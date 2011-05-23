@@ -777,9 +777,13 @@ struct ExtractGHKM
 	}
       }
       rule_pairs_local.clear();
+      rule_pair_set_local_type(rule_pairs_local).swap(rule_pairs_local);
       
       dumper(rule_pairs);
-
+      
+      if (rule_pairs.empty())
+	rule_pair_set_type(rule_pairs).swap(rule_pairs);
+      
       //std::cerr << "dumped" << std::endl;
     }
   }
