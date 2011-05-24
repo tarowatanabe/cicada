@@ -128,9 +128,6 @@ int main(int argc, char** argv)
     sentence_parser<iiter_type>    parser;
     sentence_generator<oiter_type> generator;
     
-    
-    
-    
     for (size_t i = 0; i != source_files.size(); ++ i) {
       utils::compress_istream is_src(source_files[i], 1024 * 1024);
       utils::compress_istream is_trg(target_files[i], 1024 * 1024);
