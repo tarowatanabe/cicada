@@ -466,12 +466,14 @@ struct ExtractGHKM
 	      const int __max_nodes,
 	      const int __max_height,
 	      const bool __exhaustive,
+	      const bool __constrained,
 	      const bool __inverse,
 	      const bool __swap_source_target)
     : non_terminal(__non_terminal),
       max_nodes(__max_nodes),
       max_height(__max_height),
       exhaustive(__exhaustive),
+      constrained(__constrained),
       inverse(__inverse),
       swap_source_target(__swap_source_target),
       attr_span_first("span-first"),
@@ -482,6 +484,7 @@ struct ExtractGHKM
   int max_height;
   
   bool exhaustive;
+  bool constrained;
   bool inverse;
   bool swap_source_target;
   
@@ -1364,12 +1367,36 @@ struct ExtractGHKM
 	  } else {
 	    // incomplete... futher expand!
 
-	    edge_set_type::const_iterator eiter     = frontier.first.begin();
-	    edge_set_type::const_iterator eiter_end = frontier.first.end();
-	    const std::pair<int, int> rule_stat = rule_statistics(graph, eiter, eiter_end);
+	    if (constrained) {
+	      edge_set_type::const_iterator eiter     = frontier.first.begin();
+	      edge_set_type::const_iterator eiter_end = frontier.first.end();
+	      const std::pair<int, int> rule_stat = rule_statistics(graph, eiter, eiter_end);
 
-	    if ((max_height <= 0 || rule_stat.first <= (max_height << 1)) && (max_nodes <= 0 || rule_stat.second <= (max_nodes << 1))) {
-	      
+	      if ((max_height <= 0 || rule_stat.first <= max_height) && (max_nodes <= 0 || rule_stat.second <= max_nodes)) {
+		const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
+		
+		hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
+		for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
+		  const hypergraph_type::edge_type& edge = graph.edges[*eiter];
+		
+		  queue.resize(queue.size() + 1);
+		  frontier_type& frontier_next = queue.back();
+		  
+		  frontier_next.first.reserve(frontier.first.size() + 1);
+		  frontier_next.first.insert(frontier_next.first.end(), frontier.first.begin(), frontier.first.end());
+		  frontier_next.first.push_back(*eiter);
+		  
+		  hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+		  for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+		    if (! admissibles[*titer])
+		      frontier_next.second.push_back(*titer);
+		
+		  frontier_next.second.insert(frontier_next.second.end(), frontier.second.begin() + 1, frontier.second.end());
+		
+		  node_set_type(frontier_next.second).swap(frontier_next.second);
+		}
+	      }
+	    } else {
 	      const hypergraph_type::node_type& node = graph.nodes[frontier.second.front()];
 	      
 	      hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -1593,12 +1620,13 @@ struct Task
        const int max_nodes,
        const int max_height,
        const bool exhaustive,
+       const bool constrained,
        const bool inverse,
        const bool swap,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_nodes, max_height, exhaustive, inverse, swap),
+      extractor(non_terminal, max_nodes, max_height, exhaustive, constrained, inverse, swap),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;
@@ -1613,7 +1641,7 @@ struct Task
   {
     void operator()(rule_pair_set_type& rule_pairs) const
     {
-      if (rule_pairs.empty() || utils::malloc_stats::used() <= malloc_threshold) return;
+      if (rule_pairs.size() >= 1024 || utils::malloc_stats::used() <= malloc_threshold) return;
       
       dump(rule_pairs);
       rule_pairs.clear();

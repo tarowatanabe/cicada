@@ -91,6 +91,8 @@ opt_parser = OptionParser(
                 metavar="HEIGHT", help="maximum rule height (default: 4)"),
     make_option("--exhaustive", default=None, action="store_true",
                 help="exhaustive extraction in GHKM and Tree"),
+    make_option("--constrained", default=None, action="store_true",
+                help="constrained extraction in GHKM and Tree"),
     
     make_option("--ternary", default=None, action="store_true",
                 help="extract ternary rule"),
@@ -528,6 +530,7 @@ class ExtractGHKM(Extract):
                  model_dir="",
                  non_terminal="", max_nodes=15, max_height=4,
                  exhaustive=None,
+                 constrained=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -582,6 +585,8 @@ class ExtractGHKM(Extract):
 
         if exhaustive:
             comamnd += " --exhaustive"
+        if constrained:
+            comamnd += " --constrained"
         
         command += " --max-malloc %g" %(max_malloc)
 
@@ -601,6 +606,7 @@ class ExtractTree(Extract):
                  model_dir="",
                  max_nodes=15, max_height=4,
                  exhaustive=None,
+                 constrained=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -772,6 +778,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
                               exhaustive=options.exhaustive,
+                              constrained=options.constrained,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     elif options.tree:
@@ -780,6 +787,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
                               exhaustive=options.exhaustive,
+                              constrained=options.constrained,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
                               debug=options.debug)
     else:
