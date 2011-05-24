@@ -584,9 +584,9 @@ class ExtractGHKM(Extract):
         command += " --max-height %d" %(max_height)
 
         if exhaustive:
-            comamnd += " --exhaustive"
+            command += " --exhaustive"
         if constrained:
-            comamnd += " --constrained"
+            command += " --constrained"
         
         command += " --max-malloc %g" %(max_malloc)
 
@@ -634,7 +634,7 @@ class ExtractTree(Extract):
         command += " --max-height %d" %(max_height)
         
         if exhaustive:
-            comamnd += " --exhaustive"
+            command += " --exhaustive"
         
         command += " --max-malloc %g" %(max_malloc)
         
