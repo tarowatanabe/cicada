@@ -891,7 +891,7 @@ struct ExtractTree
 
 	  if (is_goal) {
 	    // insert minimum...
-	    buf.insert(std::make_pair(range_type(0, sentence.size()), derivations.size()));
+	    buf.insert(std::make_pair(range_type(0, cspan_max), derivations.size()));
 	    node_map[id].push_back(derivations.size());
 	    
 	    goal_node = derivations.size();
@@ -899,7 +899,7 @@ struct ExtractTree
 	    derivations.resize(derivations.size() + 1);
 	  
 	    derivations.back().node = id;
-	    derivations.back().range = range_type(0, sentence.size());
+	    derivations.back().range = range_type(0, cspan_max);
 	  } else {
 	    // insert minimum...
 	    buf.insert(std::make_pair(range_min, derivations.size()));
