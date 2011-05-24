@@ -719,7 +719,6 @@ namespace cicada
       rhs_type rhs;
       tails_type tails;
       
-      int pos = 1;
       tree_rule_type::const_iterator aiter_end = rule.end();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
 	if (aiter->label.is_non_terminal()) {
@@ -741,9 +740,7 @@ namespace cicada
 	  } else
 	    tails.push_back(graph_out.add_node().id);
 	  
-	  rhs.push_back(aiter->label.non_terminal(pos));
-	  
-	  ++ pos;
+	  rhs.push_back(aiter->label.non_terminal());
 	} else
 	  rhs.push_back(aiter->label);
       
