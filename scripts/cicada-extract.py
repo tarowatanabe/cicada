@@ -635,6 +635,8 @@ class ExtractTree(Extract):
         
         if exhaustive:
             command += " --exhaustive"
+        if constrained:
+            command += " --constrained"
         
         command += " --max-malloc %g" %(max_malloc)
         

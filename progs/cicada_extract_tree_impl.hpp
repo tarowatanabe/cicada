@@ -846,7 +846,7 @@ struct ExtractTree
       derivations_new.clear();
     }
     
-    void construct_derivations(const hypergraph_type& graph, const DerivationGraph& counterpart, const bool exhaustive)
+    void construct_derivations(const hypergraph_type& graph, const DerivationGraph& counterpart, const bool exhaustive, const bool constrained)
     {
       typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
       typedef google::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_node_map_type;
@@ -888,6 +888,29 @@ struct ExtractTree
 	  buf.set_empty_key(range_type(0, 0));
 	
 	  queue_type queue;
+
+	  if (is_goal) {
+	    // insert minimum...
+	    buf.insert(std::make_pair(range_type(0, sentence.size()), derivations.size()));
+	    node_map[id].push_back(derivations.size());
+	    
+	    goal_node = derivations.size();
+	  
+	    derivations.resize(derivations.size() + 1);
+	  
+	    derivations.back().node = id;
+	    derivations.back().range = range_type(0, sentence.size());
+	  } else {
+	    // insert minimum...
+	    buf.insert(std::make_pair(range_min, derivations.size()));
+	    node_map[id].push_back(derivations.size());
+	  
+	    derivations.resize(derivations.size() + 1);
+	  
+	    derivations.back().node = id;
+	    derivations.back().range = range_min;
+	  }
+
 	
 	  // construct initial frontiers...
 	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
@@ -1067,6 +1090,31 @@ struct ExtractTree
 	}
     }
 
+    template <typename Iterator>
+    std::pair<int, int> rule_statistics(const hypergraph_type& graph,
+					Iterator& iter,
+					Iterator last)
+    {
+      if (iter == last) return std::make_pair(0, 0);
+      
+      const hypergraph_type::edge_type& edge = graph.edges[*iter];
+      ++ iter;
+      
+      int max_height = 1;
+      int num_tails = edge.tails.size();
+      
+      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	if (iter != last && *titer == graph.edges[*iter].head) {
+	  const std::pair<int, int> result = rule_statistics(graph, iter, last);
+	  
+	  max_height = utils::bithack::max(max_height, result.first + 1);
+	  num_tails += result.second;
+	}
+      
+      return std::make_pair(max_height, num_tails);
+    }
+    
     template <typename Iterator, typename Tails>
     std::pair<int, int> construct_tails(const hypergraph_type& graph,
 					Iterator& iter,
@@ -1244,10 +1292,12 @@ struct ExtractTree
   ExtractTree(const int __max_nodes,
 	      const int __max_height,
 	      const bool __exhaustive, 
+	      const bool __constrained,
 	      const bool __inverse)
     : max_nodes(__max_nodes),
       max_height(__max_height),
       exhaustive(__exhaustive),
+      constrained(__constrained),
       inverse(__inverse),
       attr_span_first("span-first"),
       attr_span_last("span-last") {}
@@ -1255,6 +1305,7 @@ struct ExtractTree
   int max_nodes;
   int max_height;
   bool exhaustive;
+  bool constrained;
   bool inverse;
 
   attribute_type attr_span_first;
@@ -1288,8 +1339,8 @@ struct ExtractTree
     graph_target.admissible_nodes(target, graph_source);
     
     // construct derivations... here, we will create minimal rules wrt single side
-    graph_source.construct_derivations(source, graph_target, exhaustive);
-    graph_target.construct_derivations(target, graph_source, exhaustive);
+    graph_source.construct_derivations(source, graph_target, exhaustive, constrained);
+    graph_target.construct_derivations(target, graph_source, exhaustive, constrained);
     
     // prune...
     //graph_source.prune_derivations();
@@ -1555,11 +1606,12 @@ struct Task
        const int max_nodes,
        const int max_height,
        const bool exhaustive,
+       const bool constrained,
        const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_nodes, max_height, exhaustive, inverse),
+      extractor(max_nodes, max_height, exhaustive, constrained, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

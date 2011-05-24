@@ -39,6 +39,7 @@ path_type output_file;
 int max_nodes = 15;
 int max_height = 3;
 bool exhaustive = false;
+bool constrained = false;
 bool inverse = false;
 
 double max_malloc = 8; // 8 GB
@@ -108,7 +109,7 @@ int main(int argc, char** argv)
     static const size_t queue_size = 64;
     
     queue_type queue(queue_size);
-    task_type task(queue, output_file, max_nodes, max_height, exhaustive, inverse, max_malloc);
+    task_type task(queue, output_file, max_nodes, max_height, exhaustive, constrained, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
     if (mpi_rank == 0) {
@@ -304,10 +305,11 @@ void options(int argc, char** argv)
     ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     ("output",    po::value<path_type>(&output_file),    "output directory")
     
-    ("max-nodes",  po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in a rule")
-    ("max-height", po::value<int>(&max_height)->default_value(max_height), "maximum height of a rule")
-    ("exhaustive", po::bool_switch(&exhaustive),                           "exhausive extraction")
-    ("inverse",    po::bool_switch(&inverse),                              "inversed word alignment")
+    ("max-nodes",   po::value<int>(&max_nodes)->default_value(max_nodes),   "maximum # of nodes in a rule")
+    ("max-height",  po::value<int>(&max_height)->default_value(max_height), "maximum height of a rule")
+    ("exhaustive",  po::bool_switch(&exhaustive),                           "exhausive extraction")
+    ("constrained", po::bool_switch(&constrained),                          "constrained minimum extraction")
+    ("inverse",     po::bool_switch(&inverse),                              "inversed word alignment")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ;
