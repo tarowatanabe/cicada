@@ -602,42 +602,43 @@ struct ExtractTree
 	  index_set_type& j = query.j;
 	  query.edge = item->edge;
 	  
-	  for (size_t i = 0; i != j.size(); ++ i) {
-	    ++ j[i];
-	    
-	    if (j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()) && cand_unique.find(&query) == cand_unique.end()) {
-	      edges_new.clear();
-	      tails_new.clear();
+	  for (size_t i = 0; i != j.size(); ++ i) 
+	    if (! derivations[edge.tails[i]].edges.empty()) {
+	      ++ j[i];
 	      
-	      const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new, max_nodes);
-	      
-	      if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
-		index_set_type::const_iterator jiter_begin = j.begin();
-		index_set_type::const_iterator jiter_end   = j.end();
-		node_set_type::const_iterator  titer_begin = edge.tails.begin();
-		edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
-		edge_set_type::const_iterator  eiter_end   = edge.edges.end();
+	      if (j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()) && cand_unique.find(&query) == cand_unique.end()) {
+		edges_new.clear();
+		tails_new.clear();
 		
-		const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
+		const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new, max_nodes);
 		
-		if (max_height <= 0 || rule_stat.first <= max_height) {
-		  candidates.push_back(candidate_type(edge, j, true));
+		if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
+		  index_set_type::const_iterator jiter_begin = j.begin();
+		  index_set_type::const_iterator jiter_end   = j.end();
+		  node_set_type::const_iterator  titer_begin = edge.tails.begin();
+		  edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
+		  edge_set_type::const_iterator  eiter_end   = edge.edges.end();
 		  
-		  candidate_type& item = candidates.back();
+		  const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
 		  
-		  item.edge_composed.edges = edges_new;
-		  item.edge_composed.tails = tails_new;
-		  item.edge_composed.height = rule_stat.first;
-		  item.edge_composed.internal = rule_stat.second;
-		
-		  cand.push(&item);
-		  cand_unique.insert(&item);
+		  if (max_height <= 0 || rule_stat.first <= max_height) {
+		    candidates.push_back(candidate_type(edge, j, true));
+		    
+		    candidate_type& item = candidates.back();
+		    
+		    item.edge_composed.edges = edges_new;
+		    item.edge_composed.tails = tails_new;
+		    item.edge_composed.height = rule_stat.first;
+		    item.edge_composed.internal = rule_stat.second;
+		    
+		    cand.push(&item);
+		    cand_unique.insert(&item);
+		  }
 		}
 	      }
+	      
+	      -- j[i];
 	    }
-	  
-	    -- j[i];
-	  }
 	}
 	
 	// sort for cube-pruning!
