@@ -133,78 +133,127 @@ int main(int argc, char** argv)
     sentence_parser<iiter_type>    parser;
     sentence_generator<oiter_type> generator;
     
-    for (size_t i = 0; i != source_files.size(); ++ i) {
-      utils::compress_istream is_src(source_files[i], 1024 * 1024);
-      utils::compress_istream is_trg(target_files[i], 1024 * 1024);
-      std::auto_ptr<utils::compress_istream> is_align(alignment_mode ? new utils::compress_istream(alignment_files[i], 1024 * 1024) : 0);
+    if (alignment_mode) {
+      for (size_t i = 0; i != source_files.size(); ++ i) {
+	utils::compress_istream is_src(source_files[i], 1024 * 1024);
+	utils::compress_istream is_trg(target_files[i], 1024 * 1024);
+	utils::compress_istream is_align(alignment_files[i], 1024 * 1024);
 
-      is_src.unsetf(std::ios::skipws);
-      is_trg.unsetf(std::ios::skipws);
+	is_src.unsetf(std::ios::skipws);
+	is_trg.unsetf(std::ios::skipws);
       
-      iiter_type siter(is_src);
-      iiter_type titer(is_trg);
-      iiter_type siter_end;
-      iiter_type titer_end;
+	iiter_type siter(is_src);
+	iiter_type titer(is_trg);
+	iiter_type siter_end;
+	iiter_type titer_end;
       
-      sentence_type source;
-      sentence_type target;
-      alignment_type alignment;
-      alignment_type alignment_new;
+	sentence_type source;
+	sentence_type target;
+	alignment_type alignment;
+	alignment_type alignment_new;
     
-      for (size_t line_no = 0; siter != siter_end && titer != titer_end; ++ line_no) {
-	source.clear();
-	target.clear();
-	alignment.clear();
+	for (size_t line_no = 0; siter != siter_end && titer != titer_end; ++ line_no) {
+	  source.clear();
+	  target.clear();
+	  alignment.clear();
       
-	if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser, boost::spirit::standard::blank, source))
-	  throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
-	if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
-	  throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
-	
-	if (alignment_mode) {
-	  *is_align >> alignment;
-	  if (! *is_align)
-	    throw std::runtime_error("no alignment?");
-	}
-      
-	const int source_size = source.size();
-	const int target_size = target.size();
-      
-	if (source_size == 0 || target_size == 0) continue;
-	if (max_length > 0)
-	  if (source_size > max_length || target_size > max_length) continue;
-	if (max_fertility > 0)
-	  if (double(utils::bithack::max(source_size, target_size)) / double(utils::bithack::min(source_size, target_size)) >= max_fertility) continue;
-      
-	if (add_bos_eos) {
-	  source.insert(source.begin(), bos);
-	  source.push_back(eos);
-	
-	  target.insert(target.begin(), bos);
-	  target.push_back(eos);
-	
-	  alignment_new.clear();
-	
-	  alignment_new.push_back(std::make_pair(0, 0));
-	  alignment_type::const_iterator aiter_end = alignment.end();
-	  for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
-	    alignment_new.push_back(std::make_pair(aiter->source + 1, aiter->target + 1));
-	  alignment_new.push_back(std::make_pair(source.size() - 1, target.size() - 1));
+	  if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser, boost::spirit::standard::blank, source))
+	    throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
+	    throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
 	  
-	  alignment_new.swap(alignment);
-	}
-
-	if (! boost::spirit::karma::generate(oiter_type(os_src), generator, source))
-	  throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
-	if (! boost::spirit::karma::generate(oiter_type(os_trg), generator, target))
-	  throw std::runtime_error("target sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
-	
-	if (alignment_mode)
-	  *os_align << alignment << '\n';
-      }
+	  if (! (is_align >> alignment))
+	    throw std::runtime_error("no alignment?");
       
-      if (siter != siter_end || titer != titer_end || (alignment_mode && *is_align >> alignment))
-	throw std::runtime_error("# of lines do not match: " + source_files[i].string() + " " + target_files[i].string());
+	  const int source_size = source.size();
+	  const int target_size = target.size();
+      
+	  if (source_size == 0 || target_size == 0) continue;
+	  if (max_length > 0)
+	    if (source_size > max_length || target_size > max_length) continue;
+	  if (max_fertility > 0)
+	    if (double(utils::bithack::max(source_size, target_size)) / double(utils::bithack::min(source_size, target_size)) >= max_fertility) continue;
+      
+	  if (add_bos_eos) {
+	    source.insert(source.begin(), bos);
+	    source.push_back(eos);
+	
+	    target.insert(target.begin(), bos);
+	    target.push_back(eos);
+	
+	    alignment_new.clear();
+	
+	    alignment_new.push_back(std::make_pair(0, 0));
+	    alignment_type::const_iterator aiter_end = alignment.end();
+	    for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
+	      alignment_new.push_back(std::make_pair(aiter->source + 1, aiter->target + 1));
+	    alignment_new.push_back(std::make_pair(source.size() - 1, target.size() - 1));
+	  
+	    alignment_new.swap(alignment);
+	  }
+
+	  if (! boost::spirit::karma::generate(oiter_type(os_src), generator, source))
+	    throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
+	  if (! boost::spirit::karma::generate(oiter_type(os_trg), generator, target))
+	    throw std::runtime_error("target sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
+	  
+	  *os_align << alignment << '\n';
+	}
+	
+	if (siter != siter_end || titer != titer_end || (is_align >> alignment))
+	  throw std::runtime_error("# of lines do not match: " + source_files[i].string() + " " + target_files[i].string());
+      }
+    } else {
+      for (size_t i = 0; i != source_files.size(); ++ i) {
+	utils::compress_istream is_src(source_files[i], 1024 * 1024);
+	utils::compress_istream is_trg(target_files[i], 1024 * 1024);
+
+	is_src.unsetf(std::ios::skipws);
+	is_trg.unsetf(std::ios::skipws);
+      
+	iiter_type siter(is_src);
+	iiter_type titer(is_trg);
+	iiter_type siter_end;
+	iiter_type titer_end;
+      
+	sentence_type source;
+	sentence_type target;
+	
+	for (size_t line_no = 0; siter != siter_end && titer != titer_end; ++ line_no) {
+	  source.clear();
+	  target.clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(siter, siter_end, parser, boost::spirit::standard::blank, source))
+	    throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
+	    throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	
+	  const int source_size = source.size();
+	  const int target_size = target.size();
+      
+	  if (source_size == 0 || target_size == 0) continue;
+	  if (max_length > 0)
+	    if (source_size > max_length || target_size > max_length) continue;
+	  if (max_fertility > 0)
+	    if (double(utils::bithack::max(source_size, target_size)) / double(utils::bithack::min(source_size, target_size)) >= max_fertility) continue;
+      
+	  if (add_bos_eos) {
+	    source.insert(source.begin(), bos);
+	    source.push_back(eos);
+	
+	    target.insert(target.begin(), bos);
+	    target.push_back(eos);
+	  }
+
+	  if (! boost::spirit::karma::generate(oiter_type(os_src), generator, source))
+	    throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
+	  if (! boost::spirit::karma::generate(oiter_type(os_trg), generator, target))
+	    throw std::runtime_error("target sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
+	}
+	
+	if (siter != siter_end || titer != titer_end)
+	  throw std::runtime_error("# of lines do not match: " + source_files[i].string() + " " + target_files[i].string());
+      }
     }
   }
   catch(std::exception& err) {
