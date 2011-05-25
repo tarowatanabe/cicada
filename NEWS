@@ -1,4 +1,5 @@
 2011-5-x
+Serious bugfix for {compose,parse}-{tree,tree-cky}: internal rules are not correctly computed
 Less memory consumption in scfg/ghkm/tree extraction by frequently checking memory usage (+ slightly slower)
 Less memory consumption in parse-coarse
 Better feature-vector implementation with smaller storage
