@@ -774,10 +774,12 @@ namespace cicada
 
       tails_type::iterator titer = tails.begin();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
-	if (aiter->label.is_non_terminal() && ! aiter->antecedents.empty()) {
-	  const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	if (aiter->label.is_non_terminal()) {
 	  
-	  *titer = graph.edges[edge_id].head;
+	  if (! aiter->antecedents.empty()) {
+	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	    *titer = graph.edges[edge_id].head;
+	  }
 	  ++ titer;
 	}
 
