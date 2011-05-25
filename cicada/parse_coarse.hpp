@@ -930,6 +930,14 @@ namespace cicada
 	  else
 	    succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev, thresholds[level - 1] * factor, CoarseSymbol(level - 2)));
 	  
+	  if (! succeed) {
+	    // anyway, try relaxed thershold
+	    if (level == 1)
+	      succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSimple>(scores_prev, thresholds[level - 1] * factor * 0.1, CoarseSimple()));
+	    else
+	      succeed = parsers[level]->operator()(lattice, scores, PruneCoarse<CoarseSymbol>(scores_prev, thresholds[level - 1] * factor * 0.1, CoarseSymbol(level - 2)));
+	  }
+	  
 	  if (! succeed) break;
 	}
 	
