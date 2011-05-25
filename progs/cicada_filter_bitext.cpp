@@ -138,8 +138,6 @@ int main(int argc, char** argv)
       utils::compress_istream is_trg(target_files[i], 1024 * 1024);
       std::auto_ptr<utils::compress_istream> is_align(alignment_mode ? new utils::compress_istream(alignment_files[i], 1024 * 1024) : 0);
 
-      std::cerr << source_files[i] << " " << target_files[i] << std::endl;
-      
       is_src.unsetf(std::ios::skipws);
       is_trg.unsetf(std::ios::skipws);
       
