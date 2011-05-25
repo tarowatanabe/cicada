@@ -107,7 +107,7 @@ int main(int argc, char** argv)
     if (source_files.empty())
       source_files.push_back("-");
     if (target_files.empty())
-      targetfiles.push_back("-");
+      target_files.push_back("-");
     
     const bool alignment_mode = ! alignment_files.empty();
 
