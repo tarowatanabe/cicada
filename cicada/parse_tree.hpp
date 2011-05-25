@@ -799,9 +799,8 @@ namespace cicada
 	  graph.connect_edge(edge_id, root);
 	  
 	  result.first->second = edge_id;
-	}
-	
-	edge_id = result.first->second;
+	} else
+	  edge_id = result.first->second;
       } else {
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
