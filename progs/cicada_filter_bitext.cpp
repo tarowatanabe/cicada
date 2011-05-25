@@ -103,6 +103,11 @@ int main(int argc, char** argv)
     read_list(list_source_file, source_files);
     read_list(list_target_file, target_files);
     read_list(list_alignment_file, alignment_files);
+
+    if (source_files.empty())
+      source_files.push_back("-");
+    if (target_files.empty())
+      targetfiles.push_back("-");
     
     const bool alignment_mode = ! alignment_files.empty();
 
@@ -115,8 +120,8 @@ int main(int argc, char** argv)
 	throw std::runtime_error("# of alignemnt files do not match");
     }
     
-    const std::string& bos = static_cast<const std::string&>(vocab_type::BOS);
-    const std::string& eos = static_cast<const std::string&>(vocab_type::EOS);
+    const std::string bos = static_cast<const std::string&>(vocab_type::BOS);
+    const std::string eos = static_cast<const std::string&>(vocab_type::EOS);
 
     utils::compress_ostream os_src(output_source_file, 1024 * 1024);
     utils::compress_ostream os_trg(output_target_file, 1024 * 1024);
@@ -132,6 +137,8 @@ int main(int argc, char** argv)
       utils::compress_istream is_src(source_files[i], 1024 * 1024);
       utils::compress_istream is_trg(target_files[i], 1024 * 1024);
       std::auto_ptr<utils::compress_istream> is_align(alignment_mode ? new utils::compress_istream(alignment_files[i], 1024 * 1024) : 0);
+
+      std::cerr << source_files[i] << " " << target_files[i] << std::endl;
       
       is_src.unsetf(std::ios::skipws);
       is_trg.unsetf(std::ios::skipws);
@@ -155,7 +162,7 @@ int main(int argc, char** argv)
 	  throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
 	if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
 	  throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
-      
+	
 	if (alignment_mode) {
 	  *is_align >> alignment;
 	  if (! *is_align)
@@ -188,14 +195,16 @@ int main(int argc, char** argv)
 	  
 	  alignment_new.swap(alignment);
 	}
-	
+
 	if (! boost::spirit::karma::generate(oiter_type(os_src), generator, source))
 	  throw std::runtime_error("source sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
 	if (! boost::spirit::karma::generate(oiter_type(os_trg), generator, target))
 	  throw std::runtime_error("target sentence generation failed at # " + utils::lexical_cast<std::string>(line_no));
 	
-	*os_align << alignment << '\n';
+	if (alignment_mode)
+	  *os_align << alignment << '\n';
       }
+      
       if (siter != siter_end || titer != titer_end || (alignment_mode && *is_align >> alignment))
 	throw std::runtime_error("# of lines do not match: " + source_files[i].string() + " " + target_files[i].string());
     }
