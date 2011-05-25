@@ -24,10 +24,13 @@
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
 #include <utils/sgi_hash_set.hpp>
+#include <utils/sgi_hash_map.hpp>
 #include <utils/bithack.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
+
+#include <boost/fusion/tuple.hpp>
 
 //
 // CFG parsing over lattice
@@ -174,6 +177,30 @@ namespace cicada
     
     typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
     typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
+
+    typedef hypergraph_type::edge_type::node_set_type tail_set_type;
+    typedef rule_type::symbol_set_type                symbol_set_type;
+    typedef boost::fusion::tuple<tail_set_type, symbol_set_type, symbol_type> internal_label_type;
+
+    struct internal_label_hash : public utils::hashmurmur<size_t>
+    {
+      typedef utils::hashmurmur<size_t> hasher_type;
+
+      size_t operator()(const internal_label_type& x) const
+      {
+	hasher_type::operator()(boost::fusion::get<0>(x).begin(), boost::fusion::get<0>(x).end(),
+				hasher_type::operator()(boost::fusion::get<1>(x).begin(), boost::fusion::get<1>(x).end(), boost::fusion::get<2>(x).id()));
+      }
+    };
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+    typedef std::tr1::unordered_map<internal_label_type, hypergraph_type::id_type, internal_label_hash, std::equal_to<internal_label_type>,
+				    std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
+#else
+    typedef sgi::hash_map<internal_label_type, hypergraph_type::id_type, internal_label_hash, std::equal_to<internal_label_type>,
+			  std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
+#endif
+
     
     struct less_non_terminal
     {
@@ -239,6 +266,8 @@ namespace cicada
       node_graph_tree.clear();
       node_graph_rule.clear();
       non_terminals.clear();
+
+      label_map.clear();
       
       actives_tree.reserve(tree_grammar.size());
       actives_rule.reserve(grammar.size());
@@ -753,7 +782,7 @@ namespace cicada
     }
     
     hypergraph_type::id_type construct_graph(const tree_rule_type& rule,
-					     const hypergraph_type::id_type root,
+					     hypergraph_type::id_type root,
 					     const hypergraph_type::edge_type::node_set_type& frontiers,
 					     hypergraph_type& graph,
 					     int& non_terminal_pos)
@@ -783,24 +812,46 @@ namespace cicada
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
 	  } else
-	    tails.push_back(graph.add_node().id); // tree-rule private node!
+	    tails.push_back(0); // tree-rule private node!
 	  
 	  rhs.push_back(aiter->label.non_terminal());
 	} else
 	  rhs.push_back(aiter->label);
-      
-      const hypergraph_type::id_type edge_id = graph.add_edge(tails.begin(), tails.end()).id;
-      graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
-      
-      graph.connect_edge(edge_id, root);
-      
+            
       // if we have antecedents traverse and construct
-      tails_type::const_iterator titer = tails.begin();
+      tails_type::iterator titer = tails.begin();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
 	if (aiter->label.is_non_terminal() && ! aiter->antecedents.empty()) {
-	  construct_graph(*aiter, *titer, frontiers, graph, non_terminal_pos);
+	  const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	  
+	  *titer = graph.edges[edge_id].head;
 	  ++ titer;
 	}
+
+      hypergraph_type::id_type edge_id;
+      
+      if (root == hypergraph_type::invalid) {
+	// we will share internal nodes
+	
+	std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(tail_set_type(tails.begin(), tails.end()),
+															symbol_set_type(rhs.begin(), rhs.end()),
+															rule.label), 0));
+	if (result.second) {
+	  root = graph.add_node().id;
+	  
+	  edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	  graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	  graph.connect_edge(edge_id, root);
+	  
+	  result.first->second = edge_id;
+	}
+	
+	edge_id = result.first->second;
+      } else {
+	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	graph.connect_edge(edge_id, root);
+      }
       
       return edge_id;
     }
@@ -830,6 +881,8 @@ namespace cicada
     node_graph_type       node_graph_tree;
     node_graph_type       node_graph_rule;
     non_terminal_set_type non_terminals;
+
+    internal_label_map_type label_map;
   };
   
   
