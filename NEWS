@@ -5,6 +5,7 @@ Added --input-sentence option to explicitly control the behavior
 Less memory consumption in scfg/ghkm/tree extraction by frequently checking memory usage (+ slightly slower)
 Less memory consumption in parse-coarse
 Better feature-vector implementation with smaller storage
+Faster(?) parse-{cky,tree,tree-cky} by pre-pruning rules if exceeding pop limits.
 Removed "dot" and use separate "dot_product" in dot_product.hpp
 Binarize-all now shares binarized nodes in a forest
 added --multiple option for cicada_unite_*
