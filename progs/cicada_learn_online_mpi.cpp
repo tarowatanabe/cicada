@@ -72,6 +72,7 @@ path_set_type oracle_files;
 
 bool input_id_mode = false;
 bool input_bitext_mode = false;
+bool input_sentence_mode = false;
 bool input_lattice_mode = false;
 bool input_forest_mode = false;
 bool input_span_mode = false;
@@ -244,6 +245,7 @@ int main(int argc, char ** argv)
 				  tree_grammar,
 				  symbol_goal,
 				  true,
+				  input_sentence_mode,
 				  input_lattice_mode,
 				  input_forest_mode,
 				  input_span_mode,
@@ -1609,6 +1611,7 @@ void options(int argc, char** argv)
     // options for input/output format
     ("input-id",         po::bool_switch(&input_id_mode),         "id-prefixed input")
     ("input-bitext",     po::bool_switch(&input_bitext_mode),     "target sentence prefixed input")
+    ("input-sentence",   po::bool_switch(&input_sentence_mode),   "sentence input")
     ("input-lattice",    po::bool_switch(&input_lattice_mode),    "lattice input")
     ("input-forest",     po::bool_switch(&input_forest_mode),     "forest input")
     ("input-span",       po::bool_switch(&input_span_mode),       "span input")

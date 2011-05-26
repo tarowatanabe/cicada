@@ -214,6 +214,7 @@ viterbi: compute viterbi tree\n\
 				const tree_grammar_type& tree_grammar,
 				const std::string& goal,
 				const bool __input_id,
+				const bool __input_sentence,
 				const bool __input_lattice,
 				const bool __input_forest,
 				const bool __input_span,
@@ -229,6 +230,7 @@ viterbi: compute viterbi tree\n\
     // initialize...
     
     input_id        = __input_id;
+    input_sentence  = __input_sentence;
     input_lattice   = __input_lattice;
     input_forest    = __input_forest;
     input_span      = __input_span;
@@ -237,6 +239,9 @@ viterbi: compute viterbi tree\n\
     input_mpi       = __input_mpi;
     
     // default to lattice input...
+    if (input_sentence)
+      input_lattice = true;
+    
     if (! input_lattice && ! input_forest)
       input_lattice = true;
     
@@ -392,8 +397,16 @@ viterbi: compute viterbi tree\n\
     if (input_lattice && input_forest) {
       {
 	utils::resource start;
-	if (! data.lattice.assign(iter, end))
-	  throw std::runtime_error("invalid lattice format: " + line);
+	
+	if (input_sentence) {
+	  sentence_type sentence;
+	  if (! sentence.assign(iter, end))
+	    throw std::runtime_error("invalid sentence format: " + line);
+	  data.lattice = lattice_type(sentence);
+	} else
+	  if (! data.lattice.assign(iter, end))
+	    throw std::runtime_error("invalid lattice format: " + line);
+	
 	utils::resource end;
 
 	statistics_type::statistic_type& stat = data.statistics["input-lattice"];
@@ -424,8 +437,16 @@ viterbi: compute viterbi tree\n\
       }
     } else if (input_lattice) {
       utils::resource start;
-      if (! data.lattice.assign(iter, end))
-	throw std::runtime_error("invalid lattice format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
+      
+      if (input_sentence) {
+	sentence_type sentence;
+	if (! sentence.assign(iter, end))
+	  throw std::runtime_error("invalid sentence format: " + line);
+	data.lattice = lattice_type(sentence);
+      } else
+	if (! data.lattice.assign(iter, end))
+	  throw std::runtime_error("invalid lattice format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
+      
       utils::resource end;
       
       statistics_type::statistic_type& stat = data.statistics["input-lattice"];

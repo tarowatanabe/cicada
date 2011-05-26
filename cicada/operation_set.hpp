@@ -56,6 +56,7 @@ namespace cicada
 		 const tree_grammar_type& tree_grammar,
 		 const std::string& goal,
 		 const bool __input_id,
+		 const bool __input_sentence,
 		 const bool __input_lattice,
 		 const bool __input_forest,
 		 const bool __input_span,
@@ -65,7 +66,7 @@ namespace cicada
 		 const int debug)
     {
       initialize(parameter_set_type(first, last), model, grammar, tree_grammar, goal, 
-		 __input_id, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
+		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
 		 debug);
     }
     
@@ -75,6 +76,7 @@ namespace cicada
 		 const tree_grammar_type& tree_grammar,
 		 const std::string& goal,
 		 const bool __input_id,
+		 const bool __input_sentence,
 		 const bool __input_lattice,
 		 const bool __input_forest,
 		 const bool __input_span,
@@ -84,7 +86,7 @@ namespace cicada
 		 const int debug)
     {
       initialize(parameters, model, grammar, tree_grammar, goal, 
-		 __input_id, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
+		 __input_id, __input_sentence, __input_lattice, __input_forest, __input_span, __input_alignment, __input_bitext, __input_mpi,
 		 debug);
     }
     
@@ -106,6 +108,7 @@ namespace cicada
 		    const tree_grammar_type& tree_grammar,
 		    const std::string& goal,
 		    const bool __input_id,
+		    const bool __input_sentence,
 		    const bool __input_lattice,
 		    const bool __input_forest,
 		    const bool __input_span,
@@ -116,6 +119,7 @@ namespace cicada
     
   private:
     bool input_id;
+    bool input_sentence;
     bool input_lattice;
     bool input_forest;
     bool input_span;
