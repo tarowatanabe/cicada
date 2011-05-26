@@ -115,7 +115,7 @@ namespace cicada
       jlf_lattice_set %= '[' >> -(jlf_lattice_arc % ',') >> ']';
       plf_lattice_set %= '(' >> +(plf_lattice_arc >> ',') >> ')';
 
-      lattice_grammar %= qi::hold['(' >> +(plf_lattice_set >> ',') >> ')'] | ('[' >> jlf_lattice_set % ',' >> ']');
+      lattice_grammar %= qi::hold['(' >> *(plf_lattice_set >> ',') >> ')'] | ('[' >> -(jlf_lattice_set % ',') >> ']');
     }
     
     typedef boost::spirit::standard::space_type space_type;
