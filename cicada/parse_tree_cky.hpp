@@ -9,6 +9,7 @@
 #include <vector>
 #include <algorithm>
 #include <set>
+#include <queue>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -1090,21 +1091,47 @@ namespace cicada
 	
 	const transducer_type::rule_pair_set_type& rules = grammar[table].rules(node);
 	
-	riter->second.reserve(rules.size());
-	
-	transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	  rule_candidates.push_back(rule_candidate_type(function(iter->features),
-							iter->source->lhs,
-							yield_source ? iter->source : iter->target,
-							iter->features,
-							iter->attributes));
+	if (rules.size() > beam_size) {
+	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
+	    const score_type score = function(iter->features);
+	    
+	    if (riter->second.size() < beam_size || score >= riter->second.front()->score) {
+	      rule_candidates.push_back(rule_candidate_type(score,
+							    iter->source->lhs,
+							    yield_source ? iter->source : iter->target,
+							    iter->features,
+							    iter->attributes));
+	      
+	      riter->second.push_back(&(rule_candidates.back()));
+	      
+	      std::push_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
+	    }
+	  }
 	  
-	  riter->second.push_back(&(rule_candidates.back()));
+	  // heap-sort!
+	  std::sort_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
+	  
+	  // shrink...
+	  rule_candidate_ptr_set_type(riter->second).swap(riter->second);
+	} else {
+	  riter->second.reserve(rules.size());
+	  
+	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
+	    rule_candidates.push_back(rule_candidate_type(function(iter->features),
+							  iter->source->lhs,
+							  yield_source ? iter->source : iter->target,
+							  iter->features,
+							  iter->attributes));
+	    
+	    riter->second.push_back(&(rule_candidates.back()));
+	  }
+	  
+	  std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
 	}
-	
-	std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
       }
       return riter->second;
     }
@@ -1117,21 +1144,47 @@ namespace cicada
 	
 	const tree_transducer_type::rule_pair_set_type& rules = tree_grammar[table].rules(node);
 	
-	riter->second.reserve(rules.size());
-	
-	tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	  tree_candidates.push_back(tree_candidate_type(function(iter->features),
-							iter->source->label,
-							yield_source ? iter->source : iter->target,
-							iter->features,
-							iter->attributes));
+	if (rules.size() > beam_size) {
+	  tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	  tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	  for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
+	    const score_type score = function(iter->features);
+
+	    if (riter->second.size() < beam_size || score >= riter->second.front()->score) {
+	      tree_candidates.push_back(tree_candidate_type(score,
+							    iter->source->label,
+							    yield_source ? iter->source : iter->target,
+							    iter->features,
+							    iter->attributes));
+	      
+	      riter->second.push_back(&(tree_candidates.back()));
+	      
+	      std::push_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<tree_candidate_type>());
+	    }
+	  }
 	  
-	  riter->second.push_back(&(tree_candidates.back()));
-	}
+	  // heap-sort!
+	  std::sort_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<tree_candidate_type>());
+	  
+	  // shrink...
+	  tree_candidate_ptr_set_type(riter->second).swap(riter->second);
+	} else {
+	  riter->second.reserve(rules.size());
 	
-	std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<tree_candidate_type>());
+	  tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	  tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	  for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
+	    tree_candidates.push_back(tree_candidate_type(function(iter->features),
+							  iter->source->label,
+							  yield_source ? iter->source : iter->target,
+							  iter->features,
+							  iter->attributes));
+	  
+	    riter->second.push_back(&(tree_candidates.back()));
+	  }
+	
+	  std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<tree_candidate_type>());
+	}
       }
       return riter->second;
     }
