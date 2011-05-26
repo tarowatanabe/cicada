@@ -239,6 +239,7 @@ viterbi: compute viterbi tree\n\
     input_mpi       = __input_mpi;
     
     // default to lattice input...
+    
     if (input_sentence)
       input_lattice = true;
     
