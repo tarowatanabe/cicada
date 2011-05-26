@@ -151,7 +151,7 @@ int main(int argc, char** argv)
 	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, sentence))
 	  throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
 	
-	if (! verify(sentence.begin(), sentence.end()))
+	if (! verify(sentence.begin(), sentence.end(), non_terminal_parser))
 	  throw std::runtime_error("sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
 	
 	if (sentence.size() == 0) continue;
