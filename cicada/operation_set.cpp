@@ -354,20 +354,6 @@ viterbi: compute viterbi tree\n\
     return phrase_parse(iter, end, ulong_ [ref(id) = _1] >> "|||", space);
   }
 
-  template <typename Iterator>
-  inline
-  bool parse_separator(Iterator& iter, Iterator end)
-  {
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
-  
-    using qi::phrase_parse;
-    using standard::space;
-  
-    return phrase_parse(iter, end, "|||", space);
-  }
-
   void OperationSet::clear()
   {
     operation_ptr_set_type::iterator oiter_end = operations.end();
@@ -377,6 +363,9 @@ viterbi: compute viterbi tree\n\
   
   void OperationSet::operator()(const std::string& line)
   {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
     // clear...
     clear();
     
@@ -415,7 +404,7 @@ viterbi: compute viterbi tree\n\
 	stat.cpu_time  += (end.cpu_time() - start.cpu_time());
       }
 
-      if (! parse_separator(iter, end))
+      if (! qi::phrase_parse(iter, end, "|||", standard::space))
 	throw std::runtime_error("invalid lattice/hypergraph format (separator): " + line);
       
       {
@@ -461,7 +450,7 @@ viterbi: compute viterbi tree\n\
     }
     
     if (input_span) {
-      if (! parse_separator(iter, end))
+      if (! qi::phrase_parse(iter, end, "|||", standard::space))
 	throw std::runtime_error("invalid span format (separator): " + line);
       
       if (! data.spans.assign(iter, end))
@@ -469,7 +458,7 @@ viterbi: compute viterbi tree\n\
     }
     
     if (input_alignment) {
-      if (! parse_separator(iter, end))
+      if (! qi::phrase_parse(iter, end, "|||", standard::space))
 	throw std::runtime_error("invalid alignment format (separator): " + line);
       
       if (! data.alignment.assign(iter, end))
@@ -477,12 +466,15 @@ viterbi: compute viterbi tree\n\
     }
     
     if (input_bitext) {
-      if (! parse_separator(iter, end))
+      if (! qi::phrase_parse(iter, end, "|||", standard::space))
 	throw std::runtime_error("invalid bitext format (separator): "  + line);
       
       if (! data.targets.assign(iter, end))
 	throw std::runtime_error("invalid sentence set format: "  + line);
     }
+
+    if (iter != end)
+      qi::parse(iter, end, +standard::space);
     
     if (iter != end)
       throw std::runtime_error("invalid input format: " + line);
