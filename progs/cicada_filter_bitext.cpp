@@ -59,6 +59,20 @@ struct sentence_parser : boost::spirit::qi::grammar<Iterator, sentence_type(), b
 };
 
 template <typename Iterator>
+struct non_terminal_parser : boost::spirit::qi::grammar<Iterator, std::string()>
+{
+  non_terminal_parser() : non_terminal_parser::base_type(string)  
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    string %= '[' >> +(standard::char_ - ',' - ']') >> -(',' >> qi::int_) >> ']';
+  }
+  
+  boost::spirit::qi::rule<Iterator, std::string()> string;
+};
+
+template <typename Iterator>
 struct sentence_generator : boost::spirit::karma::grammar<Iterator, sentence_type()>
 {
   sentence_generator() : sentence_generator::base_type(tokens)
@@ -94,6 +108,21 @@ bool add_bos_eos = false;
 
 void read_list(const path_type& path, path_set_type& files);
 void options(int argc, char** argv);
+
+template <typename Iterator, typename Grammar>
+inline
+bool verify(Iterator first, Iterator last, const Grammar& grammar)
+{
+  namespace qi = boost::spirit::qi;
+  
+  for (/**/; first != last; ++ first) {
+    std::string::const_iterator iter = first->begin();
+    std::string::const_iterator end = first->end();
+    
+    if (qi::parse(iter, end, grammar) && iter == end) return false;
+  }
+  return true;
+}
 
 int main(int argc, char** argv)
 {
@@ -132,6 +161,7 @@ int main(int argc, char** argv)
     
     sentence_parser<iiter_type>    parser;
     sentence_generator<oiter_type> generator;
+    non_terminal_parser<std::string::const_iterator> non_terminal_parser;
     
     if (alignment_mode) {
       for (size_t i = 0; i != source_files.size(); ++ i) {
@@ -161,6 +191,12 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
 	  if (! boost::spirit::qi::phrase_parse(titer, titer_end, parser, boost::spirit::standard::blank, target))
 	    throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  
+	  if (! verify(source.begin(), source.end(), non_terminal_parser))
+	    throw std::runtime_error("source sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  if (! verify(target.begin(), target.end(), non_terminal_parser))
+	    throw std::runtime_error("target sentence parsing failed at # " + utils::lexical_cast<std::string>(line_no));
+	  
 	  
 	  if (! (is_align >> alignment))
 	    throw std::runtime_error("no alignment?");

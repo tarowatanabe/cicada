@@ -49,6 +49,7 @@ bin_PROGRAMS = \
 	cicada_filter_conll \
 	cicada_filter_penntreebank \
 	cicada_filter_terminal \
+	cicada_filter_text \
 	cicada_filter_weights \
 	cicada_format_rbnf \
 	cicada_grammar_coarse \
@@ -150,6 +151,9 @@ cicada_filter_penntreebank_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(p
 
 cicada_filter_bitext_SOURCES = cicada_filter_bitext.cpp
 cicada_filter_bitext_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_text_SOURCES = cicada_filter_text.cpp
+cicada_filter_text_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_cabocha_SOURCES = cicada_filter_cabocha.cpp
 cicada_filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
