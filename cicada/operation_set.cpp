@@ -245,9 +245,6 @@ viterbi: compute viterbi tree\n\
     if (input_sentence)
       input_lattice = true;
     
-    if (! input_lattice && ! input_forest)
-      input_lattice = true;
-    
     data.id = size_t(-1);
     output_data.use_buffer = false;
     
