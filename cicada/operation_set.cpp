@@ -238,7 +238,9 @@ viterbi: compute viterbi tree\n\
     input_bitext    = __input_bitext;
     input_mpi       = __input_mpi;
     
-    // default to lattice input...
+    // default to sentence input...
+    if (! input_lattice && ! input_forest && ! input_sentence)
+      input_sentence = true;
     
     if (input_sentence)
       input_lattice = true;
