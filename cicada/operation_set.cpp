@@ -41,6 +41,7 @@
 #include "utils/sgi_hash_map.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/filesystem.hpp>
 
@@ -410,7 +411,7 @@ viterbi: compute viterbi tree\n\
       {
 	utils::resource start;
 	if (! data.hypergraph.assign(iter, end))
-	  throw std::runtime_error("invalid hypergraph format: " + line);
+	  throw std::runtime_error("invalid hypergraph format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
 	utils::resource end;
 	
 	statistics_type::statistic_type& stat = data.statistics["input-forest"];
@@ -424,7 +425,7 @@ viterbi: compute viterbi tree\n\
     } else if (input_lattice) {
       utils::resource start;
       if (! data.lattice.assign(iter, end))
-	throw std::runtime_error("invalid lattice format: " + line);
+	throw std::runtime_error("invalid lattice format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
       utils::resource end;
       
       statistics_type::statistic_type& stat = data.statistics["input-lattice"];
@@ -437,7 +438,7 @@ viterbi: compute viterbi tree\n\
     } else if (input_forest) {
       utils::resource start;
       if (! data.hypergraph.assign(iter, end))
-	throw std::runtime_error("invalid hypergraph format: " + line);
+	throw std::runtime_error("invalid hypergraph format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
       utils::resource end;
 
       statistics_type::statistic_type& stat = data.statistics["input-forest"];
@@ -451,33 +452,33 @@ viterbi: compute viterbi tree\n\
     
     if (input_span) {
       if (! qi::phrase_parse(iter, end, "|||", standard::space))
-	throw std::runtime_error("invalid span format (separator): " + line);
+	throw std::runtime_error("invalid span format (separator): " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
       
       if (! data.spans.assign(iter, end))
-	throw std::runtime_error("invalid span format: " + line);
+	throw std::runtime_error("invalid span format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
     }
     
     if (input_alignment) {
       if (! qi::phrase_parse(iter, end, "|||", standard::space))
-	throw std::runtime_error("invalid alignment format (separator): " + line);
+	throw std::runtime_error("invalid alignment format (separator): " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
       
       if (! data.alignment.assign(iter, end))
-	throw std::runtime_error("invalid alignment format: " + line);
+	throw std::runtime_error("invalid alignment format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
     }
     
     if (input_bitext) {
       if (! qi::phrase_parse(iter, end, "|||", standard::space))
-	throw std::runtime_error("invalid bitext format (separator): "  + line);
+	throw std::runtime_error("invalid bitext format (separator): "  + utils::lexical_cast<std::string>(data.id) + ' ' + line);
       
       if (! data.targets.assign(iter, end))
-	throw std::runtime_error("invalid sentence set format: "  + line);
+	throw std::runtime_error("invalid sentence set format: "  + utils::lexical_cast<std::string>(data.id) + ' ' + line);
     }
 
     if (iter != end)
       qi::parse(iter, end, +standard::space);
     
     if (iter != end)
-      throw std::runtime_error("invalid input format: " + line);
+      throw std::runtime_error("invalid input format: " + utils::lexical_cast<std::string>(data.id) + ' ' + line);
     
     // processing...
     operation_ptr_set_type::const_iterator oiter_end = operations.end();

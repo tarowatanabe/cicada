@@ -37,4 +37,7 @@ int main(int argc, char** argv)
   
   std::cout << "generation: " << sentence << std::endl;
   
+
+  while (std::cin >> sentence)
+    std::cout << sentence << std::endl;
 }
