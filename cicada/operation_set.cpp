@@ -394,7 +394,7 @@ viterbi: compute viterbi tree\n\
     
     if (input_id) {
       if (! parse_id(data.id, iter, end))
-	throw std::runtime_error("invalid id-prefixed format");
+	throw std::runtime_error("invalid id-prefixed format: " + line);
     } else
       ++ data.id;
 
@@ -403,7 +403,7 @@ viterbi: compute viterbi tree\n\
       {
 	utils::resource start;
 	if (! data.lattice.assign(iter, end))
-	  throw std::runtime_error("invalid lattice format");
+	  throw std::runtime_error("invalid lattice format: " + line);
 	utils::resource end;
 
 	statistics_type::statistic_type& stat = data.statistics["input-lattice"];
@@ -416,12 +416,12 @@ viterbi: compute viterbi tree\n\
       }
 
       if (! parse_separator(iter, end))
-	throw std::runtime_error("invalid lattice/hypergraph format (separator)");
+	throw std::runtime_error("invalid lattice/hypergraph format (separator): " + line);
       
       {
 	utils::resource start;
 	if (! data.hypergraph.assign(iter, end))
-	  throw std::runtime_error("invalid hypergraph format");
+	  throw std::runtime_error("invalid hypergraph format: " + line);
 	utils::resource end;
 	
 	statistics_type::statistic_type& stat = data.statistics["input-forest"];
@@ -435,7 +435,7 @@ viterbi: compute viterbi tree\n\
     } else if (input_lattice) {
       utils::resource start;
       if (! data.lattice.assign(iter, end))
-	throw std::runtime_error("invalid lattice format");
+	throw std::runtime_error("invalid lattice format: " + line);
       utils::resource end;
       
       statistics_type::statistic_type& stat = data.statistics["input-lattice"];
@@ -448,7 +448,7 @@ viterbi: compute viterbi tree\n\
     } else if (input_forest) {
       utils::resource start;
       if (! data.hypergraph.assign(iter, end))
-	throw std::runtime_error("invalid hypergraph format");
+	throw std::runtime_error("invalid hypergraph format: " + line);
       utils::resource end;
 
       statistics_type::statistic_type& stat = data.statistics["input-forest"];
@@ -462,30 +462,30 @@ viterbi: compute viterbi tree\n\
     
     if (input_span) {
       if (! parse_separator(iter, end))
-	throw std::runtime_error("invalid span format (separator)");
+	throw std::runtime_error("invalid span format (separator): " + line);
       
       if (! data.spans.assign(iter, end))
-	throw std::runtime_error("invalid span format");
+	throw std::runtime_error("invalid span format: " + line);
     }
     
     if (input_alignment) {
       if (! parse_separator(iter, end))
-	throw std::runtime_error("invalid alignment format (separator)");
+	throw std::runtime_error("invalid alignment format (separator): " + line);
       
       if (! data.alignment.assign(iter, end))
-	throw std::runtime_error("invalid alignment format");
+	throw std::runtime_error("invalid alignment format: " + line);
     }
     
     if (input_bitext) {
       if (! parse_separator(iter, end))
-	throw std::runtime_error("invalid bitext format (separator)");
+	throw std::runtime_error("invalid bitext format (separator): "  + line);
       
       if (! data.targets.assign(iter, end))
-	throw std::runtime_error("invalid sentence set format");
+	throw std::runtime_error("invalid sentence set format: "  + line);
     }
     
     if (iter != end)
-      throw std::runtime_error("invalid input format");
+      throw std::runtime_error("invalid input format: " + line);
     
     // processing...
     operation_ptr_set_type::const_iterator oiter_end = operations.end();
