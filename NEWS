@@ -9,7 +9,7 @@ Faster(?) parse-{cky,tree,tree-cky} by pre-pruning rules if exceeding pop limits
 Removed "dot" and use separate "dot_product" in dot_product.hpp
 Binarize-all now shares binarized nodes in a forest
 added --multiple option for cicada_unite_*
-added --constrained optin for constraining the # of nodes/height of minimal rules in GHKM extraction
+added --constrained option for constraining the # of nodes/height of minimal rules in GHKM extraction
 
 2011-5-18
 Serious bugfix for generate-earley. We will now check the depth of all the passive/active edges to be extended.
