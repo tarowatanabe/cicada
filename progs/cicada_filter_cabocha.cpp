@@ -259,8 +259,11 @@ int main(int argc, char** argv)
 	boost::tokenizer<boost::char_separator<char> > tokenizer(tokens[1], boost::char_separator<char>(","));
 	tokens_type poss(tokenizer.begin(), tokenizer.end());
 	
-	if (poss.size() < 2)
-	  throw std::runtime_error("invalid cabocha F1 format: invalid POS: " + utils::lexical_cast<std::string>(lineno));
+	if (poss.size() < 2) {
+	  poss.resize(2);
+	  poss[0] = "UNK";
+	  poss[1] = "*";
+	}
 	
 	if (poss[1] == "*")
 	  nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0]));
