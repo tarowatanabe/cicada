@@ -401,7 +401,6 @@ if options.pbs:
     pass
 else:
     
-    
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
