@@ -399,8 +399,9 @@ else:
 if options.pbs:
     # we use pbs to run jobs
     pass
+elif options.mpi:
+    pass
 else:
-    
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,

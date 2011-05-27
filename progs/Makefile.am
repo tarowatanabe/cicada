@@ -79,7 +79,8 @@ bin_PROGRAMS = \
 	\
 	mpimap \
 	mpish \
-	mpipe
+	mpipe \
+	thrsh
 
 LBFGS_SOURCE = lbfgs.c arithmetic_ansi.h  arithmetic_sse_double.h  arithmetic_sse_float.h  lbfgs.h
 
@@ -271,3 +272,7 @@ mpish_LDADD   = $(MPI_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
 mpipe_SOURCES = mpipe.cpp
 mpipe_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 mpipe_LDADD   = $(MPI_LDFLAGS) $(boost_LDADD) $(perftools_LDADD)
+
+thrsh_SOURCES = thrsh.cpp
+thrsh_CPPFLAGS = $(AM_CPPFLAGS)
+thrsh_LDADD   = $(boost_LDADD) $(perftools_LDADD)
