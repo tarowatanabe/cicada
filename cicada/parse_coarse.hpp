@@ -910,6 +910,9 @@ namespace cicada
       
       parsers.front().reset(new ParseCKY(goal, grammars.front(), function, yield_source, treebank, pos_mode));
       parsers.front()->operator()(lattice, scores_init, PruneNone());
+
+      // final parsing with hypergraph construction
+      ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
       
       double factor = 1.0;
       
@@ -945,9 +948,6 @@ namespace cicada
 	  factor *= 0.1;
 	  continue;
 	}
-	
-	// final parsing with hypergraph construction
-	ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
 	
 	// we will fallback to simple tag!
 	if (grammars.size() == 2)
