@@ -17,24 +17,33 @@ import string
 import re
 import subprocess
 
+import UserList
+import UserString
+
 from optparse import OptionParser, make_option
 
 opt_parser = OptionParser(
     option_list=[
-    make_option("--scores", default="", action="store", type="string", metavar="FILE", help="extracted scores")
-    make_option("--output", default="", action="store", type="string", metavar="FILE", help="output")
-
+    make_option("--scores", default="", action="store", type="string", metavar="FILE", help="extracted scores"),
+    make_option("--output", default="", action="store", type="string", metavar="FILE", help="output"),
+    
+    ## smoothing...
     make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
     
-    # option for extraction
+    ## feature/attribute names
+    make_option("--feature",   default=[], action="append", type="string", help="feature definitions"),
+    make_option("--attribute", default=[], action="append", type="string", help="attribute definitions"),
+    
+    ### options...
     make_option("--phrase", default=None, action="store_true", help="index phrase grammar"),
     make_option("--scfg",   default=None, action="store_true", help="index SCFG grammar"),
     make_option("--ghkm",   default=None, action="store_true", help="index GHKM (tree-to-string) grammar"),
     make_option("--tree",   default=None, action="store_true", help="index tree-to-tree grammar"),
-    make_option("--cfg",    default=None, action="store_true", help="CFG mode indexing for tree-grammar")
+    
+    make_option("--cky",    default=None, action="store_true", help="CKY mode indexing for tree-grammar"),
     
     ## quantize
-    make_option("--quantize", default=None, action="store_true", help="perform quantization")
+    make_option("--quantize", default=None, action="store_true", help="perform quantization"),
     
     ## kbest options
     make_option("--kbest", default=0, action="store", type="float",
@@ -246,557 +255,161 @@ class CICADA:
 		raise ValueError, binprog + ' does not exist'
 
 class IndexPhrase:
-    def __init__(self, cicada=None, cfg=None):
+    def __init__(self, cicada=None, cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_phrase
         self.filter += " --cicada"
-        self.cfg = None
+        self.cky = None
         
 class IndexSCFG:
-    def __init__(self, cicada=None, cfg=None):
+    def __init__(self, cicada=None, cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_scfg
         self.filter += " --feature-root"
-        self.cfg = None
+        self.cky = None
 
 class IndexGHKM:
-    def __init__(self, cicada=None, cfg=None):
+    def __init__(self, cicada=None, cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
-        self.cfg = cfg
+        self.cky = cky
 
 class IndexTree:
-    def __init__(self, cicada=None, cfg=None):
+    def __init__(self, cicada=None, cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
-        self.cfg = cfg
+        self.cky = cky
 
-class Index:
-    def __init__(self, cicada=None, indexer=None, input="", output="", kbest=0, quantize=None):
+class Index(UserString.UserString):
+    def __init__(self, cicada=None, indexer=None, input="", output="", root_source="", root_target="", kbest=0, quantize=None, features=[], attributes=[]):
+
+        if not input:
+            raise ValueError, "no input? %s" %(input)
+        if not output:
+            raise ValueError, "no output? %s" %(output)
+        if not root_source:
+            raise ValueError, "no root source? %s" %(root_source)
+        if not root_target:
+            raise ValueError, "no root target? %s" %(root_target)
         
-        self.command = ""
+        command = ""
 
         if kbest > 0:
-            self.command = cicada.cicada_filter_extract
-            self.command += " --nbest %s" %(kbest)
-            self.command += " --input \"%s\"" %(input)
-            self.command += " | "
-            self.command += indexer.filter
-            self.command += " | "
-            self.command += indexer.indexer
+            command = cicada.cicada_filter_extract
+            command += " --nbest %d" %(kbest)
+            command += " --input \"%s\"" %(input)
+            command += " | "
+            command += indexer.filter
+            command += " --root-source \"%s\"" %(root_source)
+            command += " --root-target \"%s\"" %(root_target)
+            command += " | "
+            command += indexer.indexer
+        else:
+            command = indexer.filter
+            command += " --root-source \"%s\"" %(root_source)
+            command += " --root-target \"%s\"" %(root_target)
+            command += " --input \"%s\"" %(input)
+            command += " | "
+            command += indexer.indexer
             
-            if quantize:
-                self.command += " --quantize"
-        else:
-            self.command = indexer.filter
-            self.command += " --input \"%s\"" %(input)
-            self.command += " | "
-            self.command += indexer.indexer
-            
-            if quantize:
-                self.command += " --quantize"
-
+        if quantize:
+            command += " --quantize"
         
-class Corpus:
+        path = output
+        sep = ':'
+        if indexer.cky:
+            path += sep
+            sep = ','
+            path += "cky=true"
+        if features:
+            path += sep
+            sep = ','
+            path += ','.join(features)
+        if attributes:
+            path += sep
+            sep = ','
+            path += ','.join(attributes)
 
-    def __init__(self, corpus="", f="", e="", sf="", se="", ff="", fe=""):
+        command += " --output \"%s\"" %(path)
 
-        self.source_tag = f
-        self.target_tag = e
-
-        self.source_span_tag = sf
-        self.target_span_tag = se
-
-        self.source_forest_tag = ff
-        self.target_forest_tag = fe
+        UserString.UserString.__init__(self, command)
         
-        self.source = compressed_file(corpus+'.'+f)
-        self.target = compressed_file(corpus+'.'+e)
+class Score:
+    def __init__(self, input="", output="", name=""):
+        self.input = input
+        self.output = output
+        self.name = name
+
+class Scores(UserList.UserList):
+    def __init__(self, prefix="", output=""):
+
+        UserList.UserList.__init__(self)
+
+        path_files = os.path.join(prefix, 'files');
+        path_root_source = os.path.join(prefix, 'root-source.gz')
+        path_root_target = os.path.join(prefix, 'root-target.gz')
         
-        self.source_span = compressed_file(corpus+'.'+sf)
-        self.target_span = compressed_file(corpus+'.'+se)
+        if not os.path.exists(path_files):
+            raise ValueError, "no path to files: %s" %(path_files)
+        if not os.path.exists(path_root_source):
+            raise ValueError, "no path to root-source: %s" %(path_root_source)
+        if not os.path.exists(path_root_target):
+            raise ValueError, "no path to root-target: %s" %(path_root_target)
         
-        self.source_forest = compressed_file(corpus+'.'+ff)
-        self.target_forest = compressed_file(corpus+'.'+fe)
-
-class Alignment:
-    def __init__(self, alignment_dir="", alignment=""):
-        self.alignment = compressed_file(os.path.join(alignment_dir, 'aligned.'+alignment))
-
-        if not os.path.exists(self.alignment):
-            raise ValueError, "no alignment data %s" %(self.alignment)
+        self.root_source = path_root_source
+        self.root_target = path_root_target
         
-
-class Lexicon:
-    def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
-                 threads=4, mpi=None, pbs=None,
-                 debug=None):
-        self.threads = threads
-        self.mpi = mpi
-        self.pbs = pbs
-        
-        self.source_target = compressed_file(os.path.join(lexical_dir, 'lex.f2n'))
-        self.target_source = compressed_file(os.path.join(lexical_dir, 'lex.n2f'))
-        self.makedirs = lexical_dir
-        self.data = []
-
-        self.data.append(corpus.source)
-        self.data.append(corpus.target)
-
-        command = "%s" %(cicada.cicada_lexicon)
-        
-        command += " --source \"%s\"" %(corpus.source)
-        command += " --target \"%s\"" %(corpus.target)
-        command += " --alignment \"%s\"" %(alignment.alignment)
-        
-        command += " --output-source-target \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.f2n'))
-        command += " --output-target-source \"%s.gz\"" %(os.path.join(lexical_dir, 'lex.n2f'))
-        
-        command += " --variational-bayes"
-        command += " --prior %g" %(prior)
-
-        if debug:
-            command += " --debug=%d" %(debug)
-        else:
-            command += " --debug"
-        
-        self.command = command
-
-    def run(self):
-        for file in self.data:
-            if not os.path.exists(file):
-                raise ValueError, "no file: " + file
-
-        if not os.path.exists(self.makedirs):
-            os.makedirs(self.makedirs)
-        
-        if self.pbs:
-            self.pbs.run(command=self.command, threads=self.threads, name="lexicon", memory=8, logfile="lexicon.log")
-        else:
-            run_command(self.command)
-
-        self.source_target = compressed_file(self.source_target)
-        self.target_source = compressed_file(self.target_source)
-
-class Extract:
-    def __init__(self, max_malloc=8, threads=4, mpi=None, pbs=None, makedirs=""):
-        self.threads = threads
-        self.max_malloc = max_malloc
-        self.mpi = mpi
-        self.pbs = pbs
-        self.makedirs = makedirs
-        self.data = []
-        self.logfile = ""
-        self.name = ""
-        
-        if not hasattr(self, 'command'):
-            self.command = ""
-        
-    def run(self):
-        for file in self.data:
-            if not os.path.exists(file):
-                raise ValueError, "no file: " + file
-
-        if not os.path.exists(self.makedirs):
-            os.makedirs(self.makedirs)
-
-        if not self.name:
-            self.name = "extract"
-
-        if self.mpi:
-            if self.pbs:
-                self.pbs.run(command=self.command, name=self.name, mpi=self.mpi, memory=self.max_malloc, logfile=self.logfile)
+        if output:
+            if os.path.exists(output):
+                if not os.path.isdir(output):
+                    os.remove(output)
+                    os.makedirs(output)
             else:
-                self.mpi.run(self.command)
-        else:
-            if self.pbs:
-                self.pbs.run(command=self.command, threads=self.threads, name="extract", memory=self.max_malloc, logfile=self.logfile)
-            else:
-                run_command(self.command)
-
-class ExtractPhrase(Extract):
-    
-    def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
-                 max_length=7, max_fertility=4,
-                 max_malloc=8, threads=4, mpi=None, pbs=None,
-                 debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
+                os.makedirs(output)
         
-        self.counts = os.path.join(model_dir, "phrase-counts")
-
-        self.data.append(corpus.source)
-        self.data.append(corpus.target)
-        self.logfile = "extract-phrase.log"
-        self.name = "extract-phrase"
-        
-        prog_name = cicada.cicada_extract_phrase
-        if mpi:
-            prog_name = cicada.cicada_extract_phrase_mpi
-        
-        command = prog_name
-        
-        command += " --source \"%s\"" %(corpus.source)
-        command += " --target \"%s\"" %(corpus.target)
-        command += " --alignment \"%s\"" %(alignment.alignment)
-        
-        command += " --output \"%s\"" %(self.counts)
-        
-        command += " --max-length %d"    %(max_length)
-        command += " --max-fertility %d" %(max_fertility)
-        
-        command += " --max-malloc %g" %(max_malloc)
-        
-        if not mpi:
-            command += " --threads %d" %(threads)
-
-        if debug:
-            command += " --debug=%d" %(debug)
-        else:
-            command += " --debug"
-        
-        self.command = command
-
-class ExtractSCFG(Extract):
-    
-    def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
-                 max_length=7, max_fertility=4, max_span=15, min_hole=1, ternary=None, sentential=None,
-                 max_malloc=8, threads=4, mpi=None, pbs=None,
-                 debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
-        
-        self.counts = os.path.join(model_dir, "scfg-counts")
-        
-        self.data.append(corpus.source)
-        self.data.append(corpus.target)
-        self.logfile = "extract-scfg.log"
-        self.name = "extract-scfg"
-        
-        if os.path.exists(corpus.source_span) and os.path.exists(corpus.target_span):
-            raise ValueError, "both of source/target span specified... which one?"
-        
-        prog_name = cicada.cicada_extract_scfg
-        if mpi:
-            prog_name = cicada.cicada_extract_scfg_mpi
-        
-        command = prog_name
-        
-        command += " --source \"%s\"" %(corpus.source)
-        command += " --target \"%s\"" %(corpus.target)
-        command += " --alignment \"%s\"" %(alignment.alignment)
-
-        if os.path.exists(corpus.source_span):
-            command += " --spans-source \"%s\"" %(corpus.source_span)
-        if os.path.exists(corpus.target_span):
-            command += " --spans-target \"%s\"" %(corpus.target_span)
-        
-        command += " --output \"%s\"" %(self.counts)
-        
-        command += " --max-length %d"    %(max_length)
-        command += " --max-fertility %d" %(max_fertility)
-        command += " --max-span %d"      %(max_span)
-        command += " --min-hole %d"      %(min_hole)
-
-        if ternary:
-            command += " --ternary"
-        if sentential:
-            command += " --sentential"
-        
-        command += " --max-malloc %g" %(max_malloc)
-
-        if not mpi:
-            command += " --threads %d" %(self.threads)        
-        if debug:
-            command += " --debug=%d" %(debug)
-        else:
-            command += " --debug"
-        
-        self.command = command
-
-class ExtractGHKM(Extract):
-    
-    def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
-                 non_terminal="", max_nodes=15, max_height=4,
-                 exhaustive=None,
-                 constrained=None,
-                 max_malloc=8, threads=4, mpi=None, pbs=None,
-                 debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
-        
-        self.counts = os.path.join(model_dir, "ghkm-counts")
-
-        if os.path.exists(corpus.source_forest) and os.path.exists(corpus.target_forest):
-            raise ValueError, "both source and target forest.. we can extract string-to-tree or tree-to-string"
-        
-        tree_to_string = 1
-        if os.path.exists(corpus.target_forest):
-            tree_to_string = None
+        for line in open(path_files):
+            name = line.strip()
+            if not name: continue
             
-        if tree_to_string:
-            self.data.append(corpus.source_forest)
-            self.data.append(corpus.target)
-        else:
-            self.data.append(corpus.target_forest)
-            self.data.append(corpus.source)
+            path = os.path.join(prefix, name)
+            if not os.path.exists(path):
+                raise ValueError, "no path to scores: %s" %(path)
+
+            root,stem = os.path.splitext(name)
             
-        self.logfile = "extract-ghkm.log"
-        self.name = "extract-ghkm"
-        
-        prog_name = cicada.cicada_extract_ghkm
-        if mpi:
-            prog_name = cicada.cicada_extract_ghkm_mpi
-        
-        command = prog_name
-        
-        if tree_to_string:
-            command += " --source \"%s\"" %(corpus.source_forest)
-            command += " --target \"%s\"" %(corpus.target)
-        else:
-            ## strig-to-tree extraction...!
-            command += " --source \"%s\"" %(corpus.target_forest)
-            command += " --target \"%s\"" %(corpus.source)
-            command += " --inverse"
-            command += " --swap"
-            
-        command += " --alignment \"%s\"" %(alignment.alignment)
-        
-        command += " --output \"%s\"" %(self.counts)
-        
-        if non_terminal:
-            if non_terminal[0] != '[' or non_terminal[-1] != ']':
-                raise ValueError, "invalid non-terminal: %s" %(non_terminal)
-
-            command += " --non-terminal \"%s\"" %(non_terminal)
-        
-        command += " --max-nodes %d"  %(max_nodes)
-        command += " --max-height %d" %(max_height)
-
-        if exhaustive:
-            command += " --exhaustive"
-        if constrained:
-            command += " --constrained"
-        
-        command += " --max-malloc %g" %(max_malloc)
-
-        if not mpi:
-            command += " --threads %d" %(self.threads)
-        if debug:
-            command += " --debug=%d" %(debug)
-        else:
-            command += " --debug"
-        
-        self.command = command
-
-
-class ExtractTree(Extract):
-    
-    def __init__(self, cicada=None, corpus=None, alignment=None,
-                 model_dir="",
-                 max_nodes=15, max_height=4,
-                 exhaustive=None,
-                 constrained=None,
-                 max_malloc=8, threads=4, mpi=None, pbs=None,
-                 debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
-        
-        self.counts = os.path.join(model_dir, "tree-counts")
-
-        self.data.append(corpus.source_forest)
-        self.data.append(corpus.target_forest)
-        self.logfile = "extract-tree.log"
-        self.name = "extract-tree"
-        
-        prog_name = cicada.cicada_extract_tree
-        if mpi:
-            prog_name = cicada.cicada_extract_tree_mpi
-        
-        command = prog_name
-        
-        command += " --source \"%s\"" %(corpus.source_forest)
-        command += " --target \"%s\"" %(corpus.target_forest)
-        command += " --alignment \"%s\"" %(alignment.alignment)
-        
-        command += " --output \"%s\"" %(self.counts)
-        
-        command += " --max-nodes %d"  %(max_nodes)
-        command += " --max-height %d" %(max_height)
-        
-        if exhaustive:
-            command += " --exhaustive"
-        if constrained:
-            command += " --constrained"
-        
-        command += " --max-malloc %g" %(max_malloc)
-        
-        if not mpi:
-            command += " --threads %d" %(self.threads)
-            
-        if debug:
-            command += " --debug=%d" %(debug)
-        else:
-            command += " --debug"
-        
-        self.command = command
-
-class ExtractScore(Extract):
-    
-    def __init__(self, cicada=None, lexicon=None,
-                 model_dir="",
-                 phrase=None, scfg=None, ghkm=None, tree=None,
-                 max_malloc=8, threads=4, mpi=None, pbs=None,
-                 debug=None):
-        Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
-        
-        option = ""
-        if phrase:
-            self.counts = os.path.join(model_dir, "phrase-counts")
-            self.scores = os.path.join(model_dir, "phrase-score")
-            option = " --score-phrase"
-        elif scfg:
-            self.counts = os.path.join(model_dir, "scfg-counts")
-            self.scores = os.path.join(model_dir, "scfg-score")
-            option = " --score-scfg"
-        elif ghkm:
-            self.counts = os.path.join(model_dir, "ghkm-counts")
-            self.scores = os.path.join(model_dir, "ghkm-score")
-            option = " --score-ghkm"
-        elif tree:
-            self.counts = os.path.join(model_dir, "tree-counts")
-            self.scores = os.path.join(model_dir, "tree-score")
-            option = " --score-ghkm"
-        else:
-            raise ValueError, "no count type?"
-
-        if not os.path.exists(self.counts):
-            raise ValueError, "no counts? %s" %(self.counts)
-
-        self.logfile = "extract-score.log"
-                
-        prog_name = cicada.cicada_extract_score
-        if mpi:
-            prog_name = cicada.cicada_extract_score_mpi
-        
-        command = prog_name
-        
-        command += " --list \"%s\"" %(self.counts)
-        command += " --output \"%s\"" %(self.scores)
-        command += " --lexicon-source-target \"%s\"" %(lexicon.source_target)
-        command += " --lexicon-target-source \"%s\"" %(lexicon.target_source)
-        command += option
-        command += " --max-malloc %g" %(max_malloc)
-        
-        if mpi:
-            command += " --prog \"%s\"" %(prog_name)
-        else:
-            command += " --threads %d" %(self.threads)
-            
-        if debug:
-            command += " --debug=%d" %(debug)
-        else:
-            command += " --debug"
-
-        self.command = command
-
+            self.append(Score(path, os.path.join(output, root + '.bin'), root + '.bin'))
 
 (options, args) = opt_parser.parse_args()
 
-if not options.model_dir:
-    options.model_dir = os.path.join(options.root_dir, "model")
-if not options.lexical_dir:
-    options.lexical_dir = options.model_dir
-if not options.alignment_dir:
-    options.alignment_dir = options.model_dir
-
 cicada = CICADA(options.cicada_dir)
 
-mpi = None
-if options.mpi_host or options.mpi_host_file or options.mpi > 0:
-    mpi = MPI(dir=options.mpi_dir,
-              hosts=options.mpi_host,
-              hosts_file=options.mpi_host_file,
-              number=options.mpi)
+scores = Scores(options.scores, options.output)
+indexer = None
+if options.phrase:
+    indexer = IndexPhrase(cicada, cky=options.cky)
+elif options.scfg:
+    indexer = IndexSCFG(cicada, cky=options.cky)
+elif options.ghkm:
+    indexer = IndexGHKM(cicada, cky=options.cky)
+elif options.tree:
+    indexer = IndexTree(cicada, cky=options.cky)
+else:
+    raise ValueError, "no indexer?"
 
-pbs = None
 if options.pbs:
-    pbs = PBS(queue=options.pbs_queue)
-
-corpus = Corpus(corpus=options.corpus,
-                f=options.f,
-                e=options.e,
-                sf=options.sf,
-                se=options.se,
-                ff=options.ff,
-                fe=options.fe)
-
-alignment = Alignment(options.alignment_dir, options.alignment)
-
-lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
-                  lexical_dir=options.lexical_dir,
-                  prior=options.lexicon_prior,
-                  threads=options.threads, mpi=mpi, pbs=pbs,
-                  debug=options.debug)
-
-if options.first_step <= 4 and options.last_step >= 4:
-    print "(4) generate lexical translation table started  @", time.ctime()
-    lexicon.run()
-    print "(4) generate lexical translation table finished @", time.ctime()
-
-if options.first_step <= 5 and options.last_step >= 5:
-    extract = None
-    if options.phrase:
-        extract = ExtractPhrase(cicada=cicada, corpus=corpus, alignment=alignment,
-                                model_dir=options.model_dir,
-                                max_length=options.max_length,
-                                max_fertility=options.max_fertility,
-                                max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                                debug=options.debug)
-    elif options.scfg:
-        extract = ExtractSCFG(cicada=cicada, corpus=corpus, alignment=alignment,
-                              model_dir=options.model_dir,
-                              max_length=options.max_length,
-                              max_fertility=options.max_fertility,
-                              max_span=options.max_span,
-                              min_hole=options.min_hole,
-                              ternary=options.ternary,
-                              sentential=options.sentential,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                              debug=options.debug)
-    elif options.ghkm:
-        extract = ExtractGHKM(cicada=cicada, corpus=corpus, alignment=alignment,
-                              model_dir=options.model_dir,
-                              non_terminal=options.non_terminal,
-                              max_nodes=options.max_nodes,
-                              max_height=options.max_height,
-                              exhaustive=options.exhaustive,
-                              constrained=options.constrained,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                              debug=options.debug)
-    elif options.tree:
-        extract = ExtractTree(cicada=cicada, corpus=corpus, alignment=alignment,
-                              model_dir=options.model_dir,
-                              max_nodes=options.max_nodes,
-                              max_height=options.max_height,
-                              exhaustive=options.exhaustive,
-                              constrained=options.constrained,
-                              max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                              debug=options.debug)
-    else:
-        raise ValueError, "no count type?"
-
-    print "(5) extract phrase table started @", time.ctime()
-    extract.run()
-    print "(5) extract phrase table finished @", time.ctime()
-
-if options.first_step <= 6 and options.last_step >= 6:
-    score = ExtractScore(cicada=cicada, lexicon=lexicon,
-                         model_dir=options.model_dir,
-                         phrase=options.phrase, scfg=options.scfg, ghkm=options.ghkm, tree=options.tree,
-                         max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
-                         debug=options.debug)
+    # we use pbs to run jobs
+    pass
+else:
     
-    print "(6) score phrase table started @", time.ctime()
-    score.run()
     
-    print "(6) score phrase table finished @", time.ctime()
+    for score in scores:
+        index = Index(cicada=cicada,
+                      indexer=indexer,
+                      input=score.input,
+                      output=score.output,
+                      root_source=scores.root_source,
+                      root_target=scores.root_target,
+                      kbest=options.kbest,
+                      quantize=options.quantize,
+                      features=options.feature,
+                      attributes=options.attribute)
