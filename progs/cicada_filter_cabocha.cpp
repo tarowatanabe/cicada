@@ -260,7 +260,10 @@ int main(int argc, char** argv)
 	if (poss.size() < 2)
 	  throw std::runtime_error("invalid cabocha F1 format: invalid POS");
 	
-	nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0] + '-' + poss[1]));
+	if (poss[1] == "*")
+	  nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0]));
+	else
+	  nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0] + '-' + poss[1]));
       } else
 	throw std::runtime_error("invalid cabocha F1 format: # of columns do not match");
     }
