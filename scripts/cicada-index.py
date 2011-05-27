@@ -114,16 +114,11 @@ class PBS:
         pipe.write("#!/bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
         pipe.write("#PBS -W block=true\n")
-        
-        if logfile:
-            pipe.write("#PBS -e %s\n" %(logfile))
-        else:
-            pipe.write("#PBS -e /dev/null\n")
-        pipe.write("#PBS -o /dev/null\n")
+        pipe.write("#PBS -k n\n")
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
-
+            
         if mpi:
             if memory > 0.0:
                 if memory < 1.0:
@@ -150,10 +145,16 @@ class PBS:
             
         pipe.write("cd \"%s\"\n" %(self.workingdir))
 
-        if mpi:
-            pipe.write("%s %s\n" %(mpi.mpirun, command))
+        if logfile:
+            if mpi:
+                pipe.write("%s %s >& %s\n" %(mpi.mpirun, command, logfile))
+            else:
+                pipe.write("%s >& %s\n" %(command, logfile))
         else:
-            pipe.write("%s\n" %(command))
+            if mpi:
+                pipe.write("%s %s\n" %(mpi.mpirun, command))
+            else:
+                pipe.write("%s\n" %(command))
         
         pipe.close()
         popen.wait()
@@ -245,31 +246,55 @@ class CICADA:
 		raise ValueError, binprog + ' does not exist'
 
 class IndexPhrase:
-    def __init__(self, cicada=None):
+    def __init__(self, cicada=None, cfg=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_phrase
-
         self.filter += " --cicada"
+        self.cfg = None
         
 class IndexSCFG:
-    def __init__(self, cicada=None):
+    def __init__(self, cicada=None, cfg=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_scfg
-        
         self.filter += " --feature-root"
+        self.cfg = None
 
 class IndexGHKM:
-    def __init__(self, cicada=None):
+    def __init__(self, cicada=None, cfg=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
+        self.cfg = cfg
 
 class IndexTree:
-    def __init__(self, cicada=None):
+    def __init__(self, cicada=None, cfg=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
+        self.cfg = cfg
 
+class Index:
+    def __init__(self, cicada=None, indexer=None, input="", output="", kbest=0, quantize=None):
+        
+        self.command = ""
 
-
+        if kbest > 0:
+            self.command = cicada.cicada_filter_extract
+            self.command += " --nbest %s" %(kbest)
+            self.command += " --input \"%s\"" %(input)
+            self.command += " | "
+            self.command += indexer.filter
+            self.command += " | "
+            self.command += indexer.indexer
+            
+            if quantize:
+                self.command += " --quantize"
+        else:
+            self.command = indexer.filter
+            self.command += " --input \"%s\"" %(input)
+            self.command += " | "
+            self.command += indexer.indexer
+            
+            if quantize:
+                self.command += " --quantize"
 
         
 class Corpus:
