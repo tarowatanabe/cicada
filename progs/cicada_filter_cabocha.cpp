@@ -96,7 +96,9 @@ int main(int argc, char** argv)
     if (! __non_terminal.is_non_terminal())
       throw std::runtime_error(non_terminal + " is not a non-terminal");
     
+    size_t lineno = -1;
     while (std::getline(is, line)) {
+      ++ lineno;
       tokenizer_type tokenizer(line);
       
       tokens.clear();
@@ -106,7 +108,7 @@ int main(int argc, char** argv)
       
       if (tokens.size() == 1) {
 	if (tokens.front() != "EOS")
-	  throw std::runtime_error("invalid cabocha F1 format: no EOS");
+	  throw std::runtime_error("invalid cabocha F1 format: no EOS: " + utils::lexical_cast<std::string>(lineno));
 	
 	
 	if (leaf_mode) {
@@ -245,11 +247,11 @@ int main(int argc, char** argv)
 	
       } else if (tokens.size() == 5) {
 	if (tokens.front() != "*")
-	  throw std::runtime_error("invalid cabocha F1 format: no star");
+	  throw std::runtime_error("invalid cabocha F1 format: no star: " + utils::lexical_cast<std::string>(lineno));
 	
 	const int index = utils::lexical_cast<int>(tokens[1]);
 	if (index != static_cast<int>(nodes.size()))
-	  throw std::runtime_error("invalid cabocha F1 format: node size do not match");
+	  throw std::runtime_error("invalid cabocha F1 format: node size do not match: " + utils::lexical_cast<std::string>(lineno));
 	
 	nodes.push_back(node_type(atoi(tokens[2].c_str()), atoi(tokens[3].c_str())));
 	
@@ -258,14 +260,14 @@ int main(int argc, char** argv)
 	tokens_type poss(tokenizer.begin(), tokenizer.end());
 	
 	if (poss.size() < 2)
-	  throw std::runtime_error("invalid cabocha F1 format: invalid POS");
+	  throw std::runtime_error("invalid cabocha F1 format: invalid POS: " + utils::lexical_cast<std::string>(lineno));
 	
 	if (poss[1] == "*")
 	  nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0]));
 	else
 	  nodes.back().terminals.push_back(std::make_pair(tokens[0], poss[0] + '-' + poss[1]));
       } else
-	throw std::runtime_error("invalid cabocha F1 format: # of columns do not match");
+	throw std::runtime_error("invalid cabocha F1 format: # of columns do not match: " + utils::lexical_cast<std::string>(lineno));
     }
   }
   catch (const std::exception& err) {
