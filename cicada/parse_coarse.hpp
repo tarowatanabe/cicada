@@ -959,6 +959,19 @@ namespace cicada
 							     thresholds.back() * factor,
 							     CoarseSymbol(grammars.size() - 2)));
 	if (graph.is_valid()) break;
+	
+	// second trial...
+	if (grammars.size() == 2)
+	  composer(lattice, graph, PruneCoarse<CoarseSimple>(scores,
+							     thresholds.back() * factor * 0.1,
+							     CoarseSimple()));
+	else
+	  composer(lattice, graph, PruneCoarse<CoarseSymbol>(scores,
+							     thresholds.back() * factor * 0.1,
+							     CoarseSymbol(grammars.size() - 2)));
+	
+	if (graph.is_valid()) break;
+
 	factor *= 0.1;
       }
     }
