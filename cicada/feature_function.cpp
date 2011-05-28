@@ -80,6 +80,7 @@ ngram: ngram language model\n\
 \tcluster=<word class>\n\
 \tname=feature-name(default: ngram)\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tcoarse-order=<order> ngram order for coarse heuristic\n\
 \tcoarse-file=<file>   ngram for coarrse heuristic\n\
 \tcoarse-cluster=<word class> word class for coarse heuristics\n\
