@@ -84,7 +84,7 @@ namespace cicada
       typedef boost::filesystem::path path_type;
       
       NGramImpl(const path_type& __path, const int __order)
-	: ngram(__path), order(__order), cluster(0), coarse(false), no_bos_eos(false)
+	: ngram(__path), order(__order), cluster(0), coarse(false), no_bos_eos(false), skip_sgml_tag(false)
       {
 	order = utils::bithack::min(order, ngram.index.order());
 	
@@ -99,7 +99,8 @@ namespace cicada
 	  order(x.order),
 	  cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0),
 	  coarse(x.coarse),
-	  no_bos_eos(x.no_bos_eos)
+	  no_bos_eos(x.no_bos_eos),
+	  skip_sgml_tag(x.skip_sgml_tag)
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -114,6 +115,7 @@ namespace cicada
 	cluster = (x.cluster ? &cluster_type::create(x.cluster->path()) : 0);
 	coarse = x.coarse;
 	no_bos_eos = x.no_bos_eos;
+	skip_sgml_tag = x.skip_sgml_tag;
 	
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -236,21 +238,61 @@ namespace cicada
 	}
       };
 
+      struct skipper_epsilon
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON;
+	}
+      };
+      
+      struct skipper_sgml
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON || (word != vocab_type::BOS && word != vocab_type::EOS && word.is_sgml_tag());
+	}
+      };
+      
       double ngram_score(state_ptr_type& state,
 			 const state_ptr_set_type& states,
 			 const edge_type& edge) const
       {
-	if (cluster)
-	  return ngram_score(state, states, edge, extract_cluster(cluster));
-	else
-	  return ngram_score(state, states, edge, extract_word());
+	if (cluster) {
+	  if (skip_sgml_tag)
+	    return ngram_score(state, states, edge, extract_cluster(cluster), skipper_sgml());
+	  else
+	    return ngram_score(state, states, edge, extract_cluster(cluster), skipper_epsilon());
+	} else {
+	  if (skip_sgml_tag)
+	    return ngram_score(state, states, edge, extract_word(), skipper_sgml());
+	  else
+	    return ngram_score(state, states, edge, extract_word(), skipper_epsilon());
+	}
       }
+
+      double ngram_estimate(const edge_type& edge) const
+      {
+	if (cluster) {
+	  if (skip_sgml_tag)
+	    return ngram_estimate(edge, extract_cluster(cluster), skipper_sgml());
+	  else
+	    return ngram_estimate(edge, extract_cluster(cluster), skipper_epsilon());
+	} else {
+	  if (skip_sgml_tag)
+	    return ngram_estimate(edge, extract_word(), skipper_sgml());
+	  else
+	    return ngram_estimate(edge, extract_word(), skipper_epsilon());
+	}
+      }
+
       
-      template <typename Extract>
+      template <typename Extract, typename Skipper>
       double ngram_score(state_ptr_type& state,
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
-			 Extract extract) const
+			 Extract extract,
+			 Skipper skipper) const
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
@@ -270,7 +312,7 @@ namespace cicada
 	  
 	  // we will copy to buffer...
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	    if (*titer != vocab_type::EPSILON)
+	    if (! skipper(*titer))
 	      buffer.push_back(extract(*titer));
 	  
 	  if (static_cast<int>(buffer.size()) <= context_size) {
@@ -326,7 +368,7 @@ namespace cicada
 	      biter = buffer.end();
 	    }
 	    
-	  } else if (*titer != vocab_type::EPSILON)
+	  } else if (! skipper(*titer))
 	    buffer.push_back(extract(*titer));
 	}
 	
@@ -378,8 +420,9 @@ namespace cicada
 	
 	return score;
       }
-
-      double ngram_estimate(const edge_type& edge) const
+      
+      template <typename Extract, typename Skipper>
+      double ngram_estimate(const edge_type& edge, Extract extract, Skipper skipper) const
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
@@ -394,36 +437,20 @@ namespace cicada
 	buffer.reserve(titer_end - titer_begin);
 	
 	double score = 0.0;
-	if (cluster) {
-	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
-	    if (titer->is_non_terminal()) {
-	      if (! buffer.empty()) {
-		buffer_type::iterator biter_begin = buffer.begin();
-		buffer_type::iterator biter_end   = buffer.end();
-		buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
-		
-		score += ngram_estimate(biter_begin, biter);
-		score += ngram_score(biter_begin, biter, biter_end);
-	      }
+	for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) {
+	  if (titer->is_non_terminal()) {
+	    if (! buffer.empty()) {
+	      buffer_type::iterator biter_begin = buffer.begin();
+	      buffer_type::iterator biter_end   = buffer.end();
+	      buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
 	      
-	      buffer.clear();
-	    } else if (*titer != vocab_type::EPSILON)
-	      buffer.push_back(cluster->operator[](*titer));
-	} else {
-	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer) 
-	    if (titer->is_non_terminal()) {
-	      if (! buffer.empty()) {
-		buffer_type::iterator biter_begin = buffer.begin();
-		buffer_type::iterator biter_end   = buffer.end();
-		buffer_type::iterator biter = std::min(biter_begin + context_size, biter_end);
-		
-		score += ngram_estimate(biter_begin, biter);
-		score += ngram_score(biter_begin, biter, biter_end);
-	      }
-	      
-	      buffer.clear();
-	    } else if (*titer != vocab_type::EPSILON)
-	      buffer.push_back(*titer);
+	      score += ngram_estimate(biter_begin, biter);
+	      score += ngram_score(biter_begin, biter, biter_end);
+	    }
+	    
+	    buffer.clear();
+	  } else if (! skipper(*titer))
+	    buffer.push_back(extract(*titer));
 	}
 	
 	if (! buffer.empty()) {
@@ -561,9 +588,9 @@ namespace cicada
       // cluster...
       cluster_type* cluster;
       
-      // coarse
       bool coarse;
       bool no_bos_eos;
+      bool skip_sgml_tag;
     };
     
     
@@ -580,6 +607,7 @@ namespace cicada
       path_type   path;
       int         order = 3;
       path_type   cluster_path;
+      bool        skip_sgml_tag = false;
       bool        no_bos_eos = false;
       
       path_type   coarse_path;
@@ -595,6 +623,8 @@ namespace cicada
 	  cluster_path = piter->second;
 	else if (utils::ipiece(piter->first) == "order")
 	  order = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "no-bos-eos")
 	  no_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "coarse-file")
@@ -623,6 +653,7 @@ namespace cicada
       std::auto_ptr<impl_type> ngram_impl(new impl_type(path, order));
 
       ngram_impl->no_bos_eos = no_bos_eos;
+      ngram_impl->skip_sgml_tag = skip_sgml_tag;
       
       if (! cluster_path.empty()) {
 	if (! boost::filesystem::exists(cluster_path))
@@ -647,6 +678,7 @@ namespace cicada
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
 
 	  ngram_impl->no_bos_eos = no_bos_eos;
+	  ngram_impl->skip_sgml_tag = skip_sgml_tag;
 	  
 	  if (! coarse_cluster_path.empty()) {
 	    if (! boost::filesystem::exists(coarse_cluster_path))

@@ -100,6 +100,9 @@ namespace cicada
     bool empty() const { return symbol().empty(); }
     
     bool is_sgml_tag() const;
+    bool is_start_tag() const;
+    bool is_end_tag() const;
+    bool is_empty_tag() const;
     
     id_type non_terminal_id() const;
     
