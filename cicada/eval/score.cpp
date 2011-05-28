@@ -96,14 +96,16 @@ bleu:\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 per: position indenendent error rate\n\
-\ttokenizer=[tokenizer spec]\n			\
-wer: word error rate\n				\
+\ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+wer: word error rate\n\
 \ttokenizer=[tokenizer spec]\n\
 \tmatcher=[matcher spec] approximate matching\n\
 \tmatch=approximated match cost (default 0.2)\n\
 \tsubstitution=substitution cost (default 1)\n\
 \tinsertion=insertion cost (default 1)\n\
 \tdeletion=deletion cost (default 1)\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 ter: translation error rate\n\
 \ttokenizer=[tokenizer spec]\n\
 \tmatcher=[matcher spec] approximate matching\n\
@@ -112,19 +114,24 @@ ter: translation error rate\n\
 \tinsertion=insertion cost (default 1)\n\
 \tdeletion=deletion cost (default 1)\n\
 \tshift=shift cost (default 1)\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 sk: string kernel\n\
 \tp=order of string kernel (default 4)\n\
 \tdecay=decay factor for string kernel (default 0.8)\n\
 \ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 wlcs: weighted longest common subsequence\n\
 \talpha=length factor, k^alpha (default 1.0)\n\
 \ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 sb: skip bigram\n\
 \twindow=window size (default 4, < 0 for infinity, == 0 for non-skip bigram)\n\
 \ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 parseval: parse evaluation\n\
 \tignore=[category] ignored category\n\
 \ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 ";
 
       return desc;
@@ -182,9 +189,9 @@ parseval: parse evaluation\n\
       } else if (utils::ipiece(param.name()) == "bleu" || utils::ipiece(param.name()) == "bleu-linear") {
 	int  order = 4;
 	const tokenizer_type* tokenizer = 0;
-	bool exact = false;
 	bool skip_sgml_tag = false;
-
+	bool exact = false;
+	
 	bool yield_source = false;
 	bool yield_target = false;
 	
@@ -196,10 +203,10 @@ parseval: parse evaluation\n\
 	    order = utils::lexical_cast<int>(piter->second);
 	  else if (utils::ipiece(piter->first) == "exact")
 	    exact = utils::lexical_cast<bool>(piter->second);
-	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
-	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "name")
 	    name = piter->second;
 	  else if (utils::ipiece(piter->first) == "refset")
@@ -220,20 +227,26 @@ parseval: parse evaluation\n\
 	
 	scorer = scorer_ptr_type(new BleuScorer(order));
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "per") {
 	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else
 	    std::cerr << "WARNING: unsupported parameter for per: " << piter->first << "=" << piter->second << std::endl;
 	}
 	
 	scorer = scorer_ptr_type(new PERScorer());
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "wer") {
 	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
 	const Matcher* matcher = 0;
 	
 	WERScorer::weights_type weights;
@@ -241,6 +254,8 @@ parseval: parse evaluation\n\
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "matcher")
 	    matcher = &Matcher::create(piter->second);
 	  else if (utils::ipiece(piter->first) == "match")
@@ -257,8 +272,10 @@ parseval: parse evaluation\n\
 	
 	scorer = scorer_ptr_type(new WERScorer(weights, matcher));
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "ter") {
 	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
 	const Matcher* matcher = 0;
 	
 	TERScorer::weights_type weights;
@@ -266,6 +283,8 @@ parseval: parse evaluation\n\
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "matcher")
 	    matcher = &Matcher::create(piter->second);
 	  else if (utils::ipiece(piter->first) == "match")
@@ -284,15 +303,19 @@ parseval: parse evaluation\n\
 	
 	scorer = scorer_ptr_type(new TERScorer(weights, matcher));
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "sk") {
 	int p = 4;
 	double decay = 0.8;
 	
 	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "p")
 	    p = utils::lexical_cast<int>(piter->second);
 	  else if (utils::ipiece(piter->first) == "decay")
@@ -303,14 +326,18 @@ parseval: parse evaluation\n\
 
 	scorer = scorer_ptr_type(new SKScorer(p, decay));
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "wlcs") {
 	double alpha = 1.0;
 	
 	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "alpha")
 	    alpha = utils::lexical_cast<double>(piter->second);
 	  else
@@ -319,14 +346,18 @@ parseval: parse evaluation\n\
 	
 	scorer = scorer_ptr_type(new WLCSScorer(alpha));
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "sb") {
 	int window = 4;
 	
 	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "window")
 	    window = utils::lexical_cast<int>(piter->second);
 	  else
@@ -335,14 +366,18 @@ parseval: parse evaluation\n\
 	
 	scorer = scorer_ptr_type(new SBScorer(window));
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else if (utils::ipiece(param.name()) == "parseval") {
 	std::vector<word_type, std::allocator<word_type> > ignored;
 	
 	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "ignored")
 	    ignored.push_back(piter->second);
 	  else
@@ -351,6 +386,7 @@ parseval: parse evaluation\n\
 	
 	scorer = scorer_ptr_type(new ParsevalScorer(ignored.begin(), ignored.end()));
 	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
       } else
 	throw std::runtime_error("unknown scorer" + param.name());
       

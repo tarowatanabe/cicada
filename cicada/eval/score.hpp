@@ -15,6 +15,7 @@
 #include <cicada/sentence.hpp>
 #include <cicada/sentence_vector.hpp>
 #include <cicada/tokenizer.hpp>
+#include <cicada/vocab.hpp>
 
 #include <utils/piece.hpp>
 
@@ -117,6 +118,7 @@ namespace cicada
       typedef cicada::Symbol         word_type;
       typedef cicada::Sentence       sentence_type;
       typedef cicada::SentenceVector sentence_set_type;
+      typedef cicada::Vocab          vocab_type;
       
       typedef Score score_type;
       typedef Scorer scorer_type;
