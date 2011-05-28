@@ -108,7 +108,7 @@ namespace cicada
     const symbol_type& __str = static_cast<const symbol_type&>(*this);
     const size_type str_size = __str.size();
     
-    return str_size >= 3 && __str[0] == '<' && __str[__str_size - 1] == '>';
+    return str_size >= 3 && __str[0] == '<' && __str[str_size - 1] == '>';
   }
   
   bool Symbol::is_start_tag() const
@@ -119,8 +119,8 @@ namespace cicada
     return (str_size >= 3
 	    && __str[0] == '<'
 	    && __str[1] != '/'
-	    && __str[__str_size - 2] != '/'
-	    && __str[__str_size - 1] == '>');
+	    && __str[str_size - 2] != '/'
+	    && __str[str_size - 1] == '>');
   }
 
   bool Symbol::is_end_tag() const
@@ -131,8 +131,8 @@ namespace cicada
     return (str_size >= 4
 	    && __str[0] == '<'
 	    && __str[1] == '/'
-	    && __str[__str_size - 2] != '/'
-	    && __str[__str_size - 1] == '>');
+	    && __str[str_size - 2] != '/'
+	    && __str[str_size - 1] == '>');
   }
 
   bool Symbol::is_empty_tag() const
@@ -143,8 +143,8 @@ namespace cicada
     return (str_size >= 4
 	    && __str[0] == '<'
 	    && __str[1] != '/'
-	    && __str[__str_size - 2] == '/'
-	    && __str[__str_size - 1] == '>');
+	    && __str[str_size - 2] == '/'
+	    && __str[str_size - 1] == '>');
   }
 
   bool Symbol::is_non_terminal() const
