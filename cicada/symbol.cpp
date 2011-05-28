@@ -103,6 +103,21 @@ namespace cicada
 #endif
   }
 
+  Symbol::piece_type Symbol::sgml_tag() const
+  {
+    if (! is_sgml_tag())
+      return Symbol::piece_type();
+
+    const symbol_type& __str = static_cast<const symbol_type&>(*this);
+    
+    if (is_empty_tag())
+      return piece_type(__str.begin() + 1, __str.end() - 2);
+    else if (is_end_tag())
+      return piece_type(__str.begin() + 2, __str.end() - 1);
+    else
+      return piece_type(__str.begin() + 1, __str.end() - 1);
+  }
+
   bool Symbol::is_sgml_tag() const
   {
     const symbol_type& __str = static_cast<const symbol_type&>(*this);
