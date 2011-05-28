@@ -43,6 +43,7 @@ antecedent: antecedent feature\n\
 bleu: BLEU\n\
 \torder=<order>\n\
 \texact=[true|false] clipped ngram computation\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 \ttokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu)\n\
 \trefset=reference set file\n\
@@ -55,9 +56,11 @@ bleu-linear: linear corpus-BLEU\n\
 \ttokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu-linear)\n\
 \trefset=reference set file\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 bleu-multi: multiple BLEU\n\
 \torder=<order>\n\
 \texact=[true|false] clipped ngram computation\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 \ttokenizer=[tokenizer spec]\n\
 \tname=feature-name(default: bleu-multi:integer)\n\
 \tsize=# of BLEU features\n\

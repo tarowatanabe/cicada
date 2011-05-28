@@ -24,6 +24,7 @@ namespace cicada
       
       std::string order;
       std::string exact;
+      std::string skip_sgml_tag;
       std::string tokenizer;
       
       int size = 0;
@@ -35,6 +36,8 @@ namespace cicada
 	  order = piter->second;
 	else if (utils::ipiece(piter->first) == "exact")
 	  exact = piter->second;
+	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	  skip_sgml_tag = piter->second;
 	else if (utils::ipiece(piter->first) == "tokenizer")
 	  tokenizer = piter->second;
 	else if (utils::ipiece(piter->first) == "name")

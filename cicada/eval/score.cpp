@@ -94,6 +94,7 @@ combined: combined scorer\n\
 bleu:\n\
 \torder=<order, default=4> ngram order\n\
 \ttokenizer=[tokenizer spec]\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 per: position indenendent error rate\n\
 \ttokenizer=[tokenizer spec]\n			\
 wer: word error rate\n				\
@@ -182,6 +183,7 @@ parseval: parse evaluation\n\
 	int  order = 4;
 	const tokenizer_type* tokenizer = 0;
 	bool exact = false;
+	bool skip_sgml_tag = false;
 
 	bool yield_source = false;
 	bool yield_target = false;
@@ -194,6 +196,8 @@ parseval: parse evaluation\n\
 	    order = utils::lexical_cast<int>(piter->second);
 	  else if (utils::ipiece(piter->first) == "exact")
 	    exact = utils::lexical_cast<bool>(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "tokenizer")
 	    tokenizer = &tokenizer_type::create(piter->second);
 	  else if (utils::ipiece(piter->first) == "name")

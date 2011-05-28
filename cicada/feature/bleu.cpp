@@ -132,17 +132,47 @@ namespace cicada
     public:
       BleuImpl(const int __order,
 	       const bool __exact,
+	       const bool __skip_sgml_tag,
 	       const tokenizer_type* __tokenizer)
 	: ngrams(word_type()), nodes(), sizes(),
-	  order(__order), exact(__exact), tokenizer(__tokenizer)
+	  order(__order), exact(__exact), skip_sgml_tag(__skip_sgml_tag), tokenizer(__tokenizer)
       {
 	
       }
 
+      struct skipper_epsilon
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON;
+	}
+      };
+
+      struct skipper_sgml
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON || (word != vocab_type::BOS && word != vocab_type::EOS && word.is_sgml_tag());
+	}
+      };
+      
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
 			const edge_type& edge,
 			const bool final=false) const
+      {
+	if (skip_sgml_tag)
+	  return bleu_score(state, states, edge, final, skipper_sgml());
+	else
+	  return bleu_score(state, states, edge, final, skipper_epsilon());
+      }
+      
+      template <typename Skipper>
+      double bleu_score(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			const bool final,
+			Skipper skipper) const
       {
 	if (ngrams.empty()) {
 	  char* buf = reinterpret_cast<char*>(state);
@@ -177,7 +207,7 @@ namespace cicada
 	  
 	  phrase_type::const_iterator titer_end = target.end();
 	  for (phrase_type::const_iterator titer = target.begin(); titer != titer_end; ++ titer)
-	    if (*titer != vocab_type::EPSILON)
+	    if (! skipper(*titer))
 	      buffer.push_back(*titer);
 	  
 	  collect_counts(buffer.begin(), buffer.end(), counts);
@@ -270,7 +300,7 @@ namespace cicada
 		biter = buffer.end();
 	      }
 	      
-	    } else if (*titer != vocab_type::EPSILON) {
+	    } else if (! skipper(*titer)) {
 	      buffer.push_back(*titer);
 	      *context_hypothesis += 1;
 	    }
@@ -608,6 +638,7 @@ namespace cicada
 
       int order;
       bool exact;
+      bool skip_sgml_tag;
 
       tokenizer_wrapper_type tokenizer;
     };
@@ -626,6 +657,7 @@ namespace cicada
 
       int order = 4;
       bool exact = false;
+      bool skip_sgml_tag = false;
 
       const cicada::Tokenizer* tokenizer = 0;
       
@@ -637,6 +669,8 @@ namespace cicada
 	  order = utils::lexical_cast<int>(piter->second);
 	else if (utils::ipiece(piter->first) == "exact")
 	  exact = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "tokenizer")
 	  tokenizer = &cicada::Tokenizer::create(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
@@ -650,7 +684,7 @@ namespace cicada
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
 	throw std::runtime_error("no refset file?: " + refset_file.string());
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, tokenizer));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, exact, skip_sgml_tag, tokenizer));
       
       // two-side context + length + counts-id 
       base_type::__state_size = sizeof(symbol_type) * order * 2 + sizeof(int) + sizeof(impl_type::id_type);

@@ -127,9 +127,9 @@ namespace cicada
       typedef cicada::Tokenizer tokenizer_type;
       
     public:
-      Scorer() : tokenizer(0) {}
+      Scorer() : tokenizer(0), skip_sgml_tag(false) {}
       Scorer(const Scorer& x)
-	: tokenizer(0)
+	: tokenizer(0), skip_sgml_tag(x.skip_sgml_tag)
       {
 	if (x.tokenizer)
 	  tokenizer = &tokenizer_type::create(x.tokenizer->algorithm());
@@ -142,6 +142,7 @@ namespace cicada
 	tokenizer = 0;
 	if (x.tokenizer)
 	  tokenizer = &tokenizer_type::create(x.tokenizer->algorithm());
+	skip_sgml_tag = x.skip_sgml_tag;
 	return *this;
       }
       
@@ -179,6 +180,7 @@ namespace cicada
       
     protected:
       const tokenizer_type* tokenizer;
+      bool skip_sgml_tag;
     };    
     
     class ScorerDocument

@@ -115,9 +115,11 @@ namespace cicada
       BleuLinearImpl(const int __order,
 		     const double __precision,
 		     const double __ratio,
-		     const tokenizer_type* __tokenizer)
+		     const tokenizer_type* __tokenizer,
+		     const bool __skip_sgml_tag)
 	: ngrams(word_type()), nodes(), sizes(), order(__order), precision(__precision), ratio(__ratio),
-	  tokenizer(__tokenizer)
+	  tokenizer(__tokenizer),
+	  skip_sgml_tag(__skip_sgml_tag)
       {
 	factors.clear();
 	factors.resize(order + 1, 0.0);
@@ -131,11 +133,38 @@ namespace cicada
 	}
       }
 
+      
+      struct skipper_epsilon
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON;
+	}
+      };
 
+      struct skipper_sgml
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON || (word != vocab_type::BOS && word != vocab_type::EOS && word.is_sgml_tag());
+	}
+      };
 
       double bleu_score(state_ptr_type& state,
 			const state_ptr_set_type& states,
 			const edge_type& edge) const
+      {
+	if (skip_sgml_tag)
+	  return bleu_score(state, states, edge, skipper_sgml());
+	else
+	  return bleu_score(state, states, edge, skipper_epsilon());
+      }
+      
+      template <typename Skipper>
+      double bleu_score(state_ptr_type& state,
+			const state_ptr_set_type& states,
+			const edge_type& edge,
+			Skipper skipper) const
       {
 	const rule_type& rule = *edge.rule;
 	
@@ -374,6 +403,8 @@ namespace cicada
       double ratio;
       
       tokenizer_wrapper_type tokenizer;
+
+      bool skip_sgml_tag;
     };
     
     BleuLinear::BleuLinear(const std::string& parameter)
@@ -390,6 +421,7 @@ namespace cicada
       int order        = 4;
       double precision = 0.8;
       double ratio     = 0.6;
+      bool skip_sgml_tag = false;
       
       const cicada::Tokenizer* tokenizer = 0;
       
@@ -409,6 +441,8 @@ namespace cicada
 	  name = piter->second;
 	else if (utils::ipiece(piter->first) == "refset")
 	  refset_file = piter->second;
+	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else
 	  std::cerr << "WARNING: unsupported parameter for bleu-linear: " << piter->first << "=" << piter->second << std::endl;
       }
@@ -416,7 +450,7 @@ namespace cicada
       if (! refset_file.empty() && ! boost::filesystem::exists(refset_file))
 	throw std::runtime_error("no refset file?: " + refset_file.string());
       
-      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, tokenizer));
+      std::auto_ptr<impl_type> bleu_impl(new impl_type(order, precision, ratio, tokenizer, skip_sgml_tag));
       
       // two-side context + length (hypothesis/reference) + counts-id (hypothesis/reference)
       base_type::__state_size = sizeof(symbol_type) * order * 2;
