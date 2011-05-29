@@ -6,6 +6,14 @@
 #ifndef __CICADA__FEATURE__SGML_TAG__HPP__
 #define __CICADA__FEATURE__SGML_TAG__HPP__ 1
 
+// sgml-tag feature which scores:
+//
+// penalty of start/end tag mismatch (scored only for the last edge)
+// penalty of difference of # of start and # of end tags
+//
+// here, we will not see the actual tag, but count whether start/end agrees
+//
+
 #include <string>
 
 #include <cicada/feature_function.hpp>
@@ -76,7 +84,13 @@ namespace cicada
 				  feature_set_type& estimates,
 				  const bool final) const;
       
-      virtual void initialize();
+      virtual void assign(const size_type& id,
+			  const hypergraph_type& hypergraph,
+			  const lattice_type& lattice,
+			  const span_set_type& spans,
+			  const sentence_set_type& targets,
+			  const ngram_count_set_type& ngram_counts);
+      
       
       
       virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new SGMLTag(*this)); }

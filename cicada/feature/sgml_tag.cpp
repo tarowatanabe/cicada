@@ -78,7 +78,7 @@ namespace cicada
       
       pimpl = sgml_tag.release();
       
-      base_type::__state_size = 0;
+      base_type::__state_size = sizeof(impl_type::id_type) + sizeof(int) * 2;
       base_type::__feature_name = "sgml-tag";
     }
     
@@ -145,9 +145,15 @@ namespace cicada
 				 const bool final) const
     {}
     
-    void SGMLTag::initialize()
+    void SGMLTag::assign(const size_type& id,
+			 const hypergraph_type& hypergraph,
+			 const lattice_type& lattice,
+			 const span_set_type& spans,
+			 const sentence_set_type& targets,
+			 const ngram_count_set_type& ngram_counts)
     {
       
     }
+    
   };
 };

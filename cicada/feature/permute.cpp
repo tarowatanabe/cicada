@@ -186,11 +186,6 @@ namespace cicada
 				 feature_set_type& features,
 				 feature_set_type& estimates,
 				 const bool final) const
-    {}
-    
-    void Permute::initialize()
-    {
-      
-    }
+    {}    
   };
 };
