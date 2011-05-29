@@ -55,6 +55,14 @@ namespace cicada
       {
 	
       }
+
+      void estimate(const hypergraph_type& forest) const
+      {
+	
+	
+	
+      }
+      
     };
     
     SGMLTag::SGMLTag(const std::string& parameter)
