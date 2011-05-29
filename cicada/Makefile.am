@@ -107,6 +107,7 @@ feature/parent.hpp \
 feature/penalty.hpp \
 feature/permute.hpp \
 feature/rule_shape.hpp \
+feature/sgml_tag.hpp \
 feature/span.hpp \
 feature/variational.hpp \
 feature/vocabulary.hpp
@@ -128,6 +129,7 @@ feature/parent.cpp \
 feature/penalty.cpp \
 feature/permute.cpp \
 feature/rule_shape.cpp \
+feature/sgml_tag.cpp \
 feature/span.cpp \
 feature/variational.cpp \
 feature/vocabulary.cpp

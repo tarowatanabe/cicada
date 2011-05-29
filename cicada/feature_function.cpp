@@ -22,6 +22,7 @@
 #include "feature/penalty.hpp"
 #include "feature/permute.hpp"
 #include "feature/rule_shape.hpp"
+#include "feature/sgml_tag.hpp"
 #include "feature/span.hpp"
 #include "feature/variational.hpp"
 #include "feature/vocabulary.hpp"
@@ -103,6 +104,7 @@ parent: parent feature\n\
 permute: permutation feature\n\
 \tweights=weight file for collapsed feature\n\
 \tcollapse=[true|false] collapsed feature\n\
+sgml-tag: sgml-tag feature\n\
 span: lexical span feature\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
@@ -169,6 +171,8 @@ word-pair: word pair feature\n\
 	     || param_name == "lexical-reordering"
 	     || param_name == "lexical-reorder")
       return feature_function_ptr_type(new feature::LexicalizedReordering(parameter));
+    else if (param_name == "sgml-tag")
+      return feature_function_ptr_type(new feature::SGMLTag(parameter));
     else if (param_name == "span")
       return feature_function_ptr_type(new feature::Span(parameter));
     else if (param_name == "variational")

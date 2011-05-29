@@ -13,6 +13,7 @@
 #include "utils/hashmurmur.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/piece.hpp"
+#include "utils/indexed_trie.hpp"
 
 namespace cicada
 {
@@ -27,7 +28,6 @@ namespace cicada
       typedef cicada::Sentence sentence_type;
 
       typedef cicada::HyperGraph hypergraph_type;
-      typedef cicada::Lattice    lattice_type;
       
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -44,25 +44,107 @@ namespace cicada
       
       typedef feature_function_type::rule_type rule_type;
 
-      typedef cicada::WeightVector<double, std::allocator<double> > weight_set_type;
+      typedef utils::indexed_trie<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type>, std::allocator<symbol_type > > trie_type;
+      typedef trie_type::id_type id_type;
+
+      typedef std::vector<symbol_type, std::allocator<symbol_type> > stack_type;
       
-      SGMLTagImpl() {}
+      SGMLTagImpl() : feature("sgml-tag"), trie() {}
+      
+      inline
+      bool is_sgml_tag(const symbol_type& symbol) const
+      {
+	return symbol.is_terminal() && symbol != vocab_type::EPSILON && symbol != vocab_type::BOS && symbol != vocab_type::EOS && symbol.is_sgml_tag();
+      }
+      
+      void next_state(const symbol_type& tag, id_type& node, int& penalty) const
+      {
+	trie_type& __trie = const_cast<trie_type&>(trie);
+	
+	if (tag.is_start_tag())
+	  node = __trie.push(node, tag);
+	else if (tag.is_end_tag()) {
+	  if (node == __trie.root())
+	    node = __trie.push(node, tag);
+	  else {
+	    const symbol_type& top = __trie[node];
+	    
+	    if (top.is_end_tag())
+	      node = __trie.push(node, tag);
+	    else {
+	      penalty += (top.sgml_tag() != tag.sgml_tag());
+	      node = __trie.pop(node);
+	    }
+	  }
+	}
+      }
       
       void sgml_tag_score(state_ptr_type& state,
 			  const state_ptr_set_type& states,
 			  const edge_type& edge,
-			  feature_set_type& features) const
+			  feature_set_type& features,
+			  const bool final) const
       {
+	id_type node = trie.root();
+	int penalty = 0;
 	
-      }
+	if (states.empty()) {
+	  rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
+	    if (is_sgml_tag(*riter))
+	      next_state(*riter, node, penalty);
+	} else {
+	  stack_type& stack = const_cast<stack_type&>(stack_impl);
+	  
+	  int non_terminal_pos = 0;
+	  rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter) {
+	    if (riter->is_non_terminal()) {
+	      const int __non_terminal_index = riter->non_terminal_index();
+	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+	      ++ non_terminal_pos;
+	      
+	      id_type node_antecedent = *reinterpret_cast<const id_type*>(states[antecedent_index]);
+	      
+	      if (node == trie.root())
+		node = node_antecedent;
+	      else if (node_antecedent != trie.root()) {
+		stack.clear();
+		
+		while (node_antecedent != trie.root()) {
+		  stack.push_back(trie[node_antecedent]);
+		  node_antecedent = trie.pop(node_antecedent);
+		}
+		
+		stack_type::const_reverse_iterator siter_end = stack.rend();
+		for (stack_type::const_reverse_iterator siter = stack.rbegin(); siter != siter_end; ++ siter)
+		  next_state(*siter, node, penalty);
+	      }
+	      
+	    } else if (is_sgml_tag(*riter))
+	      next_state(*riter, node, penalty);
+	  }
+	}
 
-      void estimate(const hypergraph_type& forest) const
-      {
+	if (final) {
+	  id_type node_final = node;
+	  while (node_final != trie.root()) {
+	    ++ penalty;
+	    node_final = trie.pop(node_final);
+	  }
+	}
+
+	if (penalty == 0)
+	  features.erase(feature);
+	else
+	  features[feature] = - penalty;
 	
-	
-	
+	*reinterpret_cast<id_type*>(state) = node;
       }
       
+      feature_type feature;
+      trie_type trie;
+      stack_type stack_impl;
     };
     
     SGMLTag::SGMLTag(const std::string& parameter)
@@ -78,7 +160,7 @@ namespace cicada
 
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	std::cerr << "WARNING: unsupported parameter for sgml_tag: " << piter->first << "=" << piter->second << std::endl;
+	std::cerr << "WARNING: unsupported parameter for sgml-tag: " << piter->first << "=" << piter->second << std::endl;
       }
       
       std::auto_ptr<impl_type> sgml_tag(new impl_type());
@@ -86,7 +168,7 @@ namespace cicada
       
       pimpl = sgml_tag.release();
       
-      base_type::__state_size = sizeof(impl_type::id_type) + sizeof(int) * 2;
+      base_type::__state_size = sizeof(impl_type::id_type);
       base_type::__feature_name = "sgml-tag";
     }
     
@@ -112,9 +194,7 @@ namespace cicada
 			feature_set_type& estimates,
 			const bool final) const
     {
-      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
-      
-      pimpl->sgml_tag_score(state, states, edge, features);
+      pimpl->sgml_tag_score(state, states, edge, features, final);
     }
     
     void SGMLTag::apply_coarse(state_ptr_type& state,
@@ -152,16 +232,6 @@ namespace cicada
 				 feature_set_type& estimates,
 				 const bool final) const
     {}
-    
-    void SGMLTag::assign(const size_type& id,
-			 const hypergraph_type& hypergraph,
-			 const lattice_type& lattice,
-			 const span_set_type& spans,
-			 const sentence_set_type& targets,
-			 const ngram_count_set_type& ngram_counts)
-    {
-      
-    }
     
   };
 };
