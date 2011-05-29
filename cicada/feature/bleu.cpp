@@ -184,7 +184,7 @@ namespace cicada
 	
 	const phrase_type& __target = rule.rhs;
 	
-	phrase_type __target_tokenized;
+	phrase_type& __target_tokenized = const_cast<phrase_type&>(__target_tokenized_impl);
 	if (tokenizer)
 	  tokenizer(__target, __target_tokenized);
 	const phrase_type& target = (tokenizer ? __target_tokenized : __target);
@@ -641,6 +641,7 @@ namespace cicada
       bool skip_sgml_tag;
 
       tokenizer_wrapper_type tokenizer;
+      phrase_type __target_tokenized_impl;
     };
     
     
