@@ -72,7 +72,7 @@ namespace cicada
 	    if (top.is_end_tag())
 	      node = __trie.push(node, tag);
 	    else {
-	      penalty += (top.sgml_tag() != tag.sgml_tag());
+	      penalty += 2 * (top.sgml_tag() != tag.sgml_tag());
 	      node = __trie.pop(node);
 	    }
 	  }
