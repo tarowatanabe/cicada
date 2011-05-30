@@ -342,24 +342,6 @@ viterbi: compute viterbi tree\n\
       (*oiter)->assign(weights);
   }
 
-  template <typename Iterator>
-  inline
-  bool parse_id(size_t& id, Iterator& iter, Iterator end)
-  {
-    namespace qi = boost::spirit::qi;
-    namespace standard = boost::spirit::standard;
-    namespace phoenix = boost::phoenix;
-  
-    using qi::phrase_parse;
-    using qi::_1;
-    using qi::ulong_;
-    using standard::space;
-  
-    using phoenix::ref;
-  
-    return phrase_parse(iter, end, ulong_ [ref(id) = _1] >> "|||", space);
-  }
-
   void OperationSet::clear()
   {
     operation_ptr_set_type::iterator oiter_end = operations.end();
@@ -388,7 +370,9 @@ viterbi: compute viterbi tree\n\
     data.statistics.clear();
     
     if (input_id) {
-      if (! parse_id(data.id, iter, end))
+      qi::uint_parser<size_t> id_parser;
+      
+      if (! qi::phrase_parse(iter, end, id_parser >> "|||", standard::space, data.id))
 	throw std::runtime_error("invalid id-prefixed format: " + line);
     } else
       ++ data.id;
