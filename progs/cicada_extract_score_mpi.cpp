@@ -435,7 +435,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
       if (stream[rank] && device[rank] && queues[rank]->pop_swap(phrase_pair, true)) {
 	if (! phrase_pair.source.empty()) {
 	  
-	  if (! device[rank]->test())
+	  if (! device[rank]->test() || device[rank]->flush(true) != 0)
 	    boost::thread::yield();
 	  else
 	    found = true;
@@ -766,7 +766,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
 	    generator(*stream[rank], *citer) << '\n';
 	    
-	    if (! device[rank]->test())
+	    if (! device[rank]->test() || device[rank]->flush(true) != 0)
 	      boost::thread::yield();
 	    else
 	      found = true;
