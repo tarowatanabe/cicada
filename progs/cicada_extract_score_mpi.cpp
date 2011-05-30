@@ -847,7 +847,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     bool found = false;
     
     if (queue.size() < queue_size) {
-      for (int rank = 0; rank != mpi_size; ++ rank)
+      for (int rank = 0; rank != mpi_size; ++ rank) {
 	for (int iter = 0; iter != 64 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
 	  if (std::getline(*stream[rank], line)) {
 	    if (parser(line, parsed))
@@ -861,6 +861,12 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  
 	  found = true;
 	}
+	
+	if (utils::malloc_stats::used() > malloc_threshold)
+	  boost::thread::yield();
+	else
+	  found = false;
+      }
     }
     
     const size_t modified_size = modified.size();
@@ -872,9 +878,6 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       
       modified.clear();
       modified_set_type(modified).swap(modified);
-      
-      if (utils::malloc_stats::used() > malloc_threshold)
-	boost::thread::yield();
       
       found = true;
     }
