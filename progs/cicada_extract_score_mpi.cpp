@@ -759,8 +759,6 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank] && queues[rank]->pop_swap(modified, true)) {
 	if (! modified.empty()) {
-	  found = true;
-	  
 	  if (debug >= 5)
 	    std::cerr << "modify counts mapper: " << modified.size() << std::endl;
 	  
@@ -770,6 +768,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    
 	    if (! device[rank]->test())
 	      boost::thread::yield();
+	    else
+	      found = true;
 	  }
 	  
 	  modified.clear();
