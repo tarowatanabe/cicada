@@ -533,7 +533,7 @@ struct ExtractSCFG
       const bool sentential_mode = sentential && source_length == static_cast<int>(source_size) && target_length == static_cast<int>(target_size);
       const bool rule_mode = (! sentential) && (max_span <= 0 || source_length <= max_span);
       
-      if (max_length <= 0 || source_length <= max_length || target_length <= max_length)
+      if (max_length <= 0 || (source_length <= max_length && target_length <= max_length))
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
 	  // extract rule...
 
@@ -568,7 +568,7 @@ struct ExtractSCFG
 	    const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
 	    const int target_length1 = target_length - (niter1->target.second - niter1->target.first);
 	    
-	    if (max_length <= 0 || source_length1 <= max_length || target_length1 <= max_length)
+	    if (max_length <= 0 || (source_length1 <= max_length && target_length1 <= max_length))
 	      if (max_fertility <= 0 || fertility(source_length1, target_length1) < max_fertility) {
 		// extract rule...
 		
@@ -599,7 +599,7 @@ struct ExtractSCFG
 		const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
 		const int target_length2 = target_length1 - (niter2->target.second - niter2->target.first);
 		
-		if (max_length <= 0 || source_length2 <= max_length || target_length2 <= max_length)
+		if (max_length <= 0 || (source_length2 <= max_length && target_length2 <= max_length))
 		  if (max_fertility <= 0 || fertility(source_length2, target_length2) < max_fertility) {
 		    // extract rule...
 		    
@@ -634,7 +634,7 @@ struct ExtractSCFG
 		      const int source_length3 = source_length2 - (niter3->source.second - niter3->source.first);
 		      const int target_length3 = target_length2 - (niter3->target.second - niter3->target.first);
 		      
-		      if (max_length <= 0 || source_length3 <= max_length || target_length3 <= max_length)
+		      if (max_length <= 0 || (source_length3 <= max_length && target_length3 <= max_length))
 			if (max_fertility <= 0 || fertility(source_length3, target_length3) < max_fertility) {
 			  // extract rule...
 			  
