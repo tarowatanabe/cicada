@@ -432,19 +432,19 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && queues[rank]->pop_swap(phrase_pair, true)) {
-	if (! phrase_pair.source.empty()) {
-	  
-	  if (! device[rank]->test() || device[rank]->flush(true) != 0)
-	    boost::thread::yield();
+      if (stream[rank] && device[rank]) {
+
+	if (queues[rank]->pop_swap(phrase_pair, true)) {
+	  if (! phrase_pair.source.empty())
+	    generator(*stream[rank], phrase_pair) << '\n';
 	  else
-	    found = true;
+	    stream[rank].reset();
 	  
-	  generator(*stream[rank], phrase_pair) << '\n';
-	} else {
-	  stream[rank].reset();
 	  found = true;
 	}
+	
+	if (! device[rank]->test() || device[rank]->flush(true) != 0)
+	  boost::thread::yield();
       }
     
     found |= utils::mpi_terminate_devices(stream, device);
@@ -757,25 +757,29 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank] && queues[rank]->pop_swap(modified, true)) {
-	if (! modified.empty()) {
-	  if (debug >= 5)
-	    std::cerr << "modify counts mapper: " << modified.size() << std::endl;
-	  
-	  modified_set_type::const_iterator citer_end = modified.end();
-	  for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
-	    generator(*stream[rank], *citer) << '\n';
+      if (stream[rank] && device[rank]) {
+	
+	if (! device[rank]->test() || device[rank]->flush(true) != 0)
+	  boost::thread::yield();
+	
+	if (queues[rank]->pop_swap(modified, true)) {
+	  if (! modified.empty()) {
+	    if (debug >= 5)
+	      std::cerr << "modify counts mapper: " << modified.size() << std::endl;
 	    
-	    if (! device[rank]->test() || device[rank]->flush(true) != 0)
-	      boost::thread::yield();
-	    else
-	      found = true;
-	  }
+	    modified_set_type::const_iterator citer_end = modified.end();
+	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
+	      generator(*stream[rank], *citer) << '\n';
+	      
+	      if (! device[rank]->test() || device[rank]->flush(true) != 0)
+		boost::thread::yield();
+	    }
+	    
+	    modified.clear();
+	    modified_set_type(modified).swap(modified);
+	  } else
+	    stream[rank].reset();
 	  
-	  modified.clear();
-	  modified_set_type(modified).swap(modified);
-	} else {
-	  stream[rank].reset();
 	  found = true;
 	}
       }
