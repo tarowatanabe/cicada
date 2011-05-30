@@ -434,16 +434,19 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank]) {
 
+	bool non_sleep = false;
 	if (! device[rank]->test() || device[rank]->flush(true) != 0)
 	  boost::thread::yield();
 	else
-	  found = true;
+	  non_sleep = true;
 	
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
 	    generator(*stream[rank], phrase_pair) << '\n';
 	  else
 	    stream[rank].reset();
+	  
+	  found |= non_sleep;
 	}
       }
     
@@ -758,11 +761,13 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank]) {
+
+	bool non_sleep = false;
 	
 	if (! device[rank]->test() || device[rank]->flush(true) != 0)
 	  boost::thread::yield();
 	else
-	  found = true;
+	  non_sleep = true;
 	
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.empty()) {
@@ -776,13 +781,15 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	      if (! device[rank]->test() || device[rank]->flush(true) != 0)
 		boost::thread::yield();
 	      else
-		found = true;
+		non_sleep = true;
 	    }
 	    
 	    modified.clear();
 	    modified_set_type(modified).swap(modified);
 	  } else
 	    stream[rank].reset();
+	  
+	  found |= non_sleep;
 	}
       }
     
