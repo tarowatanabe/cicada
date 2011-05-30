@@ -862,10 +862,10 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  found = true;
 	}
 	
-	if (utils::malloc_stats::used() > malloc_threshold)
+	if (found && utils::malloc_stats::used() > malloc_threshold) {
 	  boost::thread::yield();
-	else
 	  found = false;
+	}
       }
     }
     
