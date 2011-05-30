@@ -156,7 +156,7 @@ int main(int argc, char** argv)
 	bool found = false;
 	
 	for (int rank = 1; rank != mpi_size && is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg); ++ rank) 
-	  if (device[rank]->test()) {
+	  if (device[rank]->test() && device[rank]->flush(true) == 0) {
 	    
 	    while (is_src && is_trg && is_alg && (! is_span_src.get() || *is_span_src) && (! is_span_trg.get() || *is_span_trg)) {
 	      is_src >> bitext.source;

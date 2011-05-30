@@ -145,7 +145,7 @@ int main(int argc, char** argv)
 	bool found = false;
 	
 	for (int rank = 1; rank != mpi_size && is_src && is_trg && is_alg; ++ rank) 
-	  if (device[rank]->test()) {
+	  if (device[rank]->test() && device[rank]->flush(true) == 0) {
 	    
 	    while (is_src && is_trg && is_alg) {
 	      is_src >> bitext.source;
