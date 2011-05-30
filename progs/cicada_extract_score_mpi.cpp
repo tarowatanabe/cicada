@@ -434,6 +434,9 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank]) {
 
+	if (! device[rank]->test() || device[rank]->flush(true) != 0)
+	  boost::thread::yield();
+	
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
 	    generator(*stream[rank], phrase_pair) << '\n';
@@ -442,9 +445,6 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	  
 	  found = true;
 	}
-	
-	if (! device[rank]->test() || device[rank]->flush(true) != 0)
-	  boost::thread::yield();
       }
     
     found |= utils::mpi_terminate_devices(stream, device);
