@@ -434,11 +434,11 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank]) {
 
-	bool non_sleep = false;
-	if (! device[rank]->test() || device[rank]->flush(true) != 0)
+	bool non_sleep = true;
+	if (! device[rank]->test() || device[rank]->flush(true) != 0) {
 	  boost::thread::yield();
-	else
-	  non_sleep = true;
+	  non_sleep = false;
+	}
 	
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
@@ -762,12 +762,12 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank]) {
 
-	bool non_sleep = false;
+	bool non_sleep = true;
 	
-	if (! device[rank]->test() || device[rank]->flush(true) != 0)
+	if (! device[rank]->test() || device[rank]->flush(true) != 0) {
 	  boost::thread::yield();
-	else
-	  non_sleep = true;
+	  non_sleep = false;
+	}
 	
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.empty()) {
@@ -778,10 +778,10 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
 	      generator(*stream[rank], *citer) << '\n';
 	      
-	      if (! device[rank]->test() || device[rank]->flush(true) != 0)
+	      if (! device[rank]->test() || device[rank]->flush(true) != 0) {
 		boost::thread::yield();
-	      else
-		non_sleep = true;
+		non_sleep = false;
+	      }
 	    }
 	    
 	    modified.clear();
