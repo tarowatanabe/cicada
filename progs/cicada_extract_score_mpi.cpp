@@ -436,14 +436,14 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 
 	if (! device[rank]->test() || device[rank]->flush(true) != 0)
 	  boost::thread::yield();
+	else
+	  found = true;
 	
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
 	    generator(*stream[rank], phrase_pair) << '\n';
 	  else
 	    stream[rank].reset();
-	  
-	  found = true;
 	}
       }
     
@@ -761,6 +761,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	
 	if (! device[rank]->test() || device[rank]->flush(true) != 0)
 	  boost::thread::yield();
+	else
+	  found = true;
 	
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.empty()) {
@@ -773,14 +775,14 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	      
 	      if (! device[rank]->test() || device[rank]->flush(true) != 0)
 		boost::thread::yield();
+	      else
+		found = true;
 	    }
 	    
 	    modified.clear();
 	    modified_set_type(modified).swap(modified);
 	  } else
 	    stream[rank].reset();
-	  
-	  found = true;
 	}
       }
     
