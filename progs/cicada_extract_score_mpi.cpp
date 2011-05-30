@@ -829,7 +829,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
 
-  const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
+  const size_t malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
   
   const size_t queue_size = mpi_size * 128;
   queue_type queue(queue_size);
