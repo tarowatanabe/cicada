@@ -828,6 +828,8 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(boost::iostreams::gzip_decompressor());
     stream[rank]->push(*device[rank]);
   }
+
+  const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
   
   const size_t queue_size = mpi_size * 128;
   queue_type queue(queue_size);
@@ -844,9 +846,9 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
   for (;;) {
     bool found = false;
     
-    if (queue.size() < queue_size)
+    if (queue.size() < queue_size) {
       for (int rank = 0; rank != mpi_size; ++ rank)
-	for (int iter = 0; iter != 256 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
+	for (int iter = 0; iter != 64 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
 	  if (std::getline(*stream[rank], line)) {
 	    if (parser(line, parsed))
 	      modified.push_back(parsed);
@@ -859,6 +861,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 	  
 	  found = true;
 	}
+    }
     
     const size_t modified_size = modified.size();
     
@@ -869,6 +872,9 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       
       modified.clear();
       modified_set_type(modified).swap(modified);
+      
+      if (utils::malloc_stats::used() > malloc_threshold)
+	boost::thread::yield();
       
       found = true;
     }
