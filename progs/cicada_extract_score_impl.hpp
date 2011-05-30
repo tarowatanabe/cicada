@@ -1067,7 +1067,7 @@ struct PhrasePairModifyMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024) >> 1;
     bool malloc_full = false;
     
     while (! pqueue.empty()) {
@@ -1096,17 +1096,17 @@ struct PhrasePairModifyMapper
 	      ++ committed;
 	      
 	      const size_t modified_size = modified[shard].size();
-		
+	      
 	      if (queues[shard]->push_swap(modified[shard], modified_size < 1024)) {
 		if (debug >= 4)
 		  std::cerr << "modified mapper send: " << modified_size << std::endl;
-
+		
 		modified[shard].clear();
 	      } else
 		++ failed;
 	    }
 	  
-	  if (committed && committed == failed)
+	  if (committed && failed)
 	    boost::thread::yield();
 	}
 	
@@ -1914,7 +1914,7 @@ struct PhrasePairScoreMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024) >> 1;
     bool malloc_full = false;
 
     while (! pqueue.empty()) {
@@ -1927,7 +1927,7 @@ struct PhrasePairScoreMapper
 	if (! counts.counts.empty()) {
 	  if (debug >= 5)
 	    std::cerr << "score count mapper send" << std::endl;
-	      
+	  
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
 	  queues[shard]->push_swap(counts);
 	}
