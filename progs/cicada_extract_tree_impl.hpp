@@ -847,7 +847,12 @@ struct ExtractTree
       derivations_new.clear();
     }
     
-    void construct_derivations(const hypergraph_type& graph, const DerivationGraph& counterpart, const bool exhaustive, const bool constrained)
+    void construct_derivations(const hypergraph_type& graph,
+			       const DerivationGraph& counterpart,
+			       const int max_nodes,
+			       const int max_height,
+			       const bool exhaustive,
+			       const bool constrained)
     {
       typedef std::deque<frontier_type, std::allocator<frontier_type> > queue_type;
       typedef google::dense_hash_map<range_type, id_type, utils::hashmurmur<size_t>, std::equal_to<range_type> > range_node_map_type;
@@ -1369,8 +1374,8 @@ struct ExtractTree
     graph_target.admissible_nodes(target, graph_source);
     
     // construct derivations... here, we will create minimal rules wrt single side
-    graph_source.construct_derivations(source, graph_target, exhaustive, constrained);
-    graph_target.construct_derivations(target, graph_source, exhaustive, constrained);
+    graph_source.construct_derivations(source, graph_target, max_nodes, max_height, exhaustive, constrained);
+    graph_target.construct_derivations(target, graph_source, max_nodes, max_height, exhaustive, constrained);
     
     // prune...
     //graph_source.prune_derivations();
