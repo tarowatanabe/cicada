@@ -434,11 +434,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank]) {
 
-	bool non_sleep = true;
-	if (! device[rank]->test() || device[rank]->flush(true) != 0) {
-	  boost::thread::yield();
-	  non_sleep = false;
-	}
+	const bool busy = (! device[rank]->test() || device[rank]->flush(true) != 0);
 	
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
@@ -446,7 +442,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 	  else
 	    stream[rank].reset();
 	  
-	  found |= non_sleep;
+	  found |= ! busy;
 	}
       }
     
@@ -761,13 +757,8 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     
     for (int rank = 0; rank != mpi_size; ++ rank)
       if (stream[rank] && device[rank]) {
-
-	bool non_sleep = true;
 	
-	if (! device[rank]->test() || device[rank]->flush(true) != 0) {
-	  boost::thread::yield();
-	  non_sleep = false;
-	}
+	const bool busy = (! device[rank]->test() || device[rank]->flush(true) != 0);
 	
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.empty()) {
@@ -775,21 +766,15 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	      std::cerr << "modify counts mapper: " << modified.size() << std::endl;
 	    
 	    modified_set_type::const_iterator citer_end = modified.end();
-	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
+	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
 	      generator(*stream[rank], *citer) << '\n';
-	      
-	      if (! device[rank]->test() || device[rank]->flush(true) != 0) {
-		boost::thread::yield();
-		non_sleep = false;
-	      }
-	    }
 	    
 	    modified.clear();
 	    modified_set_type(modified).swap(modified);
 	  } else
 	    stream[rank].reset();
 	  
-	  found |= non_sleep;
+	  found |= ! busy;
 	}
       }
     

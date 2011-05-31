@@ -1026,6 +1026,27 @@ struct PhrasePairModifyMapper
     }
   }
   
+  inline
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+  
+    if (non_found_iter >= 16) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    
+      non_found_iter = 0;
+    }
+    return non_found_iter;
+  }
+
+
   void operator()()
   {
     typedef utils::compress_istream         istream_type;
@@ -1067,9 +1088,10 @@ struct PhrasePairModifyMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024) >> 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
     
+    int non_found_iter = 0;
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1106,8 +1128,8 @@ struct PhrasePairModifyMapper
 		++ failed;
 	    }
 	  
-	  if (committed && failed)
-	    boost::thread::yield();
+	  if (committed)
+	    non_found_iter = loop_sleep(committed != failed, non_found_iter);
 	}
 	
 	++ iter;
@@ -1914,7 +1936,7 @@ struct PhrasePairScoreMapper
     
     int iter = 0;
     const int iteration_mask = (1 << 4) - 1;
-    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024) >> 1;
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
 
     while (! pqueue.empty()) {
