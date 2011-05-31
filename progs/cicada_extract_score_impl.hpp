@@ -1899,6 +1899,26 @@ struct PhrasePairScoreMapper
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
+
+  inline
+  int loop_sleep(bool found, int non_found_iter)
+  {
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+  
+    if (non_found_iter >= 16) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    
+      non_found_iter = 0;
+    }
+    return non_found_iter;
+  }
   
   void operator()()
   {
@@ -1987,19 +2007,25 @@ struct PhrasePairScoreMapper
     
     // termination...
     // we will terminate asynchronously...
-    
+    int non_found_iter = 0;
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     
     while (1) {
+      bool found = false;
       for (size_t shard = 0; shard != queues.size(); ++ shard) 
 	if (! terminated[shard]) {
 	  counts.clear();
-	  terminated[shard] = queues[shard]->push_swap(counts, true);
+	  
+	  if (queues[shard]->push_swap(counts, true)) {
+	    counts.clear();
+	    terminated[shard] = true;
+	    found = true;
+	  }
 	}
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
-      boost::thread::yield();
+      non_found_iter = loop_sleep(failed < (committed >> 1), non_found_iter);
     }
   }
 };
