@@ -758,9 +758,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank]) {
-	
-	const bool busy = (! device[rank]->test() || device[rank]->flush(true) != 0);
+      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
 	
 	if (queues[rank]->pop_swap(modified, true)) {
 	  if (! modified.empty()) {
@@ -768,19 +766,15 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	      std::cerr << "modify counts mapper: " << modified.size() << std::endl;
 	    
 	    modified_set_type::const_iterator citer_end = modified.end();
-	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
+	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
 	      generator(*stream[rank], *citer) << '\n';
-	      
-	      if (! device[rank]->test() || device[rank]->flush(true) != 0)
-		boost::thread::yield();
-	    }
 	    
 	    modified.clear();
 	    modified_set_type(modified).swap(modified);
 	  } else
 	    stream[rank].reset();
 	  
-	  found |= ! busy;
+	  found = true;
 	}
       }
     
