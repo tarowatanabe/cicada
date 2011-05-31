@@ -2012,6 +2012,7 @@ struct PhrasePairScoreMapper
     
     while (1) {
       bool found = false;
+      
       for (size_t shard = 0; shard != queues.size(); ++ shard) 
 	if (! terminated[shard]) {
 	  counts.clear();
@@ -2025,7 +2026,7 @@ struct PhrasePairScoreMapper
       
       if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
-      non_found_iter = loop_sleep(failed < (committed >> 1), non_found_iter);
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
   }
 };
