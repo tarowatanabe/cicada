@@ -435,6 +435,8 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
       if (stream[rank] && device[rank]) {
 
 	const bool busy = (! device[rank]->test() || device[rank]->flush(true) != 0);
+	if (busy)
+	  boost::thread::yield();
 	
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
@@ -766,8 +768,12 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
 	      std::cerr << "modify counts mapper: " << modified.size() << std::endl;
 	    
 	    modified_set_type::const_iterator citer_end = modified.end();
-	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
+	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
 	      generator(*stream[rank], *citer) << '\n';
+	      
+	      if (! device[rank]->test() || device[rank]->flush(true) != 0)
+		boost::thread::yield();
+	    }
 	    
 	    modified.clear();
 	    modified_set_type(modified).swap(modified);
