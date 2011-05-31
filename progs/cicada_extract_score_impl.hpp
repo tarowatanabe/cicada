@@ -1157,27 +1157,33 @@ struct PhrasePairModifyMapper
       modified[shard].push_back(counts);
     }
     
-    // send remaining...
-    for (size_t shard = 0; shard != queues.size(); ++ shard)
-      if (! modified[shard].empty()) {
-	queues[shard]->push_swap(modified[shard]);
-	modified[shard].clear();
-      }
-    
     // termination...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     
     while (1) {
-      for (size_t shard = 0; shard != queues.size(); ++ shard) 
-	if (! terminated[shard]) {
-	  modified[shard].clear();
-	  terminated[shard] = queues[shard]->push_swap(modified[shard], true);
-	  modified[shard].clear();
+      bool found = false;
+      
+      size_t num_empty = 0;
+      for (size_t shard = 0; shard != queues.size(); ++ shard)
+	if (! modified[shard].empty()) {
+	  if (queues[shard]->push_swap(modified[shard], true)) {
+	    modified[shard].clear();
+	    found = true;
+	  }
+	} else {
+	  ++ num_empty;
+	  
+	  if (! terminated[shard] && queues[shard]->push_swap(modified[shard], true)) {
+	    modified[shard].clear();
+	    
+	    terminated[shard] = true;
+	    found = true;
+	  }
 	}
       
-      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
+      if (num_empty == queues.size() && std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(terminated.size())) break;
       
-      boost::thread::yield();
+      non_found_iter = loop_sleep(found, non_found_iter);
     }
   }
 };
