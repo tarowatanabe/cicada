@@ -2242,9 +2242,10 @@ struct PhrasePairScoreReducer
 	if (! counts.empty()) {
 	  if (debug >= 4)
 	    std::cerr << "score count reducer: " << counts.size() << std::endl;
-
+	  
 	  dump_phrase_pair(counts);
 	  counts.clear();
+	  phrase_count_set_type(counts).swap(counts);
 	}
 	
 	// increment root_observed(lhs)
