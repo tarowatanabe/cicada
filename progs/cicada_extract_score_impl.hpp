@@ -1129,7 +1129,7 @@ struct PhrasePairModifyMapper
 	    }
 	  
 	  if (committed)
-	    non_found_iter = loop_sleep(failed >= (committed >> 1), non_found_iter);
+	    non_found_iter = loop_sleep(failed < (committed >> 1), non_found_iter);
 	}
 	
 	++ iter;
