@@ -1,5 +1,5 @@
 2011-6-1
-Bugfix for mpi version of extract-score. Instead of pushing into stream, wait. We assume that send-buffer is large enough for better map-reduce
+Bugfix for mpi version of extract-score. Instead of pushing into stream, wait: We assume that send-buffer is large enough for better map-reduce
 
 2011-5-30
 Serious bugfix for {compose,parse}-{tree,tree-cky}: internal rules are not correctly computed
