@@ -2245,7 +2245,7 @@ struct PhrasePairScoreReducer
 	  
 	  dump_phrase_pair(counts);
 	  counts.clear();
-	  phrase_count_set_type(counts).swap(counts);
+	  phrase_pair_set_type(counts).swap(counts);
 	}
 	
 	// increment root_observed(lhs)
