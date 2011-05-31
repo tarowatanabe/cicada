@@ -411,7 +411,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new ostream_type());
-    device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, 1024 * 1024, false, true));
+    device[rank].reset(new odevice_type(reducer.comm, rank, phrase_pair_tag, 1024 * 1024 * 16, false, true));
     
     stream[rank]->push(boost::iostreams::gzip_compressor());
     stream[rank]->push(*device[rank]);
@@ -432,21 +432,15 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     bool found = false;
     
     for (int rank = 0; rank != mpi_size; ++ rank)
-      if (stream[rank] && device[rank]) {
-
-	const bool busy = (! device[rank]->test() || device[rank]->flush(true) != 0);
-	if (busy)
-	  boost::thread::yield();
-	
+      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0)
 	if (queues[rank]->pop_swap(phrase_pair, true)) {
 	  if (! phrase_pair.source.empty())
 	    generator(*stream[rank], phrase_pair) << '\n';
 	  else
 	    stream[rank].reset();
 	  
-	  found |= ! busy;
+	  found |= true;
 	}
-      }
     
     found |= utils::mpi_terminate_devices(stream, device);
     
@@ -511,7 +505,7 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     stream[rank].reset(new istream_type());
-    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, 1024 * 1024));
+    device[rank].reset(new idevice_type(mapper.comm, rank, phrase_pair_tag, 1024 * 1024 * 16));
 
     queues[rank].reset(new queue_type(queue_size));
     
