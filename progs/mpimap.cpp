@@ -208,7 +208,7 @@ int main(int argc, char** argv)
 	    bool found = false;
 	  
 	    for (int rank = 0; rank != mpi_child_size && is; ++ rank)
-	      if (stream[rank] && device[rank] && device[rank]->test() && std::getline(is, line)) {
+	      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0 && std::getline(is, line)) {
 		*stream[rank] << line << '\n';
 	      
 		found = true;
