@@ -1119,7 +1119,7 @@ struct PhrasePairModifyMapper
 	      
 	      const size_t modified_size = modified[shard].size();
 	      
-	      if (queues[shard]->push_swap(modified[shard], modified_size < 1024)) {
+	      if (queues[shard]->push_swap(modified[shard], true)) {
 		if (debug >= 4)
 		  std::cerr << "modified mapper send: " << modified_size << std::endl;
 		
