@@ -1108,7 +1108,6 @@ struct PhrasePairModifyMapper
 	}
 	
 	if ((iter & iteration_mask) == iteration_mask) {
-	  
 	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  
 	  int committed = 0;
@@ -1117,14 +1116,9 @@ struct PhrasePairModifyMapper
 	    if (modified[shard].size() >= 64) {
 	      ++ committed;
 	      
-	      const size_t modified_size = modified[shard].size();
-	      
-	      if (queues[shard]->push_swap(modified[shard], true)) {
-		if (debug >= 4)
-		  std::cerr << "modified mapper send: " << modified_size << std::endl;
-		
+	      if (queues[shard]->push_swap(modified[shard], true))
 		modified[shard].clear();
-	      } else
+	      else
 		++ failed;
 	    }
 	  
