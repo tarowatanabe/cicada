@@ -1116,7 +1116,9 @@ struct PhrasePairModifyMapper
 	    if (modified[shard].size() >= 64) {
 	      ++ committed;
 	      
-	      if (queues[shard]->push_swap(modified[shard], true))
+	      const size_t modified_size = modified[shard].size();
+	      
+	      if (queues[shard]->push_swap(modified[shard], modified_size < 1024))
 		modified[shard].clear();
 	      else
 		++ failed;
