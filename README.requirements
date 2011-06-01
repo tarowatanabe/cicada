@@ -13,10 +13,9 @@ MPI (Open MPI)    (http://www.open-mpi.org/)
 
 ICU               (http://site.icu-project.org/)
 google-sparsehash (http://code.google.com/p/google-sparsehash/)
+snappy            (http://code.google.com/p/snappy/)
 
 Optional:
-	snappy (http://code.google.com/p/snappy/)
-	
 	google-perftools (http://code.google.com/p/google-perftools/)
 	jemalloc (http://mxr.mozilla.org/mozilla-central/source/memory/jemalloc/)
 		 There is a different jemalloc (by the original author) from http://www.canonware.com/jemalloc/,
