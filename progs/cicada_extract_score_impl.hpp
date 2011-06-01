@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <cstring>
 
+#include <memory>
+
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
 
@@ -1634,7 +1636,7 @@ public:
     os_counts.push(boost::iostreams::file_sink(path_counts.string()), 1024 * 1024);
     os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
 
-    segment_map_type segment_map(1024 * 1024 * 4);
+    std::auto_ptr<segment_map_type> segment_map(new segment_map_type(1024 * 1024 * 4));
     
     pqueue_type pqueue;
     istream_ptr_set_type   istreams(paths.size());
@@ -1683,7 +1685,7 @@ public:
 	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
 	    const utils::piece& seg = *titer;
 	    
-	    codes.push_back(segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
+	    codes.push_back(segment_map->insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
 	  }
 	  
 	  index.insert(&(*codes.begin()), codes.size(), id);
@@ -1740,7 +1742,7 @@ public:
       for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
 	const utils::piece& seg = *titer;
 	    
-	codes.push_back(segment_map.insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
+	codes.push_back(segment_map->insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
       }
 	  
       index.insert(&(*codes.begin()), codes.size(), id);
@@ -1755,7 +1757,8 @@ public:
       os_counts.write((char*) &observed, sizeof(count_type));
     }
     
-    segment_map.write(path_segment);
+    segment_map->write(path_segment);
+    segment_map.reset();
 
     index.clear();
     counts.clear();
