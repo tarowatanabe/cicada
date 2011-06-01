@@ -1118,9 +1118,10 @@ struct PhrasePairModifyMapper
 	      
 	      const size_t modified_size = modified[shard].size();
 	      
-	      if (queues[shard]->push_swap(modified[shard], modified_size < 1024))
+	      if (queues[shard]->push_swap(modified[shard], modified_size < 1024)) {
 		modified[shard].clear();
-	      else
+		modified_set_type(modified[shard]).swap(modified[shard]);
+	      } else
 		++ failed;
 	    }
 	  
@@ -1164,6 +1165,8 @@ struct PhrasePairModifyMapper
 	if (! modified[shard].empty()) {
 	  if (queues[shard]->push_swap(modified[shard], true)) {
 	    modified[shard].clear();
+	    modified_set_type(modified[shard]).swap(modified[shard]);
+	    
 	    found = true;
 	  }
 	} else {
@@ -1171,6 +1174,7 @@ struct PhrasePairModifyMapper
 	  
 	  if (! terminated[shard] && queues[shard]->push_swap(modified[shard], true)) {
 	    modified[shard].clear();
+	    modified_set_type(modified[shard]).swap(modified[shard]);
 	    
 	    terminated[shard] = true;
 	    found = true;
