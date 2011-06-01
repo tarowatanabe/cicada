@@ -133,7 +133,7 @@ namespace succinctdb
       const key_type* last;
     };
     typedef typename Alloc::template rebind<__value_type>::other __value_alloc_type;
-    typedef std::vector<__value_type, __value_alloc_type> __value_set_type;
+    typedef std::vector<__value_type, utils::map_file_allocator<__value_type, __value_alloc_type> > __value_set_type;
     
     struct __extract_key
     {

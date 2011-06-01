@@ -19,9 +19,9 @@ struct Task
   
   void operator()() throw()
   {
-    for (int i = 0; i < 1024 * 1024 * 4; ++ i)
+    for (int i = 0; i < 1024 * 1024 * 128; ++ i)
       array.push_back(i);
-    for (int i = 0; i < 1024 * 1024 * 4; ++ i)
+    for (int i = 0; i < 1024 * 1024 * 128; ++ i)
       if (array[i] != i)
 	std::cerr << "DIFFER?" << std::endl;
   }
