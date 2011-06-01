@@ -339,7 +339,7 @@ namespace utils
     {
       if (__n == 0) return 0;
 
-      if (sizeof(_Tp) * __n < 1024 * 1024)
+      if (sizeof(_Tp) * __n < 1024 * 1024 * 256)
 	return base_allocator().allocate(__n);
       else
 	return static_cast<pointer>(map_alloc().allocate(sizeof(_Tp) * __n));
@@ -349,7 +349,7 @@ namespace utils
     deallocate(pointer __p, size_type __n) {
       if (! __p) return;
       
-      if (sizeof(_Tp) * __n < 1024 * 1024)
+      if (sizeof(_Tp) * __n < 1024 * 1024 * 256)
 	base_allocator().deallocate(__p, __n);
       else
 	map_alloc().deallocate(static_cast<void*>(__p), sizeof(_Tp) * __n);

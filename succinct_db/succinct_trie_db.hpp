@@ -28,6 +28,7 @@
 #include <utils/repository.hpp>
 #include <utils/tempfile.hpp>
 #include <utils/bithack.hpp>
+#include <utils/map_file_allocator.hpp>
 
 namespace succinctdb
 {
