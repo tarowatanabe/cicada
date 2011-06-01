@@ -911,9 +911,9 @@ namespace cicada
     rule_db.open(path_rule, rule_pair_db_type::WRITE);
     edge_map_type edge_map(1024 * 1024 * 4);
     
-    symbol_map_type symbol_map(1024 * 1024 * 4);
-    rule_map_type  source_map(1024 * 1024 * 4);
-    rule_map_type  target_map(1024 * 1024 * 4);
+    std::auto_ptr<symbol_map_type> symbol_map(new symbol_map_type(1024 * 1024 * 4));
+    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 4));
+    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 4));
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
@@ -970,10 +970,10 @@ namespace cicada
       if (source != source_prev) {
 	
 	if (! rule_options.empty()) {
-	  encode_rule(source_prev, symbol_map, buffer_source, *this);
+	  encode_rule(source_prev, *symbol_map, buffer_source, *this);
 	  
-	  const id_type id_source = source_map.insert(&(*buffer_source.begin()), buffer_source.size(),
-						      hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
+	  const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
+						       hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
 	  
 	  encode_tree_options(rule_options, buffer_options, id_source);
 
@@ -1030,19 +1030,19 @@ namespace cicada
       for (int attribute = 0; attribute < attribute_size; ++ attribute)
 	attr_streams[attribute].ostream->write((char*) &attrs[attribute], sizeof(score_type));
       
-      encode_rule(target, symbol_map, buffer_target, *this);
+      encode_rule(target, *symbol_map, buffer_target, *this);
       
-      const id_type id_target = target_map.insert(&(*buffer_target.begin()), buffer_target.size(),
-						  hasher_type::operator()(buffer_target.begin(), buffer_target.end(), 0));
+      const id_type id_target = target_map->insert(&(*buffer_target.begin()), buffer_target.size(),
+						   hasher_type::operator()(buffer_target.begin(), buffer_target.end(), 0));
       
       rule_options.push_back(std::make_pair(id_rule ++, id_target));
     }
     
     if (! rule_options.empty()) {
-      encode_rule(source_prev, symbol_map, buffer_source, *this);
+      encode_rule(source_prev, *symbol_map, buffer_source, *this);
 	  
-      const id_type id_source = source_map.insert(&(*buffer_source.begin()), buffer_source.size(),
-						  hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
+      const id_type id_source = source_map->insert(&(*buffer_source.begin()), buffer_source.size(),
+						   hasher_type::operator()(buffer_source.begin(), buffer_source.end(), 0));
       
       encode_tree_options(rule_options, buffer_options, id_source);
 
@@ -1057,14 +1057,14 @@ namespace cicada
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
     }
 
-    symbol_map.write(path_symbol);
-    symbol_map.clear();
+    symbol_map->write(path_symbol);
+    symbol_map.reset();
     
-    source_map.write(path_source);
-    source_map.clear();
+    source_map->write(path_source);
+    source_map.reset();
     
-    target_map.write(path_target);
-    target_map.clear();
+    target_map->write(path_target);
+    target_map.reset();
     
     rule_db.close();
     

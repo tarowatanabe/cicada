@@ -899,8 +899,8 @@ namespace cicada
     utils::tempfile::insert(path_vocab);
     
     rule_db.open(path_rule, rule_db_type::WRITE);
-    phrase_map_type        source_map(1024 * 1024 * 4);
-    phrase_map_type        target_map(1024 * 1024 * 4);
+    std::auto_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 4));
+    std::auto_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 4));
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
@@ -973,8 +973,8 @@ namespace cicada
 	   
 	  encode_phrase(source_prev, codes_source);
 	     
-	  const id_type id_source = source_map.insert(&(*codes_source.begin()), codes_source.size(),
-						      hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
+	  const id_type id_source = source_map->insert(&(*codes_source.begin()), codes_source.size(),
+						       hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
 
 	  // encode options
 	  encode_options(rule_options, codes_option, id_source);
@@ -1057,8 +1057,8 @@ namespace cicada
       // encode target...
       encode_phrase(target, codes_target);
       
-      const id_type id_target = target_map.insert(&(*codes_target.begin()), codes_target.size(),
-						  hasher_type::operator()(codes_target.begin(), codes_target.end(), 0));
+      const id_type id_target = target_map->insert(&(*codes_target.begin()), codes_target.size(),
+						   hasher_type::operator()(codes_target.begin(), codes_target.end(), 0));
       
       // put into rule_options...
       rule_options.push_back(boost::make_tuple(id_rule ++, id_lhs, id_target));
@@ -1069,8 +1069,8 @@ namespace cicada
 	
       encode_phrase(source_prev, codes_source);
 	     
-      const id_type id_source = source_map.insert(&(*codes_source.begin()), codes_source.size(),
-						  hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
+      const id_type id_source = source_map->insert(&(*codes_source.begin()), codes_source.size(),
+						   hasher_type::operator()(codes_source.begin(), codes_source.end(), 0));
       
       // encode options
       encode_options(rule_options, codes_option, id_source);
@@ -1082,11 +1082,11 @@ namespace cicada
       rule_db.insert(&(*source_index.begin()), source_index.size(), &(*codes_option.begin()), codes_option.size());
     }
 
-    source_map.write(path_source);
-    source_map.clear();
+    source_map->write(path_source);
+    source_map.reset();
     
-    target_map.write(path_target);
-    target_map.clear();
+    target_map->write(path_target);
+    target_map.reset();
     
     rule_db.close();
     
