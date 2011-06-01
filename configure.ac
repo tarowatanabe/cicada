@@ -60,9 +60,6 @@ fi
 AC_ARG_WITH(snappy,
 	[AC_HELP_STRING([--with-snappy=DIR], [snappy in DIR])],
 	[snappy_dir="${withval}"], [snappy_dir=''])
-AC_ARG_ENABLE(snappy,
-	[AC_HELP_STRING([--enable-snappy], [enable snappy])],
-	[ac_enable_snappy=yes], [ac_enable_snappy=no])
 
 if test "x$snappy_dir" != "x"; then
   SNAPPY_CPPFLAGS="-I${snappy_dir}/include"
@@ -72,34 +69,29 @@ else
   SNAPPY_LDFLAGS="-lsnappy"
 fi
 
-if test "x$ac_enable_snappy" = "xyes"; then
-   AC_MSG_CHECKING(for snappy)
+AC_MSG_CHECKING(for snappy)
    
-   save_CXXFLAGS="$CXXFLAGS"
-   save_LDFLAGS="$LDFLAGS"
-   CXXFLAGS="$CXXFLAGS $SNAPPY_CPPFLAGS"
-   LDFLAGS="$LDFLAGS $SNAPPY_LDFLAGS"
+save_CXXFLAGS="$CXXFLAGS"
+save_LDFLAGS="$LDFLAGS"
+CXXFLAGS="$CXXFLAGS $SNAPPY_CPPFLAGS"
+LDFLAGS="$LDFLAGS $SNAPPY_LDFLAGS"
 
-   AC_TRY_LINK([], [], [ac_have_libsnappy=yes], [ac_have_libsnappy=no])
-   AC_MSG_RESULT($ac_have_libsnappy)
-   AC_CHECK_HEADERS([snappy.h])
+AC_TRY_LINK([], [], [ac_have_libsnappy=yes], [ac_have_libsnappy=no])
+AC_MSG_RESULT($ac_have_libsnappy)
+AC_CHECK_HEADERS([snappy.h])
 
-   if test "x$ac_have_libsnappy" = "xno" -o "x$ac_cv_header_snappy_h" = "xno"; then
-     SNAPPY_CPPFLAGS=""
-     SNAPPY_LDFLAGS=""
-   else
-     AC_DEFINE(HAVE_SNAPPY, 1, [Define if you have snappy])
-   fi
-
-  CXXFLAGS="$save_CXXFLAGS"
-  LDFLAGS="$save_LDFLAGS"
-else
+if test "x$ac_have_libsnappy" = "xno" -o "x$ac_cv_header_snappy_h" = "xno"; then
   SNAPPY_CPPFLAGS=""
   SNAPPY_LDFLAGS=""
+else
+  AC_DEFINE(HAVE_SNAPPY, 1, [Define if you have snappy])
 fi
+
+CXXFLAGS="$save_CXXFLAGS"
+LDFLAGS="$save_LDFLAGS"
+
 AC_SUBST(SNAPPY_CPPFLAGS)
 AC_SUBST(SNAPPY_LDFLAGS)
-
 
 AC_ARG_WITH(jemalloc,
 	[AC_HELP_STRING([--with-jemalloc=DIR], [jemalloc in DIR])],

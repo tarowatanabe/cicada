@@ -97,6 +97,7 @@ resource.hpp \
 sgi_hash_map.hpp \
 sgi_hash_set.hpp \
 simple_vector.hpp \
+snappy_device.hpp \
 space_separator.hpp \
 sparse_hashtable.hpp \
 sparse_map.hpp \
