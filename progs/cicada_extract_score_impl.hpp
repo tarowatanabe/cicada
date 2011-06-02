@@ -57,11 +57,6 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/base64.hpp>
 #include <utils/lexical_cast.hpp>
-#include <utils/snappy_vector.hpp>
-#include <utils/snappy_device.hpp>
-
-#include <succinct_db/succinct_trie_db.hpp>
-#include <succinct_db/succinct_hash.hpp>
 
 #include <google/dense_hash_map>
 
@@ -1429,143 +1424,66 @@ struct PhrasePairModifyReducer
   }
 };
 
-// index modified counts... we will index by the target-side counts...
-class PhraseCounts : public utils::hashmurmur<uint64_t>
+struct PhrasePairReverse
 {
-public:
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
-  typedef boost::filesystem::path                            path_type;
-  typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
-
   typedef uint64_t                           hash_value_type;
   typedef utils::hashmurmur<hash_value_type> hasher_type;
   
-  typedef PhrasePair phrase_pair_type;
-  typedef phrase_pair_type::phrase_type phrase_type;
+  typedef boost::filesystem::path                            path_type;
+  typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+  
+  typedef PhrasePair         phrase_pair_type;
+  typedef RootCount          root_count_type;
+  typedef PhrasePairModified modified_type;
+  
+  typedef std::vector<modified_type, std::allocator<modified_type> > modified_set_type;
 
-  typedef PhrasePairModified       modified_type;
-  typedef PhrasePairModifiedParser modified_parser_type;
-
-  typedef RootCount root_count_type;
   typedef std::set<root_count_type, std::less<root_count_type>, std::allocator<root_count_type> > root_count_set_type;
   
-  typedef char     key_type;
-  typedef uint64_t id_type;
-  typedef double   count_type;
+  typedef utils::lockfree_list_queue<modified_type, std::allocator<modified_type> > queue_type;
   
-  typedef succinctdb::succinct_hash_mapped<key_type, std::allocator<key_type> > segment_db_type;
-  
-  typedef segment_db_type::pos_type segment_id_type;
-  typedef std::vector<segment_id_type, std::allocator<segment_id_type> > code_set_type;
-  
-  typedef succinctdb::succinct_trie_db<segment_id_type, id_type, std::allocator<std::pair<segment_id_type, id_type> > > index_db_type;
-  
-  typedef utils::snappy_vector_mapped<count_type, std::allocator<count_type> > counts_db_type;
-  
-  typedef phrase_pair_type::counts_type count_set_type;
-  
-  struct cache_type
-  {
-    index_db_type::size_type node;
-    count_set_type           counts;
-    
-    cache_type() : node(index_db_type::size_type(-1)), counts() {}
-  };
-  
-  typedef utils::array_power2<cache_type, 1024 * 4, std::allocator<cache_type> >               cache_set_type;
-  
-  PhraseCounts() : counts_size(size_type(-1)) {}
-  
-  template <typename ExtractRoot>
-  PhraseCounts(const path_set_type& paths, ExtractRoot extract_root) : counts_size(size_type(-1)) { open(paths, extract_root); }
-  PhraseCounts(const path_type& path) : counts_size(size_type(-1)) { open(path); }
-  
-  const count_set_type& operator[](const phrase_type& phrase) const
-  {
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-    
-    const utils::piece phrase_piece(phrase);
-    tokenizer_type tokenizer(phrase_piece);
-    
-    index_db_type::size_type node = 0;
-    
-    tokenizer_type::iterator titer_end = tokenizer.end();
-    for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-      const utils::piece& seg = *titer;
-      
-      const segment_db_type::pos_type id = segment.find(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0));
-      if (id == segment_db_type::npos())
-	throw std::runtime_error("no segment?: " + static_cast<std::string>(seg));
-      
-      node = index.find(&id, 1, node);
-      if (! index.is_valid(node))
-	throw std::runtime_error("no phrase?: " + phrase + " at segment: " + static_cast<std::string>(seg));
-    }
+  typedef boost::shared_ptr<queue_type> queue_ptr_type;
+  typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
+};
 
-    if (! index.exists(node))
-      throw std::runtime_error("no phrase?: " + phrase);
-    
-    const size_type cache_pos = hasher_type::operator()(node) & (caches.size() - 1);
-    cache_type& cache = const_cast<cache_type&>(caches[cache_pos]);
-    if (cache.node != node || cache.counts.empty()) {
-      cache.node = node;
-      
-      const id_type id = index[node];
-      
-      cache.counts.clear();
-      cache.counts.reserve(counts_size + 1);
-      cache.counts.resize(counts_size + 1, 0.0);
-      std::copy(counts.begin() + id * (counts_size + 1), counts.begin() + (id + 1) * (counts_size + 1), cache.counts.begin());
-    }
-    return cache.counts;
-  }
+template <typename ExtractRoot>
+struct PhrasePairReverseMapper
+{
+  typedef PhrasePairReverse map_reduce_type;
   
+  typedef map_reduce_type::size_type       size_type;
+  typedef map_reduce_type::difference_type difference_type;
   
-  bool exists(const path_type& path) const
-  {
-    if (! utils::repository::exists(path)) return false;
-    if (! segment_db_type::exists(path / "segment")) return false;
-    if (! index_db_type::exists(path / "index")) return false;
-    if (! counts_db_type::exists(path / "counts")) return false;
-    return true;
-  }
-
-  void write(const path_type& path) const
-  {
-    typedef utils::repository repository_type;
-
-    repository_type rep(path, repository_type::write);
-    
-    segment.write(rep.path("segment"));
-    index.write(rep.path("index"));
-    counts.write(rep.path("counts"));
-    
-    rep["counts-size"] = utils::lexical_cast<std::string>(counts_size);
-  }
+  typedef map_reduce_type::count_type  count_type;
   
-  void open(const path_type& path)
-  {
-    typedef utils::repository repository_type;
+  typedef map_reduce_type::hash_value_type hash_value_type;
+  typedef map_reduce_type::hasher_type     hasher_type;
+  
+  typedef map_reduce_type::path_type     path_type;
+  typedef map_reduce_type::path_set_type path_set_type;
+  
+  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
+  typedef map_reduce_type::modified_type    modified_type;
 
-    clear();
-
-    while (! repository_type::exists(path))
-      boost::thread::yield();
-
-    repository_type rep(path, repository_type::read);
-
-    repository_type::const_iterator iter = rep.find("counts-size");
-    if (iter == rep.end())
-      throw std::runtime_error("no counts size...");
-    counts_size = utils::lexical_cast<size_type>(iter->second);
+  typedef map_reduce_type::modified_set_type modified_set_type;
     
-    segment.open(rep.path("segment"));
-    index.open(rep.path("index"));
-    counts.open(rep.path("counts"));
-  }
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
 
+  typedef map_reduce_type::root_count_type     root_count_type;
+  typedef map_reduce_type::root_count_set_type root_count_set_type;
+
+  typedef PhrasePairModifiedParser    modified_parser_type;
+  typedef PhrasePairModifiedGenerator modified_generator_type;
+  
+  typedef ExtractRoot extract_root_type;
+  
+  hasher_type hasher;
+  
   template <typename Tp>
   struct greater_buffer
   {
@@ -1579,8 +1497,9 @@ public:
       return x->first.front() > y->first.front();
     }
   };
-  
-  modified_parser_type phrase_pair_parser;
+
+  modified_parser_type    parser;
+  modified_generator_type generator;
 
   template <typename Counts>
   void read_phrase_pair(std::istream& is, Counts& counts)
@@ -1589,7 +1508,7 @@ public:
     modified_type phrase_pair;
     
     while (counts.size() < 256 && std::getline(is, line)) {
-      if (! phrase_pair_parser(line, phrase_pair)) continue;
+      if (! parser(line, phrase_pair)) continue;
       
       if (counts.empty() || counts.back().source != phrase_pair.source)
 	counts.push_back(phrase_pair);
@@ -1601,12 +1520,8 @@ public:
     }
   }
 
-  template <typename ExtractRoot>
-  void open(const path_set_type& paths, ExtractRoot extract_root)
+  void operator()()
   {
-    typedef std::ostream ostream_type;
-    typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
-    
     typedef utils::compress_istream         istream_type;
     typedef boost::shared_ptr<istream_type> istream_ptr_type;
     typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
@@ -1616,32 +1531,8 @@ public:
     typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
-
-    typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
-    typedef succinctdb::succinct_hash<key_type, std::allocator<key_type> > segment_map_type;
-
-    clear();
     
-    const path_type tmp_dir = utils::tempfile::tmp_dir();
-    const path_type path_index   = utils::tempfile::directory_name(tmp_dir / "cicada.extract.index.XXXXXX");
-    const path_type path_segment = utils::tempfile::directory_name(tmp_dir / "cicada.extract.segment.XXXXXX");
-    const path_type path_counts  = utils::tempfile::file_name(tmp_dir / "cicada.extract.counts.XXXXXX");
-    
-    utils::tempfile::insert(path_index);
-    utils::tempfile::insert(path_segment);
-    utils::tempfile::insert(path_counts);
-
-    index.open(path_index, index_db_type::WRITE);
-
-    counts_size = size_type(-1);
-    boost::iostreams::filtering_ostream os_counts;
-    os_counts.push(utils::snappy_sink<>(path_counts), 1024 * 1024);
-    //os_counts.push(boost::iostreams::file_sink(path_counts.string()), 1024 * 1024);
-    os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
-
-    std::auto_ptr<segment_map_type> segment_map(new segment_map_type(1024 * 1024 * 4));
-    
-    pqueue_type pqueue;
+    pqueue_type            pqueue;
     istream_ptr_set_type   istreams(paths.size());
     buffer_stream_set_type buffer_streams(paths.size());
     
@@ -1661,48 +1552,39 @@ public:
 	pqueue.push(buffer_stream);
     }
     
-    modified_type modified;
-    count_type    observed(0);
+    modified_set_type phrase_pairs;
+    modified_type     modified;
+    count_type        observed(0);
     
     root_count_set_type::iterator riter;
-    
-    code_set_type codes;
-    id_type id = 0;
     
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
-
+      
       modified_type& curr = buffer_stream->first.front();
       
       if (curr.source != modified.source) {
 	
-	if (! modified.source.empty() && ! modified.counts.empty()) {
-	  //index.insert(modified.source.c_str(), modified.source.size(), id);
+	if (! counts.empty()) {
+	  // dump counts... but we use the counts from modified and additional observed...
+
+	  modified.counts.push_back(observed);
 	  
-	  codes.clear();
-	  const utils::piece source_piece(modified.source);
-	  tokenizer_type tokenizer(source_piece);
-	  
-	  tokenizer_type::iterator titer_end = tokenizer.end();
-	  for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-	    const utils::piece& seg = *titer;
+	  modified_set_type::iterator citer_end = counts.end();
+	  for (modified_set_type::iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+	    citer->source.swap(citer->target);
+	    citer->counts = modified.counts;
 	    
-	    codes.push_back(segment_map->insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
+	    const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
+	    
+	    queues[shard]->push_swap(*citer);
 	  }
 	  
-	  index.insert(&(*codes.begin()), codes.size(), id);
-	  ++ id;
-
-	  if (counts_size == size_type(-1))
-	    counts_size = modified.counts.size();
-	  else if (counts_size != modified.counts.size())
-	    throw std::runtime_error("# of counts do not match");
-	  
-	  os_counts.write((char*) &(*modified.counts.begin()), sizeof(count_type) * modified.counts.size());
-	  os_counts.write((char*) &observed, sizeof(count_type));
+	  counts.clear();
 	}
 	
+	counts.push_back(curr);
 	modified.swap(curr);
 	observed = 1;
 	
@@ -1717,6 +1599,7 @@ public:
 	const_cast<root_count_type&>(*riter).increment(curr.counts.begin(), curr.counts.end());
 	const_cast<root_count_type&>(*riter).observed_joint += 1;
 	
+	counts.push_back(curr);
 	modified.target.swap(curr.target);
 	modified.increment(curr.counts.begin(), curr.counts.end());
 	observed += 1;
@@ -1734,77 +1617,268 @@ public:
 	pqueue.push(buffer_stream);
     }
     
-    if (! modified.source.empty() && ! modified.counts.empty()) {
-      //index.insert(modified.source.c_str(), modified.source.size(), id);
-      
-      codes.clear();
-      const utils::piece source_piece(modified.source);
-      tokenizer_type tokenizer(source_piece);
+    if (! counts.empty()) {
+      modified.counts.push_back(observed);
 	  
-      tokenizer_type::iterator titer_end = tokenizer.end();
-      for (tokenizer_type::iterator titer = tokenizer.begin(); titer != titer_end; ++ titer) {
-	const utils::piece& seg = *titer;
-	    
-	codes.push_back(segment_map->insert(seg.c_str(), seg.size(), hasher_type::operator()(seg.begin(), seg.end(), 0)));
+      modified_set_type::iterator citer_end = counts.end();
+      for (modified_set_type::iterator citer = counts.begin(); citer != citer_end; ++ citer) {
+	citer->source.swap(citer->target);
+	citer->counts = modified.counts;
+	
+	const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
+	
+	queues[shard]->push_swap(*citer);
       }
-	  
-      index.insert(&(*codes.begin()), codes.size(), id);
-      ++ id;
       
-      if (counts_size == size_type(-1))
-	counts_size = modified.counts.size();
-      else if (counts_size != modified.counts.size())
-	throw std::runtime_error("# of counts do not match");
-      
-      os_counts.write((char*) &(*modified.counts.begin()), sizeof(count_type) * modified.counts.size());
-      os_counts.write((char*) &observed, sizeof(count_type));
+      counts.clear();
     }
     
-    segment_map->write(path_segment);
-    segment_map.reset();
-
-    index.clear();
-    counts.clear();
-    os_counts.pop();
+    std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     
-    ::sync();
-    while (! segment_db_type::exists(path_segment))
-      boost::thread::yield();
-    while (! index_db_type::exists(path_index))
-      boost::thread::yield();
-    while (! counts_db_type::exists(path_counts))
-      boost::thread::yield();
-
-    index.open(path_index);
-    segment.open(path_segment);
-    counts.open(path_counts);
+    modified.clear();
+    modified_type(modified).swap(modified);
+    
+    while (1) {
+      bool found = false;
+      
+      for (size_t shard = 0; shard != queues.size(); ++ shard)
+	if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
+	  modified.clear();
+	  modified_type(modified).swap(modified);
+	  
+	  terminated[shard] = true;
+	  found = true;
+	}
+      
+      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
+      
+      non_found_iter = loop_sleep(found, non_found_iter);
+    }
   }
   
-  void clear()
+  inline
+  int loop_sleep(bool found, int non_found_iter)
   {
-    counts_size = size_type(-1);
-    segment.clear();
-    index.clear();
-    counts.clear();
-    root_counts.clear();
-    counts_empty.clear();
-    caches.clear();
+    if (! found) {
+      boost::thread::yield();
+      ++ non_found_iter;
+    } else
+      non_found_iter = 0;
+    
+    if (non_found_iter >= 16) {
+      struct timespec tm;
+      tm.tv_sec = 0;
+      tm.tv_nsec = 2000001;
+      nanosleep(&tm, NULL);
+    
+      non_found_iter = 0;
+    }
+    return non_found_iter;
   }
-  
-  size_type counts_size;
-
-  modified_parser_type    parser;
-  
-  segment_db_type segment;
-  index_db_type   index;
-  counts_db_type  counts;
-  root_count_set_type root_counts;
-  
-  count_set_type counts_empty;
-  
-  cache_set_type        caches;
 };
 
+
+struct PhrasePairReverseReducer
+{
+  typedef PhrasePairReverse map_reduce_type;
+  
+  typedef map_reduce_type::size_type       size_type;
+  typedef map_reduce_type::difference_type difference_type;
+  
+  typedef map_reduce_type::count_type  count_type;
+  
+  typedef map_reduce_type::hash_value_type hash_value_type;
+  typedef map_reduce_type::hasher_type     hasher_type;
+  
+  typedef map_reduce_type::path_type     path_type;
+  typedef map_reduce_type::path_set_type path_set_type;
+  
+  typedef map_reduce_type::phrase_pair_type phrase_pair_type;
+  typedef map_reduce_type::modified_type    modified_type;
+
+  typedef map_reduce_type::modified_set_type modified_set_type;
+    
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+
+  typedef map_reduce_type::root_count_type     root_count_type;
+  typedef map_reduce_type::root_count_set_type root_count_set_type;
+
+  typedef PhrasePairModifiedParser    modified_parser_type;
+
+  struct less_file_size
+  {
+    bool operator()(const path_type& x, const path_type& y) const
+    {
+      return boost::filesystem::file_size(x) < boost::filesystem::file_size(y);
+    }
+  };
+
+
+  // merge counts from two streams into os..
+  void merge_counts(std::istream& is1, std::istream& is2, std::ostream& os)
+  {
+    modified_type modified1;
+    modified_type modified2;
+    
+    bool parsed1 = parser(is1, modified1);
+    bool parsed2 = parser(is2, modified2);
+    
+    while (parsed1 && parsed2) {
+      if (modified1 < modified2) {
+	generator(os, modified1) << '\n';
+	parsed1 = parser(is1, modified1);
+      } else if (modified2 < modified1) {
+	generator(os, modified2) << '\n';
+	parsed2 = parser(is2, modified2);
+      } else {
+	modified1.increment(modified2.counts.begin(), modified2.counts.end());
+	generator(os, modified1) << '\n';
+	
+	parsed1 = parser(is1, modified1);
+	parsed2 = parser(is2, modified2);
+      }
+    }
+    
+    // dump remaining...
+    while (parsed1) {
+      generator(os, modified1) << '\n';
+      parsed1 = parser(is1, modified1);
+    }
+    
+    while (parsed2) {
+      generator(os, modified2) << '\n';
+      parsed2 = parser(is2, modified2);
+    }
+  }
+  
+  // merge from smallest files...
+  void merge_counts(path_set_type& paths)
+  {
+    if (paths.size() <= 128) return;
+
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+
+    while (paths.size() > 128) {
+      
+      // sort according to the file-size...
+      std::sort(paths.begin(), paths.end(), less_file_size());
+      
+      const path_type file1 = paths.front();
+      paths.erase(paths.begin());
+      
+      const path_type file2 = paths.front();
+      paths.erase(paths.begin());
+      
+      const path_type counts_file_tmp = utils::tempfile::file_name(tmp_dir / "cicada.extract.modified.XXXXXX");
+      utils::tempfile::insert(counts_file_tmp);
+      const path_type counts_file = counts_file_tmp.string() + ".gz";
+      utils::tempfile::insert(counts_file);
+      
+      paths.push_back(counts_file);
+      {
+	utils::compress_istream is1(file1, 1024 * 1024);
+	utils::compress_istream is2(file2, 1024 * 1024);
+	
+	utils::compress_ostream os(counts_file, 1024 * 1024);
+	os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+	
+	merge_counts(is1, is2, os);
+      }
+      
+      boost::filesystem::remove(file1);
+      boost::filesystem::remove(file2);
+      
+      utils::tempfile::erase(file1);
+      utils::tempfile::erase(file2);
+    }
+  }
+  
+
+  template <typename Tp>
+  struct less_ptr
+  {
+    bool operator()(const Tp* x, const Tp* y) const
+    {
+      return *x < *y;
+    }
+  };
+
+  void dump_counts(path_set_type& paths, const modified_set_type& counts)
+  {
+    // sort...!
+    typedef std::vector<const modified_type*, std::allocator<const modified_type*> > sorted_type;
+    
+    // sorting...
+    sorted_type sorted(counts.size());
+    {
+      sorted_type::iterator siter = sorted.begin();
+      modified_set_type::const_iterator citer_end = counts.end();
+      for (modified_set_type::const_iterator citer = counts.begin(); citer != citer_end; ++ citer, ++ siter)
+	*siter = &(*citer);
+    }
+    std::sort(sorted.begin(), sorted.end(), less_ptr<modified_type>());
+    
+    // tempfile...
+    const path_type tmp_dir = utils::tempfile::tmp_dir();
+    const path_type counts_file_tmp = utils::tempfile::file_name(tmp_dir / "cicada.extract.reversed.XXXXXX");
+    utils::tempfile::insert(counts_file_tmp);
+    const path_type counts_file = counts_file_tmp.string() + ".gz";
+    utils::tempfile::insert(counts_file);
+    
+    paths.push_back(counts_file);
+
+    // final dump!
+    utils::compress_ostream os(counts_file, 1024 * 1024);
+    os.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
+    
+    sorted_type::const_iterator siter_end = sorted.end();
+    for (sorted_type::const_iterator siter = sorted.begin(); siter != siter_end; ++ siter)
+      generator(os, *(*siter)) << '\n';
+  }
+
+  void operator()()
+  {
+    // we already know that the entries are uniqued through the previous map-reduce!
+    
+    modified_type modified;
+    modified_set_type counts;
+    
+    int num_termination = 0;
+    
+    const size_type iteration_mask = (1 << 4) - 1;
+    const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
+    
+    for (size_type iteration = 0; /**/; ++ iteration) {
+      modified.clear();
+      queue.pop_swap(modified);
+      
+      if (modified.empty()) {
+	++ num_termination;
+	
+	if (num_termination == shard_size)
+	  break;
+	else
+	  continue;
+      }
+      
+      counts.push_back(modified);
+      
+      if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
+	dump_counts(paths, counts);
+	counts.clear();
+      }
+    }
+    
+    if (! counts.empty()) {
+      dump_counts(paths, counts);
+      counts.clear();
+    }
+    
+    merge_counts(paths);
+  }
+};
 
 
 // final scoring...

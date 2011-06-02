@@ -294,6 +294,7 @@ int main(int argc, char** argv)
 enum {
   root_count_tag = 2000,
   modified_tag,
+  reversed_tag,
   phrase_pair_tag,
   notify_tag,
 };
