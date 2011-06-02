@@ -207,7 +207,7 @@ namespace utils
       __file.open(path);
       
       // determine the cache size
-      const size_type cache_byte_size = utils::bithack::max(utils::bithack::next_largest_power2(__file.size_compressed() >> 6),
+      const size_type cache_byte_size = utils::bithack::max(size_type(utils::bithack::next_largest_power2(__file.size_compressed() >> 6)),
 							    size_type(1024 * 64));
       const size_type cache_size_raw = cache_byte_size / (base_type::__buffer_size * sizeof(value_type));
       const size_type cache_size_power2 = utils::bithack::branch(utils::bithack::is_power2(cache_size_raw),
@@ -253,7 +253,7 @@ namespace utils
     
     uint64_t size_bytes() const { return __file.size_bytes(); }
     uint64_t size_compressed() const { return __file.size_compressed(); }
-    uint64_t size_cache() const { return __file.size_cache(); + sizeof(cache_type) * __cache.size(); }
+    uint64_t size_cache() const { return __file.size_cache() + sizeof(cache_type) * __cache.size(); }
     
   private:
     typedef utils::spinlock             spinlock_type;

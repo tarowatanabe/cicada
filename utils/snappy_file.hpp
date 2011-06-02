@@ -105,7 +105,7 @@ namespace utils
       __size = boost::lexical_cast<size_type>(iter->second);
       
       // determine the cache size...
-      const size_type cache_byte_size = utils::bithack::max(utils::bithack::next_largest_power2(__data.size() >> 7),
+      const size_type cache_byte_size = utils::bithack::max(size_type(utils::bithack::next_largest_power2(__data.size() >> 7)),
 							    size_type(1024 * 64));
       const size_type cache_size_raw = cache_byte_size / __buffer_size;
       const size_type cache_size_power2 = utils::bithack::branch(utils::bithack::is_power2(cache_size_raw),
@@ -174,7 +174,7 @@ namespace utils
     
     uint64_t size_bytes() const { return __size; }
     uint64_t size_compressed() const { return __data.size_compressed() + __offset.size_compressed(); }
-    uint64_t size_cache() const { return __data.size_cache() + __offset.size_cache(); + sizeof(cache_type) * __cache.size(); }
+    uint64_t size_cache() const { return __data.size_cache() + __offset.size_cache() + sizeof(cache_type) * __cache.size(); }
     
   private:
     typedef utils::spinlock             spinlock_type;
