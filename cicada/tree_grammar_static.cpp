@@ -912,8 +912,8 @@ namespace cicada
     edge_map_type edge_map(1024 * 1024 * 4);
     
     std::auto_ptr<symbol_map_type> symbol_map(new symbol_map_type(1024 * 1024 * 4));
-    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 4));
-    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 4));
+    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 16));
+    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 16));
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;

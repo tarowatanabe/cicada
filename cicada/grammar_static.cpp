@@ -899,8 +899,8 @@ namespace cicada
     utils::tempfile::insert(path_vocab);
     
     rule_db.open(path_rule, rule_db_type::WRITE);
-    std::auto_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 4));
-    std::auto_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 4));
+    std::auto_ptr<phrase_map_type> source_map(new phrase_map_type(1024 * 1024 * 16));
+    std::auto_ptr<phrase_map_type> target_map(new phrase_map_type(1024 * 1024 * 16));
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
