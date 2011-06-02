@@ -42,10 +42,6 @@ struct greater_file_size
   }
 };
 
-
-typedef PhraseCounts modified_counts_type;
-typedef std::vector<modified_counts_type, std::allocator<modified_counts_type> > modified_counts_set_type;
-
 path_set_type counts_files;
 path_type     list_file;
 
@@ -67,13 +63,13 @@ int debug = 0;
 void modify_counts(const path_set_type& counts_files,
 		   path_map_type& modified_files);
 template <typename Extractor>
-void index_counts(const path_map_type& modified_files,
-		  modified_counts_set_type& modified_counts,
-		  root_count_set_type& root_targets);
+void reverse_counts(const path_map_type& modified_files,
+		    path_map_type& reversed_files,
+		    root_count_set_type& root_targets);
 template <typename Extractor, typename Lexicon>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
-		  const modified_counts_set_type& modified,
+		  const path_map_tyep& reversed_files,
 		  root_count_set_type& root_sources,
 		  const Lexicon& lexicon);
 

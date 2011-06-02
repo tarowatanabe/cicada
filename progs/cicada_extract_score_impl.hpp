@@ -1559,6 +1559,8 @@ struct PhrasePairReverseMapper
     pqueue_type            pqueue;
     istream_ptr_set_type   istreams(paths.size());
     buffer_stream_set_type buffer_streams(paths.size());
+
+    const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     size_t pos = 0;
     for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
@@ -1579,6 +1581,8 @@ struct PhrasePairReverseMapper
     modified_set_type counts;
     modified_type     modified;
     count_type        observed(0);
+
+    modified_set_type counts_saved;
     
     root_count_set_type::iterator riter;
     
@@ -1602,7 +1606,19 @@ struct PhrasePairReverseMapper
 	    
 	    const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
 	    
-	    queues[shard]->push_swap(*citer);
+	    if (! queues[shard]->push_swap(*citer, true))
+	      counts_saved.push_back(*citer);
+	  }
+	  
+	  if (counts_saved.size() > 1024 * queues.size() || utils::malloc_stats::used() > malloc_threshold) {
+	    modified_set_type::iterator citer_end = counts_saved.end();
+	    for (modified_set_type::iterator citer = counts_saved.begin(); citer != citer_end; ++ citer) {
+	      const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
+	      
+	      queues[shard]->push_swap(*citer);
+	    }
+	    
+	    counts_saved.clear();
 	  }
 	  
 	  counts.clear();
@@ -1639,6 +1655,14 @@ struct PhrasePairReverseMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
+      
+      // consume saved counts, if possible...
+      if (! counts_saved.empty()) {
+	const int shard = hasher(counts_saved.back().source.begin(), counts_saved.back().source.end(), 0) % queues.size();
+	
+	if (queues[shard]->push_swap(counts_saved.back(), true))
+	  counts_saved.pop_back();
+      }
     }
     
     if (! counts.empty()) {
@@ -1651,7 +1675,8 @@ struct PhrasePairReverseMapper
 	
 	const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
 	
-	queues[shard]->push_swap(*citer);
+	if (! queues[shard]->push_swap(*citer, true))
+	  counts_saved.push_back(*citer);
       }
       
       counts.clear();
@@ -1660,22 +1685,31 @@ struct PhrasePairReverseMapper
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
     
     modified.clear();
-    modified_type(modified).swap(modified);
     
     int non_found_iter = 0;
-    while (1) {
+    for (;;) {
       bool found = false;
       
-      for (size_t shard = 0; shard != queues.size(); ++ shard)
-	if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
-	  modified.clear();
-	  modified_type(modified).swap(modified);
+      if (! counts_saved.empty()) {
+	const int shard = hasher(counts_saved.back().source.begin(), counts_saved.back().source.end(), 0) % queues.size();
+	
+	if (queues[shard]->push_swap(counts_saved.back(), true)) {
+	  counts_saved.pop_back();
 	  
-	  terminated[shard] = true;
 	  found = true;
 	}
+      }
       
-      if (std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
+      if (counts_saved.empty())
+	for (size_t shard = 0; shard != queues.size(); ++ shard)
+	  if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
+	    modified.clear();
+	    
+	    terminated[shard] = true;
+	    found = true;
+	  }
+      
+      if (counts_saved.empty() && std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }

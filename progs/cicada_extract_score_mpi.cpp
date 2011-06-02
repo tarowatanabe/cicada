@@ -274,6 +274,12 @@ int main(int argc, char** argv)
 	std::cerr << "reverse counts mapper cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
 		  << "reverse counts mapper user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
       
+      // remove all the modified files
+      for (path_set_type::const_iterator miter = modified_files.begin(); miter != modified_files.end(); ++ miter) {
+	boost::filesystem::remove(*miter);
+	utils::tempfile::erase(*miter);
+      }
+      
       utils::resource start_score;
       score_counts_mapper(comm_child, counts_files);
       utils::resource end_score;
