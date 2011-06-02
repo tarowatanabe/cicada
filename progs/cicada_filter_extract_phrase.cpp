@@ -40,6 +40,7 @@ bool mode_bidirectional = false;
 bool mode_source_only = false;
 bool mode_target_only = false;
 
+int buffer_size = 1024 * 1024;
 int debug = 0;
 
 template <typename Scorer>
@@ -92,12 +93,8 @@ int main(int argc, char** argv)
 	if (parser(line, root_target)) break;
     }
 
-    const bool flush_output = (output_file == "-"
-			       || (boost::filesystem::exists(output_file)
-				   && ! boost::filesystem::is_regular_file(output_file)));
-    
     utils::compress_istream is(input_file,  1024 * 1024);
-    utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+    utils::compress_ostream os(output_file, buffer_size);
     
     if (mode_cicada) {
       if (mode_reordering)
@@ -533,6 +530,8 @@ void options(int argc, char** argv)
     ("bidirectional", po::bool_switch(&mode_bidirectional), "bidirectional")
     ("source-only",   po::bool_switch(&mode_source_only),   "source only")
     ("target-only",   po::bool_switch(&mode_target_only),   "target only")
+
+    ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;
   
   po::options_description opts_command("command line options");

@@ -28,6 +28,7 @@ typedef std::multimap<double, std::string, std::greater<double>,
 path_type input_file = "-";
 path_type output_file = "-";
 
+int buffer_size = 1024 * 1024;
 int nbest = 100;
 
 int debug = 0;
@@ -42,12 +43,8 @@ int main(int argc, char** argv)
     if (nbest <= 0)
       throw std::runtime_error("nbest must be positive...");
     
-    const bool flush_output = (output_file == "-"
-			       || (boost::filesystem::exists(output_file)
-				   && ! boost::filesystem::is_regular_file(output_file)));
-    
     utils::compress_istream is(input_file,  1024 * 1024);
-    utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+    utils::compress_ostream os(output_file, buffer_size);
     
     std::string          source_prev;
     phrase_pair_type     phrase_pair;
@@ -120,6 +117,8 @@ void options(int argc, char** argv)
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
     
     ("nbest", po::value<int>(&nbest)->default_value(nbest), "nbest of pairs (wrt to joint-count)")
+    
+    ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;
   
   po::options_description opts_command("command line options");

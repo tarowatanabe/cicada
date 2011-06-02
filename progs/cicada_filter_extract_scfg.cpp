@@ -38,6 +38,7 @@ double dirichlet_prior = 0.1;
 
 bool feature_root = false;
 
+int buffer_size = 1024 * 1024;
 int debug = 0;
 
 template <typename Scorer>
@@ -83,12 +84,8 @@ int main(int argc, char** argv)
 	  root_target.insert(root_count);
     }
 
-    const bool flush_output = (output_file == "-"
-			       || (boost::filesystem::exists(output_file)
-				   && ! boost::filesystem::is_regular_file(output_file)));
-    
     utils::compress_istream is(input_file,  1024 * 1024);
-    utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+    utils::compress_ostream os(output_file, buffer_size);
     
     process<ScorerCICADA>(is, os, root_source, root_target);
   }
@@ -250,6 +247,8 @@ void options(int argc, char** argv)
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
     ("feature-root", po::bool_switch(&feature_root),  "output feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
+    
+    ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;
   
   po::options_description opts_command("command line options");
