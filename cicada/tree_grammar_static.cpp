@@ -1111,13 +1111,14 @@ namespace cicada
 	edge_db.insert(&(*buffer.begin()), buffer.size(), id);
       }
       
+      // reset and close
+      edge_map.reset();
+      
       edge_db.close();
       
       ::sync();
       
       edge_db.open(path_edge);
-      
-      edge_map.reset();
     }
     
     // vocabulary...
