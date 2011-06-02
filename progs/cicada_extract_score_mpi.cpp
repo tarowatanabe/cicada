@@ -71,14 +71,14 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 template <typename Extractor, typename Lexicon>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
-			  const path_type& reversed_files,
+			  const path_set_type& reversed_files,
 			  root_count_set_type& root_sources,
 			  const Lexicon& lexicon);
 
 template <typename Extractor>
 void reverse_counts_mapper(utils::mpi_intercomm& reducer,
 			   const path_set_type& counts_files,
-			   root_count_set_type& root_targets);
+			   root_count_set_type& root_counts);
 void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 			    path_set_type& reversed_files);
 
@@ -129,9 +129,7 @@ int main(int argc, char** argv)
       utils::mpi_intercomm comm_parent(MPI::Comm::Get_parent());
       
       path_set_type reversed_files;
-      
       root_count_set_type root_sources;
-      root_count_set_type root_targets;
       
       utils::resource start_modify;
       modify_counts_reducer(comm_parent);
@@ -179,6 +177,9 @@ int main(int argc, char** argv)
 
       reduce_root_counts(root_sources);
       
+      // synchronize here...
+      synchronize_reducer(comm_parent);
+      
       // finally, dump root-sources and root-targets...
       if (mpi_rank == 0) {
 	utils::compress_ostream os_file(output_file / "files");
@@ -194,8 +195,7 @@ int main(int argc, char** argv)
 	  os_src << *siter << '\n';
       }
       
-      // synchronize here...
-      synchronize_reducer(comm_parent);
+      
     } else {
       const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.string() : std::string(argv[0]));
       utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, MPI::INFO_NULL, 0));
@@ -283,6 +283,9 @@ int main(int argc, char** argv)
 		  << "score counts mapper user time: " << end_score.user_time() - start_score.user_time() << std::endl;
 
       reduce_root_counts(root_targets);
+
+      // synchronize here...
+      synchronize_mapper(comm_child);
       
       if (mpi_rank == 0) {
 	utils::compress_ostream os_trg(output_file / "root-target.gz");
@@ -293,8 +296,6 @@ int main(int argc, char** argv)
 	  os_trg << *titer << '\n';
       }
       
-      // synchronize here...
-      synchronize_mapper(comm_child);
     }
   }
   catch (const std::exception& err) {
@@ -310,6 +311,7 @@ enum {
   modified_tag,
   reversed_tag,
   phrase_pair_tag,
+  file_tag,
   notify_tag,
 };
 
@@ -387,6 +389,46 @@ void synchronize_reducer(utils::mpi_intercomm& mapper)
   }
 }
 
+void reduce_root_counts(root_count_set_type& root_counts)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  if (mpi_rank == 0) {
+    RootCountParser parser;
+    root_count_type root_count;
+    
+    std::string line;
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      boost::iostreams::filtering_istream is;
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
+      
+      while (std::getline(is, line)) {
+	if (! parser(line, root_count)) {
+	  std::cerr << "warning: root-count parsing failed: " << line << std::endl;
+	  continue;
+	}
+	
+	std::pair<root_count_set_type::iterator, bool> result = root_counts.insert(root_count);
+	if (! result.second) {
+	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
+	  const_cast<root_count_type&>(*result.first).observed_joint += root_count.observed_joint;
+	  const_cast<root_count_type&>(*result.first).observed       += root_count.observed;
+	}
+      }
+    }
+  } else {
+    boost::iostreams::filtering_ostream os;
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
+    
+    RootCountGenerator generator;
+    root_count_set_type::const_iterator riter_end = root_counts.end();
+    for (root_count_set_type::const_iterator riter = root_counts.begin(); riter != riter_end; ++ riter)
+      generator(os, *riter) << '\n';
+  }
+}
 
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			  const path_set_type& counts_files)
@@ -430,10 +472,9 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
     
     stream[rank]->push(boost::iostreams::gzip_compressor());
     stream[rank]->push(*device[rank]);
+    stream[rank]->precision(20);
     
     queues[rank].reset(new queue_type(1024));
-    
-    stream[rank]->precision(20);
   }
   
   phrase_pair_type phrase_pair;
@@ -470,7 +511,7 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 template <typename Extractor, typename Lexicon>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
-			  const modified_counts_set_type& modified,
+			  const path_set_type& reversed_files,
 			  root_count_set_type& root_sources,
 			  const Lexicon& lexicon)
 {
@@ -531,10 +572,10 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(mpi_rank) + ".gz"), 1024 * 1024);
   
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(modified,
-						    root_sources,
+  reducer.add_thread(new boost::thread(reducer_type(root_sources,
 						    Extractor(),
 						    lexicon,
+						    reversed_files,
 						    queues,
 						    os,
 						    debug)));
@@ -573,140 +614,170 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   }
   
   reducer.join_all();
-  
-  // merge root-sources...
-  if (mpi_rank == 0) {
-    RootCountParser parser;
-    root_count_type root_count;
-    std::string line;
-    for (int rank = 1; rank != mpi_size; ++ rank) {
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
-      is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
-      
-      while (std::getline(is, line)) {
-	if (! parser(line, root_count)) {
-	  std::cerr << "warning: root-count parsing failed: " << line << std::endl;
-	  continue;
-	}
-	
-	std::pair<root_count_set_type::iterator, bool> result = root_sources.insert(root_count);
-	if (! result.second) {
-	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-	  const_cast<root_count_type&>(*result.first).observed_joint += root_count.observed_joint;
-	  const_cast<root_count_type&>(*result.first).observed       += root_count.observed;
-	}
-      }
-    }
-    
-  } else {
-    boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
-    os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
-    
-    RootCountGenerator generator;
-    root_count_set_type::const_iterator siter_end = root_sources.end();
-    for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
-      generator(os, *siter) << '\n';
-  }
 }
 
 template <typename Extractor>
-void index_counts(const path_set_type& modified_files,
-		  modified_counts_set_type& modified_counts,
-		  root_count_set_type& root_targets)
+void reverse_counts_mapper(utils::mpi_intercomm& reducer,
+			   const path_set_type& counts_files,
+			   root_count_set_type& root_counts)
 {
-  typedef utils::repository repository_type;
+  typedef boost::iostreams::filtering_ostream ostream_type;
+  typedef utils::mpi_device_sink              odevice_type;
+  
+  typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
+  typedef boost::shared_ptr<odevice_type> odevice_ptr_type;
+
+  typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
+  typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
+
+  typedef PhrasePairReverse map_reduce_type;
+  
+  typedef PhrasePairReverseMapper<Extractor>  mapper_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+  
+  typedef map_reduce_type::modified_type     modified_type;
+  
+  typedef PhrasePairModifiedGenerator modified_generator_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  modified_counts[mpi_rank].open(modified_files, Extractor());
-  
-  path_type path_index;
-  if (mpi_rank == 0) {
-    path_index = utils::tempfile::directory_name(std::string("cicada.extract.index.XXXXXX"));
-    repository_type rep(path_index, repository_type::write);
-    
-    boost::iostreams::filtering_ostream os;
-    os.push(utils::mpi_device_bcast_sink(0, 4096));
-    
-    os << path_index.string() << '\n';
-  } else {
-    boost::iostreams::filtering_istream is;
-    is.push(utils::mpi_device_bcast_source(0, 4096));
-    
-    std::string line;
-    if (std::getline(is, line))
-      path_index = line;
-  }
-  
-  utils::tempfile::insert(path_index);
-  
-  if (path_index.empty())
-    throw std::runtime_error("no index path? " + path_index.string());
-
-  while (! repository_type::exists(path_index))
-    boost::thread::yield();
-  
-  repository_type rep(path_index, repository_type::read);
-  
-  modified_counts[mpi_rank].write(rep.path(utils::lexical_cast<std::string>(mpi_rank)));
-  
-  ::sync();
-  
-  // merge root-targets.
-  if (mpi_rank == 0) {
-    root_targets = modified_counts[0].root_counts;
-    
-    RootCountParser parser;
-    root_count_type root_count;
-    std::string line;
-    for (int rank = 1; rank != mpi_size; ++ rank) {
-      boost::iostreams::filtering_istream is;
-      is.push(boost::iostreams::gzip_decompressor());
-      is.push(utils::mpi_device_source(rank, root_count_tag, 1024 * 1024));
-      
-      while (std::getline(is, line)) {
-	if (! parser(line, root_count)) {
-	  std::cerr << "warning: root-count parsing failed: " << line << std::endl;
-	  continue;
-	}
-	
-	std::pair<root_count_set_type::iterator, bool> result = root_targets.insert(root_count);
-	if (! result.second) {
-	  const_cast<root_count_type&>(*result.first).increment(root_count.counts.begin(), root_count.counts.end());
-	  const_cast<root_count_type&>(*result.first).observed_joint += root_count.observed_joint;
-	  const_cast<root_count_type&>(*result.first).observed       += root_count.observed;
-	}
-      }
-    }
-  } else {
-    boost::iostreams::filtering_ostream os;
-    os.push(boost::iostreams::gzip_compressor());
-    os.push(utils::mpi_device_sink(0, root_count_tag, 1024 * 1024));
-    
-    RootCountGenerator generator;
-    root_count_set_type::const_iterator titer_end = modified_counts[mpi_rank].root_counts.end();
-    for (root_count_set_type::const_iterator titer = modified_counts[mpi_rank].root_counts.begin(); titer != titer_end; ++ titer)
-      generator(os, *titer) << '\n';
-  }
+  ostream_ptr_set_type stream(mpi_size);
+  odevice_ptr_set_type device(mpi_size);
+  queue_ptr_set_type   queues(mpi_size);
   
   for (int rank = 0; rank != mpi_size; ++ rank) {
-    MPI::COMM_WORLD.Barrier();
+    device[rank].reset(new odevice_type(reducer.comm, rank, reversed_tag, 1024 * 1024 * 16, false, true));
     
-    const path_type path = rep.path(utils::lexical_cast<std::string>(rank));
+    stream[rank].reset(new ostream_type());
+    stream[rank]->push(boost::iostreams::gzip_compressor());
+    stream[rank]->push(*device[rank]);
+    stream[rank]->precision(20);
     
-    while (! modified_counts[rank].exists(path))
-      boost::thread::yield();
-    
-    modified_counts[rank].open(path);
+    queues[rank].reset(new queue_type(1024));
   }
+  
+  if (debug >= 2)
+    std::cerr << "reverse counts: rank: " << mpi_rank << " files: " << counts_files.size() << std::endl;
+  
+  boost::thread mapper(mapper_type(counts_files, queues, root_counts, max_malloc, debug));
+  
+  modified_type modified;
+  modified_generator_type generator;
+  
+  int non_found_iter = 0;
+  for (;;) {
+    bool found = false;
+    
+    for (int rank = 0; rank != mpi_size; ++ rank)
+      if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
+	
+	if (queues[rank]->pop_swap(modified, true)) {
+	  if (! modified.source.empty())
+	    generator(*stream[rank], modified) << '\n';
+	  else 
+	    stream[rank].reset();
+	  
+	  found = true;
+	}
+      }
+    
+    found |= utils::mpi_terminate_devices(stream, device);
+    
+    if (std::count(device.begin(), device.end(), odevice_ptr_type()) == mpi_size) break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+  
+  mapper.join();
 }
 
+void reverse_counts_reducer(utils::mpi_intercomm& mapper,
+			    path_set_type& reversed_files)
+{
+  typedef boost::iostreams::filtering_istream istream_type;
+  typedef utils::mpi_device_source            idevice_type;
+  
+  typedef boost::shared_ptr<istream_type> istream_ptr_type;
+  typedef boost::shared_ptr<idevice_type> idevice_ptr_type;
+  
+  typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
+  typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
+  
+  typedef PhrasePairReverse map_reduce_type;
+  
+  typedef PhrasePairReverseReducer reducer_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
+  
+  typedef map_reduce_type::modified_type modified_type;
+  
+  typedef PhrasePairModifiedParser modified_parser_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  istream_ptr_set_type stream(mpi_size);
+  idevice_ptr_set_type device(mpi_size);
+  
+  for (int rank = 0; rank != mpi_size; ++ rank) {
+    device[rank].reset(new idevice_type(mapper.comm, rank, reversed_tag, 1024 * 1024 * 16));
+    
+    stream[rank].reset(new istream_type());
+    stream[rank]->push(boost::iostreams::gzip_decompressor());
+    stream[rank]->push(*device[rank]);
+  }
+  
+  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+  const size_t queue_size = mpi_size * 1024;
+  
+  queue_type queue(queue_size);
+  boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), reversed_files, 1, max_malloc, debug));
+  
+  modified_type     modified;
+  
+  modified_parser_type parser;
+  std::string line;
+  
+  int non_found_iter = 0;
+  for (;;) {
+    bool found = false;
+    
+    for (int rank = 0; rank != mpi_size; ++ rank)
+      for (int iter = 0; iter != 64 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ iter) {
+	if (std::getline(*stream[rank], line)) {
+	  if (parser(line, modified))
+	    queue.push_swap(modified);
+	  else
+	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
+	} else {
+	  stream[rank].reset();
+	  device[rank].reset();
+	}
+	
+	found = true;
+      }
+    
+    if (std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+      break;
+    
+    non_found_iter = loop_sleep(found, non_found_iter);
+  }
+  
+  modified.clear();
+  queue.push_swap(modified);
+  
+  reducer.join();
+}
 
 void modify_counts_mapper(utils::mpi_intercomm& reducer,
-			  const path_set_type& counts_files)
+			  const path_set_type& counts_files,
+			  path_set_type& modified_files)
 {
   typedef boost::iostreams::filtering_ostream ostream_type;
   typedef utils::mpi_device_sink              odevice_type;
@@ -732,7 +803,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
+    
   path_set_type mapped_files;
   for (size_t i = 0; i != counts_files.size(); ++ i)
     if (static_cast<int>(i % mpi_size) == mpi_rank)
@@ -741,7 +812,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   ostream_ptr_set_type stream(mpi_size);
   odevice_ptr_set_type device(mpi_size);
   queue_ptr_set_type   queues(mpi_size);
-  
+
   for (int rank = 0; rank != mpi_size; ++ rank) {
     device[rank].reset(new odevice_type(reducer.comm, rank, modified_tag, 1024 * 1024 * 16, false, true));
     
@@ -795,11 +866,20 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   }
   
   mapper.join_all();
+  
+  // receive modified files from the reducer sharing the same rank
+  boost::iostreams::filtering_istream is;
+  is.push(utils::mpi_device_source(reducer.comm, mpi_rank, file_tag, 4096));
+  
+  std::string line;
+  while (std::getline(is, line))
+    modified_files.push_back(line);
 }
 
-void modify_counts_reducer(utils::mpi_intercomm& mapper,
-			   path_set_type& modified_files)
+void modify_counts_reducer(utils::mpi_intercomm& mapper)
 {
+  typedef utils::repository repository_type;
+
   typedef boost::iostreams::filtering_istream istream_type;
   typedef utils::mpi_device_source            idevice_type;
   
@@ -824,6 +904,34 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  path_type path_modified;
+  if (mpi_rank == 0) {
+    path_modified = utils::tempfile::directory_name(std::string("cicada.extract.modified.XXXXXX"));
+    
+    repository_type rep(path_modified, repository_type::write);
+    
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_bcast_sink(0, 4096));
+    os << path_modified.string() << '\n';
+  } else {
+    boost::iostreams::filtering_istream is;
+    is.push(utils::mpi_device_bcast_source(0, 4096));
+    
+    std::string line;
+    if (std::getline(is, line))
+      path_modified = line;
+  }
+  
+  utils::tempfile::insert(path_modified);
+  
+  if (path_modified.empty())
+    throw std::runtime_error("no index path? " + path_modified.string());
+  
+  while (! repository_type::exists(path_modified))
+    boost::thread::yield();
+  
+  path_set_type modified_files;
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
@@ -835,13 +943,14 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(boost::iostreams::gzip_decompressor());
     stream[rank]->push(*device[rank]);
   }
-
-  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   
+  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   const size_t queue_size = mpi_size * 128;
+  
   queue_type queue(queue_size);
+  
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(queue, modified_files, 1, max_malloc, debug)));
+  reducer.add_thread(new boost::thread(reducer_type(queue, path_modified, modified_files, 1, max_malloc, debug)));
   
   modified_set_type modified;
   modified_type     parsed;
@@ -895,11 +1004,17 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     non_found_iter = loop_sleep(found, non_found_iter);
   }
   
-  
   modified.clear();
   queue.push_swap(modified);
   
   reducer.join_all();
+  
+  // send modified files to mapper sharing the same rank
+  boost::iostreams::filtering_ostream os;
+  os.push(utils::mpi_device_sink(mapper.comm, mpi_rank, file_tag, 4096));
+  
+  for (path_set_type::const_iterator fiter = modified_files.begin(); fiter != modified_files.end(); ++ fiter)
+    os << fiter->string() << '\n';
 }
 
 
