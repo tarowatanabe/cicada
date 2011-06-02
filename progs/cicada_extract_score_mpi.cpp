@@ -49,9 +49,6 @@ struct greater_file_size
 };
 
 
-typedef PhraseCounts modified_counts_type;
-typedef std::vector<modified_counts_type, std::allocator<modified_counts_type> > modified_counts_set_type;
-
 path_set_type counts_files;
 path_type     list_file;
 
@@ -74,19 +71,26 @@ void score_counts_mapper(utils::mpi_intercomm& reducer,
 template <typename Extractor, typename Lexicon>
 void score_counts_reducer(utils::mpi_intercomm& mapper,
 			  const path_type& output_file,
-			  const modified_counts_set_type& modified,
+			  const path_type& reversed_files,
 			  root_count_set_type& root_sources,
 			  const Lexicon& lexicon);
+
 template <typename Extractor>
-void index_counts(const path_set_type& modified_files,
-		  modified_counts_set_type& modified_counts,
-		  root_count_set_type& root_targets);
+void reverse_counts_mapper(utils::mpi_intercomm& reducer,
+			   const path_set_type& counts_files,
+			   root_count_set_type& root_targets);
+void reverse_counts_reducer(utils::mpi_intercomm& mapper,
+			    path_set_type& reversed_files);
+
 void modify_counts_mapper(utils::mpi_intercomm& reducer,
-			  const path_set_type& counts_files);
-void modify_counts_reducer(utils::mpi_intercomm& mapper,
-			   path_set_type& modified_files);
+			  const path_set_type& counts_files,
+			  path_set_type& modified_files);
+void modify_counts_reducer(utils::mpi_intercomm& mapper);
+
 void synchronize_mapper(utils::mpi_intercomm& reducer);
 void synchronize_reducer(utils::mpi_intercomm& mapper);
+
+void reduce_root_counts(root_count_set_type& root_counts);
 
 void options(int argc, char** argv);
 
@@ -124,36 +128,26 @@ int main(int argc, char** argv)
     if (MPI::Comm::Get_parent() != MPI::COMM_NULL) {
       utils::mpi_intercomm comm_parent(MPI::Comm::Get_parent());
       
-      path_set_type modified_files;
+      path_set_type reversed_files;
+      
       root_count_set_type root_sources;
       root_count_set_type root_targets;
       
       utils::resource start_modify;
-      modify_counts_reducer(comm_parent, modified_files);
+      modify_counts_reducer(comm_parent);
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
 	std::cerr << "modify counts reducer cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
-		  << "modify counts reducer  user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
-            
-      modified_counts_set_type modified_counts(mpi_size);
+		  << "modify counts reducer user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
       
-      utils::resource start_index;
-      if (score_phrase)
-	index_counts<ExtractRootPhrase>(modified_files, modified_counts, root_targets);
-      else if (score_scfg)
-	index_counts<ExtractRootSCFG>(modified_files, modified_counts, root_targets);
-      else
-	index_counts<ExtractRootGHKM>(modified_files, modified_counts, root_targets);
-      
-      utils::resource end_index;
+      utils::resource start_reverse;
+      reverse_counts_reducer(comm_parent, reversed_files);
+      utils::resource end_reverse;
       
       if (debug && mpi_rank == 0)
-	std::cerr << "index counts cpu time:  " << end_index.cpu_time() - start_index.cpu_time() << std::endl
-		  << "index counts user time: " << end_index.user_time() - start_index.user_time() << std::endl;
-      
-      // synchronize here...
-      synchronize_reducer(comm_parent);
+	std::cerr << "reverse counts reducer cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
+		  << "reverse counts reducer user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
       
       // scoring...
       const LexiconModel lexicon_source_target(lexicon_source_target_file);
@@ -163,45 +157,41 @@ int main(int argc, char** argv)
       if (score_phrase)
 	score_counts_reducer<ExtractRootPhrase, LexiconPhrase>(comm_parent,
 							       output_file,
-							       modified_counts,
+							       reversed_files,
 							       root_sources,
 							       LexiconPhrase(lexicon_source_target, lexicon_target_source));
       else if (score_scfg)
 	score_counts_reducer<ExtractRootSCFG, LexiconSCFG>(comm_parent,
 							   output_file,
-							   modified_counts,
+							   reversed_files,
 							   root_sources,
 							   LexiconSCFG(lexicon_source_target, lexicon_target_source));
       else
 	score_counts_reducer<ExtractRootGHKM, LexiconGHKM>(comm_parent,
 							   output_file,
-							   modified_counts,
+							   reversed_files,
 							   root_sources,
 							   LexiconGHKM(lexicon_source_target, lexicon_target_source));
       utils::resource end_score;
       if (debug && mpi_rank == 0)
 	std::cerr << "score counts reducer cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		  << "score counts reducer user time: " << end_score.user_time() - start_score.user_time() << std::endl;
+
+      reduce_root_counts(root_sources);
       
       // finally, dump root-sources and root-targets...
       if (mpi_rank == 0) {
 	utils::compress_ostream os_file(output_file / "files");
 	utils::compress_ostream os_src(output_file / "root-source.gz");
-	utils::compress_ostream os_trg(output_file / "root-target.gz");
-      
+	
 	os_src.precision(20);
-	os_trg.precision(20);
-      
+	
 	for (int shard = 0; shard != mpi_size; ++ shard)
 	  os_file << (utils::lexical_cast<std::string>(shard) + ".gz") << '\n';
 	
 	root_count_set_type::const_iterator siter_end = root_sources.end();
 	for (root_count_set_type::const_iterator siter = root_sources.begin(); siter != siter_end; ++ siter)
 	  os_src << *siter << '\n';
-	
-	root_count_set_type::const_iterator titer_end = root_targets.end();
-	for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
-	  os_trg << *titer << '\n';
       }
       
       // synchronize here...
@@ -259,17 +249,30 @@ int main(int argc, char** argv)
 
       if (debug && mpi_rank == 0)
 	std::cerr << "count files: " << counts_files.size() << std::endl;
+
+      path_set_type modified_files;
+      root_count_set_type root_targets;
       
       utils::resource start_modify;
-      modify_counts_mapper(comm_child, counts_files);
+      modify_counts_mapper(comm_child, counts_files, modified_files);
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
 	std::cerr << "modify counts mapper cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
 		  << "modify counts mapper user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
       
-      // synchronize here...
-      synchronize_mapper(comm_child);
+      utils::resource start_reverse;
+      if (score_phrase)
+	reverse_counts_mapper<ExtractRootPhrase>(comm_child, modified_files, root_targets);
+      else if (score_scfg)
+	reverse_counts_mapper<ExtractRootSCFG>(comm_child, modified_files, root_targets);
+      else
+	reverse_counts_mapper<ExtractRootGHKM>(comm_child, modified_files, root_targets);
+      utils::resource end_reverse;
+      
+      if (debug && mpi_rank == 0)
+	std::cerr << "reverse counts mapper cpu time:  " << end_reverse.cpu_time() - start_reverse.cpu_time() << std::endl
+		  << "reverse counts mapper user time: " << end_reverse.user_time() - start_reverse.user_time() << std::endl;
       
       utils::resource start_score;
       score_counts_mapper(comm_child, counts_files);
@@ -279,6 +282,17 @@ int main(int argc, char** argv)
 	std::cerr << "score counts mapper cpu time:  " << end_score.cpu_time() - start_score.cpu_time() << std::endl
 		  << "score counts mapper user time: " << end_score.user_time() - start_score.user_time() << std::endl;
 
+      reduce_root_counts(root_targets);
+      
+      if (mpi_rank == 0) {
+	utils::compress_ostream os_trg(output_file / "root-target.gz");
+	os_trg.precision(20);
+	
+	root_count_set_type::const_iterator titer_end = root_targets.end();
+	for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
+	  os_trg << *titer << '\n';
+      }
+      
       // synchronize here...
       synchronize_mapper(comm_child);
     }
