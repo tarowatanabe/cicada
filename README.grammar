@@ -3,11 +3,13 @@ Grammar for cicada:
 string-to-string rules (aka Hiero rules):
 
 [lhs] ||| [x,1] abc bb ||| ddd [x,1] ||| feature=1.0 feature2=5.6 ||| attr1=1.6
+[lhs] ||| [x,1] abc [x,2] bb ||| ddd [x,1] fff [x,2] ||| feature=-1 feature2=8 ||| attr2="bad"
+
+cicada assume that rule's non-terminal indices are sorted wrt the source side, not target side.
 
 tree-to-string/string-to-tree transduction rules:
 
 [LHS]([NN,1](terminal [NP](xxx) [NP,2])) ||| [LHS]([VP](yyy [x,2] zzz) [x,1]) ||| feature=6.8 ||| attr2="attribute 2"
-
 
 In cicada, various file-based gramamr can be loaded in addition to pre-defined glue-rules, by
 
