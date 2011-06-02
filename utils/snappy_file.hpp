@@ -110,7 +110,7 @@ namespace utils
       const size_type cache_size_raw = cache_byte_size / __buffer_size;
       const size_type cache_size_power2 = utils::bithack::branch(utils::bithack::is_power2(cache_size_raw),
 								 cache_size_raw,
-								 utils::bithack::next_largest_power2(cache_size_raw));
+								 size_type(utils::bithack::next_largest_power2(cache_size_raw)));
       
       __cache.clear();
       __cache.reserve(cache_size_power2);
