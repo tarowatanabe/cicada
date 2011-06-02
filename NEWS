@@ -1,5 +1,6 @@
 2011-6-x
 Reimplemented scorer for extracted counts. Previously we store allthe target side counts in a DB, but now we use re-sort based implementation found in moses script, though it requires extra storage.
+Tweaked parameters for grammar-static and tree-grammar-static for large data indexing
 
 2011-6-1
 Bugfix for mpi version of extract-score. Instead of pushing into stream, wait: We assume that send-buffer is large enough for better map-reduce
