@@ -57,6 +57,8 @@
 #include <utils/lexical_cast.hpp>
 #include <utils/base64.hpp>
 #include <utils/lexical_cast.hpp>
+#include <utils/snappy_vector.hpp>
+#include <utils/snappy_device.hpp>
 
 #include <succinct_db/succinct_trie_db.hpp>
 #include <succinct_db/succinct_hash.hpp>
@@ -1460,7 +1462,7 @@ public:
   
   typedef succinctdb::succinct_trie_db<segment_id_type, id_type, std::allocator<std::pair<segment_id_type, id_type> > > index_db_type;
   
-  typedef utils::map_file<count_type, std::allocator<count_type> > counts_db_type;
+  typedef utils::snappy_vector_mapped<count_type, std::allocator<count_type> > counts_db_type;
   
   typedef phrase_pair_type::counts_type count_set_type;
   
@@ -1633,7 +1635,8 @@ public:
 
     counts_size = size_type(-1);
     boost::iostreams::filtering_ostream os_counts;
-    os_counts.push(boost::iostreams::file_sink(path_counts.string()), 1024 * 1024);
+    os_counts.push(utils::snappy_sink<>(path_counts), 1024 * 1024);
+    //os_counts.push(boost::iostreams::file_sink(path_counts.string()), 1024 * 1024);
     os_counts.exceptions(std::ostream::eofbit | std::ostream::failbit | std::ostream::badbit);
 
     std::auto_ptr<segment_map_type> segment_map(new segment_map_type(1024 * 1024 * 4));

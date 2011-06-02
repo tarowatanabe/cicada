@@ -150,6 +150,8 @@ sample_packed_vector \
 sample_piece \
 sample_program_options \
 sample_simple_vector \
+sample_snappy_device \
+sample_snappy_vector \
 sample_sparse_map \
 sample_static_allocator \
 sample_subprocess \
@@ -269,6 +271,12 @@ sample_program_options_LDADD = $(BOOST_PROGRAM_OPTIONS_LDFLAGS) $(BOOST_PROGRAM_
 sample_simple_vector_SOURCES = sample_simple_vector.cpp
 sample_simple_vector_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
 sample_simple_vector_LDADD = $(BOOST_THREAD_LIBS)
+
+sample_snappy_device_SOURCES = sample_snappy_device.cpp
+sample_snappy_device_LDADD = $(LIBUTILS)
+
+sample_snappy_vector_SOURCES = sample_snappy_vector.cpp
+sample_snappy_vector_LDADD = $(LIBUTILS)
 
 sample_static_allocator_SOURCES = sample_static_allocator.cpp
 sample_static_allocator_LDFLAGS = $(BOOST_THREAD_LDFLAGS)
