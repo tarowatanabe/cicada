@@ -909,11 +909,11 @@ namespace cicada
     utils::tempfile::insert(path_vocab);
     
     rule_db.open(path_rule, rule_pair_db_type::WRITE);
-    edge_map_type edge_map(1024 * 1024 * 4);
     
+    std::auto_ptr<edge_map_type>   edge_map(new edge_map_type(1024 * 1024 * 16));
     std::auto_ptr<symbol_map_type> symbol_map(new symbol_map_type(1024 * 1024 * 4));
-    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 16));
-    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 16));
+    std::auto_ptr<rule_map_type>   source_map(new rule_map_type(1024 * 1024 * 64));
+    std::auto_ptr<rule_map_type>   target_map(new rule_map_type(1024 * 1024 * 64));
     
     score_stream_set_type score_streams;
     score_stream_set_type attr_streams;
@@ -982,7 +982,7 @@ namespace cicada
 	    source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
 	  } else {
 	    source_prev.hyperpath(hyperpath);
-	    encode_path(hyperpath, buffer_index, edge_map);
+	    encode_path(hyperpath, buffer_index, *edge_map);
 	  }
 	  
 	  rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
@@ -1051,7 +1051,7 @@ namespace cicada
 	source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
       } else {
 	source_prev.hyperpath(hyperpath);
-	encode_path(hyperpath, buffer_index, edge_map);
+	encode_path(hyperpath, buffer_index, *edge_map);
       }
       
       rule_db.insert(&(*buffer_index.begin()), buffer_index.size(), &(*buffer_options.begin()), buffer_options.size());
@@ -1093,9 +1093,9 @@ namespace cicada
       
       codes_type codes;
       buffer_type buffer;
-      for (id_type id = 0; id != edge_map.size(); ++ id) {
+      for (id_type id = 0; id != edge_map->size(); ++ id) {
 	codes.clear();
-	codes.insert(codes.end(), edge_map[id].begin(), edge_map[id].end());
+	codes.insert(codes.end(), edge_map->operator[](id).begin(), edge_map->operator[](id).end());
 	
 	word_type::id_type word_id;
 
@@ -1116,6 +1116,8 @@ namespace cicada
       ::sync();
       
       edge_db.open(path_edge);
+      
+      edge_map.reset();
     }
     
     // vocabulary...
