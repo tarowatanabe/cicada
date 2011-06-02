@@ -13,7 +13,6 @@ MPI (Open MPI)    (http://www.open-mpi.org/)
 
 ICU               (http://site.icu-project.org/)
 google-sparsehash (http://code.google.com/p/google-sparsehash/)
-snappy            (http://code.google.com/p/snappy/)
 
 Optional:
 	google-perftools (http://code.google.com/p/google-perftools/)
