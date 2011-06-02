@@ -69,7 +69,7 @@ void reverse_counts(const path_map_type& modified_files,
 template <typename Extractor, typename Lexicon>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
-		  const path_map_tyep& reversed_files,
+		  const path_map_type& reversed_files,
 		  root_count_set_type& root_sources,
 		  const Lexicon& lexicon);
 
@@ -123,6 +123,7 @@ int main(int argc, char** argv)
     
     // modify counts...
     path_map_type modified_files;
+    path_map_type reversed_files;
     root_count_set_type root_sources;
     root_count_set_type root_targets;
     
@@ -134,21 +135,19 @@ int main(int argc, char** argv)
       std::cerr << "modify counts cpu time:  " << end_modify.cpu_time() - start_modify.cpu_time() << std::endl
 		<< "modify counts user time: " << end_modify.user_time() - start_modify.user_time() << std::endl;
     
-    // indexing...
-    modified_counts_set_type modified_counts(threads);
     
     utils::resource start_index;
     if (score_phrase)
-      index_counts<ExtractRootPhrase>(modified_files, modified_counts, root_targets);
+      reverse_counts<ExtractRootPhrase>(modified_files, reversed_files, root_targets);
     else if (score_scfg)
-      index_counts<ExtractRootSCFG>(modified_files, modified_counts, root_targets);
+      reverse_counts<ExtractRootSCFG>(modified_files, reversed_files, root_targets);
     else
-      index_counts<ExtractRootGHKM>(modified_files, modified_counts, root_targets);
+      reverse_counts<ExtractRootGHKM>(modified_files, reversed_files, root_targets);
     utils::resource end_index;
  
     if (debug)
-      std::cerr << "index counts cpu time:  " << end_index.cpu_time() - start_index.cpu_time() << std::endl
-		<< "index counts user time: " << end_index.user_time() - start_index.user_time() << std::endl;
+      std::cerr << "reverse counts cpu time:  " << end_index.cpu_time() - start_index.cpu_time() << std::endl
+		<< "reverse counts user time: " << end_index.user_time() - start_index.user_time() << std::endl;
    
     // scoring...
     const LexiconModel lexicon_source_target(lexicon_source_target_file);
@@ -158,20 +157,20 @@ int main(int argc, char** argv)
     if (score_phrase)
       score_counts<ExtractRootPhrase, LexiconPhrase>(output_file,
 						     counts_files,
-						     modified_counts,
+						     reversed_files,
 						     root_sources,
 						     LexiconPhrase(lexicon_source_target, lexicon_target_source));
       
     else if (score_scfg)
       score_counts<ExtractRootSCFG, LexiconSCFG>(output_file,
 						 counts_files,
-						 modified_counts,
+						 reversed_files,
 						 root_sources,
 						 LexiconSCFG(lexicon_source_target, lexicon_target_source));
     else
       score_counts<ExtractRootGHKM, LexiconGHKM>(output_file,
 						 counts_files,
-						 modified_counts,
+						 reversed_files,
 						 root_sources,
 						 LexiconGHKM(lexicon_source_target, lexicon_target_source));
     utils::resource end_score;
@@ -211,7 +210,7 @@ int main(int argc, char** argv)
 template <typename Extractor, typename Lexicon>
 void score_counts(const path_type& output_file,
 		  const path_set_type& counts_files,
-		  const modified_counts_set_type& modified,
+		  const path_map_type& reversed_files,
 		  root_count_set_type& root_sources,
 		  const Lexicon& lexicon)
 {
@@ -230,7 +229,7 @@ void score_counts(const path_type& output_file,
   typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
   typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
   
-  if (static_cast<int>(modified.size()) != threads)
+  if (static_cast<int>(reversed_files.size()) != threads)
     throw std::runtime_error("# of threads differ");
   
   // create directories for output
@@ -271,13 +270,12 @@ void score_counts(const path_type& output_file,
   for (int shard = 0; shard != threads; ++ shard) {
     const path_type path = output_file / (utils::lexical_cast<std::string>(shard) + ".gz");
     
-    // TODO: ZERO BUFFER!
-    ostreams[shard].reset(new utils::compress_ostream(path, 0));
+    ostreams[shard].reset(new utils::compress_ostream(path, 1024 * 1024));
     
-    reducers.add_thread(new boost::thread(reducer_type(modified,
-						       root_counts[shard],
+    reducers.add_thread(new boost::thread(reducer_type(root_counts[shard],
 						       Extractor(),
 						       lexicon,
+						       reversed_files[shard],
 						       queues_reducer[shard],
 						       *ostreams[shard],
 						       debug)));
@@ -303,42 +301,57 @@ void score_counts(const path_type& output_file,
 
 
 template <typename Extractor>
-struct IndexTask
+void reverse_counts(const path_map_type& modified_files,
+		    path_map_type& reversed_files,
+		    root_count_set_type& root_targets)
 {
-  const path_set_type&  paths;
-  modified_counts_type& counts;
-
-  IndexTask(const path_set_type& __paths,
-	    modified_counts_type& __counts)
-    : paths(__paths), counts(__counts) {}
+  typedef PhrasePairReverse map_reduce_type;
   
-  void operator()()
-  {
-    counts.open(paths, Extractor());
-  }
-};
+  typedef PhrasePairReverseMapper<Extractor>  mapper_type;
+  typedef PhrasePairReverseReducer            reducer_type;
+  
+  typedef map_reduce_type::queue_type         queue_type;
+  typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
+  typedef map_reduce_type::queue_ptr_set_type queue_ptr_set_type;
 
-template <typename Extractor>
-void index_counts(const path_map_type& modified_files,
-		  modified_counts_set_type& modified_counts,
-		  root_count_set_type& root_targets)
-{
   if (static_cast<int>(modified_files.size()) != threads)
     throw std::runtime_error("# of threads differ");
-  if (static_cast<int>(modified_counts.size()) != threads)
-    throw std::runtime_error("# of threads differ");
+
+  reversed_files.clear();
+  reversed_files.reserve(threads);
+  reversed_files.resize(threads);
+
+  boost::thread_group mappers;
+  boost::thread_group reducers;
+  queue_ptr_set_type  queues(threads);
   
-  boost::thread_group workers;
+  root_count_map_type root_counts(threads);
   
-  for (size_t shard = 0; shard != modified_counts.size(); ++ shard)
-    workers.add_thread(new boost::thread(IndexTask<Extractor>(modified_files[shard], modified_counts[shard])));
+  for (size_t shard = 0; shard != queues.size(); ++ shard)
+    queues[shard].reset(new queue_type(1024 * threads));
   
-  workers.join_all();
+  for (size_t shard = 0; shard != queues.size(); ++ shard)
+    reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
+						       utils::tempfile::tmp_dir(),
+						       reversed_files[shard],
+						       threads,
+						       max_malloc,
+						       debug)));
+
+  for (size_t shard = 0; shard != queues.size(); ++ shard)
+    mappers.add_thread(new boost::thread(mapper_type(modified_files[shard],
+						     queues,
+						     root_counts[shard],
+						     max_malloc,
+						     debug)));
+  
+  reducers.join_all();
+  mappers.join_all();
   
   // merge root counts...
-  for (size_t shard = 0; shard != modified_counts.size(); ++ shard) {
-    root_count_set_type::const_iterator citer_end = modified_counts[shard].root_counts.end();
-    for (root_count_set_type::const_iterator citer = modified_counts[shard].root_counts.begin(); citer != citer_end; ++ citer) {
+  for (size_t shard = 0; shard != root_counts.size(); ++ shard) {
+    root_count_set_type::const_iterator citer_end = root_counts[shard].end();
+    for (root_count_set_type::const_iterator citer = root_counts[shard].begin(); citer != citer_end; ++ citer) {
       std::pair<root_count_set_type::iterator, bool> result = root_targets.insert(*citer);
       if (! result.second) {
 	const_cast<root_count_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
@@ -378,6 +391,7 @@ void modify_counts(const path_set_type& counts_files,
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
+						       utils::tempfile::tmp_dir(),
 						       modified_files[shard],
 						       threads,
 						       max_malloc,
