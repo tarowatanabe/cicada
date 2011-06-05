@@ -739,7 +739,6 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
   
-  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
   const size_t queue_size = mpi_size * 1024;
   
   queue_type queue(queue_size);
@@ -836,7 +835,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   boost::thread_group mapper;
   mapper.add_thread(new boost::thread(mapper_type(mapped_files, queues, max_malloc, debug)));
   
-  modified_set_type       modified;
+  modified_type           modified;
   modified_generator_type generator;
 
   int non_found_iter = 0;
@@ -847,16 +846,10 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
       if (stream[rank] && device[rank] && device[rank]->test() && device[rank]->flush(true) == 0) {
 	
 	if (queues[rank]->pop_swap(modified, true)) {
-	  if (! modified.empty()) {
-	    if (debug >= 5)
-	      std::cerr << "modify counts mapper: " << modified.size() << std::endl;
-	    
-	    modified_set_type::const_iterator citer_end = modified.end();
-	    for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer)
-	      generator(*stream[rank], *citer) << '\n';
+	  if (! modified.source.empty()) {
+	    generator(*stream[rank], modified) << '\n';
 	    
 	    modified.clear();
-	    modified_set_type(modified).swap(modified);
 	  } else
 	    stream[rank].reset();
 	  
@@ -950,16 +943,14 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper)
     stream[rank]->push(*device[rank]);
   }
   
-  const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
-  const size_t queue_size = mpi_size * 128;
+  const size_t queue_size = mpi_size * 1024;
   
   queue_type queue(queue_size);
   
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(queue, path_modified, modified_files, 1, max_malloc, debug)));
   
-  modified_set_type modified;
-  modified_type     parsed;
+  modified_type modified;
   
   modified_parser_type parser;
   std::string line;
@@ -968,43 +959,22 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper)
   for (;;) {
     bool found = false;
     
-    if (queue.size() < queue_size) {
-      for (int rank = 0; rank != mpi_size; ++ rank) {
-	for (int iter = 0; iter != 64 && stream[rank] && device[rank] && device[rank]->test(); ++ iter) {
-	  if (std::getline(*stream[rank], line)) {
-	    if (parser(line, parsed))
-	      modified.push_back(parsed);
-	    else
-	      std::cerr << "failed modified phrase parsing: " << line << std::endl;
-	  } else {
-	    stream[rank].reset();
-	    device[rank].reset();
-	  }
-	  
-	  found = true;
+    for (int rank = 0; rank != mpi_size; ++ rank)
+      for (int iter = 0; iter != 64 && stream[rank] && device[rank] && device[rank]->test() && queue.size() < queue_size; ++ iter) {
+	if (std::getline(*stream[rank], line)) {
+	  if (parser(line, modified))
+	    queue.push_swap(modified);
+	  else
+	    std::cerr << "failed modified phrase parsing: " << line << std::endl;
+	} else {
+	  stream[rank].reset();
+	  device[rank].reset();
 	}
 	
-	if (found && utils::malloc_stats::used() > malloc_threshold) {
-	  boost::thread::yield();
-	  found = false;
-	}
+	found = true;
       }
-    }
     
-    const size_t modified_size = modified.size();
-    
-    if (! modified.empty() && queue.push_swap(modified, true)) {
-      
-      if (debug >= 5)
-	std::cerr << "modify counts reducer: " << modified_size << std::endl;
-      
-      modified.clear();
-      modified_set_type(modified).swap(modified);
-      
-      found = true;
-    }
-    
-    if (modified.empty() && std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
+    if (std::count(device.begin(), device.end(), idevice_ptr_type()) == mpi_size)
       break;
     
     non_found_iter = loop_sleep(found, non_found_iter);

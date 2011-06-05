@@ -942,9 +942,9 @@ struct PhrasePairModify
   typedef PhrasePair         phrase_pair_type;
   typedef PhrasePairModified modified_type;
 
-  typedef std::vector<modified_type, std::allocator<modified_type> >  modified_set_type;
+  typedef utils::chunk_vector<modified_type, 4096 / sizeof(modified_type), std::allocator<modified_type> >  modified_set_type;
 
-  typedef utils::lockfree_list_queue<modified_set_type, std::allocator<modified_set_type> > queue_type;
+  typedef utils::lockfree_list_queue<modified_type, std::allocator<modified_type> > queue_type;
 
   typedef boost::shared_ptr<queue_type> queue_ptr_type;
   typedef std::vector<queue_ptr_type, std::allocator<queue_ptr_type> > queue_ptr_set_type;
@@ -1073,25 +1073,24 @@ struct PhrasePairModifyMapper
 	throw std::runtime_error("no file? " + piter->string());
 
       istreams[pos].reset(new istream_type(*piter, 1024 * 1024));
-
+      
       buffer_stream_type* buffer_stream = &buffer_streams[pos];
       buffer_stream->second = &(*istreams[pos]);
-
+      
       read_phrase_pair(*istreams[pos], buffer_stream->first);
-
+      
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
     }
-
-    modified_map_type modified(queues.size());
-    modified_type counts;
+    
+    modified_map_type counts_saved(queues.size());
+    modified_type     counts;
 
     int iter = 0;
-    const int iteration_mask = (1 << 3) - 1;
+    const int iteration_mask = (1 << 4) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
 
-    int non_found_iter = 0;
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1103,37 +1102,27 @@ struct PhrasePairModifyMapper
 	if (! counts.counts.empty()) {
 	  // swap source and target!
 	  counts.source.swap(counts.target);
+	  
 	  const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
-	  modified[shard].push_back(counts);
+	  
+	  if (! queues[shard]->push_swap(counts, true))
+	    counts_saved[shard].push_back(counts);
 	}
-
+	
 	if ((iter & iteration_mask) == iteration_mask) {
 	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
-
-	  int committed = 0;
-	  int failed = 0;
+	  
 	  for (size_t shard = 0; shard != queues.size(); ++ shard)
-	    if (modified[shard].size() >= 64) {
-	      ++ committed;
-
-	      const size_t modified_size = modified[shard].size();
-
-	      if (queues[shard]->push_swap(modified[shard], modified_size < 1024)) {
-		modified[shard].clear();
-		modified_set_type(modified[shard]).swap(modified[shard]);
-	      } else
-		++ failed;
+	    while (! counts_saved[shard].empty()) {
+	      if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
+		counts_saved[shard].pop_back();
+	      else
+		break;
 	    }
-
-	  if (committed)
-	    non_found_iter = loop_sleep(failed < (committed >> 1), non_found_iter);
 	}
-
+	
 	++ iter;
-
-	if (malloc_full)
-	  boost::thread::yield();
-
+	
 	counts.swap(curr);
       } else
 	counts.increment(curr.counts.begin(), curr.counts.end());
@@ -1145,36 +1134,42 @@ struct PhrasePairModifyMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
+      
+      if (malloc_full)
+	boost::thread::yield();
     }
     
     if (! counts.counts.empty()) {
       // swap source and target!
       counts.source.swap(counts.target);
       const int shard = hasher(counts.source.begin(), counts.source.end(), 0) % queues.size();
-      modified[shard].push_back(counts);
+      
+      if (! queues[shard]->push_swap(counts, true))
+	counts_saved[shard].push_back(counts);
     }
     
     // termination...
     std::vector<bool, std::allocator<bool> > terminated(queues.size(), false);
+
+    counts.clear();
     
+    int non_found_iter = 0;
     while (1) {
       bool found = false;
       
       size_t num_empty = 0;
       for (size_t shard = 0; shard != queues.size(); ++ shard)
-	if (! modified[shard].empty()) {
-	  if (queues[shard]->push_swap(modified[shard], true)) {
-	    modified[shard].clear();
-	    modified_set_type(modified[shard]).swap(modified[shard]);
+	if (! counts_saved[shard].empty()) {
+	  if (queues[shard]->push_swap(counts_saved[shard].back(), true)) {
+	    counts_saved[shard].pop_back();
 	    
 	    found = true;
 	  }
 	} else {
 	  ++ num_empty;
 	  
-	  if (! terminated[shard] && queues[shard]->push_swap(modified[shard], true)) {
-	    modified[shard].clear();
-	    modified_set_type(modified[shard]).swap(modified[shard]);
+	  if (! terminated[shard] && queues[shard]->push_swap(counts, true)) {
+	    counts.clear();
 	    
 	    terminated[shard] = true;
 	    found = true;
@@ -1202,7 +1197,6 @@ struct PhrasePairModifyReducer
   typedef map_reduce_type::path_set_type path_set_type;
 
   typedef map_reduce_type::modified_type     modified_type;
-  typedef map_reduce_type::modified_set_type modified_set_type;
   
   typedef map_reduce_type::queue_type         queue_type;
   typedef map_reduce_type::queue_ptr_type     queue_ptr_type;
@@ -1375,7 +1369,7 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
   
   void operator()()
   {
-    modified_set_type    modified;
+    modified_type    modified;
     modified_unique_type counts;
 
     int num_termination = 0;
@@ -1387,7 +1381,7 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
       modified.clear();
       queue.pop_swap(modified);
       
-      if (modified.empty()) {
+      if (modified.source.empty()) {
 	++ num_termination;
 	
 	if (num_termination == shard_size)
@@ -1396,19 +1390,9 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
 	  continue;
       }
       
-      if (debug >= 4)
-	std::cerr << "modified reducer received: " << modified.size() << std::endl;
-
-      modified_set_type::const_iterator citer_end = modified.end();
-      for (modified_set_type::const_iterator citer = modified.begin(); citer != citer_end; ++ citer) {
-	
-	std::pair<modified_unique_type::iterator, bool> result = counts.insert(*citer);
-	if (! result.second)
-	  const_cast<modified_type&>(*result.first).increment(citer->counts.begin(), citer->counts.end());
-      }
-      
-      modified.clear();
-      modified_set_type(modified).swap(modified);
+      std::pair<modified_unique_type::iterator, bool> result = counts.insert(modified);
+      if (! result.second)
+	const_cast<modified_type&>(*result.first).increment(modified.counts.begin(), modified.counts.end());
       
       if (((iteration & iteration_mask) == iteration_mask) && (utils::malloc_stats::used() > malloc_threshold)) {
 	dump_counts(paths, counts);
@@ -1599,6 +1583,7 @@ struct PhrasePairReverseMapper
 	
 	if (! counts.empty()) {
 	  // dump counts... but we use the counts from modified and additional observed...
+	  // this observed is the same as counts.size()!
 	  
 	  modified.counts.push_back(observed);
 	  
@@ -1847,7 +1832,6 @@ struct PhrasePairReverseReducer
   void merge_counts(path_set_type& paths)
   {
     if (paths.size() <= 128) return;
-
 
     while (paths.size() > 128) {
       
