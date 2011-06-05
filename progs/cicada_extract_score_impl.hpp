@@ -1543,9 +1543,7 @@ struct PhrasePairReverseMapper
 	counts.back().increment(phrase_pair.counts.begin(), phrase_pair.counts.end());
     }
   }
-
   
-
   void operator()()
   {
     typedef utils::compress_istream         istream_type;
@@ -1601,7 +1599,7 @@ struct PhrasePairReverseMapper
 	
 	if (! counts.empty()) {
 	  // dump counts... but we use the counts from modified and additional observed...
-
+	  
 	  modified.counts.push_back(observed);
 	  
 	  modified_set_type::iterator citer_end = counts.end();
