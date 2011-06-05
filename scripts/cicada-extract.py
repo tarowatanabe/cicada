@@ -62,7 +62,7 @@ opt_parser = OptionParser(
                 help="alignment methods (default: grow-diag-final-and)"),
     
     # steps
-    make_option("--first-step", default=5, action="store", type="int", metavar='STEP', help="first step (default: 5)"),
+    make_option("--first-step", default=4, action="store", type="int", metavar='STEP', help="first step (default: 4)"),
     make_option("--last-step",  default=6, action="store", type="int", metavar='STEP', help="last step  (default: 6)"),
 
 

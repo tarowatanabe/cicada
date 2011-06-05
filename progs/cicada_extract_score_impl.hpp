@@ -1544,6 +1544,8 @@ struct PhrasePairReverseMapper
     }
   }
 
+  
+
   void operator()()
   {
     typedef utils::compress_istream         istream_type;
@@ -1555,13 +1557,16 @@ struct PhrasePairReverseMapper
     typedef std::vector<buffer_stream_type, std::allocator<buffer_stream_type> > buffer_stream_set_type;
     typedef std::vector<buffer_stream_type*, std::allocator<buffer_stream_type*> > pqueue_base_type;
     typedef std::priority_queue<buffer_stream_type*, pqueue_base_type, greater_buffer<buffer_stream_type> > pqueue_type;
+
+    typedef std::vector<modified_set_type, std::allocator<modified_set_type> > modified_map_type;
     
     pqueue_type            pqueue;
     istream_ptr_set_type   istreams(paths.size());
     buffer_stream_set_type buffer_streams(paths.size());
-
-    const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
+    const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
+    bool malloc_full = false;
+
     size_t pos = 0;
     for (path_set_type::const_iterator piter = paths.begin(); piter != paths.end(); ++ piter, ++ pos) {
       if (! boost::filesystem::exists(*piter))
@@ -1582,7 +1587,7 @@ struct PhrasePairReverseMapper
     modified_type     modified;
     count_type        observed(0);
 
-    modified_set_type counts_saved;
+    modified_map_type counts_saved(queues.size());
     
     root_count_set_type::iterator riter;
     
@@ -1607,18 +1612,20 @@ struct PhrasePairReverseMapper
 	    const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
 	    
 	    if (! queues[shard]->push_swap(*citer, true))
-	      counts_saved.push_back(*citer);
+	      counts_saved[shard].push_back(*citer);
 	  }
 	  
-	  while (counts_saved.size() > 1024 * queues.size() || (! counts_saved.empty() && utils::malloc_stats::used() > malloc_threshold)) {
-	    const int shard = hasher(counts_saved.back().source.begin(), counts_saved.back().source.end(), 0) % queues.size();
-	    
-	    queues[shard]->push_swap(counts_saved.back());
-	    
-	    counts_saved.pop_back();
-	  }
+	  for (size_t shard = 0; shard != queues.size(); ++ shard)
+	    while (! counts_saved[shard].empty()) {
+	      if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
+		counts_saved[shard].pop_back();
+	      else
+		break;
+	    }
 	  
 	  counts.clear();
+	  
+	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	}
 	
 	counts.push_back(curr);
@@ -1652,21 +1659,14 @@ struct PhrasePairReverseMapper
       
       if (! buffer_stream->first.empty())
 	pqueue.push(buffer_stream);
-      
-      // consume saved counts, if possible...
-      while (! counts_saved.empty()) {
-	const int shard = hasher(counts_saved.back().source.begin(), counts_saved.back().source.end(), 0) % queues.size();
-	
-	if (queues[shard]->push_swap(counts_saved.back(), true))
-	  counts_saved.pop_back();
-	else
-	  break;
-      }
+
+      if (malloc_full)
+	boost::thread::yield();
     }
     
     if (! counts.empty()) {
       modified.counts.push_back(observed);
-	  
+      
       modified_set_type::iterator citer_end = counts.end();
       for (modified_set_type::iterator citer = counts.begin(); citer != citer_end; ++ citer) {
 	citer->source.swap(citer->target);
@@ -1675,8 +1675,16 @@ struct PhrasePairReverseMapper
 	const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
 	
 	if (! queues[shard]->push_swap(*citer, true))
-	  counts_saved.push_back(*citer);
+	  counts_saved[shard].push_back(*citer);
       }
+      
+      for (size_t shard = 0; shard != queues.size(); ++ shard)
+	while (! counts_saved[shard].empty()) {
+	  if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
+	    counts_saved[shard].pop_back();
+	  else
+	    break;
+	}
       
       counts.clear();
     }
@@ -1689,26 +1697,26 @@ struct PhrasePairReverseMapper
     for (;;) {
       bool found = false;
       
-      if (! counts_saved.empty()) {
-	const int shard = hasher(counts_saved.back().source.begin(), counts_saved.back().source.end(), 0) % queues.size();
-	
-	if (queues[shard]->push_swap(counts_saved.back(), true)) {
-	  counts_saved.pop_back();
+      size_t num_empty = 0;
+      for (size_t shard = 0; shard != queues.size(); ++ shard)
+	if (! counts_saved[shard].empty()) {
+	  if (queues[shard]->push_swap(counts_saved[shard].back(), true)) {
+	    counts_saved[shard].pop_back();
+	    
+	    found = true;
+	  }
+	} else {
+	  ++ num_empty;
 	  
-	  found = true;
-	}
-      }
-      
-      if (counts_saved.empty())
-	for (size_t shard = 0; shard != queues.size(); ++ shard)
 	  if (! terminated[shard] && queues[shard]->push_swap(modified, true)) {
 	    modified.clear();
 	    
 	    terminated[shard] = true;
 	    found = true;
 	  }
+	}
       
-      if (counts_saved.empty() && std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
+      if (num_empty == queues.size() && std::count(terminated.begin(), terminated.end(), true) == static_cast<int>(queues.size())) break;
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
