@@ -282,6 +282,12 @@ int main(int argc, char** argv)
       for (path_set_type::const_iterator miter = modified_files.begin(); miter != modified_files.end(); ++ miter) {
 	boost::filesystem::remove(*miter);
 	utils::tempfile::erase(*miter);
+
+	const path_type tmp_file = miter->parent_path() / miter->stem();
+	if (boost::filesystem::exists(tmp_file)) {
+	  boost::filesystem::remove(tmp_file);
+	  utils::tempfile::erase(tmp_file);
+	}
       }
       
       utils::resource start_score;
@@ -881,11 +887,17 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   
   std::string line;
   while (std::getline(is, line)) {
-    if (! boost::filesystem::exists(line))
+    const path_type path(line);
+    
+    if (! boost::filesystem::exists(path))
       throw std::runtime_error("no modified counts? " + line);
     
-    modified_files.push_back(line);
-    utils::tempfile::insert(line);
+    modified_files.push_back(path);
+    utils::tempfile::insert(path);
+    
+    const path_type tmp_file = path.parent_path() / path.stem();
+    if (boost::filesystem::exists(tmp_file))
+      utils::tempfile::insert(tmp_file);
   }
 }
 
@@ -983,8 +995,13 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
       os << fiter->string() << '\n';
   }
   
-  for (path_set_type::const_iterator fiter = modified_files.begin(); fiter != modified_files.end(); ++ fiter)
+  for (path_set_type::const_iterator fiter = modified_files.begin(); fiter != modified_files.end(); ++ fiter) {
     utils::tempfile::erase(*fiter);
+    
+    const path_type tmp_file = fiter->parent_path() / fiter->stem();
+    if (boost::filesystem::exists(tmp_file))
+      utils::tempfile::erase(tmp_file);
+  }
 }
 
 
