@@ -66,6 +66,8 @@ path_type prog_name;
 
 int debug = 0;
 
+void prepare(const path_type& output_file);
+
 void score_counts_mapper(utils::mpi_intercomm& reducer,
 			 const path_set_type& counts_files);
 template <typename Extractor, typename Lexicon>
@@ -85,7 +87,8 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
 void modify_counts_mapper(utils::mpi_intercomm& reducer,
 			  const path_set_type& counts_files,
 			  path_set_type& modified_files);
-void modify_counts_reducer(utils::mpi_intercomm& mapper);
+void modify_counts_reducer(utils::mpi_intercomm& mapper,
+			   const path_type& output_file);
 
 void synchronize_mapper(utils::mpi_intercomm& reducer);
 void synchronize_reducer(utils::mpi_intercomm& mapper);
@@ -130,9 +133,12 @@ int main(int argc, char** argv)
       
       path_set_type reversed_files;
       root_count_set_type root_sources;
+
+      // prepare directory...
+      prepare(output_file);
       
       utils::resource start_modify;
-      modify_counts_reducer(comm_parent);
+      modify_counts_reducer(comm_parent, output_file);
       utils::resource end_modify;
       
       if (debug && mpi_rank == 0)
@@ -176,10 +182,7 @@ int main(int argc, char** argv)
 		  << "score counts reducer user time: " << end_score.user_time() - start_score.user_time() << std::endl;
 
       reduce_root_counts(root_sources);
-      
-      // synchronize here...
-      synchronize_reducer(comm_parent);
-      
+            
       // finally, dump root-sources and root-targets...
       if (mpi_rank == 0) {
 	utils::compress_ostream os_file(output_file / "files");
@@ -195,7 +198,8 @@ int main(int argc, char** argv)
 	  os_src << *siter << '\n';
       }
       
-      
+      // synchronize here...
+      synchronize_reducer(comm_parent);
     } else {
       const std::string name = (boost::filesystem::exists(prog_name) ? prog_name.string() : std::string(argv[0]));
       utils::mpi_intercomm comm_child(MPI::COMM_WORLD.Spawn(name.c_str(), &(*args.begin()), mpi_size, MPI::INFO_NULL, 0));
@@ -289,9 +293,6 @@ int main(int argc, char** argv)
 		  << "score counts mapper user time: " << end_score.user_time() - start_score.user_time() << std::endl;
 
       reduce_root_counts(root_targets);
-
-      // synchronize here...
-      synchronize_mapper(comm_child);
       
       if (mpi_rank == 0) {
 	utils::compress_ostream os_trg(output_file / "root-target.gz");
@@ -301,7 +302,9 @@ int main(int argc, char** argv)
 	for (root_count_set_type::const_iterator titer = root_targets.begin(); titer != titer_end; ++ titer)
 	  os_trg << *titer << '\n';
       }
-      
+     
+      // synchronize here...
+      synchronize_mapper(comm_child);
     }
   }
   catch (const std::exception& err) {
@@ -339,6 +342,26 @@ int loop_sleep(bool found, int non_found_iter)
     non_found_iter = 0;
   }
   return non_found_iter;
+}
+
+void prepare(const path_type& output_file)
+{
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  // create directories for output
+  if (mpi_rank == 0) {
+    if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
+      boost::filesystem::remove_all(output_file);
+    
+    boost::filesystem::create_directories(output_file);
+    
+    boost::filesystem::directory_iterator iter_end;
+    for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
+      boost::filesystem::remove_all(*iter);
+  }
+  
+  MPI::COMM_WORLD.Barrier();
 }
 
 void synchronize_mapper(utils::mpi_intercomm& reducer)
@@ -544,20 +567,6 @@ void score_counts_reducer(utils::mpi_intercomm& mapper,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  // create directories for output
-  if (mpi_rank == 0) {
-    if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
-      boost::filesystem::remove_all(output_file);
-    
-    boost::filesystem::create_directories(output_file);
-    
-    boost::filesystem::directory_iterator iter_end;
-    for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
-      boost::filesystem::remove_all(*iter);
-  }
-
-  MPI::COMM_WORLD.Barrier();
   
   istream_ptr_set_type stream(mpi_size);
   idevice_ptr_set_type device(mpi_size);
@@ -871,11 +880,17 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
   is.push(utils::mpi_device_source(reducer.comm, mpi_rank, file_tag, 4096));
   
   std::string line;
-  while (std::getline(is, line))
+  while (std::getline(is, line)) {
+    if (! boost::filesystem::exists(line))
+      throw std::runtime_error("no modified counts? " + line);
+    
     modified_files.push_back(line);
+    utils::tempfile::insert(line);
+  }
 }
 
-void modify_counts_reducer(utils::mpi_intercomm& mapper)
+void modify_counts_reducer(utils::mpi_intercomm& mapper,
+			   const path_type& output_file)
 {
   typedef utils::repository repository_type;
 
@@ -903,32 +918,6 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper)
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  path_type path_modified;
-  if (mpi_rank == 0) {
-    path_modified = utils::tempfile::directory_name(std::string("cicada.extract.modified.XXXXXX"));
-    
-    repository_type rep(path_modified, repository_type::write);
-    
-    boost::iostreams::filtering_ostream os;
-    os.push(utils::mpi_device_bcast_sink(0, 4096));
-    os << path_modified.string() << '\n';
-  } else {
-    boost::iostreams::filtering_istream is;
-    is.push(utils::mpi_device_bcast_source(0, 4096));
-    
-    std::string line;
-    if (std::getline(is, line))
-      path_modified = line;
-  }
-  
-  utils::tempfile::insert(path_modified);
-  
-  if (path_modified.empty())
-    throw std::runtime_error("no index path? " + path_modified.string());
-  
-  while (! repository_type::exists(path_modified))
-    boost::thread::yield();
   
   path_set_type modified_files;
   
@@ -948,7 +937,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper)
   queue_type queue(queue_size);
   
   boost::thread_group reducer;
-  reducer.add_thread(new boost::thread(reducer_type(queue, path_modified, modified_files, 1, max_malloc, debug)));
+  reducer.add_thread(new boost::thread(reducer_type(queue, output_file, modified_files, 1, max_malloc, debug)));
   
   modified_type modified;
   
@@ -985,12 +974,17 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper)
   
   reducer.join_all();
   
-  // send modified files to mapper sharing the same rank
-  boost::iostreams::filtering_ostream os;
-  os.push(utils::mpi_device_sink(mapper.comm, mpi_rank, file_tag, 4096));
+  {
+    // send modified files to mapper sharing the same rank
+    boost::iostreams::filtering_ostream os;
+    os.push(utils::mpi_device_sink(mapper.comm, mpi_rank, file_tag, 4096));
+    
+    for (path_set_type::const_iterator fiter = modified_files.begin(); fiter != modified_files.end(); ++ fiter)
+      os << fiter->string() << '\n';
+  }
   
   for (path_set_type::const_iterator fiter = modified_files.begin(); fiter != modified_files.end(); ++ fiter)
-    os << fiter->string() << '\n';
+    utils::tempfile::erase(*fiter);
 }
 
 

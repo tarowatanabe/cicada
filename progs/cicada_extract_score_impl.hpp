@@ -1844,7 +1844,7 @@ struct PhrasePairReverseReducer
       const path_type file2 = paths.front();
       paths.erase(paths.begin());
       
-      const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.modified.XXXXXX");
+      const path_type counts_file_tmp = utils::tempfile::file_name(prefix / "cicada.extract.reversed.XXXXXX");
       utils::tempfile::insert(counts_file_tmp);
       const path_type counts_file = counts_file_tmp.string() + ".gz";
       utils::tempfile::insert(counts_file);
