@@ -1610,15 +1610,12 @@ struct PhrasePairReverseMapper
 	      counts_saved.push_back(*citer);
 	  }
 	  
-	  if (counts_saved.size() > 1024 * queues.size() || utils::malloc_stats::used() > malloc_threshold) {
-	    modified_set_type::iterator citer_end = counts_saved.end();
-	    for (modified_set_type::iterator citer = counts_saved.begin(); citer != citer_end; ++ citer) {
-	      const int shard = hasher(citer->source.begin(), citer->source.end(), 0) % queues.size();
-	      
-	      queues[shard]->push_swap(*citer);
-	    }
+	  while (counts_saved.size() > 1024 * queues.size() || (! counts_saved.empty() && utils::malloc_stats::used() > malloc_threshold)) {
+	    const int shard = hasher(counts_saved.back().source.begin(), counts_saved.back().source.end(), 0) % queues.size();
 	    
-	    counts_saved.clear();
+	    queues[shard]->push_swap(counts_saved.back());
+	    
+	    counts_saved.pop_back();
 	  }
 	  
 	  counts.clear();
@@ -1657,11 +1654,13 @@ struct PhrasePairReverseMapper
 	pqueue.push(buffer_stream);
       
       // consume saved counts, if possible...
-      if (! counts_saved.empty()) {
+      while (! counts_saved.empty()) {
 	const int shard = hasher(counts_saved.back().source.begin(), counts_saved.back().source.end(), 0) % queues.size();
 	
 	if (queues[shard]->push_swap(counts_saved.back(), true))
 	  counts_saved.pop_back();
+	else
+	  break;
       }
     }
     
@@ -2308,7 +2307,7 @@ struct PhrasePairScoreReducer
     }
     iterators.push_back(citer_end);
 
-    if (modified.size() != iterators.size())
+    if (modified.size() != iterators.size() - 1)
       throw std::runtime_error("source/target size mismatch?");
     
     phrase_pair_type counts_pair;
@@ -2323,6 +2322,11 @@ struct PhrasePairScoreReducer
       phrase_pair_set_type::const_iterator last  = *(iiter + 1);
       
       // compute lexical weights from [first, last)... we will take "max"
+      
+      if (first->source != miter->source)
+	throw std::runtime_error("different source?") ;
+      if (first->target != miter->target)
+	throw std::runtime_error("different source?") ;
       
       counts_pair.clear();
       
