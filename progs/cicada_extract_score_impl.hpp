@@ -1087,7 +1087,7 @@ struct PhrasePairModifyMapper
     modified_type     counts;
 
     int iter = 0;
-    const int iteration_mask = (1 << 4) - 1;
+    const int iteration_mask = (1 << 8) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
 
