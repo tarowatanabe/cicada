@@ -841,7 +841,7 @@ void modify_counts_mapper(utils::mpi_intercomm& reducer,
     stream[rank]->push(*device[rank]);
     stream[rank]->precision(20);
     
-    queues[rank].reset(new queue_type(128));
+    queues[rank].reset(new queue_type(1024));
   }
 
   if (debug >= 2)
