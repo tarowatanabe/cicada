@@ -451,7 +451,7 @@ struct LexiconModel
   {
     namespace qi = boost::spirit::qi;
     namespace standard = boost::spirit::standard;
-
+    
     typedef boost::fusion::tuple<std::string, std::string, double> parsed_type;
 
     qi::rule<std::string::const_iterator, std::string(), standard::space_type> word;
@@ -1132,7 +1132,8 @@ struct PhrasePairModifyMapper
 		else
 		  break;
 	      }
-	  
+	}
+	
 	++ iter;
 	
 	counts.swap(curr);
@@ -1630,7 +1631,6 @@ struct PhrasePairReverseMapper
 		else
 		  break;
 	      }
-	  
 	  
 	  counts.clear();
 	  
