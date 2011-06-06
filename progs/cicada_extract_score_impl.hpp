@@ -1086,11 +1086,9 @@ struct PhrasePairModifyMapper
     modified_map_type counts_saved(queues.size());
     modified_type     counts;
 
-    int iter = 0;
-    const int iteration_mask = (1 << 8) - 1;
     const size_t malloc_threshold = size_t(max_malloc * 1024 * 1024 * 1024);
     bool malloc_full = false;
-
+    
     while (! pqueue.empty()) {
       buffer_stream_type* buffer_stream(pqueue.top());
       pqueue.pop();
@@ -1098,7 +1096,9 @@ struct PhrasePairModifyMapper
       modified_type& curr = buffer_stream->first.front();
 
       if (counts != curr) {
-
+	
+	const bool source_differ = (counts.source != curr.source);
+	
 	if (! counts.counts.empty()) {
 	  // swap source and target!
 	  counts.source.swap(counts.target);
@@ -1107,34 +1107,32 @@ struct PhrasePairModifyMapper
 	  
 	  if (! queues[shard]->push_swap(counts, true))
 	    counts_saved[shard].push_back(counts);
-	}
-	
-	if ((iter & iteration_mask) == iteration_mask) {
-	  malloc_full = (utils::malloc_stats::used() > malloc_threshold);
 	  
-	  size_t num_full = 0;
-	  for (size_t shard = 0; shard != queues.size(); ++ shard) {
-	    while (! counts_saved[shard].empty()) {
-	      if (queues[shard]->push_swap(counts_saved[shard].back(), true))
-		counts_saved[shard].pop_back();
-	      else
-		break;
-	    }
-
-	    num_full += (counts_saved[shard].size() > 1024);
-	  }
-	  
-	  if (num_full > (queues.size() >> 1))
-	    for (size_t shard = 0; shard != queues.size(); ++ shard)
+	  if (source_differ) {
+	    malloc_full = (utils::malloc_stats::used() > malloc_threshold);
+	    
+	    size_t num_full = 0;
+	    for (size_t shard = 0; shard != queues.size(); ++ shard) {
 	      while (! counts_saved[shard].empty()) {
-		if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
+		if (queues[shard]->push_swap(counts_saved[shard].back(), true))
 		  counts_saved[shard].pop_back();
 		else
 		  break;
 	      }
+	      
+	      num_full += (counts_saved[shard].size() > 1024);
+	    }
+	    
+	    if (num_full > (queues.size() >> 1))
+	      for (size_t shard = 0; shard != queues.size(); ++ shard)
+		while (! counts_saved[shard].empty()) {
+		  if (queues[shard]->push_swap(counts_saved[shard].back(), counts_saved[shard].size() < 1024))
+		    counts_saved[shard].pop_back();
+		  else
+		    break;
+		}
+	  }
 	}
-	
-	++ iter;
 	
 	counts.swap(curr);
       } else
