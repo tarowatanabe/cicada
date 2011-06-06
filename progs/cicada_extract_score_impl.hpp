@@ -1374,7 +1374,7 @@ typedef sgi::hash_set<modified_type, boost::hash<modified_type>, std::equal_to<m
 
     int num_termination = 0;
     
-    const size_type iteration_mask = (1 << 4) - 1;
+    const size_type iteration_mask = (1 << 5) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     for (size_type iteration = 0; /**/; ++ iteration) {
@@ -1919,7 +1919,7 @@ struct PhrasePairReverseReducer
     
     int num_termination = 0;
     
-    const size_type iteration_mask = (1 << 4) - 1;
+    const size_type iteration_mask = (1 << 5) - 1;
     const size_type malloc_threshold = size_type(max_malloc * 1024 * 1024 * 1024);
     
     for (size_type iteration = 0; /**/; ++ iteration) {
