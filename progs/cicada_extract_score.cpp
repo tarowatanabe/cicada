@@ -387,7 +387,7 @@ void modify_counts(const path_set_type& counts_files,
   queue_ptr_set_type  queues(threads);
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
-    queues[shard].reset(new queue_type(128));
+    queues[shard].reset(new queue_type(1024 * threads));
   
   for (size_t shard = 0; shard != queues.size(); ++ shard)
     reducers.add_thread(new boost::thread(reducer_type(*queues[shard],
