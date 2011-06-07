@@ -663,26 +663,28 @@ class ExtractScore(Extract):
         if phrase:
             self.counts = os.path.join(model_dir, "phrase-counts")
             self.scores = os.path.join(model_dir, "phrase-score")
+            self.logfile = "extract-score.phrase.log"
             option = " --score-phrase"
         elif scfg:
             self.counts = os.path.join(model_dir, "scfg-counts")
             self.scores = os.path.join(model_dir, "scfg-score")
+            self.logfile = "extract-score.scfg.log"
             option = " --score-scfg"
         elif ghkm:
             self.counts = os.path.join(model_dir, "ghkm-counts")
             self.scores = os.path.join(model_dir, "ghkm-score")
+            self.logfile = "extract-score.ghkm.log"
             option = " --score-ghkm"
         elif tree:
             self.counts = os.path.join(model_dir, "tree-counts")
             self.scores = os.path.join(model_dir, "tree-score")
+            self.logfile = "extract-score.tree.log"
             option = " --score-ghkm"
         else:
             raise ValueError, "no count type?"
 
         if not os.path.exists(self.counts):
             raise ValueError, "no counts? %s" %(self.counts)
-
-        self.logfile = "extract-score.log"
                 
         prog_name = cicada.cicada_extract_score
         if mpi:
