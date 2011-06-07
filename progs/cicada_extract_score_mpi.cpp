@@ -754,7 +754,7 @@ void reverse_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
   
-  const size_t queue_size = mpi_size * 1024;
+  const size_t queue_size = mpi_size * 1024 * 8;
   
   queue_type queue(queue_size);
   boost::thread reducer(reducer_type(queue, utils::tempfile::tmp_dir(), reversed_files, 1, max_malloc, debug));
@@ -944,7 +944,7 @@ void modify_counts_reducer(utils::mpi_intercomm& mapper,
     stream[rank]->push(*device[rank]);
   }
   
-  const size_t queue_size = mpi_size * 1024;
+  const size_t queue_size = mpi_size * 1024 * 8;
   
   queue_type queue(queue_size);
   
