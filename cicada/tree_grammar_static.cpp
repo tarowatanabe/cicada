@@ -1065,31 +1065,13 @@ namespace cicada
     
     target_map->write(path_target);
     target_map.reset();
-    
-    rule_db.close();
-    
-    ::sync();
 
-    while (! symbol_db_type::exists(path_symbol))
-      boost::thread::yield();
-    while (! rule_db_type::exists(path_source))
-      boost::thread::yield();
-    while (! rule_db_type::exists(path_target))
-      boost::thread::yield();
-    while (! rule_pair_db_type::exists(path_rule))
-      boost::thread::yield();
-    
-    symbol_db.open(path_symbol);
-    source_db.open(path_source);
-    target_db.open(path_target);
-    rule_db.open(path_rule);
-    
     // uncover edge_db from edge_map...
+    edge_db.open(path_edge, edge_db_type::WRITE);
+    
     {
       typedef std::vector<char, std::allocator<char> > codes_type;
       typedef std::vector<word_type::id_type, std::allocator<word_type::id_type> > buffer_type;
-      
-      edge_db.open(path_edge, edge_db_type::WRITE);
       
       codes_type codes;
       buffer_type buffer;
@@ -1098,7 +1080,7 @@ namespace cicada
 	codes.insert(codes.end(), edge_map->operator[](id).begin(), edge_map->operator[](id).end());
 	
 	word_type::id_type word_id;
-
+	
 	buffer.clear();
 	codes_type::const_iterator citer = codes.begin();
 	codes_type::const_iterator citer_end = codes.end();
@@ -1110,16 +1092,31 @@ namespace cicada
 	
 	edge_db.insert(&(*buffer.begin()), buffer.size(), id);
       }
-      
-      // reset and close
-      edge_map.reset();
-      
-      edge_db.close();
-      
-      ::sync();
-      
-      edge_db.open(path_edge);
     }
+    
+    edge_map.reset();
+    edge_db.close();
+    
+    rule_db.close();
+    
+    ::sync();
+    
+    while (! symbol_db_type::exists(path_symbol))
+      boost::thread::yield();
+    while (! rule_db_type::exists(path_source))
+      boost::thread::yield();
+    while (! rule_db_type::exists(path_target))
+      boost::thread::yield();
+    while (! edge_db_type::exists(path_edge))
+      boost::thread::yield();
+    while (! rule_pair_db_type::exists(path_rule))
+      boost::thread::yield();
+    
+    symbol_db.open(path_symbol);
+    source_db.open(path_source);
+    target_db.open(path_target);
+    edge_db.open(path_edge);
+    rule_db.open(path_rule);
     
     // vocabulary...
     word_type::write(path_vocab);
