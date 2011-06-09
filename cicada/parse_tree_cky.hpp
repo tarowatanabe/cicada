@@ -485,7 +485,7 @@ namespace cicada
 	      
 	      if (rules.empty()) continue;
 	      
-	      score_type score_antecedent = semiring::traits<score_type>::one();
+	      score_type score_antecedent = function(citer->features);
 	      
 	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = citer->tails.end();
 	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)
@@ -505,7 +505,7 @@ namespace cicada
 	      
 	      if (rules.empty()) continue;
 	      
-	      score_type score_antecedent = semiring::traits<score_type>::one();
+	      score_type score_antecedent = function(citer->features);
 	      
 	      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = citer->tails.end();
 	      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = citer->tails.begin(); titer != titer_end; ++ titer)

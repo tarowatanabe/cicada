@@ -687,7 +687,7 @@ namespace cicada
 	    if (rules.empty()) continue;
 	    
 	    // compute frontier scores
-	    score_type score = semiring::traits<score_type>::one();
+	    score_type score = function(*siter);
 	    frontier_type::const_iterator iter_end = fiter->end();
 	    for (frontier_type::const_iterator iter = fiter->begin(); iter != iter_end; ++ iter)
 	      score *= scores[*iter];
