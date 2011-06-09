@@ -28,7 +28,7 @@ opt_parser = OptionParser(
     make_option("--output", default="", action="store", type="string", metavar="FILE", help="output"),
     
     ## smoothing...
-    make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
+    make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
     
     ## feature/attribute names
     make_option("--feature",   default=[], action="append", type="string", help="feature definitions"),
@@ -299,7 +299,7 @@ class IndexTree:
         self.name = "tree"
 
 class Index(UserString.UserString):
-    def __init__(self, cicada=None, indexer=None, input="", output="", name="", root_source="", root_target="", kbest=0, quantize=None, features=[], attributes=[]):
+    def __init__(self, cicada=None, indexer=None, input="", output="", name="", root_source="", root_target="", prior=0.1, kbest=0, quantize=None, features=[], attributes=[]):
 
         if not input:
             raise ValueError, "no input? %s" %(input)
@@ -324,6 +324,7 @@ class Index(UserString.UserString):
             command += " --input \"%s\"" %(input)
             command += " | "
             command += indexer.filter
+            command += " --diricklet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
             command += " | "
@@ -333,6 +334,7 @@ class Index(UserString.UserString):
             self.threads = 2
 
             command = indexer.filter
+            command += " --diricklet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
             command += " --input \"%s\"" %(input)
@@ -435,6 +437,7 @@ if options.pbs:
                       name=score.name,
                       root_source=scores.root_source,
                       root_target=scores.root_target,
+                      prior=options.prior,
                       kbest=options.kbest,
                       quantize=options.quantize,
                       features=options.feature,
@@ -456,6 +459,7 @@ elif options.mpi:
                       output=score.output,
                       root_source=scores.root_source,
                       root_target=scores.root_target,
+                      prior=options.prior,
                       kbest=options.kbest,
                       quantize=options.quantize,
                       features=options.feature,
@@ -471,6 +475,7 @@ else:
                       output=score.output,
                       root_source=scores.root_source,
                       root_target=scores.root_target,
+                      prior=options.prior,
                       kbest=options.kbest,
                       quantize=options.quantize,
                       features=options.feature,
