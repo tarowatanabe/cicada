@@ -657,6 +657,8 @@ struct ExtractGHKM
     node_set_type tails_new;
 
     //std::cerr << "derivations size: " << derivations.size() << std::endl;
+
+    const size_t id_mask = (1 << 5) - 1;
     
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
@@ -780,7 +782,9 @@ struct ExtractGHKM
 	}
       }
       rule_pairs_local.clear();
-      dumper(rule_pairs);
+
+      if ((id & id_mask) == id_mask)
+	dumper(rule_pairs);
       
       //std::cerr << "dumped" << std::endl;
     }

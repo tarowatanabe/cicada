@@ -1428,6 +1428,8 @@ struct ExtractTree
     
     range_tail_type range_tail;
     range_tails.clear();
+
+    const size_t id_mask = (1 << 5) - 1;
     
     for (size_t id = 0; id != graph_target.derivations.size(); ++ id) {
       derivation_node_type& node = graph_target.derivations[id];
@@ -1510,7 +1512,8 @@ struct ExtractTree
 	}
       }
       
-      dumper(rule_pairs);
+      if ((id & id_mask) == id_mask)
+	dumper(rule_pairs);
     }
   }
   
