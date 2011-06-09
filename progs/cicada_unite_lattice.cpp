@@ -35,6 +35,7 @@ double count_weight = 1.0;
 
 bool remove_epsilon = false;
 bool multiple_mode = false;
+bool sentence_mode = false;
 
 int debug = 0;
 
@@ -78,6 +79,7 @@ int main(int argc, char ** argv)
     
     lattice_type merged;
     lattice_type lattice;
+    sentence_type sentence;
 
     if (input_files.empty())
       input_files.push_back("-");
@@ -109,7 +111,13 @@ int main(int argc, char ** argv)
 	      if (! qi::phrase_parse(iter, end, "|||", standard::space))
 		break;
 	    
-	    if (! lattice.assign(iter, end))
+
+	    if (sentence_mode) {
+	      if (! sentence.assign(iter, end))
+		throw std::runtime_error("invalid sentence format");
+	      
+	      lattice = lattice_type(sentence);
+	    } else if (! lattice.assign(iter, end))
 	      throw std::runtime_error("invalid lattice format");
 	    
 	    if (lattice.empty()) continue;
@@ -161,9 +169,14 @@ int main(int argc, char ** argv)
 	std::string::const_iterator iter = line.begin();
 	std::string::const_iterator end = line.end();
       
-	if (! lattice.assign(iter, end))
+	if (sentence_mode) {
+	  if (! sentence.assign(iter, end))
+	    throw std::runtime_error("invalid sentence format");
+	  
+	  lattice = lattice_type(sentence);
+	} else if (! lattice.assign(iter, end))
 	  throw std::runtime_error("invalid lattice format");
-
+	
 	if (lattice.empty()) continue;
       
 	const double conf = 1.0 / (1.0 + rank);
@@ -236,7 +249,12 @@ int main(int argc, char ** argv)
 	    std::string::const_iterator iter = line.begin();
 	    std::string::const_iterator end = line.end();
 	    
-	    if (! lattice.assign(iter, end))
+	    if (sentence_mode) {
+	      if (! sentence.assign(iter, end))
+		throw std::runtime_error("invalid sentence format");
+	      
+	      lattice = lattice_type(sentence);
+	    } else if (! lattice.assign(iter, end))
 	      throw std::runtime_error("invalid lattice format");
 	    
 	    if (lattice.empty()) continue;
@@ -317,7 +335,8 @@ void options(int argc, char** argv)
     ("count-weight", po::value<double>(&count_weight),       "count weight")
     
     ("remove-epsilon", po::bool_switch(&remove_epsilon), "remvoe epsilon")
-    ("multiple", po::bool_switch(&multiple_mode), "multiple forest in one line")
+    ("multiple", po::bool_switch(&multiple_mode),        "multiple forest in one line")
+    ("sentence", po::bool_switch(&sentence_mode),        "sentence as a lattice")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
