@@ -115,36 +115,27 @@ class PBS:
         if os.environ.has_key('TMPDIR_SPEC'):
             self.tmpdir_spec = os.environ['TMPDIR_SPEC']
             
-    def run(self, command="", threads=1, memory=0.0, name="name", mpi=None, logfile=None):
+    def run(self, command="", threads=1, memory=0.0, name="name", logfile=None):
         popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE)
 
         pipe = popen.stdin
         
         pipe.write("#!/bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
-        pipe.write("#PBS -W block=true\n")
+        # we will run in non-block
+        #pipe.write("#PBS -W block=true\n")
         pipe.write("#PBS -k n\n")
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
             
-        if mpi:
-            if memory > 0.0:
-                if memory < 1.0:
-                    pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1:mem=%dmb\n" %(mpi.number, int(memory * 1000)))
-                else:
-                    pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1:mem=%dgb\n" %(mpi.number, int(memory)))
+        if memory > 0.0:
+            if memory < 1.0:
+                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dmb\n" %(threads, int(memory * 1000)))
             else:
-                pipe.write("#PBS -l select=%d:ncpus=3:mpiprocs=1\n" %(mpi.number))
-                
+                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dgb\n" %(threads, int(memory)))
         else:
-            if memory > 0.0:
-                if memory < 1.0:
-                    pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dmb\n" %(threads, int(memory * 1000)))
-                else:
-                    pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1:mem=%dgb\n" %(threads, int(memory)))
-            else:
-                pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1\n" %(threads))
+            pipe.write("#PBS -l select=1:ncpus=%d:mpiprocs=1\n" %(threads))
         
         # setup TMPDIR and TMPDIR_SPEC
         if self.tmpdir:
@@ -153,21 +144,23 @@ class PBS:
             pipe.write("export TMPDIR_SPEC=%s\n" %(self.tmpdir_spec))
             
         pipe.write("cd \"%s\"\n" %(self.workingdir))
-
+        
         if logfile:
-            if mpi:
-                pipe.write("%s %s >& %s\n" %(mpi.mpirun, command, logfile))
-            else:
-                pipe.write("%s >& %s\n" %(command, logfile))
+            pipe.write("%s >& %s\n" %(command, logfile))
         else:
-            if mpi:
-                pipe.write("%s %s\n" %(mpi.mpirun, command))
-            else:
-                pipe.write("%s\n" %(command))
+            pipe.write("%s\n" %(command))
         
         pipe.close()
         popen.wait()
-            
+
+class Threads:
+    
+    def __init__(self, number=1):
+        pass
+    
+    def run(self, command=""):
+        pass
+        
 class MPI:
     
     def __init__(self, dir="", hosts="", hosts_file="", number=0):
@@ -201,7 +194,7 @@ class MPI:
             else:
                 setattr(self, binprog, binprog)
                 
-    def run(self, command):
+    def run(self, command=""):
         mpirun = self.mpirun
         #if self.dir:
         #    mpirun += ' --prefix %s' %(self.dir)
@@ -242,7 +235,8 @@ class CICADA:
                         'cicada_filter_extract_scfg',
                         'cicada_filter_extract_ghkm',
                         ### filters
-                        'mpish',
+                        'mpish', ### mpi-launcher
+                        'thrsh', ### thread-launcher
                         ### launchers
                         ):
 	    
@@ -260,6 +254,7 @@ class IndexPhrase:
         self.filter  = cicada.cicada_filter_extract_phrase
         self.filter += " --cicada"
         self.cky = None
+        self.name = "phrase"
         
 class IndexSCFG:
     def __init__(self, cicada=None, cky=None):
@@ -267,21 +262,24 @@ class IndexSCFG:
         self.filter  = cicada.cicada_filter_extract_scfg
         self.filter += " --feature-root"
         self.cky = None
+        self.name = "scfg"
 
 class IndexGHKM:
     def __init__(self, cicada=None, cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
+        self.name = "ghkm"
 
 class IndexTree:
     def __init__(self, cicada=None, cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
+        self.name = "tree"
 
 class Index(UserString.UserString):
-    def __init__(self, cicada=None, indexer=None, input="", output="", root_source="", root_target="", kbest=0, quantize=None, features=[], attributes=[]):
+    def __init__(self, cicada=None, indexer=None, input="", output="", name="", root_source="", root_target="", kbest=0, quantize=None, features=[], attributes=[]):
 
         if not input:
             raise ValueError, "no input? %s" %(input)
@@ -292,9 +290,15 @@ class Index(UserString.UserString):
         if not root_target:
             raise ValueError, "no root target? %s" %(root_target)
         
+        self.name    = "index-" + indexer.name
+        self.logfile = "index-" + indexer.name + "." + name + ".log"
+        
         command = ""
 
         if kbest > 0:
+            
+            self.threads = 3
+
             command = cicada.cicada_filter_extract
             command += " --nbest %d" %(kbest)
             command += " --input \"%s\"" %(input)
@@ -305,6 +309,9 @@ class Index(UserString.UserString):
             command += " | "
             command += indexer.indexer
         else:
+            
+            self.threads = 2
+
             command = indexer.filter
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
@@ -377,7 +384,7 @@ class Scores(UserList.UserList):
 
             root,stem = os.path.splitext(name)
             
-            self.append(Score(path, os.path.join(output, root + '.bin'), root + '.bin'))
+            self.append(Score(path, os.path.join(output, root + '.bin'), root))
 
 (options, args) = opt_parser.parse_args()
 
@@ -398,9 +405,36 @@ else:
 
 if options.pbs:
     # we use pbs to run jobs
-    pass
+    pbs = PBS(queue=options.pbs_queue)
+    
+    for score in scores:
+        index = Index(cicada=cicada,
+                      indexer=indexer,
+                      input=score.input,
+                      output=score.output,
+                      name=score.name,
+                      root_source=scores.root_source,
+                      root_target=scores.root_target,
+                      kbest=options.kbest,
+                      quantize=options.quantize,
+                      features=options.feature,
+                      attributes=options.attribute)
+
+        pbs.run(command=index, threads=index.threads, memory=options.max-malloc, name=index.name, logfile=index.logfile)
+    
 elif options.mpi:
-    pass
+    for score in scores:
+        index = Index(cicada=cicada,
+                      indexer=indexer,
+                      input=score.input,
+                      output=score.output,
+                      root_source=scores.root_source,
+                      root_target=scores.root_target,
+                      kbest=options.kbest,
+                      quantize=options.quantize,
+                      features=options.feature,
+                      attributes=options.attribute)
+        
 else:
     for score in scores:
         index = Index(cicada=cicada,
