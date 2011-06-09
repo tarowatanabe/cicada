@@ -79,10 +79,10 @@ A unified framework to collect statistics: Do we need stats from features?
 Cube summing?
      I'm still not sure how to efficiently collect residuals... Do we include state-less features
      to serve as residual counts?
-   
-Node sharing in {compose,parse}_{tree,tree_cky}
-    For better search, we can potentially share "internal nodes" by checking its sub-frontiers and sub-strings.
-
+  
 Implement RIBES for mteval
    Can we implement RIBES feature...?
    It is global in that we have to perform "alignment" as in METEOR...
+
+Support HMM word alignment training found in nicttm so that we can completely deprecate nicttm!
+   Add MPI version of Model 1/HMM training?

@@ -1,3 +1,6 @@
+2011-6-x
+Serious bugfix for parse-{cky,tree,tree-cky} where the features from source lattice/forest(s) are completely ignored for pruning.
+
 2011-6-6
 Reimplemented scorer for extracted counts.
    Previously we store allthe target side counts in a DB, but now we use re-sort based implementation
