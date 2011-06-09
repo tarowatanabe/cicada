@@ -59,6 +59,8 @@ opt_parser = OptionParser(
     make_option("--mpi-dir", default="", action="store", type="string",
                 metavar="DIRECTORY", help="MPI directory"),
 
+    make_option("--threads", default=2, action="store", type="int",
+                help="# of thrads for thread-based parallel processing"),
     # perform threading or MPI training    
     make_option("--mpi", default=0, action="store", type="int",
                 help="# of processes for MPI-based parallel processing. Identical to --np for mpirun"),
@@ -155,15 +157,25 @@ class PBS:
 
 class Threads:
     
-    def __init__(self, number=1):
-        pass
-    
-    def run(self, command=""):
-        pass
+    def __init__(self, cicada=None, threads=1):
         
+        command = "%s" %(cicada.thrsh)
+        command += " --threads %d" %(threads)
+        command += " --debug"
+        
+        self.popen = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
+        self.pipe = self.popen.stdin
+        
+    def __del__(self):
+        self.pipe.close()
+        self.pipe.wait()
+
+    def run(self, command=""):
+        self.pipe.write(command+'\n')
+
 class MPI:
     
-    def __init__(self, dir="", hosts="", hosts_file="", number=0):
+    def __init__(self, cicada=None, dir="", hosts="", hosts_file="", number=0):
         
 	self.dir = dir
 	self.hosts = hosts
@@ -193,20 +205,28 @@ class MPI:
                 setattr(self, binprog, prog)
             else:
                 setattr(self, binprog, binprog)
-                
-    def run(self, command=""):
-        mpirun = self.mpirun
-        #if self.dir:
-        #    mpirun += ' --prefix %s' %(self.dir)
+        
+        command = self.mpirun
         if self.number > 0:
-            mpirun += ' --np %d' %(self.number)
+            command += ' --np %d' %(self.number)
+            
         if self.hosts:
-            mpirun += ' --host %s' %(self.hosts)
+            command += ' --host %s' %(self.hosts)
         elif self.hosts_file:
-            mpirun += ' --hostfile %s' %(self.hosts_file)
-	mpirun += ' ' + command
+            command += ' --hostfile %s' %(self.hosts_file)
 
-	run_command(mpirun)
+        command += " %s" %(cicada.mpish)
+        command += " --debug"
+        
+        self.popen = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE)
+        self.pipe = self.popen.stdin
+        
+    def __del__(self):
+        self.pipe.close()
+        self.pipe.wait()
+        
+    def run(self, command=""):
+        self.pipe.write(command+'\n')
 
 
 class CICADA:
@@ -423,6 +443,8 @@ if options.pbs:
         pbs.run(command=index, threads=index.threads, memory=options.max-malloc, name=index.name, logfile=index.logfile)
     
 elif options.mpi:
+    threads = Threads(cicada=cicada, threads=options.threads)
+    
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
@@ -434,8 +456,14 @@ elif options.mpi:
                       quantize=options.quantize,
                       features=options.feature,
                       attributes=options.attribute)
-        
+        threads.run(command=index)
 else:
+    mpi = MPI(cicada=cicada,
+              dir=options.mpi_dir,
+              hosts=options.mpi_host,
+              hosts_file=options.mpi_host_file,
+              number=options.mpi)
+    
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
@@ -447,3 +475,4 @@ else:
                       quantize=options.quantize,
                       features=options.feature,
                       attributes=options.attribute)
+        mpi.run(command=index)
