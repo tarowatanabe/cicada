@@ -443,27 +443,12 @@ if options.pbs:
         pbs.run(command=index, threads=index.threads, memory=options.max-malloc, name=index.name, logfile=index.logfile)
     
 elif options.mpi:
-    threads = Threads(cicada=cicada, threads=options.threads)
-    
-    for score in scores:
-        index = Index(cicada=cicada,
-                      indexer=indexer,
-                      input=score.input,
-                      output=score.output,
-                      root_source=scores.root_source,
-                      root_target=scores.root_target,
-                      kbest=options.kbest,
-                      quantize=options.quantize,
-                      features=options.feature,
-                      attributes=options.attribute)
-        threads.run(command=index)
-else:
     mpi = MPI(cicada=cicada,
               dir=options.mpi_dir,
               hosts=options.mpi_host,
               hosts_file=options.mpi_host_file,
               number=options.mpi)
-    
+        
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
@@ -476,3 +461,18 @@ else:
                       features=options.feature,
                       attributes=options.attribute)
         mpi.run(command=index)
+else:
+    threads = Threads(cicada=cicada, threads=options.threads)
+
+    for score in scores:
+        index = Index(cicada=cicada,
+                      indexer=indexer,
+                      input=score.input,
+                      output=score.output,
+                      root_source=scores.root_source,
+                      root_target=scores.root_target,
+                      kbest=options.kbest,
+                      quantize=options.quantize,
+                      features=options.feature,
+                      attributes=options.attribute)
+        threads.run(command=index)
