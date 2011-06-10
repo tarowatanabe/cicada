@@ -3,7 +3,7 @@ Serious bugfix for parse-{cky,tree,tree-cky} where the features from source latt
 
 2011-6-6
 Reimplemented scorer for extracted counts.
-   Previously we store allthe target side counts in a DB, but now we use re-sort based implementation
+   Previously we store all the target side counts in a DB, but now we use re-sort based implementation
    found in moses script, though it requires extra storage.
 Tweaked parameters for grammar-static and tree-grammar-static for large data indexing.
 
