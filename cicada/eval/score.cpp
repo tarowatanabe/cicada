@@ -14,6 +14,7 @@
 #include "eval/wlcs.hpp"
 #include "eval/combined.hpp"
 #include "eval/parseval.hpp"
+#include "eval/ribes.hpp"
 
 #include "stemmer.hpp"
 #include "parameter.hpp"
@@ -55,6 +56,8 @@ namespace cicada
       
       if (scorer.second == "bleu")
 	return Bleu::decode(iter, end);
+      else if (scorer.second == "ribes")
+	return RIBES::decode(iter, end);
       else if (scorer.second == "wer")
 	return WER::decode(iter, end);
       else if (scorer.second == "per")
@@ -95,6 +98,8 @@ bleu:\n\
 \torder=<order, default=4> ngram order\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
+ribes: RIBES\n\
+\tweight=[weight for precision]\n\
 per: position indenendent error rate\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
@@ -228,6 +233,27 @@ parseval: parse evaluation\n\
 	scorer = scorer_ptr_type(new BleuScorer(order));
 	scorer->tokenizer = tokenizer;
 	scorer->skip_sgml_tag = skip_sgml_tag;
+      } else if (utils::ipiece(param.name()) == "ribes") {
+	const tokenizer_type* tokenizer = 0;
+	bool skip_sgml_tag = false;
+	
+	double weight = 0.25;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "weight")
+	    weight = utils::lexical_cast<double>(piter->second);
+	  else if (utils::ipiece(piter->first) == "tokenizer")
+	    tokenizer = &tokenizer_type::create(piter->second);
+	  else if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	    skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
+	  else
+	    std::cerr << "WARNING: unsupported parameter for per: " << piter->first << "=" << piter->second << std::endl;
+	}
+	
+	scorer = scorer_ptr_type(new RIBESScorer(weight));
+	scorer->tokenizer = tokenizer;
+	scorer->skip_sgml_tag = skip_sgml_tag;
+	
       } else if (utils::ipiece(param.name()) == "per") {
 	const tokenizer_type* tokenizer = 0;
 	bool skip_sgml_tag = false;

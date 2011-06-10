@@ -9,7 +9,6 @@
 #include <vector>
 
 #include <cicada/eval/score.hpp>
-#include <cicada/matcher.hpp>
 
 namespace cicada
 {
@@ -25,22 +24,22 @@ namespace cicada
     public:
       typedef double count_type;
       
-      
     public:
-      RIBES() : score(0), norm(0) {}
+      RIBES() : distance(0), penalty(0) {}
       
       double score() const
       {
-	return score / norm;
+	return distance / penalty;
       }
-
+      
       bool equal(const score_type& score) const
       {
 	const RIBES* rhs = dynamic_cast<const RIBES*>(&score);
 	if (! rhs)
 	  throw std::runtime_error("invalid RIBES score");
-
-	return (score == rhs->score && norm == rhs->norm);
+	
+	return (distance == rhs->distance
+		&& penalty == rhs->penalty);
 	
       }
       
@@ -49,9 +48,9 @@ namespace cicada
 	const RIBES* rhs = dynamic_cast<const RIBES*>(&score);
 	if (! rhs)
 	  throw std::runtime_error("invalid RIBES score");
-
-	score = rhs->score;
-	norm  = rhs->norm;
+	
+	distance  = rhs->distance;
+	penalty   = rhs->penalty;
       }
 
       void plus_equal(const score_type& score)
@@ -60,8 +59,8 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid RIBES score");
 
-	score += rhs->score;
-	norm  += rhs->norm;
+	distance  += rhs->distance;
+	penalty   += rhs->penalty;
       }
       
       void minus_equal(const score_type& score)
@@ -70,41 +69,41 @@ namespace cicada
 	if (! rhs)
 	  throw std::runtime_error("invalid RIBES score");
 
-	score -= rhs->score;
-	norm  -= rhs->norm;
+	distance -= rhs->distance;
+	penalty  -= rhs->penalty;
       }
 
       void multiplies_equal(const double& scale)
       {
-	score *= scale;
-	norm  *= scale;
+	distance *= scale;
+	penalty  *= scale;
       }
       
       void divides_equal(const double& scale)
       {
-	score /= scale;
-	norm  /= scale;
+	distance /= scale;
+	penalty  /= scale;
       }
       
       score_ptr_type zero() const
       {
 	return score_ptr_type(new RIBES());
       }
-
+      
       score_ptr_type clone() const
       {
 	return score_ptr_type(new RIBES(*this));
       }
-
+      
       std::string description() const;
       std::string encode() const;
-
+      
       static score_ptr_type decode(std::string::const_iterator& iter, std::string::const_iterator end);
       static score_ptr_type decode(const utils::piece& encoded);
       
     private:
-      count_type score;
-      count_type norm;
+      count_type distance;
+      count_type penalty;
     };
 
     class RIBESScorerImpl;
@@ -114,26 +113,14 @@ namespace cicada
     public:
       typedef double count_type;
       typedef double weight_type;
-      typedef cicada::Matcher matcher_type;
-
-      struct weights_type
-      {
-	weight_type match;
-	weight_type substitution;
-	weight_type insertion;
-	weight_type deletion;
-	
-	weights_type() : match(0.2), substitution(1.0), insertion(1.0), deletion(1.0) {}
-      };
       
     private:
       typedef RIBESScorerImpl impl_type;
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      RIBESScorer() : impl(), weights(), matcher(0) { }
-      RIBESScorer(const weights_type& __weights) : impl(), weights(__weights), matcher(0) {}
-      RIBESScorer(const weights_type& __weights, const matcher_type* __matcher) : impl(), weights(__weights), matcher(__matcher) {}
+      RIBESScorer() : impl(), weight() { }
+      RIBESScorer(const weight_type& __weight) : impl(), weight(__weight) {}
       
       RIBESScorer(const RIBESScorer& x);
       ~RIBESScorer();
@@ -150,9 +137,7 @@ namespace cicada
       
     private:
       impl_set_type impl;
-      weights_type  weights;
-      
-      const matcher_type* matcher;
+      weight_type  weight;
     };
   };
 };

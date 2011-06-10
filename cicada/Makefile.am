@@ -46,6 +46,7 @@ eval/f.hpp \
 eval/bleu.hpp \
 eval/parseval.hpp \
 eval/per.hpp \
+eval/ribes.hpp \
 eval/score.hpp \
 eval/sb.hpp \
 eval/sk.hpp \
@@ -61,6 +62,7 @@ eval/encode.hpp \
 eval/f.cpp \
 eval/parseval.cpp \
 eval/per.cpp \
+eval/ribes.cpp \
 eval/score.cpp \
 eval/sb.cpp \
 eval/sk.cpp \
