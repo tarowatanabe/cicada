@@ -10,6 +10,9 @@
 
 #include "ribes.hpp"
 
+#include "utils/mathop.hpp"
+#include "utils/bit_vector.hpp"
+
 #include <boost/functional/hash.hpp>
 
 namespace cicada
@@ -120,15 +123,53 @@ namespace cicada
       RIBESScorerImpl() { }
       RIBESScorerImpl(const sentence_type& __ref) : ref(__ref) {}
       
-      value_type operator()(const sentence_type& sentence, const weight_type& weight) const
+      typedef std::vector<int, std::allocator<int> > alignment_type;
+      typedef utils::bit_vector<4096> aligned_type;
+      
+      value_type operator()(const sentence_type& hyp, const weight_type& weight) const
       {
+	alignment_type& align = const_cast<alignment_type&>(align_impl);
+	aligned_type&   aligned = const_cast<aligned_type&>(aligned_impl);
+	
+	align.clear();
+	aligned.clear();
+	
+	for (size_t i = 0; i != hyp.size(); ++ i)
+	  for (size_t j = 0; j != ref.size(); ++ j)
+	    if (! aligned[j] && ref[j] == hyp[i])
+	      if ((j + 1 < ref.size() && i + 1 < hyp.size() && ref[j + 1] == hyp[i + 1])
+		  || (j != 0 && i != 0 && ref[j - 1] == hyp[i - 1])) {
+		// how to handle boundary condition...?
+		// see ribes code...
+		aligned.set(j, true);
+		align.push_back(j);
+	      }
+
+	if (align.size() <= 1)
+	  return value_type(0.0, 0.0);
+	
+	//
+	// after filling aligned, then, we need to re-number indicated by the "aligned" vector...
+	//
+	// we simply check "rank" of "alinged" as our new index...
+	//
+	alignment_type::iterator aiter_end = align.end();
+	for (alignment_type::iterator aiter = align.begin(); aiter != aiter_end; ++ aiter)
+	  *aiter = aligned.rank(*aiter, true) - 1;
+	
+	value_type value;
+	value.penalty = utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight);
 	
 	
 	
+	return value;
       }
       
     private:
       sentence_type ref;
+      
+      alignment_type align_impl;
+      aligned_type   aligned_impl;
     };
    
     RIBESScorer::RIBESScorer(const RIBESScorer& x)

@@ -29,7 +29,7 @@ namespace cicada
       
       double score() const
       {
-	return distance / penalty;
+	return (penalty != 0.0 ? distance / penalty : 0.0);
       }
       
       bool equal(const score_type& score) const
