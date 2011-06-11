@@ -119,8 +119,10 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      RIBESScorer() : impl(), weight() { }
-      RIBESScorer(const weight_type& __weight) : impl(), weight(__weight) {}
+      RIBESScorer() : impl(), weight(), spearman(true), kendall(false) { }
+      RIBESScorer(const weight_type& __weight) : impl(), weight(__weight), spearman(true), kendall(false) {}
+      RIBESScorer(const weight_type& __weight, const bool __kendall)
+	: impl(), weight(__weight), spearman(! __kendall), kendall(__kendall) {}
       
       RIBESScorer(const RIBESScorer& x);
       ~RIBESScorer();
@@ -138,6 +140,8 @@ namespace cicada
     private:
       impl_set_type impl;
       weight_type  weight;
+      bool spearman;
+      bool kendall;
     };
   };
 };

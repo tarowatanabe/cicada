@@ -126,7 +126,7 @@ namespace cicada
       typedef std::vector<int, std::allocator<int> > alignment_type;
       typedef utils::bit_vector<4096> aligned_type;
       
-      value_type operator()(const sentence_type& hyp, const weight_type& weight) const
+      value_type operator()(const sentence_type& hyp, const weight_type& weight, const bool spearman) const
       {
 	alignment_type& align = const_cast<alignment_type&>(align_impl);
 	aligned_type&   aligned = const_cast<aligned_type&>(aligned_impl);
@@ -146,7 +146,7 @@ namespace cicada
 	      }
 
 	if (align.size() <= 1)
-	  return value_type(0.0, 0.0);
+	  return value_type(0.0, utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight));
 	
 	//
 	// after filling aligned, then, we need to re-number indicated by the "aligned" vector...
@@ -160,7 +160,13 @@ namespace cicada
 	value_type value;
 	value.penalty = utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight);
 	
-	
+	if (spearman) {
+	  // Spearman
+	  
+	} else {
+	  // Kendall
+	  
+	}
 	
 	return value;
       }
@@ -228,7 +234,7 @@ namespace cicada
 	for (impl_set_type::const_iterator iter = impl.begin(); iter != impl.end(); ++ iter) {
 	  const impl_type& evaluator = *(*iter);
 	  
-	  const impl_type::value_type value = evaluator(sentence, weight);
+	  const impl_type::value_type value = evaluator(sentence, weight, spearman);
 	  
 	  ribes->distance = std::max(ribes->distance, value.distance * value.penalty);
 	}
