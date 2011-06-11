@@ -14,6 +14,7 @@
 #include "utils/bit_vector.hpp"
 
 #include <boost/functional/hash.hpp>
+#include <boost/math/special_functions/binomial.hpp>
 
 namespace cicada
 {
@@ -160,12 +161,26 @@ namespace cicada
 	value_type value;
 	value.penalty = utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight);
 	
+	// we use binomial coefficient found in boost.math
 	if (spearman) {
 	  // Spearman
+	  double distance = 0.0;
+	  for (size_t i = 0; i != align.size(); ++ i)
+	    distance += (align[i] - i) * (align[i] - i);
 	  
+	  const double rho = 1.0 - distance / boost::math::binomial_coefficient<double>(align.size() + 1, 3);
+	  
+	  value.distance = (rho + 1.0) * 0.5;
 	} else {
 	  // Kendall
+	  size_t num_increasing = 0;
+	  for (size_t i = 0; i != align.size() - 1; ++ i)
+	    for (size_t j = i + 1; j != align.size(); ++ j)
+	      num_increasing += (align[j] > align[i]);
 	  
+	  const double tau = 2.0 * num_increasing / boost::math::binomial_coefficient<double>(align.size(), 2) - 1.0;
+	  
+	  value.distance = (tau + 1.0) * 0.5;
 	}
 	
 	return value;
