@@ -139,10 +139,12 @@ namespace cicada
 	  bool found = false;
 	  for (size_t j = 0; j != ref.size(); ++ j)
 	    if (! aligned[j] && ref[j] == hyp[i])
-	      if ((j + 1 < ref.size() && i + 1 < hyp.size() && ref[j + 1] == hyp[i + 1])
-		  || (j != 0 && i != 0 && ref[j - 1] == hyp[i - 1])) {
-		// how to handle boundary condition...?
-		// see ribes code...
+	      if ((j + 1 == ref.size() || i + 1 == hyp.size()
+		   ? j + 1 == ref.size() && i + 1 == hyp.size()
+		   : ref[j + 1] == hyp[i + 1])
+		  || (j == 0 || i == 0
+		      ? j == 0 && i == 0
+		      : ref[j - 1] == hyp[i - 1])) {
 		aligned.set(j, true);
 		align.push_back(j);
 		found = true;
