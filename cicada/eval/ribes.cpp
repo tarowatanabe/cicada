@@ -134,8 +134,9 @@ namespace cicada
 	
 	align.clear();
 	aligned.clear();
-	
-	for (size_t i = 0; i != hyp.size(); ++ i)
+
+	for (size_t i = 0; i != hyp.size(); ++ i) {
+	  bool found = false;
 	  for (size_t j = 0; j != ref.size(); ++ j)
 	    if (! aligned[j] && ref[j] == hyp[i])
 	      if ((j + 1 < ref.size() && i + 1 < hyp.size() && ref[j + 1] == hyp[i + 1])
@@ -144,7 +145,17 @@ namespace cicada
 		// see ribes code...
 		aligned.set(j, true);
 		align.push_back(j);
+		found = true;
+		break;
 	      }
+	  if (! found)
+	    for (size_t j = 0; j != ref.size(); ++ j)
+	      if (! aligned[j] && ref[j] == hyp[i]) {
+		aligned.set(j, true);
+		align.push_back(j);
+		break;
+	      }
+	}
 
 	if (align.size() <= 1)
 	  return value_type(0.0, utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight));
@@ -160,14 +171,14 @@ namespace cicada
 	
 	value_type value;
 	value.penalty = utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight);
-	
+
 	// we use binomial coefficient found in boost.math
 	if (spearman) {
 	  // Spearman
 	  double distance = 0.0;
 	  for (size_t i = 0; i != align.size(); ++ i)
 	    distance += (align[i] - i) * (align[i] - i);
-	  
+
 	  const double rho = 1.0 - distance / boost::math::binomial_coefficient<double>(align.size() + 1, 3);
 	  
 	  value.distance = (rho + 1.0) * 0.5;
