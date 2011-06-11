@@ -353,7 +353,7 @@ namespace cicada
 	    const symbol_type* context_star = std::find(context, context_end, vocab_type::STAR);
 	    
 	    // subtract estimated score
-	    score -= ngram_estimate(context, context_star);
+	    //score -= ngram_estimate(context, context_star);
 	    
 	    buffer.insert(buffer.end(), context, context_star);
 	    if (biter - biter_first >= context_size || star_first >= 0)
@@ -744,15 +744,12 @@ namespace cicada
       double score = pimpl->ngram_score(state, states, edge);
       if (final)
 	score += pimpl->ngram_final_score(state);
-      else
-	score += pimpl->ngram_estimate(state);
       
       if (score != 0.0)
 	features[base_type::feature_name()] = score;
       else
 	features.erase(base_type::feature_name());
       
-#if 0
       if (! final) {
 	const double estimate = pimpl->ngram_estimate(state);
 	if (estimate != 0.0)
@@ -760,7 +757,6 @@ namespace cicada
 	else
 	  estimates.erase(base_type::feature_name());
       }
-#endif
     }
 
     void NGram::apply_coarse(state_ptr_type& state,
@@ -774,15 +770,12 @@ namespace cicada
 	double score = pimpl_coarse->ngram_score(state, states, edge);
 	if (final)
 	  score += pimpl_coarse->ngram_final_score(state);
-	else
-	  score += pimpl_coarse->ngram_estimate(state);
       
 	if (score != 0.0)
 	  features[base_type::feature_name()] = score;
 	else
 	  features.erase(base_type::feature_name());
       
-#if 0
 	if (! final) {
 	  const double estimate = pimpl_coarse->ngram_estimate(state);
 	  if (estimate != 0.0)
@@ -790,8 +783,6 @@ namespace cicada
 	  else
 	    estimates.erase(base_type::feature_name());
 	}
-#endif
-	
       } else {
 	// state-less...
 	const double score = pimpl->ngram_estimate(edge);
