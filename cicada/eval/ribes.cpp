@@ -135,23 +135,23 @@ namespace cicada
 	align.clear();
 	aligned.clear();
 
-	for (size_t i = 0; i != hyp.size(); ++ i) {
+	const size_t hyp_size = hyp.size();
+	const size_t ref_size = ref.size();
+	
+	for (size_t i = 0; i != hyp_size; ++ i) {
 	  bool found = false;
-	  for (size_t j = 0; j != ref.size(); ++ j)
+	  for (size_t j = 0; j != ref_size; ++ j)
 	    if (! aligned[j] && ref[j] == hyp[i])
-	      if ((j + 1 == ref.size() || i + 1 == hyp.size()
-		   ? j + 1 == ref.size() && i + 1 == hyp.size()
-		   : ref[j + 1] == hyp[i + 1])
-		  || (j == 0 || i == 0
-		      ? j == 0 && i == 0
-		      : ref[j - 1] == hyp[i - 1])) {
+	      if ((j + 1 == ref_size || i + 1 == hyp_size ? j + 1 == ref_size && i + 1 == hyp_size : ref[j + 1] == hyp[i + 1])
+		  || (j == 0 || i == 0 ? j == 0 && i == 0 : ref[j - 1] == hyp[i - 1])) {
 		aligned.set(j, true);
 		align.push_back(j);
 		found = true;
 		break;
 	      }
+	  
 	  if (! found)
-	    for (size_t j = 0; j != ref.size(); ++ j)
+	    for (size_t j = 0; j != ref_size; ++ j)
 	      if (! aligned[j] && ref[j] == hyp[i]) {
 		aligned.set(j, true);
 		align.push_back(j);
