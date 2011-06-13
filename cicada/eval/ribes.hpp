@@ -119,10 +119,10 @@ namespace cicada
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      RIBESScorer() : impl(), weight(), spearman(true), kendall(false) { }
-      RIBESScorer(const weight_type& __weight) : impl(), weight(__weight), spearman(true), kendall(false) {}
-      RIBESScorer(const weight_type& __weight, const bool __kendall)
-	: impl(), weight(__weight), spearman(! __kendall), kendall(__kendall) {}
+      RIBESScorer() : impl(), weight(), spearman(false), kendall(true) { }
+      RIBESScorer(const weight_type& __weight) : impl(), weight(__weight), spearman(false), kendall(true) {}
+      RIBESScorer(const weight_type& __weight, const bool __spearman)
+	: impl(), weight(__weight), spearman(__spearman), kendall(! __spearman) {}
       
       RIBESScorer(const RIBESScorer& x);
       ~RIBESScorer();

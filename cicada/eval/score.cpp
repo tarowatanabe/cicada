@@ -100,7 +100,8 @@ bleu:\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
 ribes: RIBES\n\
 \tweight=[weight for precision]\n\
-\tkendall=[true|false] use Kendall's correlation\n\
+\tspearman=[true|false] use Spearman's correlation\n\
+\tkendall=[true|false] use Kendall's correlation (default)\n\
 per: position indenendent error rate\n\
 \ttokenizer=[tokenizer spec]\n\
 \tskip-sgml-tag=[true|false] skip sgml tags\n\
@@ -239,11 +240,14 @@ parseval: parse evaluation\n\
 	bool skip_sgml_tag = false;
 	
 	double weight = 0.25;
+	bool spearman = false;
 	bool kendall = false;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	  if (utils::ipiece(piter->first) == "weight")
 	    weight = utils::lexical_cast<double>(piter->second);
+	  else if (utils::ipiece(piter->first) == "spearman")
+	    spearman = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "kendall")
 	    kendall = utils::lexical_cast<bool>(piter->second);
 	  else if (utils::ipiece(piter->first) == "tokenizer")
@@ -253,8 +257,11 @@ parseval: parse evaluation\n\
 	  else
 	    std::cerr << "WARNING: unsupported parameter for per: " << piter->first << "=" << piter->second << std::endl;
 	}
+
+	if (spearman && kendall)
+	  throw std::runtime_error("either Kendall or Spearman");
 	
-	scorer = scorer_ptr_type(new RIBESScorer(weight, kendall));
+	scorer = scorer_ptr_type(new RIBESScorer(weight, spearman));
 	scorer->tokenizer = tokenizer;
 	scorer->skip_sgml_tag = skip_sgml_tag;
 	

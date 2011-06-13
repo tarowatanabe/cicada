@@ -44,6 +44,6 @@ int main(int argc, char** argv)
   process("wlcs", refset, tstset);
   process("parseval", refset, tstset);
   process("ribes", refset, tstset);
-  process("ribes:kendall=true", refset, tstset);
+  process("ribes:spearman=true", refset, tstset);
   process("combined:reward=true,metric=bleu,weight=0.5,metric=ter,weight=-0.5", refset, tstset);
 }
