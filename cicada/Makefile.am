@@ -428,6 +428,7 @@ attribute_vector_main \
 cluster_main \
 eval_main \
 feature_vector_main \
+format_main \
 grammar_mutable_main \
 grammar_static_main \
 grammar_unknown_main \
@@ -462,6 +463,9 @@ eval_main_LDADD = libcicada.la
 feature_vector_main_SOURCES = feature_vector_main.cpp symbol.cpp vocab.cpp feature.cpp
 feature_vector_main_CPPFLAGS = $(AM_CPPFLAGS)
 feature_vector_main_LDADD = $(LIBUTILS)
+
+format_main_SOURCES = format_main.cpp
+format_main_LDADD = libcicada.la
 
 grammar_mutable_main_SOURCES = grammar_mutable_main.cpp
 grammar_mutable_main_LDADD = libcicada.la

@@ -1,3 +1,6 @@
+//
+//  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+//
 
 #include <vector>
 #include <string>
