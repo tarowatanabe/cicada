@@ -64,11 +64,11 @@ namespace cicada
 	for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
 	  const parser_type* parser = *piter;
 	  icu::Formattable   formattable;
-	  UErrorCode    status(U_ZERO_ERROR);
+	  icu::ParsePosition pos(0);
 	  
-	  parser->parse(uphrase, formattable, status);
+	  parser->parse(uphrase, formattable, pos);
 	  
-	  if (U_FAILURE(status)) continue;
+	  if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
 	  
 	  generator_set_type::const_iterator giter_end = generators.end();
 	  for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
@@ -83,6 +83,8 @@ namespace cicada
 	    generated.clear();
 	    ugenerated.toUTF8String(generated);
 	    uniques.insert(generated);
+
+	    //std::cerr << name << ": " << generated << std::endl;
 	  }
 	}
 	
@@ -121,6 +123,7 @@ namespace cicada
     public:
       parser_set_type    parsers;
       generator_set_type generators;
+      std::string name;
     };
     
     void Number::operator()(const phrase_type& phrase, phrase_set_type& generated) const
@@ -179,62 +182,51 @@ namespace cicada
       if (locale_target.isBogus())
 	throw std::runtime_error("invalid ocale: " + locale_str_target);
       
-      impl_map_type rbnf_sources;
-      impl_map_type rbnf_targets;
+      impl_map_type sources;
+      impl_map_type targets;
       
       UErrorCode status = U_ZERO_ERROR;
       std::auto_ptr<icu::RuleBasedNumberFormat> rbnf_source(new icu::RuleBasedNumberFormat(URBNF_SPELLOUT, locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
-      for (int i = 0; i < rbnf_source->getNumberOfRuleSetNames(); ++ i) {
-	const UnicodeString uname = rbnf_source->getRuleSetName(i);
-	
-	if (uname.indexOf("numbering") >= 0) {
-	  if (uname.indexOf("year") >= 0)
-	    rbnf_sources["numbering-year"].parsers.push_back(create_rbnf_instance(locale_source, uname));
-	  else
-	    rbnf_sources["numbering"].parsers.push_back(create_rbnf_instance(locale_source, uname));
-	} else if (uname.indexOf("ordinal") >= 0)
-	  rbnf_sources["ordinal"].parsers.push_back(create_rbnf_instance(locale_source, uname));
-	else if (uname.indexOf("cardinal") >= 0)
-	  rbnf_sources["cardinal"].parsers.push_back(create_rbnf_instance(locale_source, uname));
-	else
-	  rbnf_sources["othres"].parsers.push_back(create_rbnf_instance(locale_source, uname));
-      }
+      rbnf_source->setLenient(true);
+      sources["any"].parsers.push_back(rbnf_source.release());
+      
+      status = U_ZERO_ERROR;
+      std::auto_ptr<NumberFormat> nf_source(NumberFormat::createInstance(locale_source, status));
+      if (U_FAILURE(status))
+	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+      
+      sources["any"].parsers.push_back(nf_source.release());
       
       status = U_ZERO_ERROR;
       std::auto_ptr<RuleBasedNumberFormat> rbnf_target(new RuleBasedNumberFormat(URBNF_SPELLOUT, locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
-      for (int i = 0; i < rbnf_target->getNumberOfRuleSetNames(); ++ i) {
-	const UnicodeString uname = rbnf_target->getRuleSetName(i);
-	
-	if (uname.indexOf("numbering") >= 0) {
-	  if (uname.indexOf("year") >= 0)
-	    rbnf_targets["numbering-year"].generators.push_back(create_rbnf_instance(locale_target, uname));
-	  else
-	    rbnf_targets["numbering"].generators.push_back(create_rbnf_instance(locale_target, uname));
-	} else if (uname.indexOf("ordinal") >= 0)
-	  rbnf_targets["ordinal"].generators.push_back(create_rbnf_instance(locale_target, uname));
-	else if (uname.indexOf("cardinal") >= 0)
-	  rbnf_targets["cardinal"].generators.push_back(create_rbnf_instance(locale_target, uname));
-	else
-	  rbnf_targets["othres"].generators.push_back(create_rbnf_instance(locale_target, uname));
-      }
+      for (int i = 0; i < rbnf_target->getNumberOfRuleSetNames(); ++ i)
+	targets["any"].generators.push_back(create_rbnf_instance(locale_target, rbnf_target->getRuleSetName(i)));
+
+      status = U_ZERO_ERROR;
+      std::auto_ptr<NumberFormat> nf_target(NumberFormat::createInstance(locale_target, status));
+      if (U_FAILURE(status))
+	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
+      
+      targets["any"].generators.push_back(nf_target.release());
       
       // try match!
-      impl_map_type::iterator siter_end = rbnf_sources.end();
-      for (impl_map_type::iterator siter = rbnf_sources.begin(); siter != siter_end; ++ siter) {
-	impl_map_type::iterator titer = rbnf_targets.find(siter->first);
+      impl_map_type::iterator siter_end = sources.end();
+      for (impl_map_type::iterator siter = sources.begin(); siter != siter_end; ++ siter) {
+	impl_map_type::iterator titer = targets.find(siter->first);
 	
-	if (titer == rbnf_targets.end()) continue;
+	if (titer == targets.end()) continue;
 	
 	pimpls.push_back(new impl_type());
 	
 	pimpls.back()->parsers.swap(siter->second.parsers);
 	pimpls.back()->generators.swap(titer->second.generators);
+	pimpls.back()->name = siter->first;
       }
     }
     
