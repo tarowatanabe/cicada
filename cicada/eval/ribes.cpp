@@ -204,26 +204,27 @@ namespace cicada
 	
 	if (align.size() <= 1)
 	  return value_type(0.0, utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight));
-	
-	//
-	// after filling aligned, then, we need to re-number indicated by the "aligned" vector...
-	//
-	// we simply check "rank" of "alinged" as our new index...
-	//
-	alignment_type::iterator aiter_end = align.end();
-	for (alignment_type::iterator aiter = align.begin(); aiter != aiter_end; ++ aiter)
-	  *aiter = aligned.rank(*aiter, true) - 1;
-	
+		
 	value_type value;
 	value.penalty = utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight);
 
 	// we use binomial coefficient found in boost.math
 	if (spearman) {
+	  //
+	  // after filling aligned, then, we need to re-number indicated by the "aligned" vector...
+	  //
+	  // we simply check "rank" of "alinged" as our new index...
+	  //
+	  
+	  alignment_type::iterator aiter_end = align.end();
+	  for (alignment_type::iterator aiter = align.begin(); aiter != aiter_end; ++ aiter)
+	    *aiter = aligned.rank(*aiter, true) - 1;
+
 	  // Spearman
 	  double distance = 0.0;
 	  for (size_t i = 0; i != align.size(); ++ i)
 	    distance += (align[i] - i) * (align[i] - i);
-
+	  
 	  const double rho = 1.0 - distance / boost::math::binomial_coefficient<double>(align.size() + 1, 3);
 	  
 	  value.distance = (rho + 1.0) * 0.5;
