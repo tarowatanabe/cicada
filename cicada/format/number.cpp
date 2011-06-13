@@ -111,7 +111,12 @@ namespace cicada
       parser_set_type    parsers;
       generator_set_type generators;
     };
-    
+
+    const Number::phrase_set_type& Number::operator()(const phrase_type& phrase) const
+    {
+      
+      
+    }
     
     Number::Number(const std::string& locale_str_source,
 		   const std::string& locale_str_target)
@@ -119,18 +124,29 @@ namespace cicada
     }
     
     Number::Number(const Number& x)
+      : pimpls()
     {
-      
+      for (pimpl_set_type::const_iterator iter = x.pimpls.begin(); iter != x.pimpls.end(); ++ iter)
+	pimpls.push_back(new impl_type(*(*iter)));
     }
     
     Number& Number::operator=(const Number& x)
     {
+      for (pimpl_set_type::iterator iter = pimpls.begin(); iter != pimpls.end(); ++ iter)
+	delete *iter;
+      pimpls.clear();
+
+      for (pimpl_set_type::const_iterator iter = x.pimpls.begin(); iter != x.pimpls.end(); ++ iter)
+	pimpls.push_back(new impl_type(*(*iter)));
+
       return *this;
     }
 
     Number::~Number()
     {
-
+      for (pimpl_set_type::iterator iter = pimpls.begin(); iter != pimpls.end(); ++ iter)
+	delete *iter;
+      pimpls.clear();
     }
     
   };
