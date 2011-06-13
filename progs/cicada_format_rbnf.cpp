@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     Locale loc(locale.c_str());
     
     if (loc.isBogus())
-      throw std::runtime_error("invlaid ocale: " + locale);
+      throw std::runtime_error("invalid ocale: " + locale);
     
     UErrorCode status = U_ZERO_ERROR;
     std::auto_ptr<RuleBasedNumberFormat> formatter(new RuleBasedNumberFormat(URBNF_SPELLOUT, loc, status));

@@ -21,8 +21,7 @@ namespace cicada
     virtual ~Format() {}
     
   public:  
-    const phrase_set_type& operator[](const phrase_type& phrase) const { return operator()(phrase); }
-    virtual const phrase_set_type& operator()(const phrase_type& phrase) const = 0;
+    virtual void operator()(const phrase_type& phrase, phrase_set_type& phrases) const = 0;
   };
 };
 

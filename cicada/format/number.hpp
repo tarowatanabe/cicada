@@ -28,7 +28,7 @@ namespace cicada
       ~Number();
       
     public:
-      virtual const phrase_set_type& operator()(const phrase_type& phrase) const;
+       virtual void operator()(const phrase_type& phrase, phrase_set_type& phrases) const;
       
     private:
       pimpl_set_type pimpls;
