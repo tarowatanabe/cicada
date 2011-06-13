@@ -123,7 +123,6 @@ namespace cicada
     void Number::operator()(const phrase_type& phrase, phrase_set_type& generated) const
     {
       typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
-
       
       phrase_set_type    results;
       phrase_unique_type uniques;

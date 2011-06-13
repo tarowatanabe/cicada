@@ -359,6 +359,7 @@ attribute_vector.cpp \
 cluster.cpp \
 feature.cpp \
 feature_function.cpp \
+format.cpp \
 global_lexicon.cpp \
 grammar_mutable.cpp \
 grammar_static.cpp \

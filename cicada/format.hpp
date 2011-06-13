@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <utils/piece.hpp>
+
 namespace cicada
 {
   class Format
@@ -19,6 +21,10 @@ namespace cicada
 
   public:
     virtual ~Format() {}
+
+  public:
+    static Format&  create(const utils::piece& parameter);
+    static const char* lists();
     
   public:  
     virtual void operator()(const phrase_type& phrase, phrase_set_type& phrases) const = 0;
