@@ -9,6 +9,7 @@ libcicada-feature.la \
 libcicada-matcher.la \
 libcicada-semiring.la \
 libcicada-eval.la \
+libcicada-format.la \
 libcicada-head.la \
 libcicada-optimize.la \
 libcicada-operation.la \
@@ -19,6 +20,7 @@ libcicadaincludedir= $(pkgincludedir)/cicada
 
 semiringdir  = $(pkgincludedir)/cicada/semiring
 evaldir      = $(pkgincludedir)/cicada/eval
+formatdir    = $(pkgincludedir)/cicada/format
 headdir      = $(pkgincludedir)/cicada/head
 optimizedir  = $(pkgincludedir)/cicada/optimize
 featuredir   = $(pkgincludedir)/cicada/feature
@@ -71,6 +73,14 @@ eval/wer.cpp \
 eval/wlcs.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 
+dist_format_HEADERS = \
+format/number.hpp
+
+libcicada_format_la_SOURCES = \
+format/number.cpp
+libcicada_format_la_LIBADD = $(ICU_LDFLAGS)
+libcicada_format_la_CPPFLAGS = $(AM_CPPFLAGS)
+
 dist_head_HEADERS = \
 head/chinese.hpp \
 head/collins.hpp \
@@ -82,7 +92,6 @@ head/collins.cpp \
 head/collins_modified.cpp
 
 libcicada_head_la_CPPFLAGS = $(AM_CPPFLAGS)
-
 
 dist_optimize_HEADERS = \
 optimize/line_search.hpp \
@@ -272,6 +281,7 @@ expected_ngram.hpp \
 feature.hpp \
 feature_function.hpp \
 feature_vector.hpp \
+format.hpp \
 generate.hpp \
 generate_earley.hpp \
 global_lexicon.hpp \
@@ -393,6 +403,7 @@ libcicada_la_LDFLAGS = \
 
 libcicada_la_LIBADD = \
 	libcicada-eval.la \
+	libcicada-format.la \
 	libcicada-head.la \
 	libcicada-feature.la \
 	libcicada-matcher.la \

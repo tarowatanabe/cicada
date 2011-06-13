@@ -6,6 +6,7 @@
 #ifndef __CICADA__FORMAT__NUMBER__HPP__
 #define __CICADA__FORMAT__NUMBER__HPP__ 1
 
+#include <cicada/format.hpp>
 
 namespace cicada
 {

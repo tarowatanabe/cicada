@@ -1,7 +1,10 @@
 
 #include <vector>
+#include <string>
+#include <set>
 
 #include <unicode/format.h>
+#include <unicode/numfmt.h>
 #include <unicode/rbnf.h>
 #include <unicode/unistr.h>
 #include <unicode/locid.h>
@@ -11,9 +14,9 @@
 
 namespace cicada
 {
-  namespace foramt
+  namespace format
   {
-    class NumberImpl
+    struct NumberImpl
     {
     public:
       typedef icu::NumberFormat parser_type;
@@ -24,7 +27,7 @@ namespace cicada
       
       typedef cicada::Format::phrase_type     phrase_type;
       typedef cicada::Format::phrase_set_type phrase_set_type;
-
+      
     public:
       NumberImpl() {}
       NumberImpl(const NumberImpl& x) { assign(x); }
@@ -33,25 +36,24 @@ namespace cicada
 	assign(x);
 	return *this;
       }
-      
       ~NumberImpl() { clear(); }
       
     public:
       void operator()(const phrase_type& input, phrase_set_type& output) const
       {
 	typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
-
+	
 	UnicodeString uphrase = UnicodeString::fromUTF8(input);
 	UnicodeString ugenerated;
 	std::string   generated;
-
+	
 	phrase_unique_type uniques;
 	
 	parser_set_type::const_iterator piter_end = parsers.end();
 	for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
 	  const parser_type* parser = *piter;
 	  icu::Formattable   formattable;
-	  icu::UErrorCode    status(U_ZERO_ERROR);
+	  UErrorCode    status(U_ZERO_ERROR);
 	  
 	  parser->parse(uphrase, formattable, status);
 	  
@@ -60,7 +62,7 @@ namespace cicada
 	  generator_set_type::const_iterator giter_end = generators.end();
 	  for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
 	    const generator_type* generator = *giter;
-	    icu::UErrorCode    status(U_ZERO_ERROR);
+	    UErrorCode    status(U_ZERO_ERROR);
 	    
 	    ugenerated.remove();
 	    generator->format(formattable, ugenerated, status);
@@ -84,11 +86,11 @@ namespace cicada
 	
 	parser_set_type::const_iterator piter_end = x.parsers.end();
 	for (parser_set_type::const_iterator piter = x.parsers.begin(); piter != piter_end; ++ piter)
-	  parsers.push_back(piter->clone());
+	  parsers.push_back(dynamic_cast<parser_type*>((*piter)->clone()));
 	
 	generator_set_type::const_iterator giter_end = x.generators.end();
 	for (generator_set_type::const_iterator giter = x.generators.begin(); giter != giter_end; ++ giter)
-	  generators.push_back(giter->clone());
+	  generators.push_back(dynamic_cast<generator_type*>((*giter)->clone()));
       }
       
       void clear()
@@ -105,11 +107,31 @@ namespace cicada
 	generators.clear();
       }
       
-    private:
+    public:
       parser_set_type    parsers;
-      generator_set_tyep generators;
+      generator_set_type generators;
     };
     
+    
+    Number::Number(const std::string& locale_str_source,
+		   const std::string& locale_str_target)
+    {
+    }
+    
+    Number::Number(const Number& x)
+    {
+      
+    }
+    
+    Number& Number::operator=(const Number& x)
+    {
+      return *this;
+    }
+
+    Number::~Number()
+    {
+
+    }
     
   };
 };
