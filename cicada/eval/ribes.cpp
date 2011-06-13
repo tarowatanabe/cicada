@@ -12,6 +12,8 @@
 
 #include "utils/mathop.hpp"
 #include "utils/bit_vector.hpp"
+#include "utils/sgi_hash_map.hpp"
+#include "utils/hashmurmur.hpp"
 
 #include <boost/functional/hash.hpp>
 #include <boost/math/special_functions/binomial.hpp>
@@ -104,8 +106,10 @@ namespace cicada
       typedef ribes_scorer_type::count_type count_type;
       typedef ribes_scorer_type::weight_type weight_type;
       
-      typedef cicada::Sentence sentence_type;
-      typedef cicada::Symbol   word_type;
+      typedef cicada::Sentence                sentence_type;
+      typedef cicada::Symbol                  word_type;
+      typedef word_type                       unigram_type;
+      typedef std::pair<word_type, word_type> bigram_type;
       
       struct Score
       {
@@ -121,44 +125,83 @@ namespace cicada
       
       typedef Score value_type;
       
-      RIBESScorerImpl() { }
-      RIBESScorerImpl(const sentence_type& __ref) : ref(__ref) {}
+      RIBESScorerImpl(const sentence_type& __ref) : ref(__ref) { collect_stats(ref, ref_unigrams, ref_bigrams); }
       
       typedef std::vector<int, std::allocator<int> > alignment_type;
       typedef utils::bit_vector<4096> aligned_type;
       
+#ifdef HAVE_TR1_UNORDERED_MAP
+      typedef std::tr1::unordered_map<unigram_type, int, boost::hash<unigram_type>, std::equal_to<unigram_type>,
+				      std::allocator<std::pair<const unigram_type, int> > > unigram_count_type;
+      typedef std::tr1::unordered_map<bigram_type, int, utils::hashmurmur<size_t>, std::equal_to<bigram_type>,
+				      std::allocator<std::pair<const bigram_type, int> > > bigram_count_type;
+#else
+      typedef sgi::hash_map<unigram_type, int, boost::hash<unigram_type>, std::equal_to<unigram_type>,
+			    std::allocator<std::pair<const unigram_type, int> > > unigram_count_type;
+      typedef sgi::hash_map<bigram_type, int, utils::hashmurmur<size_t>, std::equal_to<bigram_type>,
+			    std::allocator<std::pair<const bigram_type, int> > > bigram_count_type;
+#endif
+      
+      void collect_stats(const sentence_type& sentence, unigram_count_type& unigrams, bigram_count_type& bigrams) const
+      {
+	unigrams.clear();
+	bigrams.clear();
+	
+	sentence_type::const_iterator siter_end = sentence.end();
+	for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+	  ++ unigrams[*siter];
+	
+	for (sentence_type::const_iterator siter = sentence.begin() + 1; siter != siter_end; ++ siter)
+	  ++ bigrams[bigram_type(*(siter - 1), *siter)];
+      }
+    
       value_type operator()(const sentence_type& hyp, const weight_type& weight, const bool spearman) const
       {
 	alignment_type& align = const_cast<alignment_type&>(align_impl);
 	aligned_type&   aligned = const_cast<aligned_type&>(aligned_impl);
 	
+	unigram_count_type& hyp_unigrams = const_cast<unigram_count_type&>(hyp_unigrams_impl);
+	bigram_count_type&  hyp_bigrams  = const_cast<bigram_count_type&>(hyp_bigrams_impl);
+
+	collect_stats(hyp, hyp_unigrams, hyp_bigrams);
+	
 	align.clear();
 	aligned.clear();
-
+	
 	const size_t hyp_size = hyp.size();
 	const size_t ref_size = ref.size();
 	
-	for (size_t i = 0; i != hyp_size; ++ i) {
-	  bool found = false;
+	for (size_t i = 0; i != hyp_size; ++ i)
 	  for (size_t j = 0; j != ref_size; ++ j)
-	    if (! aligned[j] && ref[j] == hyp[i])
-	      if ((j + 1 == ref_size || i + 1 == hyp_size ? j + 1 == ref_size && i + 1 == hyp_size : ref[j + 1] == hyp[i + 1])
-		  || (j == 0 || i == 0 ? j == 0 && i == 0 : ref[j - 1] == hyp[i - 1])) {
+	    if (hyp[i] == ref[j]) {
+	      
+	      // check unique unigram
+	      if (ref_unigrams.find(ref[j])->second == 1
+		  && hyp_unigrams.find(hyp[i])->second == 1) {
 		aligned.set(j, true);
 		align.push_back(j);
-		found = true;
-		break;
+		continue;
 	      }
-	  
-	  if (! found)
-	    for (size_t j = 0; j != ref_size; ++ j)
-	      if (! aligned[j] && ref[j] == hyp[i]) {
+	      
+	      // bigram with the next word
+	      if (i + 1 != hyp_size && j + 1 != ref_size && hyp[i + 1] == ref[j + 1]
+		  && ref_bigrams.find(bigram_type(ref[j], ref[j + 1]))->second == 1
+		  && hyp_bigrams.find(bigram_type(hyp[i], hyp[i + 1]))->second == 1) {
 		aligned.set(j, true);
 		align.push_back(j);
-		break;
+		continue;
 	      }
-	}
-
+	      
+	      // bigram with the previos word
+	      if (i != 0 && j != 0 && hyp[i - 1] == ref[j - 1]
+		  && ref_bigrams.find(bigram_type(ref[j - 1], ref[j]))->second == 1
+		  && hyp_bigrams.find(bigram_type(hyp[i - 1], hyp[i]))->second == 1) {
+		aligned.set(j, true);
+		align.push_back(j);
+		continue;
+	      }
+	    }
+	
 	if (align.size() <= 1)
 	  return value_type(0.0, utils::mathop::pow(static_cast<double>(align.size()) / hyp.size(), weight));
 	
@@ -201,6 +244,11 @@ namespace cicada
       
     private:
       sentence_type ref;
+      unigram_count_type ref_unigrams;
+      bigram_count_type  ref_bigrams;
+
+      unigram_count_type hyp_unigrams_impl;
+      bigram_count_type  hyp_bigrams_impl;
       
       alignment_type align_impl;
       aligned_type   aligned_impl;
