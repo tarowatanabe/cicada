@@ -20,9 +20,9 @@ namespace cicada
       if (__visited.insert(id_symbol_type(node, symbol)).second) {
 	// the combination of node/symbol has not been visited!
 	
-	std::string context = (node == root()
-			       ? static_cast<const std::string&>(symbol)
-			       : prefix[node] + ' ' + static_cast<const std::string&>(symbol));
+	const std::string context = (node == root()
+				     ? static_cast<const std::string&>(symbol)
+				     : prefix[node] + ' ' + static_cast<const std::string&>(symbol));
 	
 	format_type::phrase_set_type phrases;
 	if (remove_space)
