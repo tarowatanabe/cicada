@@ -18,6 +18,7 @@
 
 #include "utils/sgi_hash_map.hpp"
 #include "utils/hashmurmur.hpp"
+#include "utils/array_power2.hpp"
 
 #include <boost/functional/hash.hpp>
 
@@ -26,7 +27,7 @@ namespace cicada
 {
   namespace format
   {
-    struct DateImpl
+    struct DateImpl : public utils::hashmurmur<size_t>
     {
     public:
       typedef icu::DateFormat parser_type;
@@ -38,6 +39,17 @@ namespace cicada
       typedef cicada::Format::phrase_type     phrase_type;
       typedef cicada::Format::phrase_set_type phrase_set_type;
       
+      typedef utils::hashmurmur<size_t> hasher_type;
+
+      struct cache_type
+      {
+	phrase_type     key;
+	phrase_set_type value;
+	
+	cache_type() : key(), value() {}
+      };
+      typedef utils::array_power2<cache_type, 1024 * 8, std::allocator<cache_type> > cache_set_type;
+
     public:
       DateImpl() {}
       DateImpl(const DateImpl& x) { assign(x); }
@@ -49,44 +61,50 @@ namespace cicada
       ~DateImpl() { clear(); }
       
     public:
-      void operator()(const phrase_type& input, phrase_set_type& output) const
+      const phrase_set_type& operator()(const phrase_type& input) const
       {
 	typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
-	
-	UnicodeString uphrase = UnicodeString::fromUTF8(input);
-	UnicodeString ugenerated;
-	std::string   generated;
-	
-	phrase_unique_type uniques;
-	
-	parser_set_type::const_iterator piter_end = parsers.end();
-	for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
-	  const parser_type* parser = *piter;
-	  icu::Formattable   formattable;
-	  icu::ParsePosition pos(0);
+
+	cache_type& cache = const_cast<cache_type&>(caches[hasher_type::operator()(input.begin(), input.end(), 0) & (caches.size() - 1)]);
+	if (cache.key != input) {
+	  UnicodeString uphrase = UnicodeString::fromUTF8(input);
+	  UnicodeString ugenerated;
+	  std::string   generated;
 	  
-	  parser->parseObject(uphrase, formattable, pos);
+	  phrase_unique_type uniques;
+	
+	  parser_set_type::const_iterator piter_end = parsers.end();
+	  for (parser_set_type::const_iterator piter = parsers.begin(); piter != piter_end; ++ piter) {
+	    const parser_type* parser = *piter;
+	    icu::Formattable   formattable;
+	    icu::ParsePosition pos(0);
 	  
-	  if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
+	    parser->parseObject(uphrase, formattable, pos);
 	  
-	  generator_set_type::const_iterator giter_end = generators.end();
-	  for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
-	    const generator_type* generator = *giter;
-	    UErrorCode    status(U_ZERO_ERROR);
+	    if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
+	  
+	    generator_set_type::const_iterator giter_end = generators.end();
+	    for (generator_set_type::const_iterator giter = generators.begin(); giter != giter_end; ++ giter) {
+	      const generator_type* generator = *giter;
+	      UErrorCode    status(U_ZERO_ERROR);
 	    
-	    ugenerated.remove();
-	    generator->format(formattable, ugenerated, status);
+	      ugenerated.remove();
+	      generator->format(formattable, ugenerated, status);
 	    
-	    if (U_FAILURE(status)) continue;
+	      if (U_FAILURE(status)) continue;
 	    
-	    generated.clear();
-	    ugenerated.toUTF8String(generated);
-	    uniques.insert(generated);
+	      generated.clear();
+	      ugenerated.toUTF8String(generated);
+	      uniques.insert(generated);
+	    }
 	  }
+	  
+	  cache.key = input;
+	  cache.value.clear();
+	  cache.value.insert(cache.value.end(), uniques.begin(), uniques.end());
 	}
 	
-	output.clear();
-	output.insert(output.end(), uniques.begin(), uniques.end());
+	return cache.value;
       }
       
     public:
@@ -115,9 +133,12 @@ namespace cicada
 	
 	parsers.clear();
 	generators.clear();
+
+	caches.clear();
       }
       
     public:
+      cache_set_type     caches;
       parser_set_type    parsers;
       generator_set_type generators;
       std::string name;
@@ -127,11 +148,10 @@ namespace cicada
     {
       typedef std::set<std::string, std::less<std::string>, std::allocator<std::string> > phrase_unique_type;
       
-      phrase_set_type    results;
       phrase_unique_type uniques;
       
       for (pimpl_set_type::const_iterator iter = pimpls.begin(); iter != pimpls.end(); ++ iter) {
-	(*iter)->operator()(phrase, results);
+	const phrase_set_type& results = (*iter)->operator()(phrase);
 	
 	uniques.insert(results.begin(), results.end());
       }
