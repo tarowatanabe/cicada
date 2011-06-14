@@ -265,7 +265,7 @@ namespace cicada
       std::auto_ptr<NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
-      
+
       sources["numbering"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
       sources["cardinal"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
       sources["any"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
