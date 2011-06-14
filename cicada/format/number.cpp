@@ -268,6 +268,7 @@ namespace cicada
       if (has_rbnf_rule_set(*rbnf_source, "numbering")) {
 	UnicodeString rules(rules_rbnf_source);
 	
+	rules.findAndReplace("%spellout-numbering-year",  "%%spellout-numbering-year");
 	rules.findAndReplace("%spellout-ordinal",  "%%spellout-ordinal");
 	rules.findAndReplace("%spellout-cardinal", "%%spellout-cardinal");
 
@@ -299,7 +300,7 @@ namespace cicada
       for (int i = 0; i < num_rules; ++ i) {
 	const icu::UnicodeString uname = rbnf_target->getRuleSetName(i);
 	
-	if (uname.indexOf("numbering") >= 0)
+	if (uname.indexOf("numbering") >= 0 && uname.indexOf("year") < 0)
 	  targets["numbering"].generators.push_back(create_rbnf_instance(locale_target, uname));
 	else if (uname.indexOf("ordinal") >= 0)
 	  targets["ordinal"].generators.push_back(create_rbnf_instance(locale_target, uname));
