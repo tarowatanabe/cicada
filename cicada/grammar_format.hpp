@@ -31,7 +31,8 @@ namespace cicada
     typedef std::pair<id_type, symbol_type> id_symbol_type;
     typedef google::dense_hash_set<id_symbol_type, utils::hashmurmur<size_t>, std::equal_to<id_symbol_type> > visited_type;
     
-    typedef std::vector<std::string, std::allocator<std::string> > prefix_set_type;
+    typedef std::string prefix_type;
+    typedef std::vector<prefix_type, std::allocator<prefix_type> > prefix_set_type;
     
   public:
     GrammarFormat(const symbol_type& __non_terminal,

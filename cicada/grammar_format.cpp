@@ -45,6 +45,11 @@ namespace cicada
 	  }
 	  
 	  node_next = base_type::next(node, symbol);
+	  
+	  if (node_next >= prefix.size())
+	    const_cast<prefix_set_type&>(prefix).resize(node_next + 1);
+	  
+	  const_cast<prefix_type&>(prefix[node_next]) = context;
 	}
       }
     }
