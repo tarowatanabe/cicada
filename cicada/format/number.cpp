@@ -8,6 +8,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include <unicode/curramt.h>
 #include <unicode/format.h>
 #include <unicode/numfmt.h>
 #include <unicode/rbnf.h>
@@ -40,7 +41,7 @@ namespace cicada
       typedef cicada::Format::phrase_set_type phrase_set_type;
       
     public:
-      NumberImpl() : currency(false) {}
+      NumberImpl() :currency(false){}
       NumberImpl(const NumberImpl& x) { assign(x); }
       NumberImpl& operator=(const NumberImpl& x)
       {
@@ -67,9 +68,9 @@ namespace cicada
 	  icu::ParsePosition pos(0);
 	  
 	  if (currency)
-	    parser->parse(uphrase, formattable, pos);
-	  else
 	    parser->parseCurrency(uphrase, formattable, pos);
+	  else
+	    parser->parse(uphrase, formattable, pos);
 	  
 	  if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
 	  
