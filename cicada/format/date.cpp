@@ -82,8 +82,6 @@ namespace cicada
 	    generated.clear();
 	    ugenerated.toUTF8String(generated);
 	    uniques.insert(generated);
-
-	    //std::cerr << name << ": " << generated << std::endl;
 	  }
 	}
 	
@@ -166,16 +164,23 @@ namespace cicada
       impl_map_type sources;
       impl_map_type targets;
       
-      icu::DateFormat::EStyle date_styles[4] = { icu::DateFormat::SHORT, icu::DateFormat::MEDIUM, icu::DateFormat::LONG, icu::DateFormat::FULL};
+      const icu::DateFormat::EStyle date_styles[4] = { icu::DateFormat::SHORT, icu::DateFormat::MEDIUM, icu::DateFormat::LONG, icu::DateFormat::FULL};
+      const char* names[4] = {"short", "medium", "long", "full"};
       
       for (int i = 0; i != 4; ++ i) {
-	sources["date"].parsers.push_back(icu::DateFormat::createDateInstance(date_styles[i], locale_source));
-	sources["time"].parsers.push_back(icu::DateFormat::createTimeInstance(date_styles[i], locale_source));
+	std::auto_ptr<icu::DateFormat> date(icu::DateFormat::createDateInstance(date_styles[i], locale_source));
+	std::auto_ptr<icu::DateFormat> time(icu::DateFormat::createTimeInstance(date_styles[i], locale_source));
+
+	date->setLenient(true);
+	time->setLenient(true);
+	
+	sources[std::string("date-") + names[i]].parsers.push_back(date.release());
+	sources[std::string("time-") + names[i]].parsers.push_back(time.release());
       }
 
       for (int i = 0; i != 4; ++ i) {
-	targets["date"].generators.push_back(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
-	targets["time"].generators.push_back(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
+	targets[std::string("date-") + names[i]].generators.push_back(icu::DateFormat::createDateInstance(date_styles[i], locale_target));
+	targets[std::string("time-") + names[i]].generators.push_back(icu::DateFormat::createTimeInstance(date_styles[i], locale_target));
       }
       
       // try match!
