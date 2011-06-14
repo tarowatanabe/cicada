@@ -22,7 +22,7 @@ namespace cicada
       const std::string context = (node == root()
 				   ? static_cast<const std::string&>(symbol)
 				   : prefix[node] + ' ' + static_cast<const std::string&>(symbol));
-      
+
       format_type::phrase_set_type phrases;
       if (remove_space)
 	format->operator()(boost::algorithm::erase_all_copy(context, " "), phrases);

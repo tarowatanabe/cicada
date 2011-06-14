@@ -15,6 +15,11 @@
 #include <unicode/unistr.h>
 #include <unicode/locid.h>
 #include <unicode/bytestream.h>
+#include <unicode/resbund.h>
+#include <unicode/ures.h>
+#include <unicode/udata.h>
+
+#define U_ICUDATA_RBNF U_ICUDATA_NAME U_TREE_SEPARATOR_STRING "rbnf"
 
 #include "number.hpp"
 
@@ -231,8 +236,30 @@ namespace cicada
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
-      const UnicodeString rules_rbnf_source = rbnf_source->getRules();
-
+      UnicodeString rules_rbnf_source;
+      const char* rules_tag = "RBNFRules";
+      const char* fmt_tag   = "SpelloutRules";
+      
+      status = U_ZERO_ERROR;
+      icu::ResourceBundle bundle(U_ICUDATA_RBNF, locale_source, status);
+      
+      if (U_SUCCESS(status)) {
+	icu::ResourceBundle bundle_rbnf = bundle.getWithFallback(rules_tag, status);
+        if (U_FAILURE(status))
+	  throw std::runtime_error("no rbnf?");
+	
+	icu::ResourceBundle bundle_rules = bundle_rbnf.getWithFallback(fmt_tag, status);
+        if (U_FAILURE(status))
+	  throw std::runtime_error("no rules?");
+	
+	while (bundle_rules.hasNext() && U_SUCCESS(status))
+	  rules_rbnf_source += bundle_rules.getNextString(status);
+	
+	if (U_FAILURE(status))
+	  throw std::runtime_error("no string?");
+      } else 
+	throw std::runtime_error("no RBNF rules?");
+      
       if (has_rbnf_rule_set(*rbnf_source, "cardinal")) {
 	UnicodeString rules(rules_rbnf_source);
 	
