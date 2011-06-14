@@ -84,7 +84,7 @@ namespace cicada
 	    ugenerated.toUTF8String(generated);
 	    uniques.insert(generated);
 
-	    std::cerr << name << ": " << generated << std::endl;
+	    //std::cerr << name << ": " << generated << std::endl;
 	  }
 	}
 	
