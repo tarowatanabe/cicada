@@ -149,8 +149,8 @@ namespace cicada
       typedef std::tr1::unordered_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
 	std::allocator<std::pair<const std::string, impl_type> > > impl_map_type;
 #else
-    typedef sgi::hash_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
-			  std::allocator<std::pair<const std::string, impl_type> > > impl_map_type;
+      typedef sgi::hash_map<std::string, impl_type, boost::hash<std::string>, std::equal_to<std::string>,
+	std::allocator<std::pair<const std::string, impl_type> > > impl_map_type;
 #endif
       
       const icu::Locale locale_source(locale_str_source.c_str());
