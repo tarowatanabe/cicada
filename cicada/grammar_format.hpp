@@ -36,10 +36,12 @@ namespace cicada
     
   public:
     GrammarFormat(const symbol_type& __non_terminal,
-		  const std::string& param_formatter)
+		  const std::string& param_formatter,
+		  const bool __remove_space)
       : base_type(),
 	non_terminal(__non_terminal),
 	format(&format_type::create(param_formatter)),
+	remove_space(__remove_space),
 	visited(),
 	prefix(),
 	feature("format-penalty")
@@ -63,6 +65,7 @@ namespace cicada
     // we will keep actual rules in base_type + queried types via "node-id + word"
     symbol_type non_terminal;
     const format_type* format;
+    bool remove_space;
     
     visited_type    visited;
     prefix_set_type prefix;

@@ -53,6 +53,7 @@ unknown: pos assignment by signature\n\
 format: ICU's number/date format rules\n\
 \tnon-terminal=[default non-terminal]\n\
 \tformat=[formtter spec]\n\
+\tremove-space=[true|false] remove space (like Chinese/Japanese)\n\
 ";
     return desc;
   }
@@ -160,12 +161,15 @@ format: ICU's number/date format rules\n\
     } else if (utils::ipiece(param.name()) == "format") {
       std::string format;
       symbol_type non_terminal;
+      bool remove_space = false;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "non-terminal")
 	  non_terminal = piter->second;
 	else if (utils::ipiece(piter->first) == "format")
 	  format = piter->second;
+	else if (utils::ipiece(piter->first) == "remove-space")
+	  remove_space = utils::lexical_cast<bool>(piter->second);
 	else
 	  throw std::runtime_error("unsupported parameter for format grammar: " + piter->first + "=" + piter->second);
       }
@@ -173,7 +177,7 @@ format: ICU's number/date format rules\n\
       if (non_terminal.empty() || ! non_terminal.is_non_terminal())
 	throw std::runtime_error("invalid non-terminal for format grammar: " + static_cast<const std::string&>(non_terminal));
       
-      return transducer_ptr_type(new GrammarFormat(non_terminal, format));
+      return transducer_ptr_type(new GrammarFormat(non_terminal, format, remove_space));
     } else if (utils::ipiece(param.name()) == "unknown") {
       std::string signature;
       std::string file;

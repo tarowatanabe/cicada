@@ -20,7 +20,9 @@ namespace cicada
 	
 	const std::string context = (node == root()
 				     ? static_cast<const std::string&>(symbol)
-				     : prefix[node] + ' ' + static_cast<const std::string&>(symbol));
+				     : (remove_space 
+					? prefix[node] + static_cast<const std::string&>(symbol)
+					: prefix[node] + ' ' + static_cast<const std::string&>(symbol)));
 	
 	format_type::phrase_set_type phrases;
 	format->operator()(context, phrases);
