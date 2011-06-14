@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include <cicada/transducer.hpp>
+#include <cicada/grammar_format.hpp>
 #include <cicada/grammar_mutable.hpp>
 #include <cicada/grammar_static.hpp>
 #include <cicada/grammar_simple.hpp>
@@ -49,6 +50,9 @@ unknown: pos assignment by signature\n\
 \tsignature=[signature for OOV]\n\
 \tfile=[file-name] lexical grammar\n\
 \tcharacter=[file-name] character model\n\
+format: ICU's number/date format rules\n\
+\tnon-terminal=[default non-terminal]\n\
+\tformat=[formtter spec]\n\
 ";
     return desc;
   }
@@ -153,6 +157,23 @@ unknown: pos assignment by signature\n\
 	throw std::runtime_error("unsupported parameter for POS grammar: " + piter->first + "=" + piter->second);
       
       return transducer_ptr_type(new GrammarPOS());
+    } else if (utils::ipiece(param.name()) == "format") {
+      std::string format;
+      symbol_type non_terminal;
+      
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "non-terminal")
+	  non_terminal = piter->second;
+	else if (utils::ipiece(piter->first) == "format")
+	  format = piter->second;
+	else
+	  throw std::runtime_error("unsupported parameter for format grammar: " + piter->first + "=" + piter->second);
+      }
+      
+      if (non_terminal.empty() || ! non_terminal.is_non_terminal())
+	throw std::runtime_error("invalid non-terminal for format grammar: " + static_cast<const std::string&>(non_terminal));
+      
+      return transducer_ptr_type(new GrammarFormat(non_terminal, format));
     } else if (utils::ipiece(param.name()) == "unknown") {
       std::string signature;
       std::string file;

@@ -289,6 +289,7 @@ generate.hpp \
 generate_earley.hpp \
 global_lexicon.hpp \
 grammar.hpp \
+grammar_format.hpp \
 grammar_mutable.hpp \
 grammar_simple.hpp \
 grammar_static.hpp \
@@ -364,6 +365,7 @@ feature.cpp \
 feature_function.cpp \
 format.cpp \
 global_lexicon.cpp \
+grammar_format.cpp \
 grammar_mutable.cpp \
 grammar_static.cpp \
 grammar_unknown.cpp \

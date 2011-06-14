@@ -12,9 +12,8 @@
 #include <cicada/grammar_mutable.hpp>
 #include <cicada/format.hpp>
 
-#include <google/dense_hash_map>
+#include <google/dense_hash_set>
 
-#include <utils/compact_trie_dense.hpp>
 #include <utils/hashmurmur.hpp>
 
 namespace cicada
@@ -23,45 +22,49 @@ namespace cicada
   {
   private:
     typedef GrammarMutable base_type;
-    typedef Signature signature_type;
     
     typedef int32_t uchar_type;
     
     typedef feature_set_type::feature_type feature_type;
+    typedef Format format_type;
+
+    typedef std::pair<id_type, symbol_type> id_symbol_type;
+    typedef google::dense_hash_set<id_symbol_type, utils::hashmurmur<size_t>, std::equal_to<id_symbol_type> > visited_type;
     
-  private:
+    typedef std::vector<std::string, std::allocator<std::string> > prefix_set_type;
     
   public:
-    GrammarFormat(const std::string& __parameter)
+    GrammarFormat(const symbol_type& __non_terminal,
+		  const std::string& param_formatter)
       : base_type(),
-	feature("format")
+	non_terminal(__non_terminal),
+	format(&format_type::create(param_formatter)),
+	visited(),
+	prefix(),
+	feature("format-penalty")
     {
-      base_type::read(__parameter);
+      visited.set_empty_key(id_symbol_type());
     }
     
     transducer_ptr_type clone() const
     {
       std::auto_ptr<GrammarFormat> __tmp(new GrammarFormat(*this));
-      __tmp->signature = &signature_type::create(signature->algorithm());
-      
+      __tmp->format = &format_type::create(format->algorithm());
       return transducer_ptr_type(__tmp.release());
     }
     
-    void assign(const hypergraph_type& graph)
-    {
-      // we will collect unigrams first...
-    }
+    id_type next(const id_type& node, const symbol_type& symbol) const;
     
-    void assign(const lattice_type& lattice)
-    {
-      // we will collect unigrams first...
-      
-    }
-    
+    // has_next is always true...!
+    bool has_next(const id_type& node) const { return true; }
     
   private:
-    // we will keep actual rules in base_type + queried types
+    // we will keep actual rules in base_type + queried types via "node-id + word"
+    symbol_type non_terminal;
+    const format_type* format;
     
+    visited_type    visited;
+    prefix_set_type prefix;
     
     feature_type feature;
   };

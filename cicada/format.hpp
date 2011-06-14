@@ -28,6 +28,7 @@ namespace cicada
     
   public:  
     virtual void operator()(const phrase_type& phrase, phrase_set_type& phrases) const = 0;
+    const std::string& algorithm() const { return __algorithm; }
 
   private:
     std::string __algorithm;
