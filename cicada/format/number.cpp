@@ -40,7 +40,7 @@ namespace cicada
       typedef cicada::Format::phrase_set_type phrase_set_type;
       
     public:
-      NumberImpl() {}
+      NumberImpl() : currency(false) {}
       NumberImpl(const NumberImpl& x) { assign(x); }
       NumberImpl& operator=(const NumberImpl& x)
       {
@@ -66,7 +66,10 @@ namespace cicada
 	  icu::Formattable   formattable;
 	  icu::ParsePosition pos(0);
 	  
-	  parser->parse(uphrase, formattable, pos);
+	  if (currency)
+	    parser->parse(uphrase, formattable, pos);
+	  else
+	    parser->parseCurrency(uphrase, formattable, pos);
 	  
 	  if (pos.getErrorIndex() >= 0 || pos.getIndex() != uphrase.length()) continue;
 	  
@@ -104,6 +107,9 @@ namespace cicada
 	generator_set_type::const_iterator giter_end = x.generators.end();
 	for (generator_set_type::const_iterator giter = x.generators.begin(); giter != giter_end; ++ giter)
 	  generators.push_back(dynamic_cast<generator_type*>((*giter)->clone()));
+	
+	name = x.name;
+	currency = x.currency;
       }
       
       void clear()
@@ -124,6 +130,7 @@ namespace cicada
       parser_set_type    parsers;
       generator_set_type generators;
       std::string name;
+      bool currency;
     };
     
     void Number::operator()(const phrase_type& phrase, phrase_set_type& generated) const
@@ -290,6 +297,22 @@ namespace cicada
       targets["cardinal"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       targets["any"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       
+#if 0
+      // currently, we will disable currency parsing/generation
+      status = U_ZERO_ERROR;
+      std::auto_ptr<NumberFormat> curr_source(icu::NumberFormat::createCurrencyInstance(locale_source, status));
+      if (U_FAILURE(status))
+	throw std::runtime_error(std::string("NumberFormat::createCurrencyInstance: ") + u_errorName(status));
+      
+      status = U_ZERO_ERROR;
+      std::auto_ptr<NumberFormat> curr_target(icu::NumberFormat::createCurrencyInstance(locale_target, status));
+      if (U_FAILURE(status))
+	throw std::runtime_error(std::string("NumberFormat::createCurrencyInstance: ") + u_errorName(status));
+      
+      sources["currency"].parsers.push_back(curr_source.release());
+      targets["currency"].generators.push_back(curr_target.release());
+#endif
+
       // try match!
       impl_map_type::iterator siter_end = sources.end();
       for (impl_map_type::iterator siter = sources.begin(); siter != siter_end; ++ siter) {
@@ -315,6 +338,7 @@ namespace cicada
 	  pimpls.back()->parsers.swap(siter->second.parsers);
 	  pimpls.back()->generators.swap(titer->second.generators);
 	  pimpls.back()->name = siter->first;
+	  pimpls.back()->currency = (siter->first == "currency");
 	}
       }
     }
