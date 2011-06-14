@@ -84,7 +84,7 @@ namespace cicada
 	    ugenerated.toUTF8String(generated);
 	    uniques.insert(generated);
 
-	    //std::cerr << name << ": " << generated << std::endl;
+	    std::cerr << name << ": " << generated << std::endl;
 	  }
 	}
 	
@@ -143,6 +143,17 @@ namespace cicada
       generated.insert(generated.end(), uniques.begin(), uniques.end());
     }
 
+    template <typename Format>
+    inline
+    bool has_rbnf_rule_set(const Format& format, const char* name)
+    {
+      const int num_rules = format.getNumberOfRuleSetNames();
+      for (int i = 0; i < num_rules; ++ i)
+	if (format.getRuleSetName(i).indexOf(name) >= 0)
+	  return true;
+      return false;
+    }
+
     template <typename Locale, typename Name>
     inline
     icu::NumberFormat* create_rbnf_instance(const Locale& locale, const Name& name)
@@ -161,6 +172,8 @@ namespace cicada
       
       return rbnf.release();
     }
+    
+    
     
     Number::Number(const std::string& locale_str_source,
 		   const std::string& locale_str_target)
@@ -190,30 +203,92 @@ namespace cicada
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
-      rbnf_source->setLenient(true);
-      sources["any"].parsers.push_back(rbnf_source.release());
+      const UnicodeString rules_rbnf_source = rbnf_source->getRules();
+
+      if (has_rbnf_rule_set(*rbnf_source, "cardinal")) {
+	UnicodeString rules(rules_rbnf_source);
+	
+	rules.findAndReplace("%spellout-numbering", "%%spellout-numbering");
+	rules.findAndReplace("%spellout-ordinal",   "%%spellout-ordinal");
+	
+	UErrorCode status = U_ZERO_ERROR;
+	UParseError perror;
+	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	
+	rbnf->setLenient(true);
+	sources["cardinal"].parsers.push_back(rbnf.release());
+      }
       
+      if (has_rbnf_rule_set(*rbnf_source, "ordinal")) {
+	UnicodeString rules(rules_rbnf_source);
+	
+	rules.findAndReplace("%spellout-numbering", "%%spellout-numbering");
+	rules.findAndReplace("%spellout-cardinal",  "%%spellout-cardinal");
+	
+	UErrorCode status = U_ZERO_ERROR;
+	UParseError perror;
+	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	
+	rbnf->setLenient(true);
+	sources["ordinal"].parsers.push_back(rbnf.release());
+      }
+      
+      if (has_rbnf_rule_set(*rbnf_source, "numbering")) {
+	UnicodeString rules(rules_rbnf_source);
+	
+	rules.findAndReplace("%spellout-ordinal",  "%%spellout-ordinal");
+	rules.findAndReplace("%spellout-cardinal", "%%spellout-cardinal");
+
+	UErrorCode status = U_ZERO_ERROR;
+	UParseError perror;
+	std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	
+	rbnf->setLenient(true);
+	sources["numbering"].parsers.push_back(rbnf.release());
+      }
+    
       status = U_ZERO_ERROR;
       std::auto_ptr<NumberFormat> nf_source(NumberFormat::createInstance(locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
       
-      sources["any"].parsers.push_back(nf_source.release());
+      sources["numbering"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
+      sources["cardinal"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
+      sources["any"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
       
       status = U_ZERO_ERROR;
       std::auto_ptr<RuleBasedNumberFormat> rbnf_target(new RuleBasedNumberFormat(URBNF_SPELLOUT, locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
-      for (int i = 0; i < rbnf_target->getNumberOfRuleSetNames(); ++ i)
-	targets["any"].generators.push_back(create_rbnf_instance(locale_target, rbnf_target->getRuleSetName(i)));
-
+      const int num_rules = rbnf_target->getNumberOfRuleSetNames();
+      for (int i = 0; i < num_rules; ++ i) {
+	const icu::UnicodeString uname = rbnf_target->getRuleSetName(i);
+	
+	if (uname.indexOf("numbering") >= 0)
+	  targets["numbering"].generators.push_back(create_rbnf_instance(locale_target, uname));
+	else if (uname.indexOf("ordinal") >= 0)
+	  targets["ordinal"].generators.push_back(create_rbnf_instance(locale_target, uname));
+	else if (uname.indexOf("cardinal") >= 0)
+	  targets["cardinal"].generators.push_back(create_rbnf_instance(locale_target, uname));
+	else
+	  targets["any"].generators.push_back(create_rbnf_instance(locale_target, uname));
+      }
+      
       status = U_ZERO_ERROR;
       std::auto_ptr<NumberFormat> nf_target(NumberFormat::createInstance(locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
       
-      targets["any"].generators.push_back(nf_target.release());
+      targets["numbering"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
+      targets["cardinal"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
+      targets["any"].generators.push_back(dynamic_cast<impl_type::generator_type*>(nf_target->clone()));
       
       // try match!
       impl_map_type::iterator siter_end = sources.end();
