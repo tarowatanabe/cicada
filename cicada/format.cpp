@@ -5,6 +5,7 @@
 #include "format.hpp"
 #include "parameter.hpp"
 
+#include "format/date.hpp"
 #include "format/number.hpp"
 
 #include <utils/sgi_hash_map.hpp>
@@ -17,6 +18,11 @@ namespace cicada
   const char* Format::lists()
   {
     static const char* desc = "\
+date: date/time format\n\
+\tsource=[locale] parser locale\n\
+\ttarget=[locale] generator locale\n\
+\tparser=[locale] parser locale\n\
+\tgenerator=[locale] generator locale\n\
 number: number format\n\
 \tsource=[locale] parser locale\n\
 \ttarget=[locale] generator locale\n\
@@ -89,6 +95,27 @@ number: number format\n\
 	}
 	
 	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Number(locale_parser, locale_generator)))).first;
+	iter->second->__algorithm = parameter;
+      }
+      
+      return *(iter->second);
+    } else if (utils::ipiece(param.name()) == "date") {
+      
+      format_map_type::iterator iter = formats_map.find(parameter);
+      if (iter == formats_map.end()) {
+	std::string locale_parser;
+	std::string locale_generator;
+	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "parser" || utils::ipiece(piter->first) == "source")
+	    locale_parser = piter->second;
+	  else if (utils::ipiece(piter->first) == "generator" || utils::ipiece(piter->first) == "target")
+	    locale_generator = piter->second;
+	  else
+	    throw std::runtime_error("unsupported parameter: " + parameter);
+	}
+	
+	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Date(locale_parser, locale_generator)))).first;
 	iter->second->__algorithm = parameter;
       }
       

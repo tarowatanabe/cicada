@@ -74,10 +74,13 @@ eval/wlcs.cpp
 libcicada_eval_la_CPPFLAGS = $(AM_CPPFLAGS)
 
 dist_format_HEADERS = \
+format/date.hpp \
 format/number.hpp
 
 libcicada_format_la_SOURCES = \
+format/date.cpp \
 format/number.cpp
+
 libcicada_format_la_LIBADD = $(ICU_LDFLAGS)
 libcicada_format_la_CPPFLAGS = $(AM_CPPFLAGS)
 

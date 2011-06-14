@@ -254,7 +254,7 @@ namespace cicada
       }
     
       status = U_ZERO_ERROR;
-      std::auto_ptr<NumberFormat> nf_source(NumberFormat::createInstance(locale_source, status));
+      std::auto_ptr<NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
       
@@ -282,7 +282,7 @@ namespace cicada
       }
       
       status = U_ZERO_ERROR;
-      std::auto_ptr<NumberFormat> nf_target(NumberFormat::createInstance(locale_target, status));
+      std::auto_ptr<NumberFormat> nf_target(icu::NumberFormat::createInstance(locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("NumberFormat::createInstance: ") + u_errorName(status));
       
