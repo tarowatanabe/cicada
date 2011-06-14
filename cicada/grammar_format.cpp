@@ -4,6 +4,8 @@
 
 #include <cicada/sentence.hpp>
 
+#include <boost/algorithm/string/erase.hpp>
+
 #include "grammar_format.hpp"
 
 namespace cicada
@@ -18,14 +20,15 @@ namespace cicada
       if (__visited.insert(id_symbol_type(node, symbol)).second) {
 	// the combination of node/symbol has not been visited!
 	
-	const std::string context = (node == root()
-				     ? static_cast<const std::string&>(symbol)
-				     : (remove_space 
-					? prefix[node] + static_cast<const std::string&>(symbol)
-					: prefix[node] + ' ' + static_cast<const std::string&>(symbol)));
+	std::string context = (node == root()
+			       ? static_cast<const std::string&>(symbol)
+			       : prefix[node] + ' ' + static_cast<const std::string&>(symbol));
 	
 	format_type::phrase_set_type phrases;
-	format->operator()(context, phrases);
+	if (remove_space)
+	  format->operator()(boost::algorithm::erase_all_copy(context, " "), phrases);
+	else
+	  format->operator()(context, phrases);
 	
 	if (! phrases.empty()) {
 	  typedef cicada::Sentence phrase_type;

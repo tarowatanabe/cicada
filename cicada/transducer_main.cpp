@@ -20,7 +20,6 @@ int main(int argc, char** argv)
     id_set_type nodes;
     id_set_type nodes_next;
     
-    
     sentence_type::const_iterator siter_end = sentence.end();
     for (sentence_type::const_iterator siter = sentence.begin(); siter != siter_end; ++ siter) {
       
