@@ -81,6 +81,8 @@ namespace cicada
     bool has_next(id_type node) const { return ! trie.empty(node); }
     const rule_pair_set_type& rules(id_type node) { return trie[node]; }
 
+    id_type insert(const id_type& node, const symbol_type& symbol) { return trie.insert(node, symbol); }
+
     void insert(const std::string& pattern);
     void insert(const rule_pair_type& rule)
     {
@@ -477,6 +479,11 @@ namespace cicada
   GrammarMutable::id_type GrammarMutable::next(const id_type& node, const symbol_type& symbol) const
   {
     return pimpl->next(node, symbol.non_terminal());
+  }
+
+  GrammarMutable::id_type GrammarMutable::insert(const id_type& node, const symbol_type& symbol)
+  {
+    return pimpl->insert(node, symbol.non_terminal());
   }
   
   bool GrammarMutable::has_next(const id_type& node) const

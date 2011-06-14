@@ -61,6 +61,7 @@ namespace cicada
     id_type next(const id_type& node, const symbol_type& symbol) const;
     bool has_next(const id_type& node) const;
     const rule_pair_set_type& rules(const id_type& node) const;
+    id_type insert(const id_type& node, const symbol_type& symbol);
     
     // mutable grammar specific members...
     void read(const std::string& parameter);

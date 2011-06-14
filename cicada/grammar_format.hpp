@@ -27,9 +27,6 @@ namespace cicada
     
     typedef feature_set_type::feature_type feature_type;
     typedef Format format_type;
-
-    typedef std::pair<id_type, symbol_type> id_symbol_type;
-    typedef google::dense_hash_set<id_symbol_type, utils::hashmurmur<size_t>, std::equal_to<id_symbol_type> > visited_type;
     
     typedef std::string prefix_type;
     typedef std::vector<prefix_type, std::allocator<prefix_type> > prefix_set_type;
@@ -42,12 +39,9 @@ namespace cicada
 	non_terminal(__non_terminal),
 	format(&format_type::create(param_formatter)),
 	remove_space(__remove_space),
-	visited(),
 	prefix(),
 	feature("format-penalty")
-    {
-      visited.set_empty_key(id_symbol_type());
-    }
+    { }
     
     transducer_ptr_type clone() const
     {
@@ -55,6 +49,9 @@ namespace cicada
       __tmp->format = &format_type::create(format->algorithm());
       return transducer_ptr_type(__tmp.release());
     }
+
+    void assign(const hypergraph_type& graph) { base_type::clear(); prefix.clear(); }
+    void assign(const lattice_type& lattice) { base_type::clear(); prefix.clear(); }
     
     id_type next(const id_type& node, const symbol_type& symbol) const;
     
@@ -67,7 +64,6 @@ namespace cicada
     const format_type* format;
     bool remove_space;
     
-    visited_type    visited;
     prefix_set_type prefix;
     
     feature_type feature;
