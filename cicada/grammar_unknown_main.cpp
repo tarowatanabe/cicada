@@ -1,7 +1,7 @@
 #include <iostream>
 
+#include <cicada/transducer.hpp>
 #include <cicada/sentence.hpp>
-#include <cicada/grammar_unknown.hpp>
 
 int main(int argc, char** argv)
 {

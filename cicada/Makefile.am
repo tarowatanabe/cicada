@@ -449,6 +449,7 @@ span_vector_main \
 stemmer_main \
 symbol_main \
 tokenizer_main \
+transducer_main \
 tree_grammar_mutable_main \
 tree_grammar_static_main \
 tree_rule_main
@@ -516,6 +517,9 @@ symbol_main_LDADD = libcicada.la
 
 tokenizer_main_SOURCES = tokenizer_main.cpp
 tokenizer_main_LDADD = libcicada.la
+
+transducer_main_SOURCES = transducer_main.cpp
+transducer_main_LDADD = libcicada.la
 
 tree_grammar_mutable_main_SOURCES = tree_grammar_mutable_main.cpp
 tree_grammar_mutable_main_LDADD = libcicada.la
