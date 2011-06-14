@@ -295,13 +295,27 @@ namespace cicada
       for (impl_map_type::iterator siter = sources.begin(); siter != siter_end; ++ siter) {
 	impl_map_type::iterator titer = targets.find(siter->first);
 	
-	if (titer == targets.end()) continue;
-	
-	pimpls.push_back(new impl_type());
-	
-	pimpls.back()->parsers.swap(siter->second.parsers);
-	pimpls.back()->generators.swap(titer->second.generators);
-	pimpls.back()->name = siter->first;
+	if (titer == targets.end()) {
+	  if (siter->first == "ordinal") {
+	    titer = targets.find("cardinal");
+	    if (titer != targets.end()) {
+	      pimpls.push_back(new impl_type());
+	  
+	      pimpls.back()->parsers.swap(siter->second.parsers);
+	      pimpls.back()->name = siter->first;
+	      
+	      impl_type::generator_set_type::const_iterator giter_end = titer->second.generators.end();
+	      for (impl_type::generator_set_type::const_iterator giter = titer->second.generators.begin(); giter != giter_end; ++ giter)
+		pimpls.back()->generators.push_back(dynamic_cast<impl_type::generator_type*>((*giter)->clone()));
+	    }
+	  }
+	} else {
+	  pimpls.push_back(new impl_type());
+	  
+	  pimpls.back()->parsers.swap(siter->second.parsers);
+	  pimpls.back()->generators.swap(titer->second.generators);
+	  pimpls.back()->name = siter->first;
+	}
       }
     }
     
