@@ -191,9 +191,9 @@ namespace cicada
       const icu::Locale locale_target(locale_str_target.c_str());
       
       if (locale_source.isBogus())
-	throw std::runtime_error("invalid ocale: " + locale_str_source);
+	throw std::runtime_error("invalid locale: " + locale_str_source);
       if (locale_target.isBogus())
-	throw std::runtime_error("invalid ocale: " + locale_str_target);
+	throw std::runtime_error("invalid locale: " + locale_str_target);
       
       impl_map_type sources;
       impl_map_type targets;
