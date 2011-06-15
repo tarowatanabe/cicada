@@ -32,7 +32,7 @@
 
 path_type forest_path;
 path_type intersected_path;
-
+path_type weights_path;
 path_type output_path = "-";
 
 int iteration = 100;
@@ -98,6 +98,16 @@ int main(int argc, char ** argv)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
     weight_set_type weights;
+    if (! weights_path.empty()) {
+      if (! boost::filesystem::exists(weights_path))
+	throw std::runtime_error("no path? " + weights_path.string());
+      
+      utils::compress_istream is(weights_path, 1024 * 1024);
+      is >> weights;
+    }
+    
+    weights.allocate();
+    
     double objective = 0.0;
     
     boost::mt19937 generator;
@@ -433,8 +443,6 @@ struct OptimizeLBFGS
     param.max_iterations = iteration;
     
     double objective = 0.0;
-    weights.clear();
-    weights.allocate();
     
     lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
     
@@ -795,6 +803,7 @@ void options(int argc, char** argv)
   opts_command.add_options()
     ("forest",      po::value<path_type>(&forest_path),       "forest path")
     ("intersected", po::value<path_type>(&intersected_path),  "intersected forest path")
+    ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")

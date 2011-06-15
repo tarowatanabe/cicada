@@ -46,8 +46,9 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
 path_set_type forest_path;
 path_set_type intersected_path;
-
+path_type weights_path;
 path_type output_path = "-";
+
 
 int iteration = 100;
 bool learn_lbfgs = false;
@@ -56,6 +57,8 @@ bool learn_mira = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
+
+bool unite_forest = false;
 
 int debug = 0;
 
@@ -120,6 +123,16 @@ int main(int argc, char ** argv)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
     weight_set_type weights;
+    if (mpi_rank ==0 && ! weights_path.empty()) {
+      if (! boost::filesystem::exists(weights_path))
+	throw std::runtime_error("no path? " + weights_path.string());
+      
+      utils::compress_istream is(weights_path, 1024 * 1024);
+      is >> weights;
+    }
+    
+    weights.allocate();
+
     double objective = 0.0;
 
     boost::mt19937 generator;
@@ -431,6 +444,8 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   optimizer_type optimizer(graphs_forest.size(), C);
   Optimize opt(optimizer);
   
+  optimizer.weights = weights;
+  
   if (mpi_rank == 0) {
     double objective = 0.0;
     
@@ -552,8 +567,6 @@ struct OptimizeLBFGS
     param.max_iterations = iteration;
     
     double objective = 0.0;
-    weights.clear();
-    weights.allocate();
     
     lbfgs(weights.size(), &(*weights.begin()), &objective, OptimizeLBFGS::evaluate, 0, this, &param);
     
@@ -826,80 +839,147 @@ void read_forest(const path_set_type& forest_path,
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  size_t id_forest;
-  size_t id_intersected;
-  
-  std::string line;
 
-  hypergraph_type graph;
+  if (unite_forest) {
   
-  for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
+    size_t id_forest;
+    size_t id_intersected;
+  
+    std::string line;
+
+    hypergraph_type graph;
+  
+    for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
     
-    if (mpi_rank == 0 && debug)
-      std::cerr << "reading forest: " << piter->string() << std::endl;
+      if (mpi_rank == 0 && debug)
+	std::cerr << "reading forest: " << piter->string() << std::endl;
 
-    for (size_t i = mpi_rank; /**/; i += mpi_size) {
-      const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
       
-      const path_type path_forest = (*piter) / file_name;
+	const path_type path_forest = (*piter) / file_name;
       
-      if (! boost::filesystem::exists(path_forest)) break;
+	if (! boost::filesystem::exists(path_forest)) break;
       
-      utils::compress_istream is(path_forest);
-      std::getline(is, line);
+	utils::compress_istream is(path_forest);
+	std::getline(is, line);
       
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
       
-      if (! parse_id(id_forest, iter, end))
-	throw std::runtime_error("invalid id input: " + path_forest.string());
-      if (id_forest != i)
-	throw std::runtime_error("invalid id input: " + path_forest.string());
+	if (! parse_id(id_forest, iter, end))
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	if (id_forest != i)
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
       
-      if (id_forest >= graphs_forest.size())
-	graphs_forest.resize(id_forest + 1);
+	if (id_forest >= graphs_forest.size())
+	  graphs_forest.resize(id_forest + 1);
       
-      if (! graph.assign(iter, end))
-	throw std::runtime_error("invalid graph format" + path_forest.string());
-      if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+	if (! graph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_forest.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
       
-      graphs_forest[id_forest].unite(graph);
+	graphs_forest[id_forest].unite(graph);
+      }
     }
-  }
   
-  graphs_intersected.resize(graphs_forest.size());
+    graphs_intersected.resize(graphs_forest.size());
   
-  for (path_set_type::const_iterator piter = intersected_path.begin(); piter != intersected_path.end(); ++ piter) {
+    for (path_set_type::const_iterator piter = intersected_path.begin(); piter != intersected_path.end(); ++ piter) {
     
-    if (mpi_rank == 0 && debug)
-      std::cerr << "reading intersected forest: " << piter->string() << std::endl;
+      if (mpi_rank == 0 && debug)
+	std::cerr << "reading intersected forest: " << piter->string() << std::endl;
 
-    for (size_t i = mpi_rank; i < graphs_intersected.size(); i += mpi_size) {
-      const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+      for (size_t i = mpi_rank; i < graphs_intersected.size(); i += mpi_size) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
       
-      const path_type path_intersected = (*piter) / file_name;
+	const path_type path_intersected = (*piter) / file_name;
       
-      if (! boost::filesystem::exists(path_intersected)) continue;
+	if (! boost::filesystem::exists(path_intersected)) continue;
       
-      utils::compress_istream is(path_intersected);
-      std::getline(is, line);
+	utils::compress_istream is(path_intersected);
+	std::getline(is, line);
       
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
       
-      if (! parse_id(id_intersected, iter, end))
-	throw std::runtime_error("invalid id input" + path_intersected.string());
-      if (id_intersected != i)
-	throw std::runtime_error("invalid id input: " + path_intersected.string());
+	if (! parse_id(id_intersected, iter, end))
+	  throw std::runtime_error("invalid id input" + path_intersected.string());
+	if (id_intersected != i)
+	  throw std::runtime_error("invalid id input: " + path_intersected.string());
       
-      if (! graph.assign(iter, end))
-	throw std::runtime_error("invalid graph format" + path_intersected.string());
-      if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format" + path_intersected.string());
+	if (! graph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_intersected.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_intersected.string());
+	
+	graphs_intersected[id_intersected].unite(graph);
+      }
+    }
+  } else {
+    if (forest_path.size() != intersected_path.size())
+      throw std::runtime_error("# of forest does not match");
+    
+    size_t id_forest;
+    size_t id_intersected;
+    
+    std::string line;
+    
+    for (size_t pos = 0; pos != forest_path.size(); ++ pos) {
       
-      graphs_intersected[id_intersected].unite(graph);
+      if (mpi_rank == 0 && debug)
+	std::cerr << "reading forest: " << forest_path[pos].string() << " with " << intersected_path[pos].string() << std::endl;
+      
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
+	const std::string file_name = utils::lexical_cast<std::string>(i);
+	
+	const path_type path_forest      = forest_path[pos] / file_name;
+	const path_type path_intersected = intersected_path[pos] / file_name;
+	
+	if (! boost::filesystem::exists(path_forest)) break;
+	if (! boost::filesystem::exists(path_intersected)) continue;
+	
+	{
+	  utils::compress_istream is(path_forest);
+	  std::getline(is, line);
+	  
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  if (! parse_id(id_forest, iter, end))
+	    throw std::runtime_error("invalid id input: " + path_forest.string());
+	  if (id_forest != i)
+	    throw std::runtime_error("invalid id input: " + path_forest.string());
+	  
+	  graphs_forest.push_back(hypergraph_type());
+	  
+	  if (! graphs_forest.back().assign(iter, end))
+	    throw std::runtime_error("invalid graph format" + path_forest.string());
+	  if (iter != end)
+	    throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+	}
+	
+	{
+	  utils::compress_istream is(path_intersected);
+	  std::getline(is, line);
+	  
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  if (! parse_id(id_intersected, iter, end))
+	    throw std::runtime_error("invalid id input" + path_intersected.string());
+	  if (id_intersected != i)
+	    throw std::runtime_error("invalid id input: " + path_intersected.string());
+	  
+	  graphs_intersected.push_back(hypergraph_type());
+	  
+	  if (! graphs_intersected.back().assign(iter, end))
+	    throw std::runtime_error("invalid graph format" + path_intersected.string());
+	  if (iter != end)
+	    throw std::runtime_error("invalid id ||| graph format" + path_intersected.string());
+	}
+      }
     }
   }
   
@@ -1047,6 +1127,7 @@ void options(int argc, char** argv)
   opts_command.add_options()
     ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),       "forest path(s)")
     ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(),  "intersected forest path(s)")
+    ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
@@ -1057,6 +1138,8 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C"            , po::value<double>(&C),           "regularization constant")
+
+    ("unite",    po::bool_switch(&unite_forest), "unite forest sharing the same id")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
