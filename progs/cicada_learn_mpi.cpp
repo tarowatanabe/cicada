@@ -982,6 +982,9 @@ void read_forest(const path_set_type& forest_path,
       }
     }
   }
+
+  if (mpi_rank == 0 && debug >= 2)
+    std::cerr << "size: " << graphs_forest.size() << std::endl;
   
   // collect features...
   for (int rank = 0; rank < mpi_size; ++ rank) {
