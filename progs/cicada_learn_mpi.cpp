@@ -841,7 +841,6 @@ void read_forest(const path_set_type& forest_path,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
   if (unite_forest) {
-  
     size_t id_forest;
     size_t id_intersected;
   
@@ -932,7 +931,7 @@ void read_forest(const path_set_type& forest_path,
 	std::cerr << "reading forest: " << forest_path[pos].string() << " with " << intersected_path[pos].string() << std::endl;
       
       for (size_t i = mpi_rank; /**/; i += mpi_size) {
-	const std::string file_name = utils::lexical_cast<std::string>(i);
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
 	
 	const path_type path_forest      = forest_path[pos] / file_name;
 	const path_type path_intersected = intersected_path[pos] / file_name;
@@ -983,9 +982,6 @@ void read_forest(const path_set_type& forest_path,
     }
   }
 
-  if (mpi_rank == 0 && debug >= 2)
-    std::cerr << "size: " << graphs_forest.size() << std::endl;
-  
   // collect features...
   for (int rank = 0; rank < mpi_size; ++ rank) {
     weight_set_type weights;
