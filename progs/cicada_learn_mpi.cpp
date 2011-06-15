@@ -57,6 +57,8 @@ int iteration = 100;
 bool learn_lbfgs = false;
 bool learn_sgd = false;
 bool learn_mira = false;
+bool learn_arow = false;
+bool learn_cw = false;
 bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
@@ -104,9 +106,9 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,sgd}");
-    if (int(learn_lbfgs) + learn_sgd == 0)
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw > 1)
+      throw std::runtime_error("eitehr learn-{lbfgs,sgd,mira,arow,cw}");
+    if (int(learn_lbfgs) + learn_sgd + learn_mira + learn_arow + learn_cw == 0)
       learn_lbfgs = true;
 
     if (regularize_l1 && regularize_l2)
@@ -146,7 +148,13 @@ int main(int argc, char ** argv)
 	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(graphs_forest, graphs_intersected, weights, generator);
       else
 	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(graphs_forest, graphs_intersected, weights, generator);
-    } else
+    } else if (learn_mira)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(graphs_forest, graphs_intersected, weights, generator);
+    else if (learn_arow)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(graphs_forest, graphs_intersected, weights, generator);
+    else if (learn_cw)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(graphs_forest, graphs_intersected, weights, generator);
+    else
       objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
 
     if (debug && mpi_rank == 0)
@@ -396,7 +404,7 @@ struct OptimizeOnlineMargin
     counts_forest.clear();
     
     counts_intersected.resize(pruned_intersected.nodes.size());
-    counts_forest.resizse(pruned_forest.nodes.size());
+    counts_forest.resize(pruned_forest.nodes.size());
     
     accumulated_intersected.clear();
     accumulated_forest.clear();
@@ -412,6 +420,7 @@ struct OptimizeOnlineMargin
     
     
     // use the collected features...!
+    optimizer(features_intersected, features_forest);
   }
   
   Optimizer& optimizer;
@@ -1150,6 +1159,9 @@ void options(int argc, char** argv)
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
     ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
+    ("learn-mira",   po::bool_switch(&learn_mira),   "online MIRA algorithm")
+    ("learn-arow",   po::bool_switch(&learn_arow),   "online AROW algorithm")
+    ("learn-cw",     po::bool_switch(&learn_cw),     "online CW algorithm")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
