@@ -16,6 +16,7 @@
 #include "cicada_impl.hpp"
 
 #include "cicada/prune.hpp"
+#include "cicada/operation/functional.hpp"
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -374,19 +375,19 @@ struct OptimizeOnlineMargin
     }
   };
   
-  typedef std::vector<count_function::value_type, std::allocator<count_function::value_type> > count_set_type;
+  typedef std::vector<typename count_function::value_type, std::allocator<typename count_function::value_type> > count_set_type;
   
   void operator()(const hypergraph_type& hypergraph_intersected,
 		  const hypergraph_type& hypergraph_forest)
   {
     typedef cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> > function_type;
     
-    if (kbest > 0)
+    if (margin_kbest > 0)
       cicada::prune_kbest(hypergraph_forest, pruned_forest, function_type(optimizer.weights, 1.0), margin_kbest);
     else
       cicada::prune_beam(hypergraph_forest, pruned_forest, function_type(optimizer.weights, 1.0), margin_beam);
     
-    if (kbest > 0)
+    if (margin_kbest > 0)
       cicada::prune_kbest(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - 1.0), margin_kbest);
     else
       cicada::prune_beam(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - 1.0), margin_beam);
@@ -399,9 +400,9 @@ struct OptimizeOnlineMargin
     
     accumulated_intersected.clear();
     accumulated_forest.clear();
-   
-    cicada::inside_outside(graph_intersected, counts_intersected, accumulated_intersected, count_function(), feature_count_function());
-    cicada::inside_outside(graph_forest,      counts_forest,      accumulated_forest,      count_function(), feature_count_function());
+    
+    cicada::inside_outside(pruned_intersected, counts_intersected, accumulated_intersected, count_function(), feature_count_function());
+    cicada::inside_outside(pruned_forest,      counts_forest,      accumulated_forest,      count_function(), feature_count_function());
     
     features_intersected.assign(accumulated_intersected.accumulated);
     features_forest.assign(accumulated_forest.accumulated);
@@ -410,6 +411,7 @@ struct OptimizeOnlineMargin
     features_forest      *= (1.0 / double(counts_forest.back()));
     
     
+    // use the collected features...!
   }
   
   Optimizer& optimizer;
