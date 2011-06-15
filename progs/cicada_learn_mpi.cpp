@@ -748,9 +748,11 @@ struct OptimizeLBFGS
     std::fill(g, g + n, 0.0);
     std::transform(task.g.begin(), task.g.end(), g, g, std::plus<double>());
     
-    double objective = task.objective;
+    double objective = 0.0;
     MPI::COMM_WORLD.Reduce(&task.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
-
+    
+    const double objective_unregularized = objective;
+    
     // L2...
     if (regularize_l2) {
       double norm = 0.0;
@@ -762,7 +764,7 @@ struct OptimizeLBFGS
     }
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective << std::endl;
+      std::cerr << "objective: " << objective << " non-l2: " << objective_unregularized << std::endl;
     
     return objective;
   }
