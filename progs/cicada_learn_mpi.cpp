@@ -764,7 +764,7 @@ struct OptimizeLBFGS
     }
     
     if (debug >= 2)
-      std::cerr << "objective: " << objective << " non-l2: " << objective_unregularized << std::endl;
+      std::cerr << "objective: " << objective << " non-regularized: " << objective_unregularized << std::endl;
     
     return objective;
   }
