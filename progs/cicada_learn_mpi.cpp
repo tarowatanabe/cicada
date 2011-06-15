@@ -15,6 +15,8 @@
 
 #include "cicada_impl.hpp"
 
+#include "cicada/prune.hpp"
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -321,108 +323,111 @@ struct OptimizeOnlineMargin
   typedef typename optimizer_type::gradient_type gradient_type;    
   
   typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
-    
-  struct gradients_type
+  
+  struct Accumulated
   {
-    typedef gradient_type value_type;
-
-    template <typename Index>
-    gradient_type& operator[](Index)
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+    
+    typedef accumulated_type value_type;
+    
+    accumulated_type& operator[](size_t index)
     {
-      return gradient;
+      return accumulated;
     }
-
-    void clear() { gradient.clear(); }
-      
-    gradient_type gradient;
-  };
     
-  struct weight_function
+    void clear() { accumulated.clear(); }
+    
+    value_type accumulated;
+  };
+  typedef Accumulated accumulated_type;
+
+  struct count_function
   {
-    typedef weight_type value_type;
-      
-    weight_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
-      
+    typedef cicada::semiring::Log<double> value_type;
+    
+    template <typename Edge>
+    value_type operator()(const Edge& x) const
+    {
+      return cicada::semiring::traits<value_type>::exp(0.0);
+    }
+  };
+  
+  
+  struct feature_count_function
+  {
+    typedef cicada::semiring::Log<double> weight_type;
+    typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > accumulated_type;
+    typedef accumulated_type value_type;
+    
     template <typename Edge>
     value_type operator()(const Edge& edge) const
     {
-      // p_e
-      return cicada::semiring::traits<value_type>::exp(cicada::dot_product(edge.features, weights) * scale);
-    }
+      accumulated_type accumulated;
       
-    const weight_set_type& weights;
-    const double scale;
-  };
-
-  struct feature_function
-  {
-    typedef gradient_type value_type;
-
-    feature_function(const weight_set_type& __weights, const double& __scale) : weights(__weights), scale(__scale) {}
-
-    template <typename Edge>
-    value_type operator()(const Edge& edge) const
-    {
-      // p_e r_e
-      gradient_type grad;
-	
-      const weight_type weight = cicada::semiring::traits<weight_type>::exp(cicada::dot_product(edge.features, weights) * scale);
-	
       feature_set_type::const_iterator fiter_end = edge.features.end();
       for (feature_set_type::const_iterator fiter = edge.features.begin(); fiter != fiter_end; ++ fiter)
 	if (fiter->second != 0.0)
-	  grad[fiter->first] = weight_type(fiter->second) * weight;
+	  accumulated[fiter->first] = weight_type(fiter->second);
       
-      return grad;
+      return accumulated;
     }
-    
-    const weight_set_type& weights;
-    const double scale;
   };
   
+  typedef std::vector<count_function::value_type, std::allocator<count_function::value_type> > count_set_type;
   
   void operator()(const hypergraph_type& hypergraph_intersected,
 		  const hypergraph_type& hypergraph_forest)
   {
-    gradients.clear();
-    gradients_intersected.clear();
+    typedef cicada::operation::weight_scaled_function<cicada::semiring::Tropical<double> > function_type;
     
-    inside.clear();
-    inside_intersected.clear();
+    if (kbest > 0)
+      cicada::prune_kbest(hypergraph_forest, pruned_forest, function_type(optimizer.weights, 1.0), margin_kbest);
+    else
+      cicada::prune_beam(hypergraph_forest, pruned_forest, function_type(optimizer.weights, 1.0), margin_beam);
     
-    inside.reserve(hypergraph_forest.nodes.size());
-    inside.resize(hypergraph_forest.nodes.size(), weight_type());
-    cicada::inside_outside(hypergraph_forest, inside, gradients,
-			   weight_function(optimizer.weights, optimizer.weight_scale),
-			   feature_function(optimizer.weights, optimizer.weight_scale));
+    if (kbest > 0)
+      cicada::prune_kbest(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - 1.0), margin_kbest);
+    else
+      cicada::prune_beam(hypergraph_intersected, pruned_intersected, function_type(optimizer.weights, - 1.0), margin_beam);
     
-    inside_intersected.reserve(hypergraph_intersected.nodes.size());
-    inside_intersected.resize(hypergraph_intersected.nodes.size(), weight_type());
-    cicada::inside_outside(hypergraph_intersected, inside_intersected, gradients_intersected,
-			   weight_function(optimizer.weights, optimizer.weight_scale),
-			   feature_function(optimizer.weights, optimizer.weight_scale));
+    counts_intersected.clear();
+    counts_forest.clear();
     
-    gradient_type& gradient = gradients.gradient;
-    weight_type& Z = inside.back();
+    counts_intersected.resize(pruned_intersected.nodes.size());
+    counts_forest.resizse(pruned_forest.nodes.size());
     
-    gradient_type& gradient_intersected = gradients_intersected.gradient;
-    weight_type& Z_intersected = inside_intersected.back();
+    accumulated_intersected.clear();
+    accumulated_forest.clear();
+   
+    cicada::inside_outside(graph_intersected, counts_intersected, accumulated_intersected, count_function(), feature_count_function());
+    cicada::inside_outside(graph_forest,      counts_forest,      accumulated_forest,      count_function(), feature_count_function());
     
-    gradient /= Z;
-    gradient_intersected /= Z_intersected;
+    features_intersected.assign(accumulated_intersected.accumulated);
+    features_forest.assign(accumulated_forest.accumulated);
     
-    optimizer(gradients_intersected.gradient,
-	      gradients.gradient,
-	      Z_intersected,
-	      Z);
+    features_intersected *= (1.0 / double(counts_intersected.back()));
+    features_forest      *= (1.0 / double(counts_forest.back()));
+    
+    
   }
   
   Optimizer& optimizer;
 
-  gradients_type gradients;
-  gradients_type gradients_intersected;
-  weights_type   inside;
-  weights_type   inside_intersected;
+  hypergraph_type pruned_intersected;
+  hypergraph_type pruned_forest;
+
+  count_set_type counts_intersected;
+  count_set_type counts_forest;
+
+  accumulated_type accumulated_intersected;
+  accumulated_type accumulated_forest;
+  
+  feature_set_type features_intersected;
+  feature_set_type features_forest;
+  
+  double margin_beam;
+  int    margin_kbest;
 };
 
 template <typename Optimize, typename Generator>
