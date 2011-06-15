@@ -38,6 +38,7 @@ struct OptimizerBase
   typedef cicada::WeightVector<weight_type, std::allocator<weight_type> >  expectation_type;
 };
 
+
 struct OptimizerSGDL2 : public OptimizerBase
 {
   OptimizerSGDL2(const size_t& __instances,
@@ -192,6 +193,165 @@ struct OptimizerSGDL1 : public OptimizerBase
   double objective;
   weight_set_type weights;
   double weight_scale;
+};
+
+struct OptimizerMIRA : public OptimizerBase
+{
+  OptimizerMIRA(const size_t& __instances,
+		const double& C) : instances(__instances), samples(0), lambda(C / __instances) {}
+
+  void initialize()
+  {
+    samples = 0;
+    objective = 0.0;
+    weight_scale = 1.0;
+  }
+  void finalize()
+  {
+    
+  }
+
+  void operator()(const feature_set_type& features_reward,
+		  const feature_set_type& features_penalty)
+  {
+    const feature_set_type features(features_reward - features_penalty);
+    
+    const double loss = 1.0;
+    const double margin = cicada::dot_product(weights, features);
+    const double variance = cicada::dot_product(features, features);
+    
+    objective += loss - margin;
+    
+    const double alpha = std::max(0.0, std::min(1.0 / C, (loss - margin) / variance));
+    
+    if (alpha > 1e-10) {
+      feature_set_type::const_iterator fiter_end = features.end();
+      for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter)
+	weights[fiter->first] += alpha * fiter->second;
+    }
+    ++ samples;
+  }
+  
+  size_t instances;
+  size_t samples;
+  
+  double objective;
+  weight_set_type weights;
+  double weight_scale;
+  double lambda;
+};
+
+struct OptimizerAROW : public OptimizerBase
+{
+  OptimizerAROW(const size_t& __instances,
+		const double& C) : instances(__instances), samples(0), lambda(C / __instances) {}
+
+  void initialize()
+  {
+    samples = 0;
+    objective = 0.0;
+    weight_scale = 1.0;
+  }
+  void finalize()
+  {
+    
+  }
+
+  void operator()(const feature_set_type& features_reward,
+		  const feature_set_type& features_penalty)
+  {
+    feature_set_type features(features_reward - features_penalty);
+    
+    covariances.allocate(1.0);
+    
+    const double loss = 1.0;
+    const double margin = cicada::dot_product(weights, features);
+    const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
+    
+    objective += loss - margin;
+    
+    const double beta = 1.0 / (variance + C);
+    const double alpha = std::max(0.0, (loss - margin) * beta);
+    
+    if (alpha > 1e-10) {
+      feature_set_type::const_iterator fiter_end = features.end();
+      for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
+	const double var = covariances[fiter->first];
+	
+	weights[fiter->first]     += alpha * fiter->second * var;
+	covariances[fiter->first] -= beta * (var * var) * (fiter->second * fiter->second);
+      }
+    }
+    ++ samples;
+  }
+  
+  size_t instances;
+  size_t samples;
+  
+  double objective;
+  weight_set_type weights;
+  double weight_scale;
+  double lambda;
+
+  weight_set_type covariances;
+};
+
+struct OptimizerCW : public OptimizerBase
+{
+  OptimizerCW(const size_t& __instances,
+		const double& C) : instances(__instances), samples(0), lambda(C / __instances) {}
+
+  void initialize()
+  {
+    samples = 0;
+    objective = 0.0;
+    weight_scale = 1.0;
+  }
+  void finalize()
+  {
+    
+  }
+
+  void operator()(const feature_set_type& features_reward,
+		  const feature_set_type& features_penalty)
+  {
+    feature_set_type features(features_reward - features_penalty);
+    
+    covariances.allocate(1.0);
+    
+    const double loss = 1.0;
+    const double margin = cicada::dot_product(weights, features);
+    const double variance = cicada::dot_product(features, covariances, features); // multiply covariances...
+    
+    objective += loss - margin;
+    
+    if (loss - margin > 0.0) {
+      const double theta = 1.0 + 2.0 * C * (margin - loss);
+      const double alpha = ((- theta + std::sqrt(theta * theta - 8.0 * C * (margin - loss - C * variance))) / (4.0 * C * variance));
+      const double beta  = (2.0 * alpha * C) / (1.0 + 2.0 * alpha * C * variance);
+      
+      if (alpha > 1e-10 && beta > 0.0) {
+	feature_set_type::const_iterator fiter_end = features.end();
+	for (feature_set_type::const_iterator fiter = features.begin(); fiter != fiter_end; ++ fiter) {
+	  const double var = covariances[fiter->first];
+	  
+	  weights[fiter->first]     += alpha * fiter->second * var;
+	  covariances[fiter->first] -= beta * (var * var) * (fiter->second * fiter->second);
+	}
+      }
+    }
+    ++ samples;
+  }
+  
+  size_t instances;
+  size_t samples;
+  
+  double objective;
+  weight_set_type weights;
+  double weight_scale;
+  double lambda;
+
+  weight_set_type covariances;
 };
 
 

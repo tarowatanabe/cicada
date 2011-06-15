@@ -448,7 +448,15 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   for (size_t id = 0; id != ids.size(); ++ id)
     ids[id] = id;
   
-  optimizer_type optimizer(graphs_forest.size(), C);
+  int instances = graphs_forest.size();
+  if (! unite_forest) {
+    instances = 0;
+    const int instances_local = graphs_forest.size();
+    
+    MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  }
+  
+  optimizer_type optimizer(instances, C);
   Optimize opt(optimizer);
   
   optimizer.weights = weights;
