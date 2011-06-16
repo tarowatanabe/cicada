@@ -35,6 +35,9 @@
 
 #include <cicada/feature.hpp>
 #include <cicada/symbol.hpp>
+#include <cicada/lattice.hpp>
+#include <cicada/sentence.hpp>
+#include <cicada/unite.hpp>
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -285,6 +288,70 @@ int main(int argc, char** argv)
       }
       
     } else if (lattice_mode) {
+      typedef std::deque<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
+      typedef cicada::Sentence sentence_type;
+      typedef cicada::Lattice  lattice_type;
+      
+      typedef boost::spirit::istream_iterator iter_type;
+      
+      utils::compress_istream is(input_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      utils::compress_ostream os(output_file, 1024 * 1024);
+      
+      kbest_feature_parser<iter_type> parser;
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      kbest_feature_type kbest;
+
+      size_t id = size_t(-1);
+      hypothesis_set_type hypotheses;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
+      
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
+	
+	if (boost::fusion::get<0>(kbest) != id && ! hypotheses.empty()) {
+	  lattice_type lattice;
+
+	  hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
+	  for (hypothesis_set_type::const_iterator hiter = hypotheses.begin(); hiter != hiter_end; ++ hiter) {
+	    lattice_type lattice_local(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+	    
+	    lattice_local.front().front().features.assign(hiter->features.begin(), hiter->features.end());
+
+	    cicada::unite(lattice, lattice_local);
+	  }
+	  
+	  os << id << " ||| " << lattice << '\n';
+	  
+	  hypotheses.clear();
+	}
+	
+	id = boost::fusion::get<0>(kbest);
+	hypotheses.push_back(hypothesis_type(kbest));
+      }
+      
+      if (! hypotheses.empty()) {
+	lattice_type lattice;
+
+	hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
+	for (hypothesis_set_type::const_iterator hiter = hypotheses.begin(); hiter != hiter_end; ++ hiter) {
+	  lattice_type lattice_local(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+	    
+	  lattice_local.front().front().features.assign(hiter->features.begin(), hiter->features.end());
+
+	  cicada::unite(lattice, lattice_local);
+	}
+	  
+	os << id << " ||| " << lattice << '\n';
+	  
+	hypotheses.clear();
+      }
       
     } else if (! filter.empty()) {
       typedef Task task_type;
