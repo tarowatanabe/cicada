@@ -46,12 +46,11 @@ typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-
 path_set_type forest_path;
 path_set_type intersected_path;
 path_type weights_path;
 path_type output_path = "-";
-
+path_type output_objective_path;
 
 int iteration = 100;
 bool learn_lbfgs = false;
@@ -164,6 +163,12 @@ int main(int argc, char ** argv)
       utils::compress_ostream os(output_path, 1024 * 1024);
       os.precision(20);
       os << weights;
+      
+      if (! outpub_objective_path.empty()) {
+	utils::compress_ostream os(output_objective_xpath, 1024 * 1024);
+	os.precision(20);
+	os << objective << '\n';
+      }
     }
   }
   catch (const std::exception& err) {
@@ -1154,6 +1159,8 @@ void options(int argc, char** argv)
     ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(),  "intersected forest path(s)")
     ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
+    
+    ("output-objective", po::value<path_type>(&output_objective_path), "output final objective")
     
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
