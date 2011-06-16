@@ -12,6 +12,7 @@
 #include <string>
 #include <numeric>
 #include <stdexcept>
+#include <deque>
 
 #include "cicada_impl.hpp"
 
@@ -30,8 +31,12 @@
 
 #include "lbfgs.h"
 
-path_type forest_path;
-path_type intersected_path;
+typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+
+typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+
+path_set_type forest_path;
+path_set_type intersected_path;
 path_type weights_path;
 path_type output_path = "-";
 path_type output_objective_path;
@@ -44,6 +49,8 @@ bool regularize_l1 = false;
 bool regularize_l2 = false;
 double C = 1.0;
 
+bool unite_forest = false;
+
 int threads = 1;
 
 int debug = 0;
@@ -52,21 +59,20 @@ int debug = 0;
 
 void options(int argc, char** argv);
 
+void read_forest(const path_set_type& forest_path,
+		 const path_set_type& intersected_path,
+		 hypergraph_set_type& graphs_forest,
+		 hypergraph_set_type& graphs_intersected);
 
-size_t enumerate_forest(const path_type& path);
-
+template <typename Optimizer>
+double optimize_batch(const hypergraph_set_type& graphs_forest,
+		      const hypergraph_set_type& graphs_intersected,
+		      weight_set_type& weights);
 template <typename Optimizer, typename Generator>
-double optimize_online(const size_t& instances,
-		       const path_type& forest_path,
-		       const path_type& intersected_path,
+double optimize_online(const hypergraph_set_type& graphs_forest,
+		       const hypergraph_set_type& graphs_intersected,
 		       weight_set_type& weights,
 		       Generator& generator);
-template <typename Optimizer>
-double optimize_batch(const size_t& instances,
-		      const path_type& forest_path,
-		      const path_type& intersected_path,
-		      weight_set_type& weights);
-
 struct OptimizeLBFGS;
 
 template <typename Optimizer, typename Generator>
@@ -84,16 +90,18 @@ int main(int argc, char ** argv)
     
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
-
-    if (! boost::filesystem::exists(forest_path) || ! boost::filesystem::is_directory(forest_path))
+    
+    if (forest_path.empty())
       throw std::runtime_error("no forest?");
-
-    if (! boost::filesystem::exists(intersected_path) || ! boost::filesystem::is_directory(intersected_path))
+    if (intersected_path.empty())
       throw std::runtime_error("no intersected forest?");
     
     threads = utils::bithack::max(1, threads);
-
-    const size_t instances = enumerate_forest(forest_path);
+    
+    hypergraph_set_type graphs_forest;
+    hypergraph_set_type graphs_intersected;
+    
+    read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
     
     if (debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
@@ -116,11 +124,11 @@ int main(int argc, char ** argv)
 
     if (learn_sgd) {
       if (regularize_l1)
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(instances, forest_path, intersected_path, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1, boost::mt19937> >(graphs_forest, graphs_intersected, weights, generator);
       else
-	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(instances, forest_path, intersected_path, weights, generator);
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2, boost::mt19937> >(graphs_forest, graphs_intersected, weights, generator);
     } else
-      objective = optimize_batch<OptimizeLBFGS>(instances, forest_path, intersected_path, weights);
+      objective = optimize_batch<OptimizeLBFGS>(graphs_forest, graphs_intersected, weights);
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -149,30 +157,32 @@ struct OptimizeOnline
   typedef Generator generator_type;
   typedef std::vector<optimizer_type, std::allocator<optimizer_type> > optimizer_set_type;
   
-  OptimizeOnline(const size_t& __instances,
-		 const path_type& __forest_path,
-		 const path_type& __intersected_path,
+  OptimizeOnline(const hypergraph_set_type& __graphs_forest,
+		 const hypergraph_set_type& __graphs_intersected,
 		 weight_set_type& __weights,
 		 generator_type& __generator)
-    : instances(__instances), 
-      forest_path(__forest_path),
-      intersected_path(__intersected_path),
+    : graphs_forest(__graphs_forest),
+      graphs_intersected(__graphs_intersected),
       weights(__weights),
       generator(__generator) {}
   
   struct Task
   {
-    typedef std::pair<path_type, path_type> path_pair_type;
-
-    typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
     typedef Optimizer optimizer_type;
 
     typedef typename optimizer_type::weight_type   weight_type;
     typedef typename optimizer_type::gradient_type gradient_type;    
     
     Task(queue_type& __queue,
-	 optimizer_type& __optimizer)
-      : queue(__queue), optimizer(__optimizer) {}
+	 optimizer_type& __optimizer,
+	 const hypergraph_set_type& __graphs_forest,
+	 const hypergraph_set_type& __graphs_intersected)
+      : queue(__queue),
+	optimizer(__optimizer),
+	graphs_forest(__graphs_forest),
+	graphs_intersected(__graphs_intersected)
+    {}
 
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
     
@@ -236,10 +246,6 @@ struct OptimizeOnline
     
     void operator()()
     {
-      size_t id_forest;
-      size_t id_intersected;
-      hypergraph_type hypergraph;
-
       gradients_type gradients;
       gradients_type gradients_intersected;
       weights_type   inside;
@@ -247,116 +253,74 @@ struct OptimizeOnline
 
       optimizer.initialize();
       
-      path_pair_type paths;
+      int id;
       while (1) {
-	queue.pop(paths);
-	if (paths.first.empty()) break;
+	queue.pop(id);
+	if (id < 0) break;
 	
 	gradients.clear();
 	gradients_intersected.clear();
 	
 	inside.clear();
 	inside_intersected.clear();
+
+	if (! graphs_forest[id].is_valid() || ! graphs_intersected[id].is_valid()) continue;
+
 	
-	id_forest = read_forest(paths.first, hypergraph);
-	const bool valid_forest = hypergraph.is_valid();
+	inside.reserve(graphs_forest[id].nodes.size());
+	inside.resize(graphs_forest[id].nodes.size(), weight_type());
 	
-	if (valid_forest) {
-	  inside.reserve(hypergraph.nodes.size());
-	  inside.resize(hypergraph.nodes.size(), weight_type());
-	  
-	  cicada::inside_outside(hypergraph, inside, gradients,
-				 weight_function(optimizer.weights, optimizer.weight_scale),
-				 feature_function(optimizer.weights, optimizer.weight_scale));
-	}
+	inside_intersected.reserve(graphs_intersected[id].nodes.size());
+	inside_intersected.resize(graphs_intersected[id].nodes.size(), weight_type());
 	
-	id_intersected = read_forest(paths.second, hypergraph);
-	const bool valid_intersected = hypergraph.is_valid();
+	cicada::inside_outside(graphs_forest[id], inside, gradients,
+			       weight_function(optimizer.weights, optimizer.weight_scale),
+			       feature_function(optimizer.weights, optimizer.weight_scale));
 	
-	if (valid_intersected) {
-	  inside_intersected.reserve(hypergraph.nodes.size());
-	  inside_intersected.resize(hypergraph.nodes.size(), weight_type());
-	  
-	  cicada::inside_outside(hypergraph, inside_intersected, gradients_intersected,
-				 weight_function(optimizer.weights, optimizer.weight_scale),
-				 feature_function(optimizer.weights, optimizer.weight_scale));
-	}
+	cicada::inside_outside(graphs_intersected[id], inside_intersected, gradients_intersected,
+			       weight_function(optimizer.weights, optimizer.weight_scale),
+			       feature_function(optimizer.weights, optimizer.weight_scale));
 	
-	if (id_forest != id_intersected)
-	  throw std::runtime_error("different segment id?");
+	gradient_type& gradient = gradients.gradient;
+	weight_type& Z = inside.back();
 	
-	if (valid_forest && valid_intersected) {
-	  gradient_type& gradient = gradients.gradient;
-	  weight_type& Z = inside.back();
-	  
-	  gradient_type& gradient_intersected = gradients_intersected.gradient;
-	  weight_type& Z_intersected = inside_intersected.back();
-	  
-	  gradient /= Z;
-	  gradient_intersected /= Z_intersected;
-	  
-	  optimizer(gradients_intersected.gradient,
-		    gradients.gradient,
-		    Z_intersected,
-		    Z);
-	}
+	gradient_type& gradient_intersected = gradients_intersected.gradient;
+	weight_type& Z_intersected = inside_intersected.back();
+	
+	gradient /= Z;
+	gradient_intersected /= Z_intersected;
+	
+	optimizer(gradients_intersected.gradient,
+		  gradients.gradient,
+		  Z_intersected,
+		  Z);
       }
       
       optimizer.finalize();
     }
-
-    size_t read_forest(const path_type& path, hypergraph_type& hypergraph)
-    {
-      size_t id = 0;
-      std::string line;
-      
-      utils::compress_istream is(path, 1024 * 1024);
-      std::getline(is, line);
-      
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-      
-      if (! parse_id(id, iter, end))
-	throw std::runtime_error("invalid id input");
-      
-      if (! hypergraph.assign(iter, end))
-	throw std::runtime_error("invalid graph format");
-      
-      if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format");
-      
-      return id;
-    }
     
     queue_type&     queue;
     optimizer_type& optimizer;
-    
+
+    const hypergraph_set_type& graphs_forest;
+    const hypergraph_set_type& graphs_intersected;
   };
   
   double operator()()
   {
     typedef Task task_type;
     typedef typename task_type::queue_type queue_type;
-    typedef typename task_type::path_pair_type path_pair_type;
+    typedef std::vector<int, std::allocator<int> > id_set_type;
+
+    id_set_type ids;
+    const int id_max = utils::bithack::min(graphs_forest.size(), graphs_intersected.size());
+    for (int id = 0; id != id_max; ++ id)
+      if (graphs_forest[id].is_valid() && graphs_intersected[id].is_valid())
+	ids.push_back(id);
     
-    typedef std::vector<path_pair_type, std::allocator<path_pair_type> > path_pair_set_type;
-    
-    optimizer_set_type optimizers(threads, optimizer_type(instances, C));
+    optimizer_set_type optimizers(threads, optimizer_type(ids.size(), C));
     
     queue_type queue;
-
-    path_pair_set_type paths;
-    for (int sample = 0; /**/; ++ sample) {
-      const std::string file_name = utils::lexical_cast<std::string>(sample) + ".gz";
-      
-      const path_type path_forest      = forest_path / file_name;
-      const path_type path_intersected = intersected_path / file_name;
-      
-      if (! boost::filesystem::exists(path_forest)) break;
-      if (! boost::filesystem::exists(path_intersected)) continue;
-      
-      paths.push_back(std::make_pair(path_forest, path_intersected));
-    }
     
     weight_set_type weights_mixed;
     double objective = 0.0;
@@ -365,16 +329,16 @@ struct OptimizeOnline
       
       boost::thread_group workers;
       for (int i = 0; i < threads; ++ i)
-	workers.add_thread(new boost::thread(task_type(queue, optimizers[i])));
+	workers.add_thread(new boost::thread(task_type(queue, optimizers[i], graphs_forest, graphs_intersected)));
       
-      for (size_t pos = 0; pos != paths.size(); ++ pos)
-	queue.push(paths[pos]);
+      for (size_t pos = 0; pos != ids.size(); ++ pos)
+	queue.push(ids[pos]);
       
       for (int i = 0; i < threads; ++ i)
-	queue.push(path_pair_type());
+	queue.push(-1);
       
       boost::random_number_generator<Generator> gen(generator);
-      std::random_shuffle(paths.begin(), paths.end(), gen);
+      std::random_shuffle(ids.begin(), ids.end(), gen);
       
       workers.join_all();
       
@@ -406,34 +370,32 @@ struct OptimizeOnline
     
     return objective;
   }
+
+  const hypergraph_set_type& graphs_forest;
+  const hypergraph_set_type& graphs_intersected;
   
-  size_t instances;
-  path_type forest_path;
-  path_type intersected_path;
   weight_set_type& weights;
   generator_type& generator;
 };
 
 template <typename Optimizer, typename Generator>
-double optimize_online(const size_t& instances,
-		       const path_type& forest_path,
-		       const path_type& intersected_path,
+double optimize_online(const hypergraph_set_type& graphs_forest,
+		       const hypergraph_set_type& graphs_intersected,
 		       weight_set_type& weights,
 		       Generator& generator)
 {
-  return Optimizer(instances, forest_path, intersected_path,  weights, generator)();
+  return Optimizer(graphs_forest, graphs_intersected, weights, generator)();
 }
 
 
 struct OptimizeLBFGS
 {
   
-  OptimizeLBFGS(const size_t& instances,
-		const path_type& __forest_path,
-		const path_type& __intersected_path,
+  OptimizeLBFGS(const hypergraph_set_type& __graphs_forest,
+		const hypergraph_set_type& __graphs_intersected,
 		weight_set_type& __weights)
-    : forest_path(__forest_path),
-      intersected_path(__intersected_path),
+    : graphs_forest(__graphs_forest),
+      graphs_intersected(__graphs_intersected),
       weights(__weights) {}
 
   double operator()()
@@ -459,18 +421,23 @@ struct OptimizeLBFGS
   
   struct Task
   {
-    typedef std::pair<path_type, path_type> path_pair_type;
-    typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
-
+    typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+    
     typedef cicada::semiring::Log<double> weight_type;
     typedef cicada::FeatureVector<weight_type, std::allocator<weight_type> > gradient_type;
     typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > gradient_static_type;
-
+    
     typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
 
     Task(queue_type&            __queue,
-	 const weight_set_type& __weights)
-      : queue(__queue), weights(__weights) {}
+	 const weight_set_type& __weights,
+	 const hypergraph_set_type& __graphs_forest,
+	 const hypergraph_set_type& __graphs_intersected)
+      : queue(__queue),
+	weights(__weights),
+	graphs_forest(__graphs_forest),
+	graphs_intersected(__graphs_intersected)
+    {}
     
     struct gradients_type
     {
@@ -528,38 +495,8 @@ struct OptimizeLBFGS
       const weight_set_type& weights;
     };
 
-
-    size_t read_forest(const path_type& path, hypergraph_type& hypergraph)
-    {
-      size_t id = 0;
-      std::string line;
-      
-      utils::compress_istream is(path, 1024 * 1024);
-      std::getline(is, line);
-      
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-      
-      if (! parse_id(id, iter, end))
-	throw std::runtime_error("invalid id input");
-      
-      if (! hypergraph.assign(iter, end))
-	throw std::runtime_error("invalid graph format");
-      
-      if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format");
-
-      return id;
-    }
-    
     void operator()()
     {
-      path_pair_type paths;
-
-      size_t id_forest;
-      size_t id_intersected;
-      hypergraph_type hypergraph;
-      
       gradients_type gradients;
       gradients_type gradients_intersected;
       weights_type   inside;
@@ -571,8 +508,9 @@ struct OptimizeLBFGS
       objective = 0.0;
       
       while (1) {
-	queue.pop(paths);
-	if (paths.first.empty()) break;
+	int id = 0;
+	queue.pop(id);
+	if (id < 0) break;
 	
 	gradients.clear();
 	gradients_intersected.clear();
@@ -580,50 +518,33 @@ struct OptimizeLBFGS
 	inside.clear();
 	inside_intersected.clear();
 	
-	id_forest = read_forest(paths.first, hypergraph);
+	inside.reserve(graphs_forest[id].nodes.size());
+	inside.resize(graphs_forest[id].nodes.size(), weight_type());
 	
-	const bool valid_forest = hypergraph.is_valid();
+	inside_intersected.reserve(graphs_intersected[id].nodes.size());
+	inside_intersected.resize(graphs_intersected[id].nodes.size(), weight_type());
 	
-	if (valid_forest) {
-	  inside.reserve(hypergraph.nodes.size());
-	  inside.resize(hypergraph.nodes.size(), weight_type());
-	  
-	  inside_outside(hypergraph, inside, gradients, weight_function(weights), feature_function(weights));
-	}
+	cicada::inside_outside(graphs_forest[id], inside, gradients, weight_function(weights), feature_function(weights));
+	cicada::inside_outside(graphs_intersected[id], inside_intersected, gradients_intersected, weight_function(weights), feature_function(weights));
 	
-	id_intersected = read_forest(paths.second, hypergraph);
-	const bool valid_intersected = hypergraph.is_valid();
+	gradient_type& gradient = gradients.gradient;
+	weight_type& Z = inside.back();
 	
-	if (valid_intersected) {
-	  inside_intersected.reserve(hypergraph.nodes.size());
-	  inside_intersected.resize(hypergraph.nodes.size(), weight_type());
-	  
-	  inside_outside(hypergraph, inside_intersected, gradients_intersected, weight_function(weights), feature_function(weights));
-	}
+	gradient_type& gradient_intersected = gradients_intersected.gradient;
+	weight_type& Z_intersected = inside_intersected.back();
 	
-	if (id_forest != id_intersected)
-	  throw std::runtime_error("different segment id?");
+	gradient /= Z;
+	gradient_intersected /= Z_intersected;
 	
-	if (valid_forest && valid_intersected) {
-	  gradient_type& gradient = gradients.gradient;
-	  weight_type& Z = inside.back();
-	  
-	  gradient_type& gradient_intersected = gradients_intersected.gradient;
-	  weight_type& Z_intersected = inside_intersected.back();
-	  
-	  gradient /= Z;
-	  gradient_intersected /= Z_intersected;
-	  
-	  feature_expectations -= gradient_intersected;
-	  feature_expectations += gradient;
-
-	  const double margin = log(Z_intersected) - log(Z);
-	  
-	  objective -= margin;
-
-	  if (debug >= 3)
-	    std::cerr << "id: " << id_forest << " margin: " << margin << std::endl;
-	}
+	feature_expectations -= gradient_intersected;
+	feature_expectations += gradient;
+	
+	const double margin = log(Z_intersected) - log(Z);
+	
+	objective -= margin;
+	
+	if (debug >= 3)
+	  std::cerr << "id: " << id << " margin: " << margin << std::endl;
       }
       
       // transform feature_expectations into g...
@@ -635,6 +556,9 @@ struct OptimizeLBFGS
     queue_type&            queue;
     
     const weight_set_type& weights;
+    
+    const hypergraph_set_type& graphs_forest;
+    const hypergraph_set_type& graphs_intersected;
     
     double          objective;
     weight_set_type g;
@@ -654,38 +578,25 @@ struct OptimizeLBFGS
 
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
         
-    queue_type queue(1024 * threads);
+    queue_type queue;
+    
+    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.graphs_forest, optimizer.graphs_intersected));
 
-#if 0
-    for (feature_type::id_type id = 0; id < optimizer.weights.size(); ++ id)
-      if (! feature_type(id).empty() && optimizer.weights[id] != 0.0)
-	std::cerr << feature_type(id) << ": " << optimizer.weights[id] << std::endl;
-#endif
-    
-    task_set_type tasks(threads, task_type(queue, optimizer.weights));
-    
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
-    for (int sample = 0; /**/; ++ sample) {
-      const std::string file_name = utils::lexical_cast<std::string>(sample) + ".gz";
-      
-      const path_type path_forest      = optimizer.forest_path / file_name;
-      const path_type path_intersected = optimizer.intersected_path / file_name;
-      
-      if (! boost::filesystem::exists(path_forest)) break;
-      if (! boost::filesystem::exists(path_intersected)) continue;
-      
-      queue.push(std::make_pair(path_forest, path_intersected));
-    }
+    const int id_max = utils::bithack::min(optimizer.graphs_forest.size(), optimizer.graphs_intersected.size());
+    for (int id = 0; id != id_max; ++ id)
+      if (optimizer.graphs_forest[id].is_valid() && optimizer.graphs_intersected[id].is_valid())
+	queue.push(id);
     
     // collect all the objective and gradients...
     double objective = 0.0;
     std::fill(g, g + n, 0.0);
     
     for (int i = 0; i < threads; ++ i)
-      queue.push(std::make_pair(path_type(), path_type()));
+      queue.push(-1);
     
     workers.join_all();
     
@@ -710,96 +621,166 @@ struct OptimizeLBFGS
     return objective;
   }
   
-  path_type forest_path;
-  path_type intersected_path;
+  const hypergraph_set_type& graphs_forest;
+  const hypergraph_set_type& graphs_intersected;
+  
   weight_set_type& weights;
 };
 
 template <typename Optimizer>
-double optimize_batch(const size_t& instances,
-		      const path_type& forest_path,
-		      const path_type& intersected_path,
+double optimize_batch(const hypergraph_set_type& graphs_forest,
+		      const hypergraph_set_type& graphs_intersected,
 		      weight_set_type& weights)
 {
-  return Optimizer(instances, forest_path, intersected_path, weights)();
+  return Optimizer(graphs_forest, graphs_intersected, weights)();
 }
 
-// I know, it is very stupid...
-
-struct TaskEnumerate
+void read_forest(const path_set_type& forest_path,
+		 const path_set_type& intersected_path,
+		 hypergraph_set_type& graphs_forest,
+		 hypergraph_set_type& graphs_intersected)
 {
-  typedef utils::lockfree_list_queue<path_type, std::allocator<path_type> > queue_type;
-  
-  TaskEnumerate(queue_type& __queue,
-		size_t& __size)
-    : queue(__queue),
-      size(__size) {}
-  
-  void operator()()
-  {
-    path_type       path;
+  if (unite_forest) {
+    size_t id_forest;
+    size_t id_intersected;
     
-    size_t          id;
-    hypergraph_type graph;
-
     std::string line;
     
-    while (1) {
-      queue.pop_swap(path);
-      if (path.empty()) break;
+    hypergraph_type graph;
+    
+    for (path_set_type::const_iterator piter = forest_path.begin(); piter != forest_path.end(); ++ piter) {
+      if (debug)
+	std::cerr << "reading forest: " << piter->string() << std::endl;
       
-      utils::compress_istream is(path);
-      std::getline(is, line);
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_forest = (*piter) / file_name;
+	
+	if (! boost::filesystem::exists(path_forest)) break;
+	
+	utils::compress_istream is(path_forest);
+	std::getline(is, line);
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
+      
+	if (! parse_id(id_forest, iter, end))
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+	if (id_forest != i)
+	  throw std::runtime_error("invalid id input: " + path_forest.string());
+      
+	if (id_forest >= graphs_forest.size())
+	  graphs_forest.resize(id_forest + 1);
+      
+	if (! graph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_forest.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+      
+	graphs_forest[id_forest].unite(graph);
+      }
+    }
+    
+    graphs_intersected.resize(graphs_forest.size());
+    
+    for (path_set_type::const_iterator piter = intersected_path.begin(); piter != intersected_path.end(); ++ piter) {
+    
+      if (debug)
+	std::cerr << "reading intersected forest: " << piter->string() << std::endl;
 
-      std::string::const_iterator iter = line.begin();
-      std::string::const_iterator end = line.end();
-
-      if (! parse_id(id, iter, end))
-	throw std::runtime_error("invalid id input");
+      for (size_t i = 0; i < graphs_intersected.size(); ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_intersected = (*piter) / file_name;
+	
+	if (! boost::filesystem::exists(path_intersected)) continue;
+	
+	utils::compress_istream is(path_intersected);
+	std::getline(is, line);
+	
+	std::string::const_iterator iter = line.begin();
+	std::string::const_iterator end = line.end();
+	
+	if (! parse_id(id_intersected, iter, end))
+	  throw std::runtime_error("invalid id input" + path_intersected.string());
+	if (id_intersected != i)
+	  throw std::runtime_error("invalid id input: " + path_intersected.string());
+      
+	if (! graph.assign(iter, end))
+	  throw std::runtime_error("invalid graph format" + path_intersected.string());
+	if (iter != end)
+	  throw std::runtime_error("invalid id ||| graph format" + path_intersected.string());
+	
+	graphs_intersected[id_intersected].unite(graph);
+      }
+    }
+    
+  } else {
+    if (forest_path.size() != intersected_path.size())
+      throw std::runtime_error("# of forest does not match");
+    
+    size_t id_forest;
+    size_t id_intersected;
+    
+    std::string line;
+    
+    for (size_t pos = 0; pos != forest_path.size(); ++ pos) {
+      if (debug)
+	std::cerr << "reading forest: " << forest_path[pos].string() << " with " << intersected_path[pos].string() << std::endl;
+      
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_forest      = forest_path[pos] / file_name;
+	const path_type path_intersected = intersected_path[pos] / file_name;
+	
+	if (! boost::filesystem::exists(path_forest)) break;
+	if (! boost::filesystem::exists(path_intersected)) continue;
+	
+	{
+	  utils::compress_istream is(path_forest);
+	  std::getline(is, line);
 	  
-      if (! graph.assign(iter, end))
-	throw std::runtime_error("invalid graph format");
-
-      if (iter != end)
-	throw std::runtime_error("invalid id ||| graph format");
-
-      ++ size;
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  if (! parse_id(id_forest, iter, end))
+	    throw std::runtime_error("invalid id input: " + path_forest.string());
+	  if (id_forest != i)
+	    throw std::runtime_error("invalid id input: " + path_forest.string());
+	  
+	  graphs_forest.push_back(hypergraph_type());
+	  
+	  if (! graphs_forest.back().assign(iter, end))
+	    throw std::runtime_error("invalid graph format" + path_forest.string());
+	  if (iter != end)
+	    throw std::runtime_error("invalid id ||| graph format" + path_forest.string());
+	}
+	
+	{
+	  utils::compress_istream is(path_intersected);
+	  std::getline(is, line);
+	  
+	  std::string::const_iterator iter = line.begin();
+	  std::string::const_iterator end = line.end();
+	  
+	  if (! parse_id(id_intersected, iter, end))
+	    throw std::runtime_error("invalid id input" + path_intersected.string());
+	  if (id_intersected != i)
+	    throw std::runtime_error("invalid id input: " + path_intersected.string());
+	  
+	  graphs_intersected.push_back(hypergraph_type());
+	  
+	  if (! graphs_intersected.back().assign(iter, end))
+	    throw std::runtime_error("invalid graph format" + path_intersected.string());
+	  if (iter != end)
+	    throw std::runtime_error("invalid id ||| graph format" + path_intersected.string());
+	}
+      }
     }
   }
-  
-  queue_type& queue;
-  size_t& size;
-};
-
-
-size_t enumerate_forest(const path_type& dir)
-{
-  typedef TaskEnumerate task_type;
-  typedef task_type::queue_type queue_type;
-  
-  
-  queue_type queue;
-  std::vector<size_t, std::allocator<size_t> > sizes(threads, 0);
-  
-  boost::thread_group workers;
-  for (int i = 0; i < threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(queue, sizes[i])));
-  
-  for (int i = 0; /**/; ++ i) {
-    path_type path = dir / (utils::lexical_cast<std::string>(i) + ".gz");
-    if (! boost::filesystem::exists(path)) break;
-    
-    queue.push_swap(path);
-  }
-  
-  for (int i = 0; i < threads; ++ i)
-    queue.push(path_type());
-  
-  workers.join_all();
-  
-  return std::accumulate(sizes.begin(), sizes.end(), 0);
 }
-
 
 
 void options(int argc, char** argv)
@@ -808,8 +789,8 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("forest",      po::value<path_type>(&forest_path),       "forest path")
-    ("intersected", po::value<path_type>(&intersected_path),  "intersected forest path")
+    ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),      "forest path")
+    ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(), "intersected forest path")
     ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
     
@@ -823,6 +804,8 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C"            , po::value<double>(&C),           "regularization constant")
+    
+    ("unite",    po::bool_switch(&unite_forest), "unite forest sharing the same id")
 
     ("threads", po::value<int>(&threads), "# of threads")
     
