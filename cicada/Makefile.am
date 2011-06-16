@@ -221,6 +221,7 @@ operation/prune.hpp \
 operation/push_bos_eos.hpp \
 operation/remove_annotation.hpp \
 operation/remove_epsilon.hpp \
+operation/remove_features.hpp \
 operation/sort_tail.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp \
@@ -243,6 +244,7 @@ operation/prune.cpp \
 operation/push_bos_eos.cpp \
 operation/remove_annotation.cpp \
 operation/remove_epsilon.cpp \
+operation/remove_feature.cpp \
 operation/sort_tail.cpp \
 operation/span_forest.cpp \
 operation/viterbi.cpp

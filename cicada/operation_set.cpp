@@ -29,6 +29,7 @@
 #include "operation/push_bos_eos.hpp"
 #include "operation/remove_annotation.hpp"
 #include "operation/remove_epsilon.hpp"
+#include "operation/remove_feature.hpp"
 #include "operation/sort_tail.hpp"
 #include "operation/span_forest.hpp"
 #include "operation/intersect.hpp"
@@ -197,6 +198,8 @@ remove-annotation: remove latent annotation from forest\n\
 remove-epsilon: remove epsilon\n\
 \tlattice=[true|false] remove epsilon for lattice\n\
 \tforest=[true|false] remove epsilon for forest\n\
+remove-feature: remove feature(s)\n\
+\tfeature=[feature name] feature name for removal\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 span-forest: annotate terminal span\n\
 viterbi: compute viterbi tree\n\
@@ -307,6 +310,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::RemoveAnnotation(*piter, debug)));
       else if (param_name == "remove-epsilon")
 	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
+      else if (param_name == "remove-feature")
+	operations.push_back(operation_ptr_type(new operation::RemoveFeature(*piter, debug)));
       else if (param_name == "debinarize")
 	operations.push_back(operation_ptr_type(new operation::Debinarize(*piter, debug)));
       else if (param_name == "expected-ngram")
