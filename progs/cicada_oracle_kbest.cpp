@@ -25,7 +25,10 @@
 #include <boost/thread.hpp>
 
 #include "cicada_text_impl.hpp"
-#include "cicada_oracle_kbest_impl.hpp"
+#include "cicada_kbest_impl.hpp"
+
+typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
+typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;

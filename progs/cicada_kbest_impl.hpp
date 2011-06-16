@@ -2,8 +2,8 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__ORACLE_KBEST_IMPL__HPP__
-#define __CICADA__ORACLE_KBEST_IMPL__HPP__ 1
+#ifndef __CICADA__KBEST_IMPL__HPP__
+#define __CICADA__KBEST_IMPL__HPP__ 1
 
 #include <vector>
 #include <deque>
@@ -64,9 +64,6 @@ struct hypothesis_type
 
 typedef std::vector<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
 typedef std::vector<hypothesis_set_type, std::allocator<hypothesis_set_type> > hypothesis_map_type;
-
-typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
-typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
 
 template <typename Iterator>
 struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature_type(), boost::spirit::standard::blank_type>
