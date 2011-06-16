@@ -221,7 +221,7 @@ operation/prune.hpp \
 operation/push_bos_eos.hpp \
 operation/remove_annotation.hpp \
 operation/remove_epsilon.hpp \
-operation/remove_features.hpp \
+operation/remove_feature.hpp \
 operation/sort_tail.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp \
