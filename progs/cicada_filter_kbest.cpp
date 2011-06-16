@@ -327,7 +327,7 @@ int main(int argc, char** argv)
 	    cicada::unite(lattice, lattice_local);
 	  }
 	  
-	  os << id << " ||| " << lattice << '\n';
+	  os << id << " ||| " << lattice << std::endl;
 	  
 	  hypotheses.clear();
 	}
