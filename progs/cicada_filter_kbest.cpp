@@ -317,17 +317,17 @@ int main(int argc, char** argv)
 	
 	if (boost::fusion::get<0>(kbest) != id && ! hypotheses.empty()) {
 	  lattice_type lattice;
-
+	  
 	  hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
 	  for (hypothesis_set_type::const_iterator hiter = hypotheses.begin(); hiter != hiter_end; ++ hiter) {
 	    lattice_type lattice_local(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
 	    
 	    lattice_local.front().front().features.assign(hiter->features.begin(), hiter->features.end());
-
+	    
 	    cicada::unite(lattice, lattice_local);
 	  }
 	  
-	  os << id << " ||| " << lattice << std::endl;
+	  os << id << " ||| " << lattice << '\n';
 	  
 	  hypotheses.clear();
 	}
@@ -338,18 +338,18 @@ int main(int argc, char** argv)
       
       if (! hypotheses.empty()) {
 	lattice_type lattice;
-
+	
 	hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
 	for (hypothesis_set_type::const_iterator hiter = hypotheses.begin(); hiter != hiter_end; ++ hiter) {
 	  lattice_type lattice_local(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
-	    
+	  
 	  lattice_local.front().front().features.assign(hiter->features.begin(), hiter->features.end());
-
+	  
 	  cicada::unite(lattice, lattice_local);
 	}
-	  
+	
 	os << id << " ||| " << lattice << '\n';
-	  
+	
 	hypotheses.clear();
       }
       
