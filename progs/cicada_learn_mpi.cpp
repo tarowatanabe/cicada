@@ -164,7 +164,7 @@ int main(int argc, char ** argv)
       os.precision(20);
       os << weights;
       
-      if (! outpub_objective_path.empty()) {
+      if (! output_objective_path.empty()) {
 	utils::compress_ostream os(output_objective_path, 1024 * 1024);
 	os.precision(20);
 	os << objective << '\n';
