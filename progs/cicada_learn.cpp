@@ -265,7 +265,6 @@ struct OptimizeOnline
 	inside_intersected.clear();
 
 	if (! graphs_forest[id].is_valid() || ! graphs_intersected[id].is_valid()) continue;
-
 	
 	inside.reserve(graphs_forest[id].nodes.size());
 	inside.resize(graphs_forest[id].nodes.size(), weight_type());
