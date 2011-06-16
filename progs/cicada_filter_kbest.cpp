@@ -333,9 +333,9 @@ int main(int argc, char** argv)
 	  os << id << " ||| " << lattice << '\n';
 	  
 	  hypotheses.clear();
+	  id = boost::fusion::get<0>(kbest);
 	}
 	
-	id = boost::fusion::get<0>(kbest);
 	hypotheses.push_back(hypothesis_type(kbest));
       }
       
