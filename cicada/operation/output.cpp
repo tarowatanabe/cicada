@@ -355,6 +355,8 @@ namespace cicada
       std::ostream& os = (output_data.use_buffer
 			  ? static_cast<std::ostream&>(os_buffer)
 			  : *output_data.os);
+      
+      os.precision(10);
 
       if (debug)
 	std::cerr << name << ": " << data.id << std::endl;

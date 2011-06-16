@@ -293,10 +293,14 @@ int main(int argc, char** argv)
       typedef cicada::Lattice  lattice_type;
       
       typedef boost::spirit::istream_iterator iter_type;
+
+      const bool flush_output = (output_file == "-"
+				 || (boost::filesystem::exists(output_file)
+				     && ! boost::filesystem::is_regular_file(output_file)));
       
       utils::compress_istream is(input_file, 1024 * 1024);
       is.unsetf(std::ios::skipws);
-      utils::compress_ostream os(output_file, 1024 * 1024);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
       
       kbest_feature_parser<iter_type> parser;
       iter_type iter(is);
@@ -336,9 +340,9 @@ int main(int argc, char** argv)
 	  }
 	  
 	  hypotheses.clear();
-	  id = boost::fusion::get<0>(kbest);
 	}
 	
+	id = boost::fusion::get<0>(kbest);
 	hypotheses.push_back(hypothesis_type(kbest));
       }
       
