@@ -315,22 +315,25 @@ int main(int argc, char** argv)
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
 	
-	if (boost::fusion::get<0>(kbest) != id && ! hypotheses.empty()) {
-	  if (debug)
-	    std::cerr << id << " merge lattice" << std::endl;
-
-	  lattice_type lattice;
+	if (boost::fusion::get<0>(kbest) != id) {
 	  
-	  hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
-	  for (hypothesis_set_type::const_iterator hiter = hypotheses.begin(); hiter != hiter_end; ++ hiter) {
-	    lattice_type lattice_local(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+	  if (! hypotheses.empty()) {
+	    if (debug)
+	      std::cerr << id << " merge lattice" << std::endl;
 	    
-	    lattice_local.front().front().features.assign(hiter->features.begin(), hiter->features.end());
+	    lattice_type lattice;
 	    
-	    cicada::unite(lattice, lattice_local);
+	    hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
+	    for (hypothesis_set_type::const_iterator hiter = hypotheses.begin(); hiter != hiter_end; ++ hiter) {
+	      lattice_type lattice_local(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+	      
+	      lattice_local.front().front().features.assign(hiter->features.begin(), hiter->features.end());
+	      
+	      cicada::unite(lattice, lattice_local);
+	    }
+	    
+	    os << id << " ||| " << lattice << '\n';
 	  }
-	  
-	  os << id << " ||| " << lattice << '\n';
 	  
 	  hypotheses.clear();
 	  id = boost::fusion::get<0>(kbest);
