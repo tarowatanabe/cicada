@@ -316,6 +316,9 @@ int main(int argc, char** argv)
 	    throw std::runtime_error("kbest parsing failed");
 	
 	if (boost::fusion::get<0>(kbest) != id && ! hypotheses.empty()) {
+	  if (debug)
+	    std::cerr << id << " merge lattice" << std::endl;
+
 	  lattice_type lattice;
 	  
 	  hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
@@ -337,6 +340,9 @@ int main(int argc, char** argv)
       }
       
       if (! hypotheses.empty()) {
+	if (debug)
+	  std::cerr << id << " merge lattice" << std::endl;
+	
 	lattice_type lattice;
 	
 	hypothesis_set_type::const_iterator hiter_end = hypotheses.end();
