@@ -175,7 +175,7 @@ cicada_filter_extract_scfg_SOURCES = cicada_filter_extract_scfg.cpp cicada_filte
 cicada_filter_extract_scfg_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_kbest_SOURCES = cicada_filter_kbest.cpp
-cicada_filter_kbest_LDADD   = $(boost_LDADD) $(perftools_LDADD)
+cicada_filter_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_weights_SOURCES = cicada_filter_weights.cpp
 cicada_filter_weights_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

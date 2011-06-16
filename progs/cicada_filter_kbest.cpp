@@ -16,6 +16,7 @@
 #include <string>
 #include <algorithm>
 #include <iterator>
+#include <deque>
 
 #define BOOST_SPIRIT_THREADSAFE
 #define PHOENIX_THREADSAFE
@@ -32,16 +33,63 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 
+#include <cicada/feature.hpp>
+#include <cicada/symbol.hpp>
+
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/subprocess.hpp"
 #include "utils/lockfree_list_queue.hpp"
+#include "utils/hashmurmur.hpp"
+#include "utils/simple_vector.hpp"
+#include "utils/sgi_hash_set.hpp"
 
 typedef boost::filesystem::path path_type;
 
 typedef size_t size_type;
 typedef std::vector<std::string, std::allocator<std::string> > tokens_type;
 typedef boost::fusion::tuple<size_type, tokens_type, tokens_type> kbest_type;
+
+typedef std::pair<std::string, double> feature_type;
+typedef std::vector<feature_type, std::allocator<feature_type> > features_type;
+
+typedef boost::fusion::tuple<size_type, tokens_type, features_type> kbest_feature_type;
+
+struct hypothesis_type
+{
+  typedef cicada::Symbol  word_type;
+  typedef cicada::Feature feature_type;
+  typedef std::pair<feature_type, double> feature_value_type;
+  
+  typedef utils::simple_vector<word_type, std::allocator<word_type> >                   sentence_type;
+  typedef utils::simple_vector<feature_value_type, std::allocator<feature_value_type> > feature_set_type;
+  
+  hypothesis_type() : sentence(), features() {}
+  hypothesis_type(const kbest_feature_type& x)
+    : sentence(boost::fusion::get<1>(x).begin(), boost::fusion::get<1>(x).end()),
+      features(boost::fusion::get<2>(x).begin(), boost::fusion::get<2>(x).end())
+  {
+    std::sort(features.begin(), features.end());
+  }
+  
+  sentence_type    sentence;
+  feature_set_type features;
+};
+
+inline
+size_t hash_value(hypothesis_type const& x)
+{
+  typedef utils::hashmurmur<size_t> hasher_type;
+  
+  return hasher_type()(x.sentence.begin(), x.sentence.end(), hasher_type()(x.features.begin(), x.features.end(), 0));
+}
+
+inline
+bool operator==(const hypothesis_type& x, const hypothesis_type& y)
+{
+  return x.sentence == y.sentence && x.features == y.features;
+}
+
 
 template <typename Iterator>
 struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::spirit::standard::blank_type>
@@ -63,6 +111,36 @@ struct kbest_parser : boost::spirit::qi::grammar<Iterator, kbest_type(), boost::
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
   boost::spirit::qi::rule<Iterator, kbest_type(), blank_type>  kbest;
+};
+
+template <typename Iterator>
+struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature_type(), boost::spirit::standard::blank_type>
+{
+  kbest_feature_parser() : kbest_feature_parser::base_type(kbest)
+  {
+    namespace qi = boost::spirit::qi;
+    namespace standard = boost::spirit::standard;
+    
+    tokens  %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
+    remains %= *qi::lexeme[+(standard::char_ - standard::space)];
+    
+    feature %= qi::lexeme[+(standard::char_ - standard::space - '=')] >> '=' >> qi::double_;
+    features %= *feature;
+    
+    kbest %= size >> "|||" >> tokens >> "|||" >> features >> -("|||" >> remains) >> (qi::eol | qi::eoi);
+  }
+  
+  typedef boost::spirit::standard::blank_type blank_type;
+  
+  boost::spirit::qi::uint_parser<size_type, 10, 1, -1>         size;
+  boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
+  
+  boost::spirit::qi::rule<Iterator, feature_type(), blank_type>  feature;
+  boost::spirit::qi::rule<Iterator, features_type(), blank_type> features;
+
+  boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
+  
+  boost::spirit::qi::rule<Iterator, kbest_feature_type(), blank_type>  kbest;
 };
 
 struct Task
@@ -132,6 +210,10 @@ std::string filter;
 bool id_mode = false;
 bool features_mode = false;
 
+// alternative mode...
+bool merge_mode = false;
+bool lattice_mode = false;
+
 int debug = 0;
 
 void options(int argc, char** argv);
@@ -141,24 +223,86 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    const bool flush_output = (output_file == "-"
-			       || (boost::filesystem::exists(output_file)
-				   && ! boost::filesystem::is_regular_file(output_file)));
+    if (int(merge_mode) + lattice_mode + (! filter.empty()) > 1)
+      throw std::runtime_error("you can either --{merge, lattice} or --filter");
     
-    utils::compress_istream is(input_file, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
-    utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
-    
-    typedef boost::spirit::istream_iterator iter_type;
-    
-    kbest_parser<iter_type> parser;
-    iter_type iter(is);
-    iter_type iter_end;
-    
-    kbest_type kbest;
-    
-    if (! filter.empty()) {
+    if (merge_mode) {
+#ifdef HAVE_TR1_UNORDERED_SET
+      typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+	std::allocator<hypothesis_type> > hypothesis_set_type;
+#else
+      typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+	std::allocator<hypothesis_type> > hypothesis_set_type;
+#endif
+      typedef std::deque<hypothesis_set_type, std::allocator<hypothesis_set_type> > hypothesis_map_type;
+
+      typedef boost::spirit::istream_iterator iter_type;
+      
+      utils::compress_istream is(input_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      kbest_feature_parser<iter_type> parser;
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      kbest_feature_type kbest;
+
+      hypothesis_map_type hypotheses;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
+      
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
+
+	const size_t& id = boost::fusion::get<0>(kbest);
+	
+	if (id >= hypotheses.size())
+	  hypotheses.resize(id + 1);
+	
+	hypotheses[id].insert(hypothesis_type(kbest));
+      }
+      
+      utils::compress_ostream os(output_file, 1024 * 1024);
+      
+      for (size_t id = 0; id != hypotheses.size(); ++ id) {
+	namespace karma = boost::spirit::karma;
+	namespace standard = boost::spirit::standard;
+
+	hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+	for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	  os << id << " ||| ";
+	  
+	  if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hiter->sentence))
+	    throw std::runtime_error("tokens generation failed...?");
+	  os << " ||| ";
+	  if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << karma::double_) % ' '), hiter->features))
+	    throw std::runtime_error("tokens generation failed...?");
+	  os << '\n';
+	}
+      }
+      
+    } else if (lattice_mode) {
+      
+    } else if (! filter.empty()) {
       typedef Task task_type;
+      typedef boost::spirit::istream_iterator iter_type;
+
+      const bool flush_output = (output_file == "-"
+				 || (boost::filesystem::exists(output_file)
+				     && ! boost::filesystem::is_regular_file(output_file)));
+      
+      utils::compress_istream is(input_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+      
+      kbest_parser<iter_type> parser;
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      kbest_type kbest;
       
       task_type::subprocess_type subprocess(filter);
       task_type::queue_type      queue;
@@ -196,6 +340,22 @@ int main(int argc, char** argv)
       
       thread.join();
     } else {
+      typedef boost::spirit::istream_iterator iter_type;
+
+      const bool flush_output = (output_file == "-"
+				 || (boost::filesystem::exists(output_file)
+				     && ! boost::filesystem::is_regular_file(output_file)));
+      
+      utils::compress_istream is(input_file, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      utils::compress_ostream os(output_file, 1024 * 1024 * (! flush_output));
+      
+      kbest_parser<iter_type> parser;
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      kbest_type kbest;
+      
       while (iter != iter_end) {
 	boost::fusion::get<1>(kbest).clear();
 	boost::fusion::get<2>(kbest).clear();
@@ -246,6 +406,8 @@ void options(int argc, char** argv)
 
     ("id",       po::bool_switch(&id_mode),       "output id")
     ("features", po::bool_switch(&features_mode), "output features")
+    ("merge",    po::bool_switch(&merge_mode),    "merge features")
+    ("lattice",  po::bool_switch(&lattice_mode),  "output merged lattice")
     
     ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
         
