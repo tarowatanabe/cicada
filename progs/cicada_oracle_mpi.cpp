@@ -200,6 +200,7 @@ int main(int argc, char ** argv)
 	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
 	    if (oracles_forest[id].is_valid()) {
 	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      os.precision(10);
 	      
 	      os << id << " ||| " << oracles_forest[id] << '\n';
 	    }
@@ -207,6 +208,7 @@ int main(int argc, char ** argv)
 	  for (size_t id = 0; id != oracles.size(); ++ id)
 	    if (! oracles[id].empty()) {
 	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	      os.precision(10);
 	      
 	      os << id << " ||| " << oracles[id] << '\n';
 	    }
@@ -214,6 +216,7 @@ int main(int argc, char ** argv)
 	
       } else {
 	utils::compress_ostream os(output_file, 1024 * 1024);
+	os.precision(10);
 
 	if (forest_mode) {
 	  for (size_t id = 0; id != oracles_forest.size(); ++ id)

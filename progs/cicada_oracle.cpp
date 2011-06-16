@@ -47,12 +47,12 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/random.hpp>
-
 #include <boost/thread.hpp>
 
 #include "cicada_text_impl.hpp"
@@ -179,6 +179,7 @@ int main(int argc, char ** argv)
 	for (size_t id = 0; id != oracles_forest.size(); ++ id)
 	  if (oracles_forest[id].is_valid()) {
 	    utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	    os.precision(10);
 	      
 	    os << id << " ||| " << oracles_forest[id] << '\n';
 	  }
@@ -186,6 +187,7 @@ int main(int argc, char ** argv)
 	for (size_t id = 0; id != oracles.size(); ++ id)
 	  if (! oracles[id].empty()) {
 	    utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	    os.precision(10);
 	      
 	    os << id << " ||| " << oracles[id] << '\n';
 	  }
@@ -193,6 +195,7 @@ int main(int argc, char ** argv)
 	
     } else {
       utils::compress_ostream os(output_file, 1024 * 1024);
+      os.precision(10);
 
       if (forest_mode) {
 	for (size_t id = 0; id != oracles_forest.size(); ++ id)

@@ -72,6 +72,7 @@ bin_PROGRAMS = \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
 	cicada_oracle \
+	cicada_oracle_kbest \
 	cicada_oracle_mpi \
 	cicada_unite_forest \
 	cicada_unite_lattice \
@@ -256,6 +257,9 @@ cicada_unite_sentence_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 
 cicada_oracle_SOURCES = cicada_oracle.cpp cicada_text_impl.hpp
 cicada_oracle_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_oracle_kbest_SOURCES = cicada_oracle_kbest.cpp cicada_text_impl.hpp
+cicada_oracle_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_oracle_mpi_SOURCES  = cicada_oracle_mpi.cpp cicada_text_impl.hpp
 cicada_oracle_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
