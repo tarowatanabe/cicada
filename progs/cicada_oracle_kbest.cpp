@@ -33,6 +33,14 @@ typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_ma
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
+struct real_precision20 : boost::spirit::karma::real_policies<double>
+{
+  static unsigned int precision(double) 
+  { 
+    return 20;
+  }
+};
+
 path_set_type tstset_files;
 path_set_type refset_files;
 path_type     output_file = "-";
@@ -97,6 +105,8 @@ int main(int argc, char ** argv)
     oracle_map_type oracles(scorers.size());
     compute_oracles(scorers, hypotheses, oracles, generator);
     
+    boost::spirit::karma::real_generator<double, real_precision20> double20;
+    
     if (directory_mode) {
       if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
 	boost::filesystem::remove_all(output_file);
@@ -124,7 +134,7 @@ int main(int argc, char ** argv)
 	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
 	      throw std::runtime_error("tokens generation failed...?");
 	    os << " ||| ";
-	    if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << karma::double_) % ' '), hyp.features))
+	    if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
 	      throw std::runtime_error("tokens generation failed...?");
 	    os << '\n';
 	  }
@@ -147,7 +157,7 @@ int main(int argc, char ** argv)
 	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
 	      throw std::runtime_error("tokens generation failed...?");
 	    os << " ||| ";
-	    if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << karma::double_) % ' '), hyp.features))
+	    if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
 	      throw std::runtime_error("tokens generation failed...?");
 	    os << '\n';
 	  }

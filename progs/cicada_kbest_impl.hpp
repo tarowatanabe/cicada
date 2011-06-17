@@ -99,7 +99,7 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
     feature %= qi::lexeme[+(standard::char_ - standard::space - '=')] >> '=' >> qi::double_;
     features %= *feature;
     
-    kbest %= size >> "|||" >> tokens >> "|||" >> features >> -("|||" >> remains) >> (qi::eol | qi::eoi);
+    kbest %= size >> "|||" >> tokens >> -("|||" >> features >> -("|||" >> remains)) >> (qi::eol | qi::eoi);
   }
   
   typedef boost::spirit::standard::blank_type blank_type;

@@ -146,6 +146,15 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
   boost::spirit::qi::rule<Iterator, kbest_feature_type(), blank_type>  kbest;
 };
 
+struct real_precision20 : boost::spirit::karma::real_policies<double>
+{
+  static unsigned int precision(double) 
+  { 
+    return 20;
+  }
+};
+
+
 struct Task
 {
   typedef utils::lockfree_list_queue<kbest_type, std::allocator<kbest_type> > queue_type;
@@ -243,6 +252,8 @@ int main(int argc, char** argv)
       
       utils::compress_istream is(input_file, 1024 * 1024);
       is.unsetf(std::ios::skipws);
+
+      boost::spirit::karma::real_generator<double, real_precision20> double20;
       
       kbest_feature_parser<iter_type> parser;
       iter_type iter(is);
@@ -281,7 +292,7 @@ int main(int argc, char** argv)
 	  if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hiter->sentence))
 	    throw std::runtime_error("tokens generation failed...?");
 	  os << " ||| ";
-	  if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << karma::double_) % ' '), hiter->features))
+	  if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hiter->features))
 	    throw std::runtime_error("tokens generation failed...?");
 	  os << '\n';
 	}
