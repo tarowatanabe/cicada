@@ -28,28 +28,6 @@
 #include <numeric>
 #include <algorithm>
 
-#include "cicada/sentence.hpp"
-#include "cicada/lattice.hpp"
-#include "cicada/hypergraph.hpp"
-#include "cicada/inside_outside.hpp"
-
-#include "cicada/feature_function.hpp"
-#include "cicada/weight_vector.hpp"
-#include "cicada/semiring.hpp"
-#include "cicada/viterbi.hpp"
-
-#include "cicada/apply.hpp"
-#include "cicada/model.hpp"
-
-#include "cicada/feature/bleu.hpp"
-#include "cicada/feature/bleu_linear.hpp"
-#include "cicada/parameter.hpp"
-#include "cicada/prune.hpp"
-#include "cicada/eval.hpp"
-
-#include "cicada/operation/functional.hpp"
-#include "cicada/operation/traversal.hpp"
-
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
 #include "utils/resource.hpp"
@@ -62,7 +40,6 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/random.hpp>
-
 #include <boost/thread.hpp>
 
 #include "lbfgs.h"
@@ -75,72 +52,44 @@
 #include "utils/mpi_stream_simple.hpp"
 
 #include "cicada_text_impl.hpp"
+#include "cicada_kbeset_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-typedef cicada::Symbol   symbol_type;
-typedef cicada::Vocab    vocab_type;
-typedef cicada::Sentence sentence_type;
-
-typedef cicada::HyperGraph hypergraph_type;
-typedef cicada::Rule       rule_type;
-
-typedef cicada::Model model_type;
-
-typedef hypergraph_type::feature_set_type    feature_set_type;
-typedef cicada::WeightVector<double>   weight_set_type;
-typedef feature_set_type::feature_type feature_type;
-
-typedef cicada::FeatureFunction feature_function_type;
-typedef feature_function_type::feature_function_ptr_type feature_function_ptr_type;
-
-typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
-
-
-typedef std::vector<feature_function_ptr_type, std::allocator<feature_function_ptr_type> > feature_function_ptr_set_type;
-
-typedef cicada::SentenceVector sentence_set_type;
-typedef std::vector<sentence_set_type, std::allocator<sentence_set_type> > sentence_document_type;
-
-typedef cicada::eval::Scorer         scorer_type;
-typedef cicada::eval::ScorerDocument scorer_document_type;
-
-typedef scorer_type::score_ptr_type  score_ptr_type;
-typedef std::vector<score_ptr_type, std::allocator<score_ptr_type> > score_ptr_set_type;
-
+struct real_precision20 : boost::spirit::karma::real_policies<double>
+{
+  static unsigned int precision(double) 
+  { 
+    return 20;
+  }
+};
 
 path_set_type tstset_files;
 path_set_type refset_files;
 path_type     output_file = "-";
 
-bool forest_mode = false;
 bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
 
 int max_iteration = 10;
 int min_iteration = 1;
-bool apply_exact = false;
-int cube_size = 200;
+
 int debug = 0;
 
-void read_tstset(const path_set_type& files,
-		 hypergraph_set_type& graphs,
-		 const sentence_document_type& sentences,
-		 feature_function_ptr_set_type& features);
 void read_refset(const path_set_type& file,
-		 scorer_document_type& scorers,
-		 sentence_document_type& sentences);
+		 scorer_document_type& scorers);
+void read_tstset(const path_set_type& files,
+		 hypothesis_map_type& hypotheses);
+
 template <typename Generator>
 void compute_oracles(const hypergraph_set_type& graphs,
-		     const feature_function_ptr_set_type& features,
-		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests,
+		     const hypothesis_map_type& hypotheses,
+		     hypothesis_map_type& oracles,
 		     Generator& generator);
 
-void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests);
+void bcast_kbest(hypothesis_map_type& kbests);
 void bcast_weights(const int rank, weight_set_type& weights);
 void options(int argc, char** argv);
 
@@ -159,23 +108,22 @@ int main(int argc, char ** argv)
       throw std::runtime_error("no test set?");
 
     min_iteration = utils::bithack::min(min_iteration, max_iteration);
-        
+    
     // read reference set
     scorer_document_type   scorers(scorer_name);
-    sentence_document_type sentences;
     
-    read_refset(refset_files, scorers, sentences);
-    
-    if (mpi_rank == 0 && debug)
-      std::cerr << "# of references: " << sentences.size() << std::endl;
+    read_refset(refset_files, scorers);
     
     if (mpi_rank == 0 && debug)
-      std::cerr << "reading hypergraphs" << std::endl;
+      std::cerr << "# of references: " << scorers.size() << std::endl;
     
-    hypergraph_set_type       graphs(sentences.size());
-    feature_function_ptr_set_type features(sentences.size());
+    if (mpi_rank == 0 && debug)
+      std::cerr << "reading tstset" << std::endl;
     
-    read_tstset(tstset_files, graphs, sentences, features);
+    hypothesis_map_type hypotheses(scorers.size());
+    read_tstset(tstset_files, hypotheses);
+    
+    initialize_score(hypotheses, scorers);
 
     if (mpi_rank == 0 && debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
@@ -183,9 +131,10 @@ int main(int argc, char ** argv)
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
     
-    sentence_set_type oracles(sentences.size());
-    hypergraph_set_type oracles_forest(sentences.size());
+    hypothesis_map_type oracles(scorers.size());
     compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
+
+    boost::spirit::karma::real_generator<double, real_precision20> double20;
     
     if (mpi_rank == 0) {
       if (directory_mode) {
@@ -198,37 +147,52 @@ int main(int argc, char ** argv)
 	for (boost::filesystem::directory_iterator iter(output_file); iter != iter_end; ++ iter)
 	  boost::filesystem::remove_all(*iter);
 	
-	if (forest_mode) {
-	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
-	    if (oracles_forest[id].is_valid()) {
-	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
-	      os.precision(10);
+	for (size_t id = 0; id != oracles.size(); ++ id)
+	  if (! oracles[id].empty()) {
+	    namespace karma = boost::spirit::karma;
+	    namespace standard = boost::spirit::standard;
+	    
+	    utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
+	    os.precision(10);
+	    
+	    hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
+	    for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	      const hypothesis_type& hyp(*oiter);
 	      
-	      os << id << " ||| " << oracles_forest[id] << '\n';
+	      os << id << " ||| ";
+	    
+	      if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
+		throw std::runtime_error("tokens generation failed...?");
+	      os << " ||| ";
+	      if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+		throw std::runtime_error("tokens generation failed...?");
+	      os << '\n';
 	    }
-	} else {
-	  for (size_t id = 0; id != oracles.size(); ++ id)
-	    if (! oracles[id].empty()) {
-	      utils::compress_ostream os(output_file / (utils::lexical_cast<std::string>(id) + ".gz"), 1024 * 1024);
-	      os.precision(10);
-	      
-	      os << id << " ||| " << oracles[id] << '\n';
-	    }
-	}
+	  }
 	
       } else {
 	utils::compress_ostream os(output_file, 1024 * 1024);
 	os.precision(10);
-
-	if (forest_mode) {
-	  for (size_t id = 0; id != oracles_forest.size(); ++ id)
-	    if (oracles_forest[id].is_valid())
-	      os << id << " ||| " << oracles_forest[id] << '\n';
-	} else {
-	  for (size_t id = 0; id != oracles.size(); ++ id)
-	    if (! oracles[id].empty())
-	      os << id << " ||| " << oracles[id] << '\n';
-	}
+	
+	for (size_t id = 0; id != oracles.size(); ++ id)
+	  if (! oracles[id].empty()) {
+	    namespace karma = boost::spirit::karma;
+	    namespace standard = boost::spirit::standard;
+	    
+	    hypothesis_set_type::const_iterator oiter_end = oracles[id].end();
+	    for (hypothesis_set_type::const_iterator oiter = oracles[id].begin(); oiter != oiter_end; ++ oiter) {
+	      const hypothesis_type& hyp(*oiter);
+	      
+	      os << id << " ||| ";
+	      
+	      if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
+		throw std::runtime_error("tokens generation failed...?");
+	      os << " ||| ";
+	      if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+		throw std::runtime_error("tokens generation failed...?");
+	      os << '\n';
+	    }
+	  }
       }
     }
   }
@@ -481,112 +445,84 @@ void compute_oracles(const hypergraph_set_type& graphs,
     }
 }
 
-
 void read_tstset(const path_set_type& files,
-		 hypergraph_set_type& graphs,
-		 const sentence_document_type& sentences,
-		 feature_function_ptr_set_type& features)
+		 hypothesis_map_type& hypotheses)
 {
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef kbest_feature_parser<iter_type> parser_type;
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  path_set_type::const_iterator titer_end = tstset_files.end();
-  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
-    
-    if (mpi_rank == 0 && debug)
-      std::cerr << "file: " << *titer << std::endl;
-      
-    if (boost::filesystem::is_directory(*titer)) {
+  if (files.empty())
+    throw std::runtime_error("no files?");
 
-      for (int i = mpi_rank; /**/; i += mpi_size) {
-	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
+  parser_type parser;
+  kbest_feature_type kbest;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no file: " + fiter->string());
+
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (int i = 0; /**/; ++ i) {
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	int id;
-	std::string sep;
-	hypergraph_type hypergraph;
-            
-	if (is >> id >> sep >> hypergraph) {
-	  if (sep != "|||")
-	    throw std::runtime_error("format error?: " + path.string());
+	iter_type iter(is);
+	iter_type iter_end;
 	
-	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + path.string());
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
 	  
-	  if (id % mpi_size != mpi_rank)
-	    throw std::runtime_error("difference it?");
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
 	  
-	  graphs[id].unite(hypergraph);
-	} else
-	  throw std::runtime_error("format error?: " + path.string());
+	  const size_t& id = boost::fusion::get<0>(kbest);
+	  
+	  if (id >= hypotheses.size())
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  if (id != i)
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  
+	  hypotheses[id].push_back(hypothesis_type(kbest));
+	}
       }
     } else {
-      utils::compress_istream is(*titer, 1024 * 1024);
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
       
-      int id;
-      std::string sep;
-      hypergraph_type hypergraph;
-            
-      while (is >> id >> sep >> hypergraph) {
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
 	
-	if (sep != "|||")
-	  throw std::runtime_error("format error?: " + titer->string());
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
 	
-	if (id >= static_cast<int>(graphs.size()))
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id) + ": " + titer->string());
+	const size_t& id = boost::fusion::get<0>(kbest);
 	
-	if (id % mpi_size == mpi_rank)
-	  graphs[id].unite(hypergraph);
+	if (id >= hypotheses.size())
+	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	
+	hypotheses[id].push_back(hypothesis_type(kbest));
       }
     }
-  }
-
-  if (debug && mpi_rank == 0)
-    std::cerr << "assign BLEU scorer" << std::endl;
-    
-  for (size_t id = 0; id != graphs.size(); ++ id) 
-    if (static_cast<int>(id % mpi_size) == mpi_rank) {
-      if (graphs[id].goal == hypergraph_type::invalid)
-	std::cerr << "invalid graph at: " << id << std::endl;
-      else {
-	features[id] = feature_function_type::create(scorer_name);
-	
-	cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-	cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
-	
-	if (! __bleu && ! __bleu_linear)
-	  throw std::runtime_error("invalid bleu feature function...");
-
-	static const cicada::Lattice       __lattice;
-	static const cicada::SpanVector    __spans;
-	static const cicada::NGramCountSet __ngram_counts;
-	
-	if (__bleu)
-	  __bleu->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
-	else
-	  __bleu_linear->assign(id, graphs[id], __lattice, __spans, sentences[id], __ngram_counts);
-      }
-    }
-  
-  // collect weights...
-  for (int rank = 0; rank < mpi_size; ++ rank) {
-    weight_set_type weights;
-    weights.allocate();
-    
-    for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
-      if (! feature_type(id).empty())
-	weights[feature_type(id)] = 1.0;
-    
-    bcast_weights(rank, weights);
   }
 }
 
+
 void read_refset(const path_set_type& files,
-		 scorer_document_type& scorers,
-		 sentence_document_type& sentences)
+		 scorer_document_type& scorers)
 {
   typedef boost::spirit::istream_iterator iter_type;
   typedef cicada_sentence_parser<iter_type> parser_type;
@@ -598,7 +534,6 @@ void read_refset(const path_set_type& files,
   id_sentence_type id_sentence;
   
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
-    
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no reference file: " + fiter->string());
 
@@ -618,18 +553,15 @@ void read_refset(const path_set_type& files,
       
       if (id >= static_cast<int>(scorers.size()))
 	scorers.resize(id + 1);
-      if (id >= static_cast<int>(sentences.size()))
-	sentences.resize(id + 1);
       if (! scorers[id])
 	scorers[id] = scorers.create();
       
-      sentences[id].push_back(id_sentence.second);
-      scorers[id]->insert(sentences[id].back());
+      scorers[id]->insert(id_sentence.second);
     }
   }
 }
 
-void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests)
+void bcast_kbest(hypothesis_map_type& kbests)
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();

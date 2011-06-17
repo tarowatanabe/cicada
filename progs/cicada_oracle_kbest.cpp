@@ -363,35 +363,67 @@ void read_tstset(const path_set_type& files,
   typedef kbest_feature_parser<iter_type> parser_type;
   
   if (files.empty())
-    throw std::runtime_error("no reference files?");
+    throw std::runtime_error("no files?");
 
   parser_type parser;
   kbest_feature_type kbest;
   
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-      throw std::runtime_error("no reference file: " + fiter->string());
-    
-    utils::compress_istream is(*fiter, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
-    
-    iter_type iter(is);
-    iter_type iter_end;
-    
-    while (iter != iter_end) {
-      boost::fusion::get<1>(kbest).clear();
-      boost::fusion::get<2>(kbest).clear();
+      throw std::runtime_error("no file: " + fiter->string());
+
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (int i = 0; /**/; ++ i) {
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
+
+	if (! boost::filesystem::exists(path)) break;
+	
+	utils::compress_istream is(path, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+	
+	iter_type iter(is);
+	iter_type iter_end;
+	
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  const size_t& id = boost::fusion::get<0>(kbest);
+	  
+	  if (id >= hypotheses.size())
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  if (id != i)
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  
+	  hypotheses[id].push_back(hypothesis_type(kbest));
+	}
+      }
+    } else {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
       
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	if (iter != iter_end)
-	  throw std::runtime_error("kbest parsing failed");
+      iter_type iter(is);
+      iter_type iter_end;
       
-      const size_t& id = boost::fusion::get<0>(kbest);
-      
-      if (id >= hypotheses.size())
-	throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
-      
-      hypotheses[id].push_back(hypothesis_type(kbest));
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
+	
+	const size_t& id = boost::fusion::get<0>(kbest);
+	
+	if (id >= hypotheses.size())
+	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	
+	hypotheses[id].push_back(hypothesis_type(kbest));
+      }
     }
   }
 }
