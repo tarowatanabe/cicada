@@ -62,6 +62,26 @@ struct hypothesis_type
   score_ptr_type   score;
 };
 
+inline
+size_t hash_value(hypothesis_type const& x)
+{
+  typedef utils::hashmurmur<size_t> hasher_type;
+  
+  return hasher_type()(x.sentence.begin(), x.sentence.end(), hasher_type()(x.features.begin(), x.features.end(), 0));
+}
+
+inline
+bool operator==(const hypothesis_type& x, const hypothesis_type& y)
+{
+  return x.sentence == y.sentence && x.features == y.features;
+}
+
+inline
+bool operator<(const hypothesis_type& x, const hypothesis_type& y)
+{
+  return x.sentence < y.sentence || (!(y.sentence < x.sentence) && x.features < y.features);
+}
+
 typedef std::vector<hypothesis_type, std::allocator<hypothesis_type> > hypothesis_set_type;
 typedef std::vector<hypothesis_set_type, std::allocator<hypothesis_set_type> > hypothesis_map_type;
 
