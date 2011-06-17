@@ -175,11 +175,11 @@ struct TaskOracle
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
 
-  TaskOracle(queue_type&                __queue,
-	     const scorer_document_type&     __scorers,
-	     const hypothesis_map_type& __hypotheses,
-	     oracle_map_type&           __oracles,
-	     const score_ptr_type&      __score)
+  TaskOracle(queue_type&                 __queue,
+	     const scorer_document_type& __scorers,
+	     const hypothesis_map_type&  __hypotheses,
+	     oracle_map_type&            __oracles,
+	     const score_ptr_type&       __score)
     : queue(__queue), scorers(__scorers), hypotheses(__hypotheses), oracles(__oracles), score(__score ? __score->clone() : score_ptr_type()) {}
   
   void operator()()

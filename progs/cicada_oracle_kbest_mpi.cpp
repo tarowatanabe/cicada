@@ -82,9 +82,11 @@ void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers);
 void read_tstset(const path_set_type& files,
 		 hypothesis_map_type& hypotheses);
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers);
 
 template <typename Generator>
-void compute_oracles(const hypergraph_set_type& graphs,
+void compute_oracles(const scorer_document_type& scorers,
 		     const hypothesis_map_type& hypotheses,
 		     hypothesis_map_type& oracles,
 		     Generator& generator);
@@ -124,7 +126,7 @@ int main(int argc, char ** argv)
     read_tstset(tstset_files, hypotheses);
     
     initialize_score(hypotheses, scorers);
-
+    
     if (mpi_rank == 0 && debug)
       std::cerr << "# of features: " << feature_type::allocated() << std::endl;
 
@@ -132,7 +134,7 @@ int main(int argc, char ** argv)
     generator.seed(time(0) * getpid());
     
     hypothesis_map_type oracles(scorers.size());
-    compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
+    compute_oracles(scorers, hypotheses, oracles, generator);
 
     boost::spirit::karma::real_generator<double, real_precision20> double20;
     
@@ -235,31 +237,27 @@ int loop_sleep(bool found, int non_found_iter)
 template <typename Generator>
 struct TaskOracle
 {
-  TaskOracle(const hypergraph_set_type&           __graphs,
-	     const feature_function_ptr_set_type& __features,
-	     const scorer_document_type&          __scorers,
-	     score_ptr_set_type&                  __scores,
-	     sentence_set_type&                   __sentences,
-	     hypergraph_set_type&                 __forests,
-	     Generator&                           __generator)
-    : graphs(__graphs),
-      features(__features),
-      scorers(__scorers),
-      scores(__scores),
-      sentences(__sentences),
-      forests(__forests),
+  typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
+  typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
+  
+  TaskOracle(const scorer_document_type& __scorers,
+	     const hypothesis_map_type&  __hypotheses,
+	     oracle_map_type&            __oracles,
+	     Generator&                  __generator)
+    : scorers(__scorers),
+      hypotheses(__hypotheses),
+      oracles(__oracles),
       generator(__generator)
   {
-    score_optimum.reset();
+    score.reset();
     
-    score_ptr_set_type::const_iterator siter_end = scores.end();
-    for (score_ptr_set_type::const_iterator siter = scores.begin(); siter != siter_end; ++ siter) 
-      if (*siter) {
-	if (! score_optimum)
-	  score_optimum = (*siter)->clone();
+    for (size_t id = 0; id != oracles.size(); ++ id) 
+      if (! oracles[id].empty()) {
+	if (! score)
+	  score = oracles[id].front()->score->clone();
 	else
-	  *score_optimum += *(*siter);
-      } 
+	  *score += *(oracles[id].front()->score);
+      }
   }
   
   void operator()()
@@ -267,118 +265,65 @@ struct TaskOracle
     // we will try maximize    
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
-    
-    weight_set_type::feature_type feature_bleu;
-    for (size_t i = 0; i != features.size(); ++ i)
-      if (features[i]) {
-	feature_bleu = features[i]->feature_name();
-	break;
-      }
-    
-    double objective_optimum = (score_optimum
-				? score_optimum->score() * score_factor
+
+    double objective_optimum = (score
+				? score->score() * score_factor
 				: - std::numeric_limits<double>::infinity());
-
-    hypergraph_type graph_oracle;
-
-    typedef std::vector<size_t, std::allocator<size_t> > id_set_type;
-
-    id_set_type ids;
-    for (size_t id = 0; id != graphs.size(); ++ id)
-      if (graphs[id].is_valid())
-	ids.push_back(id);
     
-    boost::random_number_generator<Generator> gen(generator);
-    std::random_shuffle(ids.begin(), ids.end(), gen);
-    
-    id_set_type::const_iterator iiter_end = ids.end();
-    for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
-      const size_t id = *iiter;
-      
-      score_ptr_type score_curr;
-      if (score_optimum)
-	score_curr = score_optimum->clone();
-      
-      if (scores[id])
-	*score_curr -= *scores[id];
-      
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
-      
-      if (__bleu)
-	__bleu->assign(score_curr);
-      else
-	__bleu_linear->assign(score_curr);
+    for (size_t id = 0; id != hypotheses.size(); ++ id) 
+      if (! hypotheses[id].empty()) {
+	
+	score_ptr_type score_curr = (score ? score->clone() : score_ptr_type());
+	
+	if (score_curr && ! oracles[id].empty())
+	  *score_curr -= *(oracles[id].front()->score);
+	
+	oracles[id].clear();
+	
+	hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+	for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
+	
+	  score_ptr_type score_sample;
 
-      typedef cicada::semiring::Logprob<double> weight_type;
-      
-      model_type model;
-      model.push_back(features[id]);
-      
-      if (apply_exact)
-	cicada::apply_exact(model, graphs[id], graph_oracle);
-      else
-	cicada::apply_cube_prune(model, graphs[id], graph_oracle, cicada::operation::single_scaled_function<weight_type>(feature_bleu, score_factor), cube_size);
-      
-      // compute viterbi...
-      weight_type weight;
-      sentence_type sentence;
-      cicada::viterbi(graph_oracle, sentence, weight, cicada::operation::sentence_traversal(), cicada::operation::single_scaled_function<weight_type >(feature_bleu, score_factor));
-      
-      // compute pruned forest
-      hypergraph_type forest;
-      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_bleu, score_factor), 1e-5);
-      
-      // compute scores...
-      score_ptr_type score_sample = scorers[id]->score(sentence);
-      if (score_curr)
-	*score_curr += *score_sample;
-      else
-	score_curr = score_sample;
-      
-      const double objective = score_curr->score() * score_factor;
-      
-      if (objective > objective_optimum || ! scores[id]) {
-	score_optimum = score_curr;
-	objective_optimum = objective;
-	scores[id] = score_sample;
-	
-	sentences[id].swap(sentence);
-	forests[id].swap(forest);
-	
-	// remove features...
-	hypergraph_type::edge_set_type::iterator eiter_end = forests[id].edges.end();
-	for (hypergraph_type::edge_set_type::iterator eiter = forests[id].edges.begin(); eiter != eiter_end; ++ eiter)
-	  eiter->features.erase(feature_bleu);
+	  if (score_curr) {
+	    score_sample = score_curr->clone();
+	    *score_sample += *hiter->score;
+	  } else
+	    score_sample = hiter->score->clone();
+	  
+	  const double objective = score_sample->score() * score_factor;
+	  
+	  if (objective > objective_optimum || oracles[id].empty()) {
+	    oracles[id].clear();
+	    oracles[id].push_back(&(*hiter));
+	    
+	    objective_optimum = objective;
+	    score = score_sample;
+	  } else if (objective == objective_optimum)
+	    oracles[id].push_back(&(*hiter));
+	}
       }
-    }
   }
   
-  score_ptr_type score_optimum;
+  score_ptr_type score;
   
-  const hypergraph_set_type&           graphs;
-  const feature_function_ptr_set_type& features;
-  const scorer_document_type&          scorers;
-  score_ptr_set_type&                  scores;
-  sentence_set_type&                   sentences;
-  hypergraph_set_type&                 forests;
+  const scorer_document_type& scorers;
+  const hypothesis_map_type& hypotheses;
+  oracle_map_type& oracles;
+  
   Generator&                           generator;
 };
 
 template <typename Generator>
-void compute_oracles(const hypergraph_set_type& graphs,
-		     const feature_function_ptr_set_type& features,
-		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests,
+void compute_oracles(const scorer_document_type& scorers,
+		     const hypothesis_map_type& hypotheses,
+		     hypothesis_map_type& oracles,
 		     Generator& generator)
 {
   typedef TaskOracle<Generator> task_type;
-
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  score_ptr_set_type scores(graphs.size());
   
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
@@ -445,6 +390,19 @@ void compute_oracles(const hypergraph_set_type& graphs,
     }
 }
 
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers)
+{
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    if (! hypotheses[id].empty()) {
+      hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      
+      hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	hiter->score = scorers[id]->score(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+    }
+}
+
 void read_tstset(const path_set_type& files,
 		 hypothesis_map_type& hypotheses)
 {
@@ -465,7 +423,7 @@ void read_tstset(const path_set_type& files,
       throw std::runtime_error("no file: " + fiter->string());
 
     if (boost::filesystem::is_directory(*fiter)) {
-      for (int i = 0; /**/; ++ i) {
+      for (int i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
@@ -514,7 +472,8 @@ void read_tstset(const path_set_type& files,
 	if (id >= hypotheses.size())
 	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
 	
-	hypotheses[id].push_back(hypothesis_type(kbest));
+	if (id % mpi_size == mpi_rank)
+	  hypotheses[id].push_back(hypothesis_type(kbest));
       }
     }
   }
