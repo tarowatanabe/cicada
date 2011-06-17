@@ -677,9 +677,6 @@ struct OptimizeLBFGS
     
     void operator()()
     {
-      const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-      const int mpi_size = MPI::COMM_WORLD.Get_size();
-
       hypergraph_type hypergraph;
             
       gradients_type gradients;

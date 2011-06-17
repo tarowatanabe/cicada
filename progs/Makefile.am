@@ -59,8 +59,9 @@ bin_PROGRAMS = \
 	cicada_index_global_lexicon \
 	cicada_index_tree_grammar \
 	cicada_learn \
-	cicada_learn_kbest \
 	cicada_learn_mpi \
+	cicada_learn_kbest \
+	cicada_learn_kbest_mpi \
 	cicada_learn_online \
 	cicada_learn_online_mpi \
 	cicada_lexicon \
@@ -208,6 +209,10 @@ cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD
 
 cicada_learn_kbest_SOURCES = cicada_learn_kbest.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
 cicada_learn_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_learn_kbest_mpi_SOURCES  = cicada_learn_kbest_mpi.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
+cicada_learn_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_learn_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_learn_mpi_SOURCES  = cicada_learn_mpi.cpp $(LBFGS_SOURCE) cicada_learn_impl.hpp
 cicada_learn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)

@@ -170,8 +170,6 @@ struct OptimizeLBFGS
     typedef cicada::semiring::Log<double> weight_type;
     typedef cicada::WeightVector<weight_type, std::allocator<weight_type> > expectation_type;
 
-    typedef std::vector<weight_type, std::allocator<weight_type> > weights_type;
-    
     typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
     
     Task(queue_type&            __queue,
@@ -515,6 +513,9 @@ void read_kbest(const path_set_type& kbest_path,
 	      if (iter != iter_end)
 		throw std::runtime_error("kbest parsing failed");
 	    
+	    if (boost::fusion::get<0>(kbest) != i)
+	      throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
+	    
 	    kbests.back().push_back(hypothesis_type(kbest));
 	  }
 	}
@@ -533,6 +534,9 @@ void read_kbest(const path_set_type& kbest_path,
 	    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	      if (iter != iter_end)
 		throw std::runtime_error("kbest parsing failed");
+
+	    if (boost::fusion::get<0>(kbest) != i)
+	      throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
 	    
 	    oracles.back().push_back(hypothesis_type(kbest));
 	  }
