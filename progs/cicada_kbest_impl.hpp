@@ -94,12 +94,11 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
     namespace standard = boost::spirit::standard;
     
     tokens  %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
-    remains %= *qi::lexeme[+(standard::char_ - standard::space)];
     
     feature %= qi::lexeme[+(standard::char_ - standard::space - '=')] >> '=' >> qi::double_;
     features %= *feature;
     
-    kbest %= size >> "|||" >> tokens >> -("|||" >> features >> -("|||" >> remains)) >> (qi::eol | qi::eoi);
+    kbest %= size >> "|||" >> tokens >> -("|||" >> features) >> -("|||" >> qi::double_) >> (qi::eol | qi::eoi);
   }
   
   typedef boost::spirit::standard::blank_type blank_type;
@@ -109,8 +108,6 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
   
   boost::spirit::qi::rule<Iterator, feature_parsed_type(), blank_type>  feature;
   boost::spirit::qi::rule<Iterator, feature_parsed_set_type(), blank_type> features;
-
-  boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> remains;
   
   boost::spirit::qi::rule<Iterator, kbest_feature_type(), blank_type>  kbest;
 };
