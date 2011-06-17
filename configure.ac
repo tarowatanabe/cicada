@@ -34,6 +34,30 @@ AC_SYS_LARGEFILE
 
 # Checks for libraries.
 
+AC_ARG_WITH(blas,
+	[AC_HELP_STRING([--with-blas=DIR], [blas in DIR])],
+	[blas_dir="${withval}"], [blas_dir=''])
+
+if test "x$blas_dir" != "x"; then
+  BLAS_LDFLAGS="-L${blas_dir}/lib -lblas"
+else
+  BLAS_LDFLAGS="-lblas"
+fi
+
+AC_MSG_CHECKING(for blas)
+save_LDFLAGS="$LDFLAGS"
+LDFLAGS="$LDFLAGS $BLAS_LDFLAGS"
+AC_TRY_LINK([], [], [ac_have_blas=yes], [ac_have_blas=no])
+LDFLAGS="$save_LDFLAGS"
+AC_MSG_RESULT($ac_have_blas)
+if test "x$ac_have_blas" = "xno"; then
+  BLAS_LDFLAGS=""
+else
+   AC_DEFINE(HAVE_BLAS, 1, [Define if you have blas])
+fi
+AC_SUBST(BLAS_LDFLAGS)
+AM_CONDITIONAL([HAVE_BLAS], [test x$ac_have_blas = xyes])
+
 AC_ARG_WITH(sparsehash,
 	[AC_HELP_STRING([--with-sparsehash=DIR], [sparsehash in DIR])],
 	[sparsehash_dir="${withval}"], [sparsehash_dir=''])
