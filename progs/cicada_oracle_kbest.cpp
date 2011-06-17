@@ -49,7 +49,7 @@ bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
 int max_iteration = 10;
-int min_iteration = 5;
+int min_iteration = 1;
 
 int threads = 4;
 
