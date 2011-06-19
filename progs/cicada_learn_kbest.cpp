@@ -31,6 +31,7 @@
 #include <boost/functional/hash/hash.hpp>
 
 #include "lbfgs.h"
+#include "liblinear/linear.h"
 
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
@@ -133,6 +134,119 @@ int main(int argc, char ** argv)
   }
   return 0;
 }
+
+struct OptimizeLinear
+{
+  typedef struct model        model_type;
+  typedef struct parameter    parameter_type;
+  typedef struct problem      problem_type;
+  typedef struct feature_node feature_node_type;
+
+  typedef std::vector<feature_node_type, std::allocator<feature_node_type> > feature_node_set_type;
+  typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
+  typedef std::vector<int, std::allocator<int> > label_set_type;
+  
+  OptimizeLinear(const hypothesis_map_type& kbests,
+		 const hypothesis_map_type& oracles)
+  {
+    const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
+    for (size_t id = 0; id != id_max; ++ id)
+      if (! kbests[id].empty() && ! oracles[id].empty()) {
+	
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
+	    const hypothesis_type& oracle = oracles[id][o];
+	    const hypothesis_type& kbest  = kbests[id][k];
+	    
+	    labels.push_back(1);
+	    feature_node_type feat;
+	    
+	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator oiter_end = oracle.features.end();
+	    
+	    hypothesis_type::feature_set_type::const_iterator kiter = kbest.features.begin();
+	    hypothesis_type::feature_set_type::const_iterator kiter_end = kbest.features.end();
+	    
+	    while (oiter != oiter_end && kiter != kiter_end) {
+	      if (oiter->first < kiter->first) {
+		feat.index = oiter->first.id() + 1;
+		feat.value = oiter->second;
+		feature_nodes.push_back(feat);
+		++ oiter;
+	      } else if (kiter->first < oiter->first) {
+		feat.index = kiter->first.id() + 1;
+		feat.value = - kiter->second;
+		feature_nodes.push_back(feat);
+		++ kiter;
+	      } else {
+		feat.index = oiter->first.id() + 1;
+		feat.value = oiter->second - kiter->second;
+		if (feat.value != 0.0)
+		  feature_nodes.push_back(feat);
+		++ oiter;
+		++ kiter;
+	      }
+	    }
+	    
+	    for (/**/; oiter != oiter_end; ++ oiter) {
+	      feat.index = oiter->first.id() + 1;
+	      feat.value = oiter->second;
+	      feature_nodes.push_back(feat);
+	    }
+	    
+	    for (/**/; kiter != kiter_end; ++ kiter) {
+	      feat.index = kiter->first.id() + 1;
+	      feat.value = - kiter->second;
+	      feature_nodes.push_back(feat);
+	    }
+	    
+	    // termination...
+	    feat.index = -1;
+	    feat.value = 0.0;
+	    feature_nodes.push_back(feat);
+	  }
+      }
+    
+    // construct problem...
+    label_set_type(labels).swap(labels);
+    feature_node_set_type(feature_nodes).swap(feature_nodes);
+
+    features.reserve(labels.size());
+    feature_node_set_type::const_iterator fiter = feature_nodes.begin();
+    feature_node_set_type::const_iterator fiter_end = feature_nodes.end();
+    while (fiter != fiter_end) {
+      features.push_back(const_cast<feature_node_type*>(&(*fiter)));
+      for (/**/; fiter != fiter_end && fiter->index != -1; ++ fiter);
+      fiter += (fiter != fiter_end && fiter->index == -1);
+    }
+    
+    if (features.size() != labels.size())
+      throw std::runtime_error("invalid kbest feature conversion");
+    
+    problem_type problem;
+    
+    problem.l = labels.size();
+    problem.n = feature_type::allocated();
+    problem.y = &(*labels.begin());
+    problem.x = &(*features.begin());
+    problem.bias = -1;
+
+    parameter_type parameter;
+    parameter.solver_type = 0; // choose solver
+    parameter.eps = 0.0;       // choose recommended setting for each soler...
+    parameter.C = C;
+    parameter.nr_weight    = 0;
+    parameter.weight_label = 0;
+    parameter.weight       = 0;
+    
+    
+  }
+  
+private:
+  label_set_type        labels;
+  feature_node_map_type features;
+  feature_node_set_type feature_nodes;
+};
 
 struct OptimizeLBFGS
 {
@@ -395,8 +509,6 @@ void read_kbest(const path_set_type& kbest_path,
   kbest_feature_type kbest;
   
   if (unite_kbest) {
-    size_t id_kbest;
-    size_t id_oracle;
     
     for (path_set_type::const_iterator piter = kbest_path.begin(); piter != kbest_path.end(); ++ piter) {
       if (debug)

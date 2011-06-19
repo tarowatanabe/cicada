@@ -11,7 +11,8 @@ boost_LDADD = \
 	$(BOOST_SYSTEM_LDFLAGS) $(BOOST_SYSTEM_LIBS)
 
 LIBCICADA = $(top_builddir)/cicada/libcicada.la
-LIBUTILS   = $(top_builddir)/utils/libutils.la
+LIBUTILS  = $(top_builddir)/utils/libutils.la
+LIBLINEAR = $(top_builddir)/liblinear/liblinear.la
 
 noinst_PROGRAMS = \
 cicada_text_main
@@ -208,7 +209,7 @@ cicada_learn_SOURCES = cicada_learn.cpp $(LBFGS_SOURCE) cicada_learn_impl.hpp
 cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_learn_kbest_SOURCES = cicada_learn_kbest.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
-cicada_learn_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+cicada_learn_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
 
 cicada_learn_kbest_mpi_SOURCES  = cicada_learn_kbest_mpi.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
 cicada_learn_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
