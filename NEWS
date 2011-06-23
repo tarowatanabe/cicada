@@ -2,6 +2,7 @@
 Serious bugfix for parse-{cky,tree,tree-cky} where the features from source lattice/forest(s) are completely ignored for pruning.
 Added format, a formatter/parser derived from ICU's number/date format/parse
 Added grammar-format, grammar using the ICU's number/date formatter/parser as our rule!
+Added experimental kbest-based learner and oracle computer with support for liblinear solver
 Support multiple forest loading in cicada_learn_mpi and added an option to load previously training parameters
 Support margin-based learning in cicada_learn_mpi
 
