@@ -29,6 +29,7 @@
 #include <boost/thread.hpp>
 #include <boost/random.hpp>
 #include <boost/functional/hash/hash.hpp>
+#include <boost/numeric/conversion/bounds.hpp>
 
 #include "lbfgs.h"
 #include "liblinear/linear.h"
@@ -45,9 +46,15 @@ int iteration = 100;
 bool learn_sgd = false;
 bool learn_lbfgs = false;
 bool learn_mira = false;
+bool learn_linear = false;
+
+int linear_solver = L2R_L2LOSS_SVC_DUAL;
+
 bool regularize_l1 = false;
 bool regularize_l2 = false;
+
 double C = 1.0;
+double eps = std::numeric_limits<double>::infinity();
 
 bool unite_kbest = false;
 
@@ -261,14 +268,30 @@ struct OptimizeLinear
     problem.bias = -1;
 
     parameter_type parameter;
-    parameter.solver_type = 0; // choose solver
-    parameter.eps = 0.0;       // choose recommended setting for each soler...
+    parameter.solver_type = linear_solver;
+    parameter.eps = eps;
     parameter.C = C;
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;
     
+    if (parameter.eps == std::numeric_limits<double>::infinity()) {
+      if (parameter.solver_type == L2R_LR || parameter.solver_type == L2R_L2LOSS_SVC)
+	parameter.eps = 0.01;
+      else if (parameter.solver_type == L2R_L2LOSS_SVC_DUAL || parameter.solver_type == L2R_L1LOSS_SVC_DUAL || parameter.solver_type == MCSVM_CS || parameter.solver_type == L2R_LR_DUAL)
+	parameter.eps = 0.1;
+      else if (parameter.solver_type == L1R_L2LOSS_SVC || parameter.solver_type == L1R_LR)
+	parameter.eps = 0.01;
+    }
     
+    const char* error_message = check_parameter(&problem, &parameter);
+    if (error_message)
+      throw std::runtime_error(std::string("error: ") + error_message);
+
+    model_type* model = train(&problem, &parameter);
+    
+    
+    free_and_destroy_model(&model);
   }
   
 private:
@@ -710,11 +733,13 @@ void options(int argc, char** argv)
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
-    ("learn-sgd",    po::bool_switch(&learn_sgd),    "online SGD algorithm")
+    ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm(s)")
+    ("solver",       po::value<int>(&linear_solver), "liblinear solver type (see liblinear homepage)")
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
-    ("C"            , po::value<double>(&C),           "regularization constant")
+    ("C",             po::value<double>(&C),           "regularization constant")
+    ("eps",           po::value<double>(&eps),         "tolerance")
     
     ("unite",    po::bool_switch(&unite_kbest), "unite kbest sharing the same id")
 
