@@ -62,6 +62,7 @@ struct hypothesis_type
   score_ptr_type   score;
 };
 
+
 inline
 size_t hash_value(hypothesis_type const& x)
 {

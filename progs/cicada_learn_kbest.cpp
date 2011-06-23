@@ -146,19 +146,53 @@ struct OptimizeLinear
   typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
   typedef std::vector<int, std::allocator<int> > label_set_type;
   
+  typedef size_t size_type;
+  typedef size_t offset_type;
+  typedef std::vector<offset_type, std::allocator<offset_type> > offset_set_type;
+
+  //
+  // typedef for unique sentences
+  //
+  struct hash_sentence : public utils::hashmurmur<size_t>
+  {
+    typedef utils::hashmurmur<size_t> hasher_type;
+
+    size_t operator()(const hypothesis_type::sentence_type& x) const
+    {
+      return hasher_type()(x.begin(), x.end(), 0);
+    }
+  };
+  
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
+#endif
+  
   OptimizeLinear(const hypothesis_map_type& kbests,
 		 const hypothesis_map_type& oracles)
   {
+    // compute unique before processing
+    // 
     const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
     for (size_t id = 0; id != id_max; ++ id)
       if (! kbests[id].empty() && ! oracles[id].empty()) {
+
+	sentences.clear();
+	for (size_t o = 0; o != oracles[id].size(); ++ o)
+	  sentences.insert(oracles[id][0].sentence);
 	
 	for (size_t o = 0; o != oracles[id].size(); ++ o)
 	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
 	    const hypothesis_type& oracle = oracles[id][o];
 	    const hypothesis_type& kbest  = kbests[id][k];
 	    
+	    // ignore oracle translations
+	    if (sentences.find(kbest.sentence) != sentences.end()) continue;
+	    
 	    labels.push_back(1);
+	    offsets.push_back(feature_nodes.size());
+	    
 	    feature_node_type feat;
 	    
 	    hypothesis_type::feature_set_type::const_iterator oiter = oracle.features.begin();
@@ -206,22 +240,17 @@ struct OptimizeLinear
 	    feature_nodes.push_back(feat);
 	  }
       }
-    
+
     // construct problem...
     label_set_type(labels).swap(labels);
     feature_node_set_type(feature_nodes).swap(feature_nodes);
 
-    features.reserve(labels.size());
-    feature_node_set_type::const_iterator fiter = feature_nodes.begin();
-    feature_node_set_type::const_iterator fiter_end = feature_nodes.end();
-    while (fiter != fiter_end) {
-      features.push_back(const_cast<feature_node_type*>(&(*fiter)));
-      for (/**/; fiter != fiter_end && fiter->index != -1; ++ fiter);
-      fiter += (fiter != fiter_end && fiter->index == -1);
-    }
-    
-    if (features.size() != labels.size())
-      throw std::runtime_error("invalid kbest feature conversion");
+    features.reserve(offsets.size());
+    for (size_type pos = 0; pos != offsets.size(); ++ pos)
+      features.push_back(const_cast<feature_node_type*>(&(*feature_nodes.begin())) + offsets[pos]);
+
+    offsets.clear();
+    offset_set_type(offsets).swap(offsets);
     
     problem_type problem;
     
@@ -244,8 +273,10 @@ struct OptimizeLinear
   
 private:
   label_set_type        labels;
+  offset_set_type       offsets;
   feature_node_map_type features;
   feature_node_set_type feature_nodes;
+  sentence_unique_type  sentences;
 };
 
 struct OptimizeLBFGS
