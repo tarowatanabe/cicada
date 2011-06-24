@@ -73,7 +73,12 @@ template <typename Optimizer>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights);
+template <typename Optimizer>
+double optimize_linear(const hypothesis_map_type& kbests,
+		       const hypothesis_map_type& oracles,
+		       weight_set_type& weights);
 
+struct OptimizeLinear;
 struct OptimizeLBFGS;
 
 int main(int argc, char ** argv)
@@ -81,12 +86,12 @@ int main(int argc, char ** argv)
   try {
     options(argc, argv);
     
-    if (int(learn_lbfgs) + learn_sgd > 1)
-      throw std::runtime_error("eitehr learn-{lbfgs,sgd}");
-    if (int(learn_lbfgs) + learn_sgd == 0)
+    if (int(learn_lbfgs) + learn_linear > 1)
+      throw std::runtime_error("eitehr learn-{lbfgs,linear}");
+    if (int(learn_lbfgs) + learn_linear == 0)
       learn_lbfgs = true;
     
-    if (regularize_l1 && regularize_l2)
+    if (learn_lbfgs && regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
     
     if (kbest_path.empty())
@@ -120,7 +125,10 @@ int main(int argc, char ** argv)
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
     
-    objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
+    if (learn_linear)
+      objective = optimize_linear<OptimizeLinear>(kbests, oracles, weights);
+    else
+      objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
     
     if (debug)
       std::cerr << "objective: " << objective << std::endl;
@@ -294,7 +302,7 @@ struct OptimizeLinear
     for (int j = 0; j != model->nr_feature; ++ j)
       weights[weight_set_type::feature_type(j)] = model->w[j];
     
-    free_and_destroy_model(&const_cast<model_type*>(model));
+    free_and_destroy_model(const_cast<model_type**>(&model));
   }
   
 private:
@@ -307,6 +315,19 @@ private:
 public:
   weight_set_type weights;
 };
+
+template <typename Optimizer>
+double optimize_linear(const hypothesis_map_type& kbests,
+		       const hypothesis_map_type& oracles,
+		       weight_set_type& weights)
+{
+  Optimizer optimizer(kbests, oracles);
+  
+  weights = optimizer.weights;
+  
+  return 0.0;
+}
+
 
 struct OptimizeLBFGS
 {
