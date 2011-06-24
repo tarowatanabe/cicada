@@ -274,7 +274,7 @@ struct OptimizeLinear
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;
-    
+
     if (parameter.eps == std::numeric_limits<double>::infinity()) {
       if (parameter.solver_type == L2R_LR || parameter.solver_type == L2R_L2LOSS_SVC)
 	parameter.eps = 0.01;
@@ -287,11 +287,14 @@ struct OptimizeLinear
     const char* error_message = check_parameter(&problem, &parameter);
     if (error_message)
       throw std::runtime_error(std::string("error: ") + error_message);
-
-    model_type* model = train(&problem, &parameter);
     
+    const model_type* model = train(&problem, &parameter);
     
-    free_and_destroy_model(&model);
+    // it is an optimization...
+    for (int j = 0; j != model->nr_feature; ++ j)
+      weights[weight_set_type::feature_type(j)] = model->w[j];
+    
+    free_and_destroy_model(&const_cast<model_type*>(model));
   }
   
 private:
@@ -300,6 +303,9 @@ private:
   feature_node_map_type features;
   feature_node_set_type feature_nodes;
   sentence_unique_type  sentences;
+
+public:
+  weight_set_type weights;
 };
 
 struct OptimizeLBFGS
