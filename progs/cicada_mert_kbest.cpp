@@ -809,7 +809,7 @@ void read_tstset(const path_set_type& files,
       throw std::runtime_error("no file: " + fiter->string());
 
     if (boost::filesystem::is_directory(*fiter)) {
-      for (int i = 0; /**/; ++ i) {
+      for (size_t i = 0; /**/; ++ i) {
 	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
