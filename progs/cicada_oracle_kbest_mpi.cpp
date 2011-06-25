@@ -92,7 +92,6 @@ void compute_oracles(const scorer_document_type& scorers,
 		     Generator& generator);
 
 void bcast_kbest(hypothesis_map_type& kbests);
-void bcast_weights(const int rank, weight_set_type& weights);
 void options(int argc, char** argv);
 
 int main(int argc, char ** argv)
@@ -324,6 +323,11 @@ void compute_oracles(const scorer_document_type& scorers,
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  // TODO!
+  //
+  // we need sentence+feature bcast to keep oracles consistent
+  //
   
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
@@ -372,22 +376,6 @@ void compute_oracles(const scorer_document_type& scorers,
     objective_optimum = objective;
   }
   
-  for (size_t id = 0; id != graphs.size(); ++ id)
-    if (features[id]) {
-      if (! scores[id])
-	throw std::runtime_error("no scores?");
-      
-      score_ptr_type score_curr = score_optimum->clone();
-      *score_curr -= *scores[id];
-      
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
-      
-      if (__bleu)
-	__bleu->assign(score_curr);
-      else
-	__bleu_linear->assign(score_curr);
-    }
 }
 
 void initialize_score(hypothesis_map_type& hypotheses,
@@ -571,48 +559,6 @@ void bcast_kbest(hypothesis_map_type& kbests)
     }
   }
 }
-
-
-void bcast_weights(const int rank, weight_set_type& weights)
-{
-  typedef std::vector<char, std::allocator<char> > buffer_type;
-
-  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
-  const int mpi_size = MPI::COMM_WORLD.Get_size();
-  
-  if (mpi_rank == rank) {
-    boost::iostreams::filtering_ostream os;
-    os.push(utils::mpi_device_bcast_sink(rank, 1024));
-    
-    static const weight_set_type::feature_type __empty;
-    
-    weight_set_type::const_iterator witer_begin = weights.begin();
-    weight_set_type::const_iterator witer_end = weights.end();
-    
-    for (weight_set_type::const_iterator witer = witer_begin; witer != witer_end; ++ witer)
-      if (*witer != 0.0) {
-	const weight_set_type::feature_type feature(witer - witer_begin);
-	if (feature != __empty) {
-	  os << feature << ' ';
-	  utils::encode_base64(*witer, std::ostream_iterator<char>(os));
-	  os << '\n';
-	}
-      }
-  } else {
-    weights.clear();
-    weights.allocate();
-    
-    boost::iostreams::filtering_istream is;
-    is.push(utils::mpi_device_bcast_source(rank, 1024));
-    
-    std::string feature;
-    std::string value;
-    
-    while ((is >> feature) && (is >> value))
-      weights[feature] = utils::decode_base64<double>(value);
-  }
-}
-
 
 void options(int argc, char** argv)
 {

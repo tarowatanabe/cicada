@@ -1091,13 +1091,13 @@ namespace cicada
 	
 	const transducer_type::rule_pair_set_type& rules = grammar[table].rules(node);
 	
-	if (rules.size() > beam_size) {
+	if (rules.size() > static_cast<size_type>(beam_size)) {
 	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
 	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
 	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
 	    const score_type score = function(iter->features);
 	    
-	    if (riter->second.size() < beam_size || score >= riter->second.front()->score) {
+	    if (riter->second.size() < static_cast<size_type>(beam_size) || score >= riter->second.front()->score) {
 	      rule_candidates.push_back(rule_candidate_type(score,
 							    iter->source->lhs,
 							    yield_source ? iter->source : iter->target,
@@ -1144,13 +1144,13 @@ namespace cicada
 	
 	const tree_transducer_type::rule_pair_set_type& rules = tree_grammar[table].rules(node);
 	
-	if (rules.size() > beam_size) {
+	if (rules.size() > static_cast<size_type>(beam_size)) {
 	  tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
 	  tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
 	  for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
 	    const score_type score = function(iter->features);
 
-	    if (riter->second.size() < beam_size || score >= riter->second.front()->score) {
+	    if (riter->second.size() < static_cast<size_type>(beam_size) || score >= riter->second.front()->score) {
 	      tree_candidates.push_back(tree_candidate_type(score,
 							    iter->source->label,
 							    yield_source ? iter->source : iter->target,

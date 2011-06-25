@@ -241,10 +241,30 @@ namespace cicada
       
       const non_terminal_set_type& non_terminals;
     };
-    
+
+    struct PruneNone
+    {
+      bool operator()(const int first, const int last) const
+      {
+	return false;
+      }
+      
+      bool operator()(const int first, const int last, const symbol_type& label) const
+      {
+	return false;
+      }
+    };
     
     void operator()(const lattice_type& lattice,
 		    hypergraph_type& graph)
+    {
+      operator()(lattice, graph, PruneNone());
+    }
+    
+    template <typename Pruner>
+    void operator()(const lattice_type& lattice,
+		    hypergraph_type& graph,
+		    const Pruner& pruner)
     {
       graph.clear();
       
@@ -280,6 +300,8 @@ namespace cicada
       for (size_t length = 1; length <= lattice.size(); ++ length)
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
+
+	  if (pruner(first, last)) continue;
 	  	  
 	  //std::cerr << "span: " << first << ".." << last << " distance: " << lattice.shortest_distance(first, last) << std::endl;
 	  
@@ -372,7 +394,7 @@ namespace cicada
 	  heap.clear();
 	  
 	  for (size_t table = 0; table != grammar.size(); ++ table) {
-	    active_set_type&  cell         = actives[table](first, last);
+	    active_set_type&  cell = actives[table](first, last);
 	    
 	    typename active_set_type::const_iterator citer_end = cell.end();
 	    for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
@@ -402,7 +424,7 @@ namespace cicada
 
 	  passive_set_type& passive_arcs = passives(first, last);
 	  
-	  for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; ++ num_pop) {
+	  for (int num_pop = 0; ! heap.empty() && num_pop != beam_size; /**/) {
 	    // pop-best...
 	    const candidate_type* item = heap.top();
 	    heap.pop();
@@ -418,8 +440,20 @@ namespace cicada
 	    const active_type& active = *(item->active);
 	    const rule_candidate_type& rule = *(*(item->first));
 	    const score_type score = item->score * rule.score;
-	    	    
-	    std::pair<hypergraph_type::id_type, bool> node_passive;
+	    
+	    if (pruner(first, last, rule.rule->lhs)) {
+	      // next queue!
+	      ++ const_cast<candidate_type*>(item)->first;
+	      if (item->first != item->last)
+		heap.push(item);
+	      
+	      continue;
+	    }
+	    
+	    // we will increment here!
+	    ++ num_pop;
+	    
+	    std::pair<hypergraph_type::id_type, bool> node_passive(hypergraph_type::invalid, false);
 	    
 	    if (item->level > 0) {
 	      // check an edge consisting of:
@@ -670,13 +704,13 @@ namespace cicada
 	
 	const transducer_type::rule_pair_set_type& rules = grammar[table].rules(node);
 	
-	if (rules.size() > beam_size) {
+	if (rules.size() > static_cast<size_type>(beam_size)) {
 	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
 	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
 	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
 	    const score_type score = function(iter->features);
 	    
-	    if (riter->second.size() < beam_size || score >= riter->second.front()->score) {
+	    if (riter->second.size() < static_cast<size_type>(beam_size) || score >= riter->second.front()->score) {
 	      rule_candidates.push_back(rule_candidate_type(score,
 							    yield_source ? iter->source : iter->target,
 							    iter->features,
