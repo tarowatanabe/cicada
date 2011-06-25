@@ -342,9 +342,7 @@ void compute_oracles(const scorer_document_type& scorers,
   
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
-
-  sentence_set_type   sentences_optimum;
-  hypergraph_set_type forests_optimum;
+  hypothessi_map_type oracles_optimum(oracles.size());
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -353,22 +351,24 @@ void compute_oracles(const scorer_document_type& scorers,
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
     
-    sentences_optimum = sentences;
-    forests_optimum   = forests;
+    oracles_optimum = oracles;
     
-    task_type(graphs, features, scorers, scores, sentences, forests, generator)();
-
-    bcast_sentences(sentences, forests);
+    task_type(scorers, hypotheses, oracles, generator)();
+    
+    bcast_kbest(oracles);
     
     score_optimum.reset();
-    for (size_t id = 0; id != sentences.size(); ++ id)
-      if (! sentences[id].empty()) {
-	scores[id] = scorers[id]->score(sentences[id]);
+    for (size_t id = 0; id != oracles.size(); ++ id)
+      if (! oracles[id].empty()) {
+	hypothesis_type& hyp = oracles[id].front();
+
+	if (! hyp.score)
+	  hyp.score = scorers[id]->score(sentence_type(hyp.sentence.begin(), hyp.sentence.end()));
 	
 	if (! score_optimum)
-	  score_optimum = scores[id]->clone();
+	  score_optimum = hyp.score->clone();
 	else
-	  *score_optimum += *scores[id];
+	  *score_optimum += *hyp.score;
       }
     
     const double objective = score_optimum->score() * score_factor;
@@ -379,14 +379,12 @@ void compute_oracles(const scorer_document_type& scorers,
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
     if (terminate) {
-      sentences.swap(sentences_optimum);
-      forests.swap(forests_optimum);
+      oracles.swap(oracles_optimum);
       break;
     }
     
     objective_optimum = objective;
   }
-  
 }
 
 void initialize_score(hypothesis_map_type& hypotheses,
