@@ -17,6 +17,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/semiring.hpp>
 #include <cicada/compose_cky.hpp>
+#include <cicada/parse_cky.hpp>
 
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
