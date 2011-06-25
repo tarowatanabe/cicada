@@ -52,7 +52,7 @@
 #include "utils/mpi_stream_simple.hpp"
 
 #include "cicada_text_impl.hpp"
-#include "cicada_kbeset_impl.hpp"
+#include "cicada_kbest_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -126,9 +126,6 @@ int main(int argc, char ** argv)
     
     initialize_score(hypotheses, scorers);
     
-    if (mpi_rank == 0 && debug)
-      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
-
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
     
@@ -236,12 +233,9 @@ int loop_sleep(bool found, int non_found_iter)
 template <typename Generator>
 struct TaskOracle
 {
-  typedef std::vector<const hypothesis_type*, std::allocator<const hypothesis_type*> > oracle_set_type;
-  typedef std::vector<oracle_set_type, std::allocator<oracle_set_type> > oracle_map_type;
-  
   TaskOracle(const scorer_document_type& __scorers,
 	     const hypothesis_map_type&  __hypotheses,
-	     oracle_map_type&            __oracles,
+	     hypothesis_map_type&        __oracles,
 	     Generator&                  __generator)
     : scorers(__scorers),
       hypotheses(__hypotheses),
@@ -253,9 +247,9 @@ struct TaskOracle
     for (size_t id = 0; id != oracles.size(); ++ id) 
       if (! oracles[id].empty()) {
 	if (! score)
-	  score = oracles[id].front()->score->clone();
+	  score = oracles[id].front().score->clone();
 	else
-	  *score += *(oracles[id].front()->score);
+	  *score += *(oracles[id].front().score);
       }
   }
   
@@ -286,7 +280,7 @@ struct TaskOracle
       score_ptr_type score_curr = (score ? score->clone() : score_ptr_type());
 	
       if (score_curr && ! oracles[id].empty())
-	*score_curr -= *(oracles[id].front()->score);
+	*score_curr -= *(oracles[id].front().score);
       
       oracles[id].clear();
 	
@@ -305,12 +299,12 @@ struct TaskOracle
 	  
 	if (objective > objective_optimum || oracles[id].empty()) {
 	  oracles[id].clear();
-	  oracles[id].push_back(&(*hiter));
+	  oracles[id].push_back(*hiter);
 	    
 	  objective_optimum = objective;
 	  score = score_sample;
 	} else if (objective == objective_optimum)
-	  oracles[id].push_back(&(*hiter));
+	  oracles[id].push_back(*hiter);
       }
     }
   }
@@ -318,10 +312,9 @@ struct TaskOracle
   score_ptr_type score;
   
   const scorer_document_type& scorers;
-  const hypothesis_map_type& hypotheses;
-  oracle_map_type& oracles;
-  
-  Generator&                           generator;
+  const hypothesis_map_type&  hypotheses;
+  hypothesis_map_type&        oracles;
+  Generator&                  generator;
 };
 
 template <typename Generator>
@@ -342,7 +335,7 @@ void compute_oracles(const scorer_document_type& scorers,
   
   score_ptr_type score_optimum;
   double objective_optimum = - std::numeric_limits<double>::infinity();
-  hypothessi_map_type oracles_optimum(oracles.size());
+  hypothesis_map_type oracles_optimum(oracles.size());
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -420,7 +413,7 @@ void read_tstset(const path_set_type& files,
       throw std::runtime_error("no file: " + fiter->string());
 
     if (boost::filesystem::is_directory(*fiter)) {
-      for (int i = mpi_rank; /**/; i += mpi_size) {
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
@@ -469,7 +462,7 @@ void read_tstset(const path_set_type& files,
 	if (id >= hypotheses.size())
 	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
 	
-	if (id % mpi_size == mpi_rank)
+	if (static_cast<int>(id % mpi_size) == mpi_rank)
 	  hypotheses[id].push_back(hypothesis_type(kbest));
       }
     }
@@ -601,17 +594,12 @@ void options(int argc, char** argv)
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
 
-    ("forest",    po::bool_switch(&forest_mode),    "output by forest")
     ("directory", po::bool_switch(&directory_mode), "output in directory")
     
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     
     ("max-iteration", po::value<int>(&max_iteration), "# of hill-climbing iteration")
-    ("min-iteration", po::value<int>(&min_iteration), "# of hill-climbing iteration")
-    
-    ("apply-exact", po::bool_switch(&apply_exact), "exact application")
-    ("cube-size", po::value<int>(&cube_size), "cube-pruning size")
-    ;
+    ("min-iteration", po::value<int>(&min_iteration), "# of hill-climbing iteration");
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
