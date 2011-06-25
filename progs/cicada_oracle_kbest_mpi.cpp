@@ -57,7 +57,15 @@
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 
-struct real_precision20 : boost::spirit::karma::real_policies<double>
+struct real_precision_inf : boost::spirit::karma::real_policies<double>
+{
+  static unsigned int precision(double) 
+  { 
+    return std::numeric_limits<double>::digits10 + 1;
+  }
+};
+
+struct real_precision_20 : boost::spirit::karma::real_policies<double>
 {
   static unsigned int precision(double) 
   { 
@@ -132,7 +140,7 @@ int main(int argc, char ** argv)
     hypothesis_map_type oracles(scorers.size());
     compute_oracles(scorers, hypotheses, oracles, generator);
 
-    boost::spirit::karma::real_generator<double, real_precision20> double20;
+    boost::spirit::karma::real_generator<double, real_precision_20> double20;
     
     if (mpi_rank == 0) {
       if (directory_mode) {
@@ -527,6 +535,8 @@ void bcast_kbest(hypothesis_map_type& kbests)
 
   parser_type    parser;
   generator_type generator;
+  
+  boost::spirit::karma::real_generator<double, real_precision_inf> double_inf;
 
   kbest_feature_type kbest;
 
@@ -549,7 +559,7 @@ void bcast_kbest(hypothesis_map_type& kbests)
 	    if (! karma::generate(oiter_type(os),
 				  (generator.size
 				   << " ||| " << -(standard::string % ' ')
-				   << " ||| " << -((standard::string << '=' << generator.double20) % ' ')
+				   << " ||| " << -((standard::string << '=' << double_inf) % ' ')
 				   << '\n'),
 				  id,
 				  oiter->sentence,
