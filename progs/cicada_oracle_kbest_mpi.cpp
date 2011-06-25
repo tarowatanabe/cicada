@@ -261,6 +261,8 @@ struct TaskOracle
   
   void operator()()
   {
+    typedef std::vector<size_t, std::allocator<size_t> > id_set_type;
+
     // we will try maximize    
     const bool error_metric = scorers.error_metric();
     const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -269,39 +271,48 @@ struct TaskOracle
 				? score->score() * score_factor
 				: - std::numeric_limits<double>::infinity());
     
-    for (size_t id = 0; id != hypotheses.size(); ++ id) 
-      if (! hypotheses[id].empty()) {
+    id_set_type ids;
+    for (size_t id = 0; id != hypotheses.size(); ++ id)
+      if (! hypotheses[id].empty())
+	ids.push_back(id);
+    
+    boost::random_number_generator<Generator> gen(generator);
+    std::random_shuffle(ids.begin(), ids.end(), gen);
+    
+    id_set_type::const_iterator iiter_end = ids.end();
+    for (id_set_type::const_iterator iiter = ids.begin(); iiter != iiter_end; ++ iiter) {
+      const size_t id = *iiter;
+      
+      score_ptr_type score_curr = (score ? score->clone() : score_ptr_type());
 	
-	score_ptr_type score_curr = (score ? score->clone() : score_ptr_type());
+      if (score_curr && ! oracles[id].empty())
+	*score_curr -= *(oracles[id].front()->score);
+      
+      oracles[id].clear();
 	
-	if (score_curr && ! oracles[id].empty())
-	  *score_curr -= *(oracles[id].front()->score);
+      hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
 	
-	oracles[id].clear();
+	score_ptr_type score_sample;
 	
-	hypothesis_set_type::const_iterator hiter_end = hypotheses[id].end();
-	for (hypothesis_set_type::const_iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter) {
-	
-	  score_ptr_type score_sample;
-
-	  if (score_curr) {
-	    score_sample = score_curr->clone();
-	    *score_sample += *hiter->score;
-	  } else
-	    score_sample = hiter->score->clone();
+	if (score_curr) {
+	  score_sample = score_curr->clone();
+	  *score_sample += *hiter->score;
+	} else
+	  score_sample = hiter->score->clone();
 	  
-	  const double objective = score_sample->score() * score_factor;
+	const double objective = score_sample->score() * score_factor;
 	  
-	  if (objective > objective_optimum || oracles[id].empty()) {
-	    oracles[id].clear();
-	    oracles[id].push_back(&(*hiter));
+	if (objective > objective_optimum || oracles[id].empty()) {
+	  oracles[id].clear();
+	  oracles[id].push_back(&(*hiter));
 	    
-	    objective_optimum = objective;
-	    score = score_sample;
-	  } else if (objective == objective_optimum)
-	    oracles[id].push_back(&(*hiter));
-	}
+	  objective_optimum = objective;
+	  score = score_sample;
+	} else if (objective == objective_optimum)
+	  oracles[id].push_back(&(*hiter));
       }
+    }
   }
   
   score_ptr_type score;
@@ -510,8 +521,28 @@ void read_refset(const path_set_type& files,
 
 void bcast_kbest(hypothesis_map_type& kbests)
 {
+  typedef boost::spirit::istream_iterator  iiter_type;
+  typedef std::ostream_iterator<char>      oiter_type;
+  
+  typedef kbest_feature_parser<iiter_type>    parser_type;
+  typedef kbest_feature_generator<oiter_type> generator_type;
+  
+  namespace qi       = boost::spirit::qi;
+  namespace karma    = boost::spirit::karma;
+  namespace standard = boost::spirit::standard;
+  
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  parser_type    parser;
+  generator_type generator;
+
+  kbest_feature_type kbest;
+
+  // clear non-rank kbests
+  for (size_t id = 0; id != kbests.size(); ++ id)
+    if (static_cast<int>(id % mpi_size) != mpi_rank)
+      kbests[id].clear();
   
   for (int rank = 0; rank < mpi_size; ++ rank) {
     if (rank == mpi_rank) {
@@ -519,42 +550,42 @@ void bcast_kbest(hypothesis_map_type& kbests)
       os.push(boost::iostreams::gzip_compressor());
       os.push(utils::mpi_device_bcast_sink(rank, 4096));
       
-      for (size_t id = 0; id != sentences.size(); ++ id)
-	if (static_cast<int>(id % mpi_size) == mpi_rank)
-	  os << id << " ||| " << sentences[id] << " ||| " << forests[id] << '\n';
+      for (size_t id = 0; id != kbests.size(); ++ id)
+	if (static_cast<int>(id % mpi_size) == mpi_rank) {
+	  
+	  hypothesis_set_type::const_iterator oiter_end = kbests[id].end();
+	  for (hypothesis_set_type::const_iterator oiter = kbests[id].begin(); oiter != oiter_end; ++ oiter)
+	    if (! karma::generate(oiter_type(os),
+				  (generator.size
+				   << " ||| " << -(standard::string % ' ')
+				   << " ||| " << -((standard::string << '=' << generator.double20) % ' ')
+				   << '\n'),
+				  id,
+				  oiter->sentence,
+				  oiter->features))
+	      throw std::runtime_error("error in generating kbest");
+	}
       
     } else {
       boost::iostreams::filtering_istream is;
       is.push(boost::iostreams::gzip_decompressor());
       is.push(utils::mpi_device_bcast_source(rank, 4096));
+      is.unsetf(std::ios::skipws);
       
-      std::string line;
+      iiter_type iter(is);
+      iiter_type iter_end;
       
-      int id;
-      sentence_type sentence;
-      hypergraph_type forest;
-
-      while (std::getline(is, line)) {
-	sentence.clear();
-	forest.clear();
-
-	std::string::const_iterator iter_end = line.end();
-	std::string::const_iterator iter = line.begin();
-
-	namespace qi = boost::spirit::qi;
-	namespace standard = boost::spirit::standard;
-	namespace phoenix = boost::phoenix;
-
-	if (! qi::phrase_parse(iter, iter_end, qi::int_, standard::space, id)) continue;
-	if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-	if (! sentence.assign(iter, iter_end)) continue;
-	if (! qi::phrase_parse(iter, iter_end, "|||", standard::space)) continue;
-	if (! forest.assign(iter, iter_end)) continue;
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
 	
-	if (iter != iter_end) continue;
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
 	
-	sentences[id].swap(sentence);
-	forests[id].swap(forest);
+	const size_t& id = boost::fusion::get<0>(kbest);
+	
+	kbests[id].push_back(hypothesis_type(kbest));
       }
     }
   }

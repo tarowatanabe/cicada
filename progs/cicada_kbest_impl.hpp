@@ -113,5 +113,35 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
   boost::spirit::qi::rule<Iterator, kbest_feature_type(), blank_type>  kbest;
 };
 
+template <typename Iterator>
+struct kbest_feature_generator : boost::spirit::karma::grammar<Iterator, kbest_feature_type()>
+{
+  kbest_feature_generator() : kbest_feature_generator::base_type(kbest) 
+  {
+    namespace karma = boost::spirit::karma;
+    namespace standard = boost::spirit::standard;
+    
+    tokens %= standard::string % ' ';
+    features %= (standard::string << '=' << double20) % ' ';
+    kbest %= size << " ||| " << tokens << -karma::buffer[" ||| " << features];
+  }
+  
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 20;
+    }
+  };
+  
+  boost::spirit::karma::uint_generator<size_type>              size;
+  boost::spirit::karma::real_generator<double, real_precision> double20;
+  
+  boost::spirit::karma::rule<Iterator, tokens_type()>             tokens;
+  boost::spirit::karma::rule<Iterator, feature_parsed_set_type()> features;
+  boost::spirit::karma::rule<Iterator, kbest_feature_type()>      kbest;
+    
+
+};
 
 #endif
