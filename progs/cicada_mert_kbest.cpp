@@ -153,6 +153,9 @@ bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundItera
 void read_tstset(const path_set_type& files, hypothesis_map_type& kbests);
 void read_refset(const path_set_type& file, scorer_document_type& scorers);
 
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers);
+
 void options(int argc, char** argv);
 
 struct EnvelopeComputer
@@ -177,7 +180,7 @@ struct EnvelopeComputer
 struct ViterbiComputer
 {
   ViterbiComputer(const scorer_document_type& __scorers,
-		  const hyppothesis_map_type&  __kbests)
+		  const hypothesis_map_type&  __kbests)
     : scorers(__scorers),
       kbests(__kbests) {}
   
@@ -257,6 +260,8 @@ int main(int argc, char ** argv)
     hypothesis_map_type kbests(scorers.size());
     
     read_tstset(tstset_files, kbests);
+
+    initialize_score(kbests, scorers);
 
     // collect initial weights
     weight_set_collection_type weights;
@@ -575,8 +580,8 @@ struct EnvelopeTask
       for (hypothesis_set_type::const_iterator kiter = kbests[seg].begin(); kiter != kiter_end; ++ kiter) {
 	const hypothesis_type& hyp = *kiter;
 	
-	const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end());
-	const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end());
+	const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0);
+	const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0);
 	
 	lines.push_back(line_type(m, y, hyp));
       }
@@ -591,13 +596,13 @@ struct EnvelopeTask
 	line.x = - std::numeric_limits<double>::infinity();
 	
 	if (0 < j) {
-	  if (lines[j - 1]->m == line.m) { // parallel line...
-	    if (line.y <= lines[j - 1]->y) continue;
+	  if (lines[j - 1].m == line.m) { // parallel line...
+	    if (line.y <= lines[j - 1].y) continue;
 	    -- j;
 	  }
 	  while (0 < j) {
-	    line.x = (line.y - lines[j - 1]->y) / (lines[j - 1]->m - line.m);
-	    if (lines[j - 1]->x < line.x) break;
+	    line.x = (line.y - lines[j - 1].y) / (lines[j - 1].m - line.m);
+	    if (lines[j - 1].x < line.x) break;
 	    -- j;
 	  }
 	  
@@ -688,7 +693,7 @@ struct ViterbiTask
       hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
       for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
 	const hypothesis_type& hyp(*kiter);
-	const double score = cicada::dot_product(weights, hyp.features.begin(), hyp.features.end());
+	const double score = cicada::dot_product(weights, hyp.features.begin(), hyp.features.end(), 0.0);
 	
 	if (score > score_viterbi) {
 	  score_viterbi = score;
@@ -737,68 +742,126 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   return score->score() * (scorers.error_metric() ? 1.0 : - 1.0);
 }
 
-void read_tstset(const path_set_type& files, hypothesis_map_type& kbests)
+struct TaskInit
 {
-  path_set_type::const_iterator titer_end = tstset_files.end();
-  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
-    
-    if (debug)
-      std::cerr << "file: " << *titer << std::endl;
-      
-    if (boost::filesystem::is_directory(*titer)) {
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+  TaskInit(queue_type&                 __queue,
+	   hypothesis_map_type&        __hypotheses,
+	   const scorer_document_type& __scorers)
+    : queue(__queue), hypotheses(__hypotheses), scorers(__scorers) {}
 
+  void operator()()
+  {
+    for (;;) {
+      int id = 0;
+      queue.pop(id);
+      if (id < 0) break;
+      
+      hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      
+      hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	hiter->score = scorers[id]->score(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+    }
+  }
+
+  queue_type&                 queue;
+  hypothesis_map_type&        hypotheses;
+  const scorer_document_type& scorers;
+};
+
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers)
+{
+  typedef TaskInit task_type;
+  typedef task_type::queue_type queue_type;
+
+  queue_type queue;
+  
+  boost::thread_group workers;
+  for (int i = 0; i < threads; ++ i)
+    workers.add_thread(new boost::thread(task_type(queue, hypotheses, scorers)));
+  
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    queue.push(id);
+  
+  for (int i = 0; i < threads; ++ i)
+    queue.push(-1);
+  
+  workers.join_all();
+}
+
+void read_tstset(const path_set_type& files,
+		 hypothesis_map_type& hypotheses)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef kbest_feature_parser<iter_type> parser_type;
+  
+  if (files.empty())
+    throw std::runtime_error("no files?");
+
+  parser_type parser;
+  kbest_feature_type kbest;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no file: " + fiter->string());
+
+    if (boost::filesystem::is_directory(*fiter)) {
       for (int i = 0; /**/; ++ i) {
-	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	int id;
-	std::string sep;
-	hypergraph_type hypergraph;
-      
-	weight_set_type origin;
-	weight_set_type direction;
-      
-	while (is >> id >> sep >> hypergraph) {
+	iter_type iter(is);
+	iter_type iter_end;
 	
-	  if (sep != "|||")
-	    throw std::runtime_error("format error?");
-	
-	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
-	
-	  graphs[id].unite(hypergraph);
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  const size_t& id = boost::fusion::get<0>(kbest);
+	  
+	  if (id >= hypotheses.size())
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  if (id != i)
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  
+	  hypotheses[id].push_back(hypothesis_type(kbest));
 	}
       }
     } else {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
       
-      utils::compress_istream is(*titer, 1024 * 1024);
+      iter_type iter(is);
+      iter_type iter_end;
       
-      int id;
-      std::string sep;
-      hypergraph_type hypergraph;
-      
-      weight_set_type origin;
-      weight_set_type direction;
-      
-      while (is >> id >> sep >> hypergraph) {
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
 	
-	if (sep != "|||")
-	  throw std::runtime_error("format error?");
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
 	
-	if (id >= static_cast<int>(graphs.size()))
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
+	const size_t& id = boost::fusion::get<0>(kbest);
 	
-	graphs[id].unite(hypergraph);
+	if (id >= hypotheses.size())
+	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	
+	hypotheses[id].push_back(hypothesis_type(kbest));
       }
     }
   }
-  
-  for (size_t id = 0; id != graphs.size(); ++ id)
-    if (graphs[id].goal == hypergraph_type::invalid)
-      std::cerr << "invalid graph at: " << id << std::endl;
 }
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
