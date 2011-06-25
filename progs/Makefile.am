@@ -71,6 +71,7 @@ bin_PROGRAMS = \
 	cicada_lexicon_global_mpi \
 	cicada_lexicon_model1 \
 	cicada_mert \
+	cicada_mert_kbest \
 	cicada_mert_mpi \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
@@ -245,6 +246,9 @@ cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 
 cicada_mert_SOURCES = cicada_mert.cpp cicada_text_impl.hpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_mert_kbest_SOURCES = cicada_mert_kbest.cpp cicada_text_impl.hpp
+cicada_mert_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_mert_mpi_SOURCES  = cicada_mert_mpi.cpp cicada_text_impl.hpp
 cicada_mert_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)

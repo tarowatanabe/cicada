@@ -162,44 +162,5 @@ namespace cicada
 
       is_sorted = true;
     }
-
-#if 0
-    void Envelope::Line::yield(sentence_type& sentence) const
-    {
-      typedef std::vector<sentence_type, std::allocator<sentence_type> > yield_set_type;
-      typedef hypergraph_type::rule_type rule_type;
-
-      yield_set_type yields;
-      
-      const Line* curr = this;
-      while (! curr->edge) {
-	yields.push_back(sentence_type());
-	
-	curr->antecedent->yield(yields.back());
-	
-	curr = curr->parent.get();
-      }
-      
-      // we will traverse in reverse...
-      sentence.clear();
-
-      const rule_type::symbol_set_type& phrase = curr->edge->rule->rhs;
-      
-      int pos_non_terminal = 0;
-      rule_type::symbol_set_type::const_iterator titer_end = phrase.end();
-      for (rule_type::symbol_set_type::const_iterator titer = phrase.begin(); titer != titer_end; ++ titer)
-	if (titer->is_non_terminal()) {
-	  const int __non_terminal_index = titer->non_terminal_index();
-	  const int pos = utils::bithack::branch(__non_terminal_index <= 0, pos_non_terminal, __non_terminal_index - 1);
-	  
-	  const sentence_type& antecedent = *(yields.rbegin() + pos);
-	  
-	  sentence.insert(sentence.end(), antecedent.begin(), antecedent.end());
-	  
-	  ++ pos_non_terminal;
-	} else if (*titer != cicada::Vocab::EPSILON)
-	  sentence.push_back(*titer);
-    }
-#endif
   };
 };
