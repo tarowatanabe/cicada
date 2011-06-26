@@ -59,6 +59,7 @@
 #include <boost/thread.hpp>
 
 #include "cicada_text_impl.hpp"
+#include "cicada_kbest_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -76,8 +77,6 @@ typedef feature_set_type::feature_type feature_type;
 
 typedef std::vector<weight_set_type, std::allocator<weight_set_type> > weight_set_collection_type;
 
-typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
-
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
 
@@ -91,15 +90,10 @@ path_type bound_upper_file;
 double value_lower = -100;
 double value_upper =  100;
 
-
 path_set_type feature_weights_files;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
-
-bool yield_sentence = false;
-bool yield_alignment = false;
-bool yield_span = false;
 
 int iteration = 10;
 int samples_restarts   = 4;
@@ -166,8 +160,11 @@ bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundItera
 }
 
 
-void read_tstset(const path_set_type& files, hypergraph_set_type& graphs);
+void read_tstset(const path_set_type& files, hypothesis_map_type& kbests);
 void read_refset(const path_set_type& file, scorer_document_type& scorers);
+
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers);
 
 void options(int argc, char** argv);
 
@@ -214,32 +211,32 @@ struct EnvelopeComputer
   typedef line_search_type::segment_document_type segment_document_type;
 
   EnvelopeComputer(const scorer_document_type& __scorers,
-		   const hypergraph_set_type&  __graphs)
+		   const hypothesis_map_type&  __kbests)
     : scorers(__scorers),
-      graphs(__graphs) {}
+      kbests(__kbests) {}
 
   void operator()(segment_document_type& segments, const weight_set_type& origin, const weight_set_type& direction) const;
 
   const scorer_document_type& scorers;
-  const hypergraph_set_type&  graphs;
+  const hypothesis_map_type&  kbests;
 };
 
 struct ViterbiComputer
 {
   ViterbiComputer(const scorer_document_type& __scorers,
-		  const hypergraph_set_type&  __graphs)
+		  const hypothesis_map_type&  __kbests)
     : scorers(__scorers),
-      graphs(__graphs) {}
+      kbests(__kbests) {}
   
   double operator()(const weight_set_type& weights) const;
 
   const scorer_document_type& scorers;
-  const hypergraph_set_type&  graphs;
+  const hypothesis_map_type&  kbests;
 };
 
 template <typename Regularizer, typename Generator>
 bool powell(const scorer_document_type& scorers,
-	    const hypergraph_set_type& graphs,
+	    const hypothesis_map_type& kbests,
 	    const weight_set_type& bound_lower,
 	    const weight_set_type& bound_upper,
 	    Regularizer regularizer,
@@ -249,8 +246,8 @@ bool powell(const scorer_document_type& scorers,
 	    double& score,
 	    weight_set_type& weights)
 {
-  cicada::optimize::Powell<EnvelopeComputer, ViterbiComputer, Regularizer, Generator> optimizer(EnvelopeComputer(scorers, graphs),
-												ViterbiComputer(scorers, graphs),
+  cicada::optimize::Powell<EnvelopeComputer, ViterbiComputer, Regularizer, Generator> optimizer(EnvelopeComputer(scorers, kbests),
+												ViterbiComputer(scorers, kbests),
 												regularizer,
 												generator,
 												bound_lower,
@@ -287,11 +284,6 @@ int main(int argc, char ** argv)
       return 0;
     }
 
-    if (int(yield_sentence) + yield_alignment + yield_span > 1)
-      throw std::runtime_error("specify either sentence|alignment|span yield");
-    if (int(yield_sentence) + yield_alignment + yield_span == 0)
-      yield_sentence = true;
-    
     if (regularize_l1 && regularize_l2)
       throw std::runtime_error("you cannot use both of L1 and L2...");
     
@@ -314,13 +306,16 @@ int main(int argc, char ** argv)
     
     
     if (debug && mpi_rank == 0)
-      std::cerr << "reading hypergraphs" << std::endl;
+      std::cerr << "reading kbests" << std::endl;
     
-    hypergraph_set_type graphs;
+    hypothesis_map_type kbests(scorers.size());
     
-    if (mpi_rank != 0)
-      read_tstset(tstset_files, graphs);
-
+    if (mpi_rank != 0) {
+      read_tstset(tstset_files, kbests);
+      
+      initialize_score(kbests, scorers);
+    }
+    
     // collect and share feature names!
     for (int rank = 0; rank < mpi_size; ++ rank) {
       weight_set_type weights;
@@ -332,7 +327,6 @@ int main(int argc, char ** argv)
       
       bcast_weights(rank, weights);
     }
-
     
     // collect initial weights
     weight_set_collection_type weights;
@@ -440,7 +434,7 @@ int main(int argc, char ** argv)
 	bool moved = false;
 	if (regularize_l1)
 	  moved = powell(scorers,
-			 graphs,
+			 kbests,
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL1(C),
@@ -451,7 +445,7 @@ int main(int argc, char ** argv)
 			 sample_weights);
 	else if (regularize_l2)
 	  moved = powell(scorers,
-			 graphs,
+			 kbests,
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL2(C),
@@ -462,7 +456,7 @@ int main(int argc, char ** argv)
 			 sample_weights);
 	else
 	  moved = powell(scorers,
-			 graphs,
+			 kbests,
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeNone(C),
@@ -522,7 +516,7 @@ int main(int argc, char ** argv)
 	bool moved = false;
 	if (regularize_l1)
 	  moved = powell(scorers,
-			 graphs,
+			 kbests,
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL1(C),
@@ -533,7 +527,7 @@ int main(int argc, char ** argv)
 			 sample_weights);
 	else if (regularize_l2)
 	  moved = powell(scorers,
-			 graphs,
+			 kbests,
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeL2(C),
@@ -544,7 +538,7 @@ int main(int argc, char ** argv)
 			 sample_weights);
 	else
 	  moved = powell(scorers,
-			 graphs,
+			 kbests,
 			 bound_lower,
 			 bound_upper,
 			 line_search_type::RegularizeNone(C),
@@ -612,8 +606,8 @@ int main(int argc, char ** argv)
       
       EnvelopeComputer::segment_document_type segments;
 
-      EnvelopeComputer envelope(scorers, graphs);
-      ViterbiComputer  viterbi(scorers, graphs);
+      EnvelopeComputer envelope(scorers, kbests);
+      ViterbiComputer  viterbi(scorers, kbests);
 
       weight_set_type origin;
       weight_set_type direction;
@@ -656,6 +650,28 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+struct line_type
+{
+  line_type() : x(- std::numeric_limits<double>::infinity()), m(0), y(0), hypothesis(0) {}
+  line_type(const double& __m, const double& __y, const hypothesis_type& __hypothesis)
+    : x(- std::numeric_limits<double>::infinity()), m(__m), y(__y), hypothesis(&__hypothesis) {}
+    
+  double x;
+  double m;
+  double y;
+    
+  const hypothesis_type* hypothesis;
+};
+  
+typedef std::vector<line_type, std::allocator<line_type> > line_set_type;
+  
+struct compare_slope
+{
+  bool operator()(const line_type& x, const line_type& y) const
+  {
+    return x.m < y.m;
+  }
+};
 
 void EnvelopeComputer::operator()(segment_document_type& segments, const weight_set_type& __origin, const weight_set_type& __direction) const
 {
@@ -758,50 +774,79 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     }
     
   } else {
-    typedef cicada::semiring::Envelope envelope_type;
-    typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
+    const int mpi_rank_size = mpi_size - 1;
+
+    line_set_type lines;
 
     bcast_weights(0, origin);
     
     bcast_weights(0, direction);
-
-    envelope_set_type envelopes;
     
     ostream_type os;
     os.push(odevice_type(0, envelope_tag, 1024 * 1024));
     os.precision(20);
     
-    for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
-      const int id = mpi_id * (mpi_size - 1) + (mpi_rank - 1);
-
-      envelopes.clear();
-      envelopes.resize(graphs[mpi_id].nodes.size());
-      
-      cicada::inside(graphs[mpi_id], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
-
-      const envelope_type& envelope = envelopes[graphs[mpi_id].goal];
-      const_cast<envelope_type&>(envelope).sort();
-      
-      envelope_type::const_iterator eiter_end = envelope.end();
-      for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
-	const envelope_type::line_ptr_type& line = *eiter;
+    // revise this......
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
 	
-	const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
+	lines.clear();
 	
-	os << id << " ||| ";
-	utils::encode_base64(line->x, std::ostream_iterator<char>(os));
-	os << " ||| " << scorers[id]->score(yield)->encode() << '\n';
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& hyp = *kiter;
+	  
+	  const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0);
+	  const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0);
+	  
+	  lines.push_back(line_type(m, y, hyp));
+	}
+      
+	std::sort(lines.begin(), lines.end(), compare_slope());
+      
+	int j = 0;
+	int K = lines.size();
+      
+	for (int i = 0; i < K; ++ i) {
+	  line_type line = lines[i];
+	  line.x = - std::numeric_limits<double>::infinity();
+	
+	  if (0 < j) {
+	    if (lines[j - 1].m == line.m) { // parallel line...
+	      if (line.y <= lines[j - 1].y) continue;
+	      -- j;
+	    }
+	    while (0 < j) {
+	      line.x = (line.y - lines[j - 1].y) / (lines[j - 1].m - line.m);
+	      if (lines[j - 1].x < line.x) break;
+	      -- j;
+	    }
+	    
+	    if (0 == j)
+	      line.x = - std::numeric_limits<double>::infinity();
+	  }
+	  
+	  lines[j++] = line;
+	}
+	
+	lines.resize(j);
+	
+	line_set_type::const_iterator liter_end = lines.end();
+	for (line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	  const line_type& line = *liter;
+	  
+	  os << id << " ||| ";
+	  utils::encode_base64(line.x, std::ostream_iterator<char>(os));
+	  os << " ||| " << line.hypothesis->score->encode() << '\n';
+	}
       }
-    }
   }
-
 }
-
-typedef cicada::semiring::Logprob<double> weight_type;
-
 
 double ViterbiComputer::operator()(const weight_set_type& __weights) const
 {
+  typedef cicada::semiring::Logprob<double> weight_type;
+ 
   typedef utils::mpi_device_source idevice_type;
   typedef utils::mpi_device_sink   odevice_type;
   
@@ -884,109 +929,149 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       non_found_iter = loop_sleep(found, non_found_iter);
     }
-
-    const double score_factor = (scorers.error_metric() ? 1.0 : - 1.0);
     
-    return score->score() * score_factor;
+    return score->score() * (scorers.error_metric() ? 1.0 : - 1.0);
   } else {
     bcast_weights(0, weights);
-
-    sentence_type yield;
     
     ostream_type os;
     os.push(odevice_type(0, viterbi_tag, 1024 * 1024));
     os.precision(20);
     
-    for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
-      const int id = mpi_id * (mpi_size - 1) + (mpi_rank - 1);
-      
-      weight_type weight;
-      
-      cicada::viterbi(graphs[mpi_id], yield, weight, cicada::operation::sentence_traversal(), cicada::operation::weight_function<weight_type>(weights));
-      
-      os << id << " ||| " << scorers[id]->score(yield)->encode() << '\n';
-    }
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      if (! kbests[id].empty()) {
+	double score_viterbi = - std::numeric_limits<double>::infinity();
+	scorer_type::score_ptr_type score_ptr;
+	
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& hyp(*kiter);
+	  const double score = cicada::dot_product(weights, hyp.features.begin(), hyp.features.end(), 0.0);
+	  
+	  if (score > score_viterbi) {
+	    score_viterbi = score;
+	    score_ptr = hyp.score;
+	  }
+	}
+	
+	os << id << " ||| " << score_ptr->encode() << '\n';
+      }
   }
   
   return 0.0;
 }
 
-void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers)
 {
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+				  std::allocator<hypothesis_type> > hypothesis_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			std::allocator<hypothesis_type> > hypothesis_unique_type;
+#endif
+
+  hypothesis_unique_type uniques;
+
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    if (! hypotheses[id].empty()) {
+      uniques.clear();
+      uniques.insert(hypotheses[id].begin(), hypotheses[id].end());
+      
+      hypotheses[id].clear();
+      hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      
+      hypotheses[id].reserve(uniques.size());
+      hypotheses[id].insert(hypotheses[id].end(), uniques.begin(), uniques.end());
+      
+      hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	hiter->score = scorers[id]->score(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+    }
+}
+
+void read_tstset(const path_set_type& files,
+		 hypothesis_map_type& hypotheses)
+{
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef kbest_feature_parser<iter_type> parser_type;
+
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
 
-  graphs.clear();
+  if (mpi_rank == 0) return;
+  
+  const int mpi_rank_shifted = mpi_rank - 1;
+  const int mpi_size_shifted = mpi_size - 1;
+  
+  if (files.empty())
+    throw std::runtime_error("no files?");
 
-  path_set_type::const_iterator titer_end = tstset_files.end();
-  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
-    
-    if (debug && mpi_rank == 0)
-      std::cerr << "file: " << *titer << std::endl;
-      
-    if (boost::filesystem::is_directory(*titer)) {
+  parser_type parser;
+  kbest_feature_type kbest;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no file: " + fiter->string());
 
-      for (int i = 0; /**/; ++ i) {
-
-	if (i % (mpi_size - 1) != (mpi_rank - 1)) continue;
-	
-	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (size_t i = mpi_rank_shifted; /**/; i += mpi_size_shifted) {
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	int id;
-	std::string sep;
-	hypergraph_type hypergraph;
-      
-	weight_set_type origin;
-	weight_set_type direction;
-      
-	while (is >> id >> sep >> hypergraph) {
+	iter_type iter(is);
+	iter_type iter_end;
 	
-	  if (sep != "|||")
-	    throw std::runtime_error("format error?");
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
 	  
-	  const int mpi_id = id / (mpi_size - 1);
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
 	  
-	  if (mpi_id >= static_cast<int>(graphs.size()))
-	    graphs.resize(mpi_id + 1);
+	  const size_t& id = boost::fusion::get<0>(kbest);
 	  
-	  graphs[mpi_id].unite(hypergraph);
+	  if (id >= hypotheses.size())
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  if (id != i)
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  
+	  hypotheses[id].push_back(hypothesis_type(kbest));
 	}
       }
     } else {
-      utils::compress_istream is(*titer, 1024 * 1024);
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
       
-      int id;
-      std::string sep;
-      hypergraph_type hypergraph;
+      iter_type iter(is);
+      iter_type iter_end;
       
-      weight_set_type origin;
-      weight_set_type direction;
-      
-      while (is >> id >> sep >> hypergraph) {
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
 	
-	if (id % (mpi_size - 1) != (mpi_rank - 1)) continue;
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
 	
-	if (sep != "|||")
-	  throw std::runtime_error("format error?");
+	const size_t& id = boost::fusion::get<0>(kbest);
 	
-	const int mpi_id = id / (mpi_size - 1);
+	if (id >= hypotheses.size())
+	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
 	
-	if (mpi_id >= static_cast<int>(graphs.size()))
-	  graphs.resize(mpi_id + 1);
-	
-	graphs[mpi_id].unite(hypergraph);
+	if (static_cast<int>(id % mpi_size_shifted)  == mpi_rank_shifted)
+	  hypotheses[id].push_back(hypothesis_type(kbest));
       }
     }
   }
-  
-  for (size_t id = 0; id != graphs.size(); ++ id)
-    if (graphs[id].goal == hypergraph_type::invalid)
-      std::cerr << "invalid graph at: " << id << std::endl;
 }
+
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
 {
@@ -1081,7 +1166,7 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("tstset",  po::value<path_set_type>(&tstset_files)->multitoken(), "test set file(s) (in hypergraph format)")
+    ("tstset",  po::value<path_set_type>(&tstset_files)->multitoken(), "test set file(s) (in kbest format)")
     ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
@@ -1098,10 +1183,6 @@ void options(int argc, char** argv)
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
 
-    ("yield-sentence",  po::bool_switch(&yield_sentence),  "optimize wrt sentence yield")
-    ("yield-alignment", po::bool_switch(&yield_alignment), "optimize wrt alignment yield")
-    ("yield-span",      po::bool_switch(&yield_span),      "optimize wrt span yield")
-    
     ("iteration",          po::value<int>(&iteration),          "# of mert iteration")
     ("samples-restarts",   po::value<int>(&samples_restarts),   "# of random sampling for initial starting point")
     ("samples-directions", po::value<int>(&samples_directions), "# of ramdom sampling for directions")

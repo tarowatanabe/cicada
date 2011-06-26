@@ -71,14 +71,15 @@ bin_PROGRAMS = \
 	cicada_lexicon_global_mpi \
 	cicada_lexicon_model1 \
 	cicada_mert \
-	cicada_mert_kbest \
 	cicada_mert_mpi \
+	cicada_mert_kbest \
+	cicada_mert_kbest_mpi \
 	cicada_maxlike \
 	cicada_maxlike_mpi \
 	cicada_oracle \
+	cicada_oracle_mpi \
 	cicada_oracle_kbest \
 	cicada_oracle_kbest_mpi \
-	cicada_oracle_mpi \
 	cicada_unite_forest \
 	cicada_unite_lattice \
 	cicada_unite_sentence \
@@ -210,16 +211,16 @@ cicada_index_tree_grammar_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(pe
 cicada_learn_SOURCES = cicada_learn.cpp $(LBFGS_SOURCE) cicada_learn_impl.hpp
 cicada_learn_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
+cicada_learn_mpi_SOURCES  = cicada_learn_mpi.cpp $(LBFGS_SOURCE) cicada_learn_impl.hpp
+cicada_learn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_learn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
 cicada_learn_kbest_SOURCES = cicada_learn_kbest.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
 cicada_learn_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD) $(LIBLINEAR)
 
 cicada_learn_kbest_mpi_SOURCES  = cicada_learn_kbest_mpi.cpp $(LBFGS_SOURCE) cicada_kbest_impl.hpp
 cicada_learn_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_learn_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_learn_mpi_SOURCES  = cicada_learn_mpi.cpp $(LBFGS_SOURCE) cicada_learn_impl.hpp
-cicada_learn_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_learn_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_learn_online_SOURCES = cicada_learn_online.cpp cicada_learn_online_impl.hpp
 cicada_learn_online_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -247,12 +248,16 @@ cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 cicada_mert_SOURCES = cicada_mert.cpp cicada_text_impl.hpp
 cicada_mert_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-cicada_mert_kbest_SOURCES = cicada_mert_kbest.cpp cicada_text_impl.hpp
-cicada_mert_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
 cicada_mert_mpi_SOURCES  = cicada_mert_mpi.cpp cicada_text_impl.hpp
 cicada_mert_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_mert_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_mert_kbest_SOURCES = cicada_mert_kbest.cpp cicada_text_impl.hpp
+cicada_mert_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_mert_kbest_mpi_SOURCES  = cicada_mert_kbest_mpi.cpp cicada_text_impl.hpp
+cicada_mert_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_mert_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_maxlike_SOURCES = cicada_maxlike.cpp $(LBFGS_SOURCE) cicada_maxlike_impl.hpp cicada_text_impl.hpp
 cicada_maxlike_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
@@ -273,16 +278,16 @@ cicada_unite_sentence_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 cicada_oracle_SOURCES = cicada_oracle.cpp cicada_text_impl.hpp
 cicada_oracle_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
+cicada_oracle_mpi_SOURCES  = cicada_oracle_mpi.cpp cicada_text_impl.hpp
+cicada_oracle_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_oracle_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
 cicada_oracle_kbest_SOURCES = cicada_oracle_kbest.cpp cicada_text_impl.hpp
 cicada_oracle_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_oracle_kbest_mpi_SOURCES  = cicada_oracle_kbest_mpi.cpp cicada_text_impl.hpp
 cicada_oracle_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_oracle_kbest_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
-
-cicada_oracle_mpi_SOURCES  = cicada_oracle_mpi.cpp cicada_text_impl.hpp
-cicada_oracle_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
-cicada_oracle_mpi_LDADD    = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 mpimap_SOURCES = mpimap.cpp
 mpimap_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)

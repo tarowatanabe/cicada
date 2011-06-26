@@ -475,7 +475,7 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("tstset",  po::value<path_set_type>(&tstset_files)->multitoken(), "test set file(s) (in hypergraph format)")
+    ("tstset",  po::value<path_set_type>(&tstset_files)->multitoken(), "test set file(s) (in kbest format)")
     ("refset",  po::value<path_set_type>(&refset_files)->multitoken(), "reference set file(s)")
     
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
