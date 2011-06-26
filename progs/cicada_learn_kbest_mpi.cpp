@@ -401,6 +401,30 @@ double optimize_batch(const hypothesis_map_type& kbests,
   }
 }
 
+void unique_kbest(hypothesis_map_type& kbests)
+{
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+				  std::allocator<hypothesis_type> > hypothesis_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			std::allocator<hypothesis_type> > hypothesis_unique_type;
+#endif
+
+  hypothesis_unique_type uniques;
+
+  for (size_t id = 0; id != kbests.size(); ++ id) {
+    uniques.clear();
+    uniques.insert(kbests[id].begin(), kbests[id].end());
+    
+    kbests[id].clear();
+    hypothesis_set_type(kbests[id]).swap(kbests[id]);
+    
+    kbests[id].reserve(uniques.size());
+    kbests[id].insert(kbests[id].end(), uniques.begin(), uniques.end());
+  }
+}
+
 void read_kbest(const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
@@ -559,6 +583,10 @@ void read_kbest(const path_set_type& kbest_path,
       }
     }
   }
+
+  // uniques...
+  unique_kbest(kbests);
+  unique_kbest(oracles);
   
   // collect features...
   for (int rank = 0; rank < mpi_size; ++ rank) {

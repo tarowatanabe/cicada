@@ -746,6 +746,14 @@ struct TaskInit
 {
   typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
   
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+				  std::allocator<hypothesis_type> > hypothesis_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			std::allocator<hypothesis_type> > hypothesis_unique_type;
+#endif
+
   TaskInit(queue_type&                 __queue,
 	   hypothesis_map_type&        __hypotheses,
 	   const scorer_document_type& __scorers)
@@ -753,12 +761,21 @@ struct TaskInit
 
   void operator()()
   {
+    hypothesis_unique_type kbests;
+
     for (;;) {
       int id = 0;
       queue.pop(id);
       if (id < 0) break;
       
+      kbests.clear();
+      kbests.insert(hypotheses[id].begin(), hypotheses[id].end());
+      
+      hypotheses[id].clear();
       hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      
+      hypotheses[id].reserve(kbests.size());
+      hypotheses[id].insert(hypotheses[id].end(), kbests.begin(), kbests.end());
       
       hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
       for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
