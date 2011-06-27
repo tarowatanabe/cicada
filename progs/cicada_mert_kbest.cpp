@@ -50,6 +50,7 @@
 
 #include "cicada_text_impl.hpp"
 #include "cicada_kbest_impl.hpp"
+#include "cicada_mert_kbest_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -538,86 +539,23 @@ struct EnvelopeTask
       direction(__direction),
       scorers(__scorers),
       kbests(__kbests) {}
-
-  struct line_type
-  {
-    line_type() : x(- std::numeric_limits<double>::infinity()), m(0), y(0), hypothesis(0) {}
-    line_type(const double& __m, const double& __y, const hypothesis_type& __hypothesis)
-      : x(- std::numeric_limits<double>::infinity()), m(__m), y(__y), hypothesis(&__hypothesis) {}
-    
-    double x;
-    double m;
-    double y;
-    
-    const hypothesis_type* hypothesis;
-  };
   
-  typedef std::vector<line_type, std::allocator<line_type> > line_set_type;
-  
-    struct compare_slope
-    {
-      bool operator()(const line_type& x, const line_type& y) const
-      {
-	return x.m < y.m;
-      }
-    };
-
-
   void operator()()
   {
-    line_set_type lines;
+    EnvelopeKBest::line_set_type lines;
     int seg;
+
+    EnvelopeKBest envelopes(origin, direction);
     
     while (1) {
       queue.pop(seg);
       if (seg < 0) break;
-
-      // revise this...!
       
-      lines.clear();
+      envelopes(kbests[seg], lines);
       
-      hypothesis_set_type::const_iterator kiter_end = kbests[seg].end();
-      for (hypothesis_set_type::const_iterator kiter = kbests[seg].begin(); kiter != kiter_end; ++ kiter) {
-	const hypothesis_type& hyp = *kiter;
-	
-	const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0);
-	const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0);
-	
-	lines.push_back(line_type(m, y, hyp));
-      }
-      
-      std::sort(lines.begin(), lines.end(), compare_slope());
-      
-      int j = 0;
-      int K = lines.size();
-      
-      for (int i = 0; i < K; ++ i) {
-	line_type line = lines[i];
-	line.x = - std::numeric_limits<double>::infinity();
-	
-	if (0 < j) {
-	  if (lines[j - 1].m == line.m) { // parallel line...
-	    if (line.y <= lines[j - 1].y) continue;
-	    -- j;
-	  }
-	  while (0 < j) {
-	    line.x = (line.y - lines[j - 1].y) / (lines[j - 1].m - line.m);
-	    if (lines[j - 1].x < line.x) break;
-	    -- j;
-	  }
-	  
-	  if (0 == j)
-	    line.x = - std::numeric_limits<double>::infinity();
-	}
-	
-	lines[j++] = line;
-      }
-      
-      lines.resize(j);
-      
-      line_set_type::const_iterator liter_end = lines.end();
-      for (line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
-	const line_type& line = *liter;
+      EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+      for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	const EnvelopeKBest::line_type& line = *liter;
 	
 	if (debug >= 4)
 	  std::cerr << "segment: " << seg << " x: " << line.x << std::endl;

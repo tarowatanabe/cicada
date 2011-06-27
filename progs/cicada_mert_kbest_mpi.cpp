@@ -60,6 +60,7 @@
 
 #include "cicada_text_impl.hpp"
 #include "cicada_kbest_impl.hpp"
+#include "cicada_mert_kbest_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -650,29 +651,6 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-struct line_type
-{
-  line_type() : x(- std::numeric_limits<double>::infinity()), m(0), y(0), hypothesis(0) {}
-  line_type(const double& __m, const double& __y, const hypothesis_type& __hypothesis)
-    : x(- std::numeric_limits<double>::infinity()), m(__m), y(__y), hypothesis(&__hypothesis) {}
-    
-  double x;
-  double m;
-  double y;
-    
-  const hypothesis_type* hypothesis;
-};
-  
-typedef std::vector<line_type, std::allocator<line_type> > line_set_type;
-  
-struct compare_slope
-{
-  bool operator()(const line_type& x, const line_type& y) const
-  {
-    return x.m < y.m;
-  }
-};
-
 void EnvelopeComputer::operator()(segment_document_type& segments, const weight_set_type& __origin, const weight_set_type& __direction) const
 {
   typedef utils::mpi_device_source idevice_type;
@@ -775,12 +753,13 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     
   } else {
     const int mpi_rank_size = mpi_size - 1;
-
-    line_set_type lines;
-
+    
     bcast_weights(0, origin);
     
     bcast_weights(0, direction);
+
+    EnvelopeKBest::line_set_type lines;
+    EnvelopeKBest envelopes(origin, direction);
     
     ostream_type os;
     os.push(odevice_type(0, envelope_tag, 1024 * 1024));
@@ -790,50 +769,11 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     for (size_t id = 0; id != kbests.size(); ++ id) 
       if (! kbests[id].empty()) {
 	
-	lines.clear();
+	envelopes(kbests[id], lines);
 	
-	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
-	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
-	  const hypothesis_type& hyp = *kiter;
-	  
-	  const double m = cicada::dot_product(direction, hyp.features.begin(), hyp.features.end(), 0.0);
-	  const double y = cicada::dot_product(origin,    hyp.features.begin(), hyp.features.end(), 0.0);
-	  
-	  lines.push_back(line_type(m, y, hyp));
-	}
-      
-	std::sort(lines.begin(), lines.end(), compare_slope());
-      
-	int j = 0;
-	int K = lines.size();
-      
-	for (int i = 0; i < K; ++ i) {
-	  line_type line = lines[i];
-	  line.x = - std::numeric_limits<double>::infinity();
-	
-	  if (0 < j) {
-	    if (lines[j - 1].m == line.m) { // parallel line...
-	      if (line.y <= lines[j - 1].y) continue;
-	      -- j;
-	    }
-	    while (0 < j) {
-	      line.x = (line.y - lines[j - 1].y) / (lines[j - 1].m - line.m);
-	      if (lines[j - 1].x < line.x) break;
-	      -- j;
-	    }
-	    
-	    if (0 == j)
-	      line.x = - std::numeric_limits<double>::infinity();
-	  }
-	  
-	  lines[j++] = line;
-	}
-	
-	lines.resize(j);
-	
-	line_set_type::const_iterator liter_end = lines.end();
-	for (line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
-	  const line_type& line = *liter;
+	EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	  const EnvelopeKBest::line_type& line = *liter;
 	  
 	  os << id << " ||| ";
 	  utils::encode_base64(line.x, std::ostream_iterator<char>(os));
