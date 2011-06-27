@@ -410,19 +410,20 @@ void unique_kbest(hypothesis_map_type& kbests)
   typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
 			std::allocator<hypothesis_type> > hypothesis_unique_type;
 #endif
-
+  
   hypothesis_unique_type uniques;
-
-  for (size_t id = 0; id != kbests.size(); ++ id) {
-    uniques.clear();
-    uniques.insert(kbests[id].begin(), kbests[id].end());
-    
-    kbests[id].clear();
-    hypothesis_set_type(kbests[id]).swap(kbests[id]);
-    
-    kbests[id].reserve(uniques.size());
-    kbests[id].insert(kbests[id].end(), uniques.begin(), uniques.end());
-  }
+  
+  for (size_t id = 0; id != kbests.size(); ++ id) 
+    if (! kbests[id].empty()) {
+      uniques.clear();
+      uniques.insert(kbests[id].begin(), kbests[id].end());
+      
+      kbests[id].clear();
+      hypothesis_set_type(kbests[id]).swap(kbests[id]);
+      
+      kbests[id].reserve(uniques.size());
+      kbests[id].insert(kbests[id].end(), uniques.begin(), uniques.end());
+    }
 }
 
 void read_kbest(const path_set_type& kbest_path,
@@ -484,7 +485,7 @@ void read_kbest(const path_set_type& kbest_path,
     oracles.resize(kbests.size());
     
     for (path_set_type::const_iterator piter = oracle_path.begin(); piter != oracle_path.end(); ++ piter) {
-      if (debug)
+      if (mpi_rank == 0 && debug)
 	std::cerr << "reading oracles: " << piter->string() << std::endl;
       
       for (size_t i = mpi_rank; i < oracles.size(); i += mpi_size) {
