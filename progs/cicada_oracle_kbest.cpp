@@ -16,6 +16,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/bithack.hpp"
 #include "utils/lexical_cast.hpp"
+#include "utils/sgi_hash_set.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
