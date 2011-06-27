@@ -321,7 +321,7 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
 	if (! boost::filesystem::exists(path)) break;
 	if (finished[id]) continue;
 	
-	utils::compress_istream is(*fiter, 1024 * 1024);
+	utils::compress_istream is(path, 1024 * 1024);
 	is.unsetf(std::ios::skipws);
 	
 	iter_type iter(is);
