@@ -123,9 +123,6 @@ int main(int argc, char ** argv)
         
     read_forest(forest_path, intersected_path, graphs_forest, graphs_intersected);
 
-    if (debug && mpi_rank == 0)
-      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
-
     weight_set_type weights;
     if (mpi_rank ==0 && ! weights_path.empty()) {
       if (! boost::filesystem::exists(weights_path))
@@ -134,6 +131,21 @@ int main(int argc, char ** argv)
       utils::compress_istream is(weights_path, 1024 * 1024);
       is >> weights;
     }
+    
+    // collect features...
+    for (int rank = 0; rank < mpi_size; ++ rank) {
+      weight_set_type weights;
+      weights.allocate();
+      
+      for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
+	if (! feature_type(id).empty())
+	  weights[feature_type(id)] = 1.0;
+      
+      bcast_weights(rank, weights);
+    }
+
+    if (debug && mpi_rank == 0)
+      std::cerr << "# of features: " << feature_type::allocated() << std::endl;
     
     weights.allocate();
 
@@ -1008,18 +1020,6 @@ void read_forest(const path_set_type& forest_path,
 	}
       }
     }
-  }
-
-  // collect features...
-  for (int rank = 0; rank < mpi_size; ++ rank) {
-    weight_set_type weights;
-    weights.allocate();
-    
-    for (feature_type::id_type id = 0; id != feature_type::allocated(); ++ id)
-      if (! feature_type(id).empty())
-	weights[feature_type(id)] = 1.0;
-    
-    bcast_weights(rank, weights);
   }
 }
 
