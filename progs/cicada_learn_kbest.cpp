@@ -93,6 +93,9 @@ int main(int argc, char ** argv)
     
     if (learn_lbfgs && regularize_l1 && regularize_l2)
       throw std::runtime_error("either L1 or L2 regularization");
+
+    if (C <= 0.0)
+      throw std::runtime_error("no C <= 0.0");
     
     if (kbest_path.empty())
       throw std::runtime_error("no kbest?");
@@ -278,7 +281,7 @@ struct OptimizeLinear
     parameter_type parameter;
     parameter.solver_type = linear_solver;
     parameter.eps = eps;
-    parameter.C = C;
+    parameter.C = (1.0 / C);
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;
