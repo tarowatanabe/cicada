@@ -315,14 +315,31 @@ struct TaskInit
 	   const scorer_document_type& __scorers)
     : queue(__queue), hypotheses(__hypotheses), scorers(__scorers) {}
 
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+				  std::allocator<hypothesis_type> > hypothesis_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			std::allocator<hypothesis_type> > hypothesis_unique_type;
+#endif
+
   void operator()()
   {
+    hypothesis_unique_type uniques;
+    
     for (;;) {
       int id = 0;
       queue.pop(id);
       if (id < 0) break;
       
+      uniques.clear();
+      uniques.insert(hypotheses[id].begin(), hypotheses[id].end());
+      
+      hypotheses[id].clear();
       hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      
+      hypotheses[id].reserve(uniques.size());
+      hypotheses[id].insert(hypotheses[id].end(), uniques.begin(), uniques.end());
       
       hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
       for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
