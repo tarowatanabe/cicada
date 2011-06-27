@@ -369,6 +369,9 @@ void read_tstset(const path_set_type& files,
   kbest_feature_type kbest;
   
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    if (debug)
+      std::cerr << "file: " << *fiter << std::endl;
+
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no file: " + fiter->string());
 
