@@ -18,6 +18,7 @@
 
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
@@ -311,28 +312,60 @@ void read_tstset(const path_set_type& files, sentence_set_type& sentences)
     
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no test file: " + fiter->string());
-    
-    utils::compress_istream is(*fiter, 1024 * 1024);
-    is.unsetf(std::ios::skipws);
 
-    iter_type iter(is);
-    iter_type iter_end;
-    
-    while (iter != iter_end) {
-      id_sentence.second.clear();
-      if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
-	if (iter != iter_end)
-	  throw std::runtime_error("tstset parsing failed");
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (size_t id = 0; id != sentences.size(); ++ id) {
+	
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(id) + ".gz");
+	
+	if (! boost::filesystem::exists(path)) break;
+	if (finished[id]) continue;
+	
+	utils::compress_istream is(*fiter, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+	
+	iter_type iter(is);
+	iter_type iter_end;
+	
+	while (iter != iter_end) {
+	  id_sentence.second.clear();
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	    if (iter != iter_end)
+	      throw std::runtime_error("tstset parsing failed");
+	  
+	  if (id_sentence.first != id)
+	    throw std::runtime_error("invalid id");
+	  
+	  if (finished[id]) continue;
+	  
+	  sentences[id] = id_sentence.second;
+	  finished[id] = true;
+	  break;
+	}
+      }
+    } else {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
       
-      const int& id = id_sentence.first;
+      iter_type iter(is);
+      iter_type iter_end;
       
-      if (id >= static_cast<int>(sentences.size()))
-	throw std::runtime_error("id exceeds the reference data");
-      
-      if (finished[id]) continue;
-      
-      sentences[id] = id_sentence.second;
-      finished[id] = true;
+      while (iter != iter_end) {
+	id_sentence.second.clear();
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, id_sentence))
+	  if (iter != iter_end)
+	    throw std::runtime_error("tstset parsing failed");
+	
+	const int& id = id_sentence.first;
+	
+	if (id >= static_cast<int>(sentences.size()))
+	  throw std::runtime_error("id exceeds the reference data");
+	
+	if (finished[id]) continue;
+	
+	sentences[id] = id_sentence.second;
+	finished[id] = true;
+      }
     }
   }
   
