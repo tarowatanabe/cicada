@@ -711,7 +711,7 @@ void read_kbest(const path_set_type& kbest_path,
       oracles_size = utils::bithack::max(oracles_size, tasks[i].oracles.size());
     }
     
-    if (kbests_size != oarcles_size)
+    if (kbests_size != oracles_size)
       throw std::runtime_error("kbest/oracle size do not match");
     
     kbests.reserve(kbests_size);
