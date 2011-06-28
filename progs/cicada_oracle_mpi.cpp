@@ -130,7 +130,7 @@ void read_tstset(const path_set_type& files,
 void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
-emplate <typename Generator>
+template <typename Generator>
 double compute_oracles(const hypergraph_set_type& graphs,
 		       const feature_function_ptr_set_type& features,
 		       const scorer_document_type& scorers,
