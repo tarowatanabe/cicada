@@ -721,23 +721,19 @@ void read_kbest(const path_set_type& kbest_path,
     oracles.resize(oracles_size);
     
     for (int i = 0; i != threads; ++ i) {
-      if (kbests.empty())
-	kbests.swap(tasks[i].kbests);
-      else {
-	for (size_t id = 0; id != tasks[i].kbests.size(); ++ id)
-	  kbests[id].insert(kbests[id].end(), tasks[i].kbests[id].begin(), tasks[i].kbests[id].end());
-      }
+      for (size_t id = 0; id != tasks[i].kbests.size(); ++ id)
+	kbests[id].insert(kbests[id].end(), tasks[i].kbests[id].begin(), tasks[i].kbests[id].end());
+      
+      tasks[i].kbests.clear();
     }
     
     unique_kbest(kbests);
     
     for (int i = 0; i != threads; ++ i) {
-      if (oracles.empty())
-	oracles.swap(tasks[i].oracles);
-      else {
-	for (size_t id = 0; id != tasks[i].oracles.size(); ++ id)
-	  oracles[id].insert(oracles[id].end(), tasks[i].oracles[id].begin(), tasks[i].oracles[id].end());
-      }
+      for (size_t id = 0; id != tasks[i].oracles.size(); ++ id)
+	oracles[id].insert(oracles[id].end(), tasks[i].oracles[id].begin(), tasks[i].oracles[id].end());
+      
+      tasks[i].oracles.clear();
     }
     
     unique_kbest(oracles);
