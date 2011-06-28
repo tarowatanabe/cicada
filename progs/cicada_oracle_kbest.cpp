@@ -137,9 +137,11 @@ int main(int argc, char ** argv)
 	    
 	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
 	      throw std::runtime_error("tokens generation failed...?");
-	    os << " ||| ";
-	    if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
-	      throw std::runtime_error("tokens generation failed...?");
+	    if (! hyp.features.empty()) {
+	      os << " ||| ";
+	      if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+		throw std::runtime_error("tokens generation failed...?");
+	    }
 	    os << '\n';
 	  }
 	}
@@ -160,9 +162,11 @@ int main(int argc, char ** argv)
 	    
 	    if (! karma::generate(std::ostream_iterator<char>(os), -(standard::string % ' '), hyp.sentence))
 	      throw std::runtime_error("tokens generation failed...?");
-	    os << " ||| ";
-	    if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
-	      throw std::runtime_error("tokens generation failed...?");
+	    if (! hyp.features.empty()) {
+	      os << " ||| ";
+	      if (! karma::generate(std::ostream_iterator<char>(os), -((standard::string << '=' << double20) % ' '), hyp.features))
+		throw std::runtime_error("tokens generation failed...?");
+	    }
 	    os << '\n';
 	  }
 	}
