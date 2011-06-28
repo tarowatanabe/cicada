@@ -195,10 +195,12 @@ struct OptimizeLBFGS
 
   OptimizeLBFGS(const hypothesis_map_type& __kbests,
 		const hypothesis_map_type& __oracles,
-		weight_set_type& __weights)
+		weight_set_type& __weights,
+		const size_t& __instances)
     : kbests(__kbests),
       oracles(__oracles),
-      weights(__weights) {}
+      weights(__weights),
+      instances(__instances) {}
 
   double operator()()
   {
@@ -228,10 +230,12 @@ struct OptimizeLBFGS
     
     Task(const weight_set_type& __weights,
 	 const hypothesis_map_type& __kbests,
-	 const hypothesis_map_type& __oracles)
+	 const hypothesis_map_type& __oracles,
+	 const size_t& __instances)
       : weights(__weights),
 	kbests(__kbests),
-	oracles(__oracles)
+	oracles(__oracles),
+	instances(__instances)
     {}
     
     void operator()()
@@ -287,12 +291,17 @@ struct OptimizeLBFGS
       g.allocate();
       
       std::copy(expectations.begin(), expectations.end(), g.begin());
+      
+      objective /= instances;
+      std::transform(g.begin(), g.end(), g.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / instances));
     }
     
     const weight_set_type& weights;
 
     const hypothesis_map_type& kbests;
     const hypothesis_map_type& oracles;
+    
+    size_t instances;
     
     double          objective;
     weight_set_type g;
@@ -318,7 +327,7 @@ struct OptimizeLBFGS
     
     bcast_weights(0, optimizer.weights);
     
-    task_type task(optimizer.weights, optimizer.kbests, optimizer.oracles);
+    task_type task(optimizer.weights, optimizer.kbests, optimizer.oracles, optimizer.instances);
     task();
     
     // collect all the objective and gradients...
@@ -353,6 +362,7 @@ struct OptimizeLBFGS
   const hypothesis_map_type& oracles;
   
   weight_set_type& weights;
+  size_t instances;
 };
 
 template <typename Optimize>
@@ -362,9 +372,18 @@ double optimize_batch(const hypothesis_map_type& kbests,
 {
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
+
+  const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
+  
+  int instances_local = 0;
+  for (size_t id = 0; id != id_max; ++ id)
+    instances_local += (!kbests[id].empty()) && (!oracles[id].empty());
+
+  int instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   if (mpi_rank == 0) {
-    const double objective = Optimize(kbests, oracles, weights)();
+    const double objective = Optimize(kbests, oracles, weights, instances)();
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
@@ -396,7 +415,7 @@ double optimize_batch(const hypothesis_map_type& kbests,
 
 	bcast_weights(0, weights);
 	
-	task_type task(weights, kbests, oracles);
+	task_type task(weights, kbests, oracles, instances);
 	task();
 	
 	send_weights(task.g);

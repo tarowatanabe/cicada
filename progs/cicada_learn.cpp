@@ -431,11 +431,13 @@ struct OptimizeLBFGS
     Task(queue_type&            __queue,
 	 const weight_set_type& __weights,
 	 const hypergraph_set_type& __graphs_forest,
-	 const hypergraph_set_type& __graphs_intersected)
+	 const hypergraph_set_type& __graphs_intersected,
+	 const size_t& __instances)
       : queue(__queue),
 	weights(__weights),
 	graphs_forest(__graphs_forest),
-	graphs_intersected(__graphs_intersected)
+	graphs_intersected(__graphs_intersected),
+	instances(__instances)
     {}
     
     struct gradients_type
@@ -550,6 +552,10 @@ struct OptimizeLBFGS
       g.allocate();
       
       std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
+      
+      // normalize!
+      objective /= instances;
+      std::transform(g.begin(), g.end(), g.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / instances));
     }
 
     queue_type&            queue;
@@ -558,6 +564,7 @@ struct OptimizeLBFGS
     
     const hypergraph_set_type& graphs_forest;
     const hypergraph_set_type& graphs_intersected;
+    size_t instances;
     
     double          objective;
     weight_set_type g;
@@ -576,16 +583,20 @@ struct OptimizeLBFGS
     typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
 
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
-        
+    
+    const int id_max = utils::bithack::min(optimizer.graphs_forest.size(), optimizer.graphs_intersected.size());
+    size_t instances = 0;
+    for (int id = 0; id != id_max; ++ id)
+      instances += (optimizer.graphs_forest[id].is_valid() && optimizer.graphs_intersected[id].is_valid());
+    
     queue_type queue;
     
-    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.graphs_forest, optimizer.graphs_intersected));
+    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.graphs_forest, optimizer.graphs_intersected, instances));
 
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
-    const int id_max = utils::bithack::min(optimizer.graphs_forest.size(), optimizer.graphs_intersected.size());
     for (int id = 0; id != id_max; ++ id)
       if (optimizer.graphs_forest[id].is_valid() && optimizer.graphs_intersected[id].is_valid())
 	queue.push(id);

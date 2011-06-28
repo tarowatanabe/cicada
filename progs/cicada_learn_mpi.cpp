@@ -471,16 +471,15 @@ double optimize_online(const hypergraph_set_type& graphs_forest,
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   id_set_type ids(graphs_forest.size());
-  for (size_t id = 0; id != ids.size(); ++ id)
-    ids[id] = id;
+  int instances_local = 0;
   
-  int instances = graphs_forest.size();
-  if (! unite_forest) {
-    instances = 0;
-    const int instances_local = graphs_forest.size();
-    
-    MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  for (size_t id = 0; id != ids.size(); ++ id) {
+    ids[id] = id;
+    instances_local += (graphs_intersected[id].is_valid() && graphs_forest[id].is_valid());
   }
+  
+  int instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
   
   optimizer_type optimizer(instances, C);
   Optimize opt(optimizer);
@@ -589,10 +588,12 @@ struct OptimizeLBFGS
 
   OptimizeLBFGS(const hypergraph_set_type& __graphs_forest,
 		const hypergraph_set_type& __graphs_intersected,
-		weight_set_type& __weights)
+		weight_set_type& __weights,
+		const size_t& __instances)
     : graphs_forest(__graphs_forest),
       graphs_intersected(__graphs_intersected),
-      weights(__weights) {}
+      weights(__weights),
+      instances(__instances) {}
 
   double operator()()
   {
@@ -625,10 +626,12 @@ struct OptimizeLBFGS
 
     Task(const weight_set_type& __weights,
 	 const hypergraph_set_type& __graphs_forest,
-	 const hypergraph_set_type& __graphs_intersected)
+	 const hypergraph_set_type& __graphs_intersected,
+	 const size_t& __instances)
       : weights(__weights),
 	graphs_forest(__graphs_forest),
-	graphs_intersected(__graphs_intersected) {}
+	graphs_intersected(__graphs_intersected),
+	instances(__instances) {}
     
     struct gradients_type
     {
@@ -745,12 +748,17 @@ struct OptimizeLBFGS
       g.allocate();
       
       std::copy(feature_expectations.begin(), feature_expectations.end(), g.begin());
+      
+      // normalize!
+      objective /= instances;
+      std::transform(g.begin(), g.end(), g.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / instances));
     }
     
     const weight_set_type& weights;
 
     const hypergraph_set_type& graphs_forest;
     const hypergraph_set_type& graphs_intersected;
+    size_t instances;
     
     double          objective;
     weight_set_type g;
@@ -776,7 +784,7 @@ struct OptimizeLBFGS
     
     bcast_weights(0, optimizer.weights);
     
-    task_type task(optimizer.weights, optimizer.graphs_forest, optimizer.graphs_intersected);
+    task_type task(optimizer.weights, optimizer.graphs_forest, optimizer.graphs_intersected, optimizer.instances);
     task();
     
     // collect all the objective and gradients...
@@ -811,6 +819,7 @@ struct OptimizeLBFGS
   const hypergraph_set_type& graphs_intersected;
   
   weight_set_type& weights;
+  size_t instances;
 };
 
 template <typename Optimize>
@@ -821,8 +830,17 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
+  const int id_max = utils::bithack::min(graphs_forest.size(), graphs_intersected.size());
+  
+  int instances_local = 0;
+  for (size_t id = 0; id != id_max; ++ id)
+    instances_local += (graphs_intersected[id].is_valid() && graphs_forest[id].is_valid());
+  
+  int instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  
   if (mpi_rank == 0) {
-    const double objective = Optimize(graphs_forest, graphs_intersected, weights)();
+    const double objective = Optimize(graphs_forest, graphs_intersected, weights, instances)();
     
     // send termination!
     for (int rank = 1; rank < mpi_size; ++ rank)
@@ -854,7 +872,7 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
 
 	bcast_weights(0, weights);
 	
-	task_type task(weights, graphs_forest, graphs_intersected);
+	task_type task(weights, graphs_forest, graphs_intersected, instances);
 	task();
 	
 	send_weights(task.g);

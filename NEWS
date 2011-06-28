@@ -1,3 +1,7 @@
+2011-6-x
+Bugfix for kbest oracle for taking unique
+cicada_eval can take directory input
+
 2011-6-27
 Serious bugfix for parse-{cky,tree,tree-cky} where the features from source lattice/forest(s) are completely ignored for pruning.
 Added format, a formatter/parser derived from ICU's number/date format/parse

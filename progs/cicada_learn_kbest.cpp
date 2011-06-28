@@ -262,11 +262,11 @@ struct OptimizeLinear
     // construct problem...
     label_set_type(labels).swap(labels);
     feature_node_set_type(feature_nodes).swap(feature_nodes);
-
+    
     features.reserve(offsets.size());
     for (size_type pos = 0; pos != offsets.size(); ++ pos)
       features.push_back(const_cast<feature_node_type*>(&(*feature_nodes.begin())) + offsets[pos]);
-
+    
     offsets.clear();
     offset_set_type(offsets).swap(offsets);
     
@@ -281,7 +281,7 @@ struct OptimizeLinear
     parameter_type parameter;
     parameter.solver_type = linear_solver;
     parameter.eps = eps;
-    parameter.C = (1.0 / C);
+    parameter.C = 1.0 / (C * labels.size()); // renormalize!
     parameter.nr_weight    = 0;
     parameter.weight_label = 0;
     parameter.weight       = 0;
@@ -373,11 +373,13 @@ struct OptimizeLBFGS
     Task(queue_type&            __queue,
 	 const weight_set_type& __weights,
 	 const hypothesis_map_type& __kbests,
-	 const hypothesis_map_type& __oracles)
+	 const hypothesis_map_type& __oracles,
+	 const size_t& __instances)
       : queue(__queue),
 	weights(__weights),
 	kbests(__kbests),
-	oracles(__oracles)
+	oracles(__oracles),
+	instances(__instances)
     {}
     
 
@@ -433,8 +435,10 @@ struct OptimizeLBFGS
       // transform feature_expectations into g...
       
       g.allocate();
-      
       std::copy(expectations.begin(), expectations.end(), g.begin());
+      
+      objective /= instances;
+      std::transform(g.begin(), g.end(), g.begin(), std::bind2nd(std::multiplies<double>(), 1.0 / instances));
     }
 
     queue_type&            queue;
@@ -443,6 +447,7 @@ struct OptimizeLBFGS
     
     const hypothesis_map_type& kbests;
     const hypothesis_map_type& oracles;
+    size_t instances;
     
     double          objective;
     weight_set_type g;
@@ -461,16 +466,21 @@ struct OptimizeLBFGS
     typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
 
     OptimizeLBFGS& optimizer = *((OptimizeLBFGS*) instance);
+
+    const int id_max = utils::bithack::min(optimizer.kbests.size(), optimizer.oracles.size());
+    size_t instances = 0;
+    for (int id = 0; id != id_max; ++ id)
+      instances += (! optimizer.kbests[id].empty() && ! optimizer.oracles[id].empty());
         
     queue_type queue;
     
-    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.kbests, optimizer.oracles));
+    task_set_type tasks(threads, task_type(queue, optimizer.weights, optimizer.kbests, optimizer.oracles, instances));
 
     boost::thread_group workers;
     for (int i = 0; i < threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
-    const int id_max = utils::bithack::min(optimizer.kbests.size(), optimizer.oracles.size());
+    
     for (int id = 0; id != id_max; ++ id)
       if (! optimizer.kbests[id].empty() && ! optimizer.oracles[id].empty())
 	queue.push(id);

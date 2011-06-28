@@ -42,7 +42,7 @@ struct OptimizerBase
 struct OptimizerSGDL2 : public OptimizerBase
 {
   OptimizerSGDL2(const size_t& __instances,
-		 const double& C) : instances(__instances), samples(0), epoch(0), lambda(C / __instances), weight_scale(1.0), weight_norm(0.0) {}
+		 const double& C) : instances(__instances), samples(0), epoch(0), lambda(C), weight_scale(1.0), weight_norm(0.0) {}
   
   void initialize()
   {
@@ -70,7 +70,7 @@ struct OptimizerSGDL2 : public OptimizerBase
     //const double eta = 1.0 / (lambda * (epoch + 2));
     const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
-
+    
     rescale(1.0 - eta * lambda);
     
     gradient_type::const_iterator citer_end = correct.end();
@@ -117,7 +117,7 @@ struct OptimizerSGDL2 : public OptimizerBase
   size_t samples;
   size_t epoch;
   double lambda;
-
+  
   double weight_scale;
   double weight_norm;
   
@@ -131,7 +131,7 @@ struct OptimizerSGDL1 : public OptimizerBase
   typedef cicada::WeightVector<double> penalty_set_type;
 
   OptimizerSGDL1(const size_t& __instances, const double& C)
-    : instances(__instances), samples(0), epoch(0), lambda(C / __instances), penalties(), penalty(0.0), weight_scale(1.0) {}
+    : instances(__instances), samples(0), epoch(0), lambda(C), penalties(), penalty(0.0), weight_scale(1.0) {}
 
   void initialize()
   {
@@ -151,19 +151,20 @@ struct OptimizerSGDL1 : public OptimizerBase
   {
     //const double eta = 1.0 / (1.0 + double(epoch) / graphs.size());
     //const double eta = 1.0 / (lambda * (epoch + 2));
+    const double factor = 1.0 / instances;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
     
     gradient_type::const_iterator citer_end = correct.end();
     for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer) {
-      weights[citer->first] += eta * citer->second;
+      weights[citer->first] += eta * citer->second * factor;
       
       apply(weights[citer->first], penalties[citer->first], penalty);
     }
     
     gradient_type::const_iterator miter_end = gradient.end();
     for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter) {
-      weights[miter->first] -= eta * miter->second;
+      weights[miter->first] -= eta * miter->second * factor;
       
       apply(weights[miter->first], penalties[miter->first], penalty);
     }
@@ -307,6 +308,7 @@ struct OptimizerCW : public OptimizerBase
     objective = 0.0;
     weight_scale = 1.0;
   }
+  
   void finalize()
   {
     
