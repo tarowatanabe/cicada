@@ -470,7 +470,7 @@ double compute_oracles(const hypergraph_set_type& graphs,
   sentences.swap(sentences_best);
   forests.swap(forests_best);
   
-  return objective_best
+  return objective_best;
 }
 
 
