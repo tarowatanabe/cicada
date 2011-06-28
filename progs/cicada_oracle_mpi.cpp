@@ -118,7 +118,7 @@ bool directory_mode = false;
 std::string scorer_name = "bleu:order=4,exact=true";
 
 int max_iteration = 10;
-int min_iteration = 1;
+int min_iteration = 5;
 bool apply_exact = false;
 int cube_size = 200;
 int debug = 0;
@@ -130,13 +130,13 @@ void read_tstset(const path_set_type& files,
 void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
-template <typename Generator>
-void compute_oracles(const hypergraph_set_type& graphs,
-		     const feature_function_ptr_set_type& features,
-		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests,
-		     Generator& generator);
+emplate <typename Generator>
+double compute_oracles(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
+		       sentence_set_type& sentences,
+		       hypergraph_set_type& forests,
+		       Generator& generator);
 
 void bcast_sentences(sentence_set_type& sentences, hypergraph_set_type& forests);
 void bcast_weights(const int rank, weight_set_type& weights);
@@ -183,7 +183,10 @@ int main(int argc, char ** argv)
     
     sentence_set_type oracles(sentences.size());
     hypergraph_set_type oracles_forest(sentences.size());
-    compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
+    const double objective = compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
+
+    if (mpi_rank == 0 && debug)
+      std::cerr << "oracle score: " << objective << std::endl;
     
     if (mpi_rank == 0) {
       if (directory_mode) {
@@ -400,12 +403,12 @@ struct TaskOracle
 };
 
 template <typename Generator>
-void compute_oracles(const hypergraph_set_type& graphs,
-		     const feature_function_ptr_set_type& features,
-		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests,
-		     Generator& generator)
+double compute_oracles(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
+		       sentence_set_type& sentences,
+		       hypergraph_set_type& forests,
+		       Generator& generator)
 {
   typedef TaskOracle<Generator> task_type;
 
@@ -415,10 +418,12 @@ void compute_oracles(const hypergraph_set_type& graphs,
   score_ptr_set_type scores(graphs.size());
   
   score_ptr_type score_optimum;
-  double objective_optimum = - std::numeric_limits<double>::infinity();
-
-  sentence_set_type   sentences_optimum;
-  hypergraph_set_type forests_optimum;
+  
+  double objective_prev = - std::numeric_limits<double>::infinity();
+  double objective_best = - std::numeric_limits<double>::infinity();
+  
+  sentence_set_type   sentences_best;
+  hypergraph_set_type forests_best;
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -426,9 +431,6 @@ void compute_oracles(const hypergraph_set_type& graphs,
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
-    
-    sentences_optimum = sentences;
-    forests_optimum   = forests;
     
     task_type(graphs, features, scorers, scores, sentences, forests, generator)();
 
@@ -449,34 +451,26 @@ void compute_oracles(const hypergraph_set_type& graphs,
     if (mpi_rank == 0 && debug)
       std::cerr << "oracle score: " << objective << std::endl;
     
-    int terminate = (objective <= objective_optimum) && (iter >= min_iteration);
+    // if we found better objective, keep going!
+    if (objective > objective_best) {
+      objective_best = objective;
+      sentences_best = sentences;
+      forests_best   = forests;
+    }
+    
+    int terminate = (objective <= objective_prev) && (iter >= min_iteration);
     MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
     
-    if (terminate) {
-      sentences.swap(sentences_optimum);
-      forests.swap(forests_optimum);
+    if (terminate)
       break;
-    }
     
-    objective_optimum = objective;
+    objective_prev = objective;
   }
   
-  for (size_t id = 0; id != graphs.size(); ++ id)
-    if (features[id]) {
-      if (! scores[id])
-	throw std::runtime_error("no scores?");
-      
-      score_ptr_type score_curr = score_optimum->clone();
-      *score_curr -= *scores[id];
-      
-      cicada::feature::Bleu*       __bleu = dynamic_cast<cicada::feature::Bleu*>(features[id].get());
-      cicada::feature::BleuLinear* __bleu_linear = dynamic_cast<cicada::feature::BleuLinear*>(features[id].get());
-      
-      if (__bleu)
-	__bleu->assign(score_curr);
-      else
-	__bleu_linear->assign(score_curr);
-    }
+  sentences.swap(sentences_best);
+  forests.swap(forests_best);
+  
+  return objective_best
 }
 
 

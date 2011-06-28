@@ -100,7 +100,7 @@ bool directory_mode = false;
 
 std::string scorer_name = "bleu:order=4,exact=true";
 int max_iteration = 10;
-int min_iteration = 1;
+int min_iteration = 5;
 bool apply_exact = false;
 int cube_size = 200;
 
@@ -116,12 +116,12 @@ void read_refset(const path_set_type& file,
 		 scorer_document_type& scorers,
 		 sentence_document_type& sentences);
 template <typename Generator>
-void compute_oracles(const hypergraph_set_type& graphs,
-		     const feature_function_ptr_set_type& features,
-		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests,
-		     Generator& generator);
+double compute_oracles(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
+		       sentence_set_type& sentences,
+		       hypergraph_set_type& forests,
+		       Generator& generator);
 
 
 void options(int argc, char** argv);
@@ -163,7 +163,10 @@ int main(int argc, char ** argv)
     
     sentence_set_type   oracles(sentences.size());
     hypergraph_set_type oracles_forest(sentences.size());
-    compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
+    const double objective = compute_oracles(graphs, features, scorers, oracles, oracles_forest, generator);
+    
+    if (debug)
+      std::cerr << "oracle score: " << objective << std::endl;
     
     if (directory_mode) {
       if (boost::filesystem::exists(output_file) && ! boost::filesystem::is_directory(output_file))
@@ -346,12 +349,12 @@ struct TaskOracle
 };
 
 template <typename Generator>
-void compute_oracles(const hypergraph_set_type& graphs,
-		     const feature_function_ptr_set_type& features,
-		     const scorer_document_type& scorers,
-		     sentence_set_type& sentences,
-		     hypergraph_set_type& forests,
-		     Generator& generator)
+double compute_oracles(const hypergraph_set_type& graphs,
+		       const feature_function_ptr_set_type& features,
+		       const scorer_document_type& scorers,
+		       sentence_set_type& sentences,
+		       hypergraph_set_type& forests,
+		       Generator& generator)
 {
   typedef TaskOracle            task_type;
   typedef task_type::queue_type queue_type;
@@ -369,10 +372,12 @@ void compute_oracles(const hypergraph_set_type& graphs,
       ids.push_back(id);
 
   score_ptr_type score_optimum;
-  double objective_optimum = - std::numeric_limits<double>::infinity();
   
-  sentence_set_type   sentences_optimum(sentences.size());
-  hypergraph_set_type forests_optimum(forests.size());
+  double objective_prev = - std::numeric_limits<double>::infinity();
+  double objective_best = - std::numeric_limits<double>::infinity();
+  
+  sentence_set_type   sentences_best(sentences.size());
+  hypergraph_set_type forests_best(forests.size());
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -381,9 +386,6 @@ void compute_oracles(const hypergraph_set_type& graphs,
     if (debug)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
 
-    sentences_optimum = sentences;
-    forests_optimum = forests;
-    
     queue_type queue;
     
     task_set_type tasks(threads);
@@ -420,14 +422,24 @@ void compute_oracles(const hypergraph_set_type& graphs,
     if (debug)
       std::cerr << "oracle score: " << objective << std::endl;
     
-    if (objective <= objective_optimum && iter >= min_iteration) {
-      sentences.swap(sentences_optimum);
-      forests.swap(forests_optimum);
-      break;
+    // if we found better objective, keep going!
+    if (objective > objective_best) {
+      objective_best = objective;
+      sentences_best = sentences;
+      forests_best   = forests;
     }
     
-    objective_optimum = objective;
+    // termination condition
+    if (objective <= objective_prev && iter >= min_iteration)
+      break;
+    
+    objective_prev = objective;
   }
+  
+  sentences.swap(sentences_best);
+  forests.swap(forests_best);
+  
+  return objective_best;
 }
 
 

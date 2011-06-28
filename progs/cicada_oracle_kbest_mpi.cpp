@@ -83,7 +83,7 @@ bool directory_mode = false;
 std::string scorer_name = "bleu:order=4,exact=true";
 
 int max_iteration = 10;
-int min_iteration = 1;
+int min_iteration = 5;
 
 int debug = 0;
 
@@ -95,10 +95,10 @@ void initialize_score(hypothesis_map_type& hypotheses,
 		      const scorer_document_type& scorers);
 
 template <typename Generator>
-void compute_oracles(const scorer_document_type& scorers,
-		     const hypothesis_map_type& hypotheses,
-		     hypothesis_map_type& oracles,
-		     Generator& generator);
+double compute_oracles(const scorer_document_type& scorers,
+		       const hypothesis_map_type& hypotheses,
+		       hypothesis_map_type& oracles,
+		       Generator& generator);
 
 void bcast_kbest(hypothesis_map_type& kbests);
 void options(int argc, char** argv);
@@ -139,7 +139,10 @@ int main(int argc, char ** argv)
     generator.seed(time(0) * getpid());
     
     hypothesis_map_type oracles(scorers.size());
-    compute_oracles(scorers, hypotheses, oracles, generator);
+    const double objective = compute_oracles(scorers, hypotheses, oracles, generator);
+    
+    if (mpi_rank == 0 && debug)
+      std::cerr << "oracle score: " << objective << std::endl;
 
     boost::spirit::karma::real_generator<double, real_precision_20> double20;
     
@@ -327,10 +330,10 @@ struct TaskOracle
 };
 
 template <typename Generator>
-void compute_oracles(const scorer_document_type& scorers,
-		     const hypothesis_map_type& hypotheses,
-		     hypothesis_map_type& oracles,
-		     Generator& generator)
+double compute_oracles(const scorer_document_type& scorers,
+		       const hypothesis_map_type& hypotheses,
+		       hypothesis_map_type& oracles,
+		       Generator& generator)
 {
   typedef TaskOracle<Generator> task_type;
   
@@ -343,8 +346,9 @@ void compute_oracles(const scorer_document_type& scorers,
   //
   
   score_ptr_type score_optimum;
-  double objective_optimum = - std::numeric_limits<double>::infinity();
-  hypothesis_map_type oracles_optimum(oracles.size());
+  double objective_prev = - std::numeric_limits<double>::infinity();
+  double objective_best = - std::numeric_limits<double>::infinity();
+  hypothesis_map_type oracles_best(oracles.size());
   
   const bool error_metric = scorers.error_metric();
   const double score_factor = (error_metric ? - 1.0 : 1.0);
@@ -352,8 +356,6 @@ void compute_oracles(const scorer_document_type& scorers,
   for (int iter = 0; iter < max_iteration; ++ iter) {
     if (debug && mpi_rank == 0)
       std::cerr << "iteration: " << (iter + 1) << std::endl;
-    
-    oracles_optimum = oracles;
     
     task_type(scorers, hypotheses, oracles, generator)();
     
@@ -376,17 +378,24 @@ void compute_oracles(const scorer_document_type& scorers,
     const double objective = score_optimum->score() * score_factor;
     if (mpi_rank == 0 && debug)
       std::cerr << "oracle score: " << objective << std::endl;
-    
-    int terminate = (objective <= objective_optimum) && (iter >= min_iteration);
-    MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
-    
-    if (terminate) {
-      oracles.swap(oracles_optimum);
-      break;
+
+    if (objective > objective_best) {
+      objective_best = objective;
+      oracles_best   = oracles;
     }
     
-    objective_optimum = objective;
+    int terminate = (objective <= objective_prev) && (iter >= min_iteration);
+    MPI::COMM_WORLD.Bcast(&terminate, 1, MPI::INT, 0);
+    
+    if (terminate)
+      break;
+    
+    objective_prev = objective;
   }
+  
+  oracles.swap(oracles_best);
+
+  return objective_best;
 }
 
 void initialize_score(hypothesis_map_type& hypotheses,
