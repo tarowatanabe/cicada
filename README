@@ -42,7 +42,7 @@ After the hypergraph generation, you can:
    - K-best sentences are generated from hypergraph [5].
    - Generate oracle translations (BLEU only).
 
-Or, you can combine outputs from multiple systems by (New! and TODO):
+Or, you can combine outputs from multiple systems by [29]:
    - Perform parsing over nbests (use your favorite parser, such as Berkeley parser/Stanford parser etc.)
    - Generate context-free confusion forest by combining trees (not confusion network!)
       * It is performed by collecting rules from parse trees, and generate by Earley algorithm (New!)
@@ -69,6 +69,7 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
 
 Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
+   - Large/small featuer set from kbests on large/small traning data via MaxEnt (LBFGS)/liblinear (New, but still open problems!)
    - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
    - Small feature set on small devset learned by hypergraph-MERT [8]
    - Small/Large feature set on small devset learned by hypergraph-MaxEnt (optimized by LBFGS or SGD)
@@ -438,4 +439,17 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {210--218},
   url       = {http://www.aclweb.org/anthology/D/D09/D09-1022}
+}
+
+[29]
+@InProceedings{watanabe-sumita:2011:ACL-HLT2011,
+  author    = {Watanabe, Taro  and  Sumita, Eiichiro},
+  title     = {Machine Translation System Combination by Confusion Forest},
+  booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
+  month     = {June},
+  year      = {2011},
+  address   = {Portland, Oregon, USA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {1249--1257},
+  url       = {http://www.aclweb.org/anthology/P11-1125}
 }
