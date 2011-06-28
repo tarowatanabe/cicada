@@ -591,6 +591,60 @@ void unique_kbest(hypothesis_map_type& kbests)
   workers.join_all();
 }
 
+struct TaskReadUnite
+{
+  typedef std::pair<path_type, path_type> path_pair_type;
+  typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
+  
+  TaskReadUnite(queue_type& __queue)
+    : queue(__queue) {}
+  
+  void operator()()
+  {
+    typedef boost::spirit::istream_iterator iter_type;
+    typedef kbest_feature_parser<iter_type> parser_type;
+    
+    parser_type parser;
+    kbest_feature_type kbest;
+
+    for (;;) {
+      path_pair_type paths;
+      queue.pop(paths);
+      
+      if (paths.first.empty() && paths.second.empty()) break;
+      
+      const path_type& path           = (! paths.first.empty() ? paths.first : paths.second);
+      hypothesis_map_type& hypotheses = (! paths.first.empty() ? kbests      : oracles);
+      
+      utils::compress_istream is(path, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+      
+      iter_type iter(is);
+      iter_type iter_end;
+      
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
+	
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
+	
+	const size_t& id = boost::fusion::get<0>(kbest);
+	
+	if (id >= hypotheses.size())
+	  hypotheses.resize(id + 1);
+	
+	hypotheses[id].push_back(hypothesis_type(kbest));
+      }
+    }
+  }
+  
+  queue_type& queue;
+  hypothesis_map_type kbests;
+  hypothesis_map_type oracles;
+};
+
 void read_kbest(const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
@@ -603,6 +657,17 @@ void read_kbest(const path_set_type& kbest_path,
   kbest_feature_type kbest;
   
   if (unite_kbest) {
+    typedef TaskReadUnite task_type;
+    typedef task_type::queue_type queue_type;
+
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+    
+    queue_type queue(threads);
+    task_set_type tasks(threads, task_type(queue));
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
     
     for (path_set_type::const_iterator piter = kbest_path.begin(); piter != kbest_path.end(); ++ piter) {
       if (debug)
@@ -614,73 +679,67 @@ void read_kbest(const path_set_type& kbest_path,
 	const path_type path_kbest = (*piter) / file_name;
 	
 	if (! boost::filesystem::exists(path_kbest)) break;
-
-	if (i >= kbests.size())
-	  kbests.resize(i + 1);
 	
-	utils::compress_istream is(path_kbest, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
-	
-	iter_type iter(is);
-	iter_type iter_end;
-	
-	while (iter != iter_end) {
-	  boost::fusion::get<1>(kbest).clear();
-	  boost::fusion::get<2>(kbest).clear();
-	  
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	    if (iter != iter_end)
-	      throw std::runtime_error("kbest parsing failed");
-	  
-	  const size_t& id = boost::fusion::get<0>(kbest);
-
-	  if (id != i)
-	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(id));
-	  	  
-	  kbests[i].push_back(hypothesis_type(kbest));
-	}
+	queue.push(std::make_pair(path_kbest, path_type()));
       }
     }
-    
-    // we will compute unique!
-    unique_kbest(kbests);
-    
-    oracles.resize(kbests.size());
     
     for (path_set_type::const_iterator piter = oracle_path.begin(); piter != oracle_path.end(); ++ piter) {
       if (debug)
 	std::cerr << "reading oracles: " << piter->string() << std::endl;
       
-      for (size_t i = 0; i < oracles.size(); ++ i) {
+      for (size_t i = 0; /**/; ++ i) {
 	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
 	
 	const path_type path_oracle = (*piter) / file_name;
 	
-	if (! boost::filesystem::exists(path_oracle)) continue;
+	if (! boost::filesystem::exists(path_oracle)) break;
 	
-	utils::compress_istream is(path_oracle, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
-	
-	iter_type iter(is);
-	iter_type iter_end;
-	
-	while (iter != iter_end) {
-	  boost::fusion::get<1>(kbest).clear();
-	  boost::fusion::get<2>(kbest).clear();
-	  
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	    if (iter != iter_end)
-	      throw std::runtime_error("kbest parsing failed");
-	  
-	  if (boost::fusion::get<0>(kbest) != i)
-	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
-	  
-	  oracles[i].push_back(hypothesis_type(kbest));
-	}
+	queue.push(std::make_pair(path_type(), path_oracle));
       }
     }
     
-    // we will compute unique!
+    for (int i = 0; i != threads; ++ i)
+      queue.push(std::make_pair(path_type(), path_type()));
+    
+    workers.join_all();
+
+    size_t kbests_size  = 0;
+    size_t oracles_size = 0;
+    for (int i = 0; i != threads; ++ i) {
+      kbests_size = utils::bithack::max(kbests_size, tasks[i].kbests.size());
+      oracles_size = utils::bithack::max(oracles_size, tasks[i].oracles.size());
+    }
+    
+    if (kbests_size != oarcles_size)
+      throw std::runtime_error("kbest/oracle size do not match");
+    
+    kbests.reserve(kbests_size);
+    kbests.resize(kbests_size);
+
+    oracles.reserve(oracles_size);
+    oracles.resize(oracles_size);
+    
+    for (int i = 0; i != threads; ++ i) {
+      if (kbests.empty())
+	kbests.swap(tasks[i].kbests);
+      else {
+	for (size_t id = 0; id != tasks[i].kbests.size(); ++ id)
+	  kbests[id].insert(kbests[id].end(), tasks[i].kbests[id].begin(), tasks[i].kbests[id].end());
+      }
+    }
+    
+    unique_kbest(kbests);
+    
+    for (int i = 0; i != threads; ++ i) {
+      if (oracles.empty())
+	oracles.swap(tasks[i].oracles);
+      else {
+	for (size_t id = 0; id != tasks[i].oracles.size(); ++ id)
+	  oracles[id].insert(oracles[id].end(), tasks[i].oracles[id].begin(), tasks[i].oracles[id].end());
+      }
+    }
+    
     unique_kbest(oracles);
     
   } else {
