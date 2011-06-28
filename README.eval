@@ -1,14 +1,15 @@
 MT evaluations especially for MERT purpose
 
-BLEU: IBM Bleu (TODO: implement NIST-bleu, average-bleu?)
-WER: word error rate
-PER: position independent word error rate
-TER: translation error rate
-SB: skip bigram (by default, skip size is clipped to 4)
-WLCS: (weighted) longest common subsequence (by defaut, weight is one, meaning no weight, use alpha=2 for weight?)
-SK: string kernel (by default, decay factor = 0.8, spectrum p = 4)
-
 Implemented bootstrap resampling[1] and sign test[2] in "cicada_eval"
+
+BLEU: IBM Bleu (TODO: implement NIST-bleu, average-bleu?) [3]
+WER: word error rate [4]
+PER: position independent word error rate [5]
+TER: translation error rate [6]
+RIBES: RIBES [7]
+SB: skip bigram (by default, skip size is clipped to 4) [8]
+WLCS: (weighted) longest common subsequence (by defaut, weight is one, meaning no weight, use alpha=2 for weight?) [8]
+SK: string kernel (by default, decay factor = 0.8, spectrum p = 4)
 
 cicada_eval [options]
 
@@ -46,6 +47,7 @@ Evaluator score JSON format:
 {"eval":"ter", "edits": ["base64", ... (insertion,deletion,substitution,shift,reference)]}
 {"eval":"wer", "edits": ["base64", ... (insertion,deletion,substitution,reference)]}
 {"eval":"per", "edits": ["base64", ... (insertion,deletion,substitution,reference)]}
+{"eval":"ribes", "distance": "base64", "penalty": "base64"}
 {"eval":"sk", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
 {"eval":"sb", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
 {"eval":"wlcs", "reference":["base64" (match), "base64" (norm)], "hypothesis":["base64", ... (match, norm)]}
@@ -78,4 +80,65 @@ and doubles are encoded as base64 (string!). We can insert spaces, but encoder w
  address = {Morristown, NJ, USA},
  }
 
+[3]
+@InProceedings{papineni-EtAl:2002:ACL,
+  author    = {Kishore Papineni  and  Salim Roukos  and  Todd Ward  and  Wei-Jing Zhu},
+  title     = {Bleu: a Method for Automatic Evaluation of Machine Translation},
+  booktitle = {Proceedings of 40th Annual Meeting of the Association for Computational Linguistics},
+  month     = {July},
+  year      = {2002},
+  address   = {Philadelphia, Pennsylvania, USA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {311--318},
+  url       = {http://www.aclweb.org/anthology/P02-1040},
+  doi       = {10.3115/1073083.1073135}
+}
 
+[4]
+Sonja Nießen, Franz Josef Och, Gregor Leusch, Hermann Ney
+"An Evaluation Tool for Machine Translation: Fast Evaluation for MT Research".
+In Proc. 2nd International Conference on Language Resources and Evaluation, pp. 39-45, Athens, Greece, May-June 2000
+
+[5]
+@INPROCEEDINGS{Tillmann97accelerateddp,
+    author = {C. Tillmann and S. Vogel and H. Ney and A. Zubiaga and H. Sawaf},
+    title = {Accelerated Dp Based Search For Statistical Translation},
+    booktitle = {In European Conf. on Speech Communication and Technology},
+    year = {1997},
+    pages = {2667--2670}
+}
+
+[6]
+@INPROCEEDINGS{Snover06astudy,
+    author = {Matthew Snover and Bonnie Dorr and Richard Schwartz and Linnea Micciulla and John Makhoul},
+    title = {A study of translation edit rate with targeted human annotation},
+    booktitle = {In Proceedings of Association for Machine Translation in the Americas},
+    year = {2006},
+    pages = {223--231}
+}
+
+[7]
+@InProceedings{isozaki-EtAl:2010:EMNLP,
+  author    = {Isozaki, Hideki  and  Hirao, Tsutomu  and  Duh, Kevin  and  Sudoh, Katsuhito  and  Tsukada, Hajime},
+  title     = {Automatic Evaluation of Translation Quality for Distant Language Pairs},
+  booktitle = {Proceedings of the 2010 Conference on Empirical Methods in Natural Language Processing},
+  month     = {October},
+  year      = {2010},
+  address   = {Cambridge, MA},
+  publisher = {Association for Computational Linguistics},
+  pages     = {944--952},
+  url       = {http://www.aclweb.org/anthology/D10-1092}
+}
+
+[8]
+@inproceedings{lin-och:2004:ACL,
+  author    = {Lin, Chin-Yew  and  Och, Franz Josef},
+  title     = {Automatic Evaluation of Machine Translation Quality Using Longest Common Subsequence and Skip-Bigram Statistics},
+  booktitle = {Proceedings of the 42nd Meeting of the Association for Computational Linguistics (ACL'04), Main Volume},
+  year      = 2004,
+  month     = {July},
+  address   = {Barcelona, Spain},
+  pages     = {605--612},
+  url       = {http://www.aclweb.org/anthology/P04-1077},
+  doi       = {10.3115/1218955.1219032}
+}
