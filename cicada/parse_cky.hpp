@@ -149,15 +149,14 @@ namespace cicada
 	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
     };
     typedef RuleCandidate rule_candidate_type;
-    typedef utils::chunk_vector<rule_candidate_type, 4096 / sizeof(rule_candidate_type), std::allocator<rule_candidate_type> > rule_candidate_set_type;
-
-    typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
+    typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
+    
 #ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > > rule_candidate_map_type;
 #else
-    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > > rule_candidate_map_type;
 #endif
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
     
@@ -202,8 +201,8 @@ namespace cicada
       
       const active_type* active;
       
-      typename rule_candidate_ptr_set_type::const_iterator first;
-      typename rule_candidate_ptr_set_type::const_iterator last;
+      typename rule_candidate_set_type::const_iterator first;
+      typename rule_candidate_set_type::const_iterator last;
       
       score_type score;
       int level;
@@ -216,7 +215,7 @@ namespace cicada
       // we use less, so that when popped from heap, we will grab "greater" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return x->score * (*(x->first))->score < y->score * (*(y->first))->score;
+	return x->score * x->first->score < y->score * y->first->score;
       }
     };
     
@@ -283,7 +282,6 @@ namespace cicada
       actives.resize(grammar.size(), active_chart_type(lattice.size() + 1));
       passives.resize(lattice.size() + 1);
     
-      rule_candidates.clear();
       rule_tables.clear();
       rule_tables.reserve(grammar.size());
       rule_tables.resize(grammar.size());
@@ -398,7 +396,7 @@ namespace cicada
 	    
 	    typename active_set_type::const_iterator citer_end = cell.end();
 	    for (typename active_set_type::const_iterator citer = cell.begin(); citer != citer_end; ++ citer) {
-	      const rule_candidate_ptr_set_type& rules = cands(table, citer->node);
+	      const rule_candidate_set_type& rules = cands(table, citer->node);
 	      
 	      if (rules.empty()) continue;
 	      
@@ -438,7 +436,7 @@ namespace cicada
 	    // check unary rule, and see if this edge is already inserted!
 	    
 	    const active_type& active = *(item->active);
-	    const rule_candidate_type& rule = *(*(item->first));
+	    const rule_candidate_type& rule = *(item->first);
 	    const score_type score = item->score * rule.score;
 	    
 	    if (pruner(first, last, rule.rule->lhs)) {
@@ -470,7 +468,7 @@ namespace cicada
 	      
 	      unary_rule_set_type& unaries = unary_map[std::make_pair(std::make_pair(label_prev, item->level - 1), std::make_pair(label_next, item->level))];
 	      
-	      if (! unaries.insert(*(item->first)).second) {
+	      if (! unaries.insert(&(*(item->first))).second) {
 		typename node_map_type::const_iterator niter = node_map.find(std::make_pair(label_next, item->level));
 		if (niter == node_map.end())
 		  throw std::runtime_error("no node-map?");
@@ -511,7 +509,7 @@ namespace cicada
 	      const transducer_type::id_type node = transducer.next(transducer.root(), non_terminal);
 	      if (node == transducer.root()) continue;
 	      
-	      const rule_candidate_ptr_set_type& rules = cands(table, node);
+	      const rule_candidate_set_type& rules = cands(table, node);
 	      
 	      if (rules.empty()) continue;
 	      
@@ -688,61 +686,31 @@ namespace cicada
     }
     
     template <typename Tp>
-    struct greater_ptr_score
+    struct greater_score
     {
-      bool operator()(const Tp* x, const Tp* y) const
+      bool operator()(const Tp& x, const Tp& y) const
       {
-	return x->score > y->score;
+	return x.score > y.score;
       }
     };
 
-    const rule_candidate_ptr_set_type& cands(const size_type& table, const transducer_type::id_type& node)
+    const rule_candidate_set_type& cands(const size_type& table, const transducer_type::id_type& node)
     {
       typename rule_candidate_map_type::iterator riter = rule_tables[table].find(node);
       if (riter == rule_tables[table].end()) {
-	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_ptr_set_type())).first;
-	
 	const transducer_type::rule_pair_set_type& rules = grammar[table].rules(node);
 	
-	if (rules.size() > static_cast<size_type>(beam_size)) {
-	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	    const score_type score = function(iter->features);
-	    
-	    if (riter->second.size() < static_cast<size_type>(beam_size) || score >= riter->second.front()->score) {
-	      rule_candidates.push_back(rule_candidate_type(score,
-							    yield_source ? iter->source : iter->target,
-							    iter->features,
-							    iter->attributes));
-	      
-	      riter->second.push_back(&(rule_candidates.back()));
-	      
-	      std::push_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
-	    }
-	  }
-	  
-	  // heap-sort!
-	  std::sort_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
-	  
-	  // shrink...
-	  rule_candidate_ptr_set_type(riter->second).swap(riter->second);
-	} else {
-	  riter->second.reserve(rules.size());
-	  
-	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	    rule_candidates.push_back(rule_candidate_type(function(iter->features),
-							  yield_source ? iter->source : iter->target,
-							  iter->features,
-							  iter->attributes));
-	    
-	    riter->second.push_back(&(rule_candidates.back()));
-	  }
-	  
-	  std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
-	}
+	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_set_type(rules.size()))).first;
+	
+	typename rule_candidate_set_type::iterator citer = riter->second.begin();
+	transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	for (transducer_type::rule_pair_set_type::const_iterator iter = rules.begin(); iter != iter_end; ++ iter, ++ citer)
+	  *citer = rule_candidate_type(function(iter->features),
+				       yield_source ? iter->source : iter->target,
+				       iter->features,
+				       iter->attributes);
+	
+	std::sort(riter->second.begin(), riter->second.end(), greater_score<rule_candidate_type>());
       }
       
       return riter->second;
@@ -773,7 +741,6 @@ namespace cicada
     candidate_set_type    candidates;
     candidate_heap_type   heap;
 
-    rule_candidate_set_type   rule_candidates;
     rule_candidate_table_type rule_tables;
     
     non_terminal_set_type non_terminals;
