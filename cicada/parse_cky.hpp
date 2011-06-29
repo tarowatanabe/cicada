@@ -27,6 +27,7 @@
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
+#include <utils/simple_vector.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>

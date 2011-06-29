@@ -29,6 +29,7 @@
 #include <utils/b_heap.hpp>
 #include <utils/std_heap.hpp>
 #include <utils/bithack.hpp>
+#include <utils/simple_vector.hpp>
 
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
@@ -211,6 +212,20 @@ namespace cicada
       TreeCandidate() : score(), rule(), features(), attributes() {}
       TreeCandidate(const score_type& __score, const tree_rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
 	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
+
+      void swap(TreeCandidate& x)
+      {
+	std::swap(score, x.score);
+	rule.swap(x.rule);
+	features.swap(x.features);
+	attributes.swap(x.attributes);
+      }
+      
+      friend
+      void swap(TreeCandidate& x, TreeCandidate& y)
+      {
+	x.swap(y);
+      }
     };
     
     struct RuleCandidate
@@ -225,28 +240,39 @@ namespace cicada
       RuleCandidate() : score(), rule(), features(), attributes() {}
       RuleCandidate(const score_type& __score, const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
 	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
+
+      void swap(RuleCandidate& x)
+      {
+	std::swap(score, x.score);
+	rule.swap(x.rule);
+	features.swap(x.features);
+	attributes.swap(x.attributes);
+      }
+      
+      friend
+      void swap(RuleCandidate& x, RuleCandidate& y)
+      {
+	x.swap(y);
+      }
     };
     
     typedef TreeCandidate tree_candidate_type;
     typedef RuleCandidate rule_candidate_type;
     
-    typedef utils::chunk_vector<tree_candidate_type, 4096 / sizeof(tree_candidate_type), std::allocator<tree_candidate_type> > tree_candidate_set_type;
-    typedef utils::chunk_vector<rule_candidate_type, 4096 / sizeof(rule_candidate_type), std::allocator<rule_candidate_type> > rule_candidate_set_type;
-    
-
+    typedef utils::simple_vector<tree_candidate_type, std::allocator<tree_candidate_type> > tree_candidate_set_type;
+    typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
     typedef std::vector<const rule_candidate_type*, std::allocator<const rule_candidate_type*> > rule_candidate_ptr_set_type;
-    typedef std::vector<const tree_candidate_type*, std::allocator<const tree_candidate_type*> > tree_candidate_ptr_set_type;
     
 #ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<tree_transducer_type::id_type, tree_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
-				    std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_ptr_set_type> > > tree_candidate_map_type;
-    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+    typedef std::tr1::unordered_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
+				    std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > > tree_candidate_map_type;
+    typedef std::tr1::unordered_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+				    std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > > rule_candidate_map_type;
 #else
-    typedef sgi::hash_map<tree_transducer_type::id_type, tree_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
-			  std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_ptr_set_type> > > tree_candidate_map_type;
-    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_ptr_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
-			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_ptr_set_type> > > rule_candidate_map_type;
+    typedef sgi::hash_map<tree_transducer_type::id_type, tree_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<tree_transducer_type::id_type>,
+			  std::allocator<std::pair<const tree_transducer_type::id_type, tree_candidate_set_type> > > tree_candidate_map_type;
+    typedef sgi::hash_map<transducer_type::id_type, rule_candidate_set_type, utils::hashmurmur<size_t>, std::equal_to<transducer_type::id_type>,
+			  std::allocator<std::pair<const transducer_type::id_type, rule_candidate_set_type> > > rule_candidate_map_type;
 #endif
     typedef std::vector<tree_candidate_map_type, std::allocator<tree_candidate_map_type> > tree_candidate_table_type;
     typedef std::vector<rule_candidate_map_type, std::allocator<rule_candidate_map_type> > rule_candidate_table_type;
@@ -255,11 +281,11 @@ namespace cicada
     {      
       score_type    score;
 
-      typename tree_candidate_ptr_set_type::const_iterator tree_first;
-      typename tree_candidate_ptr_set_type::const_iterator tree_last;
+      typename tree_candidate_set_type::const_iterator tree_first;
+      typename tree_candidate_set_type::const_iterator tree_last;
       
-      typename rule_candidate_ptr_set_type::const_iterator rule_first;
-      typename rule_candidate_ptr_set_type::const_iterator rule_last;
+      typename rule_candidate_set_type::const_iterator rule_first;
+      typename rule_candidate_set_type::const_iterator rule_last;
       
       frontier_type frontier;
       
@@ -271,14 +297,14 @@ namespace cicada
       
       score_type candidate_score() const
       {
-	return (rule_first == rule_last ? (*tree_first)->score : (*rule_first)->score) * score;
+	return (rule_first == rule_last ? tree_first->score : rule_first->score) * score;
       }
       
       Candidate()
 	: score(), tree_first(), tree_last(), rule_first(), rule_last(), frontier(), features(), attributes() { rule_first = rule_last; }
       Candidate(const score_type& __score,
-		typename tree_candidate_ptr_set_type::const_iterator __tree_first,
-		typename tree_candidate_ptr_set_type::const_iterator __tree_last,
+		typename tree_candidate_set_type::const_iterator __tree_first,
+		typename tree_candidate_set_type::const_iterator __tree_last,
 		const frontier_type& __frontier,
 		const feature_set_type& __features,
 		const attribute_set_type& __attributes)
@@ -288,8 +314,8 @@ namespace cicada
 	  features(__features),
 	  attributes(__attributes) { rule_first = rule_last; }
       
-      Candidate(typename rule_candidate_ptr_set_type::const_iterator __rule_first,
-		typename rule_candidate_ptr_set_type::const_iterator __rule_last)
+      Candidate(typename rule_candidate_set_type::const_iterator __rule_first,
+		typename rule_candidate_set_type::const_iterator __rule_last)
 	: score(semiring::traits<score_type>::one()),
 	  tree_first(), tree_last(), rule_first(__rule_first), rule_last(__rule_last),
 	  frontier(),
@@ -349,9 +375,6 @@ namespace cicada
 
       label_map.clear();
       
-      rule_candidates.clear();
-      tree_candidates.clear();
-      
       rule_tables.clear();
       rule_tables.reserve(grammar.size());
       rule_tables.resize(grammar.size());
@@ -409,7 +432,7 @@ namespace cicada
 	heap.pop();
 	
 	if (item->is_tree()) {
-	  const tree_candidate_type& rule = *(*(item->tree_first));
+	  const tree_candidate_type& rule = *(item->tree_first);
 	  
 	  scores[id] = std::max(scores[id], item->score * rule.score);
 	  
@@ -426,11 +449,11 @@ namespace cicada
 	  if (item->tree_first != item->tree_last)
 	    heap.push(item);
 	} else {
-	  const rule_candidate_type& rule = *(*(item->rule_first));
+	  const rule_candidate_type& rule = *(item->rule_first);
 	  
 	  scores[id] = std::max(scores[id], item->score * rule.score);
 
-	  rules_enumerated.push_back(*(item->rule_first));
+	  rules_enumerated.push_back(&(*(item->rule_first)));
 	  
 	  ++ const_cast<candidate_type*>(item)->rule_first;
 	  if (item->rule_first != item->rule_last)
@@ -542,7 +565,7 @@ namespace cicada
 	  
 	  if (node == transducer.root()) continue;
 	  
-	  const rule_candidate_ptr_set_type& rules = candidate_rules(grammar_id, node);
+	  const rule_candidate_set_type& rules = candidate_rules(grammar_id, node);
 	  
 	  if (rules.empty()) continue;
 	  
@@ -682,7 +705,7 @@ namespace cicada
 	    
 	    queue.push_back(state_type(*fiter, node_none));
 	    
-	    const tree_candidate_ptr_set_type& rules = candidate_trees(grammar_id, node_none);
+	    const tree_candidate_set_type& rules = candidate_trees(grammar_id, node_none);
 	    
 	    if (rules.empty()) continue;
 	    
@@ -812,113 +835,57 @@ namespace cicada
     }
 
     template <typename Tp>
-    struct greater_ptr_score
+    struct greater_score
     {
-      bool operator()(const Tp* x, const Tp* y) const
+      bool operator()(const Tp& x, const Tp& y) const
       {
-	return x->score > y->score;
+	return x.score > y.score;
       }
     };
 
-    const rule_candidate_ptr_set_type& candidate_rules(const size_type& table, const transducer_type::id_type& node)
+    const rule_candidate_set_type& candidate_rules(const size_type& table, const transducer_type::id_type& node)
     {
       typename rule_candidate_map_type::iterator riter = rule_tables[table].find(node);
       if (riter == rule_tables[table].end()) {
-	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_ptr_set_type())).first;
-	
 	const transducer_type::rule_pair_set_type& rules = grammar[table].rules(node);
+
+	riter = rule_tables[table].insert(std::make_pair(node, rule_candidate_set_type(rules.size()))).first;
 	
-	if (rules.size() > static_cast<size_type>(beam_size)) {
-	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	    const score_type score = function(iter->features);
-	    
-	    if (riter->second.size() < static_cast<size_type>(beam_size) || score >= riter->second.front()->score) {
-	      rule_candidates.push_back(rule_candidate_type(score,
-							    yield_source ? iter->source : iter->target,
-							    iter->features,
-							    iter->attributes));
-	      
-	      riter->second.push_back(&(rule_candidates.back()));
-	      
-	      std::push_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
-	    }
-	  }
-	  
-	  // heap-sort!
-	  std::sort_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
-	  
-	  // shrink...
-	  rule_candidate_ptr_set_type(riter->second).swap(riter->second);
-	} else {
-	  riter->second.reserve(rules.size());
-	  
-	  transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	  transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	  for (transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	    rule_candidates.push_back(rule_candidate_type(function(iter->features),
-							  yield_source ? iter->source : iter->target,
-							  iter->features,
-							  iter->attributes));
-	    
-	    riter->second.push_back(&(rule_candidates.back()));
-	  }
-	  
-	  std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<rule_candidate_type>());
-	}
+	typename rule_candidate_set_type::iterator citer = riter->second.begin();
+	transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	for (transducer_type::rule_pair_set_type::const_iterator iter = rules.begin(); iter != iter_end; ++ iter, ++ citer)
+	  *citer = rule_candidate_type(function(iter->features),
+				       yield_source ? iter->source : iter->target,
+				       iter->features,
+				       iter->attributes);
+	
+	std::sort(riter->second.begin(), riter->second.end(), greater_score<rule_candidate_type>());
       }
+      
       return riter->second;
     }
 
-    const tree_candidate_ptr_set_type& candidate_trees(const size_type& table, const tree_transducer_type::id_type& node)
+    const tree_candidate_set_type& candidate_trees(const size_type& table, const tree_transducer_type::id_type& node)
     {
       typename tree_candidate_map_type::iterator riter = tree_tables[table].find(node);
       if (riter == tree_tables[table].end()) {
-	riter = tree_tables[table].insert(std::make_pair(node, tree_candidate_ptr_set_type())).first;
-	
 	const tree_transducer_type::rule_pair_set_type& rules = tree_grammar[table].rules(node);
 	
-	if (rules.size() > static_cast<size_type>(beam_size)) {
-	  tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	  tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	  for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	    const score_type score = function(iter->features);
-
-	    if (riter->second.size() < static_cast<size_type>(beam_size) || score >= riter->second.front()->score) {
-	      tree_candidates.push_back(tree_candidate_type(score,
-							    yield_source ? iter->source : iter->target,
-							    iter->features,
-							    iter->attributes));
-	      
-	      riter->second.push_back(&(tree_candidates.back()));
-	      
-	      std::push_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<tree_candidate_type>());
-	    }
-	  }
-	  
-	  // heap-sort!
-	  std::sort_heap(riter->second.begin(), riter->second.end(), greater_ptr_score<tree_candidate_type>());
-	  
-	  // shrink...
-	  tree_candidate_ptr_set_type(riter->second).swap(riter->second);
-	} else {
-	  riter->second.reserve(rules.size());
+	riter = tree_tables[table].insert(std::make_pair(node, tree_candidate_set_type(rules.size()))).first;
 	
-	  tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
-	  tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
-	  for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter) {
-	    tree_candidates.push_back(tree_candidate_type(function(iter->features),
-							  yield_source ? iter->source : iter->target,
-							  iter->features,
-							  iter->attributes));
-	  
-	    riter->second.push_back(&(tree_candidates.back()));
-	  }
 	
-	  std::sort(riter->second.begin(), riter->second.end(), greater_ptr_score<tree_candidate_type>());
-	}
+	typename tree_candidate_set_type::iterator citer = riter->second.begin();
+	tree_transducer_type::rule_pair_set_type::const_iterator iter_begin = rules.begin();
+	tree_transducer_type::rule_pair_set_type::const_iterator iter_end   = rules.end();
+	for (tree_transducer_type::rule_pair_set_type::const_iterator iter = iter_begin; iter != iter_end; ++ iter, ++ citer)
+	  *citer = tree_candidate_type(function(iter->features),
+				       yield_source ? iter->source : iter->target,
+				       iter->features,
+				       iter->attributes);
+	
+	std::sort(riter->second.begin(), riter->second.end(), greater_score<tree_candidate_type>());
       }
+      
       return riter->second;
     }
     
@@ -935,10 +902,7 @@ namespace cicada
 
     rule_candidate_ptr_set_type rules_enumerated;
 
-    rule_candidate_set_type   rule_candidates;
     rule_candidate_table_type rule_tables;
-    
-    tree_candidate_set_type   tree_candidates;
     tree_candidate_table_type tree_tables;
     
     score_set_type scores;
