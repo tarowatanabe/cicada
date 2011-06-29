@@ -121,6 +121,8 @@ int max_iteration = 10;
 int min_iteration = 5;
 bool apply_exact = false;
 int cube_size = 200;
+double beam_size = 1e-5;
+
 int debug = 0;
 
 void read_tstset(const path_set_type& files,
@@ -364,7 +366,7 @@ struct TaskOracle
       
       // compute pruned forest
       hypergraph_type forest;
-      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_bleu, score_factor), 1e-5);
+      cicada::prune_beam(graph_oracle, forest, cicada::operation::single_scaled_function<cicada::semiring::Tropical<double> >(feature_bleu, score_factor), beam_size);
       
       // compute scores...
       score_ptr_type score_sample = scorers[id]->score(sentence);
@@ -736,7 +738,8 @@ void options(int argc, char** argv)
     ("min-iteration", po::value<int>(&min_iteration), "# of hill-climbing iteration")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact application")
-    ("cube-size", po::value<int>(&cube_size), "cube-pruning size")
+    ("cube-size", po::value<int>(&cube_size),      "cube pruning size")
+    ("beam-size", po::value<double>(beam_size),    "beam pruning size")
     ;
   
   po::options_description opts_command("command line options");

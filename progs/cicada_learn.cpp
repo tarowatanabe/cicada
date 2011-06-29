@@ -51,7 +51,7 @@ double C = 1.0;
 
 bool unite_forest = false;
 
-int threads = 2;
+int threads = 4;
 
 int debug = 0;
 
