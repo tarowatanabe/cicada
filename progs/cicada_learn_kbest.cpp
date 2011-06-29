@@ -843,18 +843,25 @@ void read_kbest(const path_set_type& kbest_path,
       queue.push(std::make_pair(path_type(), path_type()));
     
     workers.join_all();
+
+    size_t kbests_size  = 0;
+    size_t oracles_size = 0;
+    for (int i = 0; i != threads; ++ i) {
+      kbests_size  += tasks[i].kbests.size();
+      oracles_size += tasks[i].oracles.size();
+    }
+    
+    if (kbests_size != oracles_size)
+      throw std::runtime_error("kbest/oracle size do not match");
+
+    kbests.reserve(kbests_size);
+    oracles.reserve(oracles_size);
     
     for (int i = 0; i != threads; ++ i) {
-      if (kbests.empty())
-	kbests.swap(tasks[i].kbests);
-      else
-	kbests.insert(kbests.end(), tasks[i].kbests.begin(), tasks[i].kbests.end());
-      tasks[i].kbests.clear();
+      kbests.insert(kbests.end(), tasks[i].kbests.begin(), tasks[i].kbests.end());
+      oracles.insert(oracles.end(), tasks[i].oracles.begin(), tasks[i].oracles.end());
       
-      if (oracles.empty())
-	oracles.swap(tasks[i].oracles);
-      else
-	oracles.insert(oracles.end(), tasks[i].oracles.begin(), tasks[i].oracles.end());
+      tasks[i].kbests.clear();
       tasks[i].oracles.clear();
     }
     
