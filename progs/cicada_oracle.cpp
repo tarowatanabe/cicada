@@ -594,8 +594,8 @@ void options(int argc, char** argv)
     ("min-iteration", po::value<int>(&min_iteration), "# of hill-climbing iteration")
     
     ("apply-exact", po::bool_switch(&apply_exact), "exact application")
-    ("cube-size", po::value<int>(&cube_size),      "cube pruning size")
-    ("beam-size", po::value<double>(beam_size),    "beam pruning size")
+    ("cube-size", po::value<int>(&cube_size)->default_value(cube_size),    "cube pruning size")
+    ("beam-size", po::value<double>(&beam_size)->default_value(beam_size), "beam pruning size")
     
     ("threads", po::value<int>(&threads), "# of threads")
     ;
