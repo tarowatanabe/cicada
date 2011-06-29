@@ -645,6 +645,84 @@ struct TaskReadUnite
   hypothesis_map_type oracles;
 };
 
+struct TaskReadSync
+{
+  typedef std::pair<path_type, path_type> path_pair_type;
+  typedef utils::lockfree_list_queue<path_pair_type, std::allocator<path_pair_type> > queue_type;
+  
+  TaskReadSync(queue_type& __queue)
+    : queue(__queue) {}
+  
+  void operator()()
+  {
+    typedef boost::spirit::istream_iterator iter_type;
+    typedef kbest_feature_parser<iter_type> parser_type;
+    
+    parser_type parser;
+    kbest_feature_type kbest;
+
+    for (;;) {
+      path_pair_type paths;
+      queue.pop(paths);
+      
+      if (paths.first.empty()) break;
+      
+      // we will perform paired reading...
+      
+      kbests.resize(kbests.size() + 1);
+      oracles.resize(oracles.size() + 1);
+      
+      {
+	utils::compress_istream is(paths.first, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+	  
+	iter_type iter(is);
+	iter_type iter_end;
+	  
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	    
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	    
+	  if (boost::fusion::get<0>(kbest) != i)
+	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
+	    
+	  kbests.back().push_back(hypothesis_type(kbest));
+	}
+      }
+
+      {
+	utils::compress_istream is(paths.second, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+	  
+	iter_type iter(is);
+	iter_type iter_end;
+	  
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	    
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+
+	  if (boost::fusion::get<0>(kbest) != i)
+	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
+	    
+	  oracles.back().push_back(hypothesis_type(kbest));
+	}
+      }
+    }
+  }
+  
+  queue_type& queue;
+  hypothesis_map_type kbests;
+  hypothesis_map_type oracles;
+};
+
 void read_kbest(const path_set_type& kbest_path,
 		const path_set_type& oracle_path,
 		hypothesis_map_type& kbests,
@@ -739,9 +817,22 @@ void read_kbest(const path_set_type& kbest_path,
     unique_kbest(oracles);
     
   } else {
+    typedef TaskReadSync task_type;
+    typedef task_type::queue_type queue_type;
+    
+    typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+    
     // synchronous reading...
     if (kbest_path.size() != oracle_path.size())
       throw std::runtime_error("# of kbests does not match");
+    
+    queue_type queue(threads);
+    task_set_type tasks(threads, task_type(queue));
+    
+    boost::thread_group workers;
+    for (int i = 0; i != threads; ++ i)
+      workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+    
     
     for (size_t pos = 0; pos != kbest_path.size(); ++ pos) {
       if (debug)
@@ -756,53 +847,27 @@ void read_kbest(const path_set_type& kbest_path,
 	if (! boost::filesystem::exists(path_kbest)) break;
 	if (! boost::filesystem::exists(path_oracle)) continue;
 
-	kbests.resize(kbests.size() + 1);
-	oracles.resize(oracles.size() + 1);
-
-	{
-	  utils::compress_istream is(path_kbest, 1024 * 1024);
-	  is.unsetf(std::ios::skipws);
-	  
-	  iter_type iter(is);
-	  iter_type iter_end;
-	  
-	  while (iter != iter_end) {
-	    boost::fusion::get<1>(kbest).clear();
-	    boost::fusion::get<2>(kbest).clear();
-	    
-	    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	      if (iter != iter_end)
-		throw std::runtime_error("kbest parsing failed");
-	    
-	    if (boost::fusion::get<0>(kbest) != i)
-	      throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
-	    
-	    kbests.back().push_back(hypothesis_type(kbest));
-	  }
-	}
-
-	{
-	  utils::compress_istream is(path_oracle, 1024 * 1024);
-	  is.unsetf(std::ios::skipws);
-	  
-	  iter_type iter(is);
-	  iter_type iter_end;
-	  
-	  while (iter != iter_end) {
-	    boost::fusion::get<1>(kbest).clear();
-	    boost::fusion::get<2>(kbest).clear();
-	    
-	    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	      if (iter != iter_end)
-		throw std::runtime_error("kbest parsing failed");
-
-	    if (boost::fusion::get<0>(kbest) != i)
-	      throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
-	    
-	    oracles.back().push_back(hypothesis_type(kbest));
-	  }
-	}
+	queue.push(std::make_pair(path_kbest, path_oracle));
       }
+    }
+    
+    for (int i = 0; i != threads; ++ i)
+      queue.push(std::make_pair(path_type(), path_type()));
+    
+    workers.join_all();
+    
+    for (int i = 0; i != threads; ++ i) {
+      if (kbests.empty())
+	kbests.swap(tasks[i].kbests);
+      else
+	kbests.insert(kbests.end(), tasks[i].kbests.begin(), tasks[i].kbests.end());
+      tasks[i].kbests.clear();
+      
+      if (oracles.empty())
+	oracles.swap(tasks[i].oracles);
+      else
+	oracles.insert(oracles.end(), tasks[i].oracles.begin(), tasks[i].oracles.end());
+      tasks[i].oracles.clear();
     }
     
     // uniques...
