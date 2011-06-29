@@ -147,6 +147,20 @@ namespace cicada
       RuleCandidate() : score(), rule(), features(), attributes() {}
       RuleCandidate(const score_type& __score, const rule_ptr_type& __rule, const feature_set_type& __features, const attribute_set_type& __attributes)
 	: score(__score), rule(__rule), features(__features), attributes(__attributes) {}
+
+      void swap(RuleCandidate& x)
+      {
+	std::swap(score, x.score);
+	rule.swap(x.rule);
+	features.swap(x.features);
+	attributes.swap(x.attributes);
+      }
+      
+      friend
+      void swap(RuleCandidate& x, RuleCandidate& y)
+      {
+	x.swap(y);
+      }
     };
     typedef RuleCandidate rule_candidate_type;
     typedef utils::simple_vector<rule_candidate_type, std::allocator<rule_candidate_type> > rule_candidate_set_type;
