@@ -446,9 +446,6 @@ namespace cicada
       
       passives.resize(lattice.size() + 1);
     
-      rule_candidates.clear();
-      tree_candidates.clear();
-      
       rule_tables.clear();
       rule_tables.reserve(grammar.size());
       rule_tables.resize(grammar.size());
@@ -1183,10 +1180,7 @@ namespace cicada
     candidate_set_type    candidates;
     candidate_heap_type   heap;
 
-    rule_candidate_set_type   rule_candidates;
     rule_candidate_table_type rule_tables;
-    
-    tree_candidate_set_type   tree_candidates;
     tree_candidate_table_type tree_tables;
     
     unary_rule_map_type   unary_rule_map;
