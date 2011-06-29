@@ -722,12 +722,6 @@ void read_kbest(const path_set_type& kbest_path,
 		hypothesis_map_type& kbests,
 		hypothesis_map_type& oracles)
 {
-  typedef boost::spirit::istream_iterator iter_type;
-  typedef kbest_feature_parser<iter_type> parser_type;
-  
-  parser_type parser;
-  kbest_feature_type kbest;
-  
   if (unite_kbest) {
     typedef TaskReadUnite task_type;
     typedef task_type::queue_type queue_type;
