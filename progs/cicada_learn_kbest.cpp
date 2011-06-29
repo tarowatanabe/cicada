@@ -58,7 +58,7 @@ double eps = std::numeric_limits<double>::infinity();
 
 bool unite_kbest = false;
 
-int threads = 1;
+int threads = 2;
 
 int debug = 0;
 
@@ -686,10 +686,7 @@ struct TaskReadSync
 	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
-	    
-	  if (boost::fusion::get<0>(kbest) != i)
-	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
-	    
+	  
 	  kbests.back().push_back(hypothesis_type(kbest));
 	}
       }
@@ -708,10 +705,7 @@ struct TaskReadSync
 	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
-
-	  if (boost::fusion::get<0>(kbest) != i)
-	    throw std::runtime_error("different id: " + utils::lexical_cast<std::string>(boost::fusion::get<0>(kbest)));
-	    
+	  
 	  oracles.back().push_back(hypothesis_type(kbest));
 	}
       }
