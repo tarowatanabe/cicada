@@ -153,12 +153,6 @@ int main(int argc, char ** argv)
   return 0;
 }
 
-static void print_string_stderr(const char *s)
-{
-  fputs(s,stderr);
-  fflush(stderr);
-}
-
 struct OptimizeLinear
 {
   typedef struct model        model_type;
@@ -192,6 +186,12 @@ struct OptimizeLinear
 #else
   typedef sgi::hash_set<hypothesis_type::sentence_type, hash_sentence, std::equal_to<hypothesis_type::sentence_type>, std::allocator<hypothesis_type::sentence_type> > sentence_unique_type;
 #endif
+
+  static void print_string_stderr(const char *s)
+  {
+    fputs(s,stderr);
+    fflush(stderr);
+  }
   
   OptimizeLinear(const hypothesis_map_type& kbests,
 		 const hypothesis_map_type& oracles)
