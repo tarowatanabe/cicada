@@ -69,7 +69,7 @@ Phrase/synchronou-rule/tree-to-string/string-to-tree extraction/scoring are impl
 
 Various learning components are implemented:
    - Large feature set from input lattice/hypergraph on large training data via MaxEnt (optimized by LBFGS) [3]
-   - Large/small featuer set from kbests on large/small traning data via MaxEnt (LBFGS)/liblinear (New, but still open problems!)
+   - Large/small featuer set from kbests on large/small traning data via MaxEnt (LBFGS)/liblinear [30] (New, but still open problems!)
    - Large feature set on small devset with MIRA [6,7], but with hypergraph (New! But still open problems!)
    - Small feature set on small devset learned by hypergraph-MERT [8]
    - Small/Large feature set on small devset learned by hypergraph-MaxEnt (optimized by LBFGS or SGD)
@@ -452,4 +452,14 @@ References:
   publisher = {Association for Computational Linguistics},
   pages     = {1249--1257},
   url       = {http://www.aclweb.org/anthology/P11-1125}
+}
+
+[30]
+@Article{REF08a,
+  author =	 {Rong-En Fan and Kai-Wei Chang and Cho-Jui Hsieh and Xiang-Rui Wang and Chih-Jen Lin},
+  title = 	  {{LIBLINEAR}: A Library for Large Linear Classification},
+  journal = 	   {Journal of Machine Learning Research},
+  year =   {2008},
+  volume =  {9},
+  pages =    {1871--1874}
 }
