@@ -153,6 +153,12 @@ int main(int argc, char ** argv)
   return 0;
 }
 
+static void print_string_stderr(const char *s)
+{
+  fputs(s,stderr);
+  fflush(stderr);
+}
+
 struct OptimizeLinear
 {
   typedef struct model        model_type;
@@ -294,6 +300,8 @@ struct OptimizeLinear
       else if (parameter.solver_type == L1R_L2LOSS_SVC || parameter.solver_type == L1R_LR)
 	parameter.eps = 0.01;
     }
+
+    set_print_string_function(print_string_stderr);
     
     const char* error_message = check_parameter(&problem, &parameter);
     if (error_message)
