@@ -154,7 +154,7 @@ int main(int argc, char** argv)
 	      
 	      score_ptr_type score = scorers[id]->score(id_sentence.second);
 	      *score += *base_scores[id];
-	      os << *score << '\n';
+	      os << id_sentence.first << " ||| " << *score << '\n';
 	    }
 	  }
 	} else {
@@ -175,7 +175,7 @@ int main(int argc, char** argv)
 	    
 	    score_ptr_type score = scorers[id_sentence.first]->score(id_sentence.second);
 	    *score += *base_scores[id_sentence.first];
-	    os << *score << '\n';
+	    os << id_sentence.first << " ||| " << *score << '\n';
 	  }
 	}
 	

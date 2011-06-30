@@ -3,6 +3,7 @@ Bugfix for kbest oracle for taking unique
 Bugfix for oracle computer memorize the best-so-forth results, instead of the previously best
 Revised cicada_learn{,_kbest}{,_mpi} so that the constant hyperparameter is independent of the training data size
 Evaluator can take directory input
+Evaluator can assign an individual score to each sentence with base document.
 Compact memory consumption in parse-{cky,tree,tree-cky}
 
 2011-6-27
