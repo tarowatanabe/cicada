@@ -198,7 +198,7 @@ struct OptimizeLinear
 
 	sentences.clear();
 	for (size_t o = 0; o != oracles[id].size(); ++ o)
-	  sentences.insert(oracles[id][0].sentence);
+	  sentences.insert(oracles[id][o].sentence);
 	
 	for (size_t o = 0; o != oracles[id].size(); ++ o)
 	  for (size_t k = 0; k != kbests[id].size(); ++ k) {
