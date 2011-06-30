@@ -888,9 +888,15 @@ void options(int argc, char** argv)
     ("iteration", po::value<int>(&iteration)->default_value(iteration), "max # of iterations")
     
     ("learn-lbfgs",  po::bool_switch(&learn_lbfgs),  "batch LBFGS algorithm")
-    ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm(s)")
-    ("solver",       po::value<int>(&linear_solver), "liblinear solver type (see liblinear homepage)")
-    
+    ("learn-linear", po::bool_switch(&learn_linear), "liblinear algorithm")
+    ("solver",       po::value<int>(&linear_solver), "liblinear solver type (default: 1)\n"
+     " 0: \tL2-regularized logistic regression (primal)\n"
+     " 1: \tL2-regularized L2-loss support vector classification (dual)\n"
+     " 2: \tL2-regularized L2-loss support vector classification (primal)\n"
+     " 3: \tL2-regularized L1-loss support vector classification (dual)\n"
+     " 5: \tL1-regularized L2-loss support vector classification\n"
+     " 6: \tL1-regularized logistic regression\n"
+     " 7: \tL2-regularized logistic regression (dual)")
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C),           "regularization constant")
