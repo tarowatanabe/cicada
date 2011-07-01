@@ -72,7 +72,16 @@ template <typename Optimize>
 double optimize_batch(const hypothesis_map_type& kbests,
 		      const hypothesis_map_type& oracles,
 		      weight_set_type& weights);
+template <typename Optimize, typename Generator>
+double optimize_online(const hypothesis_map_type& kbests,
+		       const hypothesis_map_type& oracles,
+		       weight_set_type& weights,
+		       Generator& generator);
 
+template <typename Optimizer>
+struct OptimizeOnline;
+template <typename Optimizer>
+struct OptimizeOnlineMargin;
 struct OptimizeLBFGS;
 
 void bcast_weights(const int rank, weight_set_type& weights);
@@ -139,7 +148,19 @@ int main(int argc, char ** argv)
     boost::mt19937 generator;
     generator.seed(time(0) * getpid());
     
-    objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
+    if (learn_sgd) {
+      if (regularize_l1)
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL1> >(kbests, oracles, weights, generator);
+      else
+	objective = optimize_online<OptimizeOnline<OptimizerSGDL2> >(kbests, oracles, weights, generator);
+    } else if (learn_mira)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerMIRA> >(kbests, oracles, weights, generator);
+    else if (learn_arow)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerAROW> >(kbests, oracles, weights, generator);
+    else if (learn_cw)
+      objective = optimize_online<OptimizeOnlineMargin<OptimizerCW> >(kbests, oracles, weights, generator);
+    else 
+      objective = optimize_batch<OptimizeLBFGS>(kbests, oracles, weights);
 
     if (debug && mpi_rank == 0)
       std::cerr << "objective: " << objective << std::endl;
@@ -191,6 +212,251 @@ int loop_sleep(bool found, int non_found_iter)
   return non_found_iter;
 }
 
+template <typename Optimizer>
+struct OptimizeOnline
+{
+  
+  OptimizeOnline(Optimizer& __optimizer)
+    : optimizer(__optimizer) {}
+  
+  typedef Optimizer optimizer_type;
+  
+  typedef typename optimizer_type::weight_type   weight_type;
+  typedef typename optimizer_type::gradient_type gradient_type;    
+
+  template <typename Iterator>
+  weight_type function(Iterator first, Iterator last)
+  {
+    return cicada::semiring::traits<weight_type>::exp(cicada::dot_product(optimizer.weights, first, last, 0.0) * optimizer.weight_scale);
+  }
+  
+  
+  void operator()(const hypothesis_set_type& oracles,
+		  const hypothesis_set_type& kbests)
+  {
+    
+    weight_type Z_oracle;
+    weight_type Z_kbest;
+    
+    hypothesis_set_type::const_iterator oiter_end = oracles.end();
+    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter)
+      Z_oracle += function(oiter->features.begin(), oiter->features.end());
+			   
+    hypothesis_set_type::const_iterator kiter_end = kbests.end();
+    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter)
+      Z_kbest += function(kiter->features.begin(), kiter->features.end());
+    
+    gradient_type gradient_oracles;
+    gradient_type gradient_kbests;
+    
+    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
+      const weight_type weight = function(oiter->features.begin(), oiter->features.end()) / Z_oracle;
+      
+      hypothesis_type::feature_set_type::const_iterator fiter_end = oiter->features.end();
+      for (hypothesis_type::feature_set_type::const_iterator fiter = oiter->features.begin(); fiter != fiter_end; ++ fiter)
+	gradient_oracles[fiter->first] += weight_type(fiter->second) * weight;
+    }
+    
+    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+      const weight_type weight = function(kiter->features.begin(), kiter->features.end()) / Z_kbest;
+      
+      hypothesis_type::feature_set_type::const_iterator fiter_end = kiter->features.end();
+      for (hypothesis_type::feature_set_type::const_iterator fiter = kiter->features.begin(); fiter != fiter_end; ++ fiter)
+	gradient_kbests[fiter->first] += weight_type(fiter->second) * weight;
+    }
+    
+    optimizer(gradient_oracles,
+	      gradient_kbests,
+	      Z_oracle,
+	      Z_kbest);
+  }
+  
+  Optimizer& optimizer;
+};
+
+template <typename Optimizer>
+struct OptimizeOnlineMargin
+{
+  
+  OptimizeOnlineMargin(Optimizer& __optimizer)
+    : optimizer(__optimizer) {}
+  
+  typedef Optimizer optimizer_type;
+  
+  typedef typename optimizer_type::weight_type   weight_type;
+  typedef typename optimizer_type::gradient_type gradient_type;
+  
+  template <typename Iterator>
+  double function(Iterator first, Iterator last)
+  {
+    return cicada::dot_product(optimizer.weights, first, last, 0.0);
+  }
+  
+  void operator()(const hypothesis_set_type& oracles,
+		  const hypothesis_set_type& kbests)
+  {
+    // compute the best among kbests
+    // compute the worst among oracles
+    
+    // then, compute!
+    
+    double score_oracle =   std::numeric_limits<double>::infinity();
+    double score_kbest  = - std::numeric_limits<double>::infinity();
+    hypothesis_set_type::const_iterator oiter_best;
+    hypothesis_set_type::const_iterator kiter_best;
+    
+    hypothesis_set_type::const_iterator oiter_end = oracles.end();
+    for (hypothesis_set_type::const_iterator oiter = oracles.begin(); oiter != oiter_end; ++ oiter) {
+      const double score = function(oiter->features.begin(), oiter->features.end());
+      
+      if (score < score_oracle) {
+	score_oracle = score;
+	oiter_best = oiter;
+      }
+    }
+    
+    hypothesis_set_type::const_iterator kiter_end = kbests.end();
+    for (hypothesis_set_type::const_iterator kiter = kbests.begin(); kiter != kiter_end; ++ kiter) {
+      const double score = function(kiter->features.begin(), kiter->features.end());
+	    
+      if (score > score_kbest) {
+	score_kbest = score;
+	kiter_best = kiter;
+      }
+    }
+    
+    optimizer(feature_set_type(oiter_best->features.begin(), oiter_best->features.end()),
+	      feature_set_type(kiter_best->features.begin(), kiter_best->features.end()));
+  }
+
+  Optimizer& optimizer;
+};
+
+template <typename Optimize, typename Generator>
+double optimize_online(const hypothesis_map_type& kbests,
+		       const hypothesis_map_type& oracles,
+		       weight_set_type& weights,
+		       Generator& generator)
+{
+  typedef std::vector<int, std::allocator<int> > id_set_type;
+  typedef typename Optimize::optimizer_type optimizer_type;
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  id_set_type ids(kbests.size());
+  int instances_local = 0;
+  
+  for (size_t id = 0; id != ids.size(); ++ id) {
+    ids[id] = id;
+    instances_local += ! kbests[id].empty() && ! oracles[id].empty();
+  }
+  
+  int instances = 0;
+  MPI::COMM_WORLD.Allreduce(&instances_local, &instances, 1, MPI::INT, MPI::SUM);
+  
+  optimizer_type optimizer(instances, C);
+  Optimize opt(optimizer);
+  
+  optimizer.weights = weights;
+
+  if (mpi_rank == 0) {
+    double objective = 0.0;
+    
+    for (int iter = 0; iter < iteration; ++ iter) {
+      
+      for (int rank = 1; rank < mpi_size; ++ rank)
+	MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, notify_tag);
+      
+      bcast_weights(0, optimizer.weights);
+      
+      optimizer.initialize();
+      
+      for (size_t id = 0; id != ids.size(); ++ id)
+	if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
+	  opt(oracles[ids[id]], kbests[ids[id]]);
+      
+      optimizer.finalize();
+      
+      boost::random_number_generator<Generator> gen(generator);
+      std::random_shuffle(ids.begin(), ids.end(), gen);
+      
+      optimizer.weights *= optimizer.samples;
+      reduce_weights(optimizer.weights);
+      
+      objective = 0.0;
+      MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+      
+      int samples = 0;
+      int samples_local = optimizer.samples;
+      MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+      
+      optimizer.weights *= (1.0 / samples);
+      
+      if (debug >= 2)
+	std::cerr << "objective: " << objective << std::endl;
+    }
+    
+    // send termination!
+    for (int rank = 1; rank < mpi_size; ++ rank)
+      MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, termination_tag);
+
+    weights.swap(optimizer.weights);
+    
+    return objective;
+    
+  } else {
+    enum {
+      NOTIFY = 0,
+      TERMINATION,
+    };
+    
+    MPI::Prequest requests[2];
+    
+    requests[NOTIFY]      = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, notify_tag);
+    requests[TERMINATION] = MPI::COMM_WORLD.Recv_init(0, 0, MPI::INT, 0, termination_tag);
+    
+    for (int i = 0; i < 2; ++ i)
+      requests[i].Start();
+    
+    while (1) {
+      if (MPI::Request::Waitany(2, requests))
+	break;
+      else {
+	requests[NOTIFY].Start();
+	
+	bcast_weights(0, optimizer.weights);
+	
+	optimizer.initialize();
+	
+	for (size_t id = 0; id != ids.size(); ++ id)
+	  if (! oracles[ids[id]].empty() && ! kbests[ids[id]].empty())
+	    opt(oracles[ids[id]], kbests[ids[id]]);
+	
+	optimizer.finalize();
+	
+	boost::random_number_generator<Generator> gen(generator);
+	std::random_shuffle(ids.begin(), ids.end(), gen);
+	
+	optimizer.weights *= optimizer.samples;
+	send_weights(optimizer.weights);
+	
+	double objective = 0.0;
+	MPI::COMM_WORLD.Reduce(&optimizer.objective, &objective, 1, MPI::DOUBLE, MPI::SUM, 0);
+	
+	int samples = 0;
+	int samples_local = optimizer.samples;
+	MPI::COMM_WORLD.Reduce(&samples_local, &samples, 1, MPI::INT, MPI::SUM, 0);
+      }
+    }
+    
+    if (requests[NOTIFY].Test())
+      requests[NOTIFY].Cancel();
+    
+    return 0.0;
+  }
+
+}
 
 struct OptimizeLBFGS
 {
@@ -474,9 +740,6 @@ void read_kbest(const path_set_type& kbest_path,
   kbest_feature_type kbest;
   
   if (unite_kbest) {
-    size_t id_kbest;
-    size_t id_oracle;
-    
     for (path_set_type::const_iterator piter = kbest_path.begin(); piter != kbest_path.end(); ++ piter) {
       if (mpi_rank == 0 && debug)
 	std::cerr << "reading kbest: " << piter->string() << std::endl;
