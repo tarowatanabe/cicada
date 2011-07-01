@@ -1850,7 +1850,7 @@ static double train_one(const problem *prob, const parameter *param, double *w, 
 		case L2R_LR:
 		{
 			fun_obj=new l2r_lr_fun(prob, Cp, Cn);
-			TRON tron_obj(fun_obj, eps*min(pos,neg)/prob->l);
+			TRON tron_obj(fun_obj, eps*max(min(pos,neg),1)/prob->l);
 			tron_obj.set_print_string(liblinear_print_string);
 			tron_obj.tron(w);
 			delete fun_obj;
@@ -1859,7 +1859,7 @@ static double train_one(const problem *prob, const parameter *param, double *w, 
 		case L2R_L2LOSS_SVC:
 		{
 			fun_obj=new l2r_l2_svc_fun(prob, Cp, Cn);
-			TRON tron_obj(fun_obj, eps*min(pos,neg)/prob->l);
+			TRON tron_obj(fun_obj, eps*max(min(pos,neg),1)/prob->l);
 			tron_obj.set_print_string(liblinear_print_string);
 			tron_obj.tron(w);
 			delete fun_obj;
@@ -1876,7 +1876,7 @@ static double train_one(const problem *prob, const parameter *param, double *w, 
 			problem prob_col;
 			feature_node *x_space = NULL;
 			transpose(prob, &x_space ,&prob_col);
-			objective = solve_l1r_l2_svc(&prob_col, w, eps*min(pos,neg)/prob->l, Cp, Cn);
+			objective = solve_l1r_l2_svc(&prob_col, w, eps*max(min(pos,neg),1)/prob->l, Cp, Cn);
 			delete [] prob_col.y;
 			delete [] prob_col.x;
 			delete [] x_space;
@@ -1887,7 +1887,7 @@ static double train_one(const problem *prob, const parameter *param, double *w, 
 			problem prob_col;
 			feature_node *x_space = NULL;
 			transpose(prob, &x_space ,&prob_col);
-			objective = solve_l1r_lr(&prob_col, w, eps*min(pos,neg)/prob->l, Cp, Cn);
+			objective = solve_l1r_lr(&prob_col, w, eps*max(min(pos,neg),1)/prob->l, Cp, Cn);
 			delete [] prob_col.y;
 			delete [] prob_col.x;
 			delete [] x_space;
