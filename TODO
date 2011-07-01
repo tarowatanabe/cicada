@@ -90,3 +90,5 @@ Support HMM word alignment training found in nicttm so that we can completely de
 Use parse-cky inside parse-coarse instead of compose-cky for (potentially) faster parsing with less memory consumption
 
 Add incremental version of MERT?
+
+parallelize liblinear???
