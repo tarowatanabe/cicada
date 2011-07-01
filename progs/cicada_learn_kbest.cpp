@@ -195,6 +195,7 @@ struct OptimizeLinear
   
   OptimizeLinear(const hypothesis_map_type& kbests,
 		 const hypothesis_map_type& oracles)
+    : weights(), objective(0.0)
   {
     // compute unique before processing
     // 
@@ -308,6 +309,8 @@ struct OptimizeLinear
       throw std::runtime_error(std::string("error: ") + error_message);
     
     const model_type* model = train(&problem, &parameter);
+
+    objective = model->objective / labels.size();
     
     // it is an optimization...
     for (int j = 0; j != model->nr_feature; ++ j)
@@ -325,6 +328,7 @@ private:
 
 public:
   weight_set_type weights;
+  double objective;
 };
 
 template <typename Optimizer>
@@ -336,7 +340,7 @@ double optimize_linear(const hypothesis_map_type& kbests,
   
   weights = optimizer.weights;
   
-  return 0.0;
+  return optimizer.objective;
 }
 
 
