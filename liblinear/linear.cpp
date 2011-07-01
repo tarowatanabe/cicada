@@ -402,7 +402,7 @@ class Solver_MCSVM_CS
 	public:
 		Solver_MCSVM_CS(const problem *prob, int nr_class, double *C, double eps=0.1, int max_iter=100000);
 		~Solver_MCSVM_CS();
-		void Solve(double *w);
+		double Solve(double *w);
 	private:
 		void solve_sub_problem(double A_i, int yi, double C_yi, int active_i, double *alpha_new);
 		bool be_shrunk(int i, int m, int yi, double alpha_i, double minG);
@@ -477,7 +477,7 @@ bool Solver_MCSVM_CS::be_shrunk(int i, int m, int yi, double alpha_i, double min
 	return false;
 }
 
-void Solver_MCSVM_CS::Solve(double *w)
+double Solver_MCSVM_CS::Solve(double *w)
 {
 	int i, m, s;
 	int iter = 0;
@@ -676,6 +676,8 @@ void Solver_MCSVM_CS::Solve(double *w)
 	delete [] alpha_index;
 	delete [] y_index;
 	delete [] active_size_i;
+
+	return v;
 }
 
 // A coordinate descent algorithm for 
@@ -708,7 +710,7 @@ void Solver_MCSVM_CS::Solve(double *w)
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-static void solve_l2r_l1l2_svc(
+static double solve_l2r_l1l2_svc(
 	const problem *prob, double *w, double eps, 
 	double Cp, double Cn, int solver_type)
 {
@@ -885,6 +887,8 @@ static void solve_l2r_l1l2_svc(
 	delete [] alpha;
 	delete [] y;
 	delete [] index;
+
+	return v/2;
 }
 
 // A coordinate descent algorithm for 
@@ -909,7 +913,7 @@ static void solve_l2r_l1l2_svc(
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, double Cn)
+double solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, double Cn)
 {
 	int l = prob->l;
 	int w_size = prob->n;
@@ -1053,6 +1057,8 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 	delete [] alpha;
 	delete [] y;
 	delete [] index;
+
+	return v;
 }
 
 // A coordinate descent algorithm for 
@@ -1072,7 +1078,7 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-static void solve_l1r_l2_svc(
+static double solve_l1r_l2_svc(
 	problem *prob_col, double *w, double eps, 
 	double Cp, double Cn)
 {
@@ -1336,6 +1342,8 @@ static void solve_l1r_l2_svc(
 	delete [] y;
 	delete [] b;
 	delete [] xj_sq;
+
+	return v;
 }
 
 // A coordinate descent algorithm for 
@@ -1355,7 +1363,7 @@ static void solve_l1r_l2_svc(
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-static void solve_l1r_lr(
+static double solve_l1r_lr(
 	const problem *prob_col, double *w, double eps, 
 	double Cp, double Cn)
 {
@@ -1705,6 +1713,8 @@ static void solve_l1r_lr(
 	delete [] exp_wTx_new;
 	delete [] tau;
 	delete [] D;
+
+	return v;
 }
 
 // transpose matrix X from row format to column format
@@ -1822,7 +1832,7 @@ static void group_classes(const problem *prob, int *nr_class_ret, int **label_re
 	free(data_label);
 }
 
-static void train_one(const problem *prob, const parameter *param, double *w, double Cp, double Cn)
+static double train_one(const problem *prob, const parameter *param, double *w, double Cp, double Cn)
 {
 	double eps=param->eps;
 	int pos = 0;
@@ -1831,6 +1841,8 @@ static void train_one(const problem *prob, const parameter *param, double *w, do
 		if(prob->y[i]==+1)
 			pos++;
 	neg = prob->l - pos;
+
+	double objective = 0.0;
 
 	function *fun_obj=NULL;
 	switch(param->solver_type)
@@ -1854,17 +1866,17 @@ static void train_one(const problem *prob, const parameter *param, double *w, do
 			break;
 		}
 		case L2R_L2LOSS_SVC_DUAL:
-			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L2LOSS_SVC_DUAL);
+			objective = solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L2LOSS_SVC_DUAL);
 			break;
 		case L2R_L1LOSS_SVC_DUAL:
-			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L1LOSS_SVC_DUAL);
+			objective = solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L1LOSS_SVC_DUAL);
 			break;
 		case L1R_L2LOSS_SVC:
 		{
 			problem prob_col;
 			feature_node *x_space = NULL;
 			transpose(prob, &x_space ,&prob_col);
-			solve_l1r_l2_svc(&prob_col, w, eps*min(pos,neg)/prob->l, Cp, Cn);
+			objective = solve_l1r_l2_svc(&prob_col, w, eps*min(pos,neg)/prob->l, Cp, Cn);
 			delete [] prob_col.y;
 			delete [] prob_col.x;
 			delete [] x_space;
@@ -1875,19 +1887,21 @@ static void train_one(const problem *prob, const parameter *param, double *w, do
 			problem prob_col;
 			feature_node *x_space = NULL;
 			transpose(prob, &x_space ,&prob_col);
-			solve_l1r_lr(&prob_col, w, eps*min(pos,neg)/prob->l, Cp, Cn);
+			objective = solve_l1r_lr(&prob_col, w, eps*min(pos,neg)/prob->l, Cp, Cn);
 			delete [] prob_col.y;
 			delete [] prob_col.x;
 			delete [] x_space;
 			break;
 		}
 		case L2R_LR_DUAL:
-			solve_l2r_lr_dual(prob, w, eps, Cp, Cn);
+			objective = solve_l2r_lr_dual(prob, w, eps, Cp, Cn);
 			break;
 		default:
 			fprintf(stderr, "Error: unknown solver_type\n");
 			break;
 	}
+
+	return objective;
 }
 
 //
@@ -1960,7 +1974,7 @@ model* train(const problem *prob, const parameter *param)
 			for(j=start[i];j<start[i]+count[i];j++)
 				sub_prob.y[j] = i;
 		Solver_MCSVM_CS Solver(&sub_prob, nr_class, weighted_C, param->eps);
-		Solver.Solve(model_->w);
+		model_->objective = Solver.Solve(model_->w);
 	}
 	else
 	{
@@ -1975,7 +1989,7 @@ model* train(const problem *prob, const parameter *param)
 			for(; k<sub_prob.l; k++)
 				sub_prob.y[k] = -1;
 
-			train_one(&sub_prob, param, &model_->w[0], weighted_C[0], weighted_C[1]);
+			model_->objective = train_one(&sub_prob, param, &model_->w[0], weighted_C[0], weighted_C[1]);
 		}
 		else
 		{
@@ -1994,7 +2008,7 @@ model* train(const problem *prob, const parameter *param)
 				for(; k<sub_prob.l; k++)
 					sub_prob.y[k] = -1;
 
-				train_one(&sub_prob, param, w, weighted_C[i], param->C);
+				model_->objective = train_one(&sub_prob, param, w, weighted_C[i], param->C);
 
 				for(int j=0;j<w_size;j++)
 					model_->w[j*nr_class+i] = w[j];

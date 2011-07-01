@@ -91,4 +91,6 @@ Use parse-cky inside parse-coarse instead of compose-cky for (potentially) faste
 
 Add incremental version of MERT?
 
-parallelize liblinear???
+reimplement liblinear functionality...???
+   liblinear does not allow starting from an intermediata state, like alpha from previous iterations
+   liblinear does not run in threading
