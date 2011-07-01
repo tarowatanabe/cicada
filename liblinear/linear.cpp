@@ -1852,7 +1852,7 @@ static double train_one(const problem *prob, const parameter *param, double *w, 
 			fun_obj=new l2r_lr_fun(prob, Cp, Cn);
 			TRON tron_obj(fun_obj, eps*max(min(pos,neg),1)/prob->l);
 			tron_obj.set_print_string(liblinear_print_string);
-			tron_obj.tron(w);
+			objective = tron_obj.tron(w);
 			delete fun_obj;
 			break;
 		}
@@ -1861,7 +1861,7 @@ static double train_one(const problem *prob, const parameter *param, double *w, 
 			fun_obj=new l2r_l2_svc_fun(prob, Cp, Cn);
 			TRON tron_obj(fun_obj, eps*max(min(pos,neg),1)/prob->l);
 			tron_obj.set_print_string(liblinear_print_string);
-			tron_obj.tron(w);
+			objective = tron_obj.tron(w);
 			delete fun_obj;
 			break;
 		}

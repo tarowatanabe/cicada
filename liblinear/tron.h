@@ -18,7 +18,7 @@ public:
 	TRON(const function *fun_obj, double eps = 0.1, int max_iter = 1000);
 	~TRON();
 
-	void tron(double *w);
+	double tron(double *w);
 	void set_print_string(void (*i_print) (const char *buf));
 
 private:

@@ -53,7 +53,7 @@ TRON::~TRON()
 {
 }
 
-void TRON::tron(double *w)
+double TRON::tron(double *w)
 {
 	// Parameters for updating the iterates.
 	double eta0 = 1e-4, eta1 = 0.25, eta2 = 0.75;
@@ -155,6 +155,8 @@ void TRON::tron(double *w)
 	delete[] r;
 	delete[] w_new;
 	delete[] s;
+
+	return f;
 }
 
 int TRON::trcg(double delta, double *g, double *s, double *r)
