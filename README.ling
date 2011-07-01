@@ -2,7 +2,7 @@
 
 We have three linsuistic components, extensively used in mteval/feature computation etc.
 
-stemmer: stemming algorithm (used in evaluation and feature computation)
+* stemmer: stemming algorithm (used in evaluation and feature computation)
 
 snowball: snowball stemming
 	language=[language] stemming algorithm (en, de etc.)
@@ -15,7 +15,7 @@ digit: digits normalized to @
 latin: romanization
 lower: lower casing
 
-tokenizer: text tokenizer (used by evaluation component)
+* tokenizer: text tokenizer (used by evaluation component)
 
 lower: lower casing
 nonascii: split non ascii characters
@@ -30,7 +30,7 @@ tokenize: use the chain of tokenization
 	penn=[true|false] perform Penn-treebank tokenization
 	stemmer=[stemmer spec] perform by stemmring tokenization
 
-matcher: word matcher (used in feature computation, part of evaluation (TER/WER etc) and system combination)
+* matcher: word matcher (used in feature computation, part of evaluation (TER/WER etc) and system combination)
 
 lower: matching by lower-case
 stemmer: matching by stemming algorithm
@@ -38,4 +38,7 @@ stemmer: matching by stemming algorithm
 wordnet: matching by wordnet synsets
 	path=[path to wordnet database]
 
+* signature: word signature (used in parse-coarse or simply monolingual components)
 
+english: English signature
+chinese: Chinese signature

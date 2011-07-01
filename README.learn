@@ -2,11 +2,10 @@ Learning component in cicada:
 
 Basically we have: MERT/MAXLIKE/LEARN/LEARN_ONLINE (may change in the future)
 
-MERT: cicada_mert{,_mpi}
-      MERT with 
+MERT: cicada_mert{,_kbest}{,_mpi}
 
 MAXLIKE: cicada_maxlike{,_mpi}
 
-LEARN: ciada_learn{,_mpi}
+LEARN: ciada_learn{,_kbest}{,_mpi}
 
 LEARN_ONLINE: cicada_learn_online{,_mpi}
