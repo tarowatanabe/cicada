@@ -72,15 +72,35 @@ struct OptimizerSGDL2 : public OptimizerBase
     ++ epoch;
     
     rescale(1.0 - eta * lambda);
-    
-    gradient_type::const_iterator citer_end = correct.end();
-    for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer)
-      update(weights[citer->first], citer->second * eta);
-    
-    gradient_type::const_iterator miter_end = gradient.end();
-    for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter)
-      update(weights[miter->first], - miter->second * eta);
 
+    gradient_type::const_iterator citer = correct.begin();
+    gradient_type::const_iterator citer_end = correct.end();
+    
+    gradient_type::const_iterator miter = gradient.begin();
+    gradient_type::const_iterator miter_end = gradient.end();
+
+    while (citer != citer_end && miter != miter_end) {
+      if (citer < miter) {
+	update(weights[citer->first], double(citer->second) * eta);
+	++ citer;
+      } else if (miter < citer) {
+	update(weights[miter->first], - double(miter->second) * eta);
+	++ miter;
+      } else {
+	const double alpha = double(citer->second) - double(miter->second);
+	if (alpha != 0.0)
+	  update(weights[citer->first], alpha * eta);
+	++ citer;
+	++ miter;
+      }
+    }
+    
+    for (/**/; citer != citer_end; ++ citer)
+      update(weights[citer->first], double(citer->second) * eta);
+
+    for (/**/; miter != miter_end; ++ miter)
+      update(weights[miter->first], - double(miter->second) * eta);
+    
     // projection...
     if (weight_norm > 1.0 / lambda)
       rescale(std::sqrt(1.0 / (lambda * weight_norm)));
@@ -154,19 +174,42 @@ struct OptimizerSGDL1 : public OptimizerBase
     const double factor = 1.0 / instances;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
+    
     penalty += eta * lambda;
     
+    gradient_type::const_iterator citer = correct.begin();
     gradient_type::const_iterator citer_end = correct.end();
-    for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer) {
-      weights[citer->first] += eta * citer->second * factor;
-      
+    
+    gradient_type::const_iterator miter = gradient.begin();
+    gradient_type::const_iterator miter_end = gradient.end();
+    
+    while (citer != citer_end && miter != miter_end) {
+      if (citer < miter) {
+	weights[citer->first] += eta * double(citer->second) * factor;
+	apply(weights[citer->first], penalties[citer->first], penalty);
+	
+	++ citer;
+      } else if (miter < citer) {
+	weights[miter->first] -= eta * double(miter->second) * factor;
+	apply(weights[miter->first], penalties[miter->first], penalty);
+	
+	++ miter;
+      } else {
+	weights[citer->first] += eta * (double(citer->second) - double(miter->second)) * factor;
+	apply(weights[citer->first], penalties[citer->first], penalty);
+	
+	++ citer;
+	++ miter;
+      }
+    }
+    
+    for (/**/; citer != citer_end; ++ citer) {
+      weights[citer->first] += eta * double(citer->second) * factor;
       apply(weights[citer->first], penalties[citer->first], penalty);
     }
     
-    gradient_type::const_iterator miter_end = gradient.end();
-    for (gradient_type::const_iterator miter = gradient.begin(); miter != miter_end; ++ miter) {
-      weights[miter->first] -= eta * miter->second * factor;
-      
+    for (/**/; miter != miter_end; ++ miter) {
+      weights[miter->first] -= eta * double(miter->second) * factor;
       apply(weights[miter->first], penalties[miter->first], penalty);
     }
     
