@@ -59,6 +59,8 @@ bool unite_kbest = false;
 
 int debug = 0;
 
+#include "cicada_learn_impl.hpp"
+
 void options(int argc, char** argv);
 
 void read_kbest(const path_set_type& kbest_path,

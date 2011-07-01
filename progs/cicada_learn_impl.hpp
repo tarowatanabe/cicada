@@ -154,6 +154,7 @@ struct OptimizerSGDL1 : public OptimizerBase
     const double factor = 1.0 / instances;
     const double eta = 0.2 * std::pow(0.85, double(epoch) / instances);
     ++ epoch;
+    penalty += eta * lambda;
     
     gradient_type::const_iterator citer_end = correct.end();
     for (gradient_type::const_iterator citer = correct.begin(); citer != citer_end; ++ citer) {
