@@ -192,6 +192,11 @@ struct OptimizeLinear
     fputs(s,stderr);
     fflush(stderr);
   }
+
+  static void print_string_none(const char *s)
+  {
+    
+  }
   
   OptimizeLinear(const hypothesis_map_type& kbests,
 		 const hypothesis_map_type& oracles)
@@ -302,7 +307,10 @@ struct OptimizeLinear
 	parameter.eps = 0.01;
     }
 
-    set_print_string_function(print_string_stderr);
+    if (debug >= 2)
+      set_print_string_function(print_string_stderr);
+    else
+      set_print_string_function(print_string_none);
     
     const char* error_message = check_parameter(&problem, &parameter);
     if (error_message)
