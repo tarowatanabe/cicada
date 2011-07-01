@@ -1,7 +1,9 @@
 Requirements
 
 expgram: ngram language model training/indexing
-nicttm:  translation model training
+nicttm:  alignment model training
+	 or, you can uses moses's script for alignment training with GIZA++
+	 or, try berkeley aligner.
 
 Others:
 Boost library     (http://www.boost.org/)
@@ -21,7 +23,7 @@ Optional:
 		 but it is not tested. (I'm sure it will not work... I'm planning to support this, though)
 	
 	For Linux, you should install one of them for better memory performance
-	and to know how many bytes malloced.
+	and to measure how many bytes malloced, since mallinfo is "broken" for memory more than 4GB.
 
 Included libraries + licenses:
 
