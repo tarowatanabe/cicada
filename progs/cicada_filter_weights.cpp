@@ -20,17 +20,21 @@
 
 #include "cicada/weight_vector.hpp"
 #include "cicada/dot_product.hpp"
+#include "cicada/parameter.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "utils/lexical_cast.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
+#include "utils/piece.hpp"
 
 typedef boost::filesystem::path path_type;
-typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
+typedef std::vector<std::string, std::allocator<std::string> > path_set_type;
 
+typedef cicada::Parameter parameter_type;
 typedef cicada::WeightVector<double> weight_set_type;
 
 path_set_type input_files;
@@ -85,18 +89,32 @@ int main(int argc, char** argv)
     
     weight_set_type weights_input;
     for (path_set_type::const_iterator fiter = input_files.begin(); fiter != input_files.end(); ++ fiter) {
-      if (*fiter != "-" && ! boost::filesystem::exists(*fiter))
-	throw std::runtime_error("no file: " + fiter->string());
+      const parameter_type param(*fiter);
 
-      utils::compress_istream is(*fiter, 1024 * 1024);
+      if (param.name() != "-" && ! boost::filesystem::exists(param.name()))
+	throw std::runtime_error("no file: " + param.name());
+
+      double scale = 1.0;
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "scale" || utils::ipiece(piter->first) == "weight")
+	  scale = utils::lexical_cast<double>(piter->second);
+	else
+	  throw std::runtime_error("WARNING: unsupported parameter: " + piter->first + "=" + piter->second);
+      }
+      
+      utils::compress_istream is(param.name(), 1024 * 1024);
       
       weights_input.clear();
       is >> weights_input;
+      
+      if (scale != 1.0)
+	weights_input *= scale;
       
       if (weights.empty())
 	weights.swap(weights_input);
       else
 	weights += weights_input;
+      
       ++ num;
     }
     
@@ -138,6 +156,7 @@ int main(int argc, char** argv)
 	std::sort(values.begin(), values.end(), greater_fabs_second<value_type>());
       
       utils::compress_ostream os(output_file, 1024 * 1024);
+      os.precision(20);
 
       value_set_type::const_iterator fiter_end = values.end();
       for (value_set_type::const_iterator fiter = values.begin(); fiter != fiter_end; ++ fiter)
@@ -146,6 +165,8 @@ int main(int argc, char** argv)
       
     } else {
       utils::compress_ostream os(output_file, 1024 * 1024);
+      os.precision(20);
+      
       os << weights;
     }
   }
