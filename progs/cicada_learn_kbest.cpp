@@ -204,6 +204,7 @@ struct OptimizeLinear
   {
     // compute unique before processing
     // 
+    
     const size_t id_max = utils::bithack::min(kbests.size(), oracles.size());
     for (size_t id = 0; id != id_max; ++ id)
       if (! kbests[id].empty() && ! oracles[id].empty()) {
@@ -271,6 +272,9 @@ struct OptimizeLinear
 	  }
       }
 
+    if (debug)
+      std::cerr << "liblinear data size: " << labels.size() << std::endl;
+
     // construct problem...
     label_set_type(labels).swap(labels);
     feature_node_set_type(feature_nodes).swap(feature_nodes);
@@ -315,6 +319,11 @@ struct OptimizeLinear
     const char* error_message = check_parameter(&problem, &parameter);
     if (error_message)
       throw std::runtime_error(std::string("error: ") + error_message);
+    
+    static const char* names[] = {"L2R_LR", "L2R_L2LOSS_SVC_DUAL", "L2R_L2LOSS_SVC", "L2R_L1LOSS_SVC_DUAL", "MCSVM_CS", "L1R_L2LOSS_SVC", "L1R_LR", "L2R_LR_DUAL"};
+    
+    if (debug)
+      std::cerr << "solver: " << names[parameter.solver_type] << std::endl;
     
     const model_type* model = train(&problem, &parameter);
 
