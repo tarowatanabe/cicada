@@ -310,7 +310,7 @@ struct OptimizeLinear
     
     const model_type* model = train(&problem, &parameter);
 
-    objective = model->objective / labels.size();
+    objective = model->objective * C;
     
     // it is an optimization...
     for (int j = 0; j != model->nr_feature; ++ j)
