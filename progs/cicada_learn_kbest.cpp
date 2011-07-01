@@ -322,7 +322,8 @@ struct OptimizeLinear
     if (error_message)
       throw std::runtime_error(std::string("error: ") + error_message);
     
-    static const char* names[] = {"L2R_LR", "L2R_L2LOSS_SVC_DUAL", "L2R_L2LOSS_SVC", "L2R_L1LOSS_SVC_DUAL", "MCSVM_CS", "L1R_L2LOSS_SVC", "L1R_LR", "L2R_LR_DUAL"};
+    static const char* names[] = {"L2R_LR", "L2R_L2LOSS_SVC_DUAL", "L2R_L2LOSS_SVC", "L2R_L1LOSS_SVC_DUAL", "MCSVM_CS",
+				  "L1R_L2LOSS_SVC", "L1R_LR", "L2R_LR_DUAL"};
     
     if (debug)
       std::cerr << "solver: " << names[parameter.solver_type] << std::endl;
