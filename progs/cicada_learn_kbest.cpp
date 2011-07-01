@@ -908,7 +908,7 @@ void options(int argc, char** argv)
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
     ("C",             po::value<double>(&C),           "regularization constant")
-    ("eps",           po::value<double>(&eps),         "tolerance")
+    ("eps",           po::value<double>(&eps),         "tolerance for liblinear")
     
     ("unite",    po::bool_switch(&unite_kbest), "unite kbest sharing the same id")
 
