@@ -176,8 +176,8 @@ struct LearnModel1Posterior : public LearnBase
 
   void operator()(const sentence_type& source, const sentence_type& target)
   {
-    learn(source, target, ttable_source_target, counts_source_target, aligned_source_target, objective_source_target);
-    learn(target, source, ttable_target_source, counts_target_source, aligned_target_source, objective_target_source);
+    learn(source, target, ttable_source_target, ttable_counts_source_target, aligned_source_target, objective_source_target);
+    learn(target, source, ttable_target_source, ttable_counts_target_source, aligned_target_source, objective_target_source);
   }
 
   posterior_set_type posterior;
@@ -306,10 +306,10 @@ struct LearnModel1Symmetric : public LearnBase
 	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
 	
 	if (trg != 0)
-	  counts_source_target[source_word][target_word] += count;
+	  ttable_counts_source_target[source_word][target_word] += count;
 	
 	if (src != 0)
-	  counts_target_source[target_word][source_word] += count;
+	  ttable_counts_target_source[target_word][source_word] += count;
       }
     
     objective_source_target += logsum_source_target / target_size;
@@ -486,10 +486,10 @@ struct LearnModel1SymmetricPosterior : public LearnBase
 	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
 	
 	if (trg != 0)
-	  counts_source_target[source_word][target_word] += posterior_source_target(trg, src);
+	  ttable_counts_source_target[source_word][target_word] += posterior_source_target(trg, src);
 	
 	if (src != 0)
-	  counts_target_source[target_word][source_word] += posterior_target_source(src, trg);
+	  ttable_counts_target_source[target_word][source_word] += posterior_target_source(src, trg);
       }
   }
 
