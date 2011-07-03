@@ -91,12 +91,19 @@ struct atable_type
       
       return (pos >= diffs.size() ? 0.0 : diffs[pos]);
     }
+
+    void initialize()
+    {
+      std::fill(positives.begin(), positives.end(), 0.0);
+      std::fill(negatives.begin(), negatives.end(), 0.0);
+    }
     
     difference_set_type positives;
     difference_set_type negatives;
   };
 
   typedef std::pair<word_type, word_type> class_pair_type;
+  typedef std::pair<index_type, index_type> range_type;
   
 #ifdef HAVE_TR1_UNORDERED_MAP
   typedef std::tr1::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
@@ -105,16 +112,51 @@ struct atable_type
   typedef sgi::hash_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
 			std::allocator<std::pair<const class_pair_type, difference_map_type> > > count_dict_type;
 #endif
+
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
+				  std::allocator<std::pair<const range_type, difference_map_type> > > cache_type;
+  typedef std::tr1::unordered_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
+				  std::allocator<std::pair<const class_pair_type, cache_type> > > cache_set_type;
+#else
+  typedef sgi::hash_map<range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
+		      std::allocator<std::pair<const range_type, difference_map_type> > > cache_type;
+  typedef sgi::hash_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
+			std::allocator<std::pair<const class_pair_type, cache_type> > > cache_set_type;
+#endif
   
   prob_type operator()(const word_type& source,
 		       const word_type& target,
-		       const index_type& source_length,
-		       const index_type& target_length,
+		       const index_type& source_size,
+		       const index_type& target_size,
 		       const index_type& i_prev,
 		       const index_type& i) const
   {
+    if (atable.empty()) return 1.0 / source_size;
     
+    // i_prev < 0 implies BOS
+    // i >= souce_size implies EOS
+    //
+    // we will cache wrt class_pair_type and diff's range
+    //
     
+    if (i_prev < 0) {
+      // 0 <= i < source_size
+      // which implies: 1 <= diff < source_size + 1
+      //
+
+    } else if (i >= source_size) {
+      // 0 <= i <= source_size
+      // which implies: 0 - i_prev <= diff < source_size - i_prev + 1
+      //
+      
+    } else {
+      // 0 <= i < source_size
+      // which implies: 0 - i_prev <= diff < source_size - i_prev
+      //
+      
+      
+    }
   }
 
   difference_map_type& operator[](const class_pair_type& x)
@@ -132,9 +174,21 @@ struct atable_type
     return atable[class_pair_type(source, target)][diff];
   }
   
-  void clear() { atable.clear(); }
+  void clear() { atable.clear(); caches.clear(); }
+  
+  void initialize()
+  {
+    count_dict_type::iterator aiter_end = atable.end();
+    for (count_dict_type::iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter)
+      aiter->second.initialize();
+    
+    cache_set_type::iterator citer_end = caches.end();
+    for (cache_set_type::iterator citer = caches.begin(); citer != citer_end; ++ citer)
+      citer->second.clear();
+  }
   
   count_dict_type atable;
+  cache_set_type  caches;
   double smooth;
 };
 
