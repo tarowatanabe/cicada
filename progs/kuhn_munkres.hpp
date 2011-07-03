@@ -140,13 +140,13 @@ namespace detail
       
       const size_type matrix_size = costs.size1();
       
-      for (index_type u = 0; u != matrix_size; ++ u)
-	for (index_type v = 0; v != matrix_size; ++ v)
+      for (size_type u = 0; u != matrix_size; ++ u)
+	for (size_type v = 0; v != matrix_size; ++ v)
 	  label_u[u] = std::max(label_u[u], costs(u, v));
       
       while (matched_size < matrix_size) {
 	// choose free vertex: u0
-	index_type u0 = 0;
+	size_type u0 = 0;
 	for (/**/; u0 != matrix_size && matched_u[u0] >= 0; ++ u0);
 	
 	// initialize tree structure...
@@ -163,8 +163,8 @@ namespace detail
       }
       
       // output results!
-      for (index_type u = 0; u != matrix_size; ++ u, ++ result)
-	*result = std::make_pair(u, matched_u[u]);
+      for (size_type u = 0; u != matrix_size; ++ u, ++ result)
+	*result = std::make_pair(static_cast<index_type>(u), matched_u[u]);
     }
     
     const CostMatrix& costs;

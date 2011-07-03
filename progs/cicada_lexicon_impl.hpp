@@ -231,8 +231,8 @@ struct LearnBase
 
   void initialize()
   {
-    counts_source_target.initialize();
-    counts_target_source.initialize();
+    ttable_counts_source_target.initialize();
+    ttable_counts_target_source.initialize();
     
     aligned_source_target.initialize();
     aligned_target_source.initialize();
@@ -243,8 +243,8 @@ struct LearnBase
   
   const ttable_type& ttable_source_target;
   const ttable_type& ttable_target_source;
-  ttable_type counts_source_target;
-  ttable_type counts_target_source;
+  ttable_type ttable_counts_source_target;
+  ttable_type ttable_counts_target_source;
   
   aligned_type aligned_source_target;
   aligned_type aligned_target_source;

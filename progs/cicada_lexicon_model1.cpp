@@ -293,8 +293,8 @@ struct TaskMaximize : public Maximizer
   {
     for (word_type::id_type source_id = id; source_id < ttable_source_target.size(); source_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].counts_source_target.exists(source_id))
-	  ttable_source_target[source_id] += learners[i].counts_source_target[source_id];
+	if (learners[i].ttable_counts_source_target.exists(source_id))
+	  ttable_source_target[source_id] += learners[i].ttable_counts_source_target[source_id];
 	
 	if (learners[i].aligned_source_target.exists(source_id))
 	  aligned_source_target[source_id] += learners[i].aligned_source_target[source_id];
@@ -306,8 +306,8 @@ struct TaskMaximize : public Maximizer
     
     for (word_type::id_type target_id = id; target_id < ttable_target_source.size(); target_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].counts_target_source.exists(target_id))
-	  ttable_target_source[target_id] += learners[i].counts_target_source[target_id];
+	if (learners[i].ttable_counts_target_source.exists(target_id))
+	  ttable_target_source[target_id] += learners[i].ttable_counts_target_source[target_id];
 	
 	if (learners[i].aligned_target_source.exists(target_id))
 	  aligned_target_source[target_id] += learners[i].aligned_target_source[target_id];
