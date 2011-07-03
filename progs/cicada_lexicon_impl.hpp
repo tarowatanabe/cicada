@@ -17,7 +17,9 @@
 #include <google/dense_hash_set>
 
 #include <utils/alloc_vector.hpp>
-
+#include <utils/bithack.hpp>
+#include <utils/sgi_hash_map.hpp>
+#include <utils/hashmurmur.hpp>
 
 typedef cicada::Symbol     word_type;
 typedef cicada::Sentence   sentence_type;
@@ -28,6 +30,113 @@ typedef boost::filesystem::path path_type;
 
 typedef double count_type;
 typedef double prob_type;
+
+struct classes_type
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef std::vector<word_type, std::allocator<word_type> > map_type;
+  
+  classes_type() : classes() {}
+
+  void clear() { classes.clear(); }
+  
+  word_type operator[](const word_type& word) const
+  {
+    return (word.id() >= classes.size() ? vocab_type::UNK : classes[word.id()]);
+  }
+  
+  word_type& operator[](const word_type& word)
+  {
+    if (word.id() >= classes.size())
+      classes.resize(word.id() + 1, vocab_type::UNK);
+    
+    return classes[word.id()];
+  }
+  
+  map_type classes;
+};
+
+struct atable_type
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  typedef int       index_type;
+
+  struct difference_map_type
+  {
+    typedef size_t    size_type;
+    typedef ptrdiff_t difference_type;
+    typedef int       index_type;
+    
+    typedef std::vector<count_type, std::allocator<count_type> > difference_set_type;
+
+    difference_map_type() : positives(), negatives() {}
+
+    count_type& operator[](const index_type& diff)
+    {
+      const size_type pos = utils::bithack::branch(diff >= 0, diff, - diff - 1);
+      difference_set_type& diffs = (diff >= 0 ? positives : negatives);
+      
+      if (pos >= diffs.size())
+	diffs.resize(pos + 1, 0.0);
+      return diffs[pos];
+    }
+    
+    count_type operator[](const index_type& diff) const
+    {
+      const size_type pos = utils::bithack::branch(diff >= 0, diff, - diff - 1);
+      const difference_set_type& diffs = (diff >= 0 ? positives : negatives);
+      
+      return (pos >= diffs.size() ? 0.0 : diffs[pos]);
+    }
+    
+    difference_set_type positives;
+    difference_set_type negatives;
+  };
+
+  typedef std::pair<word_type, word_type> class_pair_type;
+  
+#ifdef HAVE_TR1_UNORDERED_MAP
+  typedef std::tr1::unordered_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
+				  std::allocator<std::pair<const class_pair_type, difference_map_type> > > count_dict_type;
+#else
+  typedef sgi::hash_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
+			std::allocator<std::pair<const class_pair_type, difference_map_type> > > count_dict_type;
+#endif
+  
+  prob_type operator()(const word_type& source,
+		       const word_type& target,
+		       const index_type& source_length,
+		       const index_type& target_length,
+		       const index_type& i_prev,
+		       const index_type& i) const
+  {
+    
+    
+  }
+
+  difference_map_type& operator[](const class_pair_type& x)
+  {
+    return atable[x];
+  }
+
+  difference_map_type& operator()(const word_type& source, const word_type& target)
+  {
+    return atable[class_pair_type(source, target)];
+  }
+
+  count_type& operator()(const word_type& source, const word_type& target, const index_type& diff)
+  {
+    return atable[class_pair_type(source, target)][diff];
+  }
+  
+  void clear() { atable.clear(); }
+  
+  count_dict_type atable;
+  double smooth;
+};
 
 struct ttable_type
 {
