@@ -21,7 +21,7 @@ struct LearnHMM : public LearnBase
   LearnHMM(const ttable_type& __ttable_source_target,
 	   const ttable_type& __ttable_target_source,
 	   const atable_type& __atable_source_target,
-	   const atable_type& __atable_target_source,)
+	   const atable_type& __atable_target_source)
     : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
   
 
@@ -390,6 +390,45 @@ struct LearnHMM : public LearnBase
       }
     }
 
+    void estimate_posterior(const sentence_type& __source,
+			    const sentence_type& __target)
+    {
+      const size_type source_size = __source.size();
+      const size_type target_size = __target.size();
+      
+      posterior.clear();
+      posterior.reserve(target_size + 1, source_size + 1);
+      posterior.resize(target_size + 1, source_size + 1, 0.0);
+      
+      const prob_type sum = forward(target_size + 2 - 1, source_size + 2 - 1);
+      
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	const double factor = 1.0 / (scale[trg] * sum);
+	
+	// + 1 to skip BOS
+	const prob_type* fiter = &(*forward.begin(trg)) + 1;
+	const prob_type* biter = &(*backward.begin(trg)) + 1;
+	prob_type* piter = &(*posterior.begin(trg)) + 1;
+	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter, ++ piter) {
+	  const prob_type count = (*fiter) * (*biter) * factor;
+	  
+	  if (std::isfinite(count) && count > 0.0)
+	    (*piter) += count;
+	}
+	
+	fiter = &(*forward.begin(trg)) + source_size + 2;
+	biter = &(*backward.begin(trg)) + source_size + 2;
+	prob_type count_none = 0.0;
+	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
+	  const prob_type count = (*fiter) * (*biter) * factor;
+	  
+	  if (std::isfinite(count) && count > 0.0)
+	    count_none += count;
+	}
+	posterior(trg, 0) = count_none;
+      }
+    }
+
     struct logminus
     {
       double operator()(const double& logsum, const double& prob) const
@@ -538,126 +577,113 @@ struct LearnHMM : public LearnBase
   hmm_data_type hmm;
 };
 
-struct LearnModel1Posterior : public LearnBase
+struct LearnHMMPosterior : public LearnBase
 {
-  LearnModel1Posterior(const ttable_type& __ttable_source_target,
-		       const ttable_type& __ttable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source) {}
+  LearnHMMPosterior(const ttable_type& __ttable_source_target,
+		    const ttable_type& __ttable_target_source,
+		    const atable_type& __atable_source_target,
+		    const atable_type& __atable_target_source)
+    : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
 
-  typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
+  typedef LearnHMM::hmm_data_type hmm_data_type;
+  
   typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;
   
   void learn(const sentence_type& source,
 	     const sentence_type& target,
 	     const ttable_type& ttable,
-	     ttable_type& counts,
+	     const atable_type& atable,
+	     const classes_type& classes_source,
+	     const classes_type& classes_target,
+	     ttable_type& counts_ttable,
+	     atable_type& counts_atable,
 	     aligned_type& aligned,
 	     double& objective)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
     
-    const double prob_null  = p0;
-    const double prob_align = 1.0 - p0;
+    hmm.prepare(source, target, ttable, atable, classes_source, classes_target);
     
-    double logsum = 0.0;
-
-    posterior.reserve(target_size + 1, source_size + 1);
-    posterior.resize(target_size + 1, source_size + 1, 0.0);
+    hmm.forward_backward(source, target);
     
-    probs.reserve(target_size + 1, source_size + 1);
-    probs.resize(target_size + 1, source_size + 1, 0.0);
+    objective += hmm.objective() / target_size;
     
     phi.clear();
     phi.resize(source_size + 1, 0.0);
     
-    exp_phi.clear();
-    exp_phi.resize(source_size + 1, 1.0);
-    
-    for (size_type trg = 0; trg != target_size; ++ trg) {
-      const double prob_align_norm = 1.0 / source_size;
-      double prob_sum = 0.0;
-      
-      posterior_set_type::iterator piter     = probs.begin(trg + 1);
-      posterior_set_type::iterator piter_end = probs.end(trg + 1);
-      *piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
-      prob_sum += *piter;
-      
-      double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
-      
-      ++ piter;
-      
-      for (size_type src = 0; src != source_size; ++ src, ++ piter) {
-	*piter = ttable(source[src], target[trg]) * prob_align * prob_align_norm;
-	prob_sum += *piter;
-	
-	if (*piter > prob_max) {
-	  prob_max = *piter;
-	  word_max = source[src];
-	}
-      }
-      
-      logsum += utils::mathop::log(prob_sum);
-      
-      const double factor = 1.0 / prob_sum;
-      piter = probs.begin(trg + 1);
-      posterior_set_type::iterator siter = posterior.begin(trg + 1);
-      for (/**/; piter != piter_end; ++ piter, ++ siter)
-	(*siter) = (*piter) * factor;
-      
-      aligned[word_max].insert(target[trg]);
-    }
-    
-    objective += logsum / target_size;
+    exp_phi_old.clear();
+    exp_phi_old.resize(source_size + 1, 1.0);
     
     for (int iter = 0; iter < 5; ++ iter) {
-      // update phi.. but ignore NULL...
+      hmm.compute_posterior(source, target);
       
-      bool updated = false;
-      for (size_type src = 1; src <= source_size; ++ src) {
-	double sum = 0.0;
-	for (size_type trg = 1; trg <= target_size; ++ trg)
-	  sum += posterior(trg, src);
+      exp_phi.clear();
+      exp_phi.resize(source_size + 1, 1.0);
+      
+      size_type count_zero = 0;
+      for (int src = 1; src <= source_size; ++ src) {
+	double sum_posterior = 0.0;
+	for (int trg = 1; trg <= target_size; ++ trg)
+	  sum_posterior += hmm.posterior(trg, src);
 	
-	phi[src] += 1.0 - sum;
+	phi[src] += 1.0 - sum_posterior;
 	if (phi[src] > 0.0)
 	  phi[src] = 0.0;
 	
-	updated |= (phi[src] != 0.0);
+	count_zero += (phi[src] == 0.0);
 	exp_phi[src] = utils::mathop::exp(phi[src]);
       }
       
-      if (! updated) break;
+      if (count_zero == source_size) break;
       
-      for (size_type trg = 1; trg <= target_size; ++ trg) {
-	double sum = 0.0;
-	for (size_type src = 0; src <= source_size; ++ src)
-	  sum += probs(trg, src) * exp_phi[src];
-	
-	const double factor = 1.0 / sum;
-	for (size_type src = 0; src <= source_size; ++ src)
-	  posterior(trg, src) = probs(trg, src) * factor * exp_phi[src];
+      // rescale emission table...
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	// translation into non-NULL word
+	prob_type* eiter = &(*data.emission.begin(trg)) + 1;
+	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	  (*eiter) *= exp_phi[src] / exp_phi_old[src];
       }
+      // swap...
+      exp_phi_old.swap(exp_phi);
+      
+      hmm.forward_backward(source, target);
     }
     
-    // update...
-    for (size_type trg = 1; trg <= target_size; ++ trg)
-      for (size_type src = 0; src <= source_size; ++ src)
-	counts[src == 0 ? vocab_type::NONE : source[src - 1]][target[trg - 1]] += posterior(trg, src);
+    hmm.accumulate(source, target, counts_ttable);
+    
+    hmm.accumulate(source, target, counts_atable);
   }
 
   void operator()(const sentence_type& source, const sentence_type& target)
   {
-    learn(source, target, ttable_source_target, ttable_counts_source_target, aligned_source_target, objective_source_target);
-    learn(target, source, ttable_target_source, ttable_counts_target_source, aligned_target_source, objective_target_source);
+    learn(source,
+	  target,
+	  ttable_source_target,
+	  atable_source_target,
+	  classes_source,
+	  classes_target,
+	  ttable_counts_source_target,
+	  atable_counts_source_target,
+	  aligned_source_target,
+	  objective_source_target);
+    learn(target,
+	  source,
+	  ttable_target_source,
+	  atable_target_source,
+	  classes_target,
+	  classes_source,
+	  ttable_counts_target_source,
+	  atable_counts_target_source,
+	  aligned_target_source,
+	  objective_target_source);
   }
 
-  posterior_set_type posterior;
-  posterior_set_type probs;
+  hmm_data_type hmm;
   
-  prob_set_type      phi;
-  prob_set_type      exp_phi;
+  prob_set_type phi;
+  prob_set_type exp_phi;
+  prob_set_type exp_phi_old;
 };
 
 struct LearnModel1Symmetric : public LearnBase
