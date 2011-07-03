@@ -7,8 +7,10 @@
 
 #include "cicada_lexicon_impl.hpp"
 
-#include "utils/vector2.hpp"
+#include "utils/vector2_aligned.hpp"
+#include "utils/vector3_aligned.hpp"
 #include "utils/mathop.hpp"
+#include "utils/aligned_allocator.hpp"
 
 #include "kuhn_munkres.hpp"
 #include "itg_alignment.hpp"
@@ -21,10 +23,162 @@ struct LearnHMM : public LearnBase
 	   const atable_type& __atable_target_source,)
     : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
   
-  typedef std::vector<double, std::allocator<double> > prob_set_type;
+
+  struct HMMData
+  {
+    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > forward_type;
+    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > backward_type;
+    
+    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > emission_type;
+    typedef utils::vector3_aligned<prob_type, utils::aligned_allocator<prob_type> > transition_type;
+    
+    typedef std::vector<prob_type, utils::aligned_allocator<prob_type> > scale_type;
+    
+    typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > posterior_type;
+    
+    typedef std::vector<int, std::allocator<int> > point_set_type;
+    typedef std::vector<point_set_type, std::allocator<point_set_type> > point_map_type;
+    
+    forward_type    forward;
+    backward_type   backward;
+    
+    emission_type   emission;
+    transition_type transition;
+    
+    scale_type scale;
+    
+    posterior_type posterior;
+    
+    sentence_type source;
+    sentence_type target;
+    sentence_type source_class;
+    sentence_type target_class;
+    
+    point_map_type points;
+    
+    void prepare(const sentence_type& __source,
+		 const sentence_type& __target,
+		 const ttable_type& ttable,
+		 const atable_type& atable,
+		 const classes_type& classes_source,
+		 const classes_type& classes_target)
+    {
+      const size_type source_size = __source.size();
+      const size_type target_size = __target.size();
+      
+      const double prob_null  = p0;
+      const double prob_align = 1.0 - p0;
+
+      source.clear();
+      target.clear();
+      
+      source.reserve((source_size + 2) * 2);
+      target.reserve((target_size + 2) * 2);
+      source.resize((source_size + 2) * 2, vocab_type::NONE);
+      target.resize((target_size + 2) * 2, vocab_type::NONE);
+      
+      source[0] = vocab_type::BOS;
+      target[0] = vocab_type::BOS;
+      source[(source_size + 2) - 1] = vocab_type::EOS;
+      target[(target_size + 2) - 1] = vocab_type::EOS;
+      
+      std::copy(__source.begin(), __source.end(), source.begin() + 1);
+      std::copy(__target.begin(), __target.end(), target.begin() + 1);
+      
+      
+      source_class.reserve(source_size + 2);
+      target_class.reserve(target_size + 2);
+      source_class.resize(source_size + 2);
+      target_class.resize(target_size + 2);
+      
+      source_class[0] = vocab_type::BOS;
+      target_class[0] = vocab_type::BOS;
+      source_class[(source_size + 2) - 1] = vocab_type::EOS;
+      target_class[(target_size + 2) - 1] = vocab_type::EOS;
+      
+      sentence_type::iterator csiter = data.source_class.begin() + 1;
+      for (sentence_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter, ++ csiter)
+	*csiter = classes_source[*siter];
+      
+      sentence_type::iterator ctiter = data.target_class.begin() + 1;
+      for (sentence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer, ++ ctiter)
+	*ctiter = classes_target[*titer];
+      
+      
+      emission.clear();
+      transition.clear();
+      
+      emission.reserve(target_size + 2, (source_size + 2) * 2);
+      transition.reserve(target_size + 2, (source_size + 2) * 2, (source_size + 2) * 2);
+      
+      emission.resize(target_size + 2, (source_size + 2) * 2, 0.0);
+      transition.resize(target_size + 2, (source_size + 2) * 2, (source_size + 2) * 2, 0.0);
+      
+      // compute emission table...
+      emission(0, 0) = 1.0;
+      emission(target_size + 2 - 1, source_size + 2 - 1) = 1.0;
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	
+	// translation into non-NULL word
+	prob_type* eiter = &(*emission.begin(trg)) + 1;
+	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	  (*eiter) = ttable(source[src], target[trg]);
+	
+	prob_type* eiter_first = &(*emission.begin(trg)) + source_size + 2;
+	prob_type* eiter_last  = eiter_first + source_size + 2 - 1; // -1 to exclude EOS
+	
+	std::fill(eiter_first, eiter_last, ttable(vocab_type::NONE, target[trg]));
+      }
+
+      
+      // compute transition table...
+      // we start from 1, since there exists no previously aligned word before BOS...
+      for (int trg = 1; trg < target_size + 2; ++ trg) {
+	// alignment into non-null
+	// start from 1 to exlude transition into <s>
+	for (int next = 1; next < source_size + 2; ++ next) {
+	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
+	  prob_type* titer2 = titer1 + (source_size + 2);      // from NONE
+	  // - 1 to exclude previous </s>...
+	  for (int prev = 0; prev < source_size + 2 - 1; ++ prev, ++ titer1, ++ titer2) {
+	    
+	    const prob_type prob = prob_align * atable(source_class[prev], target_class[trg],
+						       source_size, target_size,
+						       prev + 1, next + 1);
+	    
+	    
+	    *titer1 = prob;
+	    *titer2 = prob;
+	  }
+	}
+	
+	// null transition
+	// we will exclude EOS
+	for (int next = 0; next < (source_size + 2) - 1; ++ next) {
+	  const int next_none = next + (source_size + 2);
+	  const int prev1_none = next;
+	  const int prev2_none = next + (source_size + 2);
+	  
+	  transition(trg, next_none, prev1_none) = prob_null;
+	  transition(trg, next_none, prev2_none) = prob_null;
+	}
+      }
+    }
+    
+    void forward()
+    {
+      
+    }
+    
+    void backward()
+    {
+      
+    }
+  };
+
   
-  void learn(const sentence_type& source,
-	     const sentence_type& target,
+  void learn(const sentence_type& __source,
+	     const sentence_type& __target,
 	     const ttable_type& ttable,
 	     const atable_type& atable,
 	     ttable_type& counts_ttable,
@@ -32,13 +186,6 @@ struct LearnHMM : public LearnBase
 	     aligned_type& aligned,
 	     double& objective)
   {
-    const size_type source_size = source.size();
-    const size_type target_size = target.size();
-    
-    const double prob_null  = p0;
-    const double prob_align = 1.0 - p0;
-    
-    // HMM!
     
   }
   
@@ -62,7 +209,6 @@ struct LearnHMM : public LearnBase
 	  objective_target_source);
   }
 
-  prob_set_type probs;
 };
 
 struct LearnModel1Posterior : public LearnBase
