@@ -587,7 +587,7 @@ struct LearnHMMPosterior : public LearnBase
 
   typedef LearnHMM::hmm_data_type hmm_data_type;
   
-  typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;
+  typedef std::vector<prob_type, std::allocator<prob_type> > phi_set_type;
   
   void learn(const sentence_type& source,
 	     const sentence_type& target,
@@ -616,7 +616,7 @@ struct LearnHMMPosterior : public LearnBase
     exp_phi_old.resize(source_size + 1, 1.0);
     
     for (int iter = 0; iter < 5; ++ iter) {
-      hmm.compute_posterior(source, target);
+      hmm.estimate_posterior(source, target);
       
       exp_phi.clear();
       exp_phi.resize(source_size + 1, 1.0);
@@ -681,271 +681,107 @@ struct LearnHMMPosterior : public LearnBase
 
   hmm_data_type hmm;
   
-  prob_set_type phi;
-  prob_set_type exp_phi;
-  prob_set_type exp_phi_old;
+  phi_set_type phi;
+  phi_set_type exp_phi;
+  phi_set_type exp_phi_old;
 };
 
-struct LearnModel1Symmetric : public LearnBase
+struct LearnHMMSymmetric : public LearnBase
 {
-  LearnModel1Symmetric(const ttable_type& __ttable_source_target,
-		       const ttable_type& __ttable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source) {}
-      
-  typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
-  typedef std::vector<double, std::allocator<double> > prob_set_type;
+  LearnHMMSymmetric(const ttable_type& __ttable_source_target,
+		    const ttable_type& __ttable_target_source,
+		    const atable_type& __atable_source_target,
+		    const atable_type& __atable_target_source)
+    : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
+
+  typedef LearnHMM::hmm_data_type hmm_data_type;
   
   void operator()(const sentence_type& source, const sentence_type& target)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
     
-    const double prob_null  = p0;
-    const double prob_align = 1.0 - p0;
+    hmm_source_target.prepare(source, target, ttable_source_target, atable_source_target, classes_source, classes_target);
+    hmm_target_source.prepare(target, source, ttable_target_source, atable_target_source, classes_target, classes_source);
     
-    // we do not have to clearn!
+    hmm_source_target.forward_backward(source, target);
+    hmm_target_source.forward_backward(target, source);
     
-    posterior_source_target.reserve(target_size + 1, source_size + 1);
-    posterior_target_source.reserve(source_size + 1, target_size + 1);
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
     
-    posterior_source_target.resize(target_size + 1, source_size + 1);
-    posterior_target_source.resize(source_size + 1, target_size + 1);
+    // accumulate lexicon
+    hmm_source_target.estimate_posterior(source, target);
+    hmm_target_source.estimate_posterior(target, source);
     
-    prob_source_target.reserve(source_size + 1);
-    prob_target_source.reserve(target_size + 1);
-    
-    prob_source_target.resize(source_size + 1);
-    prob_target_source.resize(target_size + 1);
-
-    double logsum_source_target = 0.0;
-    double logsum_target_source = 0.0;
-    
-    for (size_type trg = 0; trg != target_size; ++ trg) {
-      const double prob_align_norm = 1.0 / source_size;
-      double prob_sum = 0.0;
-      
-      prob_set_type::iterator piter     = prob_source_target.begin();
-      prob_set_type::iterator piter_end = prob_source_target.end();
-      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
-      prob_sum += *piter;
-      
-      double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
-
-      ++ piter;
-      
-      for (size_type src = 0; src != source_size; ++ src, ++ piter) {
-	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
-	prob_sum += *piter;
-	
-	if (*piter > prob_max) {
-	  prob_max = *piter;
-	  word_max = source[src];
-	}
-      }
-      
-      logsum_source_target += utils::mathop::log(prob_sum);
-      
-      const double factor = 1.0 / prob_sum;
-      
-      piter = prob_source_target.begin();
-      posterior_set_type::iterator siter = posterior_source_target.begin(trg + 1);
-      for (/**/; piter != piter_end; ++ piter, ++ siter)
-	(*siter) = (*piter) * factor;
-      
-      aligned_source_target[word_max].insert(target[trg]);
-    }
-    
-    for (size_type src = 0; src != source_size; ++ src) {
-      const double prob_align_norm = 1.0 / target_size;
-      double prob_sum = 0.0;
-      
-      prob_set_type::iterator piter     = prob_target_source.begin();
-      prob_set_type::iterator piter_end = prob_target_source.end();
-      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
-      prob_sum += *piter;
-      
-      double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
-
-      ++ piter;
-      
-      for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
-	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
-	prob_sum += *piter;
-
-	if (*piter > prob_max) {
-	  prob_max = *piter;
-	  word_max = target[trg];
-	}
-      }
-      
-      logsum_target_source += utils::mathop::log(prob_sum);
-      
-      const double factor = 1.0 / prob_sum;
-      
-      piter = prob_target_source.begin();
-      posterior_set_type::iterator titer = posterior_target_source.begin(src + 1);
-      for (/**/; piter != piter_end; ++ piter, ++ titer)
-	(*titer) = (*piter) * factor;
-      
-      aligned_target_source[word_max].insert(source[src]);
-    }
-    
-    // accumulate!
-    for (size_type src = 0; src <= source_size; ++ src)
-      for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
-	double count = ((trg == 0 ? 1.0 : posterior_source_target(trg, src))
-			* (src == 0 ? 1.0 : posterior_target_source(src, trg)));
-	
-	if (src != 0 && trg != 0)
+    // combine!
+    for (int src = 0; src <= source_size; ++ src)
+      for (int trg = 0; trg <= target_size; ++ trg) {
+	double count = (trg == 0 ? 1.0 : hmm_source_target.posterior(trg, src)) * (src == 0 ? 1.0 : hmm_target_source.posterior(src, trg));
+	if (src && trg)
 	  count = utils::mathop::sqrt(count);
 	
-	const word_type& source_word = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	const word_type word_source = (src == 0 ? vocab_type::NONE : source[src - 1]);
+	const word_type word_target = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
 	
 	if (trg != 0)
-	  ttable_counts_source_target[source_word][target_word] += count;
+	  ttable_counts_source_target[word_source][word_target] += count;
 	
 	if (src != 0)
-	  ttable_counts_target_source[target_word][source_word] += count;
+	  ttable_counts_target_source[word_target][word_source] += count;
       }
     
-    objective_source_target += logsum_source_target / target_size;
-    objective_target_source += logsum_target_source / source_size;
+    hmm_source_target.accumulate(source, target, atable_counts_source_target);
+    hmm_target_source.accumulate(target, source, atable_counts_target_source);
   }
-
-  prob_set_type      prob_source_target;
-  prob_set_type      prob_target_source;
-  posterior_set_type posterior_source_target;
-  posterior_set_type posterior_target_source;
+  
+  hmm_data_type hmm_source_target;
+  hmm_data_type hmm_target_source;
 };
 
-struct LearnModel1SymmetricPosterior : public LearnBase
+struct LearnHMMSymmetricPosterior : public LearnBase
 {
-  LearnModel1SymmetricPosterior(const ttable_type& __ttable_source_target,
-				const ttable_type& __ttable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source) {}
-
-  typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
+  LearnHMMSymmetricPosterior(const ttable_type& __ttable_source_target,
+			     const ttable_type& __ttable_target_source,
+			     const atable_type& __atable_source_target,
+			     const atable_type& __atable_target_source)
+    : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
   
+  typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > phi_set_type;
+
   void operator()(const sentence_type& source, const sentence_type& target)
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
     
-    const double prob_null  = p0;
-    const double prob_align = 1.0 - p0;
+    hmm_source_target.prepare(source, target, ttable_source_target, atable_source_target, classes_source, classes_target);
+    hmm_target_source.prepare(target, source, ttable_target_source, atable_target_source, classes_target, classes_source);
     
-    // we do not have to clearn!
+    hmm_source_target.forward_backward(source, target);
+    hmm_target_source.forward_backward(target, source);
     
-    posterior_source_target.reserve(target_size + 1, source_size + 1);
-    posterior_target_source.reserve(source_size + 1, target_size + 1);
-    
-    posterior_source_target.resize(target_size + 1, source_size + 1);
-    posterior_target_source.resize(source_size + 1, target_size + 1);
-
-    prob_source_target.reserve(target_size + 1, source_size + 1);
-    prob_target_source.reserve(source_size + 1, target_size + 1);
-    
-    prob_source_target.resize(target_size + 1, source_size + 1);
-    prob_target_source.resize(source_size + 1, target_size + 1);
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
     
     phi.clear();
-    exp_phi.clear();
-    
     phi.resize(target_size + 1, source_size + 1, 0.0);
+    
+    exp_phi.clear();
     exp_phi.resize(target_size + 1, source_size + 1, 1.0);
     
-    double logsum_source_target = 0.0;
-    double logsum_target_source = 0.0;
+    exp_phi_old.clear();
+    exp_phi_old.resize(target_size + 1, source_size + 1, 1.0);
     
-    for (size_type trg = 0; trg != target_size; ++ trg) {
-      const double prob_align_norm = 1.0 / source_size;
-      double prob_sum = 0.0;
-      
-      posterior_set_type::iterator piter     = prob_source_target.begin(trg + 1);
-      posterior_set_type::iterator piter_end = prob_source_target.end(trg + 1);
-      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
-      prob_sum += *piter;
-      
-      double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
+    for (int iter = 0; iter < 5; ++ iter) {
+      hmm_source_target.estimate_posterior(source, target);
+      hmm_target_source.estimate_posterior(target, source);
 
-      ++ piter;
-      
-      for (size_type src = 0; src != source_size; ++ src, ++ piter) {
-	*piter = ttable_source_target(source[src], target[trg]) * prob_align * prob_align_norm;
-	prob_sum += *piter;
-	
-	if (*piter > prob_max) {
-	  prob_max = *piter;
-	  word_max = source[src];
-	}
-      }
-      
-      logsum_source_target += utils::mathop::log(prob_sum);
-      
-      const double factor = 1.0 / prob_sum;
-      
-      piter = prob_source_target.begin(trg + 1);
-      posterior_set_type::iterator siter = posterior_source_target.begin(trg + 1);
-      for (/**/; piter != piter_end; ++ piter, ++ siter)
-	(*siter) = (*piter) * factor;
-
-      aligned_source_target[word_max].insert(target[trg]);
-    }
-    
-    for (size_type src = 0; src != source_size; ++ src) {
-      const double prob_align_norm = 1.0 / target_size;
-      double prob_sum = 0.0;
-      
-      posterior_set_type::iterator piter     = prob_target_source.begin(src + 1);
-      posterior_set_type::iterator piter_end = prob_target_source.end(src + 1);
-      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
-      prob_sum += *piter;
-      
-      double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
-
-      ++ piter;
-      
-      for (size_type trg = 0; trg != target_size; ++ trg, ++ piter) {
-	*piter = ttable_target_source(target[trg], source[src]) * prob_align * prob_align_norm;
-	prob_sum += *piter;
-	
-	if (*piter > prob_max) {
-	  prob_max = *piter;
-	  word_max = target[trg];
-	}
-      }
-      
-      logsum_target_source += utils::mathop::log(prob_sum);
-      
-      const double factor = 1.0 / prob_sum;
-      
-      piter = prob_target_source.begin(src + 1);
-      posterior_set_type::iterator titer = posterior_target_source.begin(src + 1);
-      for (/**/; piter != piter_end; ++ piter, ++ titer)
-	(*titer) = (*piter) * factor;
-      
-      aligned_target_source[word_max].insert(source[src]);
-    }
-    
-    // perplexity..
-    objective_source_target += logsum_source_target / target_size;
-    objective_target_source += logsum_target_source / source_size;
-    
-    // now we will adjust posterior..
-    
-    for (int iter = 0; iter != 5; ++ iter) {
-      
       bool updated = false;
       
-      // update phi... we do not consider null alignment!
-      for (size_type src = 1; src <= source_size; ++ src)
-	for (size_type trg = 1; trg <= target_size; ++ trg) {
-	  const double epsi = posterior_source_target(trg, src) - posterior_target_source(src, trg);
+      // update phi...
+      for (int src = 1; src <= source_size; ++ src)
+	for (int trg = 1; trg <= target_size; ++ trg) {
+	  const double epsi = hmm_source_target.posterior(trg, src) - hmm_target_source.posterior(src, trg);
 	  const double update = - epsi;
 	  
 	  phi(trg, src) += update;
@@ -956,49 +792,40 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       
       if (! updated) break;
       
-      // recompute...
-      for (size_type trg = 1; trg <= target_size; ++ trg) {
-	double prob_sum = 0.0;
-	for (size_type src = 0; src <= source_size; ++ src)
-	  prob_sum += prob_source_target(trg, src) * exp_phi(trg, src);
-	
-	const double factor = 1.0 / prob_sum;
-	for (size_type src = 0; src <= source_size; ++ src)
-	  posterior_source_target(trg, src) = prob_source_target(trg, src) * factor *  exp_phi(trg, src);
+      // rescale emission table...
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	prob_type* eiter = &(*hmm_source_target.emission.begin(trg)) + 1;
+	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	  (*eiter) *= exp_phi(trg, src) / exp_phi_old(trg, src);
       }
       
-      for (size_type src = 1; src <= source_size; ++ src) {
-	double prob_sum = 0.0;
-	for (size_type trg = 0; trg <= target_size; ++ trg)
-	  prob_sum += prob_target_source(src, trg) / exp_phi(trg, src);
-	
-	const double factor = 1.0 / prob_sum;
-	for (size_type trg = 0; trg <= target_size; ++ trg)
-	  posterior_target_source(src, trg) = prob_target_source(src, trg) * factor / exp_phi(trg, src);
+      for (int src = 1; src <= source_size; ++ src) {
+	prob_type* eiter = &(*hmm_target_source.emission.begin(src)) + 1;
+	for (int trg = 1; trg <= target_size; ++ trg, ++ eiter)
+	  (*eiter) *= exp_phi_old(trg, src) / exp_phi(trg, src);
       }
+      
+      // swap...
+      exp_phi_old.swap(exp_phi);
+      
+      // forward-backward...
+      hmm_source_target.forward_backward(source, target);
+      hmm_target_source.forward_backward(target, source);
     }
     
-    // since we have already adjusted posterior, we simply accumulate individual counts...
-    for (size_type src = 0; src <= source_size; ++ src)
-      for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
-	const word_type& source_word = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
-	
-	if (trg != 0)
-	  ttable_counts_source_target[source_word][target_word] += posterior_source_target(trg, src);
-	
-	if (src != 0)
-	  ttable_counts_target_source[target_word][source_word] += posterior_target_source(src, trg);
-      }
+    hmm_source_target.accumulate(source, target, ttable_counts_source_target);
+    hmm_target_source.accumulate(target, source, ttable_counts_target_source);
+    
+    hmm_source_target.accumulate(source, target, atable_counts_source_target);
+    hmm_target_source.accumulate(target, source, atable_counts_target_source);
   }
 
-  posterior_set_type prob_source_target;
-  posterior_set_type prob_target_source;
-  posterior_set_type posterior_source_target;
-  posterior_set_type posterior_target_source;
+  hmm_data_type hmm_source_target;
+  hmm_data_type hmm_target_source;
   
-  posterior_set_type phi;
-  posterior_set_type exp_phi;
+  phi_set_type phi;
+  phi_set_type exp_phi;
+  phi_set_type exp_phi_old;
 };
 
 struct ViterbiModel1 : public ViterbiBase
