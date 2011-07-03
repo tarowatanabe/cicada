@@ -20,6 +20,7 @@
 #include <utils/bithack.hpp>
 #include <utils/sgi_hash_map.hpp>
 #include <utils/hashmurmur.hpp>
+#include <utils/mathop.hpp>
 
 typedef cicada::Symbol     word_type;
 typedef cicada::Sentence   sentence_type;
@@ -126,6 +127,8 @@ struct atable_type
   typedef sgi::hash_map<class_pair_type, cache_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
 			std::allocator<std::pair<const class_pair_type, cache_type> > > cache_set_type;
 #endif
+
+  atable_type(const double __prior=0.1) : prior(__prior) {}
   
   prob_type operator()(const word_type& source,
 		       const word_type& target,
@@ -175,8 +178,9 @@ struct atable_type
 	sum += count;
       }
       
+      const double sum_digamma = utils::mathop::digamma(sum);
       for (index_type i = range.first; i != range.second; ++ i)
-	diffs[i] /= sum;
+	diffs[i] = utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma);
     }
     
     return diffs;
@@ -415,10 +419,25 @@ struct LearnBase
       objective_target_source(0)
   {}
 
+  LearnBase(const ttable_type& __ttable_source_target,
+	    const ttable_type& __ttable_target_source,
+	    const atable_type& __atable_source_target,
+	    const atable_type& __atable_target_source)
+    : ttable_source_target(__ttable_source_target),
+      ttable_target_source(__ttable_target_source),
+      atable_source_target(__atable_source_target),
+      atable_target_source(__atable_target_source),
+      objective_source_target(0),
+      objective_target_source(0)
+  {}
+
   void initialize()
   {
     ttable_counts_source_target.initialize();
     ttable_counts_target_source.initialize();
+
+    atable_counts_source_target.initialize();
+    atable_counts_target_source.initialize();
     
     aligned_source_target.initialize();
     aligned_target_source.initialize();
@@ -431,6 +450,11 @@ struct LearnBase
   const ttable_type& ttable_target_source;
   ttable_type ttable_counts_source_target;
   ttable_type ttable_counts_target_source;
+
+  atable_type atable_source_target;
+  atable_type atable_target_source;
+  atable_type atable_counts_source_target;
+  atable_type atable_counts_target_source;
   
   aligned_type aligned_source_target;
   aligned_type aligned_target_source;
@@ -449,9 +473,21 @@ struct ViterbiBase
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source)
   {}
+  ViterbiBase(const ttable_type& __ttable_source_target,
+	      const ttable_type& __ttable_target_source,
+	      const atable_type& __atable_source_target,
+	      const atable_type& __atable_target_source)
+    : ttable_source_target(__ttable_source_target),
+      ttable_target_source(__ttable_target_source),
+      atable_source_target(__atable_source_target),
+      atable_target_source(__atable_target_source)
+  {}
   
   const ttable_type& ttable_source_target;
   const ttable_type& ttable_target_source;
+  
+  atable_type atable_source_target;
+  atable_type atable_target_source;
 };
 
 
