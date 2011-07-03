@@ -97,6 +97,8 @@ struct atable_type
       std::fill(positives.begin(), positives.end(), 0.0);
       std::fill(negatives.begin(), negatives.end(), 0.0);
     }
+
+    bool empty() const { return positives.empty() && negatives.empty(); }
     
     difference_set_type positives;
     difference_set_type negatives;
@@ -144,19 +146,40 @@ struct atable_type
       // 0 <= i < source_size
       // which implies: 1 <= diff < source_size + 1
       //
-
-    } else if (i >= source_size) {
-      // 0 <= i <= source_size
-      // which implies: 0 - i_prev <= diff < source_size - i_prev + 1
-      //
       
+      return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i + 1];
+    } else if (i >= souce_size) {
+      // which implies: 1 <= diff < source_size - i_prev + 1
+      // 
+      
+      return estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[source_size - i_prev];
     } else {
       // 0 <= i < source_size
       // which implies: 0 - i_prev <= diff < source_size - i_prev
       //
       
-      
+      return estimate(class_pair_type(source, target), range_type(0 - i_prev, source_size - i_prev))[i - i_prev];
     }
+  }
+  
+  const difference_map_type& estimate(const class_pair_type& classes, const range_type& range) const
+  {
+    difference_map_type& diffs = const_cast<cache_set_type&>(caches)[classes][range];
+    if (diffs.empty()) {
+      double sum = 0.0;
+      for (index_type i = range.first; i != range.second; ++ i) {
+	count_dict_type::const_iterator aiter = atable.find(classes);
+	const double count = (aiter != atable.end() ? aiter->second[i] + prior : prior);
+	
+	diffs[i] = count;
+	sum += count;
+      }
+      
+      for (index_type i = range.first; i != range.second; ++ i)
+	diffs[i] /= sum;
+    }
+    
+    return diffs;
   }
 
   difference_map_type& operator[](const class_pair_type& x)
@@ -189,7 +212,7 @@ struct atable_type
   
   count_dict_type atable;
   cache_set_type  caches;
-  double smooth;
+  double prior;
 };
 
 struct ttable_type
