@@ -21,8 +21,12 @@ struct LearnHMM : public LearnBase
   LearnHMM(const ttable_type& __ttable_source_target,
 	   const ttable_type& __ttable_target_source,
 	   const atable_type& __atable_source_target,
-	   const atable_type& __atable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
+	   const atable_type& __atable_target_source,
+	   const classes_type& __classes_source,
+	   const classes_type& __classes_target)
+    : LearnBase(__ttable_source_target, __ttable_target_source,
+		__atable_source_target, __atable_target_source,
+		__clsses_source, __classes_target) {}
   
 
   struct HMMData
@@ -582,8 +586,12 @@ struct LearnHMMPosterior : public LearnBase
   LearnHMMPosterior(const ttable_type& __ttable_source_target,
 		    const ttable_type& __ttable_target_source,
 		    const atable_type& __atable_source_target,
-		    const atable_type& __atable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
+		    const atable_type& __atable_target_source,
+		    const classes_type& __classes_source,
+		    const classes_type& __classes_target)
+    : LearnBase(__ttable_source_target, __ttable_target_source,
+		__atable_source_target, __atable_target_source,
+		__classes_source, __classes_target) {}
 
   typedef LearnHMM::hmm_data_type hmm_data_type;
   
@@ -691,8 +699,12 @@ struct LearnHMMSymmetric : public LearnBase
   LearnHMMSymmetric(const ttable_type& __ttable_source_target,
 		    const ttable_type& __ttable_target_source,
 		    const atable_type& __atable_source_target,
-		    const atable_type& __atable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
+		    const atable_type& __atable_target_source,
+		    const classes_type& __classes_source,
+		    const classes_type& __classes_target)
+    : LearnBase(__ttable_source_target, __ttable_target_source,
+		__atable_source_target, __atable_target_source,
+		__classes_source, __classes_target) {}
 
   typedef LearnHMM::hmm_data_type hmm_data_type;
   
@@ -744,8 +756,12 @@ struct LearnHMMSymmetricPosterior : public LearnBase
   LearnHMMSymmetricPosterior(const ttable_type& __ttable_source_target,
 			     const ttable_type& __ttable_target_source,
 			     const atable_type& __atable_source_target,
-			     const atable_type& __atable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source, __atable_source_target, __atable_target_source) {}
+			     const atable_type& __atable_target_source,
+			     const classes_type& __classes_source,
+			     const classes_type& __classes_target)
+    : LearnBase(__ttable_source_target, __ttable_target_source,
+		__atable_source_target, __atable_target_source,
+		__classes_source, __classes_target) {}
   
   typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > phi_set_type;
 
@@ -828,43 +844,35 @@ struct LearnHMMSymmetricPosterior : public LearnBase
   phi_set_type exp_phi_old;
 };
 
-struct ViterbiModel1 : public ViterbiBase
+struct ViterbiHMM : public ViterbiBase
 {
-  ViterbiModel1(const ttable_type& __ttable_source_target,
-		const ttable_type& __ttable_target_source)
-    : ViterbiBase(__ttable_source_target, __ttable_target_source) {}
-
+  ViterbiHMM(const ttable_type& __ttable_source_target,
+	     const ttable_type& __ttable_target_source,
+	     const atable_type& __atable_source_target,
+	     const atable_type& __atable_target_source,
+	     const classes_type& __classes_source,
+	     const classes_type& __classes_target)
+    : ViterbiBase(__ttable_source_target, __ttable_target_source,
+		  __atable_source_target, __atable_target_source,
+		  __classes_source, __classes_target) {}
+  
   void viterbi(const sentence_type& source,
 	       const sentence_type& target,
 	       const ttable_type& ttable,
+	       const atable_type& atable,
+	       const classes_type& classes_source,
+	       const classes_type& classes_target,
 	       alignment_type& alignment)
   {
     alignment.clear();
-    
+
     const size_type source_size = source.size();
     const size_type target_size = target.size();
     
     const double prob_null  = p0;
     const double prob_align = 1.0 - p0;
     
-    for (size_type trg = 0; trg != target_size; ++ trg) {
-      const double prob_align_norm = 1.0 / source_size;
-      
-      double prob_max = ttable(vocab_type::NONE, target[trg]) * prob_null;
-      int    align_max = -1;
-      
-      for (size_type src = 0; src != source_size; ++ src) {
-	const double prob = ttable(source[src], target[trg]) * prob_align * prob_align_norm;
-	
-	if (prob > prob_max) {
-	  prob_max = prob;
-	  align_max = src;
-	}
-      }
-      
-      if (align_max >= 0)
-	alignment.push_back(std::make_pair(align_max, static_cast<int>(trg)));
-    }
+    
   }
 
   void operator()(const sentence_type& source,

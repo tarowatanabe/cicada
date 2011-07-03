@@ -208,6 +208,12 @@ struct atable_type
   }
   
   void clear() { atable.clear(); caches.clear(); }
+  void swap(atable_type& x)
+  {
+    atable.swap(x.atable);
+    caches.swap(x.caches);
+    std::swap(prior, x.prior);
+  }
   
   void initialize()
   {
@@ -218,6 +224,18 @@ struct atable_type
     cache_set_type::iterator citer_end = caches.end();
     for (cache_set_type::iterator citer = caches.begin(); citer != citer_end; ++ citer)
       citer->second.clear();
+  }
+
+  atable_type& operator+=(const atable_type& x)
+  {
+    count_dict_type::const_iterator aiter_end = x.atable.end();
+    for (count_dict_type::const_iterator aiter = x.atable.begin(); aiter != aiter_end; ++ aiter) {
+      mapped_type& mapped = atable[aiter->first];
+      
+      for (index_type i = aiter->second.min(); i <= aiter->second.max(); ++ i)
+	mapped[i] += aiter->second[i];
+    }
+    return *this;
   }
   
   count_dict_type atable;
@@ -416,11 +434,19 @@ struct LearnBase
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+
+  static const classes_type& __classes()
+  {
+    static classes_type __tmp;
+    return __tmp;
+  }
   
   LearnBase(const ttable_type& __ttable_source_target,
 	    const ttable_type& __ttable_target_source)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
+      classes_source(__classes()),
+      classes_target(__classes()),
       objective_source_target(0),
       objective_target_source(0)
   {}
@@ -466,8 +492,8 @@ struct LearnBase
   atable_type atable_counts_source_target;
   atable_type atable_counts_target_source;
 
-  classes_type classes_source;
-  classes_type classes_target;
+  const classes_type& classes_source;
+  const classes_type& classes_target;
   
   aligned_type aligned_source_target;
   aligned_type aligned_target_source;
@@ -480,11 +506,19 @@ struct ViterbiBase
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+
+  static const classes_type& __classes()
+  {
+    static classes_type __tmp;
+    return __tmp;
+  }
   
   ViterbiBase(const ttable_type& __ttable_source_target,
 	      const ttable_type& __ttable_target_source)
     : ttable_source_target(__ttable_source_target),
-      ttable_target_source(__ttable_target_source)
+      ttable_target_source(__ttable_target_source),
+      classes_source(__classes()),
+      classes_target(__classes())
   {}
   ViterbiBase(const ttable_type& __ttable_source_target,
 	      const ttable_type& __ttable_target_source,
@@ -506,8 +540,8 @@ struct ViterbiBase
   atable_type atable_source_target;
   atable_type atable_target_source;
   
-  classes_type classes_source;
-  classes_type classes_target;
+  const classes_type& classes_source;
+  const classes_type& classes_target;
 };
 
 
