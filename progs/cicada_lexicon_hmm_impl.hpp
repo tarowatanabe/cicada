@@ -389,19 +389,126 @@ struct LearnHMM : public LearnBase
 	}
       }
     }
+
+    struct logminus
+    {
+      double operator()(const double& logsum, const double& prob) const
+      {
+	return logsum - utils::mathop::log(prob);
+      }
+    };
+    
+    double objective() const
+    {
+      return std::accumulate(scale.begin(), scale.end(), 0.0, logminus());
+    }
+
+    void accumulate(const sentence_type& __source,
+		    const sentence_type& __target,
+		    ttable_type& counts)
+    {
+      const size_type source_size = __source.size();
+      const size_type target_size = __target.size();
+      
+      const prob_type sum = forward(target_size + 2 - 1, source_size + 2 - 1);
+      
+      // accumulate lexcion
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	const double factor = 1.0 / (scale[trg] * sum);
+      
+	// + 1 to skip BOS
+	const prob_type* fiter = &(*forward.begin(trg)) + 1;
+	const prob_type* biter = &(*backward.begin(trg)) + 1;
+	for (int src = 1; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
+	  const prob_type count = (*fiter) * (*biter) * factor;
+	  
+	  if (std::isfinite(count) && count > 0.0)
+	    counts[source[src]][target[trg]] += count;
+	}
+      
+	// null alignment...
+	double count_none = 0.0;
+	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
+	  const prob_type count = (*fiter) * (*biter) * factor;
+	  if (std::isfinite(count) && count > 0.0)
+	    count_none += count;
+	}
+      
+	counts[vocab_type::NONE][target[trg]] += count_none;
+      }
+    }
+    
+    void accumulate(const sentence_type& __source,
+		    const sentence_type& __target,
+		    atable_type& counts)
+    {
+      typedef std::vector<atable_type::mapped_type*, std::allocator<atable_type::mapped_type*> > mapped_type;
+
+      const size_type source_size = __source.size();
+      const size_type target_size = __target.size();
+      
+      const double sum = forward(target_size + 2 - 1, source_size + 2 - 1);
+      const double factor = 1.0 / sum;
+
+      mapped_type mapped((source_size + 2) - 1);
+      
+      for (int trg = 1; trg < target_size + 2; ++ trg) {
+	const prob_type* biter = &(*data.backward.begin(trg)) + 1;
+	const prob_type* eiter = &(*data.emission.begin(trg)) + 1;
+	
+	for (int prev = 0; prev < (source_size + 2) - 1; ++ prev)
+	  mapped[prev] = &(counts[std::make_pair(source_class[prev], target_class[trg])]);
+	
+	// + 1, we will exclude <s>, since we will never aligned to <s>
+	for (int next = 1; next < source_size + 2; ++ next, ++ biter, ++ eiter) {
+	  const prob_type factor_backward = (*biter) * (*eiter);
+	  
+	  if (factor_backward > 0.0) {
+	    const prob_type* fiter_word = &(*data.forward.begin(trg - 1));
+	    const prob_type* titer_word = &(*data.transition.begin(trg, next));
+	    const prob_type* fiter_none = &(*data.forward.begin(trg - 1)) + (source_size + 2);
+	    const prob_type* titer_none = &(*data.transition.begin(trg, next)) + (source_size + 2);
+	    
+	    // - 1 to exlude EOS
+	    for (int prev = 0; prev < (source_size + 2) - 1; ++ prev, ++ fiter_word, ++ titer_word, ++ fiter_none, ++ titer_none) {
+	      const double count_word = (*fiter_word) * factor_backward * (*titer_word) * factor;
+	      const double count_none = (*fiter_none) * factor_backward * (*titer_none) * factor;
+	      
+	      mapped[prev]->operator[](next - prev) += ((count_word > 0.0 && std::isfinite(count_word) ? count_word : 0.0)
+							+ (count_none > 0.0 && std::isfinite(count_none) ? count_none : 0.0));
+	    }
+	  }
+	}
+      }
+    }
   };
 
+  typedef HMMData hmm_data_type;
   
-  void learn(const sentence_type& __source,
-	     const sentence_type& __target,
+  
+  void learn(const sentence_type& source,
+	     const sentence_type& target,
 	     const ttable_type& ttable,
 	     const atable_type& atable,
+	     const classes_type& classes_source,
+	     const classes_type& classes_target,
 	     ttable_type& counts_ttable,
 	     atable_type& counts_atable,
 	     aligned_type& aligned,
 	     double& objective)
   {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
     
+    hmm.prepare(source, target, ttable, atable, classes_source, classes_target);
+    
+    hmm.forward_backward(source, target);
+    
+    objective += hmm.objective() / target_size;
+    
+    hmm.accumulate(source, target, counts_ttable);
+    
+    hmm.accumulate(source, target, counts_atable);
   }
   
   void operator()(const sentence_type& source, const sentence_type& target)
@@ -410,6 +517,8 @@ struct LearnHMM : public LearnBase
 	  target,
 	  ttable_source_target,
 	  atable_source_target,
+	  classes_source,
+	  classes_target,
 	  ttable_counts_source_target,
 	  atable_counts_source_target,
 	  aligned_source_target,
@@ -418,12 +527,15 @@ struct LearnHMM : public LearnBase
 	  source,
 	  ttable_target_source,
 	  atable_target_source,
+	  classes_target,
+	  classes_source,
 	  ttable_counts_target_source,
 	  atable_counts_target_source,
 	  aligned_target_source,
 	  objective_target_source);
   }
 
+  hmm_data_type hmm;
 };
 
 struct LearnModel1Posterior : public LearnBase

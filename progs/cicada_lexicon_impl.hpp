@@ -31,6 +31,7 @@ typedef boost::filesystem::path path_type;
 
 typedef double count_type;
 typedef double prob_type;
+typedef double logprob_type;
 
 struct classes_type
 {
@@ -101,6 +102,9 @@ struct atable_type
 
     bool empty() const { return positives.empty() && negatives.empty(); }
     
+    index_type min() const { return - negatives.size(); }
+    index_type max() const { return positives.size() - 1; }
+    
     difference_set_type positives;
     difference_set_type negatives;
   };
@@ -115,6 +119,8 @@ struct atable_type
   typedef sgi::hash_map<class_pair_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<class_pair_type>,
 			std::allocator<std::pair<const class_pair_type, difference_map_type> > > count_dict_type;
 #endif
+
+  typedef difference_map_type mapped_type;
 
 #ifdef HAVE_TR1_UNORDERED_MAP
   typedef std::tr1::unordered_map<range_type, difference_map_type, utils::hashmurmur<size_t>, std::equal_to<range_type>,
