@@ -148,7 +148,7 @@ struct atable_type
       //
       
       return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i + 1];
-    } else if (i >= souce_size) {
+    } else if (i >= source_size) {
       // which implies: 1 <= diff < source_size - i_prev + 1
       // 
       
