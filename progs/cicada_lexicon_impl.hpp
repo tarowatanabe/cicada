@@ -160,17 +160,17 @@ struct atable_type
     // we will cache wrt class_pair_type and diff's range
     //
     
-    if (i_prev < 0) {
+    if (source == vocab_type::BOS) {
       // 0 <= i < source_size
       // which implies: 1 <= diff < source_size + 1
       //
       
-      return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i + 1];
-    } else if (i >= source_size) {
+      return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i - i_prev];
+    } else if (target == vocab_type::EOS) {
       // which implies: 1 <= diff < source_size - i_prev + 1
       // 
       
-      return estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[source_size - i_prev];
+      return estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[i - i_prev];
     } else {
       // 0 <= i < source_size
       // which implies: 0 - i_prev <= diff < source_size - i_prev
@@ -704,6 +704,46 @@ void write_alignemnt(const path_type& path, const atable_type& align)
   for (atable_type::count_dict_type::const_iterator citer = align.atable.begin(); citer != citer_end; ++ citer)
     for (int diff = citer->second.min(); diff <= citer->second.max(); ++ diff)
       os << citer->first.first << ' ' << citer->first.second << ' ' << diff << ' ' << citer->second[diff] << '\n';
+}
+
+
+void read_classes(const path_type& path, classes_type& classes)
+{
+  typedef boost::spirit::istream_iterator iterator_type;
+  typedef std::pair<std::string, std::string> word_pair_type;
+  
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  qi::rule<iterator_type, std::string(), standard::blank_type>    word;
+  qi::rule<iterator_type, word_pair_type(), standard::blank_type> parser; 
+  
+  word   %= qi::lexeme[+(standard::char_ - standard::space)];
+  parser %= word >> word >> (qi::eol | qi::eoi);
+
+  classes.clear();
+  
+  utils::compress_istream is(path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iterator_type iter(is);
+  iterator_type iter_end;
+  
+  word_pair_type word_pair;
+  
+  while (iter != iter_end) {
+    word_pair.first.clear();
+    word_pair.second.clear();
+    
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, word_pair))
+      if (iter != iter_end)
+	throw std::runtime_error("cluster parsing failed");
+    
+    const word_type cluster(word_pair.first);
+    const word_type word(word_pair.second);
+    
+    classes[word] = cluster;
+  }
 }
 
 #endif

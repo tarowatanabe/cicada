@@ -2,15 +2,6 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#define BOOST_SPIRIT_THREADSAFE
-#define PHOENIX_THREADSAFE
-
-#include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/karma.hpp>
-
-#include <boost/fusion/tuple.hpp>
-#include <boost/fusion/adapted.hpp>
-
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -27,6 +18,8 @@ path_type source_file = "-";
 path_type target_file = "-";
 path_type span_source_file;
 path_type span_target_file;
+path_type classes_source_file;
+path_type classes_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
 path_type alignment_source_target_file;
@@ -63,17 +56,27 @@ int threads = 2;
 int debug = 0;
 
 #include "cicada_lexicon_maximize_impl.hpp"
+#include "cicada_lexicon_model1_impl.hpp"
 #include "cicada_lexicon_hmm_impl.hpp"
 
 template <typename Learner, typename Maximizer>
-void learn(ttable_type& ttable_source_target,
+void learn(const int iteration,
+	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
+	   atable_type& atable_source_target,
+	   atable_type& atalbe_target_source,
+	   const classes_type& classes_source,
+	   const classes_type& classes_target,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source);
 
 template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
-	     const ttable_type& ttable_target_source);
+	     const ttable_type& ttable_target_source,
+	     const atable_type& atable_source_target,
+	     const atable_type& atalbe_target_source,
+	     const classes_type& classes_source,
+	     const classes_type& classes_target);
 
 void options(int argc, char** argv);
 
@@ -89,6 +92,12 @@ int main(int argc, char ** argv)
     
     ttable_type ttable_source_target(smooth);
     ttable_type ttable_target_source(smooth);
+
+    atable_type atable_source_target(prior_alignment);
+    atable_type atable_target_source(prior_alignment);
+
+    classes_type classes_source;
+    classes_type classes_target;
     
     aligned_type aligned_source_target;
     aligned_type aligned_target_source;
@@ -101,57 +110,258 @@ int main(int argc, char ** argv)
       if (lexicon_target_source_file != "-" && ! boost::filesystem::exists(lexicon_target_source_file))
 	throw std::runtime_error("no file: " + lexicon_target_source_file.string());
 
+    if (! alignment_source_target_file.empty())
+      if (alignment_source_target_file != "-" && ! boost::filesystem::exists(alignment_source_target_file))
+	throw std::runtime_error("no file: " + alignment_source_target_file.string());
+
+    if (! alignment_target_source_file.empty())
+      if (alignment_target_source_file != "-" && ! boost::filesystem::exists(alignment_target_source_file))
+	throw std::runtime_error("no file: " + alignment_target_source_file.string());
+
+    if (! classes_source_file.empty())
+      if (classes_source_file != "-" && ! boost::filesystem::exists(classes_source_file))
+	throw std::runtime_error("no file: " + classes_source_file.string());
+
+    if (! classes_target_file.empty())
+      if (classes_target_file != "-" && ! boost::filesystem::exists(classes_target_file))
+	throw std::runtime_error("no file: " + classes_target_file.string());
+    
     boost::thread_group workers_read;
     
+    // read lexicon
     if (! lexicon_source_target_file.empty())
       workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_source_target_file), boost::ref(ttable_source_target))));
     if (! lexicon_target_source_file.empty())
       workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_target_source_file), boost::ref(ttable_target_source))));
     
+    // read alignment
+    if (! alignment_source_target_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_alignment, boost::cref(alignment_source_target_file), boost::ref(atable_source_target))));
+    if (! alignment_target_source_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_alignment, boost::cref(alignment_target_source_file), boost::ref(atable_target_source))));
+
+    // read classes
+    if (! classes_source_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_classes, boost::cref(classes_source_file), boost::ref(classes_source))));
+    if (! classes_target_file.empty())
+      workers_read.add_thread(new boost::thread(boost::bind(read_classes, boost::cref(classes_target_file), boost::ref(classes_target))));
+    
     workers_read.join_all();
     
-    if (iteration_model1 > 0 || iteration_hmm > 0) {
+    if (iteration_model1 > 0) {
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, MaximizeBayes>(iteration_model1,
+								ttable_source_target,
+								ttable_target_source,
+								atable_source_target,
+								atable_target_source,
+								classes_source,
+								classes_target,
+								aligned_source_target,
+								aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Symmetric, MaximizeBayes>(iteration_model1,
+						       ttable_source_target,
+						       ttable_target_source,
+						       atable_source_target,
+						       atable_target_source,
+						       classes_source,
+						       classes_target,
+						       aligned_source_target,
+						       aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Posterior, MaximizeBayes>(iteration_model1,
+						       ttable_source_target,
+						       ttable_target_source,
+						       atable_source_target,
+						       atable_target_source,
+						       classes_source,
+						       classes_target,
+						       aligned_source_target,
+						       aligned_target_source);
 	  else
-	    learn<LearnModel1, MaximizeBayes>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1, MaximizeBayes>(iteration_model1,
+					      ttable_source_target,
+					      ttable_target_source,
+					      atable_source_target,
+					      atable_target_source,
+					      classes_source,
+					      classes_target,
+					      aligned_source_target,
+					      aligned_target_source);
 	}
 	
       } else {
 	if (symmetric_mode) {
 	  if (posterior_mode)
-	    learn<LearnModel1SymmetricPosterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1SymmetricPosterior, Maximize>(iteration_model1,
+							   ttable_source_target,
+							   ttable_target_source,
+							   atable_source_target,
+							   atable_target_source,
+							   classes_source,
+							   classes_target,
+							   aligned_source_target,
+							   aligned_target_source);
 	  else
-	    learn<LearnModel1Symmetric, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Symmetric, Maximize>(iteration_model1,
+						  ttable_source_target,
+						  ttable_target_source,
+						  atable_source_target,
+						  atable_target_source,
+						  classes_source,
+						  classes_target,
+						  aligned_source_target,
+						  aligned_target_source);
 	} else {
 	  if (posterior_mode)
-	    learn<LearnModel1Posterior, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1Posterior, Maximize>(iteration_model1,
+						  ttable_source_target,
+						  ttable_target_source,
+						  atable_source_target,
+						  atable_target_source,
+						  classes_source,
+						  classes_target,
+						  aligned_source_target,
+						  aligned_target_source);
 	  else
-	    learn<LearnModel1, Maximize>(ttable_source_target, ttable_target_source, aligned_source_target, aligned_target_source);
+	    learn<LearnModel1, Maximize>(iteration_model1,
+					 ttable_source_target,
+					 ttable_target_source,
+					 atable_source_target,
+					 atable_target_source,
+					 classes_source,
+					 classes_target,
+					 aligned_source_target,
+					 aligned_target_source);
+	}
+      }
+    }
+    
+    if (iteration_hmm > 0) {
+      if (variational_bayes_mode) {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    learn<LearnHMMSymmetricPosterior, MaximizeBayes>(iteration_hmm,
+							     ttable_source_target,
+							     ttable_target_source,
+							     atable_source_target,
+							     atable_target_source,
+							     classes_source,
+							     classes_target,
+							     aligned_source_target,
+							     aligned_target_source);
+	  else
+	    learn<LearnHMMSymmetric, MaximizeBayes>(iteration_hmm,
+						    ttable_source_target,
+						    ttable_target_source,
+						    atable_source_target,
+						    atable_target_source,
+						    classes_source,
+						    classes_target,
+						    aligned_source_target,
+						    aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    learn<LearnHMMPosterior, MaximizeBayes>(iteration_hmm,
+						    ttable_source_target,
+						    ttable_target_source,
+						    atable_source_target,
+						    atable_target_source,
+						    classes_source,
+						    classes_target,
+						    aligned_source_target,
+						    aligned_target_source);
+	  else
+	    learn<LearnHMM, MaximizeBayes>(iteration_hmm,
+					   ttable_source_target,
+					   ttable_target_source,
+					   atable_source_target,
+					   atable_target_source,
+					   classes_source,
+					   classes_target,
+					   aligned_source_target,
+					   aligned_target_source);
+	}
+	
+      } else {
+	if (symmetric_mode) {
+	  if (posterior_mode)
+	    learn<LearnHMMSymmetricPosterior, Maximize>(iteration_hmm,
+							ttable_source_target,
+							ttable_target_source,
+							atable_source_target,
+							atable_target_source,
+							classes_source,
+							classes_target,
+							aligned_source_target,
+							aligned_target_source);
+	  else
+	    learn<LearnHMMSymmetric, Maximize>(iteration_hmm,
+					       ttable_source_target,
+					       ttable_target_source,
+					       atable_source_target,
+					       atable_target_source,
+					       classes_source,
+					       classes_target,
+					       aligned_source_target,
+					       aligned_target_source);
+	} else {
+	  if (posterior_mode)
+	    learn<LearnHMMPosterior, Maximize>(iteration_hmm,
+					       ttable_source_target,
+					       ttable_target_source,
+					       atable_source_target,
+					       atable_target_source,
+					       classes_source,
+					       classes_target,
+					       aligned_source_target,
+					       aligned_target_source);
+	  else
+	    learn<LearnHMM, Maximize>(iteration_hmm,
+				      ttable_source_target,
+				      ttable_target_source,
+				      atable_source_target,
+				      atable_target_source,
+				      classes_source,
+				      classes_target,
+				      aligned_source_target,
+				      aligned_target_source);
 	}
       }
     }
     
     if (! viterbi_source_target_file.empty() || ! viterbi_target_source_file.empty()) {
       if (itg_mode)
-	viterbi<ITGModel1>(ttable_source_target, ttable_target_source);
+	viterbi<ITGHMM>(ttable_source_target,
+			ttable_target_source,
+			atable_source_target,
+			atable_target_source,
+			classes_source,
+			classes_target);
       else if (max_match_mode)
-	viterbi<MaxMatchModel1>(ttable_source_target, ttable_target_source);
+	viterbi<MaxMatchHMM>(ttable_source_target,
+			     ttable_target_source,
+			     atable_source_target,
+			     atable_target_source,
+			     classes_source,
+			     classes_target);
       else
-	viterbi<ViterbiModel1>(ttable_source_target, ttable_target_source);
+	viterbi<ViterbiHMM>(ttable_source_target,
+			    ttable_target_source,
+			    atable_source_target,
+			    atable_target_source,
+			    classes_source,
+			    classes_target);
     }
-
-      
+    
     // final writing
     boost::thread_group workers_write;
     
+    // write lexicon
     if (! output_lexicon_source_target_file.empty())
       workers_write.add_thread(new boost::thread(boost::bind(write_lexicon,
 							     boost::cref(output_lexicon_source_target_file),
@@ -165,6 +375,18 @@ int main(int argc, char ** argv)
 							     boost::cref(ttable_target_source),
 							     boost::cref(aligned_target_source),
 							     threshold)));
+
+    // write alignment
+    if (! output_alignment_source_target_file.empty())
+      workers_write.add_thread(new boost::thread(boost::bind(write_alignment,
+							     boost::cref(output_alignment_source_target_file),
+							     boost::cref(atable_source_target))));
+    
+    if (! output_alignment_target_source_file.empty())
+      workers_write.add_thread(new boost::thread(boost::bind(write_alignment,
+							     boost::cref(output_alignment_target_source_file),
+							     boost::cref(atable_target_source))));
+    
     
     workers_write.join_all();
   }
@@ -208,8 +430,8 @@ struct TaskMaximize : public Maximizer
   {
     for (word_type::id_type source_id = id; source_id < ttable_source_target.size(); source_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].counts_source_target.exists(source_id))
-	  ttable_source_target[source_id] += learners[i].counts_source_target[source_id];
+	if (learners[i].ttable_counts_source_target.exists(source_id))
+	  ttable_source_target[source_id] += learners[i].ttable_counts_source_target[source_id];
 	
 	if (learners[i].aligned_source_target.exists(source_id))
 	  aligned_source_target[source_id] += learners[i].aligned_source_target[source_id];
@@ -221,8 +443,8 @@ struct TaskMaximize : public Maximizer
     
     for (word_type::id_type target_id = id; target_id < ttable_target_source.size(); target_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].counts_target_source.exists(target_id))
-	  ttable_target_source[target_id] += learners[i].counts_target_source[target_id];
+	if (learners[i].ttable_counts_target_source.exists(target_id))
+	  ttable_target_source[target_id] += learners[i].ttable_counts_target_source[target_id];
 	
 	if (learners[i].aligned_target_source.exists(target_id))
 	  aligned_target_source[target_id] += learners[i].aligned_target_source[target_id];
@@ -261,8 +483,15 @@ struct TaskLearn : public Learner
   
   TaskLearn(queue_type& __queue,
 	    const ttable_type& ttable_source_target,
-	    const ttable_type& ttable_target_source)
-    : Learner(ttable_source_target, ttable_target_source), queue(__queue) {}
+	    const ttable_type& ttable_target_source,
+	    const atable_type& atable_source_target,
+	    const atable_type& atable_target_source,
+	    const classes_type& classes_source,
+	    const classes_type& classes_target)
+    : Learner(ttable_source_target, ttable_target_source,
+	      atable_source_target, atable_target_source
+	      classes_source, classes_target),
+      queue(__queue) {}
   
   void operator()()
   {
@@ -285,8 +514,13 @@ struct TaskLearn : public Learner
 };
 
 template <typename Learner, typename Maximizer>
-void learn(ttable_type& ttable_source_target,
+void learn(const int iteration,
+	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
+	   atable_type& atable_source_target,
+	   atable_type& atalbe_target_source,
+	   const classes_type& classes_source,
+	   const classes_type& classes_target,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source)
 {
@@ -299,11 +533,14 @@ void learn(ttable_type& ttable_source_target,
   typedef std::vector<learner_type, std::allocator<learner_type> > learner_set_type;
   
   typedef TaskMaximize<learner_set_type, Maximizer> maximizer_type;
-
-  queue_type       queue(threads * 64);
-  learner_set_type learners(threads, learner_type(queue, ttable_source_target, ttable_target_source));
   
-  for (int iter = 0; iter < iteration_model1; ++ iter) {
+  queue_type       queue(threads * 64);
+  learner_set_type learners(threads, learner_type(queue,
+						  ttable_source_target, ttable_target_source,
+						  atable_source_target, atable_target_source,
+						  classes_source, classes_target));
+  
+  for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << iter << std::endl;
 
@@ -373,7 +610,7 @@ void learn(ttable_type& ttable_source_target,
     ttable_target_source.initialize();
     aligned_source_target.initialize();
     aligned_target_source.initialize();
-
+    
     double objective_source_target = 0;
     double objective_target_source = 0;
     
@@ -390,6 +627,19 @@ void learn(ttable_type& ttable_source_target,
     if (debug)
       std::cerr << "perplexity for P(target | source): " << objective_source_target << '\n'
 		<< "perplexity for P(source | target): " << objective_target_source << '\n';
+    
+    // merge atable counts... (we will dynamically create probability table!)
+    atable_source_target.clear();
+    atable_target_source.clear();
+    for (size_t i = 0; i != learners.size(); ++ i) {
+      atable_source_target += learners[i].atable_counts_source_target;
+      atable_target_source += learners[i].atable_counts_target_source;
+    }
+    
+    for (size_t i = 0; i != learners.size(); ++ i) {
+      learners[i].atable_counts_source_target = atable_source_target;
+      learners[i].atable_counts_target_source = atable_target_source;
+    }
     
     workers_maximize.join_all();
     
@@ -621,7 +871,11 @@ struct ViterbiReducer : public ViterbiMapReduce
 
 template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
-	     const ttable_type& ttable_target_source)
+	     const ttable_type& ttable_target_source,
+	     const atable_type& atable_source_target,
+	     const atable_type& atalbe_target_source,
+	     const classes_type& classes_source,
+	     const classes_type& classes_target)
 {
   typedef ViterbiReducer         reducer_type;
   typedef ViterbiMapper<Aligner> mapper_type;
@@ -640,11 +894,13 @@ void viterbi(const ttable_type& ttable_source_target,
   
   boost::thread_group mapper;
   for (int i = 0; i != threads; ++ i)
-    mapper.add_thread(new boost::thread(mapper_type(Aligner(ttable_source_target, ttable_target_source),
+    mapper.add_thread(new boost::thread(mapper_type(Aligner(ttable_source_target, ttable_target_source,
+							    atable_source_target, atable_target_source,
+							    classes_source, classes_target),
 						    queue,
 						    queue_source_target,
 						    queue_target_source)));
-
+  
   boost::thread_group reducer;
   reducer.add_thread(new boost::thread(reducer_type(viterbi_source_target_file, queue_source_target)));
   reducer.add_thread(new boost::thread(reducer_type(viterbi_target_source_file, queue_target_source)));
@@ -684,7 +940,7 @@ void viterbi(const ttable_type& ttable_source_target,
 	std::cerr << '\n';
     }
   }
-
+  
   if (debug && bitext.id >= 10000)
     std::cerr << std::endl;
   if (debug)
@@ -729,6 +985,9 @@ void options(int argc, char** argv)
     
     ("span-source", po::value<path_type>(&span_source_file), "source span file")
     ("span-target", po::value<path_type>(&span_target_file), "target span file")
+
+    ("classes-source", po::value<path_type>(&classes_source_file), "source classes file")
+    ("classes-target", po::value<path_type>(&classes_target_file), "target classes file")
     
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
