@@ -35,9 +35,6 @@ struct LearnHMM : public LearnBase
     
     typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > posterior_type;
     
-    typedef std::vector<int, std::allocator<int> > point_set_type;
-    typedef std::vector<point_set_type, std::allocator<point_set_type> > point_map_type;
-    
     forward_type    forward;
     backward_type   backward;
     
@@ -52,9 +49,7 @@ struct LearnHMM : public LearnBase
     sentence_type target;
     sentence_type source_class;
     sentence_type target_class;
-    
-    point_map_type points;
-    
+        
     void prepare(const sentence_type& __source,
 		 const sentence_type& __target,
 		 const ttable_type& ttable,
@@ -95,13 +90,12 @@ struct LearnHMM : public LearnBase
       target_class[(target_size + 2) - 1] = vocab_type::EOS;
       
       sentence_type::iterator csiter = source_class.begin() + 1;
-      for (sentence_type::const_iterator siter = source.begin(); siter != source.end(); ++ siter, ++ csiter)
+      for (sentence_type::const_iterator siter = __source.begin(); siter != __source.end(); ++ siter, ++ csiter)
 	*csiter = classes_source[*siter];
       
       sentence_type::iterator ctiter = target_class.begin() + 1;
-      for (sentence_type::const_iterator titer = target.begin(); titer != target.end(); ++ titer, ++ ctiter)
+      for (sentence_type::const_iterator titer = __target.begin(); titer != __target.end(); ++ titer, ++ ctiter)
 	*ctiter = classes_target[*titer];
-      
       
       emission.clear();
       transition.clear();
@@ -137,6 +131,7 @@ struct LearnHMM : public LearnBase
 	for (int next = 1; next < source_size + 2; ++ next) {
 	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
 	  prob_type* titer2 = titer1 + (source_size + 2);      // from NONE
+	  
 	  // - 1 to exclude previous </s>...
 	  for (int prev = 0; prev < source_size + 2 - 1; ++ prev, ++ titer1, ++ titer2) {
 	    const prob_type prob = prob_align * atable(source_class[prev], target_class[trg],
@@ -343,6 +338,7 @@ struct LearnHMM : public LearnBase
 	// + 1 to skip BOS
 	const prob_type* fiter = &(*forward.begin(trg)) + 1;
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
+	
 	for (int src = 1; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
 	  const prob_type count = (*fiter) * (*biter) * factor;
 	  
@@ -375,18 +371,19 @@ struct LearnHMM : public LearnBase
       const double factor = 1.0 / sum;
 
       mapped_type mapped((source_size + 2) - 1);
-      
+
       for (int trg = 1; trg < target_size + 2; ++ trg) {
-	const prob_type* biter = &(*backward.begin(trg)) + 1;
-	const prob_type* eiter = &(*emission.begin(trg)) + 1;
 	
 	for (int prev = 0; prev < (source_size + 2) - 1; ++ prev)
 	  mapped[prev] = &(counts[std::make_pair(source_class[prev], target_class[trg])]);
 	
+	const prob_type* biter = &(*backward.begin(trg)) + 1;
+	const prob_type* eiter = &(*emission.begin(trg)) + 1;
+	
 	// + 1, we will exclude <s>, since we will never aligned to <s>
 	for (int next = 1; next < source_size + 2; ++ next, ++ biter, ++ eiter) {
 	  const prob_type factor_backward = (*biter) * (*eiter);
-	  
+
 	  if (factor_backward > 0.0) {
 	    const prob_type* fiter_word = &(*forward.begin(trg - 1));
 	    const prob_type* titer_word = &(*transition.begin(trg, next));
@@ -423,7 +420,7 @@ struct LearnHMM : public LearnBase
   {
     const size_type source_size = source.size();
     const size_type target_size = target.size();
-    
+
     hmm.prepare(source, target, ttable, atable, classes_source, classes_target);
     
     hmm.forward_backward(source, target);

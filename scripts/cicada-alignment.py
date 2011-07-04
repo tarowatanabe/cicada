@@ -66,16 +66,16 @@ opt_parser = OptionParser(
     make_option("--last-step",  default=3, action="store", type="int", metavar='STEP', help="last step  (default: 3)"),
     
     ## iteratin
-    make_option("--iteration-cluster", default=50, action="store", type="int", metavar='ITERATION', help="word cluter iterations (default: 50)")
-    make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: 5)")
-    make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: 5)")
+    make_option("--iteration-cluster", default=50, action="store", type="int", metavar='ITERATION', help="word cluter iterations (default: 50)"),
+    make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: 5)"),
+    make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: 5)"),
     
     ## training parameters
-    make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)")
-    make_option("--p0",          default=1e-4, action="store", type="float", metavar='P0', help="parameter for NULL alignment")
-    make_option("--symmetric",   default=None, action="store_true", help="symmetric training")
-    make_option("--posterior",   default=None, action="store_true", help="posterior constrainedx training")
-    make_option("--variational", default=None, action="store_true", help="variational Bayes estimates")
+    make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)"),
+    make_option("--p0",          default=1e-4, action="store", type="float", metavar='P0', help="parameter for NULL alignment"),
+    make_option("--symmetric",   default=None, action="store_true", help="symmetric training"),
+    make_option("--posterior",   default=None, action="store_true", help="posterior constrainedx training"),
+    make_option("--variational", default=None, action="store_true", help="variational Bayes estimates"),
     
     ## option for lexicon
     make_option("--prior-lexicon",   default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
@@ -189,13 +189,13 @@ class Cluster:
         command = cicada.cicada_cluster_word
         
         command += " --input \"%s\""  %(corpus)
-        command += " --outupt \"%s\"" %(name)
+        command += " --output \"%s\"" %(name)
         command += " --cluster %d" %(cluster)
         command += " --iteration %d" %(iteration)
         command += " --threads %d" %(threads)
         
         if debug:
-            command += " --debug=%d" $(debug)
+            command += " --debug=%d" %(debug)
         else:
             command += " --debug"
             
@@ -241,13 +241,20 @@ class Giza:
                  prefix_source_target="",
                  prefix_target_source="",
                  iteration_model1=5,
-                 iteartion_hmm=5,
+                 iteration_hmm=5,
                  prior_lexicon=0.1,
-                 prior_alignemnt=0.1,
+                 prior_alignment=0.1,
                  p0=1e-4,
                  symmetric=None,
                  posterior=None,
-                 variational=None):
+                 variational=None,
+                 threads=8,
+                 debug=0):
+
+        if not os.path.exists(dir_source_target):
+            os.makedirs(dir_source_target)
+        if not os.path.exists(dir_target_source):
+            os.makedirs(dir_target_source)
         
         command = ""
         
@@ -258,19 +265,19 @@ class Giza:
         else:
             raise ValueError, "invalid model iterations"
         
-        command += " --source \"%s\"" %(corpus.target)
-        command += " --target \"%s\"" %(corpus.source)
+        command += " --source \"%s\"" %(corpus.source)
+        command += " --target \"%s\"" %(corpus.target)
 
         if iteration_hmm > 0:
             command += " --classes-source \"%s\"" %(cluster.source.cluster)
             command += " --classes-target \"%s\"" %(cluster.target.cluster)
         
         if iteration_hmm > 0:
-            command += " --outupt-alignment-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz'))
-            command += " --outupt-alignment-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.alignment.final.gz'))
+            command += " --output-alignment-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz'))
+            command += " --output-alignment-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.alignment.final.gz'))
         
-        command += " --outupt-lexicon-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.lexicon.final.gz'))
-        command += " --outupt-lexicon-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.lexicon.final.gz'))
+        command += " --output-lexicon-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.lexicon.final.gz'))
+        command += " --output-lexicon-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.lexicon.final.gz'))
         
         command += " --viterbi-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.A3.final.gz'))
         command += " --viterbi-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.A3.final.gz'))
@@ -353,8 +360,8 @@ giza = Giza(cicada=cicada,
             cluster=prepare,
             dir_source_target=options.giza_e2f,
             dir_target_source=options.giza_f2e,
-            prefix_source_target=corpus.source_tag+'-'+corpus.target_tag,
-            prefix_target_source=corpus.target_tag+'-'+corpus.source_tag,
+            prefix_source_target=corpus.target_tag+'-'+corpus.source_tag,
+            prefix_target_source=corpus.source_tag+'-'+corpus.target_tag,
             iteration_model1=options.iteration_model1,
             iteration_hmm=options.iteration_hmm,
             prior_lexicon=options.prior_lexicon,
@@ -362,7 +369,9 @@ giza = Giza(cicada=cicada,
             p0=options.p0,
             symmetric=options.symmetric,
             posterior=options.posterior,
-            variational=options.variational)
+            variational=options.variational,
+            threads=options.threads,
+            debug=options.debug)
 
 ## run giza++ in two directions
 if options.first_step <= 2 and options.last_step >= 2:
