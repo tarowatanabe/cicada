@@ -273,14 +273,24 @@ class Giza:
             command += " --classes-target \"%s\"" %(cluster.target.cluster)
         
         if iteration_hmm > 0:
-            command += " --output-alignment-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz'))
-            command += " --output-alignment-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.alignment.final.gz'))
+            
+            self.alignment_source_target = os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz')
+            self.alignment_target_source = os.path.join(dir_target_source, prefix_target_source + '.alignment.final.gz')
+
+            command += " --output-alignment-source-target \"%s\"" %(self.alignment_source_target)
+            command += " --output-alignment-target-source \"%s\"" %(self.alignment_target_source)
+            
+        self.lexicon_source_target = os.path.join(dir_source_target, prefix_source_target + '.lexicon.final.gz')
+        self.lexicon_target_source = os.path.join(dir_target_source, prefix_target_source + '.lexicon.final.gz')
         
-        command += " --output-lexicon-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.lexicon.final.gz'))
-        command += " --output-lexicon-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.lexicon.final.gz'))
+        command += " --output-lexicon-source-target \"%s\"" %(self.lexicon_source_target)
+        command += " --output-lexicon-target-source \"%s\"" %(self.lexicon_target_source)
+
+        self.viterbi_source_target = os.path.join(dir_source_target, prefix_source_target + '.A3.final.gz')
+        self.viterbi_target_source = os.path.join(dir_target_source, prefix_target_source + '.A3.final.gz')
         
-        command += " --viterbi-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.A3.final.gz'))
-        command += " --viterbi-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.A3.final.gz'))
+        command += " --viterbi-source-target \"%s\"" %(self.viterbi_source_target)
+        command += " --viterbi-target-source \"%s\"" %(self.viterbi_target_source)
 
         if iteration_hmm > 0:
             command += " --iteration-hmm %d" %(iteration_hmm)
