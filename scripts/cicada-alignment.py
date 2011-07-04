@@ -272,8 +272,8 @@ class Giza:
         command += " --target \"%s\"" %(corpus.target)
 
         if iteration_hmm > 0:
-            command += " --classes-source \"%s\"" %(cluster.source.cluster)
-            command += " --classes-target \"%s\"" %(cluster.target.cluster)
+            command += " --classes-source \"%s\"" %(compressed_file(cluster.source.cluster))
+            command += " --classes-target \"%s\"" %(compressed_file(cluster.target.cluster))
         
         if iteration_hmm > 0:
             self.alignment_source_target = os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz')
@@ -344,8 +344,8 @@ class AlignmentHeuristic:
             os.makedirs(alignment_dir)
         
         command = cicada.cicada_alignment
-        command += " --source-target \"%s\"" %(giza.viterbi_source_target)
-        command += " --target-source \"%s\"" %(giza.viterbi_target_source)
+        command += " --source-target \"%s\"" %(compressed_file(giza.viterbi_source_target))
+        command += " --target-source \"%s\"" %(compressed_file(giza.viterbi_target_source))
         
         self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
 
@@ -416,15 +416,15 @@ class AlignmentPosterior:
         command += " --target \"%s\"" %(corpus.target)
 
         if learn_hmm:
-            command += " --classes-source \"%s\"" %(cluster.source.cluster)
-            command += " --classes-target \"%s\"" %(cluster.target.cluster)
+            command += " --classes-source \"%s\"" %(compressed_file(cluster.source.cluster))
+            command += " --classes-target \"%s\"" %(compressed_file(cluster.target.cluster))
 
-        command += " --lexicon-source-target \"%s\"" %(giza.lexicon_source_target)
-        command += " --lexicon-target-source \"%s\"" %(giza.lexicon_target_source)
+        command += " --lexicon-source-target \"%s\"" %(compressed_file(giza.lexicon_source_target))
+        command += " --lexicon-target-source \"%s\"" %(compressed_file(giza.lexicon_target_source))
 
         if learn_hmm:
-            command += " --alignment-source-target \"%s\"" %(giza.alignment_source_target)
-            command += " --alignment-target-source \"%s\"" %(giza.alignment_target_source)
+            command += " --alignment-source-target \"%s\"" %(compressed_file(giza.alignment_source_target))
+            command += " --alignment-target-source \"%s\"" %(compressed_file(giza.alignment_target_source))
         
         self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
         
