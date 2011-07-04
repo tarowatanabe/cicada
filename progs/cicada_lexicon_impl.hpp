@@ -185,8 +185,10 @@ struct atable_type
     difference_map_type& diffs = const_cast<cache_set_type&>(caches)[classes][range];
     if (diffs.empty()) {
       double sum = 0.0;
+      
+      count_dict_type::const_iterator aiter = atable.find(classes);
+      
       for (index_type i = range.first; i != range.second; ++ i) {
-	count_dict_type::const_iterator aiter = atable.find(classes);
 	const double count = (aiter != atable.end() ? aiter->second[i] + prior : prior);
 	
 	diffs[i] = count;
