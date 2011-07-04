@@ -19,15 +19,8 @@
 
 struct LearnHMM : public LearnBase
 {
-  LearnHMM(const ttable_type& __ttable_source_target,
-	   const ttable_type& __ttable_target_source,
-	   const atable_type& __atable_source_target,
-	   const atable_type& __atable_target_source,
-	   const classes_type& __classes_source,
-	   const classes_type& __classes_target)
-    : LearnBase(__ttable_source_target, __ttable_target_source,
-		__atable_source_target, __atable_target_source,
-		__classes_source, __classes_target) {}
+  LearnHMM(const LearnBase& __base)
+    : LearnBase(__base) {}
   
 
   struct HMMData
@@ -471,15 +464,8 @@ struct LearnHMM : public LearnBase
 
 struct LearnHMMPosterior : public LearnBase
 {
-  LearnHMMPosterior(const ttable_type& __ttable_source_target,
-		    const ttable_type& __ttable_target_source,
-		    const atable_type& __atable_source_target,
-		    const atable_type& __atable_target_source,
-		    const classes_type& __classes_source,
-		    const classes_type& __classes_target)
-    : LearnBase(__ttable_source_target, __ttable_target_source,
-		__atable_source_target, __atable_target_source,
-		__classes_source, __classes_target) {}
+  LearnHMMPosterior(const LearnBase& __base)
+    : LearnBase(__base) {}
 
   typedef LearnHMM::hmm_data_type hmm_data_type;
   
@@ -584,15 +570,8 @@ struct LearnHMMPosterior : public LearnBase
 
 struct LearnHMMSymmetric : public LearnBase
 {
-  LearnHMMSymmetric(const ttable_type& __ttable_source_target,
-		    const ttable_type& __ttable_target_source,
-		    const atable_type& __atable_source_target,
-		    const atable_type& __atable_target_source,
-		    const classes_type& __classes_source,
-		    const classes_type& __classes_target)
-    : LearnBase(__ttable_source_target, __ttable_target_source,
-		__atable_source_target, __atable_target_source,
-		__classes_source, __classes_target) {}
+  LearnHMMSymmetric(const LearnBase& __base)
+    : LearnBase(__base) {}
 
   typedef LearnHMM::hmm_data_type hmm_data_type;
   
@@ -641,15 +620,8 @@ struct LearnHMMSymmetric : public LearnBase
 
 struct LearnHMMSymmetricPosterior : public LearnBase
 {
-  LearnHMMSymmetricPosterior(const ttable_type& __ttable_source_target,
-			     const ttable_type& __ttable_target_source,
-			     const atable_type& __atable_source_target,
-			     const atable_type& __atable_target_source,
-			     const classes_type& __classes_source,
-			     const classes_type& __classes_target)
-    : LearnBase(__ttable_source_target, __ttable_target_source,
-		__atable_source_target, __atable_target_source,
-		__classes_source, __classes_target) {}
+  LearnHMMSymmetricPosterior(const LearnBase& __base)
+    : LearnBase(__base) {}
   
   typedef LearnHMM::hmm_data_type hmm_data_type;
   typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > phi_set_type;

@@ -84,9 +84,6 @@ Implement RIBES for mteval
    Can we implement RIBES feature...?
    It is global in that we have to perform "alignment" as in METEOR...
 
-Support HMM word alignment training found in nicttm so that we can completely deprecate nicttm!
-   Add MPI version of Model 1/HMM training?
-
 Use parse-cky inside parse-coarse instead of compose-cky for (potentially) faster parsing with less memory consumption
 
 Add incremental version of MERT?
@@ -94,3 +91,5 @@ Add incremental version of MERT?
 reimplement liblinear functionality...???
    liblinear does not allow starting from an intermediata state, like alpha from previous iterations
    liblinear does not run in threading
+
+Add MPI version of Model1/HMM alignment?

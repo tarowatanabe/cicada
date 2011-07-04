@@ -482,15 +482,8 @@ struct TaskLearn : public Learner
   typedef utils::lockfree_list_queue<bitext_set_type, std::allocator<bitext_set_type> > queue_type;
   
   TaskLearn(queue_type& __queue,
-	    const ttable_type& ttable_source_target,
-	    const ttable_type& ttable_target_source,
-	    const atable_type& atable_source_target,
-	    const atable_type& atable_target_source,
-	    const classes_type& classes_source,
-	    const classes_type& classes_target)
-    : Learner(ttable_source_target, ttable_target_source,
-	      atable_source_target, atable_target_source,
-	      classes_source, classes_target),
+	    const LearnBase& __base)
+    : Learner(__base),
       queue(__queue) {}
   
   void operator()()
@@ -536,9 +529,9 @@ void learn(const int iteration,
   
   queue_type       queue(threads * 64);
   learner_set_type learners(threads, learner_type(queue,
-						  ttable_source_target, ttable_target_source,
-						  atable_source_target, atable_target_source,
-						  classes_source, classes_target));
+						  LearnBase(ttable_source_target, ttable_target_source,
+							    atable_source_target, atable_target_source,
+							    classes_source, classes_target)));
   
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)

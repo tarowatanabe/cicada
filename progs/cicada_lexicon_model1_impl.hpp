@@ -15,9 +15,8 @@
 
 struct LearnModel1 : public LearnBase
 {
-  LearnModel1(const ttable_type& __ttable_source_target,
-	      const ttable_type& __ttable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source) {}
+  LearnModel1(const LearnBase& __base)
+    : LearnBase(__base) {}
   
   typedef std::vector<double, std::allocator<double> > prob_set_type;
   
@@ -89,9 +88,8 @@ struct LearnModel1 : public LearnBase
 
 struct LearnModel1Posterior : public LearnBase
 {
-  LearnModel1Posterior(const ttable_type& __ttable_source_target,
-		       const ttable_type& __ttable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source) {}
+  LearnModel1Posterior(const LearnBase& __base)
+    : LearnBase(__base) {}  
 
   typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
   typedef std::vector<prob_type, std::allocator<prob_type> > prob_set_type;
@@ -211,10 +209,9 @@ struct LearnModel1Posterior : public LearnBase
 
 struct LearnModel1Symmetric : public LearnBase
 {
-  LearnModel1Symmetric(const ttable_type& __ttable_source_target,
-		       const ttable_type& __ttable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source) {}
-      
+  LearnModel1Symmetric(const LearnBase& __base)
+    : LearnBase(__base) {}
+  
   typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
   typedef std::vector<double, std::allocator<double> > prob_set_type;
   
@@ -346,10 +343,9 @@ struct LearnModel1Symmetric : public LearnBase
 
 struct LearnModel1SymmetricPosterior : public LearnBase
 {
-  LearnModel1SymmetricPosterior(const ttable_type& __ttable_source_target,
-				const ttable_type& __ttable_target_source)
-    : LearnBase(__ttable_source_target, __ttable_target_source) {}
-
+  LearnModel1SymmetricPosterior(const LearnBase& __base)
+    : LearnBase(__base) {}
+  
   typedef utils::vector2<prob_type, std::allocator<prob_type> > posterior_set_type;
   
   void operator()(const sentence_type& source, const sentence_type& target)
