@@ -460,6 +460,8 @@ struct LearnBase
 	    const ttable_type& __ttable_target_source)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
+      ttable_counts_source_target(__ttable_source_target.smooth),
+      ttable_counts_target_source(__ttable_target_source.smooth),
       classes_source(__classes()),
       classes_target(__classes()),
       objective_source_target(0),
@@ -474,8 +476,12 @@ struct LearnBase
 	    const classes_type& __classes_target)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
+      ttable_counts_source_target(__ttable_source_target.smooth),
+      ttable_counts_target_source(__ttable_target_source.smooth),
       atable_source_target(__atable_source_target),
       atable_target_source(__atable_target_source),
+      atable_counts_source_target(__atable_source_target.prior),
+      atable_counts_target_source(__atable_target_source.prior),
       classes_source(__classes_source),
       classes_target(__classes_target),
       objective_source_target(0),

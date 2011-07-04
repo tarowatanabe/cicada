@@ -72,14 +72,14 @@ opt_parser = OptionParser(
     
     ## training parameters
     make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)"),
-    make_option("--p0",          default=1e-4, action="store", type="float", metavar='P0', help="parameter for NULL alignment"),
+    make_option("--p0",          default=1e-3, action="store", type="float", metavar='P0', help="parameter for NULL alignment (default: 1e-3)"),
     make_option("--symmetric",   default=None, action="store_true", help="symmetric training"),
     make_option("--posterior",   default=None, action="store_true", help="posterior constrained training"),
     make_option("--variational", default=None, action="store_true", help="variational Bayes estimates"),
     
     ## option for lexicon
-    make_option("--prior-lexicon",   default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
-    make_option("--prior-alignment", default=0.1, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 0.1)"),
+    make_option("--prior-lexicon",   default=1e-2, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 1e-2)"),
+    make_option("--prior-alignment", default=1e-4, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 1e-4)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
