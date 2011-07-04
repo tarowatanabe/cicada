@@ -235,7 +235,10 @@ class Prepare:
 
 class Giza:
 
-    def __init__(self, cicada=None, corpus=None, cluster=None,
+    def __init__(self,
+                 cicada=None,
+                 corpus=None,
+                 cluster=None,
                  dir_source_target="",
                  dir_target_source="",
                  prefix_source_target="",
@@ -273,7 +276,6 @@ class Giza:
             command += " --classes-target \"%s\"" %(cluster.target.cluster)
         
         if iteration_hmm > 0:
-            
             self.alignment_source_target = os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz')
             self.alignment_target_source = os.path.join(dir_target_source, prefix_target_source + '.alignment.final.gz')
 
@@ -305,10 +307,73 @@ class Giza:
         if variational:
             command += " --variational-bayes"
         
+        self.p0 = p0
+        self.prior_lexicon = prior_lexicon
+        self.prior_alignment = prior_alignment
+        
         command += " --p0 %.20g" %(p0)
         command += " --prior-lexicon %.20g"   %(prior_lexicon)
         if iteration_hmm > 0:
             command += " --prior-alignment %.20g" %(prior_alignment)
+                    
+        command += " --threads %d" %(threads)
+
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+    def run(self):
+        run_command(self.command)
+
+class AlignmentHeuristic:
+
+    def __init__(self,
+                 cicada=None,
+                 corpus=None,
+                 cluster=None,
+                 giza=None,
+                 alignment_dir="",
+                 alignment="grow-diag-final-and",
+                 threads=8,
+                 debug=0):
+
+        if not os.path.exists(alignment_dir):
+            os.makedirs(alignment_dir)
+        
+        command = cicada.cicada_alignment
+        command += " --source-target \"%s\"" %(giza.viterbi_source_target)
+        command += " --target-source \"%s\"" %(giza.viterbi_target_source)
+        
+        self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
+
+        command += " --output \"%s\"" %(self.alignment)
+        
+        if 'f2e' in alignment:
+            command += " --f2e"
+        if 'e2f' in alignment:
+            command += " --e2f"
+        
+        if 'union' in alignment:
+            command += " --union"
+        elif 'intersection' in alignment:
+            command += " --intersection"
+        elif 'grow' in alignment:
+            command += " --grow"
+            if 'diag' in alignment:
+                command += ' --diag'
+            if 'final' in alignment:
+                if 'final-and' in alignment:
+                    command += " --final-and"
+                else:
+                    command += " --final"
+
+        if 'itg' in alignment:
+            command += " --itg"
+        if 'max-match' in alignment:
+            command += " --max-match"
         
         command += " --threads %d" %(threads)
 
@@ -322,6 +387,80 @@ class Giza:
     def run(self):
         run_command(self.command)
 
+
+class AlignmentPosterior:
+
+    def __init__(self,
+                 cicada=None,
+                 corpus=None,
+                 cluster=None,
+                 giza=None,
+                 alignment_dir="",
+                 alignment="grow-diag-final-and",
+                 threads=8,
+                 debug=0):
+
+        if not os.path.exists(alignment_dir):
+            os.makedirs(alignment_dir)
+
+        learn_hmm = None
+        if hasattr(giza, 'alignment_source_target'):
+            learn_hmm = 1
+            
+        
+        command = cicada.cicada_lexicon_model1
+        if learn_hmm:
+            command = cicada.cicada_lexicon_hmm
+           
+        command += " --source \"%s\"" %(corpus.source)
+        command += " --target \"%s\"" %(corpus.target)
+
+        if learn_hmm:
+            command += " --classes-source \"%s\"" %(cluster.source.cluster)
+            command += " --classes-target \"%s\"" %(cluster.target.cluster)
+
+        command += " --lexicon-source-target \"%s\"" %(giza.lexicon_source_target)
+        command += " --lexicon-target-source \"%s\"" %(giza.lexicon_target_source)
+
+        if learn_hmm:
+            command += " --alignment-source-target \"%s\"" %(giza.alignment_source_target)
+            command += " --alignment-target-source \"%s\"" %(giza.alignment_target_source)
+        
+        self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
+        
+        command += " --viterbi-source-target \"%s\"" %(self.alignment)
+        command += " --viterbi-target-source /dev/null"
+
+        if learn_hmm:
+            command += " --iteration-model1 0"
+            command += " --iteration-hmm 0"
+        else:
+            command += " --iteration 0"
+            
+        command += " --p0 %.20g" %(giza.p0)
+        command += " --prior-lexicon %.20g"   %(giza.prior_lexicon)
+        if learn_hmm:
+            command += " --prior-alignment %.20g" %(giza.prior_alignment)
+
+        if 'itg' in alignment:
+            command += " --itg"
+        if 'max-match' in alignment:
+            command += " --max-match"
+
+        ## dump in moses mode
+        command += " --moses"
+        
+        command += " --threads %d" %(threads)
+
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+    def run(self):
+        run_command(self.command)
 
 (options, args) = opt_parser.parse_args()
 
@@ -389,15 +528,29 @@ if options.first_step <= 2 and options.last_step >= 2:
     giza.run()
     print "(2) running giza finished @", time.ctime()
 
-#alignment=None
-#if "posterior" in options.alignment:
-#    alignment = AlignmentPosterior()
-#else:
-#    alignment = AlignmentHeuristic()
+alignment=None
+if "posterior" in options.alignment:
+    alignment = AlignmentPosterior(cicada=cicada,
+                                   corpus=corpus,
+                                   cluster=prepare,
+                                   giza=giza,
+                                   alignment_dir=options.alignment_dir,
+                                   alignment=options.alignment,
+                                   threads=options.threads,
+                                   debug=options.debug)
+else:
+    alignment = AlignmentHeuristic(cicada=cicada,
+                                   corpus=corpus,
+                                   cluster=prepare,
+                                   giza=giza,
+                                   alignment_dir=options.alignment_dir,
+                                   alignment=options.alignment,
+                                   threads=options.threads,
+                                   debug=options.debug)
 
-#if options.first_step <= 3 and options.last_step >= 3:
-#    print "(3) generate word alignment started  @", time.ctime()
-#    alignment.run()
-#    print "(3) generate word alignment finished @", time.ctime()
+if options.first_step <= 3 and options.last_step >= 3:
+    print "(3) generate word alignment started  @", time.ctime()
+    alignment.run()
+    print "(3) generate word alignment finished @", time.ctime()
 
 
