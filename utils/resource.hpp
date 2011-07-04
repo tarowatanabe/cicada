@@ -6,6 +6,8 @@
 #ifndef __UTILS__RESOURCE__HPP__
 #define __UTILS__RESOURCE__HPP__ 1
 
+#include <cstdio>
+
 #include <sys/time.h>
 #include <sys/resource.h>
 
