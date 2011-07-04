@@ -320,6 +320,9 @@ struct ttable_type
   
   double operator()(const word_type& source, const word_type& target) const
   {
+    if (source == vocab_type::BOS || source == vocab_type::EOS || target == vocab_type::BOS || target == vocab_type::EOS)
+      return source == target;
+    
     if (! ttable.exists(source.id())) return smooth;
     
     const count_map_type& counts = ttable[source.id()];

@@ -115,11 +115,11 @@ struct LearnHMM : public LearnBase
       // compute emission table...
       emission(0, 0) = 1.0;
       emission(target_size + 2 - 1, source_size + 2 - 1) = 1.0;
-      for (int trg = 1; trg <= target_size; ++ trg) {
+      for (int trg = 1; trg <= static_cast<int>(target_size); ++ trg) {
 	
 	// translation into non-NULL word
 	prob_type* eiter = &(*emission.begin(trg)) + 1;
-	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	for (size_type src = 1; src <= source_size; ++ src, ++ eiter)
 	  (*eiter) = ttable(source[src], target[trg]);
 	
 	prob_type* eiter_first = &(*emission.begin(trg)) + source_size + 2;
