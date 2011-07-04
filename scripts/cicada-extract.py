@@ -714,6 +714,10 @@ class ExtractScore(Extract):
 
 (options, args) = opt_parser.parse_args()
 
+if options.root_dir:
+    if not os.path.exists(options.root_dir):
+	os.makedirs(options.root_dir)
+
 if not options.model_dir:
     options.model_dir = os.path.join(options.root_dir, "model")
 if not options.lexical_dir:

@@ -1,5 +1,5 @@
 2011-7-x
-??
+Added lexicon learning by HMM + a script to perform bidirectional alignment combination
 
 2011-6-30
 Bugfix for kbest oracle for taking unique

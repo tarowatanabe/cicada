@@ -1,0 +1,384 @@
+#!/usr/bin/env python
+#
+#  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+#
+### a wrapper script (similar to phrase-extract in moses)
+### we support only "extraction" meaning only step 5 and 6
+### TODO: use argparse for command-lines...?
+
+import threading
+import multiprocessing
+
+import time
+import sys
+import os, os.path
+import string
+import re
+import subprocess
+
+from optparse import OptionParser, make_option
+
+opt_parser = OptionParser(
+    option_list=[
+	
+    # output directory/filename prefix
+    make_option("--root-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="root directory for outputs"),
+    make_option("--corpus-dir", default="", action="store", type="string",
+                metavar="PREFIX", help="corpus directory (default: ${root_dir}/corpus)"),
+    make_option("--giza-f2e", default="", action="store", type="string",
+                metavar="DIRECTORY", help="giza directory for P(f|e) (default: ${root_dir}/giza.${f}-${e})"),
+    make_option("--giza-e2f", default="", action="store", type="string",
+                metavar="DIRECTORY", help="giza directory for P(e|f) (default: ${root_dir}/giza.${e}-${f})"),
+    make_option("--model-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="model directory (default: ${root_dir}/model)"),
+    make_option("--alignment-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="alignment directory (default: ${model_dir})"),
+    make_option("--lexical-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir)"),
+    
+    ### source/target flags
+    make_option("--f", default="F", action="store", type="string",
+                metavar="SUFFIX", help="source (or 'French')  language suffix for training corpus"),
+    make_option("--e", default="E", action="store", type="string",
+                metavar="SUFFIX", help="target (or 'English') language suffix for training corpus"),
+    ### span...
+    make_option("--sf", default="SF", action="store", type="string",
+                metavar="SUFFIX", help="source (or 'French')  span suffix for training corpus"),
+    make_option("--se", default="SE", action="store", type="string",
+                metavar="SUFFIX", help="target (or 'English') span suffix for training corpus"),
+    ### forest!
+    make_option("--ff", default="SF", action="store", type="string",
+                metavar="SUFFIX", help="source (or 'French')  forest suffix for training corpus"),
+    make_option("--fe", default="SE", action="store", type="string",
+                metavar="SUFFIX", help="target (or 'English') forest suffix for training corpus"),
+    
+    # data prefix
+    make_option("--corpus", default="corpus", action="store", type="string",
+                help="bilingual trainging corpus"),
+
+    # alignment method
+    make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
+                help="alignment methods (default: grow-diag-final-and)"),
+    
+    # steps
+    make_option("--first-step", default=1, action="store", type="int", metavar='STEP', help="first step (default: 1)"),
+    make_option("--last-step",  default=3, action="store", type="int", metavar='STEP', help="last step  (default: 3)"),
+    
+    ## iteratin
+    make_option("--iteration-cluster", default=50, action="store", type="int", metavar='ITERATION', help="word cluter iterations (default: 50)")
+    make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: 5)")
+    make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: 5)")
+    
+    ## training parameters
+    make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)")
+    make_option("--p0",          default=1e-4, action="store", type="float", metavar='P0', help="parameter for NULL alignment")
+    make_option("--symmetric",   default=None, action="store_true", help="symmetric training")
+    make_option("--posterior",   default=None, action="store_true", help="posterior constrainedx training")
+    make_option("--variational", default=None, action="store_true", help="variational Bayes estimates")
+    
+    ## option for lexicon
+    make_option("--prior-lexicon",   default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
+    make_option("--prior-alignment", default=0.1, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 0.1)"),
+
+    # CICADA Toolkit directory
+    make_option("--cicada-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="cicada directory"),
+    
+    make_option("--threads", default=2, action="store", type="int",
+                help="# of thrads for thread-based parallel processing"),
+
+    ## debug messages
+    make_option("--debug", default=0, action="store", type="int"),
+    ])
+
+
+### dump to stderr
+stdout = sys.stdout
+sys.stdout = sys.stderr
+
+def run_command(command):
+    fp = os.popen(command)
+    while 1:
+        data = fp.read(1)
+        if not data: break
+        stdout.write(data)
+
+def compressed_file(file):
+    if not file:
+        return file
+    if os.path.exists(file):
+        return file
+    if os.path.exists(file+'.gz'):
+	return file+'.gz'
+    if os.path.exists(file+'.bz2'):
+	return file+'.bz2'
+    (base, ext) = os.path.splitext(file)
+    if ext == '.gz' or ext == '.bz2':
+	if os.path.exists(base):
+	    return base
+    return file
+
+
+class CICADA:
+    def __init__(self, dir=""):
+
+	self.dir = dir	
+	if not dir: return
+	
+	if not os.path.exists(self.dir):
+	    raise ValueError, self.dir + " does not exist"
+	
+	self.dir = os.path.realpath(self.dir)
+        
+	self.bindirs = []
+	for dir in ('bin', 'progs', 'scripts'): 
+	    bindir = os.path.join(self.dir, dir)
+	    if os.path.exists(bindir) and os.path.isdir(bindir):
+		self.bindirs.append(bindir)
+        self.bindirs.append(self.dir)
+	
+        for binprog in ('cicada_cluster_word',
+                        ## step 1
+                        'cicada_lexicon_model1',
+                        'cicada_lexicon_hmm',
+                        'cicada_lexicon_dice',
+                        ## step2
+                        'cicada_alignment', 
+                        ## step 3
+                        ):
+	    
+	    for bindir in self.bindirs:
+		prog = os.path.join(bindir, binprog)
+		if os.path.exists(prog):
+		    setattr(self, binprog, prog)
+		    break
+	    if not hasattr(self, binprog):
+		raise ValueError, binprog + ' does not exist'
+        
+class Corpus:
+
+    def __init__(self, corpus_dir="", corpus="", f="", e="", sf="", se="", ff="", fe=""):
+
+        self.source_tag = f
+        self.target_tag = e
+
+        self.source_span_tag = sf
+        self.target_span_tag = se
+
+        self.source_forest_tag = ff
+        self.target_forest_tag = fe
+        
+        self.source = compressed_file(corpus+'.'+f)
+        self.target = compressed_file(corpus+'.'+e)
+        
+        self.source_span = compressed_file(corpus+'.'+sf)
+        self.target_span = compressed_file(corpus+'.'+se)
+        
+        self.source_forest = compressed_file(corpus+'.'+ff)
+        self.target_forest = compressed_file(corpus+'.'+fe)
+
+        self.corpus_dir = corpus_dir
+
+class Cluster:
+
+    def __init__(self, cicada=None, corpus="", name="", cluster=64, iteration=64, threads=8, debug=0):
+        
+        self.cicada  = cicada
+        
+        command = cicada.cicada_cluster_word
+        
+        command += " --input \"%s\""  %(corpus)
+        command += " --outupt \"%s\"" %(name)
+        command += " --cluster %d" %(cluster)
+        command += " --iteration %d" %(iteration)
+        command += " --threads %d" %(threads)
+        
+        if debug:
+            command += " --debug=%d" $(debug)
+        else:
+            command += " --debug"
+            
+        self.command = command
+        self.cluster = name
+    
+    def run(self):
+        run_command(self.command)
+
+class Prepare:
+    
+    def __init__(self, cicada=None, corpus=None, cluster=64, iteration=64, threads=8, debug=0):
+        
+        if not os.path.exists(corpus.corpus_dir):
+            os.makedirs(corpus.corpus_dir)
+
+        self.corpus = corpus
+        self.source = Cluster(cicada=cicada,
+                              corpus=corpus.source,
+                              name=os.path.join(corpus.corpus_dir, corpus.source_tag+'.vcb.classes'),
+                              cluster=cluster,
+                              iteration=iteration,
+                              threads=threads,
+                              debug=debug)
+        
+        self.target = Cluster(cicada=cicada,
+                              corpus=corpus.target,
+                              name=os.path.join(corpus.corpus_dir, corpus.target_tag+'.vcb.classes'),
+                              cluster=cluster,
+                              iteration=iteration,
+                              threads=threads,
+                              debug=debug)
+    
+    def run(self):
+        self.source.run()
+        self.target.run()
+
+class Giza:
+
+    def __init__(self, cicada=None, corpus=None, cluster=None,
+                 dir_source_target="",
+                 dir_target_source="",
+                 prefix_source_target="",
+                 prefix_target_source="",
+                 iteration_model1=5,
+                 iteartion_hmm=5,
+                 prior_lexicon=0.1,
+                 prior_alignemnt=0.1,
+                 p0=1e-4,
+                 symmetric=None,
+                 posterior=None,
+                 variational=None):
+        
+        command = ""
+        
+        if iteration_hmm > 0:
+            command = cicada.cicada_lexicon_hmm
+        elif iteration_model1 > 0:
+            command = cicada.cicada_lexicon_model1
+        else:
+            raise ValueError, "invalid model iterations"
+        
+        command += " --source \"%s\"" %(corpus.target)
+        command += " --target \"%s\"" %(corpus.source)
+
+        if iteration_hmm > 0:
+            command += " --classes-source \"%s\"" %(cluster.source.cluster)
+            command += " --classes-target \"%s\"" %(cluster.target.cluster)
+        
+        if iteration_hmm > 0:
+            command += " --outupt-alignment-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.alignment.final.gz'))
+            command += " --outupt-alignment-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.alignment.final.gz'))
+        
+        command += " --outupt-lexicon-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.lexicon.final.gz'))
+        command += " --outupt-lexicon-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.lexicon.final.gz'))
+        
+        command += " --viterbi-source-target \"%s\"" %(os.path.join(dir_source_target, prefix_source_target + '.A3.final.gz'))
+        command += " --viterbi-target-source \"%s\"" %(os.path.join(dir_target_source, prefix_target_source + '.A3.final.gz'))
+
+        if iteration_hmm > 0:
+            command += " --iteration-hmm %d" %(iteration_hmm)
+            command += " --iteration-model1 %d" %(iteration_model1)
+        else:
+            command += " --iteration %d" %(iteration_model1)
+
+        if symmetric:
+            command += " --symmetric"
+        if posterior:
+            command += " --posterior"
+        if variational:
+            command += " --variational-bayes"
+        
+        command += " --p0 %.20g" %(p0)
+        command += " --prior-lexicon %.20g"   %(prior_lexicon)
+        if iteration_hmm > 0:
+            command += " --prior-alignment %.20g" %(prior_alignment)
+        
+        command += " --threads %d" %(threads)
+
+        if debug:
+            command += " --debug=%d" %(debug)
+        else:
+            command += " --debug"
+        
+        self.command = command
+
+    def run(self):
+        run_command(self.command)
+
+
+(options, args) = opt_parser.parse_args()
+
+if options.root_dir:
+    if not os.path.exists(options.root_dir):
+	os.makedirs(options.root_dir)
+
+if not options.corpus_dir:
+    options.corpus_dir = os.path.join(options.root_dir, "corpus")
+if not options.giza_f2e:
+    options.giza_f2e = os.path.join(options.root_dir, "giza.%s-%s" %(options.f, options.e))
+if not options.giza_e2f:
+    options.giza_e2f = os.path.join(options.root_dir, "giza.%s-%s" %(options.e, options.f))
+if not options.model_dir:
+    options.model_dir = os.path.join(options.root_dir, "model")
+if not options.lexical_dir:
+    options.lexical_dir = options.model_dir
+if not options.alignment_dir:
+    options.alignment_dir = options.model_dir
+
+cicada = CICADA(options.cicada_dir)
+
+corpus = Corpus(corpus_dir=options.corpus_dir,
+                corpus=options.corpus,
+                f=options.f,
+                e=options.e,
+                sf=options.sf,
+                se=options.se,
+                ff=options.ff,
+                fe=options.fe)
+
+prepare = Prepare(cicada=cicada,
+                  corpus=corpus,
+                  cluster=options.cluster,
+                  iteration=options.iteration_cluster,
+                  threads=options.threads,
+                  debug=options.debug)
+
+if options.first_step <= 1 and options.last_step >= 1:
+    print "(1) preparing corpus started  @", time.ctime()
+    prepare.run()
+    print "(1) preparing corpus finished @", time.ctime()
+
+giza = Giza(cicada=cicada,
+            corpus=corpus,
+            cluster=prepare,
+            dir_source_target=options.giza_e2f,
+            dir_target_source=options.giza_f2e,
+            prefix_source_target=corpus.source_tag+'-'+corpus.target_tag,
+            prefix_target_source=corpus.target_tag+'-'+corpus.source_tag,
+            iteration_model1=options.iteration_model1,
+            iteration_hmm=options.iteration_hmm,
+            prior_lexicon=options.prior_lexicon,
+            prior_alignment=options.prior_alignment,
+            p0=options.p0,
+            symmetric=options.symmetric,
+            posterior=options.posterior,
+            variational=options.variational)
+
+## run giza++ in two directions
+if options.first_step <= 2 and options.last_step >= 2:
+    print "(2) running giza started  @", time.ctime()
+    giza.run()
+    print "(2) running giza finished @", time.ctime()
+
+#alignment=None
+#if "posterior" in options.alignment:
+#    alignment = AlignmentPosterior()
+#else:
+#    alignment = AlignmentHeuristic()
+
+#if options.first_step <= 3 and options.last_step >= 3:
+#    print "(3) generate word alignment started  @", time.ctime()
+#    alignment.run()
+#    print "(3) generate word alignment finished @", time.ctime()
+
+
