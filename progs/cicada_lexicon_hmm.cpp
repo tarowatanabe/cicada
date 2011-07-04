@@ -38,7 +38,8 @@ path_type output_alignment_target_source_file;
 path_type viterbi_source_target_file;
 path_type viterbi_target_source_file;
 
-int iteration = 5;
+int iteration_model1 = 5;
+int iteration_hmm = 5;
 
 bool symmetric_mode = false;
 bool posterior_mode = false;
@@ -50,8 +51,10 @@ bool max_match_mode = false;
 
 // parameter...
 double p0    = 1e-4;
-double prior = 0.1;
-double smooth = 1e-7;
+double prior_lexicon = 0.1;
+double smooth_lexicon = 1e-40;
+double prior_alignment = 0.1;
+double smooth_alignment = 1e-40;
 
 double threshold = 0.0;
 
@@ -107,7 +110,7 @@ int main(int argc, char ** argv)
     
     workers_read.join_all();
     
-    if (iteration > 0) {
+    if (iteration_model1 > 0 || iteration_hmm > 0) {
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
@@ -149,16 +152,16 @@ int main(int argc, char ** argv)
     // final writing
     boost::thread_group workers_write;
     
-    if (! output_source_target_file.empty())
+    if (! output_lexicon_source_target_file.empty())
       workers_write.add_thread(new boost::thread(boost::bind(write_lexicon,
-							     boost::cref(output_source_target_file),
+							     boost::cref(output_lexicon_source_target_file),
 							     boost::cref(ttable_source_target),
 							     boost::cref(aligned_source_target),
 							     threshold)));
     
-    if (! output_target_source_file.empty())
+    if (! output_lexicon_target_source_file.empty())
       workers_write.add_thread(new boost::thread(boost::bind(write_lexicon,
-							     boost::cref(output_target_source_file),
+							     boost::cref(output_lexicon_target_source_file),
 							     boost::cref(ttable_target_source),
 							     boost::cref(aligned_target_source),
 							     threshold)));
@@ -300,7 +303,7 @@ void learn(ttable_type& ttable_source_target,
   queue_type       queue(threads * 64);
   learner_set_type learners(threads, learner_type(queue, ttable_source_target, ttable_target_source));
   
-  for (int iter = 0; iter < iteration; ++ iter) {
+  for (int iter = 0; iter < iteration_model1; ++ iter) {
     if (debug)
       std::cerr << "iteration: " << iter << std::endl;
 
@@ -729,27 +732,34 @@ void options(int argc, char** argv)
     
     ("lexicon-source-target", po::value<path_type>(&lexicon_source_target_file), "lexicon model for P(target | source)")
     ("lexicon-target-source", po::value<path_type>(&lexicon_target_source_file), "lexicon model for P(source | target)")
-    
-    ("output-source-target", po::value<path_type>(&output_source_target_file), "lexicon model output for P(target | source)")
-    ("output-target-source", po::value<path_type>(&output_target_source_file), "lexicon model output for P(source | target)")
+    ("alignment-source-target", po::value<path_type>(&alignment_source_target_file), "alignment model for P(target | source)")
+    ("alignment-target-source", po::value<path_type>(&alignment_target_source_file), "alignment model for P(source | target)")
+
+    ("output-lexicon-source-target", po::value<path_type>(&output_lexicon_source_target_file), "lexicon model output for P(target | source)")
+    ("output-lexicon-target-source", po::value<path_type>(&output_lexicon_target_source_file), "lexicon model output for P(source | target)")
+    ("output-alignment-source-target", po::value<path_type>(&output_alignment_source_target_file), "alignment model output for P(target | source)")
+    ("output-alignment-target-source", po::value<path_type>(&output_alignment_target_source_file), "alignment model output for P(source | target)")
     
     ("viterbi-source-target", po::value<path_type>(&viterbi_source_target_file), "viterbi for P(target | source)")
     ("viterbi-target-source", po::value<path_type>(&viterbi_target_source_file), "viterbi for P(source | target)")
     
-    ("iteration", po::value<int>(&iteration)->default_value(iteration), "max iteration")
+    ("iteration-model1", po::value<int>(&iteration_model1)->default_value(iteration_model1), "max Model1 iteration")
+    ("iteration-hmm", po::value<int>(&iteration_hmm)->default_value(iteration_hmm), "max HMM iteration")
     
-    ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric model1 training")
-    ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained model1 training")
+    ("symmetric",  po::bool_switch(&symmetric_mode),  "symmetric training")
+    ("posterior",  po::bool_switch(&posterior_mode),  "posterior constrained training")
     ("variational-bayes", po::bool_switch(&variational_bayes_mode), "variational Bayes estimates")
     
     ("itg",       po::bool_switch(&itg_mode),       "ITG alignment")
     ("max-match", po::bool_switch(&max_match_mode), "maximum matching alignment")
     ("moses",     po::bool_switch(&moses_mode),     "Moses alignment foramt")
-    
-    ("p0",     po::value<double>(&p0)->default_value(p0),         "parameter for NULL alignment")
-    ("prior",  po::value<double>(&prior)->default_value(prior),   "Dirichlet prior for variational Bayes")
-    ("smooth", po::value<double>(&smooth)->default_value(smooth), "smoothing parameter for uniform distribution")
 
+    ("p0",             po::value<double>(&p0)->default_value(p0),                               "parameter for NULL alignment")
+    ("prior-lexicon",  po::value<double>(&prior_lexicon)->default_value(prior_lexicon),         "Dirichlet prior for variational Bayes")
+    ("smooth-lexicon", po::value<double>(&smooth_lexicon)->default_value(smooth_lexicon),       "smoothing parameter for uniform distribution")
+    ("prior-alignment",  po::value<double>(&prior_alignment)->default_value(prior_alignment),   "Dirichlet prior for variational Bayes")
+    ("smooth-alignment", po::value<double>(&smooth_alignment)->default_value(smooth_alignment), "smoothing parameter for uniform distribution")
+    
     ("threshold", po::value<double>(&threshold)->default_value(threshold), "write with beam-threshold (<= 0.0 implies no beam)")
 
     ("threads", po::value<int>(&threads), "# of threads")
