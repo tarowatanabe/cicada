@@ -74,7 +74,7 @@ opt_parser = OptionParser(
     make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)"),
     make_option("--p0",          default=1e-4, action="store", type="float", metavar='P0', help="parameter for NULL alignment"),
     make_option("--symmetric",   default=None, action="store_true", help="symmetric training"),
-    make_option("--posterior",   default=None, action="store_true", help="posterior constrainedx training"),
+    make_option("--posterior",   default=None, action="store_true", help="posterior constrained training"),
     make_option("--variational", default=None, action="store_true", help="variational Bayes estimates"),
     
     ## option for lexicon
