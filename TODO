@@ -14,7 +14,7 @@ Better MIRA training
     Separate averaging and non-averaging code during optimization...
 
 Systematic symbols:
-  - So forth, we have abuced many symbols, such as |:;+ for binarization, permutation, parent, etc.
+  - So forth, we have abused many symbols, such as |:;+ for binarization, permutation, parent, etc.
     I think it's time to systemacically define symbols so that we can de-binarize, de-parentize etc.
 
 Add head-finder?
@@ -93,3 +93,10 @@ reimplement liblinear functionality...???
    liblinear does not run in threading
 
 Add MPI version of Model1/HMM alignment?
+
+Integrate cicada-alignment.py and cicada-extract.py???
+   Currently, NO, in order to encourange user to select an alternative paths.
+
+Integrate MPI and non-MPI of cicada_learn{,kbest}{,mpi}
+   Use the same gradient,margin computers across mpi and non-mpi applications
+   
