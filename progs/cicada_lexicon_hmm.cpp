@@ -90,8 +90,8 @@ int main(int argc, char ** argv)
     
     threads = utils::bithack::max(threads, 1);
     
-    ttable_type ttable_source_target(smooth);
-    ttable_type ttable_target_source(smooth);
+    ttable_type ttable_source_target(smooth_lexicon);
+    ttable_type ttable_target_source(smooth_lexicon);
 
     atable_type atable_source_target(prior_alignment);
     atable_type atable_target_source(prior_alignment);
@@ -489,7 +489,7 @@ struct TaskLearn : public Learner
 	    const classes_type& classes_source,
 	    const classes_type& classes_target)
     : Learner(ttable_source_target, ttable_target_source,
-	      atable_source_target, atable_target_source
+	      atable_source_target, atable_target_source,
 	      classes_source, classes_target),
       queue(__queue) {}
   
@@ -518,7 +518,7 @@ void learn(const int iteration,
 	   ttable_type& ttable_source_target,
 	   ttable_type& ttable_target_source,
 	   atable_type& atable_source_target,
-	   atable_type& atalbe_target_source,
+	   atable_type& atable_target_source,
 	   const classes_type& classes_source,
 	   const classes_type& classes_target,
 	   aligned_type& aligned_source_target,
@@ -873,7 +873,7 @@ template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
 	     const ttable_type& ttable_target_source,
 	     const atable_type& atable_source_target,
-	     const atable_type& atalbe_target_source,
+	     const atable_type& atable_target_source,
 	     const classes_type& classes_source,
 	     const classes_type& classes_target)
 {

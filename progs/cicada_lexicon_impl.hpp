@@ -443,6 +443,7 @@ struct LearnBase
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+  typedef int       index_type;
 
   static const classes_type& __classes()
   {
@@ -515,6 +516,7 @@ struct ViterbiBase
 {
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
+  typedef int       index_type;
 
   static const classes_type& __classes()
   {
@@ -695,7 +697,7 @@ void read_alignment(const path_type& path, atable_type& align)
   }
 }
 
-void write_alignemnt(const path_type& path, const atable_type& align)
+void write_alignment(const path_type& path, const atable_type& align)
 {
   utils::compress_ostream os(path, 1024 * 1024);
   os.precision(20);

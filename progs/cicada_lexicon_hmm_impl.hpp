@@ -5,6 +5,8 @@
 #ifndef __CICADA_LEXICON_HMM_IMPL__HPP__
 #define __CICADA_LEXICON_HMM_IMPL__HPP__ 1
 
+#include <numeric>
+
 #include "cicada_lexicon_impl.hpp"
 
 #include "utils/vector2_aligned.hpp"
@@ -25,7 +27,7 @@ struct LearnHMM : public LearnBase
 	   const classes_type& __classes_target)
     : LearnBase(__ttable_source_target, __ttable_target_source,
 		__atable_source_target, __atable_target_source,
-		__clsses_source, __classes_target) {}
+		__classes_source, __classes_target) {}
   
 
   struct HMMData
@@ -237,7 +239,7 @@ struct LearnHMM : public LearnBase
       backward(target_size + 2 - 1, source_size + 2 - 1) = 1.0;
       
       for (int trg = target_size + 2 - 2; trg >= 0; -- trg) {
-	const prob_type scale = scale[trg];
+	const prob_type factor_scale = scale[trg];
 	
 	// +1 to exclude BOS
 	const prob_type* niter = &(*backward.begin(trg + 1)) + 1;
@@ -247,7 +249,7 @@ struct LearnHMM : public LearnBase
 	  prob_type*       piter = &(*backward.begin(trg));
 	  const prob_type* titer = &(*transition.begin(trg + 1, next));
 	  
-	  const double factor = (*eiter) * (*niter) * scale;
+	  const double factor = (*eiter) * (*niter) * factor_scale;
 	  if (factor > 0.0) {
 	    const int loop_size = (source_size + 2) * 2;
 	    for (int prev = 0; prev < loop_size - 3; prev += 4) {
@@ -274,8 +276,8 @@ struct LearnHMM : public LearnBase
 	  const int prev_none1 = next;
 	  const int prev_none2 = next + source_size + 2;
 	  
-	  *piter_none1 += (*niter_none) * (*eiter_none) * transition(trg + 1, next_none, prev_none1) * scale;
-	  *piter_none2 += (*niter_none) * (*eiter_none) * transition(trg + 1, next_none, prev_none2) * scale;
+	  *piter_none1 += (*niter_none) * (*eiter_none) * transition(trg + 1, next_none, prev_none1) * factor_scale;
+	  *piter_none2 += (*niter_none) * (*eiter_none) * transition(trg + 1, next_none, prev_none2) * factor_scale;
 	}
       }
     }
@@ -382,8 +384,8 @@ struct LearnHMM : public LearnBase
       mapped_type mapped((source_size + 2) - 1);
       
       for (int trg = 1; trg < target_size + 2; ++ trg) {
-	const prob_type* biter = &(*data.backward.begin(trg)) + 1;
-	const prob_type* eiter = &(*data.emission.begin(trg)) + 1;
+	const prob_type* biter = &(*backward.begin(trg)) + 1;
+	const prob_type* eiter = &(*emission.begin(trg)) + 1;
 	
 	for (int prev = 0; prev < (source_size + 2) - 1; ++ prev)
 	  mapped[prev] = &(counts[std::make_pair(source_class[prev], target_class[trg])]);
@@ -393,10 +395,10 @@ struct LearnHMM : public LearnBase
 	  const prob_type factor_backward = (*biter) * (*eiter);
 	  
 	  if (factor_backward > 0.0) {
-	    const prob_type* fiter_word = &(*data.forward.begin(trg - 1));
-	    const prob_type* titer_word = &(*data.transition.begin(trg, next));
-	    const prob_type* fiter_none = &(*data.forward.begin(trg - 1)) + (source_size + 2);
-	    const prob_type* titer_none = &(*data.transition.begin(trg, next)) + (source_size + 2);
+	    const prob_type* fiter_word = &(*forward.begin(trg - 1));
+	    const prob_type* titer_word = &(*transition.begin(trg, next));
+	    const prob_type* fiter_none = &(*forward.begin(trg - 1)) + (source_size + 2);
+	    const prob_type* titer_none = &(*transition.begin(trg, next)) + (source_size + 2);
 	    
 	    // - 1 to exlude EOS
 	    for (int prev = 0; prev < (source_size + 2) - 1; ++ prev, ++ fiter_word, ++ titer_word, ++ fiter_none, ++ titer_none) {
@@ -534,7 +536,7 @@ struct LearnHMMPosterior : public LearnBase
       // rescale emission table...
       for (int trg = 1; trg <= target_size; ++ trg) {
 	// translation into non-NULL word
-	prob_type* eiter = &(*data.emission.begin(trg)) + 1;
+	prob_type* eiter = &(*hmm.emission.begin(trg)) + 1;
 	for (int src = 1; src <= source_size; ++ src, ++ eiter)
 	  (*eiter) *= exp_phi[src] / exp_phi_old[src];
       }
@@ -649,6 +651,7 @@ struct LearnHMMSymmetricPosterior : public LearnBase
 		__atable_source_target, __atable_target_source,
 		__classes_source, __classes_target) {}
   
+  typedef LearnHMM::hmm_data_type hmm_data_type;
   typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > phi_set_type;
 
   void operator()(const sentence_type& source, const sentence_type& target)

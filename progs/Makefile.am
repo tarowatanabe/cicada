@@ -69,6 +69,7 @@ bin_PROGRAMS = \
 	cicada_lexicon_dice \
 	cicada_lexicon_global \
 	cicada_lexicon_global_mpi \
+	cicada_lexicon_hmm \
 	cicada_lexicon_model1 \
 	cicada_mert \
 	cicada_mert_mpi \
@@ -241,6 +242,9 @@ cicada_lexicon_global_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perfto
 cicada_lexicon_global_mpi_SOURCES = cicada_lexicon_global_mpi.cpp $(LBFGS_SOURCE) cicada_lexicon_global_impl.hpp
 cicada_lexicon_global_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
 cicada_lexicon_global_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_lexicon_hmm_SOURCES = cicada_lexicon_hmm.cpp cicada_lexicon_hmm_impl.hpp cicada_lexicon_model1_impl.hpp cicada_lexicon_maximize_impl.hpp kuhn_munkres.hpp
+cicada_lexicon_hmm_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_lexicon_model1_SOURCES = cicada_lexicon_model1.cpp cicada_lexicon_model1_impl.hpp cicada_lexicon_maximize_impl.hpp kuhn_munkres.hpp
 cicada_lexicon_model1_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
