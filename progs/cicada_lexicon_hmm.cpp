@@ -29,8 +29,12 @@ path_type span_source_file;
 path_type span_target_file;
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
-path_type output_source_target_file;
-path_type output_target_source_file;
+path_type alignment_source_target_file;
+path_type alignment_target_source_file;
+path_type output_lexicon_source_target_file;
+path_type output_lexicon_target_source_file;
+path_type output_alignment_source_target_file;
+path_type output_alignment_target_source_file;
 path_type viterbi_source_target_file;
 path_type viterbi_target_source_file;
 
@@ -56,7 +60,7 @@ int threads = 2;
 int debug = 0;
 
 #include "cicada_lexicon_maximize_impl.hpp"
-#include "cicada_lexicon_model1_impl.hpp"
+#include "cicada_lexicon_hmm_impl.hpp"
 
 template <typename Learner, typename Maximizer>
 void learn(ttable_type& ttable_source_target,
@@ -67,9 +71,6 @@ void learn(ttable_type& ttable_source_target,
 template <typename Aligner>
 void viterbi(const ttable_type& ttable_source_target,
 	     const ttable_type& ttable_target_source);
-
-void read(const path_type& path, ttable_type& lexicon);
-void dump(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned);
 
 void options(int argc, char** argv);
 
@@ -100,9 +101,9 @@ int main(int argc, char ** argv)
     boost::thread_group workers_read;
     
     if (! lexicon_source_target_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read, boost::cref(lexicon_source_target_file), boost::ref(ttable_source_target))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_source_target_file), boost::ref(ttable_source_target))));
     if (! lexicon_target_source_file.empty())
-      workers_read.add_thread(new boost::thread(boost::bind(read, boost::cref(lexicon_target_source_file), boost::ref(ttable_target_source))));
+      workers_read.add_thread(new boost::thread(boost::bind(read_lexicon, boost::cref(lexicon_target_source_file), boost::ref(ttable_target_source))));
     
     workers_read.join_all();
     
@@ -145,22 +146,24 @@ int main(int argc, char ** argv)
     }
 
       
-    // final dumping...
-    boost::thread_group workers_dump;
-
+    // final writing
+    boost::thread_group workers_write;
+    
     if (! output_source_target_file.empty())
-      workers_dump.add_thread(new boost::thread(boost::bind(dump,
-							    boost::cref(output_source_target_file),
-							    boost::cref(ttable_source_target),
-							    boost::cref(aligned_source_target))));
+      workers_write.add_thread(new boost::thread(boost::bind(write_lexicon,
+							     boost::cref(output_source_target_file),
+							     boost::cref(ttable_source_target),
+							     boost::cref(aligned_source_target),
+							     threshold)));
     
     if (! output_target_source_file.empty())
-      workers_dump.add_thread(new boost::thread(boost::bind(dump,
-							    boost::cref(output_target_source_file),
-							    boost::cref(ttable_target_source),
-							    boost::cref(aligned_target_source))));
+      workers_write.add_thread(new boost::thread(boost::bind(write_lexicon,
+							     boost::cref(output_target_source_file),
+							     boost::cref(ttable_target_source),
+							     boost::cref(aligned_target_source),
+							     threshold)));
     
-    workers_dump.join_all();
+    workers_write.join_all();
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -178,97 +181,6 @@ struct greater_second
   }
 };
 
-void read(const path_type& path, ttable_type& lexicon)
-{
-  typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
-  typedef boost::spirit::istream_iterator iterator_type;
-
-  namespace qi = boost::spirit::qi;
-  namespace standard = boost::spirit::standard;
-  
-  qi::rule<iterator_type, std::string(), standard::blank_type>         word;
-  qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
-  
-  word   %= qi::lexeme[+(standard::char_ - standard::space)];
-  parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
-  
-  lexicon.clear();
-  lexicon.smooth = boost::numeric::bounds<double>::highest();
-  
-  utils::compress_istream is(path, 1024 * 1024);
-  is.unsetf(std::ios::skipws);
-  
-  iterator_type iter(is);
-  iterator_type iter_end;
-  
-  lexicon_parsed_type lexicon_parsed;
-  
-  while (iter != iter_end) {
-    boost::fusion::get<0>(lexicon_parsed).clear();
-    boost::fusion::get<1>(lexicon_parsed).clear();
-    
-    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
-      if (iter != iter_end)
-	throw std::runtime_error("global lexicon parsing failed");
-    
-    const word_type target(boost::fusion::get<0>(lexicon_parsed));
-    const word_type source(boost::fusion::get<1>(lexicon_parsed));
-    const double&   prob(boost::fusion::get<2>(lexicon_parsed));
-    
-    lexicon[source][target] = prob;
-    lexicon.smooth = std::min(lexicon.smooth, prob * 0.1);
-  }
-}
-
-void dump(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned)
-{
-  typedef ttable_type::count_map_type::value_type value_type;
-  typedef std::vector<const value_type*, std::allocator<const value_type*> > sorted_type;
-
-  utils::compress_ostream os(path, 1024 * 1024);
-  os.precision(10);
-
-  const aligned_type::aligned_map_type __empty;
-  sorted_type sorted;
-  
-  ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
-  ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
-  for (ttable_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
-    if (*siter) {
-      const word_type source(word_type::id_type(siter - siter_begin));
-      const ttable_type::count_map_type& dict = *(*siter);
-      
-      if (dict.empty()) continue;
-      
-      sorted.clear();
-      sorted.reserve(dict.size());
-      
-      ttable_type::count_map_type::const_iterator titer_end = dict.end();
-      for (ttable_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
-	if (titer->second >= 0.0)
-	  sorted.push_back(&(*titer));
-      
-      std::sort(sorted.begin(), sorted.end(), greater_second());
-      
-      if (threshold > 0.0) {
-	const double prob_max       = sorted.front()->second;
-	const double prob_threshold = prob_max * threshold;
-	
-	const aligned_type::aligned_map_type& viterbi = (aligned.exists(source) ? aligned[source] : __empty);
-	
-	// TODO: extra checking to keep Viterbi alignemnt in the final output!
-	
-	sorted_type::const_iterator iter_end = sorted.end();
-	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	  if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
-	    os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
-      } else {
-	sorted_type::const_iterator iter_end = sorted.end();
-	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	  os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
-      }
-    }
-}
 
 template <typename LearnerSet, typename Maximizer>
 struct TaskMaximize : public Maximizer
@@ -609,7 +521,7 @@ struct ViterbiReducer : public ViterbiMapReduce
   align_set_type  aligns;
   align_none_type aligns_none;
   
-  void dump(std::ostream& os, const bitext_type& bitext)
+  void write(std::ostream& os, const bitext_type& bitext)
   {
     if (moses_mode)
       os << bitext.alignment << '\n';
@@ -680,26 +592,26 @@ struct ViterbiReducer : public ViterbiMapReduce
 	if (bitext.id == size_type(-1)) break;
 	
 	if (bitext.id == id) {
-	  dump(os, bitext);
+	  write(os, bitext);
 	  ++ id;
 	} else
 	  bitexts.insert(bitext);
 	
 	while (! bitexts.empty() && bitexts.begin()->id == id) {
-	  dump(os, *bitexts.begin());
+	  write(os, *bitexts.begin());
 	  bitexts.erase(bitexts.begin());
 	  ++ id;
 	}
       }
       
       while (! bitexts.empty() && bitexts.begin()->id == id) {
-	dump(os, *bitexts.begin());
+	write(os, *bitexts.begin());
 	bitexts.erase(bitexts.begin());
 	++ id;
       }
       
       if (! bitexts.empty())
-	throw std::runtime_error("error while dumping viterbi output?");
+	throw std::runtime_error("error while writeing viterbi output?");
     }
   }
 };
@@ -838,7 +750,7 @@ void options(int argc, char** argv)
     ("prior",  po::value<double>(&prior)->default_value(prior),   "Dirichlet prior for variational Bayes")
     ("smooth", po::value<double>(&smooth)->default_value(smooth), "smoothing parameter for uniform distribution")
 
-    ("threshold", po::value<double>(&threshold)->default_value(threshold), "dump with beam-threshold (<= 0.0 implies no beam)")
+    ("threshold", po::value<double>(&threshold)->default_value(threshold), "write with beam-threshold (<= 0.0 implies no beam)")
 
     ("threads", po::value<int>(&threads), "# of threads")
     

@@ -5,6 +5,15 @@
 #ifndef __CICADA_LEXICON_IMPL__HPP__
 #define __CICADA_LEXICON_IMPL__HPP__ 1
 
+#define BOOST_SPIRIT_THREADSAFE
+#define PHOENIX_THREADSAFE
+
+#include <boost/spirit/include/qi.hpp>
+#include <boost/spirit/include/karma.hpp>
+
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
+
 #include <cicada/sentence.hpp>
 #include <cicada/alignment.hpp>
 #include <cicada/span_vector.hpp>
@@ -544,5 +553,157 @@ struct ViterbiBase
   const classes_type& classes_target;
 };
 
+void read_lexicon(const path_type& path, ttable_type& lexicon)
+{
+  typedef boost::fusion::tuple<std::string, std::string, double > lexicon_parsed_type;
+  typedef boost::spirit::istream_iterator iterator_type;
+
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  qi::rule<iterator_type, std::string(), standard::blank_type>         word;
+  qi::rule<iterator_type, lexicon_parsed_type(), standard::blank_type> parser; 
+  
+  word   %= qi::lexeme[+(standard::char_ - standard::space)];
+  parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
+  
+  lexicon.clear();
+  lexicon.smooth = boost::numeric::bounds<double>::highest();
+  
+  utils::compress_istream is(path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iterator_type iter(is);
+  iterator_type iter_end;
+  
+  lexicon_parsed_type lexicon_parsed;
+  
+  while (iter != iter_end) {
+    boost::fusion::get<0>(lexicon_parsed).clear();
+    boost::fusion::get<1>(lexicon_parsed).clear();
+    
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, lexicon_parsed))
+      if (iter != iter_end)
+	throw std::runtime_error("global lexicon parsing failed");
+    
+    const word_type target(boost::fusion::get<0>(lexicon_parsed));
+    const word_type source(boost::fusion::get<1>(lexicon_parsed));
+    const double&   prob(boost::fusion::get<2>(lexicon_parsed));
+    
+    lexicon[source][target] = prob;
+    lexicon.smooth = std::min(lexicon.smooth, prob * 0.1);
+  }
+}
+
+struct ttable_greater_second
+{
+  template <typename Tp>
+  bool operator()(const Tp* x, const Tp* y) const
+  {
+    return x->second > y->second;
+  }
+};
+
+void write_lexicon(const path_type& path, const ttable_type& lexicon, const aligned_type& aligned, const double threshold)
+{
+  typedef ttable_type::count_map_type::value_type value_type;
+  typedef std::vector<const value_type*, std::allocator<const value_type*> > sorted_type;
+
+  utils::compress_ostream os(path, 1024 * 1024);
+  os.precision(20);
+
+  const aligned_type::aligned_map_type __empty;
+  sorted_type sorted;
+  
+  ttable_type::count_dict_type::const_iterator siter_begin = lexicon.ttable.begin();
+  ttable_type::count_dict_type::const_iterator siter_end   = lexicon.ttable.end();
+  for (ttable_type::count_dict_type::const_iterator siter = siter_begin; siter != siter_end; ++ siter) 
+    if (*siter) {
+      const word_type source(word_type::id_type(siter - siter_begin));
+      const ttable_type::count_map_type& dict = *(*siter);
+      
+      if (dict.empty()) continue;
+      
+      sorted.clear();
+      sorted.reserve(dict.size());
+      
+      ttable_type::count_map_type::const_iterator titer_end = dict.end();
+      for (ttable_type::count_map_type::const_iterator titer = dict.begin(); titer != titer_end; ++ titer)
+	if (titer->second >= 0.0)
+	  sorted.push_back(&(*titer));
+      
+      std::sort(sorted.begin(), sorted.end(), ttable_greater_second());
+      
+      if (threshold > 0.0) {
+	const double prob_max       = sorted.front()->second;
+	const double prob_threshold = prob_max * threshold;
+	
+	const aligned_type::aligned_map_type& viterbi = (aligned.exists(source) ? aligned[source] : __empty);
+	
+	// TODO: extra checking to keep Viterbi alignemnt in the final output!
+	
+	sorted_type::const_iterator iter_end = sorted.end();
+	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	  if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
+	    os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+      } else {
+	sorted_type::const_iterator iter_end = sorted.end();
+	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
+	  os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+      }
+    }
+}
+
+void read_alignment(const path_type& path, atable_type& align)
+{
+  typedef boost::fusion::tuple<std::string, std::string, int, double > align_parsed_type;
+  typedef boost::spirit::istream_iterator iterator_type;
+
+  namespace qi = boost::spirit::qi;
+  namespace standard = boost::spirit::standard;
+  
+  qi::rule<iterator_type, std::string(), standard::blank_type>       word;
+  qi::rule<iterator_type, align_parsed_type(), standard::blank_type> parser; 
+  
+  word   %= qi::lexeme[+(standard::char_ - standard::space)];
+  parser %= word >> word >> qi::int_ >> qi::double_ >> (qi::eol | qi::eoi);
+  
+  align.clear();
+  
+  utils::compress_istream is(path, 1024 * 1024);
+  is.unsetf(std::ios::skipws);
+  
+  iterator_type iter(is);
+  iterator_type iter_end;
+  
+  align_parsed_type align_parsed;
+  
+  while (iter != iter_end) {
+    boost::fusion::get<0>(align_parsed).clear();
+    boost::fusion::get<1>(align_parsed).clear();
+    
+    if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, standard::blank, align_parsed))
+      if (iter != iter_end)
+	throw std::runtime_error("global lexicon parsing failed");
+    
+    const word_type source(boost::fusion::get<0>(align_parsed));
+    const word_type target(boost::fusion::get<1>(align_parsed));
+    const int&      index(boost::fusion::get<2>(align_parsed));
+    const double&   prob(boost::fusion::get<3>(align_parsed));
+    
+    align[std::make_pair(source, target)][index] = prob;
+  }
+}
+
+void write_alignemnt(const path_type& path, const atable_type& align)
+{
+  utils::compress_ostream os(path, 1024 * 1024);
+  os.precision(20);
+  
+  atable_type::count_dict_type::const_iterator citer_end = align.atable.end();
+  for (atable_type::count_dict_type::const_iterator citer = align.atable.begin(); citer != citer_end; ++ citer)
+    for (int diff = citer->second.min(); diff <= citer->second.max(); ++ diff)
+      os << citer->first.first << ' ' << citer->first.second << ' ' << diff << ' ' << citer->second[diff] << '\n';
+}
 
 #endif
