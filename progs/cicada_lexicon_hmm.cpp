@@ -622,8 +622,8 @@ void learn(const int iteration,
 		<< "perplexity for P(source | target): " << objective_target_source << '\n';
     
     // merge atable counts... (we will dynamically create probability table!)
-    atable_source_target.clear();
-    atable_target_source.clear();
+    atable_source_target.initialize();
+    atable_target_source.initialize();
     for (size_t i = 0; i != learners.size(); ++ i) {
       atable_source_target += learners[i].atable_counts_source_target;
       atable_target_source += learners[i].atable_counts_target_source;
