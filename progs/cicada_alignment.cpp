@@ -1232,7 +1232,19 @@ void process_giza(std::istream& is_src_trg, std::istream& is_trg_src, std::istre
     queue_bitext.push_swap(bitext_pair);
     
     ++ id;
+
+    if (debug) {
+      if (id % 10000 == 0)
+	std::cerr << '.';
+      if (id % 1000000 == 0)
+	std::cerr << '\n';
+    }
   }
+
+  if (debug && id >= 10000)
+    std::cerr << std::endl;
+  if (debug)
+    std::cerr << "# of bitexts: " << id << std::endl;
   
   for (int i = 0; i != threads; ++ i) {
     bitext_pair.clear();
