@@ -851,6 +851,8 @@ struct ViterbiHMM : public ViterbiBase
 	alignment.push_back(std::make_pair(position - 1, trg - 1));
       position = backptr(trg, position);
     }
+    
+    std::sort(alignment.begin(), alignment.end());
   }
   
   void operator()(const sentence_type& source,
