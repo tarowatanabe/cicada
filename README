@@ -27,7 +27,7 @@ Alignment can be carried out by:
    - A lattice is composed with dictionary, generating alignment hypergraph, or
    - A hypergraph is composed with dictinary, generating alignment hypergraph [20].
      
-     In order to support word alignment training, we can learn Model1 lexicon model
+     In order to support word alignment training, we can learn Model1/HMM lexicon model
      by symmetized learning [22] or posterior constrained learning [23] with smoothing
      via variational Bayes.
 
