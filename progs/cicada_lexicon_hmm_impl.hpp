@@ -6,6 +6,7 @@
 #define __CICADA_LEXICON_HMM_IMPL__HPP__ 1
 
 #include <numeric>
+#include <set>
 
 #include "cicada_lexicon_impl.hpp"
 
@@ -34,6 +35,9 @@ struct LearnHMM : public LearnBase
     typedef std::vector<prob_type, utils::aligned_allocator<prob_type> > scale_type;
     
     typedef utils::vector2_aligned<prob_type, utils::aligned_allocator<prob_type> > posterior_type;
+
+    typedef std::set<int, std::less<int>, std::allocator<int> > point_set_type;
+    typedef std::vector<point_set_type, std::allocator<point_set_type> > point_map_type;
     
     forward_type    forward;
     backward_type   backward;
@@ -49,7 +53,135 @@ struct LearnHMM : public LearnBase
     sentence_type target;
     sentence_type source_class;
     sentence_type target_class;
-        
+
+    point_map_type points;
+    
+    void prepare(const sentence_type& __source,
+		 const sentence_type& __target,
+		 const alignment_type& alignment,
+		 const bool inverse,
+		 const ttable_type& ttable,
+		 const atable_type& atable,
+		 const classes_type& classes_source,
+		 const classes_type& classes_target)
+    {
+      const size_type source_size = __source.size();
+      const size_type target_size = __target.size();
+      
+      const double prob_null  = p0;
+      const double prob_align = 1.0 - p0;
+
+      source.clear();
+      target.clear();
+      
+      source.reserve((source_size + 2) * 2);
+      target.reserve((target_size + 2) * 2);
+      source.resize((source_size + 2) * 2, vocab_type::NONE);
+      target.resize((target_size + 2) * 2, vocab_type::NONE);
+      
+      source[0] = vocab_type::BOS;
+      target[0] = vocab_type::BOS;
+      source[(source_size + 2) - 1] = vocab_type::EOS;
+      target[(target_size + 2) - 1] = vocab_type::EOS;
+      
+      std::copy(__source.begin(), __source.end(), source.begin() + 1);
+      std::copy(__target.begin(), __target.end(), target.begin() + 1);
+      
+      source_class.reserve(source_size + 2);
+      target_class.reserve(target_size + 2);
+      source_class.resize(source_size + 2);
+      target_class.resize(target_size + 2);
+      
+      source_class[0] = vocab_type::BOS;
+      target_class[0] = vocab_type::BOS;
+      source_class[(source_size + 2) - 1] = vocab_type::EOS;
+      target_class[(target_size + 2) - 1] = vocab_type::EOS;
+      
+      sentence_type::iterator csiter = source_class.begin() + 1;
+      for (sentence_type::const_iterator siter = __source.begin(); siter != __source.end(); ++ siter, ++ csiter)
+	*csiter = classes_source[*siter];
+      
+      sentence_type::iterator ctiter = target_class.begin() + 1;
+      for (sentence_type::const_iterator titer = __target.begin(); titer != __target.end(); ++ titer, ++ ctiter)
+	*ctiter = classes_target[*titer];
+
+      points.clear();
+      points.resize(target_size);
+
+      if (inverse) {
+	alignment_type::const_iterator aiter_end = alignment.end();
+	for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
+	  points[aiter->source].insert(aiter->target);
+      } else {
+	alignment_type::const_iterator aiter_end = alignment.end();
+	for (alignment_type::const_iterator aiter = alignment.begin(); aiter != aiter_end; ++ aiter)
+	  points[aiter->target].insert(aiter->source);
+      }
+      
+      emission.clear();
+      transition.clear();
+      
+      emission.reserve(target_size + 2, (source_size + 2) * 2);
+      transition.reserve(target_size + 2, (source_size + 2) * 2, (source_size + 2) * 2);
+      
+      emission.resize(target_size + 2, (source_size + 2) * 2, 0.0);
+      transition.resize(target_size + 2, (source_size + 2) * 2, (source_size + 2) * 2, 0.0);
+      
+      // compute emission table...
+      emission(0, 0) = 1.0;
+      emission(target_size + 2 - 1, source_size + 2 - 1) = 1.0;
+      for (int trg = 1; trg <= static_cast<int>(target_size); ++ trg) {
+	if (! points[trg - 1].empty()) {
+	  point_set_type::const_iterator piter_end = points[trg - 1].end();
+	  for (point_set_type::const_iterator piter = points[trg - 1].begin(); piter != piter_end; ++ piter)
+	    emission(trg, *piter + 1) = ttable(source[*piter + 1], target[trg]);
+	} else {
+	  // translation into non-NULL word
+	  prob_type* eiter = &(*emission.begin(trg)) + 1;
+	  for (size_type src = 1; src <= source_size; ++ src, ++ eiter)
+	    (*eiter) = ttable(source[src], target[trg]);
+	
+	  // NULL
+	  prob_type* eiter_first = &(*emission.begin(trg)) + source_size + 2;
+	  prob_type* eiter_last  = eiter_first + source_size + 2 - 1; // -1 to exclude EOS
+	  
+	  std::fill(eiter_first, eiter_last, ttable(vocab_type::NONE, target[trg]));
+	}
+      }
+      
+      // compute transition table...
+      // we start from 1, since there exists no previously aligned word before BOS...
+      for (int trg = 1; trg < target_size + 2; ++ trg) {
+	// alignment into non-null
+	// start from 1 to exlude transition into <s>
+	for (int next = 1; next < source_size + 2; ++ next) {
+	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
+	  prob_type* titer2 = titer1 + (source_size + 2);      // from NONE
+	  
+	  // - 1 to exclude previous </s>...
+	  for (int prev = 0; prev < source_size + 2 - 1; ++ prev, ++ titer1, ++ titer2) {
+	    const prob_type prob = prob_align * atable(source_class[prev], target_class[trg],
+						       source_size, target_size,
+						       prev - 1, next - 1);
+	    
+	    *titer1 = prob;
+	    *titer2 = prob;
+	  }
+	}
+	
+	// null transition
+	// we will exclude EOS
+	for (int next = 0; next < (source_size + 2) - 1; ++ next) {
+	  const int next_none = next + (source_size + 2);
+	  const int prev1_none = next;
+	  const int prev2_none = next + (source_size + 2);
+	  
+	  transition(trg, next_none, prev1_none) = prob_null;
+	  transition(trg, next_none, prev2_none) = prob_null;
+	}
+      }
+    }
+
     void prepare(const sentence_type& __source,
 		 const sentence_type& __target,
 		 const ttable_type& ttable,
@@ -406,6 +538,32 @@ struct LearnHMM : public LearnBase
 
   typedef HMMData hmm_data_type;
   
+  void learn(const sentence_type& source,
+	     const sentence_type& target,
+	     const alignment_type& alignment,
+	     const bool inverse,
+	     const ttable_type& ttable,
+	     const atable_type& atable,
+	     const classes_type& classes_source,
+	     const classes_type& classes_target,
+	     ttable_type& counts_ttable,
+	     atable_type& counts_atable,
+	     aligned_type& aligned,
+	     double& objective)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+
+    hmm.prepare(source, target, alignment, inverse, ttable, atable, classes_source, classes_target);
+    
+    hmm.forward_backward(source, target);
+    
+    objective += hmm.objective() / target_size;
+    
+    hmm.accumulate(source, target, counts_ttable);
+    
+    hmm.accumulate(source, target, counts_atable);
+  }
   
   void learn(const sentence_type& source,
 	     const sentence_type& target,
@@ -430,6 +588,34 @@ struct LearnHMM : public LearnBase
     hmm.accumulate(source, target, counts_ttable);
     
     hmm.accumulate(source, target, counts_atable);
+  }
+
+  void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
+  {
+    learn(source,
+	  target,
+	  alignment,
+	  false,
+	  ttable_source_target,
+	  atable_source_target,
+	  classes_source,
+	  classes_target,
+	  ttable_counts_source_target,
+	  atable_counts_source_target,
+	  aligned_source_target,
+	  objective_source_target);
+    learn(target,
+	  source,
+	  alignment,
+	  true,
+	  ttable_target_source,
+	  atable_target_source,
+	  classes_target,
+	  classes_source,
+	  ttable_counts_target_source,
+	  atable_counts_target_source,
+	  aligned_target_source,
+	  objective_target_source);
   }
   
   void operator()(const sentence_type& source, const sentence_type& target)
@@ -467,6 +653,74 @@ struct LearnHMMPosterior : public LearnBase
   typedef LearnHMM::hmm_data_type hmm_data_type;
   
   typedef std::vector<prob_type, std::allocator<prob_type> > phi_set_type;
+
+  void learn(const sentence_type& source,
+	     const sentence_type& target,
+	     const alignment_type& alignment,
+	     const bool inverse,
+	     const ttable_type& ttable,
+	     const atable_type& atable,
+	     const classes_type& classes_source,
+	     const classes_type& classes_target,
+	     ttable_type& counts_ttable,
+	     atable_type& counts_atable,
+	     aligned_type& aligned,
+	     double& objective)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    hmm.prepare(source, target, alignment, inverse, ttable, atable, classes_source, classes_target);
+    
+    hmm.forward_backward(source, target);
+    
+    objective += hmm.objective() / target_size;
+    
+    phi.clear();
+    phi.resize(source_size + 1, 0.0);
+    
+    exp_phi_old.clear();
+    exp_phi_old.resize(source_size + 1, 1.0);
+    
+    for (int iter = 0; iter < 5; ++ iter) {
+      hmm.estimate_posterior(source, target);
+      
+      exp_phi.clear();
+      exp_phi.resize(source_size + 1, 1.0);
+      
+      size_type count_zero = 0;
+      for (int src = 1; src <= source_size; ++ src) {
+	double sum_posterior = 0.0;
+	for (int trg = 1; trg <= target_size; ++ trg)
+	  sum_posterior += hmm.posterior(trg, src);
+	
+	phi[src] += 1.0 - sum_posterior;
+	if (phi[src] > 0.0)
+	  phi[src] = 0.0;
+	
+	count_zero += (phi[src] == 0.0);
+	exp_phi[src] = utils::mathop::exp(phi[src]);
+      }
+      
+      if (count_zero == source_size) break;
+      
+      // rescale emission table...
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	// translation into non-NULL word
+	prob_type* eiter = &(*hmm.emission.begin(trg)) + 1;
+	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	  (*eiter) *= exp_phi[src] / exp_phi_old[src];
+      }
+      // swap...
+      exp_phi_old.swap(exp_phi);
+      
+      hmm.forward_backward(source, target);
+    }
+    
+    hmm.accumulate(source, target, counts_ttable);
+    
+    hmm.accumulate(source, target, counts_atable);    
+  }
   
   void learn(const sentence_type& source,
 	     const sentence_type& target,
@@ -534,6 +788,34 @@ struct LearnHMMPosterior : public LearnBase
     hmm.accumulate(source, target, counts_atable);
   }
 
+  void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
+  {
+    learn(source,
+	  target,
+	  alignment,
+	  false,
+	  ttable_source_target,
+	  atable_source_target,
+	  classes_source,
+	  classes_target,
+	  ttable_counts_source_target,
+	  atable_counts_source_target,
+	  aligned_source_target,
+	  objective_source_target);
+    learn(target,
+	  source,
+	  alignment,
+	  true,
+	  ttable_target_source,
+	  atable_target_source,
+	  classes_target,
+	  classes_source,
+	  ttable_counts_target_source,
+	  atable_counts_target_source,
+	  aligned_target_source,
+	  objective_target_source);
+  }
+
   void operator()(const sentence_type& source, const sentence_type& target)
   {
     learn(source,
@@ -571,6 +853,45 @@ struct LearnHMMSymmetric : public LearnBase
     : LearnBase(__base) {}
 
   typedef LearnHMM::hmm_data_type hmm_data_type;
+
+  void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    hmm_source_target.prepare(source, target, alignment, false, ttable_source_target, atable_source_target, classes_source, classes_target);
+    hmm_target_source.prepare(target, source, alignment, true,  ttable_target_source, atable_target_source, classes_target, classes_source);
+    
+    hmm_source_target.forward_backward(source, target);
+    hmm_target_source.forward_backward(target, source);
+    
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
+    
+    // accumulate lexicon
+    hmm_source_target.estimate_posterior(source, target);
+    hmm_target_source.estimate_posterior(target, source);
+    
+    // combine!
+    for (int src = 0; src <= source_size; ++ src)
+      for (int trg = 0; trg <= target_size; ++ trg) {
+	double count = (trg == 0 ? 1.0 : hmm_source_target.posterior(trg, src)) * (src == 0 ? 1.0 : hmm_target_source.posterior(src, trg));
+	if (src && trg)
+	  count = utils::mathop::sqrt(count);
+	
+	const word_type word_source = (src == 0 ? vocab_type::NONE : source[src - 1]);
+	const word_type word_target = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	
+	if (trg != 0)
+	  ttable_counts_source_target[word_source][word_target] += count;
+	
+	if (src != 0)
+	  ttable_counts_target_source[word_target][word_source] += count;
+      }
+    
+    hmm_source_target.accumulate(source, target, atable_counts_source_target);
+    hmm_target_source.accumulate(target, source, atable_counts_target_source);    
+  }
   
   void operator()(const sentence_type& source, const sentence_type& target)
   {
@@ -622,6 +943,78 @@ struct LearnHMMSymmetricPosterior : public LearnBase
   
   typedef LearnHMM::hmm_data_type hmm_data_type;
   typedef utils::vector2_aligned<double, utils::aligned_allocator<double> > phi_set_type;
+
+  void operator()(const sentence_type& source, const sentence_type& target, const alignment_type& alignment)
+  {
+    const size_type source_size = source.size();
+    const size_type target_size = target.size();
+    
+    hmm_source_target.prepare(source, target, alignment, false, ttable_source_target, atable_source_target, classes_source, classes_target);
+    hmm_target_source.prepare(target, source, alignment, true,  ttable_target_source, atable_target_source, classes_target, classes_source);
+    
+    hmm_source_target.forward_backward(source, target);
+    hmm_target_source.forward_backward(target, source);
+    
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
+    
+    phi.clear();
+    phi.resize(target_size + 1, source_size + 1, 0.0);
+    
+    exp_phi.clear();
+    exp_phi.resize(target_size + 1, source_size + 1, 1.0);
+    
+    exp_phi_old.clear();
+    exp_phi_old.resize(target_size + 1, source_size + 1, 1.0);
+    
+    for (int iter = 0; iter < 5; ++ iter) {
+      hmm_source_target.estimate_posterior(source, target);
+      hmm_target_source.estimate_posterior(target, source);
+
+      bool updated = false;
+      
+      // update phi...
+      for (int src = 1; src <= source_size; ++ src)
+	for (int trg = 1; trg <= target_size; ++ trg) {
+	  const double epsi = hmm_source_target.posterior(trg, src) - hmm_target_source.posterior(src, trg);
+	  const double update = - epsi;
+	  
+	  phi(trg, src) += update;
+	  
+	  updated |= (phi(trg, src) != 0.0);
+	  exp_phi(trg, src) = utils::mathop::exp(phi(trg, src));
+	}
+      
+      if (! updated) break;
+      
+      // rescale emission table...
+      for (int trg = 1; trg <= target_size; ++ trg) {
+	prob_type* eiter = &(*hmm_source_target.emission.begin(trg)) + 1;
+	for (int src = 1; src <= source_size; ++ src, ++ eiter)
+	  (*eiter) *= exp_phi(trg, src) / exp_phi_old(trg, src);
+      }
+      
+      for (int src = 1; src <= source_size; ++ src) {
+	prob_type* eiter = &(*hmm_target_source.emission.begin(src)) + 1;
+	for (int trg = 1; trg <= target_size; ++ trg, ++ eiter)
+	  (*eiter) *= exp_phi_old(trg, src) / exp_phi(trg, src);
+      }
+      
+      // swap...
+      exp_phi_old.swap(exp_phi);
+      
+      // forward-backward...
+      hmm_source_target.forward_backward(source, target);
+      hmm_target_source.forward_backward(target, source);
+    }
+    
+    hmm_source_target.accumulate(source, target, ttable_counts_source_target);
+    hmm_target_source.accumulate(target, source, ttable_counts_target_source);
+    
+    hmm_source_target.accumulate(source, target, atable_counts_source_target);
+    hmm_target_source.accumulate(target, source, atable_counts_target_source);
+  }
+
 
   void operator()(const sentence_type& source, const sentence_type& target)
   {

@@ -16,6 +16,7 @@
 
 path_type source_file = "-";
 path_type target_file = "-";
+path_type alignment_file;
 path_type span_source_file;
 path_type span_target_file;
 path_type classes_source_file;
@@ -470,12 +471,15 @@ struct TaskLearn : public Learner
 {
   struct bitext_type
   {
-    bitext_type() : source(), target() {}
+    bitext_type() : source(), target(), alignment() {}
     bitext_type(const sentence_type& __source, const sentence_type& __target)
-      : source(__source), target(__target) {}
+      : source(__source), target(__target), alignment() {}
+    bitext_type(const sentence_type& __source, const sentence_type& __target, const alignment_type& __alignment)
+      : source(__source), target(__target), alignment(__alignment) {}
     
     sentence_type source;
     sentence_type target;
+    alignment_type alignment;
   };
   
   typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
@@ -498,8 +502,12 @@ struct TaskLearn : public Learner
       if (bitexts.empty()) break;
       
       typename bitext_set_type::const_iterator biter_end = bitexts.end();
-      for (typename bitext_set_type::const_iterator biter = bitexts.begin(); biter != biter_end; ++ biter)
-	Learner::operator()(biter->source, biter->target);
+      for (typename bitext_set_type::const_iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
+	if (biter->alignment.empty())
+	  Learner::operator()(biter->source, biter->target);
+	else
+	  Learner::operator()(biter->source, biter->target, biter->alignment);
+      }
     }
   }
   
@@ -545,6 +553,8 @@ void learn(const int iteration,
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);
+    std::auto_ptr<std::istream> is_align(! alignment_file.empty()
+					 ? new utils::compress_istream(alignment_file, 1024 * 1024) : 0);
     
     bitext_type     bitext;
     bitext_set_type bitexts;
@@ -554,8 +564,10 @@ void learn(const int iteration,
     for (;;) {
       is_src >> bitext.source;
       is_trg >> bitext.target;
+      if (is_align.get())
+	*is_align >> bitext.alignment;
       
-      if (! is_src || ! is_trg) break;      
+      if (! is_src || ! is_trg || (is_align.get() && ! *is_align)) break;
       
       if (bitext.source.empty() || bitext.target.empty()) continue;
       
@@ -583,7 +595,7 @@ void learn(const int iteration,
     if (debug)
       std::cerr << "# of bitexts: " << num_bitext << std::endl;
 
-    if (is_src || is_trg)
+    if (is_src || is_trg || (is_align.get() && *is_align))
       throw std::runtime_error("# of samples do not match");
         
     for (size_t i = 0; i != learners.size(); ++ i) {
@@ -973,8 +985,9 @@ void options(int argc, char** argv)
   
   po::options_description desc("options");
   desc.add_options()
-    ("source", po::value<path_type>(&source_file), "source file")
-    ("target", po::value<path_type>(&target_file), "target file")
+    ("source",    po::value<path_type>(&source_file),    "source file")
+    ("target",    po::value<path_type>(&target_file),    "target file")
+    ("alignment", po::value<path_type>(&alignment_file), "alignment file")
     
     ("span-source", po::value<path_type>(&span_source_file), "source span file")
     ("span-target", po::value<path_type>(&span_target_file), "target span file")

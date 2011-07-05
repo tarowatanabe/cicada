@@ -42,6 +42,8 @@ opt_parser = OptionParser(
                 metavar="SUFFIX", help="source (or 'French')  language suffix for training corpus"),
     make_option("--e", default="E", action="store", type="string",
                 metavar="SUFFIX", help="target (or 'English') language suffix for training corpus"),
+    make_option("--a", default="A", action="store", type="string",
+                metavar="SUFFIX", help="source-to-target alignment suffix for training corpus"),
     ### span...
     make_option("--sf", default="SF", action="store", type="string",
                 metavar="SUFFIX", help="source (or 'French')  span suffix for training corpus"),
@@ -70,14 +72,16 @@ opt_parser = OptionParser(
     make_option("--iteration-model1",  default=5,  action="store", type="int", metavar='ITERATION', help="Model1 iteratins (default: 5)"),
     make_option("--iteration-hmm",     default=5,  action="store", type="int", metavar='ITERATION', help="HMM iteratins    (default: 5)"),
     
-    ## training parameters
+    ## # of clusters
     make_option("--cluster",     default=50, action="store", type="int", metavar='CLUSTER', help="# of clusters (default: 50)"),
-    make_option("--p0",          default=1e-3, action="store", type="float", metavar='P0', help="parameter for NULL alignment (default: 1e-3)"),
+    
+    ## training parameters
     make_option("--symmetric",   default=None, action="store_true", help="symmetric training"),
     make_option("--posterior",   default=None, action="store_true", help="posterior constrained training"),
     make_option("--variational", default=None, action="store_true", help="variational Bayes estimates"),
     
-    ## option for lexicon
+    ## options for lexicon model training
+    make_option("--p0",              default=1e-3, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: 1e-3)"),
     make_option("--prior-lexicon",   default=1e-2, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 1e-2)"),
     make_option("--prior-alignment", default=1e-4, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 1e-4)"),
 
@@ -158,10 +162,11 @@ class CICADA:
         
 class Corpus:
 
-    def __init__(self, corpus_dir="", corpus="", f="", e="", sf="", se="", ff="", fe=""):
+    def __init__(self, corpus_dir="", corpus="", f="", e="", a="", sf="", se="", ff="", fe=""):
 
         self.source_tag = f
         self.target_tag = e
+        self.alignment_tag = a
 
         self.source_span_tag = sf
         self.target_span_tag = se
@@ -171,6 +176,7 @@ class Corpus:
         
         self.source = compressed_file(corpus+'.'+f)
         self.target = compressed_file(corpus+'.'+e)
+        self.alignment = compressed_file(corpus+'.'+a)
         
         self.source_span = compressed_file(corpus+'.'+sf)
         self.target_span = compressed_file(corpus+'.'+se)
@@ -270,6 +276,10 @@ class Giza:
         
         command += " --source \"%s\"" %(corpus.source)
         command += " --target \"%s\"" %(corpus.target)
+
+        if os.path.exists(corpus.alignment):
+            command += " --alignment \"%s\"" %(corpus.alignment)
+            
 
         if iteration_hmm > 0:
             command += " --classes-source \"%s\"" %(compressed_file(cluster.source.cluster))
