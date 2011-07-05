@@ -292,8 +292,11 @@ void learn(ttable_type& ttable_source_target,
     utils::resource accumulate_start;
     
     boost::thread_group workers_learn;
-    for (size_t i = 0; i != learners.size(); ++ i)
+    for (size_t i = 0; i != learners.size(); ++ i) {
+      learners[i].initialize();
+      
       workers_learn.add_thread(new boost::thread(boost::ref(learners[i])));
+    }
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);

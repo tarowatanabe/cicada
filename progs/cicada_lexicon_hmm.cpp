@@ -492,8 +492,6 @@ struct TaskLearn : public Learner
   
   void operator()()
   {
-    Learner::initialize();
-
     bitext_set_type bitexts;
     
     for (;;) {
@@ -548,8 +546,11 @@ void learn(const int iteration,
     utils::resource accumulate_start;
     
     boost::thread_group workers_learn;
-    for (size_t i = 0; i != learners.size(); ++ i)
+    for (size_t i = 0; i != learners.size(); ++ i) {
+      learners[i].initialize();
+      
       workers_learn.add_thread(new boost::thread(boost::ref(learners[i])));
+    }
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);
@@ -838,8 +839,8 @@ struct ViterbiReducer : public ViterbiMapReduce
       bitext_set_type bitexts;
 
       const bool flush_output = (path == "-"
-			       || (boost::filesystem::exists(path)
-				   && ! boost::filesystem::is_regular_file(path)));
+				 || (boost::filesystem::exists(path)
+				     && ! boost::filesystem::is_regular_file(path)));
       
       utils::compress_ostream os(path, 1024 * 1024 * (! flush_output));
       
@@ -974,8 +975,6 @@ void viterbi(const ttable_type& ttable_source_target,
     std::cerr << "cpu time:  " << viterbi_end.cpu_time() - viterbi_start.cpu_time() << std::endl
 	      << "user time: " << viterbi_end.user_time() - viterbi_start.user_time() << std::endl;
 }
-
-
 
 void options(int argc, char** argv)
 {
