@@ -356,6 +356,7 @@ struct ttable_type
   bool exists(size_type pos) const { return ttable.exists(pos); }
   
   void resize(size_type __size) { ttable.resize(__size); }
+  void reserve(size_type __size) { ttable.reserve(__size); }
 
   void initialize()
   {
@@ -444,6 +445,7 @@ struct aligned_type
   bool exists(const word_type& word) const { return aligned.exists(word.id()); }
   
   void resize(size_type __size) { aligned.resize(__size); }
+  void reserve(size_type __size) { aligned.reserve(__size); }
   void clear() { aligned.clear(); }
 
   void initialize()
@@ -504,12 +506,20 @@ struct LearnBase
   {
     ttable_counts_source_target.clear();
     ttable_counts_target_source.clear();
+    ttable_counts_source_target.reserve(word_type::allocated());
+    ttable_counts_target_source.reserve(word_type::allocated());
+    ttable_counts_source_target.resize(word_type::allocated());
+    ttable_counts_target_source.resize(word_type::allocated());
     
     atable_counts_source_target.initialize();
     atable_counts_target_source.initialize();
     
     aligned_source_target.clear();
     aligned_target_source.clear();
+    aligned_source_target.reserve(word_type::allocated());
+    aligned_target_source.reserve(word_type::allocated());
+    aligned_source_target.resize(word_type::allocated());
+    aligned_target_source.resize(word_type::allocated());
     
     objective_source_target = 0.0;
     objective_target_source = 0.0;

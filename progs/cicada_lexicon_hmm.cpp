@@ -610,6 +610,11 @@ void learn(const int iteration,
     ttable_target_source.initialize();
     aligned_source_target.initialize();
     aligned_target_source.initialize();
+
+    ttable_source_target.reserve(word_type::allocated());
+    ttable_target_source.reserve(word_type::allocated());
+    aligned_source_target.reserve(word_type::allocated());
+    aligned_target_source.reserve(word_type::allocated());
     
     ttable_source_target.resize(word_type::allocated());
     ttable_target_source.resize(word_type::allocated());

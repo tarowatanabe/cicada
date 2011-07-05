@@ -355,10 +355,16 @@ void learn(ttable_type& ttable_source_target,
     aligned_source_target.initialize();
     aligned_target_source.initialize();
     
+    ttable_source_target.reserve(word_type::allocated());
+    ttable_target_source.reserve(word_type::allocated());
+    aligned_source_target.reserve(word_type::allocated());
+    aligned_target_source.reserve(word_type::allocated());
+
     ttable_source_target.resize(word_type::allocated());
     ttable_target_source.resize(word_type::allocated());
     aligned_source_target.resize(word_type::allocated());
     aligned_target_source.resize(word_type::allocated());
+    
     
     double objective_source_target = 0;
     double objective_target_source = 0;
