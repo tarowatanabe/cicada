@@ -490,14 +490,14 @@ struct LearnBase
 
   void initialize()
   {
-    ttable_counts_source_target.clear();
-    ttable_counts_target_source.clear();
+    ttable_counts_source_target.initialize();
+    ttable_counts_target_source.initialize();
 
     atable_counts_source_target.initialize();
     atable_counts_target_source.initialize();
     
-    aligned_source_target.clear();
-    aligned_target_source.clear();
+    aligned_source_target.initialize();
+    aligned_target_source.initialize();
     
     objective_source_target = 0.0;
     objective_target_source = 0.0;
