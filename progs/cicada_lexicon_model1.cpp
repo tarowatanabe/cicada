@@ -2,6 +2,8 @@
 //  Copyright(C) 2010-2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+#include "cicada_lexicon_impl.hpp"
+
 #include "utils/resource.hpp"
 #include "utils/program_options.hpp"
 #include "utils/compress_stream.hpp"
@@ -11,8 +13,6 @@
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
-
-#include "cicada_lexicon_impl.hpp"
 
 path_type source_file = "-";
 path_type target_file = "-";
