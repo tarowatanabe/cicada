@@ -1,5 +1,5 @@
 2011-7-x
-Added lexicon learning by HMM/Model1 + a script to perform bidirectional alignment combination.
+Added lexicon learning by HMM/Model1 + a script to perform bidirectional alignment combination
 Added alignment constrained learning in HMM/Model1
 Added online learning (MIRA/CW/AROW) for kbest-based learner
 
