@@ -259,6 +259,14 @@ struct ttable_type
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
 
+  struct real_precision : boost::spirit::karma::real_policies<double>
+  {
+    static unsigned int precision(double) 
+    { 
+      return 20;
+    }
+  };
+
   struct count_map_type
   {
     typedef google::dense_hash_map<word_type, count_type, boost::hash<word_type>, std::equal_to<word_type> > counts_type;
@@ -330,7 +338,7 @@ struct ttable_type
     const count_map_type& counts = ttable[source.id()];
     count_map_type::const_iterator citer = counts.find(target);
     
-    return (citer == counts.end() ? smooth : citer->second);
+    return (citer == counts.end() ? smooth : std::max(citer->second, smooth));
   }
   
   void clear() { ttable.clear(); }
@@ -581,7 +589,6 @@ void read_lexicon(const path_type& path, ttable_type& lexicon)
   parser %= word >> word >> qi::double_ >> (qi::eol | qi::eoi);
   
   lexicon.clear();
-  lexicon.smooth = boost::numeric::bounds<double>::highest();
   
   utils::compress_istream is(path, 1024 * 1024);
   is.unsetf(std::ios::skipws);
@@ -604,7 +611,6 @@ void read_lexicon(const path_type& path, ttable_type& lexicon)
     const double&   prob(boost::fusion::get<2>(lexicon_parsed));
     
     lexicon[source][target] = prob;
-    lexicon.smooth = std::min(lexicon.smooth, prob * 0.1);
   }
 }
 
@@ -621,9 +627,16 @@ void write_lexicon(const path_type& path, const ttable_type& lexicon, const alig
 {
   typedef ttable_type::count_map_type::value_type value_type;
   typedef std::vector<const value_type*, std::allocator<const value_type*> > sorted_type;
+  typedef std::ostream_iterator<char> oiterator_type;
+  
+  namespace karma = boost::spirit::karma;
+  namespace standard = boost::spirit::standard;
 
   utils::compress_ostream os(path, 1024 * 1024);
   os.precision(20);
+  
+  oiterator_type oiter(os);
+  karma::real_generator<double, ttable_type::real_precision> real;
 
   const aligned_type::aligned_map_type __empty;
   sorted_type sorted;
@@ -653,16 +666,16 @@ void write_lexicon(const path_type& path, const ttable_type& lexicon, const alig
 	
 	const aligned_type::aligned_map_type& viterbi = (aligned.exists(source) ? aligned[source] : __empty);
 	
-	// TODO: extra checking to keep Viterbi alignemnt in the final output!
-	
 	sorted_type::const_iterator iter_end = sorted.end();
 	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
 	  if ((*iter)->second >= prob_threshold || viterbi.find((*iter)->first) != viterbi.end())
-	    os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+	    if (! karma::generate(oiter, standard::string << ' ' << standard::string << ' ' << real << '\n', (*iter)->first, source, (*iter)->second))
+	      throw std::runtime_error("generation failed");
       } else {
 	sorted_type::const_iterator iter_end = sorted.end();
 	for (sorted_type::const_iterator iter = sorted.begin(); iter != iter_end; ++ iter)
-	  os << (*iter)->first << ' ' << source << ' '  << (*iter)->second << '\n';
+	  if (! karma::generate(oiter, standard::string << ' ' << standard::string << ' ' << real << '\n', (*iter)->first, source, (*iter)->second))
+	    throw std::runtime_error("generation failed");
       }
     }
 }
