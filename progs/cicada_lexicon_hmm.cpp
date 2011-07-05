@@ -492,6 +492,8 @@ struct TaskLearn : public Learner
   
   void operator()()
   {
+    Learner::initialize();
+    
     bitext_set_type bitexts;
     
     for (;;) {
@@ -546,11 +548,8 @@ void learn(const int iteration,
     utils::resource accumulate_start;
     
     boost::thread_group workers_learn;
-    for (size_t i = 0; i != learners.size(); ++ i) {
-      learners[i].initialize();
-      
+    for (size_t i = 0; i != learners.size(); ++ i)
       workers_learn.add_thread(new boost::thread(boost::ref(learners[i])));
-    }
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);
@@ -607,15 +606,15 @@ void learn(const int iteration,
     workers_learn.join_all();
     
     // merge and normalize...! 
-    ttable_source_target.resize(word_type::allocated());
-    ttable_target_source.resize(word_type::allocated());
-    aligned_source_target.resize(word_type::allocated());
-    aligned_target_source.resize(word_type::allocated());
-    
     ttable_source_target.initialize();
     ttable_target_source.initialize();
     aligned_source_target.initialize();
     aligned_target_source.initialize();
+    
+    ttable_source_target.resize(word_type::allocated());
+    ttable_target_source.resize(word_type::allocated());
+    aligned_source_target.resize(word_type::allocated());
+    aligned_target_source.resize(word_type::allocated());
     
     double objective_source_target = 0;
     double objective_target_source = 0;
