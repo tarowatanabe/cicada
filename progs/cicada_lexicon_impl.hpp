@@ -143,7 +143,7 @@ struct atable_type
 			std::allocator<std::pair<const class_pair_type, cache_type> > > cache_set_type;
 #endif
 
-  atable_type(const double __prior=0.1) : prior(__prior) {}
+  atable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
   
   prob_type operator()(const word_type& source,
 		       const word_type& target,
@@ -165,18 +165,18 @@ struct atable_type
       // which implies: 1 <= diff < source_size + 1
       //
       
-      return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i - i_prev];
+      return std::max(estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i - i_prev], smooth);
     } else if (target == vocab_type::EOS) {
       // which implies: 1 <= diff < source_size - i_prev + 1
       // 
       
-      return estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[i - i_prev];
+      return std::max(estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[i - i_prev], smooth);
     } else {
       // 0 <= i < source_size
       // which implies: 0 - i_prev <= diff < source_size - i_prev
       //
       
-      return estimate(class_pair_type(source, target), range_type(0 - i_prev, source_size - i_prev))[i - i_prev];
+      return std::max(estimate(class_pair_type(source, target), range_type(0 - i_prev, source_size - i_prev))[i - i_prev], smooth);
     }
   }
   
@@ -223,7 +223,8 @@ struct atable_type
   {
     atable.swap(x.atable);
     caches.swap(x.caches);
-    std::swap(prior, x.prior);
+    std::swap(prior,  x.prior);
+    std::swap(smooth, x.smooth);
   }
   
   void initialize()
@@ -252,6 +253,7 @@ struct atable_type
   count_dict_type atable;
   cache_set_type  caches;
   double prior;
+  double smooth;
 };
 
 struct ttable_type
@@ -315,7 +317,7 @@ struct ttable_type
   
   typedef utils::alloc_vector<count_map_type, std::allocator<count_map_type> > count_dict_type;
   
-  ttable_type(const double __smooth=1e-20) : smooth(__smooth) {}
+  ttable_type(const double __prior=0.1, const double __smooth=1e-20) : prior(__prior), smooth(__smooth) {}
   
   count_map_type& operator[](const word_type& word)
   {
@@ -345,6 +347,7 @@ struct ttable_type
   void swap(ttable_type& x)
   {
     ttable.swap(x.ttable);
+    std::swap(prior,  x.prior);
     std::swap(smooth, x.smooth);
   }
 
@@ -371,6 +374,7 @@ struct ttable_type
   }
   
   count_dict_type ttable;
+  double prior;
   double smooth;
 };
 
@@ -468,8 +472,8 @@ struct LearnBase
 	    const ttable_type& __ttable_target_source)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
-      ttable_counts_source_target(__ttable_source_target.smooth),
-      ttable_counts_target_source(__ttable_target_source.smooth),
+      ttable_counts_source_target(__ttable_source_target.prior, __ttable_source_target.smooth),
+      ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
       classes_source(__classes()),
       classes_target(__classes()),
       objective_source_target(0),
@@ -484,12 +488,12 @@ struct LearnBase
 	    const classes_type& __classes_target)
     : ttable_source_target(__ttable_source_target),
       ttable_target_source(__ttable_target_source),
-      ttable_counts_source_target(__ttable_source_target.smooth),
-      ttable_counts_target_source(__ttable_target_source.smooth),
+      ttable_counts_source_target(__ttable_source_target.prior, __ttable_source_target.smooth),
+      ttable_counts_target_source(__ttable_target_source.prior, __ttable_target_source.smooth),
       atable_source_target(__atable_source_target),
       atable_target_source(__atable_target_source),
-      atable_counts_source_target(__atable_source_target.prior),
-      atable_counts_target_source(__atable_target_source.prior),
+      atable_counts_source_target(__atable_source_target.prior, __atable_source_target.smooth),
+      atable_counts_target_source(__atable_target_source.prior, __atable_target_source.smooth),
       classes_source(__classes_source),
       classes_target(__classes_target),
       objective_source_target(0),

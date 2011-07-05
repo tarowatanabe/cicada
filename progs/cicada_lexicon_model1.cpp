@@ -72,8 +72,8 @@ int main(int argc, char ** argv)
     
     threads = utils::bithack::max(threads, 1);
     
-    ttable_type ttable_source_target(smooth_lexicon);
-    ttable_type ttable_target_source(smooth_lexicon);
+    ttable_type ttable_source_target(prior_lexicon, smooth_lexicon);
+    ttable_type ttable_target_source(prior_lexicon, smooth_lexicon);
     
     aligned_type aligned_source_target;
     aligned_type aligned_target_source;
@@ -192,7 +192,7 @@ struct TaskMaximize : public Maximizer
       }
       
       if (ttable_source_target.exists(source_id))
-	Maximizer::operator()(ttable_source_target[source_id]);
+	Maximizer::operator()(ttable_source_target[source_id], ttable_source_target.prior);
     }
     
     for (word_type::id_type target_id = id; target_id < ttable_target_source.size(); target_id += learners.size()) {
@@ -205,7 +205,7 @@ struct TaskMaximize : public Maximizer
       }
       
       if (ttable_target_source.exists(target_id))
-	Maximizer::operator()(ttable_target_source[target_id]);
+	Maximizer::operator()(ttable_target_source[target_id], ttable_target_source.prior);
     }
   }
   
