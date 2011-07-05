@@ -558,7 +558,7 @@ struct LearnHMM : public LearnBase
     
     hmm.forward_backward(source, target);
     
-    objective += hmm.objective() / (target_size + 1); // + 1 for EOS
+    objective += hmm.objective() / target_size;
     
     hmm.accumulate(source, target, counts_ttable);
     
@@ -583,7 +583,7 @@ struct LearnHMM : public LearnBase
     
     hmm.forward_backward(source, target);
     
-    objective += hmm.objective() / (target_size + 1); // + 1 for EOS
+    objective += hmm.objective() / target_size;
     
     hmm.accumulate(source, target, counts_ttable);
     
@@ -674,7 +674,7 @@ struct LearnHMMPosterior : public LearnBase
     
     hmm.forward_backward(source, target);
     
-    objective += hmm.objective() / (target_size + 1); // + 1 for EOS
+    objective += hmm.objective() / target_size;
     
     phi.clear();
     phi.resize(source_size + 1, 0.0);
@@ -740,7 +740,7 @@ struct LearnHMMPosterior : public LearnBase
     
     hmm.forward_backward(source, target);
     
-    objective += hmm.objective() / (target_size + 1); // + 1 for EOS
+    objective += hmm.objective() / target_size;
     
     phi.clear();
     phi.resize(source_size + 1, 0.0);
@@ -865,8 +865,8 @@ struct LearnHMMSymmetric : public LearnBase
     hmm_source_target.forward_backward(source, target);
     hmm_target_source.forward_backward(target, source);
     
-    objective_source_target += hmm_source_target.objective() / (target_size + 1); // + 1 for EOS
-    objective_target_source += hmm_target_source.objective() / (source_size + 1); // + 1 for EOS
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
     
     // accumulate lexicon
     hmm_source_target.estimate_posterior(source, target);
@@ -904,8 +904,8 @@ struct LearnHMMSymmetric : public LearnBase
     hmm_source_target.forward_backward(source, target);
     hmm_target_source.forward_backward(target, source);
     
-    objective_source_target += hmm_source_target.objective() / (target_size + 1); // + 1 for EOS
-    objective_target_source += hmm_target_source.objective() / (source_size + 1); // + 1 for EOS
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
     
     // accumulate lexicon
     hmm_source_target.estimate_posterior(source, target);
@@ -955,8 +955,8 @@ struct LearnHMMSymmetricPosterior : public LearnBase
     hmm_source_target.forward_backward(source, target);
     hmm_target_source.forward_backward(target, source);
     
-    objective_source_target += hmm_source_target.objective() / (target_size + 1); // + 1 for EOS
-    objective_target_source += hmm_target_source.objective() / (source_size + 1); // + 1 for EOS
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
     
     phi.clear();
     phi.resize(target_size + 1, source_size + 1, 0.0);
@@ -1027,8 +1027,8 @@ struct LearnHMMSymmetricPosterior : public LearnBase
     hmm_source_target.forward_backward(source, target);
     hmm_target_source.forward_backward(target, source);
     
-    objective_source_target += hmm_source_target.objective() / (target_size + 1); // + 1 for EOS
-    objective_target_source += hmm_target_source.objective() / (source_size + 1); // + 1 for EOS
+    objective_source_target += hmm_source_target.objective() / target_size;
+    objective_target_source += hmm_target_source.objective() / source_size;
     
     phi.clear();
     phi.resize(target_size + 1, source_size + 1, 0.0);
