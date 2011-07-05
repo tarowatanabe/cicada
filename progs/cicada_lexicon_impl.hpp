@@ -348,7 +348,9 @@ struct ttable_type
 
   void initialize()
   {
-    clear();
+    for (size_type i = 0; i != ttable.size(); ++ i)
+      if (ttable.exists(i))
+        ttable[i].clear();
   }
 
   ttable_type& operator+=(const ttable_type& x)
@@ -434,7 +436,9 @@ struct aligned_type
 
   void initialize()
   {
-    clear();
+    for (size_type i = 0; i != aligned.size(); ++ i)
+      if (aligned.exists(i))
+        aligned[i].clear();
   }
   
   aligned_set_type aligned;
@@ -486,14 +490,14 @@ struct LearnBase
 
   void initialize()
   {
-    ttable_counts_source_target.initialize();
-    ttable_counts_target_source.initialize();
+    ttable_counts_source_target.clear();
+    ttable_counts_target_source.clear();
 
     atable_counts_source_target.initialize();
     atable_counts_target_source.initialize();
     
-    aligned_source_target.initialize();
-    aligned_target_source.initialize();
+    aligned_source_target.clear();
+    aligned_target_source.clear();
     
     objective_source_target = 0.0;
     objective_target_source = 0.0;
