@@ -647,8 +647,8 @@ void learn(const int iteration,
     }
     
     for (size_t i = 0; i != learners.size(); ++ i) {
-      learners[i].atable_counts_source_target = atable_source_target;
-      learners[i].atable_counts_target_source = atable_target_source;
+      learners[i].atable_source_target = atable_source_target;
+      learners[i].atable_target_source = atable_target_source;
     }
     
     workers_maximize.join_all();
