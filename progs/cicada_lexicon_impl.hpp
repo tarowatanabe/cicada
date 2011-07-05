@@ -496,8 +496,8 @@ struct LearnBase
     atable_counts_source_target.initialize();
     atable_counts_target_source.initialize();
     
-    aligned_source_target.initialize();
-    aligned_target_source.initialize();
+    aligned_source_target.clear();
+    aligned_target_source.clear();
     
     objective_source_target = 0.0;
     objective_target_source = 0.0;
