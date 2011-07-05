@@ -6,10 +6,13 @@ cicada_lexicon_dice
 	Dice
 
 cicada_lexicon_model1
-	IBM Model1 + symmetric learning[1] + posterior constrained learning [2]
+	IBM Model1[1] + symmetric learning[2] + posterior constrained learning [3]
+
+cicada_lexicon_hmm
+	HMM Model[2] + symmetric learning[2] + posterior constrained learning [3]
 
 cicada_lexicon_global{,_mpi}
-	Trigger based global lexicon[3]
+	Trigger based global lexicon[4]
 
 cicada_lexicon
 	Heuristic word alignment combiner (as in Moses grow-diagl-final-and etc.)
@@ -17,6 +20,25 @@ cicada_lexicon
 	+ MaxMatch combiner (using Hungarian algorithm)
 
 [1]
+@article{Brown:1993:MSM:972470.972474,
+ author = {Brown, Peter F. and Pietra, Vincent J. Della and Pietra, Stephen A. Della and Mercer, Robert L.},
+ title = {The mathematics of statistical machine translation: parameter estimation},
+ journal = {Comput. Linguist.},
+ issue_date = {June 1993},
+ volume = {19},
+ issue = {2},
+ month = {June},
+ year = {1993},
+ issn = {0891-2017},
+ pages = {263--311},
+ numpages = {49},
+ url = {http://portal.acm.org/citation.cfm?id=972470.972474},
+ acmid = {972474},
+ publisher = {MIT Press},
+ address = {Cambridge, MA, USA},
+} 
+
+[2]
 @InProceedings{liang-taskar-klein:2006:HLT-NAACL06-Main,
   author    = {Liang, Percy  and  Taskar, Ben  and  Klein, Dan},
   title     = {Alignment by Agreement},
@@ -29,7 +51,7 @@ cicada_lexicon
   url       = {http://www.aclweb.org/anthology/N/N06/N06-1014}
 }
 
-[2]
+[3]
 @InProceedings{ganchev-gracca-taskar:2008:ACLMain,
   author    = {Ganchev, Kuzman  and  Gra\c{c}a, Jo\~{a}o V.  and  Taskar, Ben},
   title     = {Better Alignments = Better Translations?},
@@ -42,7 +64,7 @@ cicada_lexicon
   url       = {http://www.aclweb.org/anthology/P/P08/P08-1112}
 }
 
-[3]
+[4]
 @InProceedings{mauser-hasan-ney:2009:EMNLP,
   author    = {Mauser, Arne  and  Hasan, Sa{\v{s}}a  and  Ney, Hermann},
   title     = {Extending Statistical Machine Translation with Discriminative and Trigger-Based Lexicon Models},
