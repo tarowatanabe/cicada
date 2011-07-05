@@ -84,6 +84,8 @@ opt_parser = OptionParser(
     make_option("--p0",              default=1e-3, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: 1e-3)"),
     make_option("--prior-lexicon",   default=1e-2, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 1e-2)"),
     make_option("--prior-alignment", default=1e-4, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 1e-4)"),
+    make_option("--smooth-lexicon",   default=1e-20, action="store", type="float", metavar="SMOOTH", help="smoothing for lexicon model (default: 1e-20)"),
+    make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="smoothing for alignment model (default: 1e-20)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
@@ -253,6 +255,8 @@ class Giza:
                  iteration_hmm=5,
                  prior_lexicon=0.1,
                  prior_alignment=0.1,
+                 smooth_lexicon=1e-20,
+                 smooth_alignment=1e-20,
                  p0=1e-4,
                  symmetric=None,
                  posterior=None,
@@ -320,11 +324,15 @@ class Giza:
         self.p0 = p0
         self.prior_lexicon = prior_lexicon
         self.prior_alignment = prior_alignment
+        self.smooth_lexicon = smooth_lexicon
+        self.smooth_alignment = smooth_alignment
         
         command += " --p0 %.20g" %(p0)
         command += " --prior-lexicon %.20g"   %(prior_lexicon)
+        command += " --smooth-lexicon %.20g"   %(smooth_lexicon)
         if iteration_hmm > 0:
             command += " --prior-alignment %.20g" %(prior_alignment)
+            command += " --smooth-alignment %.20g" %(smooth_alignment)
                     
         command += " --threads %d" %(threads)
 
@@ -448,9 +456,11 @@ class AlignmentPosterior:
             command += " --iteration 0"
             
         command += " --p0 %.20g" %(giza.p0)
-        command += " --prior-lexicon %.20g"   %(giza.prior_lexicon)
+        command += " --prior-lexicon %.20g"  %(giza.prior_lexicon)
+        command += " --smooth-lexicon %.20g" %(giza.smooth_lexicon)
         if learn_hmm:
-            command += " --prior-alignment %.20g" %(giza.prior_alignment)
+            command += " --prior-alignment %.20g"  %(giza.prior_alignment)
+            command += " --smooth-alignment %.20g" %(giza.smooth_alignment)
 
         if 'itg' in alignment:
             command += " --itg"
@@ -526,6 +536,8 @@ giza = Giza(cicada=cicada,
             iteration_hmm=options.iteration_hmm,
             prior_lexicon=options.prior_lexicon,
             prior_alignment=options.prior_alignment,
+            smooth_lexicon=options.smooth_lexicon,
+            smooth_alignment=options.smooth_alignment,
             p0=options.p0,
             symmetric=options.symmetric,
             posterior=options.posterior,

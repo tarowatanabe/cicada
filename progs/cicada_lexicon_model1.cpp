@@ -39,7 +39,7 @@ bool max_match_mode = false;
 // parameter...
 double p0    = 1e-4;
 double prior_lexicon = 0.1;
-double smooth_lexicon = 1e-40;
+double smooth_lexicon = 1e-20;
 
 double threshold = 0.0;
 
