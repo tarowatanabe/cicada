@@ -311,6 +311,12 @@ struct ttable_type
 	counts[citer->first] += citer->second;
       return *this;
     }
+
+    count_map_type& operator|=(const count_map_type& x)
+    {
+      counts.insert(x.begin(), x.end());
+      return *this;
+    }
     
     counts_type counts;
   };
@@ -373,6 +379,15 @@ struct ttable_type
     
     return *this;
   }
+
+  ttable_type& operator|=(const ttable_type& x)
+  {
+    for (size_type i = 0; i != x.ttable.size(); ++ i) 
+      if (x.ttable.exists(i))
+	ttable[i] |= x.ttable[i];
+    
+    return *this;
+  }
   
   count_dict_type ttable;
   double prior;
@@ -412,7 +427,7 @@ struct aligned_type
     
     size_type size() const { return aligned.size(); }
     bool empty() const { return aligned.empty(); }
-
+    
     void clear() { aligned.clear(); }
     
     aligned_map_type& operator+=(const aligned_map_type& x)
