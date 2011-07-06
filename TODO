@@ -96,6 +96,9 @@ Add MPI version of Model1/HMM alignment?
 
 Model1 starting from dice-estimated parameters...??
 
+Dictionary constrained Model1/HMM training?
+   As in GIZA++, we will constraint by the existence of dictionary items
+
 Integrate cicada-alignment.py and cicada-extract.py???
    Currently, NO, in order to encourange user to select an alternative paths.
 
