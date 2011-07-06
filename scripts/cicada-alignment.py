@@ -84,8 +84,8 @@ opt_parser = OptionParser(
     make_option("--p0",              default=0.01, action="store", type="float", metavar='P0',    help="parameter for NULL alignment (default: 0.01)"),
     make_option("--prior-lexicon",   default=0.01, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.01)"),
     make_option("--prior-alignment", default=0.01, action="store", type="float", metavar="PRIOR", help="alignment model prior (default: 0.01)"),
-    make_option("--smooth-lexicon",   default=1e-20, action="store", type="float", metavar="SMOOTH", help="smoothing for lexicon model (default: 1e-20)"),
-    make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="smoothing for alignment model (default: 1e-20)"),
+    make_option("--smooth-lexicon",   default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for lexicon model (default: 1e-20)"),
+    make_option("--smooth-alignment", default=1e-20, action="store", type="float", metavar="SMOOTH", help="lower-bound parameter for alignment model (default: 1e-20)"),
 
     # CICADA Toolkit directory
     make_option("--cicada-dir", default="", action="store", type="string",
