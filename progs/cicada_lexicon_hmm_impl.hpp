@@ -422,23 +422,18 @@ struct LearnHMM : public LearnBase
 	const prob_type* fiter = &(*forward.begin(trg)) + 1;
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
 	prob_type* piter = &(*posterior.begin(trg)) + 1;
-	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter, ++ piter) {
-	  const prob_type count = (*fiter) * (*biter) * factor;
-	  
-	  if (std::isfinite(count) && count > 0.0) 
-	    (*piter) += count;
-	}
+	
+	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter, ++ piter)
+	  (*piter) += (*fiter) * (*biter) * factor;
 	
 	fiter = &(*forward.begin(trg)) + source_size + 2;
 	biter = &(*backward.begin(trg)) + source_size + 2;
+	
 	double count_none = 0.0;
-	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
-	  const prob_type count = (*fiter) * (*biter) * factor;
-	  
-	  if (std::isfinite(count) && count > 0.0)
-	    count_none += count;
-	}
-	posterior(trg, 0) = count_none;
+	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
+	  count_none += (*fiter) * (*biter) * factor;
+	
+      	posterior(trg, 0) = count_none;
       }
     }
 
@@ -472,22 +467,14 @@ struct LearnHMM : public LearnBase
 	const prob_type* fiter = &(*forward.begin(trg)) + 1;
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
 	
-	for (int src = 1; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
-	  const prob_type count = (*fiter) * (*biter) * factor;
-	  
-	  if (std::isfinite(count) && count > 0.0)
-	    counts[source[src]][target[trg]] += count;
-	}
-      
+	for (int src = 1; src < source_size + 2; ++ src, ++ fiter, ++ biter)
+	  counts[source[src]][target[trg]] += (*fiter) * (*biter) * factor;
+	
 	// null alignment...
 	double count_none = 0.0;
-	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
-	  const prob_type count = (*fiter) * (*biter) * factor;
-	  
-	  if (std::isfinite(count) && count > 0.0)
-	    count_none += count;
-	}
-      
+	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
+	  count_none += (*fiter) * (*biter) * factor;
+	
 	counts[vocab_type::NONE][target[trg]] += count_none;
       }
     }
@@ -529,8 +516,7 @@ struct LearnHMM : public LearnBase
 	      const double count_word = (*fiter_word) * factor_backward * (*titer_word) * factor;
 	      const double count_none = (*fiter_none) * factor_backward * (*titer_none) * factor;
 	      
-	      mapped[prev]->operator[](next - prev) += ((count_word > 0.0 && std::isfinite(count_word) ? count_word : 0.0)
-							+ (count_none > 0.0 && std::isfinite(count_none) ? count_none : 0.0));
+	      mapped[prev]->operator[](next - prev) += count_word + count_none;
 	    }
 	  }
 	}

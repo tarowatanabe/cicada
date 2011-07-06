@@ -99,6 +99,10 @@ Model1 starting from dice-estimated parameters...??
 Dictionary constrained Model1/HMM training?
    As in GIZA++, we will constraint by the existence of dictionary items
 
+Alignment constrained alignment
+   As observed in training, we will constraint the alignment space in training.
+   Do we also constrain for the viterbi/ITG/MaxMatch alignment?
+
 Integrate cicada-alignment.py and cicada-extract.py???
    Currently, NO, in order to encourange user to select an alternative paths.
 
