@@ -16,7 +16,10 @@ google-sparsehash (http://code.google.com/p/google-sparsehash/)
 Optional:
 	nicttm:  alignment model training
 	         or, you can uses moses's script for alignment training with GIZA++
-	         or, try berkeley aligner.
+	         or, try berkeley aligner
+		 or, try postcat.
+		 Remark that cicada can "align words" using symmetized training of berkeley aligner and posterior
+		 constrained training of postcat.
 
 	google-perftools (http://code.google.com/p/google-perftools/)
 	jemalloc (http://mxr.mozilla.org/mozilla-central/source/memory/jemalloc/)
