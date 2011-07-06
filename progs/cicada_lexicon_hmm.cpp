@@ -150,6 +150,9 @@ int main(int argc, char ** argv)
     workers_read.join_all();
     
     if (iteration_model1 > 0) {
+      if (debug)
+	std::cerr << "start Model1 training" << std::endl;
+      
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
@@ -243,6 +246,9 @@ int main(int argc, char ** argv)
     }
     
     if (iteration_hmm > 0) {
+      if (debug)
+	std::cerr << "start HMM training" << std::endl;
+
       if (variational_bayes_mode) {
 	if (symmetric_mode) {
 	  if (posterior_mode)
@@ -336,27 +342,37 @@ int main(int argc, char ** argv)
     }
     
     if (! viterbi_source_target_file.empty() || ! viterbi_target_source_file.empty()) {
-      if (itg_mode)
+      if (itg_mode) {
+	if (debug)
+	  std::cerr << "ITG alignment" << std::endl;
+
 	viterbi<ITGHMM>(ttable_source_target,
 			ttable_target_source,
 			atable_source_target,
 			atable_target_source,
 			classes_source,
 			classes_target);
-      else if (max_match_mode)
+      } else if (max_match_mode) {
+	if (debug)
+	  std::cerr << "Max-Match alignment" << std::endl;
+	
 	viterbi<MaxMatchHMM>(ttable_source_target,
 			     ttable_target_source,
 			     atable_source_target,
 			     atable_target_source,
 			     classes_source,
 			     classes_target);
-      else
+      } else {
+	if (debug)
+	  std::cerr << "Viterbi alignment" << std::endl;
+	
 	viterbi<ViterbiHMM>(ttable_source_target,
 			    ttable_target_source,
 			    atable_source_target,
 			    atable_target_source,
 			    classes_source,
 			    classes_target);
+      }
     }
     
     // final writing
@@ -551,7 +567,7 @@ void learn(const int iteration,
   
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
-      std::cerr << "iteration: " << iter << std::endl;
+      std::cerr << "iteration: " << (iter + 1) << std::endl;
 
     utils::resource accumulate_start;
     
@@ -903,9 +919,6 @@ void viterbi(const ttable_type& ttable_source_target,
   
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
 
-  if (debug)
-    std::cerr << "Viterbi alignment" << std::endl;
-  
   queue_type queue(threads * 4096);
   queue_type queue_source_target(threads * 4096);
   queue_type queue_target_source(threads * 4096);

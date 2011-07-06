@@ -447,7 +447,8 @@ class AlignmentPosterior:
         self.alignment = os.path.join(alignment_dir, "aligned." + alignment)
         
         command += " --viterbi-source-target \"%s\"" %(self.alignment)
-        command += " --viterbi-target-source /dev/null"
+        # we do not specify an alternative alignment!
+        # command += " --viterbi-target-source /dev/null"
 
         if learn_hmm:
             command += " --iteration-model1 0"
