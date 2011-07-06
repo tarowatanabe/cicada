@@ -155,6 +155,7 @@ parse-coarse: parsing via coarse-to-fine\n\
 \tyield=[source|target] use source or target yield for rule\n\
 \ttreebank=[true|false] assume treebank-style grammar\n\
 \tpos=[true|false] pos-annotated input\n\
+\tsize=<beam size>\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tgoal=[goal symbol]\n\

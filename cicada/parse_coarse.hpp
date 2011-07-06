@@ -854,6 +854,7 @@ namespace cicada
 		IteratorGrammar gfirst, IteratorGrammar glast,
 		IteratorThreshold tfirst, IteratorThreshold tlast,
 		const function_type& __function,
+		const int __beam_size,
 		const bool __yield_source=false,
 		const bool __treebank=false,
 		const bool __pos_mode=false)
@@ -861,6 +862,7 @@ namespace cicada
 	grammars(gfirst, glast),
 	thresholds(tfirst, tlast),
 	function(__function),
+	beam_size(__beam_size),
 	yield_source(__yield_source),
 	treebank(__treebank),
 	pos_mode(__pos_mode)
@@ -876,6 +878,7 @@ namespace cicada
 		const Grammars& __grammars,
 		const Thresholds& __thresholds,
 		const function_type& __function,
+		const int __beam_size,
 		const bool __yield_source=false,
 		const bool __treebank=false,
 		const bool __pos_mode=false)
@@ -883,6 +886,7 @@ namespace cicada
 	grammars(__grammars.begin(), __grammars.end()),
 	thresholds(__thresholds.begin(), __thresholds.end()),
 	function(__function),
+	beam_size(__beam_size),
 	yield_source(__yield_source),
 	treebank(__treebank),
 	pos_mode(__pos_mode)
@@ -913,7 +917,8 @@ namespace cicada
       parsers.front()->operator()(lattice, scores_init, PruneNone());
 
       // final parsing with hypergraph construction
-      ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
+      //ComposeCKY composer(goal, grammars.back(), yield_source, treebank, pos_mode, true);
+      cicada::ParseCKY<Semiring, Function> composer(goal, grammars.back(), function, beam_size, yield_source, treebank, pos_mode, true);
       
       double factor = 1.0;
       
@@ -983,6 +988,7 @@ namespace cicada
     threshold_set_type thresholds;
     
     const function_type& function;
+    const int beam_size;
 
     const bool yield_source;
     const bool treebank;
@@ -998,11 +1004,12 @@ namespace cicada
 		    const Function& function,
 		    const Lattice& lattice,
 		    HyperGraph& graph,
+		    const int  beam_size,
 		    const bool yield_source=false,
 		    const bool treebank=false,
 		    const bool pos_mode=false)
   {
-    ParseCoarse<typename Function::value_type, Function>(goal, gfirst, glast, tfirst, tlast, function, yield_source, treebank, pos_mode)(lattice, graph);
+    ParseCoarse<typename Function::value_type, Function>(goal, gfirst, glast, tfirst, tlast, function, beam_size, yield_source, treebank, pos_mode)(lattice, graph);
   }
   
   template <typename Grammars, typename Thresholds, typename Function>
@@ -1013,11 +1020,12 @@ namespace cicada
 		    const Function& function,
 		    const Lattice& lattice,
 		    HyperGraph& graph,
+		    const int  beam_size,
 		    const bool yield_source=false,
 		    const bool treebank=false,
 		    const bool pos_mode=false)
   {
-    ParseCoarse<typename Function::value_type, Function>(goal, grammars, thresholds, function, yield_source, treebank, pos_mode)(lattice, graph);
+    ParseCoarse<typename Function::value_type, Function>(goal, grammars, thresholds, function, beam_size, yield_source, treebank, pos_mode)(lattice, graph);
   }
   
 };

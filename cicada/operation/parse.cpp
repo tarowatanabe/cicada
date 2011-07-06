@@ -553,6 +553,7 @@ namespace cicada
 	goal(__goal),
 	weights(0),
 	weights_assigned(0),
+	size(200),
 	weights_one(false),
 	weights_fixed(false),
 	yield_source(false),
@@ -570,7 +571,9 @@ namespace cicada
       bool target = false;
       
       for (param_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "weights")
+	if (utils::ipiece(piter->first) == "size")
+	  size = utils::lexical_cast<int>(piter->second);
+	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
 	  weights_one = utils::lexical_cast<bool>(piter->second);
@@ -696,12 +699,12 @@ namespace cicada
 	cicada::parse_coarse(goal,
 			     grammars.begin(), grammars.end(),
 			     thresholds.begin(), thresholds.end(),
-			     weight_function_one<weight_type>(), lattice, parsed, yield_source, treebank, pos_mode);
+			     weight_function_one<weight_type>(), lattice, parsed, size, yield_source, treebank, pos_mode);
       else
 	cicada::parse_coarse(goal,
 			     grammars.begin(), grammars.end(),
 			     thresholds.begin(), thresholds.end(),
-			     weight_function<weight_type>(*weights_parse), lattice, parsed, yield_source, treebank, pos_mode);
+			     weight_function<weight_type>(*weights_parse), lattice, parsed, size, yield_source, treebank, pos_mode);
       
       utils::resource end;
     
