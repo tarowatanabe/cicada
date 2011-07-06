@@ -425,13 +425,13 @@ struct LearnHMM : public LearnBase
 	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter, ++ piter) {
 	  const prob_type count = (*fiter) * (*biter) * factor;
 	  
-	  if (std::isfinite(count) && count > 0.0)
+	  if (std::isfinite(count) && count > 0.0) 
 	    (*piter) += count;
 	}
 	
 	fiter = &(*forward.begin(trg)) + source_size + 2;
 	biter = &(*backward.begin(trg)) + source_size + 2;
-	prob_type count_none = 0.0;
+	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
 	  const prob_type count = (*fiter) * (*biter) * factor;
 	  
@@ -483,6 +483,7 @@ struct LearnHMM : public LearnBase
 	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter) {
 	  const prob_type count = (*fiter) * (*biter) * factor;
+	  
 	  if (std::isfinite(count) && count > 0.0)
 	    count_none += count;
 	}
