@@ -42,9 +42,11 @@ struct LearnModel1 : public LearnBase
     
     double logsum = 0.0;
     
+    probs.reserve(source_size + 1);
     probs.resize(source_size + 1);
     
     points.clear();
+    points.reserve(target_size);
     points.resize(target_size);
     
     if (inverse) {
@@ -141,6 +143,7 @@ struct LearnModel1 : public LearnBase
     
     double logsum = 0.0;
     
+    probs.reserve(source_size + 1);
     probs.resize(source_size + 1);
     
     for (size_type trg = 0; trg != target_size; ++ trg) {
@@ -228,20 +231,25 @@ struct LearnModel1Posterior : public LearnBase
     double logsum = 0.0;
     
     posterior.clear();
-    posterior.reserve(target_size + 1, source_size + 1);
-    posterior.resize(target_size + 1, source_size + 1, 0.0);
-    
     probs.clear();
+    
+    posterior.reserve(target_size + 1, source_size + 1);
     probs.reserve(target_size + 1, source_size + 1);
+    
+    posterior.resize(target_size + 1, source_size + 1, 0.0);
     probs.resize(target_size + 1, source_size + 1, 0.0);
     
     phi.clear();
-    phi.resize(source_size + 1, 0.0);
-    
     exp_phi.clear();
+    
+    phi.reserve(source_size + 1);
+    exp_phi.reserve(source_size + 1);
+    
+    phi.resize(source_size + 1, 0.0);
     exp_phi.resize(source_size + 1, 1.0);
     
     points.clear();
+    points.reserve(target_size);
     points.resize(target_size);
 
     if (inverse) {
@@ -377,15 +385,18 @@ struct LearnModel1Posterior : public LearnBase
     double logsum = 0.0;
     
     posterior.reserve(target_size + 1, source_size + 1);
-    posterior.resize(target_size + 1, source_size + 1, 0.0);
-    
     probs.reserve(target_size + 1, source_size + 1);
+    
+    posterior.resize(target_size + 1, source_size + 1, 0.0);
     probs.resize(target_size + 1, source_size + 1, 0.0);
     
     phi.clear();
-    phi.resize(source_size + 1, 0.0);
-    
     exp_phi.clear();
+    
+    phi.reserve(source_size + 1);
+    exp_phi.reserve(source_size + 1);
+    
+    phi.resize(source_size + 1, 0.0);
     exp_phi.resize(source_size + 1, 1.0);
     
     for (size_type trg = 0; trg != target_size; ++ trg) {
@@ -504,6 +515,9 @@ struct LearnModel1Symmetric : public LearnBase
 
     points_source_target.clear();
     points_target_source.clear();
+
+    points_source_target.reserve(target_size);
+    points_target_source.reserve(source_size);
     
     points_source_target.resize(target_size);
     points_target_source.resize(source_size);
@@ -849,6 +863,9 @@ struct LearnModel1SymmetricPosterior : public LearnBase
     
     points_source_target.clear();
     points_target_source.clear();
+
+    points_source_target.reserve(target_size);
+    points_target_source.reserve(source_size);
     
     points_source_target.resize(target_size);
     points_target_source.resize(source_size);
@@ -1448,6 +1465,7 @@ struct ITGModel1 : public ViterbiBase
     }
 
     costs.clear();
+    costs.reserve(source_size + 1, target_size + 1);
     costs.resize(source_size + 1, target_size + 1, boost::numeric::bounds<double>::lowest());
     
     for (size_type src = 1; src <= source_size; ++ src)
@@ -1608,6 +1626,7 @@ struct MaxMatchModel1 : public ViterbiBase
     }
     
     costs.clear();
+    costs.reserve(source_size + target_size, target_size + source_size);
     costs.resize(source_size + target_size, target_size + source_size, 0.0);
     
     for (size_type src = 0; src != source_size; ++ src)

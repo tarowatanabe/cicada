@@ -94,6 +94,8 @@ reimplement liblinear functionality...???
 
 Add MPI version of Model1/HMM alignment?
 
+Model1 starting from dice-estimated parameters...??
+
 Integrate cicada-alignment.py and cicada-extract.py???
    Currently, NO, in order to encourange user to select an alternative paths.
 

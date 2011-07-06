@@ -106,6 +106,7 @@ struct LearnHMM : public LearnBase
 	*ctiter = classes_target[*titer];
 
       points.clear();
+      points.reserve(target_size);
       points.resize(target_size);
 
       if (inverse) {
@@ -677,15 +678,19 @@ struct LearnHMMPosterior : public LearnBase
     objective += hmm.objective() / target_size;
     
     phi.clear();
-    phi.resize(source_size + 1, 0.0);
-    
     exp_phi_old.clear();
+    
+    phi.reserve(source_size);
+    exp_phi_old.reserve(source_size);
+    
+    phi.resize(source_size + 1, 0.0);
     exp_phi_old.resize(source_size + 1, 1.0);
     
     for (int iter = 0; iter < 5; ++ iter) {
       hmm.estimate_posterior(source, target);
       
       exp_phi.clear();
+      exp_phi.reserve(source_size + 1);
       exp_phi.resize(source_size + 1, 1.0);
       
       size_type count_zero = 0;
@@ -743,15 +748,19 @@ struct LearnHMMPosterior : public LearnBase
     objective += hmm.objective() / target_size;
     
     phi.clear();
-    phi.resize(source_size + 1, 0.0);
-    
     exp_phi_old.clear();
+    
+    phi.reserve(source_size + 1);
+    exp_phi_old.reserve(source_size + 1);
+    
+    phi.resize(source_size + 1, 0.0);
     exp_phi_old.resize(source_size + 1, 1.0);
     
     for (int iter = 0; iter < 5; ++ iter) {
       hmm.estimate_posterior(source, target);
       
       exp_phi.clear();
+      exp_phi.reserve(source_size + 1);
       exp_phi.resize(source_size + 1, 1.0);
       
       size_type count_zero = 0;
@@ -959,12 +968,15 @@ struct LearnHMMSymmetricPosterior : public LearnBase
     objective_target_source += hmm_target_source.objective() / source_size;
     
     phi.clear();
-    phi.resize(target_size + 1, source_size + 1, 0.0);
-    
     exp_phi.clear();
-    exp_phi.resize(target_size + 1, source_size + 1, 1.0);
-    
     exp_phi_old.clear();
+    
+    phi.reserve(target_size + 1, source_size + 1);
+    exp_phi.reserve(target_size + 1, source_size + 1);
+    exp_phi_old.reserve(target_size + 1, source_size + 1);
+    
+    phi.resize(target_size + 1, source_size + 1, 0.0);
+    exp_phi.resize(target_size + 1, source_size + 1, 1.0);
     exp_phi_old.resize(target_size + 1, source_size + 1, 1.0);
     
     for (int iter = 0; iter < 5; ++ iter) {
@@ -1031,12 +1043,15 @@ struct LearnHMMSymmetricPosterior : public LearnBase
     objective_target_source += hmm_target_source.objective() / source_size;
     
     phi.clear();
-    phi.resize(target_size + 1, source_size + 1, 0.0);
-    
     exp_phi.clear();
-    exp_phi.resize(target_size + 1, source_size + 1, 1.0);
-    
     exp_phi_old.clear();
+
+    phi.reserve(target_size + 1, source_size + 1);
+    exp_phi.reserve(target_size + 1, source_size + 1);
+    exp_phi_old.reserve(target_size + 1, source_size + 1);
+    
+    phi.resize(target_size + 1, source_size + 1, 0.0);
+    exp_phi.resize(target_size + 1, source_size + 1, 1.0);
     exp_phi_old.resize(target_size + 1, source_size + 1, 1.0);
     
     for (int iter = 0; iter < 5; ++ iter) {
@@ -1130,6 +1145,11 @@ struct ViterbiHMM : public ViterbiBase
     forward_sum.clear();
     backptr.clear();
     scale.clear();
+
+    forward_max.reserve(target_size + 2, (source_size + 2) * 2);
+    forward_sum.reserve(target_size + 2, (source_size + 2) * 2);
+    backptr.reserve(target_size + 2, (source_size + 2) * 2);
+    scale.reserve(target_size + 2);
     
     forward_max.resize(target_size + 2, (source_size + 2) * 2, 0.0);
     forward_sum.resize(target_size + 2, (source_size + 2) * 2, 0.0);
@@ -1354,6 +1374,7 @@ struct ITGHMM : public ViterbiBase
     hmm_target_source.estimate_posterior(target, source);
     
     costs.clear();
+    costs.reserve(source_size + 1, target_size + 1);
     costs.resize(source_size + 1, target_size + 1, boost::numeric::bounds<double>::lowest());
     
     for (size_type src = 1; src <= source_size; ++ src)
@@ -1464,6 +1485,7 @@ struct MaxMatchHMM : public ViterbiBase
     hmm_target_source.estimate_posterior(target, source);
     
     costs.clear();
+    costs.reserve(source_size + target_size, target_size + source_size);
     costs.resize(source_size + target_size, target_size + source_size, 0.0);
     
     for (size_type src = 0; src != source_size; ++ src)
