@@ -470,6 +470,9 @@ struct LearnHMM : public LearnBase
 	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter)
 	  counts[source[src]][target[trg]] += (*fiter) * (*biter) * factor;
 	
+	fiter = &(*forward.begin(trg)) + source_size + 2;
+	biter = &(*backward.begin(trg)) + source_size + 2;
+	
 	// null alignment...
 	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
