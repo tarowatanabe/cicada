@@ -391,7 +391,7 @@ struct LearnHMM : public LearnBase
 	const prob_type* eiter_none = &(*emission.begin(trg + 1)) + (source_size + 2);
 	prob_type*       piter_none1 = &(*backward.begin(trg));
 	prob_type*       piter_none2 = piter_none1 + (source_size + 2);
-	
+
 	for (int next = 0; next < source_size + 2 - 1; ++ next, ++ niter_none, ++ eiter_none, ++ piter_none1, ++ piter_none2) {
 	  const int next_none = next + source_size + 2;
 	  const int prev_none1 = next;
