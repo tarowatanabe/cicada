@@ -171,14 +171,16 @@ namespace utils
     
     const_reference operator[](size_type __n) const
     {
-      if (__n >= impl.map().size())
-	const_cast<impl_type&>(impl).map().resize(__n + 1, 0);
-      if (! impl.map()[__n]) {
+      impl_type& __impl = const_cast<impl_type&>(impl);
+      
+      if (__n >= __impl.map().size())
+	__impl.map().resize(__n + 1, 0);
+      if (! __impl.map()[__n]) {
 	// perform allocation and construction...
-	const_cast<impl_type&>(impl).map()[__n] = const_cast<impl_type&>(impl).alloc().allocate(1);
-	utils::construct_object(const_cast<impl_type&>(impl).map()[__n]);
+	__impl.map()[__n] = __impl.alloc().allocate(1);
+	utils::construct_object(__impl.map()[__n]);
       }
-      return *(impl.map()[__n]);
+      return *(__impl.map()[__n]);
     }
     
   private:

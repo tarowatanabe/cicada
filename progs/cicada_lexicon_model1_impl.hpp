@@ -880,6 +880,9 @@ struct LearnModel1SymmetricPosterior : public LearnBase
     
     phi.clear();
     exp_phi.clear();
+
+    phi.reserve(target_size + 1, source_size + 1);
+    exp_phi.reserve(target_size + 1, source_size + 1);
     
     phi.resize(target_size + 1, source_size + 1, 0.0);
     exp_phi.resize(target_size + 1, source_size + 1, 1.0);
@@ -1112,6 +1115,9 @@ struct LearnModel1SymmetricPosterior : public LearnBase
     
     phi.clear();
     exp_phi.clear();
+
+    phi.reserve(target_size + 1, source_size + 1);
+    exp_phi.reserve(target_size + 1, source_size + 1);
     
     phi.resize(target_size + 1, source_size + 1, 0.0);
     exp_phi.resize(target_size + 1, source_size + 1, 1.0);

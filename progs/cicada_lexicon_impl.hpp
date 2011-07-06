@@ -165,18 +165,18 @@ struct atable_type
       // which implies: 1 <= diff < source_size + 1
       //
       
-      return std::max(estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i - i_prev], smooth);
+      return estimate(class_pair_type(source, target), range_type(1, source_size + 1))[i - i_prev];
     } else if (target == vocab_type::EOS) {
       // which implies: 1 <= diff < source_size - i_prev + 1
       // 
       
-      return std::max(estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[i - i_prev], smooth);
+      return estimate(class_pair_type(source, target), range_type(1, source_size - i_prev + 1))[i - i_prev];
     } else {
       // 0 <= i < source_size
       // which implies: 0 - i_prev <= diff < source_size - i_prev
       //
       
-      return std::max(estimate(class_pair_type(source, target), range_type(0 - i_prev, source_size - i_prev))[i - i_prev], smooth);
+      return estimate(class_pair_type(source, target), range_type(0 - i_prev, source_size - i_prev))[i - i_prev];
     }
   }
   
@@ -197,7 +197,7 @@ struct atable_type
       
       const double sum_digamma = utils::mathop::digamma(sum);
       for (index_type i = range.first; i != range.second; ++ i)
-	diffs[i] = utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma);
+	diffs[i] = std::max(utils::mathop::exp(utils::mathop::digamma(diffs[i]) - sum_digamma), smooth);
     }
     
     return diffs;

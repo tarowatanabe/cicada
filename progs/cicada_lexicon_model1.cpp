@@ -37,8 +37,8 @@ bool itg_mode = false;
 bool max_match_mode = false;
 
 // parameter...
-double p0    = 1e-4;
-double prior_lexicon = 0.1;
+double p0    = 0.01;
+double prior_lexicon = 0.01;
 double smooth_lexicon = 1e-20;
 
 double threshold = 0.0;
@@ -167,7 +167,7 @@ struct TaskMaximize : public Maximizer
   typedef size_t    size_type;
   typedef ptrdiff_t difference_type;
   
-  TaskMaximize(const LearnerSet& __learners,
+  TaskMaximize(LearnerSet& __learners,
 	       const int __id,
 	       ttable_type& __ttable_source_target,
 	       ttable_type& __ttable_target_source,
@@ -184,11 +184,15 @@ struct TaskMaximize : public Maximizer
   {
     for (word_type::id_type source_id = id; source_id < ttable_source_target.size(); source_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].ttable_counts_source_target.exists(source_id))
+	if (learners[i].ttable_counts_source_target.exists(source_id)) {
 	  ttable_source_target[source_id] += learners[i].ttable_counts_source_target[source_id];
+	  learners[i].ttable_counts_source_target[source_id].clear();
+	}
 	
-	if (learners[i].aligned_source_target.exists(source_id))
+	if (learners[i].aligned_source_target.exists(source_id)) {
 	  aligned_source_target[source_id] += learners[i].aligned_source_target[source_id];
+	  learners[i].aligned_source_target[source_id].clear();
+	}
       }
       
       if (ttable_source_target.exists(source_id))
@@ -197,11 +201,15 @@ struct TaskMaximize : public Maximizer
     
     for (word_type::id_type target_id = id; target_id < ttable_target_source.size(); target_id += learners.size()) {
       for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].ttable_counts_target_source.exists(target_id))
+	if (learners[i].ttable_counts_target_source.exists(target_id)) {
 	  ttable_target_source[target_id] += learners[i].ttable_counts_target_source[target_id];
+	  learners[i].ttable_counts_target_source[target_id].clear();
+	}
 	
-	if (learners[i].aligned_target_source.exists(target_id))
+	if (learners[i].aligned_target_source.exists(target_id)) {
 	  aligned_target_source[target_id] += learners[i].aligned_target_source[target_id];
+	  learners[i].aligned_target_source[target_id].clear();
+	}
       }
       
       if (ttable_target_source.exists(target_id))
@@ -209,7 +217,7 @@ struct TaskMaximize : public Maximizer
     }
   }
   
-  const LearnerSet& learners;
+  LearnerSet& learners;
   const int id;
 
   ttable_type& ttable_source_target;
