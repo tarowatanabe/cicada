@@ -467,7 +467,7 @@ struct LearnHMM : public LearnBase
 	const prob_type* fiter = &(*forward.begin(trg)) + 1;
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
 	
-	for (int src = 1; src < source_size + 2; ++ src, ++ fiter, ++ biter)
+	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter)
 	  counts[source[src]][target[trg]] += (*fiter) * (*biter) * factor;
 	
 	// null alignment...
