@@ -645,7 +645,7 @@ struct LearnModel1Symmetric : public LearnBase
       
 	prob_set_type::iterator piter     = prob_target_source.begin();
 	prob_set_type::iterator piter_end = prob_target_source.end();
-	*piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+	*piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
 	prob_sum += *piter;
       
 	double prob_max    = *piter;
@@ -766,7 +766,7 @@ struct LearnModel1Symmetric : public LearnBase
       
       prob_set_type::iterator piter     = prob_target_source.begin();
       prob_set_type::iterator piter_end = prob_target_source.end();
-      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
@@ -999,7 +999,7 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       
 	posterior_set_type::iterator piter     = prob_target_source.begin(src + 1);
 	posterior_set_type::iterator piter_end = prob_target_source.end(src + 1);
-	*piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+	*piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
 	prob_sum += *piter;
       
 	double prob_max    = *piter;
@@ -1167,7 +1167,7 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       
       posterior_set_type::iterator piter     = prob_target_source.begin(src + 1);
       posterior_set_type::iterator piter_end = prob_target_source.end(src + 1);
-      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
@@ -1430,7 +1430,7 @@ struct ITGModel1 : public ViterbiBase
       
       prob_set_type::iterator piter     = prob_target_source.begin();
       prob_set_type::iterator piter_end = prob_target_source.end();
-      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
       prob_sum += *piter;
       ++ piter;
       
@@ -1590,7 +1590,7 @@ struct MaxMatchModel1 : public ViterbiBase
       
       prob_set_type::iterator piter     = prob_target_source.begin();
       prob_set_type::iterator piter_end = prob_target_source.end();
-      *piter = ttable_target_source(vocab_type::NONE, target[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
       prob_sum += *piter;
       ++ piter;
       
