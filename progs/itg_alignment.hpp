@@ -98,6 +98,7 @@ namespace detail
 	const int target_size = (! inverse ? costs.size2() : costs.size1()) - 1;
 	
 	span_prune.clear();
+	span_prune.reserve(source_size + 1);
 	span_prune.resize(source_size + 1, typename Spans::value_type(target_size + 1, true));
 	
 	probs.clear();
@@ -105,11 +106,18 @@ namespace detail
 	suffix.clear();
 	delta.clear();
 	inside.clear();
+
+	probs.reserve(source_size + 2, target_size + 2);
+	prefix.reserve(source_size + 2, target_size + 2);
+	suffix.reserve(source_size + 2, target_size + 2);
       
 	probs.resize(source_size + 2, target_size + 2, 0.0);
 	prefix.resize(source_size + 2, target_size + 2, 0.0);
 	suffix.resize(source_size + 2, target_size + 2, 0.0);
-      
+	
+	delta.reserve(target_size + 2, 3);
+	inside.reserve(target_size + 2);
+	
 	delta.resize(target_size + 2, 3, 0.0);
 	inside.resize(target_size + 2, 1.0);
 
@@ -275,9 +283,11 @@ namespace detail
 					 span_pair_type(span_type(-1, -1), span_type(-1, -1)));
       
       inside.clear();
+      inside.reserve(source_size + 1);
       inside.resize(source_size + 1, chart_type(target_size + 1, lowest));
       
       backptr.clear();
+      backptr.reserve(source_size + 1);
       backptr.resize(source_size + 1, backptr_set_type(target_size + 1, backptr_invalid));
       
       for (int src = 0; src <= source_size; ++ src)
