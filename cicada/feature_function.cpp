@@ -73,7 +73,8 @@ lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tbidirectional=[true|false]\n\
 \tmonotonicity=[true|false]\n\
 \tfeature=attribute name mapping\n\
-lexicon: space lexicon feature\n\
+lexicon: sparse lexicon feature\n\
+\tname=feature-name-prefix (default: lexicon)\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\

@@ -50,7 +50,7 @@ namespace cicada
       typedef google::dense_hash_map<word_pair_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<word_pair_type> > cache_set_type;
       
       
-      LexiconImpl() : uniques(), words(), caches(), forced_feature(false) { uniques.set_empty_key(word_type()); caches.set_empty_key(word_pair_type()); }
+      LexiconImpl() : uniques(), words(), caches(), prefix("lexicon"), forced_feature(false) { uniques.set_empty_key(word_type()); caches.set_empty_key(word_pair_type()); }
       
       void lexicon_score(const edge_type& edge,
 			 feature_set_type& features)
@@ -66,9 +66,9 @@ namespace cicada
 	    std::pair<cache_set_type::iterator, bool> result = caches.insert(std::make_pair(word_pair_type(*witer, *piter), feature_type()));
 	    if (result.second) {
 	      if (forced_feature)
-		result.first->second = "lexicon:" + static_cast<const std::string&>(*witer) + ":" + static_cast<const std::string&>(*piter);
+		result.first->second = prefix + ":" + static_cast<const std::string&>(*witer) + ":" + static_cast<const std::string&>(*piter);
 	      else {
-		const std::string name = "lexicon:" + static_cast<const std::string&>(*witer) + ":" + static_cast<const std::string&>(*piter);
+		const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + ":" + static_cast<const std::string&>(*piter);
 		if (feature_type::exists(name))
 		  result.first->second = name;
 	      }
@@ -127,6 +127,7 @@ namespace cicada
       sentence_type  words;
       cache_set_type caches;
       
+      std::string prefix;
       bool forced_feature;
     };
     
@@ -143,14 +144,19 @@ namespace cicada
       
       std::string name;
       
-      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter)
-	std::cerr << "WARNING: unsupported parameter for lexicon: " << piter->first << "=" << piter->second << std::endl;
+      for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	if (utils::ipiece(piter->first) == "name")
+	  name = piter->second;
+	else
+	  std::cerr << "WARNING: unsupported parameter for lexicon: " << piter->first << "=" << piter->second << std::endl;
+      }
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
+      lexiocn_impl->perfix = (name.empty() ? std::string("lexicon") : name);
       
       // two-side context + length + counts-id 
       base_type::__state_size = 0;
-      base_type::__feature_name = "lexicon";
+      base_type::__feature_name = (name.empty() ? std::string("lexicon") : name);
       base_type::__sparse_feature = true;
       
       pimpl = lexicon_impl.release();
