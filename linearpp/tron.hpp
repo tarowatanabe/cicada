@@ -10,10 +10,10 @@
 extern "C" {
 #endif
 
-extern double dnrm2_(int *, double *, int *);
-extern double ddot_(int *, double *, int *, double *, int *);
-extern int daxpy_(int *, double *, double *, int *, double *, int *);
-extern int dscal_(int *, double *, double *, int *);
+  extern double dnrm2_(int *, double *, int *);
+  extern double ddot_(int *, double *, int *, double *, int *);
+  extern int daxpy_(int *, double *, double *, int *, double *, int *);
+  extern int dscal_(int *, double *, double *, int *);
 
 #ifdef __cplusplus
 }
