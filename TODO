@@ -91,6 +91,8 @@ Add incremental version of MERT?
 reimplement liblinear functionality...???
    liblinear does not allow starting from an intermediata state, like alpha from previous iterations
    liblinear does not run in threading
+   
+   Implement with template techniques...?
 
 Add MPI version of Model1/HMM alignment?
 
