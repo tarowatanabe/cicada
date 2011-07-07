@@ -152,7 +152,7 @@ namespace cicada
       }
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
-      lexicon_impl->perfix = (name.empty() ? std::string("lexicon") : name);
+      lexicon_impl->prefix = (name.empty() ? std::string("lexicon") : name);
       
       // two-side context + length + counts-id 
       base_type::__state_size = 0;
