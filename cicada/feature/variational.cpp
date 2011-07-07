@@ -205,14 +205,12 @@ namespace cicada
 	    std::copy(buffer.begin(), buffer.begin() + prefix_size, context);
 	    context[prefix_size] = vocab_type::STAR;
 	    std::copy(buffer.end() - suffix_size, buffer.end(), context + prefix_size + 1);
-	  } else {
-	    if (static_cast<int>(buffer.size()) <= context_size)
-	      std::copy(buffer.begin(), buffer.end(), context);
-	    else {
-	      std::copy(buffer.begin(), buffer.begin() + context_size, context);
-	      context[context_size] = vocab_type::STAR;
-	      std::copy(buffer.end() - context_size, buffer.end(), context + order);
-	    }
+	  } else if (static_cast<int>(buffer.size()) <= context_size)
+	    std::copy(buffer.begin(), buffer.end(), context);
+	  else {
+	    std::copy(buffer.begin(), buffer.begin() + context_size, context);
+	    context[context_size] = vocab_type::STAR;
+	    std::copy(buffer.end() - context_size, buffer.end(), context + order);
 	  }
 	}
       }
