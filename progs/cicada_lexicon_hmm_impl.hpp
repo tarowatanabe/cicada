@@ -422,18 +422,52 @@ struct LearnHMM : public LearnBase
 	const prob_type* fiter = &(*forward.begin(trg)) + 1;
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
 	prob_type* piter = &(*posterior.begin(trg)) + 1;
-	
+
+#if 0	
+	for (int src = 0; src < source_size - 3; src += 4) {
+	  piter[src + 0] += fiter[src + 0] * biter[src + 0] * factor;
+	  piter[src + 1] += fiter[src + 1] * biter[src + 1] * factor;
+	  piter[src + 2] += fiter[src + 2] * biter[src + 2] * factor;
+	  piter[src + 3] += fiter[src + 3] * biter[src + 3] * factor;
+	}
+	switch (source_size & 0x03) {
+	case 3: piter[source_size - 3] += fiter[source_size - 3] * biter[source_size - 3] * factor;
+	case 2: piter[source_size - 2] += fiter[source_size - 2] * biter[source_size - 2] * factor;
+	case 1: piter[source_size - 1] += fiter[source_size - 1] * biter[source_size - 1] * factor;
+	}
+#endif	
+#if 1
 	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter, ++ piter)
 	  (*piter) += (*fiter) * (*biter) * factor;
+#endif
 	
-	fiter = &(*forward.begin(trg)) + source_size + 2;
+	fiter = &(*forward.begin(trg))  + source_size + 2;
 	biter = &(*backward.begin(trg)) + source_size + 2;
 	
+#if 0
+	double count_none[4] = {0.0, 0.0, 0.0, 0.0};
+	const int loop_size = source_size + 2;
+	for (int src = 0; src < loop_size - 3; src += 4) {
+	  count_none[0] += fiter[src + 0] * biter[src + 0] * factor;
+	  count_none[1] += fiter[src + 1] * biter[src + 1] * factor;
+	  count_none[2] += fiter[src + 2] * biter[src + 2] * factor;
+	  count_none[3] += fiter[src + 3] * biter[src + 3] * factor;
+	}
+	switch (loop_size & 0x03) {
+	case 3: count_none[4 - 3] += fiter[loop_size - 3] * biter[loop_size - 3] * factor;
+	case 2: count_none[4 - 2] += fiter[loop_size - 2] * biter[loop_size - 2] * factor;
+	case 1: count_none[4 - 1] += fiter[loop_size - 1] * biter[loop_size - 1] * factor;
+	}
+	
+	posterior(trg, 0) = count_none[0] + count_none[1] + count_none[2] + count_none[3];
+#endif
+#if 1
 	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
 	  count_none += (*fiter) * (*biter) * factor;
 	
       	posterior(trg, 0) = count_none;
+#endif
       }
     }
 
@@ -470,15 +504,34 @@ struct LearnHMM : public LearnBase
 	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter)
 	  counts[source[src]][target[trg]] += (*fiter) * (*biter) * factor;
 	
+	// null alignment...
 	fiter = &(*forward.begin(trg)) + source_size + 2;
 	biter = &(*backward.begin(trg)) + source_size + 2;
 	
-	// null alignment...
+#if 0
+	double count_none[4] = {0.0, 0.0, 0.0, 0.0};
+	const int loop_size = source_size + 2;
+	for (int src = 0; src < loop_size - 3; src += 4) {
+	  count_none[0] += fiter[src + 0] * biter[src + 0] * factor;
+	  count_none[1] += fiter[src + 1] * biter[src + 1] * factor;
+	  count_none[2] += fiter[src + 2] * biter[src + 2] * factor;
+	  count_none[3] += fiter[src + 3] * biter[src + 3] * factor;
+	}
+	switch (loop_size & 0x03) {
+	case 3: count_none[4 - 3] += fiter[loop_size - 3] * biter[loop_size - 3] * factor;
+	case 2: count_none[4 - 2] += fiter[loop_size - 2] * biter[loop_size - 2] * factor;
+	case 1: count_none[4 - 1] += fiter[loop_size - 1] * biter[loop_size - 1] * factor;
+	}
+	
+	counts[vocab_type::NONE][target[trg]] += count_none[0] + count_none[1] + count_none[2] + count_none[3];
+#endif
+#if 1
 	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
 	  count_none += (*fiter) * (*biter) * factor;
 	
 	counts[vocab_type::NONE][target[trg]] += count_none;
+#endif
       }
     }
     
