@@ -68,9 +68,9 @@ namespace cicada
 	    std::pair<cache_set_type::iterator, bool> result = caches.insert(std::make_pair(word_pair_type(*witer, *piter), feature_type()));
 	    if (result.second) {
 	      if (forced_feature)
-		result.first->second = prefix + ":" + static_cast<const std::string&>(*witer) + ":" + static_cast<const std::string&>(*piter);
+		result.first->second = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
 	      else {
-		const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + ":" + static_cast<const std::string&>(*piter);
+		const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
 		if (feature_type::exists(name))
 		  result.first->second = name;
 	      }
