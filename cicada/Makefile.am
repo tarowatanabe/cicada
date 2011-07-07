@@ -114,7 +114,6 @@ feature/bleu_multi.hpp \
 feature/distortion.hpp \
 feature/global_lexicon.hpp \
 feature/lexicalized_reordering.hpp \
-feature/lexicon.hpp \
 feature/neighbours.hpp \
 feature/ngram.hpp \
 feature/ngram_tree.hpp \
@@ -124,6 +123,7 @@ feature/permute.hpp \
 feature/rule_shape.hpp \
 feature/sgml_tag.hpp \
 feature/span.hpp \
+feature/sparse_lexicon.hpp \
 feature/variational.hpp \
 feature/vocabulary.hpp
 
@@ -137,7 +137,6 @@ feature/bleu_multi.cpp \
 feature/distortion.cpp \
 feature/global_lexicon.cpp \
 feature/lexicalized_reordering.cpp \
-feature/lexicon.cpp \
 feature/neighbours.cpp \
 feature/ngram.cpp \
 feature/ngram_tree.cpp \
@@ -147,6 +146,7 @@ feature/permute.cpp \
 feature/rule_shape.cpp \
 feature/sgml_tag.cpp \
 feature/span.cpp \
+feature/sparse_lexicon.cpp \
 feature/variational.cpp \
 feature/vocabulary.cpp
 

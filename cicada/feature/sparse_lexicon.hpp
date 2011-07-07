@@ -3,8 +3,8 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-#ifndef __CICADA__FEATURE__LEXICON__HPP__
-#define __CICADA__FEATURE__LEXICON__HPP__ 1
+#ifndef __CICADA__FEATURE__SPARSE_LEXICON__HPP__
+#define __CICADA__FEATURE__SPARSE_LEXICON__HPP__ 1
 
 #include <string>
 
@@ -14,9 +14,9 @@ namespace cicada
 {
   namespace feature
   {
-    class LexiconImpl;
+    class SparseLexiconImpl;
     
-    class Lexicon : public FeatureFunction
+    class SparseLexicon : public FeatureFunction
     {
     public:
       typedef size_t    size_type;
@@ -28,7 +28,7 @@ namespace cicada
       
     private:
       typedef FeatureFunction base_type;
-      typedef LexiconImpl       impl_type;
+      typedef SparseLexiconImpl       impl_type;
       
     public:
       // parameter = key:[key=value (delimited by ',')]*
@@ -39,14 +39,14 @@ namespace cicada
       // name: name of this feature function. default to ngram
       // order: ngram's order
       
-      Lexicon(const std::string& parameter);
-      Lexicon(const Lexicon&);
-      ~Lexicon();
+      SparseLexicon(const std::string& parameter);
+      SparseLexicon(const SparseLexicon&);
+      ~SparseLexicon();
       
-      Lexicon& operator=(const Lexicon&);
+      SparseLexicon& operator=(const SparseLexicon&);
 
     private:
-      Lexicon() {}
+      SparseLexicon() {}
       
     public:
       virtual void apply(state_ptr_type& state,
@@ -88,7 +88,7 @@ namespace cicada
 			  const sentence_set_type& targets,
 			  const ngram_count_set_type& ngram_counts);
 
-      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new Lexicon(*this)); }
+      virtual feature_function_ptr_type clone() const { return feature_function_ptr_type(new SparseLexicon(*this)); }
       
     private:
       

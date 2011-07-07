@@ -15,7 +15,6 @@
 #include "feature/distortion.hpp"
 #include "feature/global_lexicon.hpp"
 #include "feature/lexicalized_reordering.hpp"
-#include "feature/lexicon.hpp"
 #include "feature/neighbours.hpp"
 #include "feature/ngram.hpp"
 #include "feature/ngram_tree.hpp"
@@ -25,6 +24,7 @@
 #include "feature/rule_shape.hpp"
 #include "feature/sgml_tag.hpp"
 #include "feature/span.hpp"
+#include "feature/sparse_lexicon.hpp"
 #include "feature/variational.hpp"
 #include "feature/vocabulary.hpp"
 
@@ -73,8 +73,6 @@ lexicalized-reordering: lexicalized reordering for phrase-based\n\
 \tbidirectional=[true|false]\n\
 \tmonotonicity=[true|false]\n\
 \tfeature=attribute name mapping\n\
-lexicon: sparse lexicon feature\n\
-\tname=feature-name-prefix (default: lexicon)\n\
 neighbours: neighbour words feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
@@ -112,6 +110,8 @@ span: lexical span feature\n\
 variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
+sparse-lexicon: sparse lexicon feature\n\
+\tname=feature-name-prefix (default: sparse-lexicon)\n\
 word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
@@ -174,8 +174,6 @@ word-pair: word pair feature\n\
 	     || param_name == "lexical-reordering"
 	     || param_name == "lexical-reorder")
       return feature_function_ptr_type(new feature::LexicalizedReordering(parameter));
-    else if (param_name == "lexicon")
-      return feature_function_ptr_type(new feature::Lexicon(parameter));
     else if (param_name == "sgml-tag")
       return feature_function_ptr_type(new feature::SGMLTag(parameter));
     else if (param_name == "span")
@@ -202,6 +200,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::WordPair(parameter));
     else if (param_name == "rule-shape")
       return feature_function_ptr_type(new feature::RuleShape(parameter));
+    else if (param_name == "sparse-lexicon")
+      return feature_function_ptr_type(new feature::SparseLexicon(parameter));
     else
       throw std::runtime_error("unknown featuer: " + parameter);
     
