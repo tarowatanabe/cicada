@@ -3,7 +3,6 @@
 #ifndef __LINEARPP__TRON__HPP__
 #define __LINEARPP__TRON__HPP__ 1
 
-#include <vector>
 #include <algorithm>
 
 #ifdef __cplusplus
