@@ -7,6 +7,7 @@
 
 #include "utils/piece.hpp"
 #include "utils/indexed_trie.hpp"
+#include "utils/lexical_cast.hpp"
 
 namespace cicada
 {
@@ -65,6 +66,32 @@ namespace cicada
 	}
       };
       
+      void ngram_final_score(state_ptr_type& state,
+			     const state_ptr_set_type& states,
+			     const edge_type& edge,
+			     feature_set_type& features)
+      {
+	if (no_bos_eos) return;
+	
+	const trie_type::id_type* context = reinterpret_cast<const trie_type::id_type*>(state);
+
+	buffer.clear();
+	buffer.reserve(order * 2 + 2);
+	
+	buffer.push_back(vocab_type::BOS);
+	unpack_context(context[0], buffer);
+	
+	ngram_feature(buffer.begin(), buffer.begin() + 1, buffer.end(), features);
+	
+	if (context[1] != trie.root()) {
+	  buffer.clear();
+	  unpack_context(context[1], buffer);
+	}
+	buffer.push_back(vocab_type::EOS);
+	
+	ngram_feature(buffer.begin(), buffer.end() - 1, buffer.end(), features);
+      }
+
       void ngram_score(state_ptr_type& state,
 		       const state_ptr_set_type& states,
 		       const edge_type& edge,
@@ -97,7 +124,7 @@ namespace cicada
 	  // we will copy to buffer...
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
 	    if (! skipper(*titer))
-	      buffer.push_back(extract(*titer));
+	      buffer.push_back(*titer);
 	  
 	  ngram_feature(buffer.begin(), buffer.end(), features);
 	  
@@ -134,17 +161,20 @@ namespace cicada
 	      }
 	      
 	      // uncover antecedent_context into buffer.
+	      unpack_context(context_antecedent[0], buffer);
 	      
 	      if (biter_first != biter && biter != buffer.end())
 		ngram_feature(biter_first, biter, buffer.end(), features);
 	      biter = buffer.end();
 	      
 	      if (context_antecedent[1] != trie.root()) {
-		star_first = utils::bithack::branch(star_first < 0, static_cast<int>(buffer.size()) + 1, star_first);
-		star_last  = buffer.size() + 1;
+		star_first = utils::bithack::branch(star_first < 0, static_cast<int>(buffer.size()), star_first);
+		star_last  = buffer.size();
 		
-		biter_first = buffer.end() + 1;
+		biter_first = buffer.end();
+		
 		// uncover suffix context
+		unpack_context(context_antecedent[1], buffer);
 		
 		biter = buffer.end();
 	      }
@@ -194,7 +224,7 @@ namespace cicada
 	    if (iter2 < iter) continue;
 	    
 	    if (! cache[id].empty())
-	      featuers[cache[id]] += 1.0;
+	      features[cache[id]] += 1.0;
 	  }
 	}
       }
@@ -210,7 +240,7 @@ namespace cicada
 	    id = traverse(id, first, iter);
 	    
 	    if (! cache[id].empty())
-	      featuers[cache[id]] += 1.0;
+	      features[cache[id]] += 1.0;
 	  }
 	}
       }
@@ -224,7 +254,21 @@ namespace cicada
 	
 	return id;
       }
-
+      
+      
+      void unpack_context(trie_type::id_type id, buffer_type& buffer)
+      {
+	// we assume that buffer is allocated with enough space
+	
+	buffer_type::iterator biter = buffer.end();
+	
+	while (id != trie.root()) {
+	  buffer.push_back(trie[id]);
+	  id = trie.pop(id);
+	}
+	std::reverse(biter, buffer.end());
+      }
+      
       template <typename Iterator>
       trie_type::id_type traverse(trie_type::id_type id, Iterator first, Iterator iter) {
 	id = trie.push(id, *iter);
@@ -264,6 +308,7 @@ namespace cicada
       checked_type checked;
       
       int order;
+      bool no_bos_eos;
       bool skip_sgml_tag;
       
       std::string prefix;
@@ -301,10 +346,14 @@ namespace cicada
       }
       
       std::auto_ptr<impl_type> ngram_impl(new impl_type());
+
+      ngram_impl->order = order;
+      ngram_impl->no_bos_eos = no_bos_eos;
+      ngram_impl->skip_sgml_tag = skip_sgml_tag;
       ngram_impl->prefix = (name.empty() ? std::string("sparse-ngram") : name);
       
       // two-side context + length + counts-id 
-      base_type::__state_size = 0;
+      base_type::__state_size = sizeof(impl_type::trie_type::id_type) * 2;
       base_type::__feature_name = (name.empty() ? std::string("sparse-ngram") : name);
       base_type::__sparse_feature = true;
       
@@ -337,7 +386,9 @@ namespace cicada
 
       const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
       
-      pimpl->ngram_score(edge, features);
+      pimpl->ngram_score(state, states, edge, features);
+      if (final)
+	pimpl->ngram_final_score(state, states, edge, features);
     }
 
     void SparseNGram::apply_coarse(state_ptr_type& state,
@@ -378,7 +429,7 @@ namespace cicada
     void SparseNGram::initialize()
     {
       // initialize internal data structs
-      
+      pimpl->clear();
     }
 
   };

@@ -25,6 +25,7 @@
 #include "feature/sgml_tag.hpp"
 #include "feature/span.hpp"
 #include "feature/sparse_lexicon.hpp"
+#include "feature/sparse_ngram.hpp"
 #include "feature/variational.hpp"
 #include "feature/vocabulary.hpp"
 
@@ -112,6 +113,11 @@ variational: variational feature for variational decoding\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
 sparse-lexicon: sparse lexicon feature\n\
 \tname=feature-name-prefix (default: sparse-lexicon)\n\
+sparse-ngram: sparse ngram feature\n\
+\torder=<order>\n\
+\tno-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
+\tname=feature-name-prefix (default: sparse-ngram)\n\
 word-penalty: word penalty feature\n\
 rule-penalty: rule penalty feature\n\
 arity-penalty: rule arity penalty feature\n\
@@ -202,6 +208,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::RuleShape(parameter));
     else if (param_name == "sparse-lexicon")
       return feature_function_ptr_type(new feature::SparseLexicon(parameter));
+    else if (param_name == "sparse-ngram")
+      return feature_function_ptr_type(new feature::SparseNGram(parameter));
     else
       throw std::runtime_error("unknown featuer: " + parameter);
     

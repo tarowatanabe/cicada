@@ -124,6 +124,7 @@ feature/rule_shape.hpp \
 feature/sgml_tag.hpp \
 feature/span.hpp \
 feature/sparse_lexicon.hpp \
+feature/sparse_ngram.hpp \
 feature/variational.hpp \
 feature/vocabulary.hpp
 
@@ -147,6 +148,7 @@ feature/rule_shape.cpp \
 feature/sgml_tag.cpp \
 feature/span.cpp \
 feature/sparse_lexicon.cpp \
+feature/sparse_ngram.cpp \
 feature/variational.cpp \
 feature/vocabulary.cpp
 
