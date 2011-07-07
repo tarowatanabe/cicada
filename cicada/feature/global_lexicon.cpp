@@ -223,6 +223,7 @@ namespace cicada
 			       const ngram_count_set_type& ngram_counts)
     {
       pimpl->words.clear();
+      pimpl->caches.clear();
       
       if (! lattice.empty())
 	pimpl->assign(lattice);
