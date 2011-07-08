@@ -1,4 +1,5 @@
 2011-7-x
+INCOMPATIBLE CHANGE: use EPSILON instead of NONE at many places... but NONE is still used inside tree-grammar indexer
 Added spearse-lexicon and sparse-ngram features to reproduce Watanabe et al. (2007)
 Bugfix for reading features in kbest: if "=" appears in a feature name, we cannot parse!
 
