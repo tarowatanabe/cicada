@@ -193,7 +193,7 @@ struct OptimizeAROW : public Optimizer
 
     const size_t vocabulary_size = word_type::allocated();
     
-    const word_type::id_type id_bias = vocab_type::NONE.id();
+    const word_type::id_type id_bias = vocab_type::EPSILON.id();
     
     x.clear();
     x.reserve(vocabulary_size);
@@ -280,7 +280,7 @@ struct OptimizeCW : public Optimizer
 
     const size_t vocabulary_size = word_type::allocated();
     
-    const word_type::id_type id_bias = vocab_type::NONE.id();
+    const word_type::id_type id_bias = vocab_type::EPSILON.id();
     
     x.clear();
     x.reserve(vocabulary_size);
@@ -367,7 +367,7 @@ struct OptimizeMIRA : public Optimizer
 
     const size_t vocabulary_size = word_type::allocated();
     
-    const word_type::id_type id_bias = vocab_type::NONE.id();
+    const word_type::id_type id_bias = vocab_type::EPSILON.id();
     
     x.clear();
     x.reserve(vocabulary_size);
@@ -463,7 +463,7 @@ struct OptimizeSGD : public Optimizer
 
     const size_t vocabulary_size = word_type::allocated();
     
-    const word_type::id_type id_bias = vocab_type::NONE.id();
+    const word_type::id_type id_bias = vocab_type::EPSILON.id();
     
     x.clear();
     x.reserve(vocabulary_size);
@@ -569,7 +569,7 @@ struct OptimizeSGD : public Optimizer
 
     const size_t vocabulary_size = word_type::allocated();
     
-    const word_type::id_type id_bias = vocab_type::NONE.id();
+    const word_type::id_type id_bias = vocab_type::EPSILON.id();
     
     x.clear();
     x.reserve(vocabulary_size);
@@ -712,7 +712,7 @@ struct OptimizeLBFGS : public Optimizer
     double objective = 0.0;
     std::fill(g, g + n, 0.0);
     
-    const word_type::id_type id_bias = vocab_type::NONE.id();
+    const word_type::id_type id_bias = vocab_type::EPSILON.id();
 
     double margin_sum = 0.0;
     size_t num_correct_classify = 0;

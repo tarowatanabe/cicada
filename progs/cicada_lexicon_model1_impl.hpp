@@ -65,7 +65,7 @@ struct LearnModel1 : public LearnBase
 	double prob_sum = 0.0;
 	
 	double prob_max    = - std::numeric_limits<double>::infinity();
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 	
 	point_set_type::const_iterator iter_end = points[trg].end();
 	for (point_set_type::const_iterator iter = points[trg].begin(); iter != iter_end; ++ iter) {
@@ -93,11 +93,11 @@ struct LearnModel1 : public LearnBase
 	double prob_sum = 0.0;
       
 	prob_set_type::iterator piter = probs.begin();
-	*piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
+	*piter = ttable(vocab_type::EPSILON, target[trg]) * prob_null;
 	prob_sum += *piter;
 	
 	double prob_max    = *piter;
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 	
 	++ piter;
 	
@@ -115,7 +115,7 @@ struct LearnModel1 : public LearnBase
 	
 	const double factor = 1.0 / prob_sum;
 	piter = probs.begin();
-	counts[vocab_type::NONE][target[trg]] += (*piter) * factor;
+	counts[vocab_type::EPSILON][target[trg]] += (*piter) * factor;
 	++ piter;
 	
 	for (size_type src = 0; src != source_size; ++ src, ++ piter)
@@ -152,11 +152,11 @@ struct LearnModel1 : public LearnBase
       
       
       prob_set_type::iterator piter = probs.begin();
-      *piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
+      *piter = ttable(vocab_type::EPSILON, target[trg]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
+      word_type word_max = vocab_type::EPSILON;
       
       ++ piter;
       
@@ -174,7 +174,7 @@ struct LearnModel1 : public LearnBase
       
       const double factor = 1.0 / prob_sum;
       piter = probs.begin();
-      counts[vocab_type::NONE][target[trg]] += (*piter) * factor;
+      counts[vocab_type::EPSILON][target[trg]] += (*piter) * factor;
       ++ piter;
       
       for (size_type src = 0; src != source_size; ++ src, ++ piter)
@@ -268,7 +268,7 @@ struct LearnModel1Posterior : public LearnBase
 	double prob_sum = 0.0;
 	
 	double prob_max    = - std::numeric_limits<double>::infinity();
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 	
 	point_set_type::const_iterator iter_end = points[trg].end();
 	for (point_set_type::const_iterator iter = points[trg].begin(); iter != iter_end; ++ iter) {
@@ -301,11 +301,11 @@ struct LearnModel1Posterior : public LearnBase
       
 	posterior_set_type::iterator piter     = probs.begin(trg + 1);
 	posterior_set_type::iterator piter_end = probs.end(trg + 1);
-	*piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
+	*piter = ttable(vocab_type::EPSILON, target[trg]) * prob_null;
 	prob_sum += *piter;
       
 	double prob_max    = *piter;
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
       
 	++ piter;
       
@@ -366,7 +366,7 @@ struct LearnModel1Posterior : public LearnBase
     // update...
     for (size_type trg = 1; trg <= target_size; ++ trg)
       for (size_type src = 0; src <= source_size; ++ src)
-	counts[src == 0 ? vocab_type::NONE : source[src - 1]][target[trg - 1]] += posterior(trg, src);
+	counts[src == 0 ? vocab_type::EPSILON : source[src - 1]][target[trg - 1]] += posterior(trg, src);
   }
   
   void learn(const sentence_type& source,
@@ -405,11 +405,11 @@ struct LearnModel1Posterior : public LearnBase
       
       posterior_set_type::iterator piter     = probs.begin(trg + 1);
       posterior_set_type::iterator piter_end = probs.end(trg + 1);
-      *piter = ttable(vocab_type::NONE, target[trg]) * prob_null;
+      *piter = ttable(vocab_type::EPSILON, target[trg]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
+      word_type word_max = vocab_type::EPSILON;
       
       ++ piter;
       
@@ -469,7 +469,7 @@ struct LearnModel1Posterior : public LearnBase
     // update...
     for (size_type trg = 1; trg <= target_size; ++ trg)
       for (size_type src = 0; src <= source_size; ++ src)
-	counts[src == 0 ? vocab_type::NONE : source[src - 1]][target[trg - 1]] += posterior(trg, src);
+	counts[src == 0 ? vocab_type::EPSILON : source[src - 1]][target[trg - 1]] += posterior(trg, src);
   }
 
   void operator()(const sentence_type& source, const sentence_type& target)
@@ -552,7 +552,7 @@ struct LearnModel1Symmetric : public LearnBase
 	double prob_sum = 0.0;
 	
 	double prob_max    = - std::numeric_limits<double>::infinity();
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 	
 	std::fill(prob_source_target.begin(), prob_source_target.end(), 0.0);
 	
@@ -587,11 +587,11 @@ struct LearnModel1Symmetric : public LearnBase
       
 	prob_set_type::iterator piter     = prob_source_target.begin();
 	prob_set_type::iterator piter_end = prob_source_target.end();
-	*piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+	*piter = ttable_source_target(vocab_type::EPSILON, target[trg]) * prob_null;
 	prob_sum += *piter;
       
 	double prob_max    = *piter;
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 
 	++ piter;
       
@@ -624,7 +624,7 @@ struct LearnModel1Symmetric : public LearnBase
 	double prob_sum = 0.0;
 	
 	double prob_max    = - std::numeric_limits<double>::infinity();
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 
 	std::fill(prob_target_source.begin(), prob_target_source.end(), 0.0);
 	
@@ -659,11 +659,11 @@ struct LearnModel1Symmetric : public LearnBase
       
 	prob_set_type::iterator piter     = prob_target_source.begin();
 	prob_set_type::iterator piter_end = prob_target_source.end();
-	*piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
+	*piter = ttable_target_source(vocab_type::EPSILON, source[src]) * prob_null;
 	prob_sum += *piter;
       
 	double prob_max    = *piter;
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 
 	++ piter;
       
@@ -699,8 +699,8 @@ struct LearnModel1Symmetric : public LearnBase
 	if (src != 0 && trg != 0)
 	  count = utils::mathop::sqrt(count);
 	
-	const word_type& source_word = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	const word_type& source_word = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	const word_type& target_word = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
 	
 	if (trg != 0)
 	  ttable_counts_source_target[source_word][target_word] += count;
@@ -744,11 +744,11 @@ struct LearnModel1Symmetric : public LearnBase
       
       prob_set_type::iterator piter     = prob_source_target.begin();
       prob_set_type::iterator piter_end = prob_source_target.end();
-      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+      *piter = ttable_source_target(vocab_type::EPSILON, target[trg]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
+      word_type word_max = vocab_type::EPSILON;
 
       ++ piter;
       
@@ -780,11 +780,11 @@ struct LearnModel1Symmetric : public LearnBase
       
       prob_set_type::iterator piter     = prob_target_source.begin();
       prob_set_type::iterator piter_end = prob_target_source.end();
-      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::EPSILON, source[src]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
+      word_type word_max = vocab_type::EPSILON;
 
       ++ piter;
       
@@ -819,8 +819,8 @@ struct LearnModel1Symmetric : public LearnBase
 	if (src != 0 && trg != 0)
 	  count = utils::mathop::sqrt(count);
 	
-	const word_type& source_word = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	const word_type& source_word = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	const word_type& target_word = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
 	
 	if (trg != 0)
 	  ttable_counts_source_target[source_word][target_word] += count;
@@ -913,7 +913,7 @@ struct LearnModel1SymmetricPosterior : public LearnBase
 	double prob_sum = 0.0;
 	
 	double prob_max    = - std::numeric_limits<double>::infinity();
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 	
 	point_set_type::const_iterator iter_end = points_source_target[trg].end();
 	for (point_set_type::const_iterator iter = points_source_target[trg].begin(); iter != iter_end; ++ iter) {
@@ -945,11 +945,11 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       
 	posterior_set_type::iterator piter     = prob_source_target.begin(trg + 1);
 	posterior_set_type::iterator piter_end = prob_source_target.end(trg + 1);
-	*piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+	*piter = ttable_source_target(vocab_type::EPSILON, target[trg]) * prob_null;
 	prob_sum += *piter;
       
 	double prob_max    = *piter;
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 
 	++ piter;
       
@@ -982,7 +982,7 @@ struct LearnModel1SymmetricPosterior : public LearnBase
 	double prob_sum = 0.0;
 	
 	double prob_max    = - std::numeric_limits<double>::infinity();
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 	
 	point_set_type::const_iterator iter_end = points_target_source[src].end();
 	for (point_set_type::const_iterator iter = points_target_source[src].begin(); iter != iter_end; ++ iter) {
@@ -1016,11 +1016,11 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       
 	posterior_set_type::iterator piter     = prob_target_source.begin(src + 1);
 	posterior_set_type::iterator piter_end = prob_target_source.end(src + 1);
-	*piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
+	*piter = ttable_target_source(vocab_type::EPSILON, source[src]) * prob_null;
 	prob_sum += *piter;
       
 	double prob_max    = *piter;
-	word_type word_max = vocab_type::NONE;
+	word_type word_max = vocab_type::EPSILON;
 
 	++ piter;
       
@@ -1096,8 +1096,8 @@ struct LearnModel1SymmetricPosterior : public LearnBase
     // since we have already adjusted posterior, we simply accumulate individual counts...
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
-	const word_type& source_word = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	const word_type& source_word = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	const word_type& target_word = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
 	
 	if (trg != 0)
 	  ttable_counts_source_target[source_word][target_word] += posterior_source_target(trg, src);
@@ -1148,11 +1148,11 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       
       posterior_set_type::iterator piter     = prob_source_target.begin(trg + 1);
       posterior_set_type::iterator piter_end = prob_source_target.end(trg + 1);
-      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+      *piter = ttable_source_target(vocab_type::EPSILON, target[trg]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
+      word_type word_max = vocab_type::EPSILON;
 
       ++ piter;
       
@@ -1184,11 +1184,11 @@ struct LearnModel1SymmetricPosterior : public LearnBase
       
       posterior_set_type::iterator piter     = prob_target_source.begin(src + 1);
       posterior_set_type::iterator piter_end = prob_target_source.end(src + 1);
-      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::EPSILON, source[src]) * prob_null;
       prob_sum += *piter;
       
       double prob_max    = *piter;
-      word_type word_max = vocab_type::NONE;
+      word_type word_max = vocab_type::EPSILON;
 
       ++ piter;
       
@@ -1263,8 +1263,8 @@ struct LearnModel1SymmetricPosterior : public LearnBase
     // since we have already adjusted posterior, we simply accumulate individual counts...
     for (size_type src = 0; src <= source_size; ++ src)
       for (size_type trg = (src == 0); trg <= target_size; ++ trg) {
-	const word_type& source_word = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type& target_word = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	const word_type& source_word = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	const word_type& target_word = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
 	
 	if (trg != 0)
 	  ttable_counts_source_target[source_word][target_word] += posterior_source_target(trg, src);
@@ -1308,7 +1308,7 @@ struct ViterbiModel1 : public ViterbiBase
     for (size_type trg = 0; trg != target_size; ++ trg) {
       const double prob_align_norm = 1.0 / source_size;
       
-      double prob_max = ttable(vocab_type::NONE, target[trg]) * prob_null;
+      double prob_max = ttable(vocab_type::EPSILON, target[trg]) * prob_null;
       int    align_max = -1;
       
       for (size_type src = 0; src != source_size; ++ src) {
@@ -1424,7 +1424,7 @@ struct ITGModel1 : public ViterbiBase
       
       prob_set_type::iterator piter     = prob_source_target.begin();
       prob_set_type::iterator piter_end = prob_source_target.end();
-      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+      *piter = ttable_source_target(vocab_type::EPSILON, target[trg]) * prob_null;
       prob_sum += *piter;
       ++ piter;
       
@@ -1447,7 +1447,7 @@ struct ITGModel1 : public ViterbiBase
       
       prob_set_type::iterator piter     = prob_target_source.begin();
       prob_set_type::iterator piter_end = prob_target_source.end();
-      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::EPSILON, source[src]) * prob_null;
       prob_sum += *piter;
       ++ piter;
       
@@ -1585,7 +1585,7 @@ struct MaxMatchModel1 : public ViterbiBase
       
       prob_set_type::iterator piter     = prob_source_target.begin();
       prob_set_type::iterator piter_end = prob_source_target.end();
-      *piter = ttable_source_target(vocab_type::NONE, target[trg]) * prob_null;
+      *piter = ttable_source_target(vocab_type::EPSILON, target[trg]) * prob_null;
       prob_sum += *piter;
       ++ piter;
       
@@ -1608,7 +1608,7 @@ struct MaxMatchModel1 : public ViterbiBase
       
       prob_set_type::iterator piter     = prob_target_source.begin();
       prob_set_type::iterator piter_end = prob_target_source.end();
-      *piter = ttable_target_source(vocab_type::NONE, source[src]) * prob_null;
+      *piter = ttable_target_source(vocab_type::EPSILON, source[src]) * prob_null;
       prob_sum += *piter;
       ++ piter;
       

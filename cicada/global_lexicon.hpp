@@ -104,7 +104,7 @@ namespace cicada
       
       if (lexicon.is_valid(node)) {
 	// bias term...
-	const lexicon_type::size_type node_next = find(node, vocab_type::NONE);
+	const lexicon_type::size_type node_next = find(node, vocab_type::EPSILON);
 	if (lexicon.is_valid(node_next) && lexicon.exists(node_next))
 	  weight += lexicon[node_next];
 	

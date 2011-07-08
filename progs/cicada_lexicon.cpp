@@ -366,16 +366,16 @@ struct TaskLearn
 	  if (! aligned_target[trg]) {
 	    const word_type& target_word = biter->target[trg];
 	    
-	    ++ counts_source_target[vocab_type::NONE][target_word];
-	    ++ counts_target_source[target_word][vocab_type::NONE];
+	    ++ counts_source_target[vocab_type::EPSILON][target_word];
+	    ++ counts_target_source[target_word][vocab_type::EPSILON];
 	  }
 	
 	for (size_t src = 0; src != biter->source.size(); ++ src)
 	  if (! aligned_source[src]) {
 	    const word_type& source_word = biter->source[src];
 	    
-	    ++ counts_source_target[source_word][vocab_type::NONE];
-	    ++ counts_target_source[vocab_type::NONE][source_word];
+	    ++ counts_source_target[source_word][vocab_type::EPSILON];
+	    ++ counts_target_source[vocab_type::EPSILON][source_word];
 	  }
       }
     }

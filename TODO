@@ -47,9 +47,6 @@ Reimplement cicada-learn-online:
   
   or, implement as cicada_learn_online_static{,_mpi} ?? since we will pre-demine spliting...
 
-Cutting-plane learning under cicada_maxlike{,_mpi}...
-	We need to merge feature vector...
-
 Implement scalable training by L1 regularized feature selection:
   1. Collect features.. it is the hardest part...
      Decode-and-extract features
@@ -93,6 +90,11 @@ reimplement liblinear functionality...???
    liblinear does not run in threading
    
    Implement with template techniques...?
+
+Correctly implement cutting-plane algorithms:
+   we need to merge feature vector into a bundle, then, iterative add new vectors...
+   do we implement in maxlike families...?
+
 
 Add MPI version of Model1/HMM alignment?
 

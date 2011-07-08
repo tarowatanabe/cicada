@@ -76,8 +76,8 @@ struct LearnHMM : public LearnBase
       
       source.reserve((source_size + 2) * 2);
       target.reserve((target_size + 2) * 2);
-      source.resize((source_size + 2) * 2, vocab_type::NONE);
-      target.resize((target_size + 2) * 2, vocab_type::NONE);
+      source.resize((source_size + 2) * 2, vocab_type::EPSILON);
+      target.resize((target_size + 2) * 2, vocab_type::EPSILON);
       
       source[0] = vocab_type::BOS;
       target[0] = vocab_type::BOS;
@@ -146,7 +146,7 @@ struct LearnHMM : public LearnBase
 	  prob_type* eiter_first = &(*emission.begin(trg)) + source_size + 2;
 	  prob_type* eiter_last  = eiter_first + source_size + 2 - 1; // -1 to exclude EOS
 	  
-	  std::fill(eiter_first, eiter_last, ttable(vocab_type::NONE, target[trg]));
+	  std::fill(eiter_first, eiter_last, ttable(vocab_type::EPSILON, target[trg]));
 	}
       }
       
@@ -157,7 +157,7 @@ struct LearnHMM : public LearnBase
 	// start from 1 to exlude transition into <s>
 	for (int next = 1; next < source_size + 2; ++ next) {
 	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
-	  prob_type* titer2 = titer1 + (source_size + 2);      // from NONE
+	  prob_type* titer2 = titer1 + (source_size + 2);      // from EPSILON
 	  
 	  // - 1 to exclude previous </s>...
 	  for (int prev = 0; prev < source_size + 2 - 1; ++ prev, ++ titer1, ++ titer2) {
@@ -201,8 +201,8 @@ struct LearnHMM : public LearnBase
       
       source.reserve((source_size + 2) * 2);
       target.reserve((target_size + 2) * 2);
-      source.resize((source_size + 2) * 2, vocab_type::NONE);
-      target.resize((target_size + 2) * 2, vocab_type::NONE);
+      source.resize((source_size + 2) * 2, vocab_type::EPSILON);
+      target.resize((target_size + 2) * 2, vocab_type::EPSILON);
       
       source[0] = vocab_type::BOS;
       target[0] = vocab_type::BOS;
@@ -252,7 +252,7 @@ struct LearnHMM : public LearnBase
 	prob_type* eiter_first = &(*emission.begin(trg)) + source_size + 2;
 	prob_type* eiter_last  = eiter_first + source_size + 2 - 1; // -1 to exclude EOS
 	
-	std::fill(eiter_first, eiter_last, ttable(vocab_type::NONE, target[trg]));
+	std::fill(eiter_first, eiter_last, ttable(vocab_type::EPSILON, target[trg]));
       }
 
       
@@ -263,7 +263,7 @@ struct LearnHMM : public LearnBase
 	// start from 1 to exlude transition into <s>
 	for (int next = 1; next < source_size + 2; ++ next) {
 	  prob_type* titer1 = &(*transition.begin(trg, next)); // from word
-	  prob_type* titer2 = titer1 + (source_size + 2);      // from NONE
+	  prob_type* titer2 = titer1 + (source_size + 2);      // from EPSILON
 	  
 	  // - 1 to exclude previous </s>...
 	  for (int prev = 0; prev < source_size + 2 - 1; ++ prev, ++ titer1, ++ titer2) {
@@ -523,14 +523,14 @@ struct LearnHMM : public LearnBase
 	case 1: count_none[4 - 1] += fiter[loop_size - 1] * biter[loop_size - 1] * factor;
 	}
 	
-	counts[vocab_type::NONE][target[trg]] += count_none[0] + count_none[1] + count_none[2] + count_none[3];
+	counts[vocab_type::EPSILON][target[trg]] += count_none[0] + count_none[1] + count_none[2] + count_none[3];
 #endif
 #if 0
 	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
 	  count_none += (*fiter) * (*biter) * factor;
 	
-	counts[vocab_type::NONE][target[trg]] += count_none;
+	counts[vocab_type::EPSILON][target[trg]] += count_none;
 #endif
       }
     }
@@ -931,8 +931,8 @@ struct LearnHMMSymmetric : public LearnBase
 	if (src && trg)
 	  count = utils::mathop::sqrt(count);
 	
-	const word_type word_source = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type word_target = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	const word_type word_source = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	const word_type word_target = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
 	
 	if (trg != 0)
 	  ttable_counts_source_target[word_source][word_target] += count;
@@ -970,8 +970,8 @@ struct LearnHMMSymmetric : public LearnBase
 	if (src && trg)
 	  count = utils::mathop::sqrt(count);
 	
-	const word_type word_source = (src == 0 ? vocab_type::NONE : source[src - 1]);
-	const word_type word_target = (trg == 0 ? vocab_type::NONE : target[trg - 1]);
+	const word_type word_source = (src == 0 ? vocab_type::EPSILON : source[src - 1]);
+	const word_type word_target = (trg == 0 ? vocab_type::EPSILON : target[trg - 1]);
 	
 	if (trg != 0)
 	  ttable_counts_source_target[word_source][word_target] += count;
@@ -1223,7 +1223,7 @@ struct ViterbiHMM : public ViterbiBase
     double scale_accumulated = 0.0;
     for (int trg = 1; trg < target_size + 2; ++ trg) {
       const word_type target_word = (trg == target_size + 1 ? vocab_type::EOS : target[trg - 1]);
-      const double emission_none = ttable(vocab_type::NONE, target_word);
+      const double emission_none = ttable(vocab_type::EPSILON, target_word);
       
       // + 1 to exclude BOS
       prob_type* niter_sum = &(*forward_sum.begin(trg)) + 1;

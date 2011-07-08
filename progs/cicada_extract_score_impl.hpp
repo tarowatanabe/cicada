@@ -552,7 +552,7 @@ struct LexiconBase
     for (size_t trg = 0; trg != target_size; ++ trg) 
       if (target[trg].is_terminal()) {
 	if (aligns_target[trg].empty())
-	  lex_source_target *= lexicon_source_target(lexicon_model_type::vocab_type::NONE, target[trg]);
+	  lex_source_target *= lexicon_source_target(lexicon_model_type::vocab_type::EPSILON, target[trg]);
 	else {
 	  double score = 0.0;
 	  align_set_type::const_iterator aiter_end = aligns_target[trg].end();
@@ -566,7 +566,7 @@ struct LexiconBase
     for (size_t src = 0; src != source_size; ++ src) 
       if (source[src].is_terminal()) {
 	if (aligns_source[src].empty())
-	  lex_target_source *= lexicon_target_source(lexicon_model_type::vocab_type::NONE, source[src]);
+	  lex_target_source *= lexicon_target_source(lexicon_model_type::vocab_type::EPSILON, source[src]);
 	else {
 	  double score = 0.0;
 	  align_set_type::const_iterator aiter_end = aligns_source[src].end();
