@@ -112,4 +112,6 @@ Integrate cicada-alignment.py and cicada-extract.py???
 
 Integrate MPI and non-MPI of cicada_learn{,kbest}{,mpi}
    Use the same gradient,margin computers across mpi and non-mpi applications
-   
+
+Global lexicon learning by liblinear...?
+   We will add bias feature, then learn...

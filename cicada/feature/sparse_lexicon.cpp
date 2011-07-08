@@ -52,18 +52,10 @@ namespace cicada
       
       
       SparseLexiconImpl()
-	: uniques(), words(), caches(), skip_bos_eos(false), skip_sgml_tag(false), prefix("sparse-lexicon"), forced_feature(false)
+	: uniques(), words(), caches(), skip_sgml_tag(false), prefix("sparse-lexicon"), forced_feature(false)
       { uniques.set_empty_key(word_type()); caches.set_empty_key(word_pair_type()); }
 
       struct skipper_epsilon
-      {
-	bool operator()(const symbol_type& word) const
-	{
-	  return word == vocab_type::EPSILON;
-	}
-      };
-
-      struct skipper_bos_eos
       {
 	bool operator()(const symbol_type& word) const
 	{
@@ -75,14 +67,6 @@ namespace cicada
       {
 	bool operator()(const symbol_type& word) const
 	{
-	  return word == vocab_type::EPSILON || (word != vocab_type::BOS && word != vocab_type::EOS && word.is_sgml_tag());
-	}
-      };
-      
-      struct skipper_bos_eos_sgml
-      {
-	bool operator()(const symbol_type& word) const
-	{
 	  return word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS || word.is_sgml_tag();
 	}
       };
@@ -90,11 +74,7 @@ namespace cicada
       void lexicon_score(const edge_type& edge,
 			 feature_set_type& features)
       {
-	if (skip_bos_eos && skip_sgml_tag)
-	  lexicon_score(edge, features, skipper_bos_eos_sgml());
-	else if (skip_bos_eos)
-	  lexicon_score(edge, features, skipper_bos_eos());
-	else if (skip_sgml_tag)
+	if (skip_sgml_tag)
 	  lexicon_score(edge, features, skipper_sgml());
 	else
 	  lexicon_score(edge, features, skipper_epsilon());
@@ -130,6 +110,24 @@ namespace cicada
 
       void assign(const lattice_type& lattice)
       {
+	if (skip_sgml_tag)
+	  assign(lattice, skipper_sgml());
+	else
+	  assign(lattice, skipper_epsilon());
+      }
+      
+      void assign(const hypergraph_type& graph)
+      {
+	if (skip_sgml_tag)
+	  assign(graph, skipper_sgml());
+	else
+	  assign(graph, skipper_epsilon());
+      }
+      
+      template <typename Skipper>
+      void assign(const lattice_type& lattice,
+		  Skipper skipper)
+      {
 	uniques.clear();
 	caches.clear();
 	
@@ -137,7 +135,7 @@ namespace cicada
 	for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
 	  lattice_type::arc_set_type::const_iterator aiter_end = liter->end();
 	  for (lattice_type::arc_set_type::const_iterator aiter = liter->begin(); aiter != aiter_end; ++ aiter)
-	    if (aiter->label != vocab_type::EPSILON)
+	    if (! skipper(aiter->label))
 	      uniques.insert(aiter->label);
 	}
 
@@ -145,7 +143,9 @@ namespace cicada
 	words.insert(words.end(), uniques.begin(), uniques.end());
       }
       
-      void assign(const hypergraph_type& forest)
+      template <typename Skipper>
+      void assign(const hypergraph_type& forest,
+		  Skipper skipper)
       {
 	uniques.clear();
 	caches.clear();
@@ -157,7 +157,7 @@ namespace cicada
 	    
 	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	    for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
-	      if (siter->is_terminal() && *siter != vocab_type::EPSILON && *siter != vocab_type::BOS && *siter != vocab_type::EOS)
+	      if (siter->is_terminal() && ! skipper(*siter))
 		uniques.insert(*siter);
 	  }
 	
@@ -175,7 +175,6 @@ namespace cicada
       sentence_type  words;
       cache_set_type caches;
       
-      bool skip_bos_eos;
       bool skip_sgml_tag;
       
       std::string prefix;
@@ -194,15 +193,12 @@ namespace cicada
 	throw std::runtime_error("this is not sparse lexicon feature: " + parameter);
       
       bool skip_sgml_tag = false;
-      bool skip_bos_eos = false;
       
       std::string name;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
 	if (utils::ipiece(piter->first) == "skip-sgml-tag")
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
-	else if (utils::ipiece(piter->first) == "skip-bos-eos")
-	  skip_bos_eos = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
@@ -211,7 +207,6 @@ namespace cicada
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
       
-      lexicon_impl->skip_bos_eos  = skip_bos_eos;
       lexicon_impl->skip_sgml_tag = skip_sgml_tag;
       lexicon_impl->prefix = (name.empty() ? std::string("sparse-lexicon") : name);
       
