@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     
     feature_parsed_set_type::const_iterator fiter_end = boost::fusion::get<2>(kbest).end();
     for (feature_parsed_set_type::const_iterator fiter = boost::fusion::get<2>(kbest).begin(); fiter != fiter_end; ++ fiter)
-      std::cout << ' ' << fiter->first << "=" << fiter->second;
+      std::cout << ' ' << fiter->first << " = " << fiter->second;
     std::cout << std::endl;
   }
 }

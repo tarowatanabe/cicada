@@ -98,7 +98,7 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
     tokens  %= *qi::lexeme[+(standard::char_ - standard::space) - "|||"];
     
     // TODO: we want to handle longest character sequences... HOW?
-    feature %= qi::lexeme[+(standard::char_ - standard::space - '=')] >> '=' >> qi::double_;
+    feature %= qi::lexeme[+(!(qi::lit('=') >> qi::double_) >> (standard::char_ - standard::space))] >> '=' >> qi::double_;
     features %= *feature;
     
     kbest %= size >> "|||" >> tokens >> -("|||" >> features) >> -("|||" >> qi::double_) >> (qi::eol | qi::eoi);
