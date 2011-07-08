@@ -27,6 +27,7 @@ int main(int argc, char** argv)
   grammar.insert("[x] ||| good boy |||  bad boy ||| feature1=0.4 ||| attribute1=6.7 attribute2=6 attribute3=\"bad morning\" 5.6 \"good\"");
   grammar.insert("[x] ||| good boy |||  bad boy ||| ||| attribute1=6.7 attribute2=6 attribute3=\"bad morning\"");
   grammar.insert("[x] ||| good boy |||  bad boy ||| ||| ");
+  grammar.insert("[x] ||| good boy |||  bad boy ||| 0.5 0.6 0.7 ||| ");
   grammar.insert("[x] ||| good boy |||  bad boy ||| feature2=0.6 fature3=good=5 ||| ");
 
   std::string line;
