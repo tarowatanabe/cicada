@@ -1,3 +1,6 @@
+2011-7-x
+Added sparse-lexicon and sparse-ngram features to reproduce Watanabe et al. (2007)
+
 2011-7-7
 Added lexicon learning by HMM/Model1 + a script to perform bidirectional alignment combination
 Added alignment constrained learning in HMM/Model1

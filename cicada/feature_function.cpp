@@ -112,6 +112,8 @@ variational: variational feature for variational decoding\n\
 \torder=<order>\n\
 \tno-bos-eos=[true|false] do not add bos/eos\n\
 sparse-lexicon: sparse lexicon feature\n\
+\tskip-bos-eos=[true|false] do not add bos/eos\n\
+\tskip-sgml-tag=[true|false] skip sgml tags\n\
 \tname=feature-name-prefix (default: sparse-lexicon)\n\
 sparse-ngram: sparse ngram feature\n\
 \torder=<order>\n\

@@ -6,6 +6,7 @@
 #include "cicada/parameter.hpp"
 
 #include "utils/piece.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
@@ -51,35 +52,83 @@ namespace cicada
       
       
       SparseLexiconImpl()
-	: uniques(), words(), caches(), prefix("sparse-lexicon"), forced_feature(false)
+	: uniques(), words(), caches(), skip_bos_eos(false), skip_sgml_tag(false), prefix("sparse-lexicon"), forced_feature(false)
       { uniques.set_empty_key(word_type()); caches.set_empty_key(word_pair_type()); }
+
+      struct skipper_epsilon
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON;
+	}
+      };
+
+      struct skipper_bos_eos
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS;
+	}
+      };
+
+      struct skipper_sgml
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON || (word != vocab_type::BOS && word != vocab_type::EOS && word.is_sgml_tag());
+	}
+      };
+      
+      struct skipper_bos_eos_sgml
+      {
+	bool operator()(const symbol_type& word) const
+	{
+	  return word == vocab_type::EPSILON || word == vocab_type::BOS || word == vocab_type::EOS || word.is_sgml_tag();
+	}
+      };
       
       void lexicon_score(const edge_type& edge,
 			 feature_set_type& features)
       {
+	if (skip_bos_eos && skip_sgml_tag)
+	  lexicon_score(edge, features, skipper_bos_eos_sgml());
+	else if (skip_bos_eos)
+	  lexicon_score(edge, features, skipper_bos_eos());
+	else if (skip_sgml_tag)
+	  lexicon_score(edge, features, skipper_sgml());
+	else
+	  lexicon_score(edge, features, skipper_epsilon());
+      }
+      
+      
+      template <typename Skipper>
+      void lexicon_score(const edge_type& edge,
+			 feature_set_type& features,
+			 Skipper skipper)
+      {
 	const phrase_type& phrase = edge.rule->rhs;
 	
 	phrase_type::const_iterator piter_end = phrase.end();
-	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) {
-	  
-	  sentence_type::const_iterator witer_end = words.end();
-	  for (sentence_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
-	    
-	    std::pair<cache_set_type::iterator, bool> result = caches.insert(std::make_pair(word_pair_type(*witer, *piter), feature_type()));
-	    if (result.second) {
-	      if (forced_feature)
-		result.first->second = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
-	      else {
-		const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
-		if (feature_type::exists(name))
-		  result.first->second = name;
+	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
+	  if (piter->is_terminal() && ! skipper(*piter)) {
+	    sentence_type::const_iterator witer_end = words.end();
+	    for (sentence_type::const_iterator witer = words.begin(); witer != witer_end; ++ witer) {
+	      
+	      std::pair<cache_set_type::iterator, bool> result = caches.insert(std::make_pair(word_pair_type(*witer, *piter), feature_type()));
+	      if (result.second) {
+		if (forced_feature)
+		  result.first->second = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
+		else {
+		  const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(*piter);
+		  if (feature_type::exists(name))
+		    result.first->second = name;
+		}
 	      }
+	      
+	      if (! result.first->second.empty())
+		features[result.first->second] += 1.0;
 	    }
-	    
-	    if (! result.first->second.empty())
-	      features[result.first->second] += 1.0;
 	  }
-	}
       }
 
       void assign(const lattice_type& lattice)
@@ -129,6 +178,9 @@ namespace cicada
       sentence_type  words;
       cache_set_type caches;
       
+      bool skip_bos_eos;
+      bool skip_sgml_tag;
+      
       std::string prefix;
       bool forced_feature;
     };
@@ -144,16 +196,26 @@ namespace cicada
       if (utils::ipiece(param.name()) != "sparse-lexicon")
 	throw std::runtime_error("this is not sparse lexicon feature: " + parameter);
       
+      bool skip_sgml_tag = false;
+      bool skip_bos_eos = false;
+      
       std::string name;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "name")
+	if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "skip-bos-eos")
+	  skip_bos_eos = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
 	else
 	  std::cerr << "WARNING: unsupported parameter for sparse lexicon: " << piter->first << "=" << piter->second << std::endl;
       }
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
+      
+      lexicon_impl->skip_bos_eos  = skip_bos_eos;
+      lexicon_impl->skip_sgml_tag = skip_sgml_tag;
       lexicon_impl->prefix = (name.empty() ? std::string("sparse-lexicon") : name);
       
       // two-side context + length + counts-id 
