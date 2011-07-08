@@ -18,7 +18,6 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/adapted.hpp>
 
-#include <utils/json_string_parser.hpp>
 #include <utils/simple_vector.hpp>
 
 #include "cicada/sentence.hpp"
@@ -108,9 +107,7 @@ struct kbest_feature_parser : boost::spirit::qi::grammar<Iterator, kbest_feature
   
   boost::spirit::qi::uint_parser<size_type, 10, 1, -1>         size;
   boost::spirit::qi::rule<Iterator, tokens_type(), blank_type> tokens;
- 
-  utils::json_string_parser<Iterator> feature_name;
- 
+  
   boost::spirit::qi::rule<Iterator, feature_parsed_type(), blank_type>  feature;
   boost::spirit::qi::rule<Iterator, feature_parsed_set_type(), blank_type> features;
   
