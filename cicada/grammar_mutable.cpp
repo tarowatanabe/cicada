@@ -135,7 +135,7 @@ namespace cicada
       phrase %= *(qi::lexeme[+(standard::char_ - standard::space) - "|||"]);
       
       score %= (qi::hold[qi::lexeme[+(!(qi::lit('=') >> qi::double_) >> (standard::char_ - standard::space))] >> '='] | qi::attr("")) >> qi::double_;
-      scores %= *score;
+      scores %= -(score % (+standard::space));
       
       data %= data_string | double_dot | int64_;
       
@@ -153,8 +153,8 @@ namespace cicada
     boost::spirit::qi::rule<Iterator, std::string(), space_type> lhs;
     boost::spirit::qi::rule<Iterator, phrase_parsed_type(), space_type> phrase;
     
-    boost::spirit::qi::rule<Iterator, score_parsed_type(), space_type>  score;
-    boost::spirit::qi::rule<Iterator, scores_parsed_type(), space_type> scores;
+    boost::spirit::qi::rule<Iterator, score_parsed_type()>  score;
+    boost::spirit::qi::rule<Iterator, scores_parsed_type()> scores;
     
     utils::json_string_parser<Iterator> data_string;
     

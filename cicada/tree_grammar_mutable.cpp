@@ -141,7 +141,7 @@ namespace cicada
       namespace standard = boost::spirit::standard;
       
       score  %= (qi::hold[qi::lexeme[+(!(qi::lit('=') >> qi::double_) >> (standard::char_ - standard::space))] >> '='] | qi::attr("")) >> qi::double_;
-      scores %= *score;
+      scores %= -(score % (+standard::space));
       
       data %= data_string | double_dot | int64_;
       
@@ -156,8 +156,8 @@ namespace cicada
     boost::spirit::qi::int_parser<AttributeVector::int_type, 10, 1, -1> int64_;
     boost::spirit::qi::real_parser<double, boost::spirit::qi::strict_real_policies<double> > double_dot;
     
-    boost::spirit::qi::rule<Iterator, score_parsed_type(), space_type>  score;
-    boost::spirit::qi::rule<Iterator, scores_parsed_type(), space_type> scores;
+    boost::spirit::qi::rule<Iterator, score_parsed_type()>  score;
+    boost::spirit::qi::rule<Iterator, scores_parsed_type()> scores;
 
     utils::json_string_parser<Iterator> data_string;
     boost::spirit::qi::rule<Iterator, AttributeVector::data_type(), space_type> data;
