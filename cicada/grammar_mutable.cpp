@@ -134,7 +134,7 @@ namespace cicada
       lhs %= (qi::lexeme[standard::char_('[') >> +(standard::char_ - standard::space - ']') >> standard::char_(']')]);
       phrase %= *(qi::lexeme[+(standard::char_ - standard::space) - "|||"]);
       
-      score %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> qi::double_;
+      score %= (qi::hold[qi::lexeme[+(!(qi::lit('=') >> qi::double_) >> (standard::char_ - standard::space))] >> '='] | qi::attr("")) >> qi::double_;
       scores %= *score;
       
       data %= data_string | double_dot | int64_;

@@ -140,7 +140,7 @@ namespace cicada
       namespace qi = boost::spirit::qi;
       namespace standard = boost::spirit::standard;
       
-      score  %= (qi::hold[qi::lexeme[+(standard::char_ - standard::space - '=')] >> '='] | qi::attr("")) >> qi::double_;
+      score  %= (qi::hold[qi::lexeme[+(!(qi::lit('=') >> qi::double_) >> (standard::char_ - standard::space))] >> '='] | qi::attr("")) >> qi::double_;
       scores %= *score;
       
       data %= data_string | double_dot | int64_;
