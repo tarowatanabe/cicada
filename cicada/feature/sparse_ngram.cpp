@@ -284,7 +284,7 @@ namespace cicada
 	  std::string name = prefix + ":";
 	  for (Iterator fiter = first; fiter != iter + 1; ++ fiter)
 	    name += "_" + static_cast<const std::string&>(*fiter);
-	  
+	  	  
 	  if (forced_feature || feature_type::exists(name))
 	    cache[id] = name;
 	  
