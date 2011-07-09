@@ -15,6 +15,13 @@
 
 #include <boost/tuple/tuple.hpp>
 
+#include <google/dense_hash_set>
+#include <google/dense_hash_map>
+
+//
+// TODO: implement unigram and bigram features!
+//
+
 namespace cicada
 {
   namespace feature
@@ -41,15 +48,30 @@ namespace cicada
       
       typedef feature_function_type::rule_type rule_type;
       
-      typedef utils::compact_trie_dense<int, feature_type, utils::hashmurmur<size_t>, std::equal_to<int>,
-					std::allocator<std::pair<const int, feature_type> > > trie_type;
-    
+      typedef utils::simple_vector<char, std::allocator<char> > signature_type;
+      
+      typedef utils::compact_trie_dense<int, signature_type, utils::hashmurmur<size_t>, std::equal_to<int>,
+					std::allocator<std::pair<const int, signature_type> > > trie_type;
+      
+      typedef std::vector<feature_type, std::allocator<feature_type> > cache_unigram_type;
+      
       typedef trie_type::id_type id_type;
+      
+      class node_map_type : public google::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> >
+      {
+      public:
+	typedef google::dense_hash_map<id_type, feature_type, utils::hashmurmur<size_t>, std::equal_to<id_type> > map_type;
+	
+	node_map_type() : map_type() { map_type::set_empty_key(id_type(-1)); }
+      };
+      typedef std::deque<node_map_type, std::allocator<node_map_type> > cache_bigram_type;
     
-      RuleShapeImpl() : trie(-1) {}
+      RuleShapeImpl() : trie(-1), forced_feature(false) {}
     
-      void rule_shape_score(const edge_type& edge,
-			    feature_set_type& features) const
+      void rule_shape_score(state_ptr_type& state,
+			    const state_ptr_set_type& states,
+			    const edge_type& edge,
+			    feature_set_type& features)
       {
 	id_type node = trie.root();
 	
@@ -69,7 +91,7 @@ namespace cicada
 	}
 	
 	if (trie[node].empty()) {
-	  std::string feature("rule-shape");
+	  std::string feature;
 	  
 	  int non_terminal_pos = 0;
 	  rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
@@ -83,16 +105,74 @@ namespace cicada
 	      index = non_terminal_index + 1;
 	    } 
 	    
-	    feature += ':' + utils::lexical_cast<std::string>(index);
+	    if (feature.empty())
+	      feature = utils::lexical_cast<std::string>(index);
+	    else
+	      feature += '|' + utils::lexical_cast<std::string>(index);
 	  }
-
-	  const_cast<trie_type&>(trie).operator[](node) = feature;
+	  
+	  const_cast<trie_type&>(trie).operator[](node) = signature_type(feature.begin(), feature.end());
+	  
+	  if (node >= cache_unigram.size())
+	    cache_unigram.resize(node + 1);
+	  
+	  std::string name = "rule-shape:" + feature;
+	  if (forced_feature || feature_type::exists(name))
+	    cache_unigram[node] = name;
 	}
 	
-	features[trie[node]] = 1.0;
-      }
+	if (! cache_unigram[node].empty())
+	  features[cache_unigram[node]] += 1.0;
+	
+	*reinterpret_cast<id_type*>(state) = node;
+	
+	if (! states.empty()) {
+	  if (node >= cache_bigram.size())
+	    cache_bigram.resize(node + 1);
 
+	  const id_type& node_parent = node;
+	  
+	  int non_terminal_pos = 0;
+	  rule_type::symbol_set_type::const_iterator titer_end = edge.rule->rhs.end();
+	  for (rule_type::symbol_set_type::const_iterator titer = edge.rule->rhs.begin(); titer != titer_end; ++ titer) {
+	    if (titer->is_non_terminal()) {
+	      const int __non_terminal_index = titer->non_terminal_index();
+	      const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
+	      ++ non_terminal_pos;
+	      
+	      const id_type& node_child = *reinterpret_cast<const id_type*>(states[antecedent_index]);
+	      
+	      std::pair<node_map_type::iterator, bool> result = cache_bigram[node_parent].insert(std::make_pair(node_child, feature_type()));
+	      if (result.second) {
+		const std::string name = ("rule-shape2:"
+					  + std::string(trie[node_parent].begin(), trie[node_parent].end())
+					  + "+"
+					  + std::string(trie[node_child].begin(), trie[node_child].end()));
+		
+		if (forced_feature || feature_type::exists(name))
+		  result.first->second = name;
+	      }
+	      
+	      if (! result.first->second.empty())
+		features[result.first->second] += 1.0;
+	    }
+	  }
+	}
+      }
+      
+      void clear()
+      {
+	trie.clear();
+	cache_unigram.clear();
+	cache_bigram.clear();
+      }
+      
       trie_type trie;
+      
+      cache_unigram_type cache_unigram;
+      cache_bigram_type  cache_bigram;
+      
+      bool forced_feature;
     };
     
     
@@ -111,8 +191,9 @@ namespace cicada
       
       std::auto_ptr<impl_type> rule_shape_impl(new impl_type());
       
-      base_type::__state_size = 0;
+      base_type::__state_size = sizeof(impl_type::id_type);
       base_type::__feature_name = "rule-shape";
+      base_type::__sparse_feature = true;
       
       pimpl = rule_shape_impl.release();
     }
@@ -125,7 +206,7 @@ namespace cicada
     { }
     
     RuleShape& RuleShape::operator=(const RuleShape& x)
-    {
+    {      
       static_cast<base_type&>(*this) = static_cast<const base_type&>(x);
       *pimpl = *x.pimpl;
       
@@ -139,7 +220,11 @@ namespace cicada
 			  feature_set_type& estimates,
 			  const bool final) const
     {
-      pimpl->rule_shape_score(edge, features);
+      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      
+      const_cast<impl_type*>(pimpl)->forced_feature = base_type::apply_feature();
+      
+      pimpl->rule_shape_score(state, states, edge, features);
     }
 
     void RuleShape::apply_coarse(state_ptr_type& state,
@@ -178,5 +263,11 @@ namespace cicada
 				   feature_set_type& estimates,
 				   const bool final) const
     {}
+    
+    void RuleShape::initialize()
+    {
+      pimpl->clear();
+    }
+    
   };
 };
