@@ -128,7 +128,7 @@ namespace cicada
 	if (! checked_unigram[node]) {
 	  checked_unigram[node] = true;
 	  
-	  std::string name = "rule-shape:" + trie[node];
+	  const std::string name = "rule-shape:" + trie[node];
 	  if (forced_feature || feature_type::exists(name))
 	    cache_unigram[node] = name;
 	}
