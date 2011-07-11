@@ -48,12 +48,11 @@ namespace cicada
       
       typedef feature_function_type::rule_type rule_type;
       
-      typedef utils::simple_vector<char, std::allocator<char> > signature_type;
-      
-      typedef utils::compact_trie_dense<int, signature_type, utils::hashmurmur<size_t>, std::equal_to<int>,
-					std::allocator<std::pair<const int, signature_type> > > trie_type;
+      typedef utils::compact_trie_dense<int, std::string, utils::hashmurmur<size_t>, std::equal_to<int>,
+					std::allocator<std::pair<const int, std::string> > > trie_type;
       
       typedef std::vector<feature_type, std::allocator<feature_type> > cache_unigram_type;
+      typedef std::vector<bool, std::allocator<bool> > checked_unigram_type;
       
       typedef trie_type::id_type id_type;
       
@@ -111,12 +110,18 @@ namespace cicada
 	      feature += '|' + utils::lexical_cast<std::string>(index);
 	  }
 	  
-	  const_cast<trie_type&>(trie).operator[](node) = signature_type(feature.begin(), feature.end());
+	  const_cast<trie_type&>(trie).operator[](node) = feature;
+	}
+	
+	if (node >= cache_unigram.size())
+	  cache_unigram.resize(node + 1);
+	if (node >= checked_unigram.size())
+	  checked_unigram.resize(node + 1, false);
+	
+	if (! checked_unigram[node]) {
+	  checked_unigram[node] = true;
 	  
-	  if (node >= cache_unigram.size())
-	    cache_unigram.resize(node + 1);
-	  
-	  std::string name = "rule-shape:" + feature;
+	  std::string name = "rule-shape:" + trie[node];
 	  if (forced_feature || feature_type::exists(name))
 	    cache_unigram[node] = name;
 	}
@@ -144,10 +149,7 @@ namespace cicada
 	      
 	      std::pair<node_map_type::iterator, bool> result = cache_bigram[node_parent].insert(std::make_pair(node_child, feature_type()));
 	      if (result.second) {
-		const std::string name = ("rule-shape2:"
-					  + std::string(trie[node_parent].begin(), trie[node_parent].end())
-					  + "+"
-					  + std::string(trie[node_child].begin(), trie[node_child].end()));
+		const std::string name = "rule-shape2:" + trie[node_parent] + '+' + trie[node_child];
 		
 		if (forced_feature || feature_type::exists(name))
 		  result.first->second = name;
@@ -162,15 +164,16 @@ namespace cicada
       
       void clear()
       {
-	trie.clear();
+	checked_unigram.clear();
 	cache_unigram.clear();
 	cache_bigram.clear();
       }
       
       trie_type trie;
       
-      cache_unigram_type cache_unigram;
-      cache_bigram_type  cache_bigram;
+      checked_unigram_type checked_unigram;
+      cache_unigram_type   cache_unigram;
+      cache_bigram_type    cache_bigram;
       
       bool forced_feature;
     };
