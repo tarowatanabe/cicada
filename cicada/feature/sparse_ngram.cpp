@@ -5,6 +5,7 @@
 #include "sparse_ngram.hpp"
 #include "cicada/parameter.hpp"
 
+#include "utils/array_power2.hpp"
 #include "utils/piece.hpp"
 #include "utils/indexed_trie.hpp"
 #include "utils/lexical_cast.hpp"
@@ -14,7 +15,7 @@ namespace cicada
   namespace feature
   {
 
-    class SparseNGramImpl
+    class SparseNGramImpl : public utils::hashmurmur<size_t>
     {
     public:
       typedef size_t    size_type;
@@ -47,6 +48,35 @@ namespace cicada
       typedef std::vector<bool, std::allocator<bool> > checked_type;
 
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
+
+      typedef utils::hashmurmur<size_t> hasher_type;
+
+      struct CacheContext
+      {
+	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+	
+	phrase_type      context;
+	phrase_type      ngram;
+	feature_set_type features;
+	
+	CacheContext() : context(), ngram(), features() {}
+      };
+
+      struct CacheNGram
+      {
+	typedef utils::simple_vector<symbol_type, std::allocator<symbol_type> > phrase_type;
+	
+	phrase_type      ngram;
+	feature_set_type features;
+	
+	CacheNGram() : ngram(), features() {}
+      };
+
+      typedef CacheContext cache_context_type;
+      typedef CacheNGram   cache_ngram_type;
+      
+      typedef utils::array_power2<cache_context_type,  1024 * 32, std::allocator<cache_context_type> >  cache_context_set_type;
+      typedef utils::array_power2<cache_ngram_type,    1024 * 8,  std::allocator<cache_ngram_type> >    cache_ngram_set_type;
       
       SparseNGramImpl() : trie(), cache(), checked(), prefix("sparse-ngram"), forced_feature(false) {}
       
@@ -209,44 +239,85 @@ namespace cicada
       }
 
       template <typename Iterator>
-      const feature_type& ngram_feature(Iterator first, Iterator iter, Iterator last, feature_set_type& features)
+      inline
+      size_t hash_phrase(Iterator first, Iterator last, size_t seed=0) const
       {
-	const int context_size = order - 1;
-	
-	first = std::max(iter - context_size, first);
-	for (/**/; first != iter; ++ first) {
-	  trie_type::id_type id = trie.root();
-	  
-	  Iterator end = std::min(first + order, last);
-	  for (Iterator iter2 = first; iter2 != end; ++ iter2) {
-	    id = traverse(id, first, iter2);
-	    
-	    if (iter2 < iter) continue;
-	    
-	    if (! cache[id].empty())
-	      features[cache[id]] += 1.0;
-	  }
-	}
+	return hasher_type::operator()(first, last, seed);
       }
       
-      template <typename Iterator>
-      const feature_type& ngram_feature(Iterator first, Iterator last, feature_set_type& features)
+      template <typename Iterator, typename __Phrase>
+      inline
+      bool equal_phrase(Iterator first, Iterator last, const __Phrase& x) const
       {
-	for (/**/; first != last; ++ first) {
-	  trie_type::id_type id = trie.root();
-	  
-	  Iterator end = std::min(first + order, last);
-	  for (Iterator iter = first; iter != end; ++ iter) {
-	    id = traverse(id, first, iter);
-	    
-	    if (! cache[id].empty())
-	      features[cache[id]] += 1.0;
-	  }
-	}
+	return static_cast<int>(x.size()) == std::distance(first, last) && std::equal(first, last, x.begin());
       }
 
       template <typename Iterator>
-      trie_type::id_type ngram_context(Iterator first, Iterator last) {
+      void ngram_feature(Iterator first, Iterator iter, Iterator last, feature_set_type& features)
+      {
+	if (iter == last) return;
+	
+	const int context_size = order - 1;
+	
+	first = std::max(iter - context_size, first);
+	
+	const size_t cache_pos = hash_phrase(first, iter, hash_phrase(iter, last)) & (caches_context.size() - 1);
+	cache_context_type& cache_context = const_cast<cache_context_type&>(caches_context[cache_pos]);
+	
+	if (! equal_phrase(first, iter, cache_context.context) || ! equal_phrase(iter, last, cache_context.ngram)) {
+	  cache_context.context.assign(first, iter);
+	  cache_context.ngram.assign(iter, last);
+	  cache_context.features.clear();
+	  
+	  for (/**/; first != iter; ++ first) {
+	    trie_type::id_type id = trie.root();
+	    
+	    Iterator end = std::min(first + order, last);
+	    for (Iterator iter2 = first; iter2 != end; ++ iter2) {
+	      id = traverse(id, first, iter2);
+	      
+	      if (iter2 < iter) continue;
+	      
+	      if (! cache[id].empty())
+		cache_context.features[cache[id]] += 1.0;
+	    }
+	  }
+	}
+	
+	features += cache_context.features;
+      }
+      
+      template <typename Iterator>
+      void ngram_feature(Iterator first, Iterator last, feature_set_type& features)
+      {
+	if (first == last) return;
+
+	const size_t cache_pos = hash_phrase(first, last) & (caches_ngram.size() - 1);
+	cache_ngram_type& cache_ngram = const_cast<cache_ngram_type&>(caches_ngram[cache_pos]);
+	
+	if (! equal_phrase(first, last, cache_ngram.ngram)) {
+	  cache_ngram.ngram.assign(first, last);
+	  cache_ngram.features.clear();
+	  
+	  for (/**/; first != last; ++ first) {
+	    trie_type::id_type id = trie.root();
+	    
+	    Iterator end = std::min(first + order, last);
+	    for (Iterator iter = first; iter != end; ++ iter) {
+	      id = traverse(id, first, iter);
+	      
+	      if (! cache[id].empty())
+		cache_ngram.features[cache[id]] += 1.0;
+	    }
+	  }
+	}
+	
+	features += cache_ngram.features;
+      }
+
+      template <typename Iterator>
+      trie_type::id_type ngram_context(Iterator first, Iterator last)
+      {
 	trie_type::id_type id = trie.root();
 	
 	for (Iterator iter = first; iter != last; ++ iter)
@@ -299,6 +370,9 @@ namespace cicada
 	trie.clear();
 	cache.clear();
 	checked.clear();
+
+	caches_context.clear();
+	caches_ngram.clear();
       }
 
       buffer_type buffer;
@@ -306,6 +380,10 @@ namespace cicada
       trie_type    trie;
       cache_type   cache;
       checked_type checked;
+
+      cache_context_set_type caches_context;
+      cache_ngram_set_type   caches_ngram;
+
       
       int order;
       bool no_bos_eos;
