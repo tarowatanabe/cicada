@@ -1187,7 +1187,7 @@ void options(int argc, char** argv)
     
     ("regularize-l1", po::bool_switch(&regularize_l1), "L1-regularization")
     ("regularize-l2", po::bool_switch(&regularize_l2), "L2-regularization")
-    ("C"            , po::value<double>(&C),           "regularization constant")
+    ("C",             po::value<double>(&C)->default_value(C), "regularization constant")
 
     ("unite",    po::bool_switch(&unite_forest), "unite forest sharing the same id")
     

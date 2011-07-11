@@ -2,9 +2,15 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
-// ribes requires
 //
-// a set of indices already aligned
+// ribes requires unique word to unique word alignment + falling back to unique bigram to unique bigram alignment
+//
+// scorer:
+// a set of "unique" words in ref-set + indices
+// a set of "unique" bigrams in ref-set + indices
+
+// state: (one state each for one-reference translation)
+// prefix + aligned word position w/ context, i.e. unigram/bigram etc. + suffix
 //
 
 #include <map>
@@ -27,8 +33,9 @@
 #include "cicada/tokenizer.hpp"
 
 #include <boost/numeric/conversion/bounds.hpp>
+#include <boost/math/special_functions/binomial.hpp>
 #include <boost/tokenizer.hpp>
-
+#include <boost/functional/hash.hpp>
 
 namespace cicada
 {
