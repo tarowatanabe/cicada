@@ -184,8 +184,7 @@ namespace cicada
 	      const trie_type::id_type* context_antecedent = reinterpret_cast<const trie_type::id_type*>(states[antecedent_index]);
 	      
 	      if (biter != buffer.end()) {
-		if (biter_first != biter)
-		  ngram_feature(biter_first, biter, buffer.end(), features);
+		ngram_feature(biter_first, biter, buffer.end(), features);
 		ngram_feature(biter, buffer.end(), features);
 		biter = buffer.end();
 	      }
@@ -193,8 +192,7 @@ namespace cicada
 	      // uncover antecedent_context into buffer.
 	      unpack_context(context_antecedent[0], buffer);
 	      
-	      if (biter_first != biter && biter != buffer.end())
-		ngram_feature(biter_first, biter, buffer.end(), features);
+	      ngram_feature(biter_first, biter, buffer.end(), features);
 	      biter = buffer.end();
 	      
 	      if (context_antecedent[1] != trie.root()) {
@@ -213,8 +211,7 @@ namespace cicada
 	  }
 	  
 	  if (biter != buffer.end()) {
-	    if (biter_first != biter)
-	      ngram_feature(biter_first, biter, buffer.end(), features);
+	    ngram_feature(biter_first, biter, buffer.end(), features);
 	    ngram_feature(biter, buffer.end(), features);
 	    biter = buffer.end();
 	  }
@@ -255,7 +252,7 @@ namespace cicada
       template <typename Iterator>
       void ngram_feature(Iterator first, Iterator iter, Iterator last, feature_set_type& features)
       {
-	if (iter == last) return;
+	if (first == iter || iter == last) return;
 	
 	const int context_size = order - 1;
 	
