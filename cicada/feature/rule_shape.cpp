@@ -88,6 +88,10 @@ namespace cicada
 	  
 	  node = const_cast<trie_type&>(trie).insert(node, index);
 	}
+
+	// root!
+	if (node == trie.root())
+	  node = const_cast<trie_type&>(trie).insert(node, -1);
 	
 	if (trie[node].empty()) {
 	  std::string feature;
@@ -109,6 +113,9 @@ namespace cicada
 	    else
 	      feature += '|' + utils::lexical_cast<std::string>(index);
 	  }
+	  
+	  if (feature.empty())
+	    feature = "<epsilon>";
 	  
 	  const_cast<trie_type&>(trie).operator[](node) = feature;
 	}
