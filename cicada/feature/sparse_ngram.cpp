@@ -44,8 +44,8 @@ namespace cicada
 
       typedef utils::indexed_trie<word_type, boost::hash<word_type>, std::equal_to<word_type>, std::allocator<word_type> > trie_type;
       
-      typedef std::vector<feature_type, std::allocator<feature_type> > cache_type;
-      typedef std::vector<bool, std::allocator<bool> > checked_type;
+      typedef std::vector<feature_type, std::allocator<feature_type> > cache_feature_type;
+      typedef std::vector<bool, std::allocator<bool> >                 checked_feature_type;
 
       typedef std::vector<symbol_type, std::allocator<symbol_type> > buffer_type;
 
@@ -78,7 +78,7 @@ namespace cicada
       typedef utils::array_power2<cache_context_type,  1024 * 32, std::allocator<cache_context_type> >  cache_context_set_type;
       typedef utils::array_power2<cache_ngram_type,    1024 * 8,  std::allocator<cache_ngram_type> >    cache_ngram_set_type;
       
-      SparseNGramImpl() : trie(), cache(), checked(), prefix("sparse-ngram"), forced_feature(false) {}
+      SparseNGramImpl() : trie(), cache_feature(), checked_feature(), prefix("sparse-ngram"), forced_feature(false) {}
       
       struct skipper_epsilon
       {
@@ -278,8 +278,8 @@ namespace cicada
 	      
 	      if (iter2 < iter) continue;
 	      
-	      if (! cache[id].empty())
-		cache_context.features[cache[id]] += 1.0;
+	      if (! cache_feature[id].empty())
+		cache_context.features[cache_feature[id]] += 1.0;
 	    }
 	  }
 	}
@@ -306,8 +306,8 @@ namespace cicada
 	    for (Iterator iter = first; iter != end; ++ iter) {
 	      id = traverse(id, first, iter);
 	      
-	      if (! cache[id].empty())
-		cache_ngram.features[cache[id]] += 1.0;
+	      if (! cache_feature[id].empty())
+		cache_ngram.features[cache_feature[id]] += 1.0;
 	    }
 	  }
 	}
@@ -344,12 +344,12 @@ namespace cicada
       trie_type::id_type traverse(trie_type::id_type id, Iterator first, Iterator iter) {
 	id = trie.push(id, *iter);
 	
-	if (id >= cache.size())
-	  cache.resize(id + 1, feature_type());
-	if (id >= checked.size())
-	  checked.resize(id + 1, false);
+	if (id >= cache_feature.size())
+	  cache_feature.resize(id + 1, feature_type());
+	if (id >= checked_feature.size())
+	  checked_feature.resize(id + 1, false);
 	
-	if (! checked[id]) {
+	if (! checked_feature[id]) {
 	  // ngram at [first, iter + 1)
 	  
 	  std::string name = prefix + ":";
@@ -357,9 +357,9 @@ namespace cicada
 	    name += "_" + static_cast<const std::string&>(*fiter);
 	  	  
 	  if (forced_feature || feature_type::exists(name))
-	    cache[id] = name;
+	    cache_feature[id] = name;
 	  
-	  checked[id] = true;
+	  checked_feature[id] = true;
 	}
 	
 	return id;
@@ -368,8 +368,8 @@ namespace cicada
       void clear()
       {
 	trie.clear();
-	cache.clear();
-	checked.clear();
+	cache_feature.clear();
+	checked_feature.clear();
 
 	caches_context.clear();
 	caches_ngram.clear();
@@ -378,8 +378,8 @@ namespace cicada
       buffer_type buffer;
       
       trie_type    trie;
-      cache_type   cache;
-      checked_type checked;
+      cache_feature_type   cache_feature;
+      checked_feature_type checked_feature;
 
       cache_context_set_type caches_context;
       cache_ngram_set_type   caches_ngram;
