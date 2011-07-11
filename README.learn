@@ -7,5 +7,7 @@ MERT: cicada_mert{,_kbest}{,_mpi}
 MAXLIKE: cicada_maxlike{,_mpi}
 
 LEARN: ciada_learn{,_kbest}{,_mpi}
+       Generic learner which simply differentate correct translations to incorrect tranlsations by forest or kbests.
+       The hyperparameter C is independent of data size, and is used as a scaling for L_{1,2} regularizer.
 
 LEARN_ONLINE: cicada_learn_online{,_mpi}
