@@ -2,6 +2,11 @@
 //  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 //
 
+// ribes requires
+//
+// a set of indices already aligned
+//
+
 #include <map>
 
 #include "utils/space_separator.hpp"
