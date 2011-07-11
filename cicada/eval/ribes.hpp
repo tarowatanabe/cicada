@@ -14,18 +14,18 @@ namespace cicada
 {
   namespace eval
   {
-    class RIBESScorer;
+    class RibesScorer;
 
-    class RIBES : public Score
+    class Ribes : public Score
     {
     private:
-      friend class RIBESScorer;
+      friend class RibesScorer;
       
     public:
       typedef double count_type;
       
     public:
-      RIBES() : distance(0), penalty(0) {}
+      Ribes() : distance(0), penalty(0) {}
       
       double score() const
       {
@@ -34,9 +34,9 @@ namespace cicada
       
       bool equal(const score_type& score) const
       {
-	const RIBES* rhs = dynamic_cast<const RIBES*>(&score);
+	const Ribes* rhs = dynamic_cast<const Ribes*>(&score);
 	if (! rhs)
-	  throw std::runtime_error("invalid RIBES score");
+	  throw std::runtime_error("invalid Ribes score");
 	
 	return (distance == rhs->distance
 		&& penalty == rhs->penalty);
@@ -45,9 +45,9 @@ namespace cicada
       
       void assign(const score_type& score)
       {
-	const RIBES* rhs = dynamic_cast<const RIBES*>(&score);
+	const Ribes* rhs = dynamic_cast<const Ribes*>(&score);
 	if (! rhs)
-	  throw std::runtime_error("invalid RIBES score");
+	  throw std::runtime_error("invalid Ribes score");
 	
 	distance  = rhs->distance;
 	penalty   = rhs->penalty;
@@ -55,9 +55,9 @@ namespace cicada
 
       void plus_equal(const score_type& score)
       {
-	const RIBES* rhs = dynamic_cast<const RIBES*>(&score);
+	const Ribes* rhs = dynamic_cast<const Ribes*>(&score);
 	if (! rhs)
-	  throw std::runtime_error("invalid RIBES score");
+	  throw std::runtime_error("invalid Ribes score");
 
 	distance  += rhs->distance;
 	penalty   += rhs->penalty;
@@ -65,9 +65,9 @@ namespace cicada
       
       void minus_equal(const score_type& score)
       {
-	const RIBES* rhs = dynamic_cast<const RIBES*>(&score);
+	const Ribes* rhs = dynamic_cast<const Ribes*>(&score);
 	if (! rhs)
-	  throw std::runtime_error("invalid RIBES score");
+	  throw std::runtime_error("invalid Ribes score");
 
 	distance -= rhs->distance;
 	penalty  -= rhs->penalty;
@@ -87,12 +87,12 @@ namespace cicada
       
       score_ptr_type zero() const
       {
-	return score_ptr_type(new RIBES());
+	return score_ptr_type(new Ribes());
       }
       
       score_ptr_type clone() const
       {
-	return score_ptr_type(new RIBES(*this));
+	return score_ptr_type(new Ribes(*this));
       }
       
       std::string description() const;
@@ -106,31 +106,31 @@ namespace cicada
       count_type penalty;
     };
 
-    class RIBESScorerImpl;
+    class RibesScorerImpl;
     
-    class RIBESScorer : public Scorer
+    class RibesScorer : public Scorer
     {
     public:
       typedef double count_type;
       typedef double weight_type;
       
     private:
-      typedef RIBESScorerImpl impl_type;
+      typedef RibesScorerImpl impl_type;
       typedef std::vector<impl_type*, std::allocator<impl_type*> >  impl_set_type;
       
     public:
-      RIBESScorer() : impl(), weight(), spearman(false), kendall(true) { }
-      RIBESScorer(const weight_type& __weight) : impl(), weight(__weight), spearman(false), kendall(true) {}
-      RIBESScorer(const weight_type& __weight, const bool __spearman)
+      RibesScorer() : impl(), weight(), spearman(false), kendall(true) { }
+      RibesScorer(const weight_type& __weight) : impl(), weight(__weight), spearman(false), kendall(true) {}
+      RibesScorer(const weight_type& __weight, const bool __spearman)
 	: impl(), weight(__weight), spearman(__spearman), kendall(! __spearman) {}
       
-      RIBESScorer(const RIBESScorer& x);
-      ~RIBESScorer();
-      RIBESScorer& operator=(const RIBESScorer& x);
+      RibesScorer(const RibesScorer& x);
+      ~RibesScorer();
+      RibesScorer& operator=(const RibesScorer& x);
       
       bool error_metric() const { return true; }
       
-      scorer_ptr_type clone() const { return scorer_ptr_type(new RIBESScorer(*this)); }
+      scorer_ptr_type clone() const { return scorer_ptr_type(new RibesScorer(*this)); }
       
       void clear();
       

@@ -57,7 +57,7 @@ namespace cicada
       if (scorer.second == "bleu")
 	return Bleu::decode(iter, end);
       else if (scorer.second == "ribes")
-	return RIBES::decode(iter, end);
+	return Ribes::decode(iter, end);
       else if (scorer.second == "wer")
 	return WER::decode(iter, end);
       else if (scorer.second == "per")
@@ -261,7 +261,7 @@ parseval: parse evaluation\n\
 	if (spearman && kendall)
 	  throw std::runtime_error("either Kendall or Spearman");
 	
-	scorer = scorer_ptr_type(new RIBESScorer(weight, spearman));
+	scorer = scorer_ptr_type(new RibesScorer(weight, spearman));
 	scorer->tokenizer = tokenizer;
 	scorer->skip_sgml_tag = skip_sgml_tag;
 	

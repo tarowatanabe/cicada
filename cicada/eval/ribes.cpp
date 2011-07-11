@@ -23,14 +23,14 @@ namespace cicada
   namespace eval
   {
 
-    std::string RIBES::description() const
+    std::string Ribes::description() const
     {
       std::ostringstream stream;
       stream << "ribes: " << score() << ' ' << distance << " penalty: " << penalty;
       return stream.str();
     }
     
-    std::string RIBES::encode() const
+    std::string Ribes::encode() const
     {
       std::ostringstream stream;
       stream << '{' << "\"eval\":\"ribes\",";
@@ -66,7 +66,7 @@ namespace cicada
       boost::spirit::qi::rule<Iterator, ribes_parsed_type(), space_type> ribes_parsed;
     };
 
-    Score::score_ptr_type RIBES::decode(std::string::const_iterator& iter, std::string::const_iterator end)
+    Score::score_ptr_type Ribes::decode(std::string::const_iterator& iter, std::string::const_iterator end)
     {
       typedef std::string::const_iterator iterator_type;
       
@@ -80,14 +80,14 @@ namespace cicada
       if (! result)
 	return score_ptr_type();
       
-      std::auto_ptr<RIBES> ribes(new RIBES());
+      std::auto_ptr<Ribes> ribes(new Ribes());
       ribes->distance = boost::fusion::get<0>(parsed);
       ribes->penalty  = boost::fusion::get<1>(parsed);
       
       return score_ptr_type(ribes.release());
     }
     
-    Score::score_ptr_type RIBES::decode(const utils::piece& encoded)
+    Score::score_ptr_type Ribes::decode(const utils::piece& encoded)
     {
       std::string::const_iterator iter(encoded.begin());
       std::string::const_iterator iter_end(encoded.end());
@@ -95,13 +95,13 @@ namespace cicada
       return decode(iter, iter_end);
     }
 
-    class RIBESScorerImpl
+    class RibesScorerImpl
     {
     private:
-      friend class RIBESScorer;
+      friend class RibesScorer;
       
     public:
-      typedef RIBESScorer ribes_scorer_type;
+      typedef RibesScorer ribes_scorer_type;
       
       typedef ribes_scorer_type::count_type count_type;
       typedef ribes_scorer_type::weight_type weight_type;
@@ -125,7 +125,7 @@ namespace cicada
       
       typedef Score value_type;
       
-      RIBESScorerImpl(const sentence_type& __ref) : ref(__ref) { collect_stats(ref, ref_unigrams, ref_bigrams); }
+      RibesScorerImpl(const sentence_type& __ref) : ref(__ref) { collect_stats(ref, ref_unigrams, ref_bigrams); }
       
       typedef std::vector<int, std::allocator<int> > alignment_type;
       typedef utils::bit_vector<4096> aligned_type;
@@ -255,7 +255,7 @@ namespace cicada
       aligned_type   aligned_impl;
     };
    
-    RIBESScorer::RIBESScorer(const RIBESScorer& x)
+    RibesScorer::RibesScorer(const RibesScorer& x)
       : Scorer(static_cast<const Scorer&>(*this)),
 	weight(x.weight)
     {
@@ -263,12 +263,12 @@ namespace cicada
 	impl.push_back(new impl_type(*(*iter)));
     }
     
-    RIBESScorer::~RIBESScorer()
+    RibesScorer::~RibesScorer()
     {
       clear();
     }
     
-    RIBESScorer& RIBESScorer::operator=(const RIBESScorer& x)
+    RibesScorer& RibesScorer::operator=(const RibesScorer& x)
     {
       clear();
       
@@ -282,7 +282,7 @@ namespace cicada
       return *this;
     }
     
-    void RIBESScorer::clear()
+    void RibesScorer::clear()
     {
       for (impl_set_type::iterator iter = impl.begin(); iter != impl.end(); ++ iter)
 	delete *iter;
@@ -290,7 +290,7 @@ namespace cicada
       impl.clear();
     }
     
-    void RIBESScorer::insert(const sentence_type& __sentence)
+    void RibesScorer::insert(const sentence_type& __sentence)
     {
       sentence_type sentence;
       tokenize(__sentence, sentence);
@@ -298,12 +298,12 @@ namespace cicada
       impl.push_back(new impl_type(sentence));
     }
     
-    RIBESScorer::score_ptr_type RIBESScorer::score(const sentence_type& __sentence) const
+    RibesScorer::score_ptr_type RibesScorer::score(const sentence_type& __sentence) const
     {
       sentence_type sentence;
       tokenize(__sentence, sentence);
       
-      std::auto_ptr<RIBES> ribes(new RIBES());
+      std::auto_ptr<Ribes> ribes(new Ribes());
       
       if (! impl.empty()) {
 	ribes->distance = - std::numeric_limits<double>::infinity();
