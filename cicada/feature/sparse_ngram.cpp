@@ -258,13 +258,13 @@ namespace cicada
 	
 	first = std::max(iter - context_size, first);
 	
-	const size_t cache_pos = hash_phrase(first, iter, hash_phrase(iter, last)) & (caches_context.size() - 1);
-	cache_context_type& cache_context = const_cast<cache_context_type&>(caches_context[cache_pos]);
+	const size_t cache_pos = hash_phrase(first, iter, hash_phrase(iter, last)) & (cache_context.size() - 1);
+	cache_context_type& cache = const_cast<cache_context_type&>(cache_context[cache_pos]);
 	
-	if (! equal_phrase(first, iter, cache_context.context) || ! equal_phrase(iter, last, cache_context.ngram)) {
-	  cache_context.context.assign(first, iter);
-	  cache_context.ngram.assign(iter, last);
-	  cache_context.features.clear();
+	if (! equal_phrase(first, iter, cache.context) || ! equal_phrase(iter, last, cache.ngram)) {
+	  cache.context.assign(first, iter);
+	  cache.ngram.assign(iter, last);
+	  cache.features.clear();
 	  
 	  for (/**/; first != iter; ++ first) {
 	    trie_type::id_type id = trie.root();
@@ -276,12 +276,12 @@ namespace cicada
 	      if (iter2 < iter) continue;
 	      
 	      if (! cache_feature[id].empty())
-		cache_context.features[cache_feature[id]] += 1.0;
+		cache.features[cache_feature[id]] += 1.0;
 	    }
 	  }
 	}
 	
-	features += cache_context.features;
+	features += cache.features;
       }
       
       template <typename Iterator>
@@ -289,12 +289,12 @@ namespace cicada
       {
 	if (first == last) return;
 
-	const size_t cache_pos = hash_phrase(first, last) & (caches_ngram.size() - 1);
-	cache_ngram_type& cache_ngram = const_cast<cache_ngram_type&>(caches_ngram[cache_pos]);
+	const size_t cache_pos = hash_phrase(first, last) & (cache_ngram.size() - 1);
+	cache_ngram_type& cache = const_cast<cache_ngram_type&>(cache_ngram[cache_pos]);
 	
-	if (! equal_phrase(first, last, cache_ngram.ngram)) {
-	  cache_ngram.ngram.assign(first, last);
-	  cache_ngram.features.clear();
+	if (! equal_phrase(first, last, cache.ngram)) {
+	  cache.ngram.assign(first, last);
+	  cache.features.clear();
 	  
 	  for (/**/; first != last; ++ first) {
 	    trie_type::id_type id = trie.root();
@@ -304,12 +304,12 @@ namespace cicada
 	      id = traverse(id, first, iter);
 	      
 	      if (! cache_feature[id].empty())
-		cache_ngram.features[cache_feature[id]] += 1.0;
+		cache.features[cache_feature[id]] += 1.0;
 	    }
 	  }
 	}
 	
-	features += cache_ngram.features;
+	features += cache.features;
       }
 
       template <typename Iterator>
@@ -368,8 +368,8 @@ namespace cicada
 	cache_feature.clear();
 	checked_feature.clear();
 
-	caches_context.clear();
-	caches_ngram.clear();
+	cache_context.clear();
+	cache_ngram.clear();
       }
 
       buffer_type buffer;
@@ -378,8 +378,8 @@ namespace cicada
       cache_feature_type   cache_feature;
       checked_feature_type checked_feature;
 
-      cache_context_set_type caches_context;
-      cache_ngram_set_type   caches_ngram;
+      cache_context_set_type cache_context;
+      cache_ngram_set_type   cache_ngram;
 
       
       int order;
