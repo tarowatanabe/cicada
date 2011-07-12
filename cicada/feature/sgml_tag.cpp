@@ -173,7 +173,6 @@ namespace cicada
       
       std::auto_ptr<impl_type> sgml_tag(new impl_type());
       
-      
       pimpl = sgml_tag.release();
       
       base_type::__state_size = sizeof(impl_type::id_type);

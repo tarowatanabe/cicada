@@ -118,6 +118,8 @@ namespace cicada
 	
 	if (node >= cache_unigram.size())
 	  cache_unigram.resize(node + 1);
+	if (node >= cache_bigram.size())
+	  cache_bigram.resize(node + 1);
 	if (node >= checked_unigram.size())
 	  checked_unigram.resize(node + 1, false);
 	
@@ -135,9 +137,6 @@ namespace cicada
 	*reinterpret_cast<id_type*>(state) = node;
 	
 	if (! states.empty()) {
-	  if (node >= cache_bigram.size())
-	    cache_bigram.resize(node + 1);
-
 	  const id_type& node_parent = node;
 	  
 	  int non_terminal_pos = 0;
