@@ -6,7 +6,6 @@
 
 #include "cicada/feature/bleu_linear.hpp"
 #include "cicada/parameter.hpp"
-#include "cicada/inside_outside.hpp"
 #include "cicada/semiring.hpp"
 #include "cicada/tokenizer.hpp"
 
