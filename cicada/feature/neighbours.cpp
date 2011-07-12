@@ -269,7 +269,7 @@ namespace cicada
 	}
       }
 
-      void apply_feature(feature_set_type& features, const std::string& node, const symbol_type& prev, const symbol_type& next, const int span) const
+      void apply_feature(feature_set_type& features, const symbol_type& node, const symbol_type& prev, const symbol_type& next, const int span) const
       {
 	const std::string name = feature_name(node, prev, next, span);
 	if (forced_feature || feature_set_type::feature_type::exists(name))

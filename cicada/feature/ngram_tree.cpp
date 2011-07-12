@@ -14,8 +14,10 @@
 #include "utils/compact_trie_dense.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/piece.hpp"
+#include "utils/sgi_hash_map.hpp"
 
-#include <boost/tuple/tuple.hpp>
+#include <boost/fusion/tuple.hpp>
+#include <boost/fusion/adapted.hpp>
 
 namespace cicada
 {
@@ -67,6 +69,16 @@ namespace cicada
 
       typedef tree_map_type::id_type id_type;
 
+      typedef boost::fusion::tuple<symbol_type, id_type, id_type> cache_type;
+      
+#ifdef HAVE_TR1_UNORDERED_MAP
+      typedef std::tr1::unordered_map<cache_type, feature_set_type, utils::hashmurmur<size_t>, std::equal_to<cache_type>,
+				      std::allocator<std::pair<const cache_type, feature_set_type> > > cache_set_type;
+#else
+      typedef sgi::hash_map<cache_type, feature_set_type, utils::hashmurmur<size_t>, std::equal_to<cache_type>,
+			    std::allocator<std::pair<const cache_type, feature_set_type> > > cache_set_type;
+#endif
+
       NGramTreeImpl()
 	: tree_map(symbol_type()),
 	  sentence(0),
@@ -79,11 +91,13 @@ namespace cicada
       void clear()
       {
 	tree_map.clear();
+	caches.clear();
       }
       
       normalizer_set_type normalizers;
       
       tree_map_type  tree_map;
+      cache_set_type caches;
       
       phrase_span_set_type phrase_spans_impl;
       
@@ -285,19 +299,25 @@ namespace cicada
 
       void apply_feature(feature_set_type& features, const symbol_type& node, const id_type& prev, const id_type& next) const
       {
-	const node_pair_type& prev_node = tree_map[prev];
-	const node_pair_type& next_node = tree_map[next];
+	std::pair<cache_set_type::iterator, bool> result = const_cast<cache_set_type&>(caches).insert(std::make_pair(cache_type(node, prev, next),
+														     feature_set_type()));
+	if (result.second) {
+	  const node_pair_type& prev_node = tree_map[prev];
+	  const node_pair_type& next_node = tree_map[next];
+	  
+	  const std::string name = feature_name(node, prev_node.nodes.front(), next_node.nodes.front());
+	  if (forced_feature || feature_set_type::feature_type::exists(name))
+	    result.first->second[name] += 1.0;
+	  
+	  for (size_t i = 0; i != normalizers.size(); ++ i) 
+	    if (prev_node.nodes.front() != prev_node.nodes[i + 1] || next_node.nodes.front() != next_node.nodes[i + 1]) {
+	      const std::string name = feature_name(node, prev_node.nodes[i + 1], next_node.nodes[i + 1]);
+	      if (forced_feature || feature_set_type::feature_type::exists(name))
+		result.first->second[name] += 1.0;
+	    }
+	}
 	
-	const std::string name = feature_name(node, prev_node.nodes.front(), next_node.nodes.front());
-	if (forced_feature || feature_set_type::feature_type::exists(name))
-	  features[name] += 1.0;
-
-	for (size_t i = 0; i != normalizers.size(); ++ i) 
-	  if (prev_node.nodes.front() != prev_node.nodes[i + 1] || next_node.nodes.front() != next_node.nodes[i + 1]) {
-	    const std::string name = feature_name(node, prev_node.nodes[i + 1], next_node.nodes[i + 1]);
-	    if (forced_feature || feature_set_type::feature_type::exists(name))
-	      features[name] += 1.0;
-	  }
+	features += result.first->second;
       }
 
       template <typename Iterator>
@@ -451,7 +471,6 @@ namespace cicada
       apply(state, states, edge, features, estimates, final);
     }
 
-
     void NGramTree::initialize()
     {
       pimpl->clear();
@@ -464,6 +483,8 @@ namespace cicada
 			   const sentence_set_type& targets,
 			   const ngram_count_set_type& ngram_counts)
     {
+      pimpl->clear();
+      
       pimpl->sentence = 0;
       if (! targets.empty())
 	pimpl->sentence = &targets.front();
