@@ -422,7 +422,7 @@ namespace cicada
     {
       // find passives whose first match with active's last
 
-      if (active.depth + 1 == edges_passive.size()) return;
+      if (active.depth + 1 == static_cast<int>(edges_passive.size())) return;
 
       const grammar_node_type& dot = *(active.dot);
             
