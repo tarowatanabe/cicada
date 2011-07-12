@@ -379,7 +379,7 @@ void initialize_score(hypothesis_map_type& hypotheses,
   for (int i = 0; i < threads; ++ i)
     workers.add_thread(new boost::thread(task_type(queue, hypotheses, scorers)));
   
-  for (int id = 0; id != hypotheses.size(); ++ id)
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
     queue.push(id);
   
   for (int i = 0; i < threads; ++ i)
