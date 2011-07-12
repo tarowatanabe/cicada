@@ -1,3 +1,6 @@
+2011-7-x
+Added more human-loop-unrolling in hmm code
+
 2011-7-12
 Better caching for sparse-{lexicon,ngram},rule-shape features
 Removed human-unrolling

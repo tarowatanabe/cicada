@@ -18,10 +18,6 @@
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
 
-//
-// TODO: implement unigram and bigram features!
-//
-
 namespace cicada
 {
   namespace feature
