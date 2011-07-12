@@ -74,8 +74,12 @@ namespace cicada
 	    else {
 	      penalty += 2 * (top.sgml_tag() != tag.sgml_tag());
 	      node = __trie.pop(node);
+
+	      const std::string name = (static_cast<const std::string&>(feature)
+					+ ':' + static_cast<const std::string&>(top)
+					+ '|' + static_cast<const std::string&>(tag));
 	      
-	      features[static_cast<const std::string&>(feature) + ':' + static_cast<const std::string&>(top) + '|' + static_cast<const std::string&>(tag)] += 1.0;
+	      features[name] += 1.0;
 	    }
 	  }
 	}
@@ -131,16 +135,16 @@ namespace cicada
 	if (final) {
 	  id_type node_final = node;
 	  while (node_final != trie.root()) {
-	    features[static_cast<const std::string&>(feature) + ':' + static_cast<const std::string&>(trie[node_final])] += 1.0;
+	    const std::string name = (static_cast<const std::string&>(feature)
+				      + ':' + static_cast<const std::string&>(trie[node_final]));
+	    features[name] += 1.0;
 	    
 	    ++ penalty;
 	    node_final = trie.pop(node_final);
 	  }
 	}
 
-	if (penalty == 0)
-	  features.erase(feature);
-	else
+	if (penalty != 0)
 	  features[feature] = - penalty;
 	
 	*reinterpret_cast<id_type*>(state) = node;
