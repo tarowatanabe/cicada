@@ -22,6 +22,7 @@
 #include <boost/thread.hpp>
 
 #include <cicada/vocab.hpp>
+#include <cicada/stemmer.hpp>
 
 #include "utils/bithack.hpp"
 #include "utils/program_options.hpp"
@@ -88,6 +89,9 @@ path_set_type input_files;
 path_type list_file;
 path_type output_file = "-";
 
+std::string stemmer_spec;
+bool stemmer_list = false;
+
 int max_length = 0;
 
 bool add_bos_eos = false;
@@ -114,6 +118,13 @@ int main(int argc, char** argv)
 {
   try {
     options(argc, argv);
+    
+    if (stemmer_list) {
+      std::cout << cicada::Stemmer::lists();
+      return 1;
+    }
+
+    cicada::Stemmer* stemmer = (! stemmer_spec.empty() ? &cicada::Stemmer::create(stemmer_spec) : 0);
     
     read_list(list_file, input_files);
 
@@ -156,6 +167,12 @@ int main(int argc, char** argv)
 	
 	if (sentence.size() == 0) continue;
 	if (max_length > 0 && sentence.size() > max_length) continue;
+	
+	if (stemmer) {
+	  sentence_type::iterator siter_end = sentence.end();
+	  for (sentence_type::iterator siter = sentence.begin(); siter != siter_end; ++ siter)
+	    *siter = stemmer->operator()(*siter);
+	}
 	
 	if (add_bos_eos) {
 	  sentence.insert(sentence.begin(), bos);
@@ -200,6 +217,9 @@ void options(int argc, char** argv)
     ("input",  po::value<path_set_type>(&input_files)->multitoken(),           "input file(s)")
     ("list",   po::value<path_type>(&list_file),                               "list file")
     ("output", po::value<path_type>(&output_file)->default_value(output_file), "output file")
+
+    ("stemmer",      po::value<std::string>(&stemmer_spec), "stemmer")
+    ("stemmer-list", po::bool_switch(&stemmer_list),        "list of stemmers")
     
     ("max-length",    po::value<int>(&max_length)->default_value(max_length),          "maximum length")
     ("add-bos-eos",   po::bool_switch(&add_bos_eos), "add BOS/EOS for each sentence")
