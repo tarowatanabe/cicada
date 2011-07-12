@@ -760,8 +760,9 @@ struct PhrasePairParser
       namespace standard = boost::spirit::standard;
 
       phrase %= qi::lexeme[+(standard::char_ - (standard::space >> "|||" >> standard::space))];
-      alignment %= *(qi::int_ >> '-' >> qi::int_);
-
+      point %= qi::int_ >> '-' >> qi::int_;
+      alignment %= *point;
+      
       token %= qi::lexeme[+(standard::char_ - standard::space)];
       count_base64 %= token;
 
@@ -770,6 +771,8 @@ struct PhrasePairParser
     }
 
     boost::spirit::qi::rule<Iterator, std::string(), boost::spirit::standard::space_type> phrase;
+
+    boost::spirit::qi::rule<Iterator, alignment_type::point_type(), boost::spirit::standard::space_type> point;
     boost::spirit::qi::rule<Iterator, alignment_type(), boost::spirit::standard::space_type> alignment;
 
     boost::spirit::qi::rule<Iterator, double_base64_type(), boost::spirit::standard::space_type> token;
