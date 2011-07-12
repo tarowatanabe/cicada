@@ -7,7 +7,7 @@
 
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
-#include "utils/chunk_vector.hpp"
+#include "utils/alloc_vector.hpp"
 
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>
@@ -49,13 +49,11 @@ namespace cicada
       typedef std::pair<word_type, word_type> word_pair_type;
       
       typedef google::dense_hash_set<word_type, boost::hash<word_type>, std::equal_to<word_type> > word_set_type;
-      
-      typedef utils::chunk_vector<feature_set_type, 4096 / sizeof(feature_set_type), std::allocator<feature_set_type> > cache_set_type;
-      typedef std::vector<bool, std::allocator<bool> > check_set_type;
-      
+
+      typedef utils::alloc_vector<feature_set_type, std::allocator<feature_set_type> > cache_set_type;
       
       SparseLexiconImpl()
-	: uniques(), words(), caches(), checks(), skip_sgml_tag(false), prefix("sparse-lexicon"), forced_feature(false)
+	: uniques(), words(), caches(), skip_sgml_tag(false), prefix("sparse-lexicon"), forced_feature(false)
       { uniques.set_empty_key(word_type());  }
 
       struct skipper_epsilon
@@ -94,15 +92,8 @@ namespace cicada
 	phrase_type::const_iterator piter_end = phrase.end();
 	for (phrase_type::const_iterator piter = phrase.begin(); piter != piter_end; ++ piter) 
 	  if (piter->is_terminal() && ! skipper(*piter)) {
-	    
-	    if (piter->id() >= caches.size())
-	      caches.resize(piter->id() + 1);
-	    if (piter->id() >= checks.size())
-	      checks.resize(piter->id() + 1, false);
-	    
-	    if (! checks[piter->id()]) {
-	      checks[piter->id()] = true;
-	      
+
+	    if (! caches.exists(piter->id())) {
 	      feature_set_type& features = caches[piter->id()];
 	      features.clear();
 	      
@@ -141,7 +132,6 @@ namespace cicada
       {
 	uniques.clear();
 	caches.clear();
-	checks.clear();
 	
 	lattice_type::const_iterator liter_end = lattice.end();
 	for (lattice_type::const_iterator liter = lattice.begin(); liter != liter_end; ++ liter) {
@@ -161,7 +151,6 @@ namespace cicada
       {
 	uniques.clear();
 	caches.clear();
-	checks.clear();
 	
 	hypergraph_type::edge_set_type::const_iterator eiter_end = forest.edges.end();
 	for (hypergraph_type::edge_set_type::const_iterator eiter = forest.edges.begin(); eiter != eiter_end; ++ eiter)
@@ -182,13 +171,11 @@ namespace cicada
       {
 	words.clear();
 	caches.clear();
-	checks.clear();
       }
       
       word_set_type  uniques;
       sentence_type  words;
       cache_set_type caches;
-      check_set_type checks;
       
       bool skip_sgml_tag;
       
