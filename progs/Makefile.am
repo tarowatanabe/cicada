@@ -75,12 +75,12 @@ bin_PROGRAMS = \
 	cicada_lexicon_global_mpi \
 	cicada_lexicon_hmm \
 	cicada_lexicon_model1 \
+	cicada_maxlike \
+	cicada_maxlike_mpi \
 	cicada_mert \
 	cicada_mert_mpi \
 	cicada_mert_kbest \
 	cicada_mert_kbest_mpi \
-	cicada_maxlike \
-	cicada_maxlike_mpi \
 	cicada_oracle \
 	cicada_oracle_mpi \
 	cicada_oracle_kbest \
