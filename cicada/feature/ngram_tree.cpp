@@ -283,7 +283,7 @@ namespace cicada
 	return id;
       }
 
-      void apply_feature(feature_set_type& features, const std::string& node, const id_type& prev, const id_type& next) const
+      void apply_feature(feature_set_type& features, const symbol_type& node, const id_type& prev, const id_type& next) const
       {
 	const node_pair_type& prev_node = tree_map[prev];
 	const node_pair_type& next_node = tree_map[next];
