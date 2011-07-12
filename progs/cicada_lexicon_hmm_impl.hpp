@@ -406,8 +406,8 @@ struct LearnHMM : public LearnBase
     void estimate_posterior(const sentence_type& __source,
 			    const sentence_type& __target)
     {
-      const size_type source_size = __source.size();
-      const size_type target_size = __target.size();
+      const int source_size = __source.size();
+      const int target_size = __target.size();
       
       posterior.clear();
       posterior.reserve(target_size + 1, source_size + 1);
@@ -422,8 +422,8 @@ struct LearnHMM : public LearnBase
 	const prob_type* fiter = &(*forward.begin(trg)) + 1;
 	const prob_type* biter = &(*backward.begin(trg)) + 1;
 	prob_type* piter = &(*posterior.begin(trg)) + 1;
-
-#if 0
+	
+#if 1
 	for (int src = 0; src < source_size - 3; src += 4) {
 	  piter[src + 0] += fiter[src + 0] * biter[src + 0] * factor;
 	  piter[src + 1] += fiter[src + 1] * biter[src + 1] * factor;
@@ -436,7 +436,7 @@ struct LearnHMM : public LearnBase
 	case 1: piter[source_size - 1] += fiter[source_size - 1] * biter[source_size - 1] * factor;
 	}
 #endif	
-#if 1
+#if 0
 	for (int src = 1; src <= source_size; ++ src, ++ fiter, ++ biter, ++ piter)
 	  (*piter) += (*fiter) * (*biter) * factor;
 #endif
@@ -444,7 +444,7 @@ struct LearnHMM : public LearnBase
 	fiter = &(*forward.begin(trg))  + source_size + 2;
 	biter = &(*backward.begin(trg)) + source_size + 2;
 	
-#if 0
+#if 1
 	double count_none[4] = {0.0, 0.0, 0.0, 0.0};
 	const int loop_size = source_size + 2;
 	for (int src = 0; src < loop_size - 3; src += 4) {
@@ -461,7 +461,7 @@ struct LearnHMM : public LearnBase
 	
 	posterior(trg, 0) = count_none[0] + count_none[1] + count_none[2] + count_none[3];
 #endif
-#if 1
+#if 0
 	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
 	  count_none += (*fiter) * (*biter) * factor;
@@ -488,8 +488,8 @@ struct LearnHMM : public LearnBase
 		    const sentence_type& __target,
 		    ttable_type& counts)
     {
-      const size_type source_size = __source.size();
-      const size_type target_size = __target.size();
+      const int source_size = __source.size();
+      const int target_size = __target.size();
       
       const prob_type sum = forward(target_size + 2 - 1, source_size + 2 - 1);
       
@@ -508,7 +508,7 @@ struct LearnHMM : public LearnBase
 	fiter = &(*forward.begin(trg)) + source_size + 2;
 	biter = &(*backward.begin(trg)) + source_size + 2;
 	
-#if 0
+#if 1
 	double count_none[4] = {0.0, 0.0, 0.0, 0.0};
 	const int loop_size = source_size + 2;
 	for (int src = 0; src < loop_size - 3; src += 4) {
@@ -525,7 +525,7 @@ struct LearnHMM : public LearnBase
 	
 	counts[vocab_type::EPSILON][target[trg]] += count_none[0] + count_none[1] + count_none[2] + count_none[3];
 #endif
-#if 1
+#if 0
 	double count_none = 0.0;
 	for (int src = 0; src < source_size + 2; ++ src, ++ fiter, ++ biter)
 	  count_none += (*fiter) * (*biter) * factor;
