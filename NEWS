@@ -3,7 +3,7 @@ Added more human-loop-unrolling in hmm code
 
 2011-7-12
 Better caching for sparse-{lexicon,ngram},rule-shape features
-Removed human-unrolling
+Removed human-unrolling (for potential bug?)
 
 2011-7-11
 INCOMPATIBLE CHANGE: use EPSILON instead of NONE at many places... 
