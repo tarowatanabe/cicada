@@ -830,7 +830,7 @@ double optimize_batch(const hypergraph_set_type& graphs_forest,
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
   
-  const int id_max = utils::bithack::min(graphs_forest.size(), graphs_intersected.size());
+  const size_t id_max = utils::bithack::min(graphs_forest.size(), graphs_intersected.size());
   
   int instances_local = 0;
   for (size_t id = 0; id != id_max; ++ id)
