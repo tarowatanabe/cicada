@@ -1,3 +1,6 @@
+2011-7-x
+Better caching for sparse-{lexicon,ngram},rule-shape features
+
 2011-7-11
 INCOMPATIBLE CHANGE: use EPSILON instead of NONE at many places... 
   This will affect cicada-extract.py and cicada-alignment.py since they requres NULL word representations
