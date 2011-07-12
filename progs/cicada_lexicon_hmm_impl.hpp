@@ -723,8 +723,8 @@ struct LearnHMMPosterior : public LearnBase
     phi.clear();
     exp_phi_old.clear();
     
-    phi.reserve(source_size);
-    exp_phi_old.reserve(source_size);
+    phi.reserve(source_size + 1);
+    exp_phi_old.reserve(source_size + 1);
     
     phi.resize(source_size + 1, 0.0);
     exp_phi_old.resize(source_size + 1, 1.0);
