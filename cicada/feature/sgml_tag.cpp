@@ -57,7 +57,7 @@ namespace cicada
 	return symbol.is_terminal() && symbol != vocab_type::EPSILON && symbol != vocab_type::BOS && symbol != vocab_type::EOS && symbol.is_sgml_tag();
       }
       
-      void next_state(const symbol_type& tag, id_type& node, int& penalty) const
+      void next_state(const symbol_type& tag, id_type& node, feature_set_type& features, int& penalty) const
       {
 	trie_type& __trie = const_cast<trie_type&>(trie);
 	
@@ -74,6 +74,8 @@ namespace cicada
 	    else {
 	      penalty += 2 * (top.sgml_tag() != tag.sgml_tag());
 	      node = __trie.pop(node);
+	      
+	      features[static_cast<const std::string&>(feature) + ':' + static_cast<const std::string&>(top) + '|' + static_cast<const std::string&>(tag)] += 1.0;
 	    }
 	  }
 	}
@@ -92,7 +94,7 @@ namespace cicada
 	  rule_type::symbol_set_type::const_iterator riter_end = edge.rule->rhs.end();
 	  for (rule_type::symbol_set_type::const_iterator riter = edge.rule->rhs.begin(); riter != riter_end; ++ riter)
 	    if (is_sgml_tag(*riter))
-	      next_state(*riter, node, penalty);
+	      next_state(*riter, node, features, penalty);
 	} else {
 	  stack_type& stack = const_cast<stack_type&>(stack_impl);
 	  
@@ -118,17 +120,19 @@ namespace cicada
 		
 		stack_type::const_reverse_iterator siter_end = stack.rend();
 		for (stack_type::const_reverse_iterator siter = stack.rbegin(); siter != siter_end; ++ siter)
-		  next_state(*siter, node, penalty);
+		  next_state(*siter, node, features, penalty);
 	      }
 	      
 	    } else if (is_sgml_tag(*riter))
-	      next_state(*riter, node, penalty);
+	      next_state(*riter, node, features, penalty);
 	  }
 	}
 
 	if (final) {
 	  id_type node_final = node;
 	  while (node_final != trie.root()) {
+	    features[static_cast<const std::string&>(feature) + ':' + static_cast<const std::string&>(trie[node_final])] += 1.0;
+	    
 	    ++ penalty;
 	    node_final = trie.pop(node_final);
 	  }
@@ -194,6 +198,8 @@ namespace cicada
 			feature_set_type& estimates,
 			const bool final) const
     {
+      features.erase_prefix(static_cast<const std::string&>(base_type::feature_name()));
+      
       pimpl->sgml_tag_score(state, states, edge, features, final);
     }
     
