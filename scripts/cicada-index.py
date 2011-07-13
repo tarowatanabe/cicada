@@ -20,6 +20,7 @@ import shutil
 
 import UserList
 import UserString
+import cStringIO
 
 from optparse import OptionParser, make_option
 
@@ -119,9 +120,9 @@ class PBS:
             self.tmpdir_spec = os.environ['TMPDIR_SPEC']
             
     def run(self, command="", threads=1, memory=0.0, name="name", logfile=None):
-        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE)
+        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-        pipe = popen.stdin
+        pipe = cStringIO.StringIO()
         
         pipe.write("#!/bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
@@ -156,8 +157,10 @@ class PBS:
         else:
             pipe.write("%s\n" %(command))
         
-        pipe.close()
-        popen.wait()
+        (stdout, stderr) = popen.communicate(pipe.getvalue())
+        
+        print "qsub", stdout
+        
 
 class Threads:
     
