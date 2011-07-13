@@ -116,6 +116,6 @@ Integrate MPI and non-MPI of cicada_learn{,kbest}{,mpi}
 Global lexicon learning by liblinear...?
    We will add bias feature, then learn...
 
-Add more lexical scoring to phrase/rule-tables, such as Model1, noisy-xor, insertion/deletion, since we can learn weights!
+Add more lexical scoring to phrase/rule-tables, such as Model1, noisy-or, insertion/deletion, since we can learn weights!
   How and when do we assign lexical scores...? during extraction...? during filtering...?
   Filtering process is easiner, since we have already differentiated what types of rules (phrase, hiero etc.) are used.

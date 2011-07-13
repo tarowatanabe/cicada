@@ -521,7 +521,7 @@ struct LexiconBase
   const lexicon_model_type& lexicon_source_target;
   const lexicon_model_type& lexicon_target_source;
   
-  std::pair<double, double> noisy_xor() const
+  std::pair<double, double> noisy_or() const
   {
     const size_t source_size = source.size();
     const size_t target_size = target.size();
