@@ -275,9 +275,9 @@ void options(int argc, char** argv)
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
-    ("feature-root",       po::bool_switch(&feature_root_mode),  "feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
-    ("model1",             po::bool_switch(&model1_mode),        "Model1 feature (requires lexicon models)")
-    ("noisy-or",           po::bool_switch(&noisy_or_mode),      "noisy-or feature (requires lexicon models)")
+    ("feature-root",       po::bool_switch(&feature_root_mode),       "feature of p(lhs | root(lhs)) and p(rhs | root(rhs))")
+    ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
+    ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
     ("insertion-deletion", po::bool_switch(&insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
     
     ("threshold-insertion", po::value<double>(&threshold_insertion)->default_value(threshold_insertion), "threshold for insertion")

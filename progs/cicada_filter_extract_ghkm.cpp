@@ -29,21 +29,34 @@ typedef PhrasePair phrase_pair_type;
 
 typedef google::dense_hash_set<root_count_type, boost::hash<root_count_type>, std::equal_to<root_count_type> > root_count_set_type;
 
+typedef LexiconModel lexicon_model_type;
+
 path_type input_file = "-";
 path_type output_file = "-";
 path_type root_source_file;
 path_type root_target_file;
+
+path_type lexicon_source_target_file;
+path_type lexicon_target_source_file;
+
+bool model1_mode = false;
+bool noisy_or_mode = false;
+bool insertion_deletion_mode = false;
+
+double threshold_insertion = 0.01;
+double threshold_deletion = 0.01;
 
 double dirichlet_prior = 0.1;
 
 int buffer_size = 1024 * 1024;
 int debug = 0;
 
-template <typename Scorer>
+template <typename Scorer, typename Lexicon>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_set_type& root_source,
-	     const root_count_set_type& root_target);
+	     const root_count_set_type& root_target,
+	     const Lexicon& lexicon);
 
 struct ScorerCICADA;
 
@@ -58,6 +71,17 @@ int main(int argc, char** argv)
       throw std::runtime_error("no root count file for source side");
     if (! boost::filesystem::exists(root_target_file))
       throw std::runtime_error("no root count file for target side");
+
+    bool read_lexicon = false;
+    
+    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
+      if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
+	throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.string());
+      if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
+	throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.string());
+
+      read_lexicon = true;
+    }
     
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
 
@@ -66,6 +90,14 @@ int main(int argc, char** argv)
     root_source.set_empty_key(root_count_type());
     root_target.set_empty_key(root_count_type());
     
+    lexicon_model_type lexicon_source_target;
+    lexicon_model_type lexicon_target_source;
+
+    if (read_lexicon) {
+      lexicon_source_target.open(lexicon_source_target_file);
+      lexicon_target_source.open(lexicon_target_source_file);
+    }
+
     {
       root_count_type root_count;
       RootCountParser parser;
@@ -85,7 +117,7 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file,  1024 * 1024);
     utils::compress_ostream os(output_file, buffer_size);
     
-    process<ScorerCICADA>(is, os, root_source, root_target);
+    process<ScorerCICADA, LexiconGHKM>(is, os, root_source, root_target, LexiconGHKM(lexicon_source_target, lexicon_target_source));
   }
   catch (std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -94,11 +126,12 @@ int main(int argc, char** argv)
   return 0;
 }
 
-template <typename Scorer>
+template <typename Scorer, typename Lexicon>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_set_type& root_source,
-	     const root_count_set_type& root_target)
+	     const root_count_set_type& root_target,
+	     const Lexicon& lexicon)
 {
   Scorer scorer;
 
@@ -111,7 +144,7 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, root_source, root_target, os);
+    scorer(phrase_pair, root_source, root_target, lexicon, os);
   }
 }
 
@@ -129,9 +162,11 @@ struct ScorerCICADA
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
   
+  template <typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_set_type& root_count_source,
 		  const root_count_set_type& root_count_target,
+		  const Lexicon& lexicon,
 		  std::ostream& os)
   {
     namespace karma = boost::spirit::karma;
@@ -177,8 +212,7 @@ struct ScorerCICADA
 			  << ' ' << double10 << ' ' << double10
 			  << ' ' << double10 << ' ' << double10
 			  << ' ' << double10
-			  << ' ' << double10
-			  << '\n',
+			  << ' ' << double10,
 			  phrase_pair.source, phrase_pair.target,
 			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
 			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source),
@@ -186,16 +220,33 @@ struct ScorerCICADA
 			  std::log(prob_root_target)))
       throw std::runtime_error("failed generation");
     
-#if 0
-    os << phrase_pair.source
-       << " ||| " << phrase_pair.target
-       << " |||"
-       << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
-       << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
-       << ' ' << std::log(prob_root_source)
-       << ' ' << std::log(prob_root_target)
-       << '\n';
-#endif
+    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
+      const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
+      const_cast<Lexicon&>(lexicon).assign_target(phrase_pair.target);
+      
+      if (model1_mode) {
+	const std::pair<double, double> scores = lexicon.model1();
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (noisy_or_mode) {
+	const std::pair<double, double> scores = lexicon.noisy_or();
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (insertion_deletion_mode) {
+	const std::pair<double, double> scores = lexicon.insertion_deletion(threshold_insertion, threshold_deletion);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+    }
+    
+    os << '\n';
   }
 };
 
@@ -212,8 +263,18 @@ void options(int argc, char** argv)
     
     ("root-source", po::value<path_type>(&root_source_file), "root source file")
     ("root-target", po::value<path_type>(&root_target_file), "root target file")
+
+    ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),     "lexicon model for lex(target | source)")
+    ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
+
+    ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
+    ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
+    ("insertion-deletion", po::bool_switch(&insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
+    
+    ("threshold-insertion", po::value<double>(&threshold_insertion)->default_value(threshold_insertion), "threshold for insertion")
+    ("threshold-deletion",  po::value<double>(&threshold_deletion)->default_value(threshold_deletion),   "threshold for deletion")
     
     ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;
