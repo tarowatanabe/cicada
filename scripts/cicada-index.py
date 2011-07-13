@@ -106,7 +106,18 @@ def compressed_file(file):
 	    return base
     return file
 
+class QSUB(multiprocessing.Process):
+    def __init__(self, command=""):
+        
+        multiprocessing.Process.__init__(self)
+        self.command = command
+        
+    def run(self):
+        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        popen.communicate(self.command)
+        
 class PBS:
+    ### rewrite this by threads!
     def __init__(self, queue="", workingdir=os.getcwd()):
         self.queue = queue
         self.workingdir = workingdir
@@ -119,21 +130,20 @@ class PBS:
         if os.environ.has_key('TMPDIR_SPEC'):
             self.tmpdir_spec = os.environ['TMPDIR_SPEC']
 
-        self.queues = []
+        self.workers = []
+
+    def __del__(self):
+        for worker in self.workers:
+            worker.join()
             
     def run(self, command="", threads=1, memory=0.0, name="name", logfile=None):
-        popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-
         pipe = cStringIO.StringIO()
         
         pipe.write("#!/bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
         pipe.write("#PBS -e /dev/null\n")
         pipe.write("#PBS -o /dev/null\n")
-        
-        # we will run in non-block
-        #pipe.write("#PBS -W block=true\n")
-        pipe.write("#PBS -k n\n")
+        pipe.write("#PBS -W block=true\n")
         
         if self.queue:
             pipe.write("#PBS -q %s\n" %(self.queue))
@@ -158,10 +168,9 @@ class PBS:
             pipe.write("%s >& %s\n" %(command, logfile))
         else:
             pipe.write("%s\n" %(command))
-        
-        (stdout, stderr) = popen.communicate(pipe.getvalue())
 
-        self.queues.append(stdout.strip())
+        self.workers.append(QSUB(pipe.getvalue()))
+        self.workers[-1].start();
 
 class Threads:
     
