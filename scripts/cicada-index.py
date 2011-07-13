@@ -437,7 +437,7 @@ elif options.tree:
 else:
     raise ValueError, "no indexer?"
 
-fp = open(os.path.join(options.output, files), 'w')
+fp = open(os.path.join(options.output, "files"), 'w')
 
 if options.pbs:
     # we use pbs to run jobs
