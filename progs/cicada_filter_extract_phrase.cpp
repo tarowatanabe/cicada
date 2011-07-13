@@ -24,10 +24,15 @@ typedef boost::filesystem::path path_type;
 typedef RootCount  root_count_type;
 typedef PhrasePair phrase_pair_type;
 
+typedef LexiconModel lexicon_model_type;
+
 path_type input_file = "-";
 path_type output_file = "-";
 path_type root_source_file;
 path_type root_target_file;
+
+path_type lexicon_source_target_file;
+path_type lexicon_target_source_file;
 
 double dirichlet_prior = 0.1;
 
@@ -40,14 +45,22 @@ bool mode_bidirectional = false;
 bool mode_source_only = false;
 bool mode_target_only = false;
 
+bool model1_mode = false;
+bool noisy_or_mode = false;
+bool insertion_deletion_mode = false;
+
+double threshold_insertion = 0.01;
+double threshold_deletion = 0.01;
+
 int buffer_size = 1024 * 1024;
 int debug = 0;
 
-template <typename Scorer>
+template <typename Scorer, typename Lexicon>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_type& root_source,
-	     const root_count_type& root_target);
+	     const root_count_type& root_target,
+	     const Lexicon& lexicon);
 
 struct ScorerCICADA;
 struct ScorerCICADAReordering;
@@ -74,12 +87,31 @@ int main(int argc, char** argv)
     if (mode_reordering)
       if (mode_source_only && mode_target_only)
 	throw std::runtime_error("you cannot specify both of source-only and target-only");
+
+    bool read_lexicon = false;
+    
+    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
+      if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
+	throw std::runtime_error("no lexicon model for lex(target | source): " + lexicon_source_target_file.string());
+      if (lexicon_target_source_file.empty() || ! boost::filesystem::exists(lexicon_target_source_file))
+	throw std::runtime_error("no lexicon model for lex(source | target): " + lexicon_target_source_file.string());
+
+      read_lexicon = true;
+    }
     
     dirichlet_prior = std::max(dirichlet_prior, 0.0);
     
     root_count_type root_source;
     root_count_type root_target;
     
+    lexicon_model_type lexicon_source_target;
+    lexicon_model_type lexicon_target_source;
+
+    if (read_lexicon) {
+      lexicon_source_target.open(lexicon_source_target_file);
+      lexicon_target_source.open(lexicon_target_source_file);
+    }
+
     {
       RootCountParser parser;
       std::string line;
@@ -98,14 +130,14 @@ int main(int argc, char** argv)
     
     if (mode_cicada) {
       if (mode_reordering)
-	process<ScorerCICADAReordering>(is, os, root_source, root_target);
+	process<ScorerCICADAReordering, LexiconPhrase>(is, os, root_source, root_target, LexiconPhrase(lexicon_source_target, lexicon_target_source));
       else
-	process<ScorerCICADA>(is, os, root_source, root_target);
+	process<ScorerCICADA, LexiconPhrase>(is, os, root_source, root_target, LexiconPhrase(lexicon_source_target, lexicon_target_source));
     } else if (mode_moses) {
       if (mode_reordering)
-	process<ScorerMOSESReordering>(is, os, root_source, root_target);
+	process<ScorerMOSESReordering, LexiconPhrase>(is, os, root_source, root_target, LexiconPhrase(lexicon_source_target, lexicon_target_source));
       else
-	process<ScorerMOSES>(is, os, root_source, root_target);
+	process<ScorerMOSES, LexiconPhrase>(is, os, root_source, root_target, LexiconPhrase(lexicon_source_target, lexicon_target_source));
     }
   }
   catch (std::exception& err) {
@@ -115,11 +147,12 @@ int main(int argc, char** argv)
   return 0;
 }
 
-template <typename Scorer>
+template <typename Scorer, typename Lexicon>
 void process(std::istream& is,
 	     std::ostream& os,
 	     const root_count_type& root_source,
-	     const root_count_type& root_target)
+	     const root_count_type& root_target,
+	     const Lexicon& lexicon)
 {
   Scorer scorer;
 
@@ -132,7 +165,7 @@ void process(std::istream& is,
     
     if (! parser(line, phrase_pair)) continue;
     
-    scorer(phrase_pair, root_source, root_target, os);
+    scorer(phrase_pair, root_source, root_target, lexicon, os);
   }
 }
 
@@ -148,10 +181,12 @@ struct ScorerCICADA
   };
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
-
+  
+  template <typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
+		  const Lexicon& lexicon,
 		  std::ostream& os)
   {
     namespace karma = boost::spirit::karma;
@@ -176,21 +211,39 @@ struct ScorerCICADA
     if (! karma::generate(iter,
 			  standard::string << " ||| " << standard::string << " |||"
 			  << ' ' << double10 << ' ' << double10
-			  << ' ' << double10 << ' ' << double10
-			  << '\n',
+			  << ' ' << double10 << ' ' << double10,
 			  phrase_pair.source, phrase_pair.target,
 			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
 			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
       throw std::runtime_error("failed generation");
     
-#if 0
-    os << phrase_pair.source
-       << " ||| " << phrase_pair.target
-       << " |||"
-       << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
-       << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
-       << '\n';
-#endif
+    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
+      const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
+      const_cast<Lexicon&>(lexicon).assign_target(phrase_pair.target);
+      
+      if (model1_mode) {
+	const std::pair<double, double> scores = lexicon.model1();
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (noisy_or_mode) {
+	const std::pair<double, double> scores = lexicon.noisy_or();
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (insertion_deletion_mode) {
+	const std::pair<double, double> scores = lexicon.insertion_deletion(threshold_insertion, threshold_deletion);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+    }
+    
+    os << '\n';
   }
 };
 
@@ -206,9 +259,11 @@ struct ScorerCICADAReordering
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
 
+  template <typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
+		  const Lexicon& lexicon,
 		  std::ostream& os)
   {
     namespace karma = boost::spirit::karma;
@@ -235,16 +290,38 @@ struct ScorerCICADAReordering
     const double prob_source_target = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_source + count_source);
     const double prob_target_source = (dirichlet_prior + count) / (dirichlet_prior * phrase_pair.observed_target + count_target);
 
-    if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10 << " |||",
+    if (! karma::generate(iter, ' ' << double10 << ' ' << double10 << ' ' << double10 << ' ' << double10,
 			  std::log(prob_source_target), std::log(phrase_pair.lexicon_source_target),
 			  std::log(prob_target_source), std::log(phrase_pair.lexicon_target_source)))
       throw std::runtime_error("failed generation");
-			  
-#if 0
-    os << ' ' << std::log(prob_source_target) << ' ' << std::log(phrase_pair.lexicon_source_target)
-       << ' ' << std::log(prob_target_source) << ' ' << std::log(phrase_pair.lexicon_target_source)
-       << " |||";
-#endif
+    
+    if (model1_mode || noisy_or_mode || insertion_deletion_mode) {
+      const_cast<Lexicon&>(lexicon).assign_source(phrase_pair.source);
+      const_cast<Lexicon&>(lexicon).assign_target(phrase_pair.target);
+      
+      if (model1_mode) {
+	const std::pair<double, double> scores = lexicon.model1();
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (noisy_or_mode) {
+	const std::pair<double, double> scores = lexicon.noisy_or();
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+      
+      if (insertion_deletion_mode) {
+	const std::pair<double, double> scores = lexicon.insertion_deletion(threshold_insertion, threshold_deletion);
+	
+	if (! karma::generate(iter, ' ' << double10 << ' ' << double10, scores.first, scores.second))
+	  throw std::runtime_error("failed generation");
+      }
+    }
+    
+    os << " |||";
 
     // we will dump reordering table as "attributes"
     {
@@ -334,10 +411,12 @@ struct ScorerMOSES
   };
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
-
+  
+  template <typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
+		  const Lexicon& lexicon,
 		  std::ostream& os)
   {
     namespace karma = boost::spirit::karma;
@@ -370,16 +449,6 @@ struct ScorerMOSES
 			  prob_target_source, phrase_pair.lexicon_target_source,
 			  boost::math::constants::e<double>()))
       throw std::runtime_error("failed generation");
-
-#if 0
-    os << phrase_pair.source
-       << " ||| " << phrase_pair.target
-       << " |||"
-       << ' ' << prob_source_target << ' ' << phrase_pair.lexicon_source_target
-       << ' ' << prob_target_source << ' ' << phrase_pair.lexicon_target_source
-       << ' ' << boost::math::constants::e<double>()
-       << '\n';
-#endif
   }
 };
 
@@ -395,9 +464,11 @@ struct ScorerMOSESReordering
   
   boost::spirit::karma::real_generator<double, real_precision> double10;
 
+  template <typename Lexicon>
   void operator()(const phrase_pair_type& phrase_pair,
 		  const root_count_type& root_source,
 		  const root_count_type& root_target,
+		  const Lexicon& lexicon,
 		  std::ostream& os)
   {
     namespace karma = boost::spirit::karma;
@@ -422,15 +493,6 @@ struct ScorerMOSESReordering
       if (! karma::generate(iter, standard::string << " ||| " << standard::string << " |||", phrase_pair.source, phrase_pair.target))
 	throw std::runtime_error("failed generation");
     }
-    
-#if 0
-    if (mode_source_only)
-      os << phrase_pair.source << " |||";
-    else if (mode_target_only)
-      os << phrase_pair.target << " |||";
-    else
-      os << phrase_pair.source << " ||| " << phrase_pair.target << " |||";
-#endif
 
     const phrase_pair_type::counts_type& counts = (mode_source_only 
 						   ? phrase_pair.counts_source
@@ -457,11 +519,6 @@ struct ScorerMOSESReordering
 			      prob_prev_mono, prob_prev_others,
 			      prob_next_mono, prob_next_others))
 	  throw std::runtime_error("failed generation");
-#if 0
-	os << ' ' << prob_prev_mono << ' ' << prob_prev_others
-	   << ' ' << prob_next_mono << ' ' << prob_next_others
-	   << '\n';
-#endif
       } else {
 	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono) / (dirichlet_prior * 2 + count);
 	const double prob_prev_others = (dirichlet_prior + count_prev_swap + count_prev_others) / (dirichlet_prior * 2 + count);
@@ -470,7 +527,6 @@ struct ScorerMOSESReordering
 			      ' ' << double10 << ' ' << double10 << '\n',
 			      prob_prev_mono, prob_prev_others))
 	  throw std::runtime_error("failed generation");
-	//os << ' ' << prob_prev_mono << ' ' << prob_prev_others << '\n';
       }
     } else {
       if (mode_bidirectional) {
@@ -487,11 +543,6 @@ struct ScorerMOSESReordering
 			      prob_prev_mono, prob_prev_swap, prob_prev_others,
 			      prob_next_mono, prob_next_swap, prob_next_others))
 	  throw std::runtime_error("failed generation");
-#if 0
-	os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others
-	   << ' ' << prob_next_mono << ' ' << prob_next_swap << ' ' << prob_next_others
-	   << '\n';
-#endif
       } else {
 	const double prob_prev_mono   = (dirichlet_prior + count_prev_mono)   / (dirichlet_prior * 3 + count);
 	const double prob_prev_swap   = (dirichlet_prior + count_prev_swap)   / (dirichlet_prior * 3 + count);
@@ -501,7 +552,6 @@ struct ScorerMOSESReordering
 			      ' ' << double10 << ' ' << double10 << ' ' << double10 << '\n',
 			      prob_prev_mono, prob_prev_swap, prob_prev_others))
 	  throw std::runtime_error("failed generation");
-	//os << ' ' << prob_prev_mono << ' ' << prob_prev_swap << ' ' << prob_prev_others << '\n';
       }
     }
   }  
@@ -519,6 +569,9 @@ void options(int argc, char** argv)
     
     ("root-source", po::value<path_type>(&root_source_file), "root source file")
     ("root-target", po::value<path_type>(&root_target_file), "root target file")
+
+    ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),     "lexicon model for lex(target | source)")
+    ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
     
     ("dirichlet-prior", po::value<double>(&dirichlet_prior)->default_value(dirichlet_prior), "dirichlet prior weight")
     
@@ -530,6 +583,13 @@ void options(int argc, char** argv)
     ("bidirectional", po::bool_switch(&mode_bidirectional), "bidirectional")
     ("source-only",   po::bool_switch(&mode_source_only),   "source only")
     ("target-only",   po::bool_switch(&mode_target_only),   "target only")
+    
+    ("model1",             po::bool_switch(&model1_mode),             "Model1 feature (requires lexicon models)")
+    ("noisy-or",           po::bool_switch(&noisy_or_mode),           "noisy-or feature (requires lexicon models)")
+    ("insertion-deletion", po::bool_switch(&insertion_deletion_mode), "insertion/deletion feature (requires lexicon models)")
+    
+    ("threshold-insertion", po::value<double>(&threshold_insertion)->default_value(threshold_insertion), "threshold for insertion")
+    ("threshold-deletion",  po::value<double>(&threshold_deletion)->default_value(threshold_deletion),   "threshold for deletion")
 
     ("buffer", po::value<int>(&buffer_size)->default_value(buffer_size), "buffer size")
     ;
