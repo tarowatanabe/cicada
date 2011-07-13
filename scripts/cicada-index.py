@@ -27,6 +27,7 @@ opt_parser = OptionParser(
     option_list=[
     make_option("--scores", default="", action="store", type="string", metavar="FILE", help="extracted scores"),
     make_option("--output", default="", action="store", type="string", metavar="FILE", help="output"),
+    make_option("--config", default="", action="store", type="string", metavar="FILE", help="configuration output")
     
     ## smoothing...
     make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
@@ -280,6 +281,7 @@ class IndexPhrase:
         self.filter  = cicada.cicada_filter_extract_phrase
         self.filter += " --cicada"
         self.cky = None
+        self.grammar = "grammar"
         self.name = "phrase"
         
 class IndexSCFG:
@@ -288,6 +290,7 @@ class IndexSCFG:
         self.filter  = cicada.cicada_filter_extract_scfg
         self.filter += " --feature-root"
         self.cky = None
+        self.grammar = "grammar"
         self.name = "scfg"
 
 class IndexGHKM:
@@ -295,6 +298,7 @@ class IndexGHKM:
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
+        self.grammar = "tree-grammar"
         self.name = "ghkm"
 
 class IndexTree:
@@ -302,6 +306,7 @@ class IndexTree:
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
+        self.grammar = "tree-grammar"
         self.name = "tree"
 
 class Index(UserString.UserString):
@@ -436,6 +441,10 @@ elif options.tree:
 else:
     raise ValueError, "no indexer?"
 
+fp_config = None
+if options.config:
+    fp_config = open(options.config, 'w')
+
 if options.pbs:
     # we use pbs to run jobs
     pbs = PBS(queue=options.pbs_queue)
@@ -453,6 +462,9 @@ if options.pbs:
                       quantize=options.quantize,
                       features=options.feature,
                       attributes=options.attribute)
+
+        if fp_config:
+            fp_config.write("%s = %s\n" %(indexer.grammar, score.output))
 
         pbs.run(command=index, threads=index.threads, memory=options.max_malloc, name=index.name, logfile=index.logfile)
     
@@ -475,6 +487,10 @@ elif options.mpi:
                       quantize=options.quantize,
                       features=options.feature,
                       attributes=options.attribute)
+
+        if fp_config:
+            fp_config.write("%s = %s\n" %(indexer.grammar, score.output))
+
         mpi.run(command=index)
 else:
     threads = Threads(cicada=cicada, threads=options.threads)
@@ -492,4 +508,7 @@ else:
                       features=options.feature,
                       attributes=options.attribute)
         
+        if fp_config:
+            fp_config.write("%s = %s\n" %(indexer.grammar, score.output))
+
         threads.run(command=index)
