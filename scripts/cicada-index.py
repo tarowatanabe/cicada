@@ -16,6 +16,7 @@ import os, os.path
 import string
 import re
 import subprocess
+import shutil
 
 import UserList
 import UserString
@@ -395,6 +396,9 @@ class Scores(UserList.UserList):
             if os.path.exists(output):
                 if not os.path.isdir(output):
                     os.remove(output)
+                    os.makedirs(output)
+                else:
+                    shutil.rmtree(output)
                     os.makedirs(output)
             else:
                 os.makedirs(output)
