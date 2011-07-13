@@ -334,6 +334,11 @@ struct LearnHMM : public LearnBase
 	    case 1: accum[4 - 1] += piter[loop_size - 1] * titer[loop_size - 1] * factor;
 	    }
 	    *niter += accum[0] + accum[1] + accum[2] + accum[3];
+	    
+#if 0
+	    for (int prev = 0; prev < (source_size + 2) * 2; ++ prev, ++ piter, ++ titer)
+	      *niter += (*piter) * (*titer) * factor;
+#endif
 	  }
 	}
 	
@@ -384,6 +389,11 @@ struct LearnHMM : public LearnBase
 	    case 2: piter[loop_size - 2] += titer[loop_size - 2] * factor;
 	    case 1: piter[loop_size - 1] += titer[loop_size - 1] * factor;
 	    }
+	    
+#if 0
+	    for (int prev = 0; prev < (source_size + 2) * 2; ++ prev, ++ piter, ++ titer)
+	      *piter += (*titer) * factor;
+#endif
 	  }
 	}
 	
