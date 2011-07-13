@@ -447,7 +447,7 @@ if options.pbs:
                       features=options.feature,
                       attributes=options.attribute)
 
-        pbs.run(command=index, threads=index.threads, memory=options.max-malloc, name=index.name, logfile=index.logfile)
+        pbs.run(command=index, threads=index.threads, memory=options.max_malloc, name=index.name, logfile=index.logfile)
     
 elif options.mpi:
     mpi = MPI(cicada=cicada,
