@@ -27,7 +27,6 @@ opt_parser = OptionParser(
     option_list=[
     make_option("--scores", default="", action="store", type="string", metavar="FILE", help="extracted scores"),
     make_option("--output", default="", action="store", type="string", metavar="FILE", help="output"),
-    make_option("--config", default="", action="store", type="string", metavar="FILE", help="configuration output"),
     
     ## smoothing...
     make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
@@ -405,9 +404,6 @@ class Scores(UserList.UserList):
                 if not os.path.isdir(output):
                     os.remove(output)
                     os.makedirs(output)
-                else:
-                    shutil.rmtree(output)
-                    os.makedirs(output)
             else:
                 os.makedirs(output)
         
@@ -441,9 +437,7 @@ elif options.tree:
 else:
     raise ValueError, "no indexer?"
 
-fp_config = None
-if options.config:
-    fp_config = open(options.config, 'w')
+fp = open(os.path.join(options.output, files), 'w')
 
 if options.pbs:
     # we use pbs to run jobs
@@ -463,8 +457,7 @@ if options.pbs:
                       features=options.feature,
                       attributes=options.attribute)
 
-        if fp_config:
-            fp_config.write("%s = %s\n" %(indexer.grammar, score.output))
+        fp.write(os.path.basename(score.output)+'\n')
 
         pbs.run(command=index, threads=index.threads, memory=options.max_malloc, name=index.name, logfile=index.logfile)
     
@@ -488,8 +481,7 @@ elif options.mpi:
                       features=options.feature,
                       attributes=options.attribute)
 
-        if fp_config:
-            fp_config.write("%s = %s\n" %(indexer.grammar, score.output))
+        fp.write(os.path.basename(score.output)+'\n')
 
         mpi.run(command=index)
 else:
@@ -508,7 +500,6 @@ else:
                       features=options.feature,
                       attributes=options.attribute)
         
-        if fp_config:
-            fp_config.write("%s = %s\n" %(indexer.grammar, score.output))
+        fp.write(os.path.basename(score.output)+'\n')
 
         threads.run(command=index)
