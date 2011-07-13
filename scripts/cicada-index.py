@@ -125,6 +125,9 @@ class PBS:
         
         pipe.write("#!/bin/sh\n")
         pipe.write("#PBS -N %s\n" %(name))
+        pipe.write("#PBS -e /dev/null\n")
+        pipe.write("#PBS -o /dev/null\n")
+        
         # we will run in non-block
         #pipe.write("#PBS -W block=true\n")
         pipe.write("#PBS -k n\n")
