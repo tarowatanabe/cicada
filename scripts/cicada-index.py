@@ -118,6 +118,8 @@ class PBS:
 
         if os.environ.has_key('TMPDIR_SPEC'):
             self.tmpdir_spec = os.environ['TMPDIR_SPEC']
+
+        self.queues = []
             
     def run(self, command="", threads=1, memory=0.0, name="name", logfile=None):
         popen = subprocess.Popen("qsub -S /bin/sh", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -158,9 +160,8 @@ class PBS:
             pipe.write("%s\n" %(command))
         
         (stdout, stderr) = popen.communicate(pipe.getvalue())
-        
-        print "qsub", stdout
-        
+
+        self.queues.append(stdout.strip())
 
 class Threads:
     
