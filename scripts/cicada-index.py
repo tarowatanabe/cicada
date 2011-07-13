@@ -27,7 +27,7 @@ opt_parser = OptionParser(
     option_list=[
     make_option("--scores", default="", action="store", type="string", metavar="FILE", help="extracted scores"),
     make_option("--output", default="", action="store", type="string", metavar="FILE", help="output"),
-    make_option("--config", default="", action="store", type="string", metavar="FILE", help="configuration output")
+    make_option("--config", default="", action="store", type="string", metavar="FILE", help="configuration output"),
     
     ## smoothing...
     make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
