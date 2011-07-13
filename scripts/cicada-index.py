@@ -168,10 +168,11 @@ class Threads:
         
     def __del__(self):
         self.pipe.close()
-        self.pipe.wait()
+        self.popen.wait()
 
     def run(self, command=""):
-        self.pipe.write(command+'\n')
+        self.pipe.write("%s\n" %(command))
+        self.pipe.flush()
 
 class MPI:
     
@@ -223,10 +224,11 @@ class MPI:
         
     def __del__(self):
         self.pipe.close()
-        self.pipe.wait()
+        self.popen.wait()
         
     def run(self, command=""):
-        self.pipe.write(command+'\n')
+        self.pipe.write("%s\n" %(command))
+        self.pipe.flush()
 
 
 class CICADA:
@@ -324,7 +326,7 @@ class Index(UserString.UserString):
             command += " --input \"%s\"" %(input)
             command += " | "
             command += indexer.filter
-            command += " --diricklet-prior %g" %(prior)
+            command += " --dirichlet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
             command += " | "
@@ -334,7 +336,7 @@ class Index(UserString.UserString):
             self.threads = 2
 
             command = indexer.filter
-            command += " --diricklet-prior %g" %(prior)
+            command += " --dirichlet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
             command += " --input \"%s\"" %(input)
@@ -368,6 +370,7 @@ class Score:
         self.input = input
         self.output = output
         self.name = name
+
 
 class Scores(UserList.UserList):
     def __init__(self, prefix="", output=""):
@@ -405,8 +408,9 @@ class Scores(UserList.UserList):
                 raise ValueError, "no path to scores: %s" %(path)
 
             root,stem = os.path.splitext(name)
-            
+
             self.append(Score(path, os.path.join(output, root + '.bin'), root))
+            
 
 (options, args) = opt_parser.parse_args()
 
@@ -467,7 +471,7 @@ elif options.mpi:
         mpi.run(command=index)
 else:
     threads = Threads(cicada=cicada, threads=options.threads)
-
+    
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
@@ -480,4 +484,5 @@ else:
                       quantize=options.quantize,
                       features=options.feature,
                       attributes=options.attribute)
+        
         threads.run(command=index)
