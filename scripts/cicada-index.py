@@ -57,6 +57,14 @@ opt_parser = OptionParser(
     
     make_option("--cky",    default=None, action="store_true", help="CKY mode indexing for tree-grammar"),
     
+    ## additional feature functions
+    make_option("--lexicon-model1",             default=None, action="store_true", help="compute Model1 features"),
+    make_option("--lexicon-noisy-or",           default=None, action="store_true", help="compute noisy-or features"),
+    make_option("--lexicon-insertion-deletion", default=None, action="store_true", help="compute insertion/deletion features"),
+    
+    make_option("--threshold-insertion", default=0.01, action="store", type="float", help="threshold for insertion (default: 0.01)"),
+    make_option("--threshold-deletion",  default=0.01, action="store", type="float", help="threshold for deletion (default: 0.01)"),
+    
     ## quantize
     make_option("--quantize", default=None, action="store_true", help="perform quantization"),
     
@@ -351,9 +359,39 @@ class IndexTree:
         self.scores = os.path.join(model_dir, "tree-score")
         self.index  = os.path.join(model_dir, "tree-index")
 
+class Lexicon:
+    def __init__(self, lexical_dir="",
+                 model1=None,
+                 noisy_or=None,
+                 insertion_deletion=None,
+                 threshold_insertion=0.01,
+                 threshold_deletion=0.01):
+        self.lexicon_source_target = compressed_file(os.path.join(lexical_dir, "lex.f2n"))
+        self.lexicon_target_source = compressed_file(os.path.join(lexical_dir, "lex.n2f"))
+
+        self.model1   = model1
+        self.noisy_or = noisy_or
+        self.insertion_deletion = insertion_deletion
+        
+        self.threshold_insertion = threshold_insertion
+        self.threshold_deletion  = threshold_deletion
+
 
 class Index(UserString.UserString):
-    def __init__(self, cicada=None, indexer=None, input="", output="", name="", root_source="", root_target="", prior=0.1, kbest=0, quantize=None, features=[], attributes=[]):
+    def __init__(self,
+                 cicada=None,
+                 indexer=None,
+                 lexicon=None,
+                 input="",
+                 output="",
+                 name="",
+                 root_source="",
+                 root_target="",
+                 prior=0.1,
+                 kbest=0,
+                 quantize=None,
+                 features=[],
+                 attributes=[]):
 
         if not input:
             raise ValueError, "no input? %s" %(input)
@@ -366,6 +404,20 @@ class Index(UserString.UserString):
         
         self.name    = "index-" + indexer.name
         self.logfile = "index-" + indexer.name + "." + name + ".log"
+
+        options_lexicon = ""
+        if lexicon.model1 or lexicon.noisy_or or lexicon.insertion_deletion:
+            options_lexicon += " --lexicon-source-target \"%s\"" %(lexicon.lexicon_source_target)
+            options_lexicon += " --lexicon-target-source \"%s\"" %(lexicon.lexicon_target_source)
+            
+            if lexicon.model1:
+                options_lexicon += " --model1"
+            if lexicon.noisy_or:
+                options_lexicon += " --noisy-or"
+            if lexicon.insertion_deletion:
+                options_lexicon += " --insertion-deletion"
+                options_lexicon += " --threshold-insertion %.20g" %(lexicon.threshold_insertion)
+                options_lexicon += " --threshold-deletion %.20g" %(lexicon.threshold_deletion)
         
         command = ""
 
@@ -381,6 +433,7 @@ class Index(UserString.UserString):
             command += " --dirichlet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
+            command += options_lexicon
             command += " | "
             command += indexer.indexer
         else:
@@ -391,6 +444,7 @@ class Index(UserString.UserString):
             command += " --dirichlet-prior %g" %(prior)
             command += " --root-source \"%s\"" %(root_source)
             command += " --root-target \"%s\"" %(root_target)
+            command += options_lexicon
             command += " --input \"%s\"" %(input)
             command += " | "
             command += indexer.indexer
@@ -495,6 +549,12 @@ else:
     raise ValueError, "no indexer?"
 
 scores = Scores(indexer)
+lexicon = Lexicon(lexical_dir=options.lexical_dir,
+                  model1=options.lexicon_model1,
+                  noisy_or=options.lexicon_noisy_or,
+                  insertion_deletion=options.lexicon_insertion_deletion,
+                  threshold_insertion=options.threshold_insertion,
+                  threshold_deletion=options.threshold_deletion)
 
 fp = open(os.path.join(indexer.index, "files"), 'w')
 
@@ -505,6 +565,7 @@ if options.pbs:
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
+                      lexicon=lexicon,
                       input=score.input,
                       output=score.output,
                       name=score.name,
@@ -530,6 +591,7 @@ elif options.mpi:
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
+                      lexicon=lexicon,
                       input=score.input,
                       output=score.output,
                       root_source=scores.root_source,
@@ -549,6 +611,7 @@ else:
     for score in scores:
         index = Index(cicada=cicada,
                       indexer=indexer,
+                      lexicon=lexicon,
                       input=score.input,
                       output=score.output,
                       root_source=scores.root_source,
