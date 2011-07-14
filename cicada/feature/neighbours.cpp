@@ -371,7 +371,7 @@ namespace cicada
       
       const std::string feature_name(const std::string& node, const std::string& prev, const std::string& next, const int span) const
       {
-	const int span_power2 = utils::bithack::branch(utils::bithack::is_power2(span), span, utils::bithac::next_largest_power2(span));
+	const int span_power2 = utils::bithack::branch(utils::bithack::is_power2(span), span, utils::bithack::next_largest_power2(span));
 
 	return (static_cast<const std::string&>(feature_name_prefix)
 		+ ':' + node

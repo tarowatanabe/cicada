@@ -288,7 +288,7 @@ namespace cicada
 				     const std::string& suffix,
 				     const int span_size) const
       {
-	const int span_size_power2 = utils::bithack::branch(utils::bithack::is_power2(span_size), span_size, utils::bithac::next_largest_power2(span_size));
+	const int span_size_power2 = utils::bithack::branch(utils::bithack::is_power2(span_size), span_size, utils::bithack::next_largest_power2(span_size));
 
 	return (static_cast<const std::string&>(feature_name_prefix) + ":"
 		+ node + antecedent + '|' + prefix + '|' + suffix + '|' + utils::lexical_cast<std::string>(span_size_power2));
