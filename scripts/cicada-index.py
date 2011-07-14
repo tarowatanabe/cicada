@@ -26,9 +26,22 @@ from optparse import OptionParser, make_option
 
 opt_parser = OptionParser(
     option_list=[
-    make_option("--scores", default="", action="store", type="string", metavar="FILE", help="extracted scores"),
-    make_option("--output", default="", action="store", type="string", metavar="FILE", help="output"),
-    
+    # output directory/filename prefix
+    make_option("--root-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="root directory for outputs"),
+    make_option("--corpus-dir", default="", action="store", type="string",
+                metavar="PREFIX", help="corpus directory (default: ${root_dir}/corpus)"),
+    make_option("--giza-f2e", default="", action="store", type="string",
+                metavar="DIRECTORY", help="giza directory for P(f|e) (default: ${root_dir}/giza.${f}-${e})"),
+    make_option("--giza-e2f", default="", action="store", type="string",
+                metavar="DIRECTORY", help="giza directory for P(e|f) (default: ${root_dir}/giza.${e}-${f})"),
+    make_option("--model-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="model directory (default: ${root_dir}/model)"),
+    make_option("--alignment-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="alignment directory (default: ${model_dir})"),
+    make_option("--lexical-dir", default="", action="store", type="string",
+                metavar="DIRECTORY", help="lexical transltion table directory (default: ${model_dir)"),
+
     ## smoothing...
     make_option("--prior", default=0.1, action="store", type="float", metavar="PRIOR", help="model prior (default: 0.1)"),
     
@@ -288,7 +301,7 @@ class CICADA:
 		raise ValueError, binprog + ' does not exist'
 
 class IndexPhrase:
-    def __init__(self, cicada=None, cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_phrase
         self.filter += " --cicada"
@@ -296,8 +309,12 @@ class IndexPhrase:
         self.grammar = "grammar"
         self.name = "phrase"
         
+        self.counts = os.path.join(model_dir, "phrase-counts")
+        self.scores = os.path.join(model_dir, "phrase-score")
+        self.index  = os.path.join(model_dir, "phrase-index")
+        
 class IndexSCFG:
-    def __init__(self, cicada=None, cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_scfg
         self.filter += " --feature-root"
@@ -305,21 +322,35 @@ class IndexSCFG:
         self.grammar = "grammar"
         self.name = "scfg"
 
+        self.counts = os.path.join(model_dir, "scfg-counts")
+        self.scores = os.path.join(model_dir, "scfg-score")
+        self.index  = os.path.join(model_dir, "scfg-index")
+
 class IndexGHKM:
-    def __init__(self, cicada=None, cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
         self.grammar = "tree-grammar"
         self.name = "ghkm"
 
+        self.counts = os.path.join(model_dir, "ghkm-counts")
+        self.scores = os.path.join(model_dir, "ghkm-score")
+        self.index  = os.path.join(model_dir, "ghkm-index")
+
+
 class IndexTree:
-    def __init__(self, cicada=None, cky=None):
+    def __init__(self, cicada=None, model_dir="", cky=None):
         self.indexer = cicada.cicada_index_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
         self.grammar = "tree-grammar"
         self.name = "tree"
+
+        self.counts = os.path.join(model_dir, "tree-counts")
+        self.scores = os.path.join(model_dir, "tree-score")
+        self.index  = os.path.join(model_dir, "tree-index")
+
 
 class Index(UserString.UserString):
     def __init__(self, cicada=None, indexer=None, input="", output="", name="", root_source="", root_target="", prior=0.1, kbest=0, quantize=None, features=[], attributes=[]):
@@ -394,9 +425,12 @@ class Score:
 
 
 class Scores(UserList.UserList):
-    def __init__(self, prefix="", output=""):
+    def __init__(self, indexer=None):
 
         UserList.UserList.__init__(self)
+
+        prefix = indexer.scores
+        output = indexer.index
 
         path_files = os.path.join(prefix, 'files');
         path_root_source = os.path.join(prefix, 'root-source.gz')
@@ -435,22 +469,34 @@ class Scores(UserList.UserList):
 
 (options, args) = opt_parser.parse_args()
 
+if options.root_dir:
+    if not os.path.exists(options.root_dir):
+	os.makedirs(options.root_dir)
+
+if not options.model_dir:
+    options.model_dir = os.path.join(options.root_dir, "model")
+if not options.lexical_dir:
+    options.lexical_dir = options.model_dir
+if not options.alignment_dir:
+    options.alignment_dir = options.model_dir
+
 cicada = CICADA(options.cicada_dir)
 
-scores = Scores(options.scores, options.output)
 indexer = None
 if options.phrase:
-    indexer = IndexPhrase(cicada, cky=options.cky)
+    indexer = IndexPhrase(cicada, model_dir=options.model_dir, cky=options.cky)
 elif options.scfg:
-    indexer = IndexSCFG(cicada, cky=options.cky)
+    indexer = IndexSCFG(cicada, model_dir=options.model_dir, cky=options.cky)
 elif options.ghkm:
-    indexer = IndexGHKM(cicada, cky=options.cky)
+    indexer = IndexGHKM(cicada, model_dir=options.model_dir, cky=options.cky)
 elif options.tree:
-    indexer = IndexTree(cicada, cky=options.cky)
+    indexer = IndexTree(cicada, model_dir=options.model_dir, cky=options.cky)
 else:
     raise ValueError, "no indexer?"
 
-fp = open(os.path.join(options.output, "files"), 'w')
+scores = Scores(indexer)
+
+fp = open(os.path.join(indexer.index, "files"), 'w')
 
 if options.pbs:
     # we use pbs to run jobs
