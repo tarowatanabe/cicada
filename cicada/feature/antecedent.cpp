@@ -292,8 +292,12 @@ namespace cicada
 							    span_size,
 							    static_cast<int>(utils::bithack::next_largest_power2(span_size)));
 
-	return (static_cast<const std::string&>(feature_name_prefix) + ":"
-		+ node + antecedent + '|' + prefix + '|' + suffix + '|' + utils::lexical_cast<std::string>(span_size_power2));
+	return (static_cast<const std::string&>(feature_name_prefix)
+		+ ':' + node + antecedent
+		+ '|' + prefix
+		+ '|' + suffix
+		+ '|' + utils::lexical_cast<std::string>(span_size_power2));
+		
       }
     };
     
