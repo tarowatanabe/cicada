@@ -3,7 +3,11 @@
 //
 
 #include "sparse_lexicon.hpp"
+
 #include "cicada/parameter.hpp"
+#include "cicada/cluster.hpp"
+#include "cicada/stemmer.hpp"
+#include "cicada/cluster_stemmer.hpp"
 
 #include "utils/piece.hpp"
 #include "utils/lexical_cast.hpp"
@@ -28,6 +32,12 @@ namespace cicada
       typedef cicada::Sentence sentence_type;
       typedef cicada::Lattice       lattice_type;
       typedef cicada::HyperGraph    hypergraph_type;
+
+      typedef cicada::Cluster  cluster_type;
+      typedef cicada::Stemmer  stemmer_type;
+      
+      typedef cicada::ClusterStemmer normalizer_type;
+      typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
 
       typedef cicada::FeatureFunction feature_function_type;
       
@@ -103,6 +113,16 @@ namespace cicada
 		
 		if (forced_feature || feature_type::exists(name))
 		  features[name] += 1.0;
+		
+		for (size_t i = 0; i != normalizers_target.size(); ++ i) {
+		  const word_type normalized = normalizers_target[i](*piter);
+		  if (normalized != *piter) {
+		    const std::string name = prefix + ":" + static_cast<const std::string&>(*witer) + "_" + static_cast<const std::string&>(normalized);
+		    
+		    if (forced_feature || feature_type::exists(name))
+		      features[name] += 1.0;
+		  }
+		}
 	      }
 	    }
 	    
@@ -142,7 +162,16 @@ namespace cicada
 	}
 
 	words.clear();
-	words.insert(words.end(), uniques.begin(), uniques.end());
+	word_set_type::const_iterator uiter_end = uniques.end();
+	for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
+	  words.push_back(*uiter);
+	  
+	  for (size_t i = 0; i != normalizers_source.size(); ++ i) {
+	    const word_type normalized = normalizers_source[i](*uiter);
+	    if (normalized != *uiter)
+	      words.push_back(normalized);
+	  }
+	}
       }
       
       template <typename Skipper>
@@ -164,7 +193,16 @@ namespace cicada
 	  }
 	
 	words.clear();
-	words.insert(words.end(), uniques.begin(), uniques.end());
+	word_set_type::const_iterator uiter_end = uniques.end();
+	for (word_set_type::const_iterator uiter = uniques.begin(); uiter != uiter_end; ++ uiter) {
+	  words.push_back(*uiter);
+	  
+	  for (size_t i = 0; i != normalizers_source.size(); ++ i) {
+	    const word_type normalized = normalizers_source[i](*uiter);
+	    if (normalized != *uiter)
+	      words.push_back(normalized);
+	  }
+	}
       }
       
       void clear()
@@ -172,6 +210,9 @@ namespace cicada
 	words.clear();
 	caches.clear();
       }
+
+      normalizer_set_type normalizers_source;
+      normalizer_set_type normalizers_target;
       
       word_set_type  uniques;
       sentence_type  words;
@@ -194,12 +235,29 @@ namespace cicada
       if (utils::ipiece(param.name()) != "sparse-lexicon")
 	throw std::runtime_error("this is not sparse lexicon feature: " + parameter);
       
+      impl_type::normalizer_set_type normalizers_source;
+      impl_type::normalizer_set_type normalizers_target;
+      
       bool skip_sgml_tag = false;
       
       std::string name;
       
       for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	if (utils::ipiece(piter->first) == "skip-sgml-tag")
+	if (utils::ipiece(piter->first) == "cluster-source") {
+	  if (! boost::filesystem::exists(piter->second))
+	    throw std::runtime_error("no cluster file: " + piter->second);
+	  
+	  normalizers_source.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
+	} else if (utils::ipiece(piter->first) == "cluster-target") {
+	  if (! boost::filesystem::exists(piter->second))
+	    throw std::runtime_error("no cluster file: " + piter->second);
+	  
+	  normalizers_target.push_back(impl_type::normalizer_type(&cicada::Cluster::create(piter->second)));
+	} else if (utils::ipiece(piter->first) == "stemmer-source")
+	  normalizers_source.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
+	else if (utils::ipiece(piter->first) == "stemmer-target")
+	  normalizers_target.push_back(impl_type::normalizer_type(&cicada::Stemmer::create(piter->second)));
+	else if (utils::ipiece(piter->first) == "skip-sgml-tag")
 	  skip_sgml_tag = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "name")
 	  name = piter->second;
@@ -208,6 +266,9 @@ namespace cicada
       }
       
       std::auto_ptr<impl_type> lexicon_impl(new impl_type());
+
+      lexicon_impl->normalizers_source.swap(normalizers_source);
+      lexicon_impl->normalizers_target.swap(normalizers_target);
       
       lexicon_impl->skip_sgml_tag = skip_sgml_tag;
       lexicon_impl->prefix = (name.empty() ? std::string("sparse-lexicon") : name);
