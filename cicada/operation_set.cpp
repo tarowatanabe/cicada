@@ -28,6 +28,7 @@
 #include "operation/prune.hpp"
 #include "operation/push_bos_eos.hpp"
 #include "operation/remove_annotation.hpp"
+#include "operation/remove_bos_eos.hpp"
 #include "operation/remove_epsilon.hpp"
 #include "operation/remove_feature.hpp"
 #include "operation/sort_tail.hpp"
@@ -196,6 +197,9 @@ prune: pruning\n\
 \tweights-one=[true|false] one initialzied weight\n\
 push-bos-eos: push bos/eos\n\
 remove-annotation: remove latent annotation from forest\n\
+remove-bos-eos: remove BOS/EOS\n\
+\tlattice=[true|false] remove BOS/EOS for lattice\n\
+\tforest=[true|false] remove BOS/EOS for forest\n\
 remove-epsilon: remove epsilon\n\
 \tlattice=[true|false] remove epsilon for lattice\n\
 \tforest=[true|false] remove epsilon for forest\n\
@@ -309,6 +313,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::PushBosEos(*piter, debug)));
       else if (param_name == "remove-annotation")
 	operations.push_back(operation_ptr_type(new operation::RemoveAnnotation(*piter, debug)));
+      else if (param_name == "remove-bos-eos")
+	operations.push_back(operation_ptr_type(new operation::RemoveBosEos(*piter, debug)));
       else if (param_name == "remove-epsilon")
 	operations.push_back(operation_ptr_type(new operation::RemoveEpsilon(*piter, debug)));
       else if (param_name == "remove-feature")
