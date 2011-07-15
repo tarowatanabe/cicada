@@ -8,13 +8,6 @@
 // output is a set of points with evaluation score (BLEU)
 //
 
-#include <iostream>
-#include <vector>
-#include <deque>
-#include <string>
-#include <stdexcept>
-#include <numeric>
-
 #include "cicada/sentence.hpp"
 #include "cicada/lattice.hpp"
 #include "cicada/hypergraph.hpp"
@@ -47,6 +40,8 @@
 #include <boost/thread.hpp>
 
 #include "cicada_text_impl.hpp"
+#include "cicada_kbest_impl.hpp"
+#include "cicada_mert_kbest_impl.hpp"
 
 typedef boost::filesystem::path path_type;
 typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
@@ -62,7 +57,7 @@ typedef hypergraph_type::feature_set_type    feature_set_type;
 typedef cicada::WeightVector<double>   weight_set_type;
 typedef feature_set_type::feature_type feature_type;
 
-typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+typedef std::vector<weight_set_type, std::allocator<weight_set_type> > weight_set_collection_type;
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
@@ -74,16 +69,6 @@ typedef line_search_type::segment_set_type      segment_set_type;
 typedef line_search_type::segment_document_type segment_document_type;
 
 typedef std::vector<line_search_type::value_type, std::allocator<line_search_type::value_type> > convex_hull_type;
-
-void read_tstset(const path_set_type& files, hypergraph_set_type& graphs);
-void read_refset(const path_set_type& file, scorer_document_type& scorers);
-void compute_envelope(const scorer_document_type& scorers,
-		      const hypergraph_set_type&  graphs,
-		      const weight_set_type& origin,
-		      const weight_set_type& direction,
-		      segment_document_type& segments);
-
-void options(int argc, char** argv);
 
 path_set_type tstset_files;
 path_set_type refset_files;
@@ -98,13 +83,24 @@ std::string direction_name;
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
 
-bool yield_sentence = false;
-bool yield_alignment = false;
-bool yield_span = false;
-
 int threads = 4;
 
 int debug = 0;
+
+void read_tstset(const path_set_type& files, hypothesis_map_type& kbests);
+void read_refset(const path_set_type& file, scorer_document_type& scorers);
+
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers);
+
+void compute_envelope(const scorer_document_type& scorers,
+		      const hypothesis_map_type&  kbests,
+		      const weight_set_type& origin,
+		      const weight_set_type& direction,
+		      segment_document_type& segments);
+
+
+void options(int argc, char** argv);
 
 int main(int argc, char ** argv)
 {
@@ -113,29 +109,18 @@ int main(int argc, char ** argv)
 
     cicada::optimize::LineSearch::value_min = value_lower;
     cicada::optimize::LineSearch::value_max = value_upper;
-    
+
     if (scorer_list) {
       std::cout << cicada::eval::Scorer::lists();
       return 0;
-    }
-    
-    if (int(yield_sentence) + yield_alignment + yield_span > 1)
-      throw std::runtime_error("specify either sentence|alignment|span yield");
-    if (int(yield_sentence) + yield_alignment + yield_span == 0)
-      yield_sentence = true;
-
-    if (weights_file.empty() || ! boost::filesystem::exists(weights_file))
-      throw std::runtime_error("no weight file? " + weights_file.string());
-    if (direction_name.empty())
-      throw std::runtime_error("no direction?");
+    }    
     
     threads = utils::bithack::max(threads, 1);
     
     // read reference set
     scorer_document_type scorers(scorer_name);
-    
     read_refset(refset_files, scorers);
-    
+
     if (debug)
       std::cerr << "# of references: " << scorers.size() << std::endl;
 
@@ -144,11 +129,13 @@ int main(int argc, char ** argv)
       tstset_files.push_back("-");
 
     if (debug)
-      std::cerr << "reading hypergraphs" << std::endl;
+      std::cerr << "reading kbests" << std::endl;
 
-    hypergraph_set_type graphs(scorers.size());
+    hypothesis_map_type kbests(scorers.size());
     
-    read_tstset(tstset_files, graphs);
+    read_tstset(tstset_files, kbests);
+    
+    initialize_score(kbests, scorers);
     
     weight_set_type weights;
     {
@@ -159,9 +146,9 @@ int main(int argc, char ** argv)
     weight_set_type direction;
     direction[direction_name] = 1.0;
     
-    segment_document_type segments(graphs.size());
+    segment_document_type segments(scorers.size());
     
-    compute_envelope(scorers, graphs, weights, direction, segments);
+    compute_envelope(scorers, kbests, weights, direction, segments);
     
     line_search_type line_search(debug);
     
@@ -204,51 +191,41 @@ struct EnvelopeTask
   typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
 
   typedef utils::lockfree_list_queue<int, std::allocator<int> >  queue_type;
-
-    
+  
   EnvelopeTask(queue_type& __queue,
 	       segment_document_type&      __segments,
 	       const weight_set_type&      __origin,
 	       const weight_set_type&      __direction,
 	       const scorer_document_type& __scorers,
-	       const hypergraph_set_type&  __graphs)
+	       const hypothesis_map_type&  __kbests)
     : queue(__queue),
       segments(__segments),
       origin(__origin),
       direction(__direction),
       scorers(__scorers),
-      graphs(__graphs) {}
-
+      kbests(__kbests) {}
+  
   void operator()()
   {
-    envelope_set_type envelopes;
-
+    EnvelopeKBest::line_set_type lines;
     int seg;
+
+    EnvelopeKBest envelopes(origin, direction);
     
     while (1) {
       queue.pop(seg);
       if (seg < 0) break;
       
-      envelopes.clear();
-      envelopes.resize(graphs[seg].nodes.size());
-
-      cicada::inside(graphs[seg], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
+      envelopes(kbests[seg], lines);
       
-      const envelope_type& envelope = envelopes[graphs[seg].goal];
-      const_cast<envelope_type&>(envelope).sort();
-      
-      envelope_type::const_iterator eiter_end = envelope.end();
-      for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
-	const envelope_type::line_ptr_type& line = *eiter;
-	
-	const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
-	
-	scorer_type::score_ptr_type score = scorers[seg]->score(yield);
+      EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+      for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter) {
+	const EnvelopeKBest::line_type& line = *liter;
 	
 	if (debug >= 4)
-	  std::cerr << "segment: " << seg << " x: " << line->x << std::endl;
+	  std::cerr << "segment: " << seg << " x: " << line.x << std::endl;
 	
-	segments[seg].push_back(std::make_pair(line->x, score));
+	segments[seg].push_back(std::make_pair(line.x, line.hypothesis->score));
       }
     }
   }
@@ -261,11 +238,11 @@ struct EnvelopeTask
   const weight_set_type& direction;
   
   const scorer_document_type& scorers;
-  const hypergraph_set_type&  graphs;
+  const hypothesis_map_type&  kbests;
 };
 
 void compute_envelope(const scorer_document_type& scorers,
-		      const hypergraph_set_type&  graphs,
+		      const hypothesis_map_type&  kbests,
 		      const weight_set_type& origin,
 		      const weight_set_type& direction,
 		      segment_document_type& segments)
@@ -277,10 +254,10 @@ void compute_envelope(const scorer_document_type& scorers,
   
   boost::thread_group workers;
   for (int i = 0; i < threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(queue, segments, origin, direction, scorers, graphs)));
+    workers.add_thread(new boost::thread(task_type(queue, segments, origin, direction, scorers, kbests)));
   
-  for (size_t seg = 0; seg != graphs.size(); ++ seg)
-    if (graphs[seg].goal != hypergraph_type::invalid)
+  for (size_t seg = 0; seg != kbests.size(); ++ seg)
+    if (! kbests[seg].empty())
       queue.push(seg);
   
   for (int i = 0; i < threads; ++ i)
@@ -290,68 +267,76 @@ void compute_envelope(const scorer_document_type& scorers,
 }
 
 
-void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
+void read_tstset(const path_set_type& files,
+		 hypothesis_map_type& hypotheses)
 {
-  path_set_type::const_iterator titer_end = tstset_files.end();
-  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
-    
-    if (debug)
-      std::cerr << "file: " << *titer << std::endl;
-      
-    if (boost::filesystem::is_directory(*titer)) {
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef kbest_feature_parser<iter_type> parser_type;
+  
+  if (files.empty())
+    throw std::runtime_error("no files?");
 
-      for (int i = 0; /**/; ++ i) {
-	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
+  parser_type parser;
+  kbest_feature_type kbest;
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no file: " + fiter->string());
+
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (size_t i = 0; /**/; ++ i) {
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
 	
-	int id;
-	std::string sep;
-	hypergraph_type hypergraph;
-      
-	weight_set_type origin;
-	weight_set_type direction;
-      
-	while (is >> id >> sep >> hypergraph) {
+	iter_type iter(is);
+	iter_type iter_end;
 	
-	  if (sep != "|||")
-	    throw std::runtime_error("format error?");
-	
-	  if (id >= static_cast<int>(graphs.size()))
-	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
-	
-	  graphs[id].unite(hypergraph);
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  const size_t& id = boost::fusion::get<0>(kbest);
+	  
+	  if (id >= hypotheses.size())
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  if (id != i)
+	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	  
+	  hypotheses[id].push_back(hypothesis_type(kbest));
 	}
       }
     } else {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
       
-      utils::compress_istream is(*titer, 1024 * 1024);
+      iter_type iter(is);
+      iter_type iter_end;
       
-      int id;
-      std::string sep;
-      hypergraph_type hypergraph;
-      
-      weight_set_type origin;
-      weight_set_type direction;
-      
-      while (is >> id >> sep >> hypergraph) {
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
 	
-	if (sep != "|||")
-	  throw std::runtime_error("format error?");
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
 	
-	if (id >= static_cast<int>(graphs.size()))
-	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
+	const size_t& id = boost::fusion::get<0>(kbest);
 	
-	graphs[id].unite(hypergraph);
+	if (id >= hypotheses.size())
+	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	
+	hypotheses[id].push_back(hypothesis_type(kbest));
       }
     }
   }
-  
-  for (size_t id = 0; id != graphs.size(); ++ id)
-    if (graphs[id].goal == hypergraph_type::invalid)
-      std::cerr << "invalid graph at: " << id << std::endl;
 }
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
@@ -396,6 +381,73 @@ void read_refset(const path_set_type& files, scorer_document_type& scorers)
   }
 }
 
+struct TaskInit
+{
+  typedef utils::lockfree_list_queue<int, std::allocator<int> > queue_type;
+  
+#ifdef HAVE_TR1_UNORDERED_SET
+  typedef std::tr1::unordered_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+				  std::allocator<hypothesis_type> > hypothesis_unique_type;
+#else
+  typedef sgi::hash_set<hypothesis_type, boost::hash<hypothesis_type>, std::equal_to<hypothesis_type>,
+			std::allocator<hypothesis_type> > hypothesis_unique_type;
+#endif
+
+  TaskInit(queue_type&                 __queue,
+	   hypothesis_map_type&        __hypotheses,
+	   const scorer_document_type& __scorers)
+    : queue(__queue), hypotheses(__hypotheses), scorers(__scorers) {}
+
+  void operator()()
+  {
+    hypothesis_unique_type kbests;
+
+    for (;;) {
+      int id = 0;
+      queue.pop(id);
+      if (id < 0) break;
+      
+      kbests.clear();
+      kbests.insert(hypotheses[id].begin(), hypotheses[id].end());
+      
+      hypotheses[id].clear();
+      hypothesis_set_type(hypotheses[id]).swap(hypotheses[id]);
+      
+      hypotheses[id].reserve(kbests.size());
+      hypotheses[id].insert(hypotheses[id].end(), kbests.begin(), kbests.end());
+      
+      hypothesis_set_type::iterator hiter_end = hypotheses[id].end();
+      for (hypothesis_set_type::iterator hiter = hypotheses[id].begin(); hiter != hiter_end; ++ hiter)
+	hiter->score = scorers[id]->score(sentence_type(hiter->sentence.begin(), hiter->sentence.end()));
+    }
+  }
+
+  queue_type&                 queue;
+  hypothesis_map_type&        hypotheses;
+  const scorer_document_type& scorers;
+};
+
+void initialize_score(hypothesis_map_type& hypotheses,
+		      const scorer_document_type& scorers)
+{
+  typedef TaskInit task_type;
+  typedef task_type::queue_type queue_type;
+
+  queue_type queue;
+  
+  boost::thread_group workers;
+  for (int i = 0; i < threads; ++ i)
+    workers.add_thread(new boost::thread(task_type(queue, hypotheses, scorers)));
+  
+  for (size_t id = 0; id != hypotheses.size(); ++ id)
+    queue.push(id);
+  
+  for (int i = 0; i < threads; ++ i)
+    queue.push(-1);
+  
+  workers.join_all();
+}
+
 void options(int argc, char** argv)
 {
   namespace po = boost::program_options;
@@ -416,11 +468,7 @@ void options(int argc, char** argv)
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
-
-    ("yield-sentence",  po::bool_switch(&yield_sentence),  "optimize wrt sentence yield")
-    ("yield-alignment", po::bool_switch(&yield_alignment), "optimize wrt alignment yield")
-    ("yield-span",      po::bool_switch(&yield_span),      "optimize wrt span yield")
-
+    
     ("threads", po::value<int>(&threads), "# of threads")
     ;
   
