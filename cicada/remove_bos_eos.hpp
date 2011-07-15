@@ -397,7 +397,7 @@ namespace cicada
       rhs_set_type rhs;
       tail_set_type tails;
       
-      bos_eos_map_type bos_eoss(target.nodes.size());
+      bos_eos_map_type bos_eos(target.nodes.size());
       removed_type     removed(target.edges.size(), false);
       size_type        bos_eos_remove = 0;
       size_type        bos_eos_new = 0;
@@ -417,7 +417,7 @@ namespace cicada
 	    // we will mark this as deleted,
 	    // and keep bit-vector indicating the node.id has a edge with bos_eos...
 	    
-	    bos_eoss[node.id].push_back(edge.id);
+	    bos_eos[node.id].push_back(edge.id);
 	    removed[edge.id] = true;
 	    ++ bos_eos_remove;
 	  } else {
@@ -437,8 +437,8 @@ namespace cicada
 	    bool found_bos_eos = false;
 	    
 	    for (size_type i = 0; i != edge.tails.size(); ++ i) {
-	      found_bos_eos |= ! bos_eoss[edge.tails[i]].empty();
-	      j_ends[i] = utils::bithack::branch(bos_eoss[edge.tails[i]].empty(), size_type(0), bos_eoss[edge.tails[i]].size() + 1);
+	      found_bos_eos |= ! bos_eos[edge.tails[i]].empty();
+	      j_ends[i] = utils::bithack::branch(bos_eos[edge.tails[i]].empty(), size_type(0), bos_eos[edge.tails[i]].size() + 1);
 	    }
 	    
 	    if (! found_bos_eos) continue;
@@ -458,7 +458,7 @@ namespace cicada
 		  ++ non_terminal_pos;
 		  
 		  if (j[antecedent_index] > 0 && j_ends[antecedent_index] > 0) {
-		    const hypergraph_type::edge_type& edge_antecedent = target.edges[bos_eoss[edge.tails[antecedent_index]][j[antecedent_index] - 1]];
+		    const hypergraph_type::edge_type& edge_antecedent = target.edges[bos_eos[edge.tails[antecedent_index]][j[antecedent_index] - 1]];
 		    
 		    features += edge_antecedent.features;
 		    // edge_antcedent is an bos_eos rule without tails!
