@@ -238,7 +238,116 @@ namespace cicada
 	  bound_upper(__bound_upper),
 	  debug(__debug) { initialize_bound(bound_lower, bound_upper); }
 
-      value_type operator()(segment_document_type& segments,
+      template <typename Iterator>
+      void operator()(const segment_document_type& segments,
+		      const double value_min,
+		      const double value_max,
+		      const bool minimize,
+		      Iterator iter)
+      {
+	// we assume a set of line_ptr and score_ptr pair...
+	
+	const double score_factor = (minimize ? 1.0 : - 1.0);
+	const std::pair<double, double> range(value_min, value_max);
+
+	heap_type heap;
+	
+	if (debug >= 4)
+	  std::cerr << "minimum: " << range.first << " maximum: " << range.second << std::endl;
+	
+	score_ptr_type stat;
+	score_set_type scores(segments.size());
+	
+	for (size_t seg = 0; seg != segments.size(); ++ seg)
+	  if (! segments[seg].empty()) {
+	    
+	    if (! stat)
+	      stat = segments[seg].front().second->zero();
+	    
+	    scores[seg] = segments[seg].front().second;
+	    *stat += *segments[seg].front().second;
+	    
+	    if (segments[seg].size() > 1)
+	      heap.push_back(item_type(seg, segments[seg].begin() + 1, segments[seg].end()));
+	  }
+
+	if (heap.empty()) return;
+	
+	// priority queue...
+	std::make_heap(heap.begin(), heap.end(), item_heap_compare_type());
+	
+	const double score = score_factor * stat->score();
+	
+	double lower = lower_bound(heap.front().first->first, range.first);
+	double upper = heap.front().first->first;
+	
+	double objective = score;
+	
+	double segment_prev = lower;
+	double score_prev   = score;
+	
+	*iter = value_type(objective, score, lower, upper);
+	++ iter;
+	
+	if (debug >= 4)
+	  std::cerr << "lower: " << lower
+		    << " upper: " << upper
+		    << " score: " << score
+		    << " objective: " << objective
+		    << std::endl;
+	
+	while (! heap.empty()) {
+	  // next at heap...
+	  
+	  const double segment_curr = heap.front().first->first;
+	  
+	  while (! heap.empty() && heap.front().first->first == segment_curr) { 
+	    std::pop_heap(heap.begin(), heap.end(), item_heap_compare_type());
+	    
+	    *stat -= *scores[heap.back().seg];
+	    *stat += *heap.back().first->second;
+	    scores[heap.back().seg] = heap.back().first->second;
+	    
+	    // pop and push heap...
+	    ++ heap.back().first;
+	    if (heap.back().first != heap.back().last)
+	      std::push_heap(heap.begin(), heap.end(), item_heap_compare_type());
+	    else
+	      heap.pop_back();
+	  }
+	  
+	  const double segment_next = (heap.empty() ? upper_bound(segment_curr, range.second) : heap.front().first->first);
+	  
+	  // we perform merging of ranges if error counts are equal...
+	  const double score = score_factor * stat->score();
+	  if (score != score_prev) {
+	    segment_prev = segment_curr;
+	    score_prev = score;
+	  }
+	  
+	  const double lower = segment_prev;
+	  const double upper = segment_next;
+	  const double point = (lower + upper) * 0.5;
+	  
+	  if (point > range.second) break;   // out of range for upper-bound, quit!
+	  if (point < range.first) continue; // out of range for lower-bound...
+	  if (std::fabs(point) < interval_min) continue; // interval is very small
+	  
+	  const double objective = score;
+	  
+	  if (debug >= 4)
+	    std::cerr << "lower: " << lower
+		      << " upper: " << upper
+		      << " score: " << score
+		      << " objective: " << objective
+		      << std::endl;
+	  
+	  *iter = value_type(objective, score, lower, upper);
+	  ++ iter;
+	}
+      }
+
+      value_type operator()(const segment_document_type& segments,
 			    const double value_min,
 			    const double value_max,
 			    const bool minimize)
@@ -363,7 +472,7 @@ namespace cicada
       }
 
       template <typename Regularizer>
-      value_type operator()(segment_document_type& segments,
+      value_type operator()(const segment_document_type& segments,
 			    const weight_set_type& origin,
 			    const weight_set_type& direction,
 			    Regularizer regularizer,
