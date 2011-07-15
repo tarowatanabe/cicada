@@ -164,7 +164,7 @@ namespace cicada
 	double upper;
 	
 	weight_set_type operator()(const weight_set_type& origin,
-				   const weight_set_type& direction)
+				   const weight_set_type& direction) const
 	{
 	  weight_set_type weights;
 	  

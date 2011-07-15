@@ -73,6 +73,7 @@ typedef line_search_type::segment_type          segment_type;
 typedef line_search_type::segment_set_type      segment_set_type;
 typedef line_search_type::segment_document_type segment_document_type;
 
+typedef std::vector<line_search_type::value_type, std::allocator<line_search_type::value_type> > convex_hull_type;
 
 void read_tstset(const path_set_type& files, hypergraph_set_type& graphs);
 void read_refset(const path_set_type& file, scorer_document_type& scorers);
@@ -92,7 +93,7 @@ double value_lower = -100;
 double value_upper =  100;
 
 path_type weights_file;
-path_type direction_file;
+std::string direction_name;
 
 std::string scorer_name = "bleu:order=4";
 bool scorer_list = false;
@@ -125,8 +126,8 @@ int main(int argc, char ** argv)
 
     if (weights_file.empty() || ! boost::filesystem::exists(weights_file))
       throw std::runtime_error("no weight file? " + weights_file.string());
-    if (direction_file.empty() || ! boost::filesystem::exists(direction_file))
-      throw std::runtime_error("no weight file? " + direction_file.string());
+    if (direction_name.empty())
+      throw std::runtime_error("no direction?");
     
     threads = utils::bithack::max(threads, 1);
     
@@ -150,23 +151,39 @@ int main(int argc, char ** argv)
     read_tstset(tstset_files, graphs);
     
     weight_set_type weights;
-    weight_set_type direction;
-
     {
       utils::compress_istream is(weights_file, 1024 * 1024);
       is >> weights;
     }
     
-    {
-      utils::compress_istream is(direction_file, 1024 * 1024);
-      is >> direction;
-    }
+    weight_set_type direction;
+    direction[direction_name] = 1.0;
     
     segment_document_type segments(graphs.size());
-
+    
     compute_envelope(scorers, graphs, weights, direction, segments);
     
+    line_search_type line_search(debug);
     
+    convex_hull_type convex_hull;
+    
+    line_search(segments, value_lower, value_upper, scorers.error_metric(), std::back_inserter(convex_hull));
+
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    
+    const double weight = weights[direction_name];
+
+    convex_hull_type::const_iterator hiter_end = convex_hull.end();
+    for (convex_hull_type::const_iterator hiter = convex_hull.begin(); hiter != hiter_end; ++ hiter) {
+      const double feature_lower = weight + hiter->lower;
+      const double feature_upper = weight + hiter->upper;
+      
+      const double average = (lower + upper) * 0.5;
+      
+      const double value = (weight + average) * double(! (feature_lower * feature_upper < 0.0));
+
+      os << value << ' ' << hiter->objective << '\n';
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -394,8 +411,8 @@ void options(int argc, char** argv)
     ("value-lower", po::value<double>(&value_lower)->default_value(value_lower), "default lower bounds")
     ("value-upper", po::value<double>(&value_upper)->default_value(value_upper), "default upper_bounds")
     
-    ("weights",   po::value<path_type>(&weights_file),   "weights")
-    ("direction", po::value<path_type>(&direction_file), "direction")
+    ("weights",   po::value<path_type>(&weights_file),     "weights")
+    ("direction", po::value<std::string>(&direction_name), "direction (feature name)")
 
     ("scorer",      po::value<std::string>(&scorer_name)->default_value(scorer_name), "error metric")
     ("scorer-list", po::bool_switch(&scorer_list),                                    "list of error metric")
