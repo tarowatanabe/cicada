@@ -266,55 +266,28 @@ void compute_envelope(const scorer_document_type& scorers,
   workers.join_all();
 }
 
-
-void read_tstset(const path_set_type& files,
-		 hypothesis_map_type& hypotheses)
+struct TaskRead
 {
-  typedef boost::spirit::istream_iterator iter_type;
-  typedef kbest_feature_parser<iter_type> parser_type;
+  typedef utils::lockfree_list_queue<path_type, std::allocator<path_type> > queue_type;
   
-  if (files.empty())
-    throw std::runtime_error("no files?");
-
-  parser_type parser;
-  kbest_feature_type kbest;
+  TaskRead(queue_type& __queue)
+    : queue(__queue) {}
   
-  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
-    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
-      throw std::runtime_error("no file: " + fiter->string());
+  void operator()()
+  {
+    typedef boost::spirit::istream_iterator iter_type;
+    typedef kbest_feature_parser<iter_type> parser_type;
+    
+    parser_type parser;
+    kbest_feature_type kbest;
 
-    if (boost::filesystem::is_directory(*fiter)) {
-      for (size_t i = 0; /**/; ++ i) {
-	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
-
-	if (! boost::filesystem::exists(path)) break;
-	
-	utils::compress_istream is(path, 1024 * 1024);
-	is.unsetf(std::ios::skipws);
-	
-	iter_type iter(is);
-	iter_type iter_end;
-	
-	while (iter != iter_end) {
-	  boost::fusion::get<1>(kbest).clear();
-	  boost::fusion::get<2>(kbest).clear();
-	  
-	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	    if (iter != iter_end)
-	      throw std::runtime_error("kbest parsing failed");
-	  
-	  const size_t& id = boost::fusion::get<0>(kbest);
-	  
-	  if (id >= hypotheses.size())
-	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
-	  if (id != i)
-	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
-	  
-	  hypotheses[id].push_back(hypothesis_type(kbest));
-	}
-      }
-    } else {
-      utils::compress_istream is(*fiter, 1024 * 1024);
+    for (;;) {
+      path_type path;
+      queue.pop(path);
+      
+      if (path.empty()) break;
+      
+      utils::compress_istream is(path, 1024 * 1024);
       is.unsetf(std::ios::skipws);
       
       iter_type iter(is);
@@ -330,12 +303,62 @@ void read_tstset(const path_set_type& files,
 	
 	const size_t& id = boost::fusion::get<0>(kbest);
 	
-	if (id >= hypotheses.size())
-	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
+	if (id >= kbests.size())
+	  kbests.resize(id + 1);
 	
-	hypotheses[id].push_back(hypothesis_type(kbest));
+	kbests[id].push_back(hypothesis_type(kbest));
       }
     }
+  }
+  
+  queue_type& queue;
+  hypothesis_map_type kbests;
+};
+
+void read_tstset(const path_set_type& files,
+		 hypothesis_map_type& hypotheses)
+{
+  typedef TaskRead task_type;
+  typedef task_type::queue_type queue_type;
+  
+  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+
+  queue_type queue(threads);
+  task_set_type tasks(threads, task_type(queue));
+    
+  boost::thread_group workers;
+  for (int i = 0; i != threads; ++ i)
+    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+    if (! boost::filesystem::exists(*fiter) && *fiter != "-")
+      throw std::runtime_error("no file: " + fiter->string());
+    
+    if (boost::filesystem::is_directory(*fiter)) {
+      for (size_t i = 0; /**/; ++ i) {
+	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
+
+	if (! boost::filesystem::exists(path)) break;
+	
+	queue.push(path);
+      }
+    } else
+      queue.push(*fiter);
+  }
+  
+  for (int i = 0; i != threads; ++ i)
+    queue.push(path_type());
+  
+  workers.join_all();
+  
+  for (int i = 0; i != threads; ++ i) {
+    if (tasks[i].kbests.size() > hypotheses.size())
+      throw std::runtime_error("invalid kbests");
+    
+    for (size_t id = 0; id != tasks[i].kbests.size(); ++ id)
+      hypotheses[id].insert(hypotheses[id].end(), tasks[i].kbests[id].begin(), tasks[i].kbests[id].end());
+    
+    tasks[i].kbests.clear();
   }
 }
 
