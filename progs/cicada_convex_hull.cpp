@@ -178,7 +178,7 @@ int main(int argc, char ** argv)
       const double feature_lower = weight + hiter->lower;
       const double feature_upper = weight + hiter->upper;
       
-      const double average = (lower + upper) * 0.5;
+      const double average = (hiter->lower + hiter->upper) * 0.5;
       
       const double value = (weight + average) * double(! (feature_lower * feature_upper < 0.0));
 
