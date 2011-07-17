@@ -68,8 +68,6 @@ typedef line_search_type::segment_type          segment_type;
 typedef line_search_type::segment_set_type      segment_set_type;
 typedef line_search_type::segment_document_type segment_document_type;
 
-typedef std::vector<line_search_type::value_type, std::allocator<line_search_type::value_type> > convex_hull_type;
-
 path_set_type tstset_files;
 path_set_type refset_files;
 path_type     output_file = "-";
@@ -101,6 +99,33 @@ void compute_envelope(const scorer_document_type& scorers,
 
 
 void options(int argc, char** argv);
+
+struct OutputIterator
+{
+  OutputIterator(std::ostream& __os, const double& __weight)
+    : os(__os), weight(__weight) {}
+  
+  OutputIterator& operator=(const line_search_type::value_type& value)
+  {
+    const double feature_lower = weight + value.lower;
+    const double feature_upper = weight + value.upper;
+    const double average = (value.lower + value.upper) * 0.5;
+    
+    const double point = (weight + average) * double(! (feature_lower * feature_upper < 0.0));
+    
+    os << point << ' '  << value.objective << '\n';
+    
+    return *this;
+  }
+  
+  OutputIterator& operator*() { return *this; }
+  OutputIterator& operator++() { return *this; }
+  OutputIterator  operator++(int) { return *this; }
+ 
+  
+  std::ostream& os;
+  double weight;
+};
 
 int main(int argc, char ** argv)
 {
@@ -152,25 +177,9 @@ int main(int argc, char ** argv)
     
     line_search_type line_search(debug);
     
-    convex_hull_type convex_hull;
-    
-    line_search(segments, value_lower, value_upper, scorers.error_metric(), std::back_inserter(convex_hull));
-
     utils::compress_ostream os(output_file, 1024 * 1024);
     
-    const double weight = weights[direction_name];
-    
-    convex_hull_type::const_iterator hiter_end = convex_hull.end();
-    for (convex_hull_type::const_iterator hiter = convex_hull.begin(); hiter != hiter_end; ++ hiter) {
-      const double feature_lower = weight + hiter->lower;
-      const double feature_upper = weight + hiter->upper;
-      
-      const double average = (hiter->lower + hiter->upper) * 0.5;
-      
-      const double value = (weight + average) * double(! (feature_lower * feature_upper < 0.0));
-
-      os << value << ' ' << hiter->objective << '\n';
-    }
+    line_search(segments, value_lower, value_upper, scorers.error_metric(), OutputIterator(os, weights[direction_name]));
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
