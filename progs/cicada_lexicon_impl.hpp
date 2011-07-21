@@ -302,7 +302,11 @@ struct ttable_type
     bool empty() const { return counts.empty(); }
 
     void swap(count_map_type& x) { counts.swap(x.counts); }
-    void clear() { counts.clear(); }
+    void clear()
+    {
+      counts.clear();
+      counts_type(counts).swap(counts);
+    }
 
     count_map_type& operator+=(const count_map_type& x)
     {
