@@ -305,7 +305,6 @@ struct ttable_type
     void clear()
     {
       counts.clear();
-      counts_type(counts).swap(counts);
     }
 
     count_map_type& operator+=(const count_map_type& x)
@@ -354,6 +353,14 @@ struct ttable_type
   }
   
   void clear() { ttable.clear(); }
+  
+  void clear(const word_type& word)
+  {
+    if (! ttable.exists(word.id())) return;
+    
+    ttable.erase(ttable.begin() + word.id());
+  }
+
   void swap(ttable_type& x)
   {
     ttable.swap(x.ttable);
@@ -465,8 +472,15 @@ struct aligned_type
   
   void resize(size_type __size) { aligned.resize(__size); }
   void reserve(size_type __size) { aligned.reserve(__size); }
+  
   void clear() { aligned.clear(); }
-
+  void clear(const word_type& word)
+  {
+    if (! aligned.exists(word.id())) return;
+    
+    aligned.erase(aligned.begin() + word.id());
+  }
+  
   void initialize()
   {
     for (size_type i = 0; i != aligned.size(); ++ i)

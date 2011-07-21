@@ -199,12 +199,12 @@ struct TaskMaximize : public Maximizer
       for (size_t i = 0; i != learners.size(); ++ i) {
 	if (learners[i].ttable_counts_source_target.exists(source_id)) {
 	  ttable_source_target[source_id] += learners[i].ttable_counts_source_target[source_id];
-	  learners[i].ttable_counts_source_target[source_id].clear();
+	  learners[i].ttable_counts_source_target.clear(source_id);
 	}
 	
 	if (learners[i].aligned_source_target.exists(source_id)) {
 	  aligned_source_target[source_id] += learners[i].aligned_source_target[source_id];
-	  learners[i].aligned_source_target[source_id].clear();
+	  learners[i].aligned_source_target.clear(source_id);
 	}
       }
       
@@ -216,12 +216,12 @@ struct TaskMaximize : public Maximizer
       for (size_t i = 0; i != learners.size(); ++ i) {
 	if (learners[i].ttable_counts_target_source.exists(target_id)) {
 	  ttable_target_source[target_id] += learners[i].ttable_counts_target_source[target_id];
-	  learners[i].ttable_counts_target_source[target_id].clear();
+	  learners[i].ttable_counts_target_source.clear(target_id);
 	}
 	
 	if (learners[i].aligned_target_source.exists(target_id)) {
 	  aligned_target_source[target_id] += learners[i].aligned_target_source[target_id];
-	  learners[i].aligned_target_source[target_id].clear();
+	  learners[i].aligned_target_source.clear(target_id);
 	}
       }
       
