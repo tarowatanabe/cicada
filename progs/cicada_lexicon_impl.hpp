@@ -383,6 +383,8 @@ struct ttable_type
     for (size_type i = 0; i != ttable.size(); ++ i)
       if (ttable.exists(i))
         ttable[i].clear();
+
+    shrink();
   }
 
   ttable_type& operator+=(const ttable_type& x)
@@ -490,6 +492,8 @@ struct aligned_type
     for (size_type i = 0; i != aligned.size(); ++ i)
       if (aligned.exists(i))
         aligned[i].clear();
+    
+    shrink();
   }
   
   aligned_set_type aligned;
