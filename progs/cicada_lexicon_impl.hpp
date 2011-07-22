@@ -352,6 +352,8 @@ struct ttable_type
     return (citer == counts.end() ? smooth : std::max(citer->second, smooth));
   }
   
+  
+  void shrink() { ttable.shrink(); }
   void clear() { ttable.clear(); }
   
   void clear(const word_type& word)
@@ -473,6 +475,7 @@ struct aligned_type
   void resize(size_type __size) { aligned.resize(__size); }
   void reserve(size_type __size) { aligned.reserve(__size); }
   
+  void shrink() { aligned.shrink(); }
   void clear() { aligned.clear(); }
   void clear(const word_type& word)
   {
@@ -659,6 +662,8 @@ void read_lexicon(const path_type& path, ttable_type& lexicon)
     
     lexicon[source][target] = prob;
   }
+
+  lexicon.shrink();
 }
 
 struct ttable_greater_second
