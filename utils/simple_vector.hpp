@@ -71,7 +71,11 @@ namespace utils {
 					    size,
 					    static_cast<size_type>(bithack::next_largest_power2(size)));
       
-      return bithack::branch((power2 * sizeof(value_type) + sizeof(size_type) > 256) || size == 0, size, power2);
+      const size_t size_alloc        = size * sizeof(value_type) + sizeof(size_type);
+      const size_t size_power2_alloc = power2 * sizeof(value_type) + sizeof(size_type);
+      const size_t size_256 = (size_t(256) - sizeof(size_type)) / sizeof(value_type);
+      
+      return bithack::branch(size_alloc > 256 || size == 0, size, bithack::branch(size_power2_alloc > 256, size_256, power2));
     }
     
     bool empty() const { return size() == 0; }
