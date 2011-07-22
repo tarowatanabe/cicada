@@ -52,6 +52,7 @@ struct classes_type
   classes_type() : classes() {}
 
   void clear() { classes.clear(); }
+  void shrink() { map_type(classes).swap(classes); }
   
   word_type operator[](const word_type& word) const
   {
@@ -65,7 +66,7 @@ struct classes_type
     
     return classes[word.id()];
   }
-  
+
   map_type classes;
 };
 
@@ -822,6 +823,8 @@ void read_classes(const path_type& path, classes_type& classes)
     
     classes[word] = cluster;
   }
+
+  classes.shrink();
 }
 
 #endif
