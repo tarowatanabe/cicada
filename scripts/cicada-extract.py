@@ -77,8 +77,10 @@ opt_parser = OptionParser(
 
     make_option("--non-terminal", default="[x]", action="store", type="string", help="default non-terminal for GHKM rule (default: [x])"),
     
-    make_option("--max-span", default=15, action="store", type="int",
-                metavar="LENGTH", help="maximum span size (default: 15)"),
+    make_option("--max-span-source", default=15, action="store", type="int",
+                metavar="LENGTH", help="maximum source span size (default: 15)"),
+    make_option("--max-span-target", default=20, action="store", type="int",
+                metavar="LENGTH", help="maximum target span size (default: 20)"),
     make_option("--min-hole", default=1, action="store", type="int",
                 metavar="LENGTH", help="minimum hole size (default: 1)"),
     make_option("--max-length", default=7, action="store", type="int",
@@ -471,7 +473,7 @@ class ExtractSCFG(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
-                 max_length=7, max_fertility=4, max_span=15, min_hole=1, ternary=None, sentential=None,
+                 max_length=7, max_fertility=4, max_span_source=15, max_span_target=20, min_hole=1, exhaustive=None, ternary=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -505,9 +507,12 @@ class ExtractSCFG(Extract):
         
         command += " --max-length %d"    %(max_length)
         command += " --max-fertility %d" %(max_fertility)
-        command += " --max-span %d"      %(max_span)
+        command += " --max-span-source %d"      %(max_span_source)
+        command += " --max-span-target %d"      %(max_span_target)
         command += " --min-hole %d"      %(min_hole)
-
+        
+        if exhaustive:
+            command += " --exhaustive"
         if ternary:
             command += " --ternary"
         if sentential:
@@ -773,8 +778,10 @@ if options.first_step <= 5 and options.last_step >= 5:
                               model_dir=options.model_dir,
                               max_length=options.max_length,
                               max_fertility=options.max_fertility,
-                              max_span=options.max_span,
+                              max_span_source=options.max_span_source,
+                              max_span_target=options.max_span_target,
                               min_hole=options.min_hole,
+                              exhaustive=options.exhaustive,
                               ternary=options.ternary,
                               sentential=options.sentential,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,

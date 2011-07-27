@@ -320,23 +320,29 @@ struct ExtractSCFG
 
   ExtractSCFG(const int __max_length,
 	      const int __max_fertility,
-	      const int __max_span,
+	      const int __max_span_source,
+	      const int __max_span_target,
 	      const int __min_hole,
+	      const bool __exhaustive,
 	      const bool __ternary,
 	      const bool __sentential,
 	      const bool __inverse)
     : max_length(__max_length),
       max_fertility(__max_fertility),
-      max_span(__max_span),
+      max_span_source(__max_span_source),
+      max_span_target(__max_span_target),
       min_hole(__min_hole),
+      exhaustive(__exhaustive),
       ternary(__ternary),
       sentential(__sentential),
       inverse(__inverse) {}
 		
   int max_length;
   int max_fertility;
-  int max_span;
+  int max_span_source;
+  int max_span_target;
   int min_hole;
+  bool exhaustive;
   bool ternary;
   bool sentential;
   bool inverse;
@@ -531,7 +537,9 @@ struct ExtractSCFG
       //const int target_count = alignment_count_target[iter->target.second] - alignment_count_target[iter->target.first];
       
       const bool sentential_mode = sentential && source_length == static_cast<int>(source_size) && target_length == static_cast<int>(target_size);
-      const bool rule_mode = (! sentential) && (max_span <= 0 || source_length <= max_span);
+      const bool rule_mode = ((! sentential)
+			      && (max_span_source <= 0 || source_length <= max_span_source)
+			      && (max_span_target <= 0 || target_length <= max_span_target));
       
       if (max_length <= 0 || (source_length <= max_length && target_length <= max_length))
 	if (max_fertility <= 0 || fertility(source_length, target_length) < max_fertility) {
@@ -551,10 +559,10 @@ struct ExtractSCFG
 	rule_pair_list.clear();
 	sentential_pair_list.clear();
 	
-	span_pair_set_type::const_iterator niter_end = spans_unique.end();
+	span_pair_set_type::const_iterator niter_end = (exhaustive ? spans.end() : spans_unique.end());
 	
 	// first non-terminal...
-	for (span_pair_set_type::const_iterator niter1 = spans_unique.begin(); niter1 != niter_end; ++ niter1) 
+	for (span_pair_set_type::const_iterator niter1 = (exhaustive ? spans.begin() : spans_unique.begin()); niter1 != niter_end; ++ niter1) 
 	  if (*iter != *niter1
 	      && (min_hole <= 1 || (niter1->source.second - niter1->source.first) >= min_hole)
 	      && is_parent(iter->source, niter1->source)
@@ -563,6 +571,7 @@ struct ExtractSCFG
 	    const int source_count1 = alignment_count_source[niter1->source.second] - alignment_count_source[niter1->source.first];
 	    //const int target_count1 = alignment_count_target[niter1->target.second] - alignment_count_target[niter1->target.first];
 	    
+	    // minimum constraint
 	    if (source_count1 == source_count) continue;
 	    
 	    const int source_length1 = source_length - (niter1->source.second - niter1->source.first);
@@ -594,6 +603,7 @@ struct ExtractSCFG
 		const int source_count2 = alignment_count_source[niter2->source.second] - alignment_count_source[niter2->source.first];
 		//const int target_count2 = alignment_count_target[niter2->target.second] - alignment_count_target[niter2->target.first];
 		
+		// minimum constraint
 		if (source_count == source_count1 + source_count2) continue;
 		
 		const int source_length2 = source_length1 - (niter2->source.second - niter2->source.first);
@@ -611,7 +621,6 @@ struct ExtractSCFG
 		      sentential_pair_list.push_back(rule_pair);
 		    }
 		  }
-
 		
 		if (ternary)
 		  for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
@@ -629,6 +638,7 @@ struct ExtractSCFG
 		      const int source_count3 = alignment_count_source[niter3->source.second] - alignment_count_source[niter3->source.first];
 		      //const int target_count3 = alignment_count_target[niter3->target.second] - alignment_count_target[niter3->target.first];
 		      
+		      // minimum constraint
 		      if (source_count == source_count1 + source_count2 + source_count3) continue;
 		      
 		      const int source_length3 = source_length2 - (niter3->source.second - niter3->source.first);
@@ -1119,15 +1129,17 @@ struct Task
        const path_type& __output,
        const int max_length,
        const int max_fertility,
-       const int max_span,
+       const int max_span_source,
+       const int max_span_target,
        const int min_hole,
+       const bool exhaustive,
        const bool ternary,
        const bool sentential,
        const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_length, max_fertility, max_span, min_hole, ternary, sentential, inverse),
+      extractor(max_length, max_fertility, max_span_source, max_span_target, min_hole, exhaustive, ternary, sentential, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

@@ -34,8 +34,10 @@ path_type output_file;
 
 int max_length = 7;
 int max_fertility = 10;
-int max_span = 15;
+int max_span_source = 15;
+int max_span_target = 20;
 int min_hole = 1;
+bool exhaustive = false;
 bool ternary = false;
 bool sentential = false;
 bool inverse = false;
@@ -77,7 +79,7 @@ int main(int argc, char** argv)
     utils::resource start_extract;
     
     queue_type queue(1024 * threads);
-    task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_span, min_hole, ternary, sentential, inverse, max_malloc));
+    task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility, max_span_source, max_span_target, min_hole, exhaustive, ternary, sentential, inverse, max_malloc));
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -171,13 +173,15 @@ void options(int argc, char** argv)
     
     ("output",    po::value<path_type>(&output_file),    "output directory")
     
-    ("max-length",    po::value<int>(&max_length)->default_value(max_length),       "maximum terminal length")
-    ("max-fertility", po::value<int>(&max_fertility)->default_value(max_fertility), "maximum terminal fertility ratio")
-    ("max-span",      po::value<int>(&max_span)->default_value(max_span),           "maximum span for rule")
-    ("min-hole",      po::value<int>(&min_hole)->default_value(min_hole),           "minimum hole for antecedent non-terminals")
-    ("ternary",       po::bool_switch(&ternary),                                    "extract ternary rules")
-    ("sentential",    po::bool_switch(&sentential),                                 "extract sentential rules")
-    ("inverse",       po::bool_switch(&inverse),                                    "inversed word alignment")
+    ("max-length",      po::value<int>(&max_length)->default_value(max_length),           "maximum terminal length")
+    ("max-fertility",   po::value<int>(&max_fertility)->default_value(max_fertility),     "maximum terminal fertility ratio")
+    ("max-span-source", po::value<int>(&max_span_source)->default_value(max_span_source), "maximum source span for rule")
+    ("max-span-target", po::value<int>(&max_span_target)->default_value(max_span_target), "maximum target span for rule")
+    ("min-hole",        po::value<int>(&min_hole)->default_value(min_hole),               "minimum hole for antecedent non-terminals")
+    ("exhaustive",      po::bool_switch(&exhaustive),                                     "exhaustive extraction by considering all holes")
+    ("ternary",         po::bool_switch(&ternary),                                        "extract ternary rules")
+    ("sentential",      po::bool_switch(&sentential),                                     "extract sentential rules")
+    ("inverse",         po::bool_switch(&inverse),                                        "inversed word alignment")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ("threads",    po::value<int>(&threads),       "# of threads")
