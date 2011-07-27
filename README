@@ -36,6 +36,7 @@ After the hypergraph generation, you can:
       * cicada implementes cube-pruning [4], cube-growing [4], incremental [18]
         and exact (and stateless-inside-algorithm) methods
       * cube-growing employs coarse-heuristics [11], such as lower-order ngrams etc.
+      * cube-pruning implements algorithm 2 of faster cube pruning [31].
    - Perform variational decoding for hypergraph [10].
    - Perform MBR decoding for hypergraph [12].
       * Above two computations rely on expected ngram-counts over forest [13].
@@ -464,3 +465,12 @@ References:
   pages =    {1871--1874}
 }
 
+[31]
+@inproceedings{iwslt10:TP:gesmundo,
+  author = {Andrea Gesmundo and James Henderson},
+  editor = {Marcello Federico and Ian Lane and Michael Paul and Fran\c{c}ois Yvon},
+  title = {{Faster Cube Pruning}},
+  booktitle = {Proceedings of the seventh International Workshop on Spoken Language Translation (IWSLT)},
+  year = {2010},
+  pages = {267--274},
+  location = {Paris, France}
