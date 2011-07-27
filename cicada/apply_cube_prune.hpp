@@ -401,7 +401,49 @@ namespace cicada
 #endif
 #if 1
       //
-      // Faster Cube Pruning
+      // Faster Cube Pruning: Algorithm 2
+      //
+      // @inproceedings{iwslt10:TP:gesmundo,
+      //   author = {Andrea Gesmundo and James Henderson},
+      //   editor = {Marcello Federico and Ian Lane and Michael Paul and Fran\c{c}ois Yvon},
+      //   title = {{Faster Cube Pruning}},
+      //   booktitle = {Proceedings of the seventh International Workshop on Spoken Language Translation (IWSLT)},
+      //   year = {2010},
+      //   pages = {267--274},
+      //   location = {Paris, France}
+      //
+      // original cube-pruning
+      candidate_type query(candidate.j);
+      
+      query.in_edge = candidate.in_edge;
+      index_set_type& j = query.j;
+      
+      size_type inserted = 0;
+      for (size_t i = 0; i != candidate.j.size(); ++ i) {
+	
+	++ j[i];
+	
+	if (j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size())) {
+	  // new candidate...
+	  const candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
+	  
+	  cand.push(candidate_new);
+	  
+	  ++ inserted;
+	}
+	
+	if (candidate.j[i] != 0) break;
+	
+	-- j[i];
+      }
+      
+      //std::cerr << "inserted: " << inserted << std::endl;
+      
+      return inserted;      
+#endif
+#if 0
+      //
+      // Faster Cube Pruning: Algorithm 3
       //
       // @inproceedings{iwslt10:TP:gesmundo,
       //   author = {Andrea Gesmundo and James Henderson},
