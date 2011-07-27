@@ -90,7 +90,7 @@ Remarks on SCFG: (I don't know the default for Joshua... anybody has any clue?)
 
 	The Hiero-style extraction from Chiang (2007) will be:
 
-	--max-span-source 15
+	--max-span-source 10
 	--max-span-target 0
 	--min-hole-source 2
 	--min-hole-target 1
