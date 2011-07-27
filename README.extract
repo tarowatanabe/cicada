@@ -8,7 +8,7 @@ We support various phrase/rule/tree extraction. Basically, we will run in two st
    They can operate similarly with underlying extraction specific map/reduce framework.
 
 You can try "cicada-extract.py" which runs like phrase-extract in Moses, but starting from step 4 (and 6).
-For details, see the last part of this document. It is recommended to specify TMPDIR or TMPDIR_SPEC pointing to 
+It is recommended to specify TMPDIR_SPEC (or TMPDIR) pointing to 
 a large "local" storage for efficient extraction. In NICT, you can exploit local disc on running machines
 (and cluster machines):
 
@@ -77,90 +77,31 @@ Following filers are implemented:
    cicada_filter_extract_ghkm:
 	Dump in cicada format for tree-to-string, string-to-tree, tree-to-tree.
 
-Usage: cicada-extract.py [options]
+Remarks on SCFG: (I don't know the default for Joshua... anybody has any clue?)
+	If you want to simulate the Moses-style hierarchical rule, you can use "cicada-extract.py" with options:
+	
+	--max-span-source 15
+	--max-span-target 15
+	--min-hole-source 2
+	--min-hole-target 1
+	--max-length 5
+	--max-fertility 0
+	--exhaustive
 
-Options:
+	The Hiero-style extraction from Chiang (2007) will be:
 
-Directory setup:
-  --root-dir=DIRECTORY  root directory for outputs
-  --corpus-dir=PREFIX   corpus directory (default: ${root_dir}/corpus)
-  --giza-f2e=DIRECTORY  giza directory for P(f|e) (default: ${root_dir}/giza.${f}-${e})
-  --giza-e2f=DIRECTORY  giza directory for P(e|f) (default: ${root_dir}/giza.${e}-${f})
-  --model-dir=DIRECTORY
-                        model directory (default: ${root_dir}/model)
-  --alignment-dir=DIRECTORY
-                        alignment directory (default: ${model_dir})
-  --lexical-dir=DIRECTORY
-                        lexical transltion table directory (default: ${model_dir})
+	--max-span-source 15
+	--max-span-target 0
+	--min-hole-source 2
+	--min-hole-target 1
+	--max-length 5(?)
+	--max-fertility 0
 
-Corpus suffix options:
-  --f=SUFFIX            source (or 'French')  language suffix for training corpus
-  --e=SUFFIX            target (or 'English') language suffix for training corpus
-  --sf=SUFFIX           source (or 'French')  span suffix for training corpus
-  --se=SUFFIX           target (or 'English') span suffix for training corpus
-  --ff=SUFFIX           source (or 'French')  forest suffix for training corpus
-  --fe=SUFFIX           target (or 'English') forest suffix for training corpus
+	Our default:
 
-Corpus: (we will differentiate various data by the suffix above)
-  --corpus=CORPUS       bilingual trainging corpus
-
-Alignment data: (we will use the alignment data located at ${model_dir}/aligned.${alignment})
-  --alignment=ALIGNMENT
-                        alignment methods (default: grow-diag-final-and)
-
-Steps:
-  --first-step=STEP     first step (default: 5)
-  --last-step=STEP      last step  (default: 6)
-
-Dirichlet prior parameter for Lexical model learning:
-  --lexicon-prior=PRIOR
-                        lexicon model prior (default: 0.1)
-
-Extraction algorithms:
-  --phrase              extract phrase
-  --scfg                extract SCFG
-  --ghkm                extract GHKM (tree-to-string)
-  --tree                extract tree-to-tree
-
-Default non-terminal for GHKM/Tree-to-tree extraction
-  --non-terminal=NON_TERMINAL
-                        default non-terminal for GHKM rule (default: [x])
-
-Parameters for extraction:
-  --max-span=LENGTH     maximum span size (default: 15)
-  --min-hole=LENGTH     minimum hole size (default: 1)
-  --max-length=LENGTH   maximum terminal length (default: 7)
-  --max-fertility=FERTILITY
-                        maximum terminal fertility (default: 4)
-  --max-nodes=NODES     maximum rule nodes (default: 15)
-  --max-height=HEIGHT   maximum rule height (default: 4)
-  --exhaustive          exhaustive extraction in GHKM and Tree
-  --constrained         constrained extraction in GHKM and Tree
-  --ternary             extract ternary rule
-
-Max memory allocation:
-  --max-malloc=MALLOC   maximum memory in GB (default: 8)
-
-Directories:
-  --toolkit-dir=DIRECTORY
-                        toolkit directory
-  --mpi-dir=DIRECTORY   MPI directory
-
-MPI options: (if one of mpi/mpi-host/mpi-host-file is set, we will run by MPI)
-  --mpi=MPI             # of processes for MPI-based parallel processing.
-                        Identical to --np for mpirun
-  --mpi-host=HOSTS      list of hosts to run job. Identical to --host for
-                        mpirun
-  --mpi-host-file=FILE  host list file to run job. Identical to --hostfile for
-                        mpirun
-Threading option: (for non-MPI applications)
-  --threads=THREADS     # of thrads for thread-based parallel processing
-
-Running on cluster using PBS Pro batch job scheduler:
-  --pbs                 PBS for launching processes
-  --pbs-queue=NAME      PBS queue for launching processes (default: ltg)
-
-Others:
-  --debug=DEBUG         
-  -h, --help            show this help message and exit
-
+	--max-span-source 15
+	--max-span-target 20
+	--min-hole-source 1
+	--min-hole-target 1
+	--max-length 7
+	--max-fertility 4

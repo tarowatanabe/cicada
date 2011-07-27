@@ -42,7 +42,8 @@ int max_length = 7;
 int max_fertility = 10;
 int max_span_source = 15;
 int max_span_target = 20;
-int min_hole = 1;
+int min_hole_source = 1;
+int min_hole_target = 1;
 bool exhaustive = false;
 bool ternary = false;
 bool sentential = false;
@@ -115,7 +116,10 @@ int main(int argc, char** argv)
     static const size_t queue_size = 256;
     
     queue_type queue(queue_size);
-    task_type task(queue, output_file, max_length, max_fertility, max_span_source, max_span_target, min_hole, exhaustive, ternary, sentential, inverse, max_malloc);
+    task_type task(queue, output_file, max_length, max_fertility,
+		   max_span_source, max_span_target,
+		   min_hole_source, min_hole_target,
+		   exhaustive, ternary, sentential, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
     if (mpi_rank == 0) {
@@ -334,7 +338,8 @@ void options(int argc, char** argv)
     ("max-fertility",   po::value<int>(&max_fertility)->default_value(max_fertility),     "maximum terminal fertility ratio")
     ("max-span-source", po::value<int>(&max_span_source)->default_value(max_span_source), "maximum source span for rule")
     ("max-span-target", po::value<int>(&max_span_target)->default_value(max_span_target), "maximum target span for rule")
-    ("min-hole",        po::value<int>(&min_hole)->default_value(min_hole),               "minimum hole for antecedent non-terminals")
+    ("min-hole-source", po::value<int>(&min_hole_source)->default_value(min_hole_source), "minimum hole for antecedent non-terminals")
+    ("min-hole-target", po::value<int>(&min_hole_target)->default_value(min_hole_target), "minimum hole for antecedent non-terminals")
     ("exhaustive",      po::bool_switch(&exhaustive),                                     "exhaustive extraction by considering all holes")
     ("ternary",         po::bool_switch(&ternary),                                        "extract ternary rules")
     ("sentential",      po::bool_switch(&sentential),                                     "extract sentential rules")

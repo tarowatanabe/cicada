@@ -81,8 +81,10 @@ opt_parser = OptionParser(
                 metavar="LENGTH", help="maximum source span size (default: 15)"),
     make_option("--max-span-target", default=20, action="store", type="int",
                 metavar="LENGTH", help="maximum target span size (default: 20)"),
-    make_option("--min-hole", default=1, action="store", type="int",
-                metavar="LENGTH", help="minimum hole size (default: 1)"),
+    make_option("--min-hole-source", default=1, action="store", type="int",
+                metavar="LENGTH", help="minimum source hole size (default: 1)"),
+    make_option("--min-hole-target", default=1, action="store", type="int",
+                metavar="LENGTH", help="minimum target hole size (default: 1)"),
     make_option("--max-length", default=7, action="store", type="int",
                 metavar="LENGTH", help="maximum terminal length (default: 7)"),
     make_option("--max-fertility", default=4, action="store", type="int",
@@ -473,7 +475,10 @@ class ExtractSCFG(Extract):
     
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
-                 max_length=7, max_fertility=4, max_span_source=15, max_span_target=20, min_hole=1, exhaustive=None, ternary=None, sentential=None,
+                 max_length=7, max_fertility=4,
+                 max_span_source=15, max_span_target=20,
+                 min_hole_source=1, min_hole_target=1,
+                 exhaustive=None, ternary=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -509,7 +514,8 @@ class ExtractSCFG(Extract):
         command += " --max-fertility %d" %(max_fertility)
         command += " --max-span-source %d"      %(max_span_source)
         command += " --max-span-target %d"      %(max_span_target)
-        command += " --min-hole %d"      %(min_hole)
+        command += " --min-hole-source %d"      %(min_hole_source)
+        command += " --min-hole-target %d"      %(min_hole_target)
         
         if exhaustive:
             command += " --exhaustive"
@@ -780,7 +786,8 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_fertility=options.max_fertility,
                               max_span_source=options.max_span_source,
                               max_span_target=options.max_span_target,
-                              min_hole=options.min_hole,
+                              min_hole_source=options.min_hole_source,
+                              min_hole_target=options.min_hole_target,
                               exhaustive=options.exhaustive,
                               ternary=options.ternary,
                               sentential=options.sentential,

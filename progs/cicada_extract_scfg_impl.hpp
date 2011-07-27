@@ -322,7 +322,8 @@ struct ExtractSCFG
 	      const int __max_fertility,
 	      const int __max_span_source,
 	      const int __max_span_target,
-	      const int __min_hole,
+	      const int __min_hole_source,
+	      const int __min_hole_target,
 	      const bool __exhaustive,
 	      const bool __ternary,
 	      const bool __sentential,
@@ -331,7 +332,8 @@ struct ExtractSCFG
       max_fertility(__max_fertility),
       max_span_source(__max_span_source),
       max_span_target(__max_span_target),
-      min_hole(__min_hole),
+      min_hole_source(__min_hole_source),
+      min_hole_target(__min_hole_target),
       exhaustive(__exhaustive),
       ternary(__ternary),
       sentential(__sentential),
@@ -341,7 +343,8 @@ struct ExtractSCFG
   int max_fertility;
   int max_span_source;
   int max_span_target;
-  int min_hole;
+  int min_hole_source;
+  int min_hole_target;
   bool exhaustive;
   bool ternary;
   bool sentential;
@@ -564,7 +567,8 @@ struct ExtractSCFG
 	// first non-terminal...
 	for (span_pair_set_type::const_iterator niter1 = (exhaustive ? spans.begin() : spans_unique.begin()); niter1 != niter_end; ++ niter1) 
 	  if (*iter != *niter1
-	      && (min_hole <= 1 || (niter1->source.second - niter1->source.first) >= min_hole)
+	      && (min_hole_source <= 1 || (niter1->source.second - niter1->source.first) >= min_hole_source)
+	      && (min_hole_target <= 1 || (niter1->target.second - niter1->target.first) >= min_hole_target)
 	      && is_parent(iter->source, niter1->source)
 	      && is_parent(iter->target, niter1->target)) {
 	    
@@ -593,7 +597,8 @@ struct ExtractSCFG
 	    // second non-terminal...
 	    for (span_pair_set_type::const_iterator niter2 = niter1 + 1; niter2 != niter_end; ++ niter2) 
 	      if (*iter != *niter2
-		  && (min_hole <= 1 || (niter2->source.second - niter2->source.first) >= min_hole)
+		  && (min_hole_source <= 1 || (niter2->source.second - niter2->source.first) >= min_hole_source)
+		  && (min_hole_target <= 1 || (niter2->target.second - niter2->target.first) >= min_hole_target)
 		  && is_parent(iter->source, niter2->source)
 		  && is_parent(iter->target, niter2->target)
 		  && is_disjoint(niter1->source, niter2->source)
@@ -625,7 +630,8 @@ struct ExtractSCFG
 		if (ternary)
 		  for (span_pair_set_type::const_iterator niter3 = niter2 + 1; niter3 != niter_end; ++ niter3) 
 		    if (*iter != *niter3
-			&& (min_hole <= 1 || (niter3->source.second - niter3->source.first) >= min_hole)
+			&& (min_hole_source <= 1 || (niter3->source.second - niter3->source.first) >= min_hole_source)
+			&& (min_hole_target <= 1 || (niter3->target.second - niter3->target.first) >= min_hole_target)
 			&& is_parent(iter->source, niter3->source)
 			&& is_parent(iter->target, niter3->target)
 			&& is_disjoint(niter1->source, niter3->source)
@@ -1131,7 +1137,8 @@ struct Task
        const int max_fertility,
        const int max_span_source,
        const int max_span_target,
-       const int min_hole,
+       const int min_hole_source,
+       const int min_hole_target,
        const bool exhaustive,
        const bool ternary,
        const bool sentential,
@@ -1139,7 +1146,10 @@ struct Task
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_length, max_fertility, max_span_source, max_span_target, min_hole, exhaustive, ternary, sentential, inverse),
+      extractor(max_length, max_fertility,
+		max_span_source, max_span_target, 
+		min_hole_source, min_hole_target,
+		exhaustive, ternary, sentential, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;
