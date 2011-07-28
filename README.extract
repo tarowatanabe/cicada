@@ -77,7 +77,7 @@ Following filers are implemented:
    cicada_filter_extract_ghkm:
 	Dump in cicada format for tree-to-string, string-to-tree, tree-to-tree.
 
-Remarks on SCFG: (I don't know the default for Joshua... anybody has any clue?)
+Remarks on SCFG: (I don't know the default for Joshua... any clues?)
 	If you want to simulate the Moses-style hierarchical rule, you can use "cicada-extract.py" with options:
 	
 	--max-span-source 15
