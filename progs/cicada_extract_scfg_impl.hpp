@@ -637,9 +637,9 @@ struct ExtractSCFG
       rule_pair_list_type::const_iterator riter_end = rule_pair_list.end();
       for (rule_pair_list_type::const_iterator riter = rule_pair_list.begin(); riter != riter_end; ++ riter)
 	const_cast<rule_pair_type&>(*(rule_pairs.insert(*riter).first)).count += count;
+
+      dumper(rule_pairs);
     }
-    
-    dumper(rule_pairs);
   }
 
   template <typename Category, typename Dumper>
@@ -773,9 +773,9 @@ struct ExtractSCFG
 	  const_cast<rule_pair_type&>(*(rule_pairs.insert(*riter).first)).count += count;
 	
 	rule_pair_list.clear();
+
+	dumper(rule_pairs);
       }
-      
-      dumper(rule_pairs);
     }
   }
   
