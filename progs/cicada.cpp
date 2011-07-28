@@ -15,6 +15,7 @@
 #include "utils/lockfree_list_queue.hpp"
 #include "utils/lexical_cast.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/bithack.hpp"
 
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
@@ -47,6 +48,8 @@ bool feature_list = false;
 op_set_type ops;
 bool op_list = false;
 
+int threads = 1;
+
 int debug = 0;
 
 
@@ -77,6 +80,8 @@ int main(int argc, char ** argv)
       std::cout << tree_grammar_type::lists();
       return 0;
     }
+    
+    threads = utils::bithack::max(1, threads);
 
     // read grammars...
     grammar_type grammar(grammar_files.begin(), grammar_files.end());
@@ -226,8 +231,9 @@ void options(int argc, char** argv)
 
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("config", po::value<path_type>(), "configuration file")
-    ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
+    ("config",  po::value<path_type>(),                    "configuration file")
+    ("threads", po::value<int>(&threads),                  "# of threads (highly experimental)")
+    ("debug",   po::value<int>(&debug)->implicit_value(1), "debug level")
     ("help", "help message");
 
   po::options_description opts_deprecated("deprecated options");
