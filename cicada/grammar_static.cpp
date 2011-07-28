@@ -138,7 +138,7 @@ namespace cicada
     typedef std::vector<score_set_type, std::allocator<score_set_type> > score_db_type;
     
     // caching...
-    typedef utils::arc_list<size_type, rule_pair_set_type, 16,
+    typedef utils::arc_list<size_type, rule_pair_set_type, 8,
 			    std::equal_to<size_type>,
 			    std::allocator<std::pair<size_type, rule_pair_set_type> > > cache_rule_set_type;
 
