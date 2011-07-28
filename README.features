@@ -24,13 +24,22 @@ antecedent: sparse features assigned two-level non-terminals, delimited terminal
 bleu: bleu score
 blue-linear: linear bleu score
 bleu-expected: expected bleu score (You need to compute expected counts before this feature application)
+bleu-multi: multiple bleu score feature
 neighbours: sparse features assigned for non-terminal, its neighboring words and span-size
 ngram: ngram langauge model feature. You can assign multiple LM by defining name=<feature-name> option.
 ngram-tree: sparse featuers assigned for non-terminal path for boundaries.
 parent:  rule (itself) and rule with its parent category
 permute: permutation feature (we assume tree is permuted via "permute" operation)
+rule-shape: rule-shape feature, which book keep the permuted non-terminal + terminal
+sgml-tag: SGML tag feature
 span: span feature
+sparse-lexicon: sparse lexicon feature
+sparse-ngram: sparse ngram feature
 variational: features for variational decoding
+vocabulary: in-vocabulary feature
+arity-penalty: arity penalty feature
+glue-tree-penalty: glue-tree penalty
+non-latin-penalty: non-latin penalty
 word-penalty: simply count # of words
 rule-penalty: simply count # of rules
 
