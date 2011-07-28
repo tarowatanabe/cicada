@@ -313,8 +313,9 @@ namespace cicada
       if (graphviz || yield_graphviz)
 	no_id = true;
       
-      if (lattice_mode && forest_mode)
+      if (lattice_mode && forest_mode && graphviz)
 	throw std::runtime_error("only one of lattice or forest can be dumped");
+      
       if (int(lattice_mode) + forest_mode == 0)
 	forest_mode = true;
     }
@@ -390,7 +391,9 @@ namespace cicada
 	       << id << " ||| lattice-num-epsilon: " << num_epsilon << '\n'
 	       << id << " ||| lattice-shortest-distance: " << data.lattice.shortest_distance() << '\n'
 	       << id << " ||| lattice-longest-distance: "  << data.lattice.longest_distance() << '\n';
-	} else {
+	}
+	
+	if (forest_mode) {
 	  std::vector<shortest_length_function::value_type, std::allocator<shortest_length_function::value_type> > lengths_shortest(data.hypergraph.nodes.size());
 	  std::vector<longest_length_function::value_type, std::allocator<longest_length_function::value_type> >   lengths_longest(data.hypergraph.nodes.size());
 	    
@@ -422,9 +425,12 @@ namespace cicada
       } else if (kbest_size <= 0) {	
 	if (! no_id)
 	  os << id << " ||| ";
-	if (lattice_mode)
+	if (lattice_mode && forest_mode)
+	  os << data.lattice << " ||| "
+	     << hypergraph << '\n';
+	else if (lattice_mode)
 	  os << data.lattice << '\n';
-	else
+	else 
 	  os << hypergraph << '\n';
       } else {
 	const weight_set_type* weights_kbest = (weights_assigned ? weights_assigned : &(weights->weights));
