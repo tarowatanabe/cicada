@@ -565,7 +565,8 @@ struct ExtractTree
 	derivations_new[id].range = node.range;
 	
 	candidates.clear();
-	cand_unique.clear();
+	// we will use Algorithm 2 of faster cube-pruning
+	//cand_unique.clear();
 	
 	cand.clear();
 	cand.reserve(node.edges.size() * 100);
@@ -578,7 +579,8 @@ struct ExtractTree
 	  candidates.push_back(candidate_type(edge, j, false));
 	  
 	  cand.push(&candidates.back());
-	  cand_unique.insert(&candidates.back());
+	  // we will use Algorithm 2 of faster cube-pruning
+	  //cand_unique.insert(&candidates.back());
 	}
 	
 	while (! cand.empty()) {
@@ -606,7 +608,9 @@ struct ExtractTree
 	    if (! derivations[edge.tails[i]].edges.empty()) {
 	      ++ j[i];
 	      
-	      if (j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size()) && cand_unique.find(&query) == cand_unique.end()) {
+	      // we will use Algorithm 2 of faster cube-pruning
+	      // no checking:  && cand_unique.find(&query) == cand_unique.end()
+	      if (j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size())) {
 		edges_new.clear();
 		tails_new.clear();
 		
@@ -624,18 +628,21 @@ struct ExtractTree
 		  if (max_height <= 0 || rule_stat.first <= max_height) {
 		    candidates.push_back(candidate_type(edge, j, true));
 		    
-		    candidate_type& item = candidates.back();
+		    candidate_type& item_next = candidates.back();
 		    
-		    item.edge_composed.edges = edges_new;
-		    item.edge_composed.tails = tails_new;
-		    item.edge_composed.height = rule_stat.first;
-		    item.edge_composed.internal = rule_stat.second;
+		    item_next.edge_composed.edges = edges_new;
+		    item_next.edge_composed.tails = tails_new;
+		    item_next.edge_composed.height = rule_stat.first;
+		    item_next.edge_composed.internal = rule_stat.second;
 		    
-		    cand.push(&item);
-		    cand_unique.insert(&item);
+		    cand.push(&item_next);
+		    // we will use Algorithm 2 of faster cube-pruning
+		    //cand_unique.insert(&item_next);
 		  }
 		}
 	      }
+	      
+	      if (item->j[i] != 0) break;
 	      
 	      -- j[i];
 	    }
