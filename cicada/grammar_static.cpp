@@ -221,12 +221,6 @@ namespace cicada
       caching = false;
     }
     
-    size_type find(const word_type& word) const
-    {
-      size_type node = 0;
-      return find(word, node);
-    }
-    
     size_type find(const word_type& word, size_type node) const
     {
       if (caching && word.is_non_terminal()) {
@@ -242,21 +236,6 @@ namespace cicada
 	const word_type::id_type id = vocab[word];
 	return rule_db.find(&id, 1, node);
       }
-    }
-    
-    template <typename Iterator>
-    size_type find(Iterator first, Iterator last) const
-    {
-      size_type node = 0;
-      return find(first, last, node);
-    }
-    
-    template <typename Iterator>
-    size_type find(Iterator first, Iterator last, size_type node) const
-    {
-      for (/**/; first != last && is_valid(node); ++ first)
-	node = find(*first, node);
-      return node;
     }
     
     // valid implies that you can continue searching from node...
