@@ -45,6 +45,7 @@ int max_span_target = 20;
 int min_hole_source = 1;
 int min_hole_target = 1;
 bool exhaustive = false;
+bool constrained = false;
 bool ternary = false;
 bool sentential = false;
 bool inverse = false;
@@ -119,7 +120,7 @@ int main(int argc, char** argv)
     task_type task(queue, output_file, max_length, max_fertility,
 		   max_span_source, max_span_target,
 		   min_hole_source, min_hole_target,
-		   exhaustive, ternary, sentential, inverse, max_malloc);
+		   exhaustive, constrained, ternary, sentential, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
     if (mpi_rank == 0) {
@@ -341,6 +342,7 @@ void options(int argc, char** argv)
     ("min-hole-source", po::value<int>(&min_hole_source)->default_value(min_hole_source), "minimum hole for antecedent non-terminals")
     ("min-hole-target", po::value<int>(&min_hole_target)->default_value(min_hole_target), "minimum hole for antecedent non-terminals")
     ("exhaustive",      po::bool_switch(&exhaustive),                                     "exhaustive extraction by considering all holes")
+    ("constrained",     po::bool_switch(&constrained),                                    "constrained initial phrases")
     ("ternary",         po::bool_switch(&ternary),                                        "extract ternary rules")
     ("sentential",      po::bool_switch(&sentential),                                     "extract sentential rules")
     ("inverse",         po::bool_switch(&inverse),                                        "inversed word alignment")

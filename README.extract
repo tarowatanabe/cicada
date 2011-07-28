@@ -86,6 +86,7 @@ Remarks on SCFG: (I don't know the default for Joshua... anybody has any clue?)
 	--min-hole-target 1
 	--max-length 5
 	--max-fertility 0
+	--constrained
 	--exhaustive
 
 	The Hiero-style extraction from Chiang (2007) will be:
@@ -96,6 +97,7 @@ Remarks on SCFG: (I don't know the default for Joshua... anybody has any clue?)
 	--min-hole-target 1
 	--max-length 5(?)
 	--max-fertility 0
+	--constrained
 
 	Our default:
 

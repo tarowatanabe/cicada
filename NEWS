@@ -2,6 +2,9 @@
 Use of Algorihm 2 of Faster Cube Pruning which completely eliminates parent book-keeping
 Added more human-loop-unrolling in hmm code
 Added convex-hull computer, which will answer a question, "If this feature scaling were set to ..., your BLEU were ...%."
+Bugfix for minimum alignment constraint: when checking with more non-terminals, it was too-constrained
+Differentiated max-span for source/target and min-hole for source/target
+   I'm not sure whether it is worthwhile to completely simulate Hiero-rules. At least, I can say that there's small difference.
 
 2011-7-12
 Better caching for sparse-{lexicon,ngram},rule-shape features

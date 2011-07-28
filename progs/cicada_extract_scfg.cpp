@@ -39,6 +39,7 @@ int max_span_target = 20;
 int min_hole_source = 1;
 int min_hole_target = 1;
 bool exhaustive = false;
+bool constrained = false;
 bool ternary = false;
 bool sentential = false;
 bool inverse = false;
@@ -81,9 +82,9 @@ int main(int argc, char** argv)
     
     queue_type queue(1024 * threads);
     task_set_type tasks(threads, task_type(queue, output_file, max_length, max_fertility,
-					   max_span_source, max_span_target
-					   , min_hole_source, min_hole_target,
-					   exhaustive, ternary, sentential, inverse, max_malloc));
+					   max_span_source, max_span_target,
+					   min_hole_source, min_hole_target,
+					   exhaustive, constrained, ternary, sentential, inverse, max_malloc));
     boost::thread_group workers;
     for (int i = 0; i != threads; ++ i)
       workers.add_thread(new boost::thread(boost::ref(tasks[i])));
@@ -183,6 +184,7 @@ void options(int argc, char** argv)
     ("max-span-target", po::value<int>(&max_span_target)->default_value(max_span_target), "maximum target span for rule")
     ("min-hole-source", po::value<int>(&min_hole_source)->default_value(min_hole_source), "minimum hole for antecedent non-terminals")
     ("min-hole-target", po::value<int>(&min_hole_target)->default_value(min_hole_target), "minimum hole for antecedent non-terminals")
+    ("constrained",     po::bool_switch(&constrained),                                    "constrained initial phrases")
     ("exhaustive",      po::bool_switch(&exhaustive),                                     "exhaustive extraction by considering all holes")
     ("ternary",         po::bool_switch(&ternary),                                        "extract ternary rules")
     ("sentential",      po::bool_switch(&sentential),                                     "extract sentential rules")

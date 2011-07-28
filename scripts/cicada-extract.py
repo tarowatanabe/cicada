@@ -94,9 +94,9 @@ opt_parser = OptionParser(
     make_option("--max-height", default=4, action="store", type="int",
                 metavar="HEIGHT", help="maximum rule height (default: 4)"),
     make_option("--exhaustive", default=None, action="store_true",
-                help="exhaustive extraction in GHKM and Tree"),
+                help="exhaustive extraction in SCFG, GHKM and Tree"),
     make_option("--constrained", default=None, action="store_true",
-                help="constrained extraction in GHKM and Tree"),
+                help="constrained extraction in SCFG, GHKM and Tree"),
     
     make_option("--ternary", default=None, action="store_true",
                 help="extract ternary rule"),
@@ -478,7 +478,7 @@ class ExtractSCFG(Extract):
                  max_length=7, max_fertility=4,
                  max_span_source=15, max_span_target=20,
                  min_hole_source=1, min_hole_target=1,
-                 exhaustive=None, ternary=None, sentential=None,
+                 exhaustive=None, constrained=None, ternary=None, sentential=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
                  debug=None):
         Extract.__init__(self, max_malloc, threads, mpi, pbs, model_dir)
@@ -519,6 +519,8 @@ class ExtractSCFG(Extract):
         
         if exhaustive:
             command += " --exhaustive"
+        if constrained:
+            command += " --constrained"
         if ternary:
             command += " --ternary"
         if sentential:
