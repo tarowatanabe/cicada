@@ -670,6 +670,9 @@ void learn(const int iteration,
       atable_target_source += learners[i].atable_counts_target_source;
     }
     
+    atable_source_target.estimate_unk();
+    atable_target_source.estimate_unk();
+    
     for (size_t i = 0; i != learners.size(); ++ i) {
       learners[i].atable_source_target = atable_source_target;
       learners[i].atable_target_source = atable_target_source;

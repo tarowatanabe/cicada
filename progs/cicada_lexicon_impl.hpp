@@ -86,6 +86,13 @@ struct atable_type
 
     difference_map_type() : positives(), negatives() {}
 
+    difference_map_type& operator+=(const difference_map_type& x)
+    {
+      for (index_type i = x.min(); i <= x.max(); ++ i)
+	operator[](i) += x[i];
+      return *this;
+    }
+
     count_type& operator[](const index_type& diff)
     {
       const size_type pos = utils::bithack::branch(diff >= 0, diff, - diff - 1);
@@ -114,6 +121,7 @@ struct atable_type
     
     index_type min() const { return - negatives.size(); }
     index_type max() const { return positives.size() - 1; }
+
     
     difference_set_type positives;
     difference_set_type negatives;
@@ -227,6 +235,42 @@ struct atable_type
     std::swap(prior,  x.prior);
     std::swap(smooth, x.smooth);
   }
+
+  void estimate_unk()
+  {
+    difference_map_type atable_source_target;
+    count_dict_type atable_source;
+    count_dict_type atable_target;
+    
+    count_dict_type::const_iterator aiter_end = atable.end();
+    for (count_dict_type::const_iterator aiter = atable.begin(); aiter != aiter_end; ++ aiter) {
+      const class_pair_type& pair = aiter->first;
+
+      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS)
+	atable_source[class_pair_type(vocab_type::UNK, pair.second)] += aiter->second;
+      
+      if (pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
+	atable_target[class_pair_type(pair.first, vocab_type::UNK)] += aiter->second;
+      
+      if (pair.first != vocab_type::BOS && pair.first != vocab_type::EOS
+	  && pair.second != vocab_type::BOS && pair.second != vocab_type::EOS)
+	atable_source_target += aiter->second;
+    }
+    
+    
+    {
+      count_dict_type::const_iterator aiter_end = atable_source.end();
+      for (count_dict_type::const_iterator aiter = atable_source.begin(); aiter != aiter_end; ++ aiter)
+	atable[aiter->first] = aiter->second;
+    }
+    {
+      count_dict_type::const_iterator aiter_end = atable_target.end();
+      for (count_dict_type::const_iterator aiter = atable_target.begin(); aiter != aiter_end; ++ aiter)
+	atable[aiter->first] = aiter->second;
+    }
+    
+    atable[class_pair_type(vocab_type::UNK, vocab_type::UNK)] = atable_source_target;
+  }
   
   void initialize()
   {
@@ -242,12 +286,9 @@ struct atable_type
   atable_type& operator+=(const atable_type& x)
   {
     count_dict_type::const_iterator aiter_end = x.atable.end();
-    for (count_dict_type::const_iterator aiter = x.atable.begin(); aiter != aiter_end; ++ aiter) {
-      mapped_type& mapped = atable[aiter->first];
-      
-      for (index_type i = aiter->second.min(); i <= aiter->second.max(); ++ i)
-	mapped[i] += aiter->second[i];
-    }
+    for (count_dict_type::const_iterator aiter = x.atable.begin(); aiter != aiter_end; ++ aiter)
+      atable[aiter->first] += aiter->second;
+    
     return *this;
   }
   
