@@ -399,7 +399,7 @@ namespace cicada
       
       return inserted;
 #endif
-#if 0
+#if 1
       //
       // Faster Cube Pruning: Algorithm 2
       //
@@ -441,7 +441,7 @@ namespace cicada
       
       return inserted;      
 #endif
-#if 1
+#if 0
       //
       // Faster Cube Pruning: Algorithm 3
       //
