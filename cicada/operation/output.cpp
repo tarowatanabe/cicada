@@ -426,12 +426,13 @@ namespace cicada
 	if (! no_id)
 	  os << id << " ||| ";
 	if (lattice_mode && forest_mode)
-	  os << data.lattice << " ||| "
-	     << hypergraph << '\n';
+	  os << data.lattice << " ||| " << hypergraph;
 	else if (lattice_mode)
-	  os << data.lattice << '\n';
+	  os << data.lattice;
 	else 
-	  os << hypergraph << '\n';
+	  os << hypergraph;
+	
+	os << '\n';
       } else {
 	const weight_set_type* weights_kbest = (weights_assigned ? weights_assigned : &(weights->weights));
 	
