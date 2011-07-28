@@ -18,7 +18,6 @@
 #include "utils/compress_stream.hpp"
 #include "utils/tempfile.hpp"
 #include "utils/group_aligned_code.hpp"
-#include "utils/byte_aligned_code.hpp"
 #include "utils/simple_vector.hpp"
 #include "utils/array_power2.hpp"
 #include "utils/arc_list.hpp"
