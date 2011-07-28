@@ -149,7 +149,7 @@ namespace cicada
     
     // caching...
     
-    typedef utils::arc_list<size_type, rule_pair_set_type, 16,
+    typedef utils::arc_list<size_type, rule_pair_set_type, 8,
 			    std::equal_to<size_type>,
 			    std::allocator<std::pair<size_type, rule_pair_set_type> > > cache_rule_pair_set_type;
     
