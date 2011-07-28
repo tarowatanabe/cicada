@@ -362,6 +362,20 @@ struct MapStdout
     if (input_directory_mode) {
       std::string line;
       
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_input = path / file_name;
+	
+	if (! boost::filesystem::exists(path_input)) break;
+	
+	utils::compress_istream is(path_input, 1024 * 1024);
+	
+	if (std::getline(is, line))
+	  queue.push(std::make_pair(line, false));
+      }
+      
+#if 0
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(path); iter != iter_end; ++ iter) {
 	utils::compress_istream is(*iter, 1024 * 1024);
@@ -369,6 +383,7 @@ struct MapStdout
 	if (std::getline(is, line))
 	  queue.push(std::make_pair(line, false));
       }
+#endif
       
     } else {
       size_t id = 0;

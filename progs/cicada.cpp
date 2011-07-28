@@ -12,8 +12,12 @@
 
 #include "utils/program_options.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/lockfree_list_queue.hpp"
+#include "utils/lexical_cast.hpp"
+#include "utils/filesystem.hpp"
 
 #include <boost/program_options.hpp>
+#include <boost/thread.hpp>
 
 typedef std::string op_type;
 typedef std::vector<op_type, std::allocator<op_type> > op_set_type;
@@ -123,6 +127,22 @@ int main(int argc, char ** argv)
     if (input_directory_mode) {
       std::string line;
       
+      for (size_t i = 0; /**/; ++ i) {
+	const std::string file_name = utils::lexical_cast<std::string>(i) + ".gz";
+	
+	const path_type path_input = input_file / file_name;
+	
+	if (! boost::filesystem::exists(path_input)) break;
+	
+	utils::compress_istream is(path_input, 1024 * 1024);
+	
+	if (std::getline(is, line)) {
+	  operations(line);
+	  operations.clear();
+	}
+      }
+      
+#if 0
       boost::filesystem::directory_iterator iter_end;
       for (boost::filesystem::directory_iterator iter(input_file); iter != iter_end; ++ iter) {
 	utils::compress_istream is(*iter, 1024 * 1024);
@@ -132,6 +152,7 @@ int main(int argc, char ** argv)
 	  operations.clear();
 	}
       }
+#endif
       
     } else {
       utils::compress_istream is(input_file, 1024 * 1024);
