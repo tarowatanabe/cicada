@@ -791,6 +791,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               min_hole_source=options.min_hole_source,
                               min_hole_target=options.min_hole_target,
                               exhaustive=options.exhaustive,
+                              constrained=options.constrained,
                               ternary=options.ternary,
                               sentential=options.sentential,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
