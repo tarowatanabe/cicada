@@ -100,6 +100,18 @@ namespace cicada
     const data_type& get_data() const { return data; }
 
     const statistics_type& get_statistics() const { return statistics; }
+
+    OperationSet clone() const
+    {
+      OperationSet __operations(*this);
+      
+      __operations.operations.clear();
+      operation_ptr_set_type::const_iterator oiter_end = operations.end();
+      for (operation_ptr_set_type::const_iterator oiter = operations.begin(); oiter != oiter_end; ++ oiter)
+	__operations.operations.push_back((*oiter)->clone());
+      
+      return __operations;
+    }
     
   private:
     void initialize(const parameter_set_type& parameters,
