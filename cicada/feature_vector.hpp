@@ -468,14 +468,17 @@ namespace cicada
     friend
     bool operator<(const FeatureVector& x, const FeatureVector& y)
     {
+      return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());
+#if 0
       if (x.__sparse)
 	return (y.__sparse
 		? *x.__sparse < *y.sparse
 		: std::lexicographical_compare(x.__sparse->begin(), x.__sparse->end(), y.__dense.begin(), y.__dense.end()));
       else
 	return (y.__sparse
-		? std::lexicographical_compare(x.__dense.begin(), x.__dense.end(), y.__sparse->begin(), y.__sparse.end())
+		? std::lexicographical_compare(x.__dense.begin(), x.__dense.end(), y.__sparse->begin(), y.__sparse->end())
 		: x.__dense < y.__dense);
+#endif
     }
 
     friend
