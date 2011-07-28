@@ -63,6 +63,8 @@ namespace cicada
     typedef boost::filesystem::path path_type;    
     
     typedef Operation base_type;
+    typedef Operation operation_type;
+    typedef boost::shared_ptr<operation_type> operation_ptr_type;
 
     struct weights_path_type
     {
@@ -104,6 +106,7 @@ namespace cicada
     Operation(const attribute_type& __name) : name(__name) {}
     virtual ~Operation() {}
     
+    virtual operation_ptr_type clone() const { return operation_ptr_type(); };
     virtual void operator()(data_type& data) const = 0;
     virtual void assign(const weight_set_type& weights) {}
     virtual void clear() {};
