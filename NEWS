@@ -1,3 +1,6 @@
+2011-8-x
+Allow output both of lattice and forest (may potentially extend to output bitext/alignment/spans etc....?)
+
 2011-7-28
 Implemented Algorihm 2 of Faster Cube Pruning which completely eliminates parent book-keeping
 Added more human-loop-unrolling in hmm code
