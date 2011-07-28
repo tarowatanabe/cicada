@@ -14,10 +14,11 @@ ICU               (http://site.icu-project.org/)
 google-sparsehash (http://code.google.com/p/google-sparsehash/)
 
 Optional:
-	nicttm:  alignment model training
-	         or, you can uses moses's script for alignment training with GIZA++
-	         or, try berkeley aligner
-		 or, try postcat.
+	srilm:   language model training (http://www-speech.sri.com/projects/srilm/)
+	GIZA++:  alignment model training (http://code.google.com/p/giza-pp/)
+	         or, you can uses moses (http://www.statmt.org/moses/) for alignment training with GIZA++
+	         or, try berkeley aligner (http://code.google.com/p/berkeleyaligner/)
+		 or, try postcat (http://www.seas.upenn.edu/~strctlrn/CAT/CAT.html).
 		 Remark that cicada can "align words" using symmetized training of berkeley aligner and posterior
 		 constrained training of postcat.
 
