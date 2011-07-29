@@ -105,7 +105,7 @@ double C = 1.0; // inverse of C == 1.0 / C : where C is a constant of SVM^{light
 bool weight_normalize_l1 = false;
 bool weight_normalize_l2 = false;
 
-int threads = 4;
+int threads = 2;
 
 int debug = 0;
 

@@ -10,7 +10,7 @@ tstset=""
 refset=""
 
 ## # of processes, # of cores
-np=4
+np=1
 nc=2
 hosts=""
 hosts_file=""
@@ -36,7 +36,7 @@ exit 1"
 
 usage="\
 $me [options]
-  Generation options
+  General options
   --root                    root directory
   --cicada                  cicada directory (required)
   --mpi                     MPI directory
@@ -44,9 +44,9 @@ $me [options]
   --hostfile, --host-file   MPI host file
   -q, --queue               PBS queue
   -n, --num                 # of processes to run
-
+  
   Decoding options
-  -c, --config              Configuration file
+  -c, --config              Configuration file (required)
   
   Training options
   -i, --iteration           MERT iterations
@@ -61,6 +61,10 @@ $me [options]
 
 while test $# -gt 0 ; do
   case $1 in
+  --root )
+    test $# = 1 && eval "$exit_missing_arg"
+    root=$2
+    shift; shift ;;
   --cicada )
     test $# = 1 && eval "$exit_missing_arg"
     cicada=$2
@@ -177,6 +181,7 @@ if test "$qsub" = ""; then
   fi
 fi
 
+
 qsubsingle() {
   name=$1
   shift
@@ -199,9 +204,9 @@ qsubsingle() {
       echo "cd $workingdir"
       echo "$@"
     ) |
-    return qsub -S /bin/sh > /dev/null
+    qsub -S /bin/sh > /dev/null
   else
-    return $@ >& $logfile
+    $@ >& $logfile
   fi
 }
 
@@ -228,9 +233,9 @@ qsubwrapper() {
       echo "cd $workingdir"
       echo "$@"
     ) |
-    return qsub -S /bin/sh > /dev/null
+    qsub -S /bin/sh > /dev/null
   else
-    return $@ >& $logfile
+    $@ >& $logfile
   fi
 }
 
@@ -242,7 +247,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   # as our initial weights, use the ${weights_init} if exists
   #
   weights="weights-one=true" 
-  if test -e ${weights_init}; then
+  if test "${weights_init}" != ""; then
     weights="weights=${weights_init}"  
   fi
 
@@ -253,32 +258,22 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   # generate translation and generate hypergraph (kbest=0)
   # instead of compose-cky, we use parse-cky with ${weights_init} learned by learn.sh!
 
-  compose="compose-cky"
-  if test "$parse_cky" = "yes"; then
-    compose="parse-cky:size=1000,weights=${weights_init}"
-  fi
-
   qsubsingle config ${cicada}/cicada_filter_config \
       --weights $weights \
       --directory ${root}forest-$iter \
       --input $config \
       --output ${root}cicada.config.$iter
  
-  qsubwrapper decode -l ${root}decode.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
+#  qsubwrapper decode -l ${root}decode.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
+   qsubsingle decode -l ${root}decode.$iter.log $cicada/cicada \
 	--input $tstset \
 	--config ${root}cicada.config.$iter \
-	\
-	--operation $compose \
-	--operation push-bos-eos \
-	--operation apply:prune=true,size=200,${weights} \
-	--operation prune:density=100,${weights} \
-	--operation remove-bos-eos \
-	--operation output:kbest=0,directory=${root}forest-$iter,${weights} \
 	\
 	--debug
 
   # compute bleu from hypergraph with current weights. this will also server as to how to grab 1best... see kbest=1 !
-  qsubwrapper onebest -l ${root}1best.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
+#  qsubwrapper onebest -l ${root}1best.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
+   qsubsingle onebest -l ${root}1best.$iter.log $cicada/cicada \
 	--input ${root}forest-$iter \
 	--input-forest --input-directory \
 	--operation output:kbest=1,${weights},file=${root}1best-$iter \
@@ -315,7 +310,8 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     upper_bound=" --bound-upper $upper"
   fi
 
-  qsubwrapper mert -l ${root}mert.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mert_mpi \
+#  qsubwrapper mert -l ${root}mert.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mert_mpi \
+  qsubsingle mert -l ${root}mert.$iter.log $cicada/cicada_mert \
 			--refset $refset \
 			--tstset $tsts \
 			--output ${root}weights.$iter \

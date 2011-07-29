@@ -105,7 +105,7 @@ bool apply_exact = false;
 int cube_size = 200;
 double beam_size = 1e-5;
 
-int threads = 4;
+int threads = 2;
 
 int debug = 0;
 
