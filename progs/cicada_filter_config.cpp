@@ -77,10 +77,10 @@ void options(int argc, char** argv)
     ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
     ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
     
-    ("weights",     po::value<std::string>(&weights),     "${weights}")
-    ("weight-file", po::value<std::string>(&weight_file), "${weight_file}")
-    ("directory",   po::value<std::string>(&directory),   "${directory}")
-    ("file",        po::value<std::string>(&file),   "${file}")
+    ("weights",     po::value<std::string>(&weights),     "substitute ${weights}")
+    ("weight-file", po::value<std::string>(&weight_file), "substitute ${weight_file}")
+    ("directory",   po::value<std::string>(&directory),   "substitute ${directory}")
+    ("file",        po::value<std::string>(&file),   "substitute ${file}")
     
     ("help", "help message");
   
