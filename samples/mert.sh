@@ -2,6 +2,7 @@
 
 me=`basename $0`
 
+root=""
 cicada=/data/lttools/decoder/cicada/bin
 openmpi=""
 
@@ -36,6 +37,7 @@ exit 1"
 usage="\
 $me [options]
   Generation options
+  --root                    root directory
   -c, --cicada              cicada directory (required)
   -m, --mpi                 MPI directory
   --host, --hosts           MPI hosts
@@ -51,8 +53,8 @@ $me [options]
   -w, --weights             initial weights
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
-  -t, --test, --tstset      tuning data
-  -r, --reference, --refset reference translations
+  -t, --test, --tstset      tuning data (required)
+  -r, --reference, --refset reference translations (required)
 
   -h, --help                help message
 "
@@ -145,6 +147,14 @@ if test "$weights_init" != ""; then
   fi
 fi
 
+if test "$openmpi" != ""; then
+  openmpi="${openmpi}/"
+fi
+
+if test "$root" != ""; then
+  root="${root}/"
+fi
+
 ### working dir..
 workingdir=`pwd`
 
@@ -231,8 +241,8 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     weights="weights=${weights_init}"  
   fi
 
-  if test -e "weights.$iter_prev"; then
-    weights="weights=weights.$iter_prev"
+  if test -e "${root}weights.$iter_prev"; then
+    weights="weights=${root}weights.$iter_prev"
   fi
 
   # generate translation and generate hypergraph (kbest=0)
@@ -243,41 +253,41 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     compose="parse-cky:size=1000,weights=${weights_init}"
   fi
  
-  qsubwrapper decode -l decode.$iter.log $openmpi/mpirun $mpinp $cicada/cicada_mpi \
+  qsubwrapper decode -l ${root}decode.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
 	--input $tstset \
-	--config cicada.config \
+	--config ${root}cicada.config \
 	\
 	--operation $compose \
 	--operation push-bos-eos \
 	--operation apply:prune=true,size=200,${weights} \
 	--operation prune:density=100,${weights} \
 	--operation remove-bos-eos \
-	--operation output:kbest=0,directory=forest-$iter,${weights} \
+	--operation output:kbest=0,directory=${root}forest-$iter,${weights} \
 	\
 	--debug
 
   # compute bleu from hypergraph with current weights. this will also server as to how to grab 1best... see kbest=1 !
-  qsubwrapper onebest -l 1best.$iter.log $openmpi/mpirun $mpinp $cicada/cicada_mpi \
-	--input forest-$iter \
+  qsubwrapper onebest -l ${root}1best.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
+	--input ${root}forest-$iter \
 	--input-forest --input-directory \
-	--operation output:kbest=1,${weights},file=1best-$iter \
+	--operation output:kbest=1,${weights},file=${root}1best-$iter \
 	--debug
 
-  qsubsingle eval $cicada/cicada_eval --refset $refset --tstset 1best-$iter --output eval-$iter.1best --scorer bleu:order=4
+  qsubsingle eval $cicada/cicada_eval --refset $refset --tstset ${root}1best-$iter --output ${root}eval-$iter.1best --scorer bleu:order=4
 
   ### forests upto now...
   tsts=""
   for ((i=1;i<=$iter;++i)); do
-    if test -e forest-$i; then
-      tsts="$tsts forest-$i"
+    if test -e ${root}forest-$i; then
+      tsts="$tsts ${root}forest-$i"
     fi
   done
 
   ### previous weights...
   weights="${weights_init}"
   for ((i=1;i<$iter;++i)); do
-    if test -e weights.$i; then
-      weights="$weights weights.$i"
+    if test -e ${root}weights.$i; then
+      weights="$weights ${root}weights.$i"
     fi
   done
 
@@ -294,10 +304,10 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     upper_bound=" --bound-upper $upper"
   fi
 
-  qsubwrapper mert -l mert.$iter.log $openmpi/mpirun $mpinp $cicada/cicada_mert_mpi \
+  qsubwrapper mert -l ${root}mert.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mert_mpi \
 			--refset $refset \
 			--tstset $tsts \
-			--output weights.$iter \
+			--output ${root}weights.$iter \
 			\
 			$weights \
 			--value-lower -5 \
