@@ -80,7 +80,7 @@ void options(int argc, char** argv)
     ("weights",     po::value<std::string>(&weights),     "substitute ${weights}")
     ("weight-file", po::value<std::string>(&weight_file), "substitute ${weight_file}")
     ("directory",   po::value<std::string>(&directory),   "substitute ${directory}")
-    ("file",        po::value<std::string>(&file),   "substitute ${file}")
+    ("file",        po::value<std::string>(&file),        "substitute ${file}")
     
     ("help", "help message");
   
