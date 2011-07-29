@@ -15,8 +15,8 @@ nc=2
 hosts=""
 hosts_file=""
 
-### decoding parameter
-parse_cky=no
+### decoding config
+config=""
 
 ### MERT learning
 iteration=10
@@ -38,15 +38,15 @@ usage="\
 $me [options]
   Generation options
   --root                    root directory
-  -c, --cicada              cicada directory (required)
-  -m, --mpi                 MPI directory
+  --cicada                  cicada directory (required)
+  --mpi                     MPI directory
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
   -q, --queue               PBS queue
   -n, --num                 # of processes to run
 
   Decoding options
-  -p, --parse               perform parsing-composition with initial weights
+  -c, --config              Configuration file
   
   Training options
   -i, --iteration           MERT iterations
@@ -61,11 +61,11 @@ $me [options]
 
 while test $# -gt 0 ; do
   case $1 in
-  --cicada | -c )
+  --cicada )
     test $# = 1 && eval "$exit_missing_arg"
     cicada=$2
     shift; shift ;;
-  --mpi | -m )
+  --mpi )
     test $# = 1 && eval "$exit_missing_arg"
     openmpi=$2
     shift; shift ;;
@@ -85,10 +85,6 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     np=$2
     shift; shift ;;
-  ## decoding
-  --parse | -p )
-    parse_cky=yes
-    shift ;;
 
   ## training
   --iteration | -i )
@@ -106,6 +102,11 @@ while test $# -gt 0 ; do
   --upper | -u )
     test $# = 1 && eval "$exit_missing_arg"
     lower=$2
+    shift; shift ;;
+
+  --config | -c )
+    test $# = 1 && eval "$exit_missing_arg"
+    config=$2
     shift; shift ;;
 
 ### test set and reference set
@@ -137,6 +138,10 @@ if test "$tstset" = ""; then
 fi
 if test "$refset" = ""; then
   echo "specify reference data"
+  exit -1
+fi
+if test "$config" = ""; then
+  echo "specify config file"
   exit -1
 fi
 
@@ -194,9 +199,9 @@ qsubsingle() {
       echo "cd $workingdir"
       echo "$@"
     ) |
-    qsub -S /bin/sh > /dev/null
+    return qsub -S /bin/sh > /dev/null
   else
-    $@ >& $logfile
+    return $@ >& $logfile
   fi
 }
 
@@ -223,9 +228,9 @@ qsubwrapper() {
       echo "cd $workingdir"
       echo "$@"
     ) |
-    qsub -S /bin/sh > /dev/null
+    return qsub -S /bin/sh > /dev/null
   else
-    $@ >& $logfile
+    return $@ >& $logfile
   fi
 }
 
@@ -252,10 +257,16 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   if test "$parse_cky" = "yes"; then
     compose="parse-cky:size=1000,weights=${weights_init}"
   fi
+
+  qsubsingle config ${cicada}/cicada_filter_config \
+      --weights $weights \
+      --directory ${root}forest-$iter \
+      --input $config \
+      --output ${root}cicada.config.$iter
  
   qsubwrapper decode -l ${root}decode.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
 	--input $tstset \
-	--config ${root}cicada.config \
+	--config ${root}cicada.config.$iter \
 	\
 	--operation $compose \
 	--operation push-bos-eos \
