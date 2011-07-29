@@ -58,7 +58,7 @@ double eps = std::numeric_limits<double>::infinity();
 
 bool unite_kbest = false;
 
-int threads = 4;
+int threads = 2;
 
 int debug = 0;
 
