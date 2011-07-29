@@ -47,6 +47,7 @@ bin_PROGRAMS = \
 	cicada_extract_tree_mpi \
 	cicada_filter_bitext \
 	cicada_filter_cabocha \
+	cicada_filter_config \
 	cicada_filter_extract \
 	cicada_filter_extract_ghkm \
 	cicada_filter_extract_phrase \
@@ -178,6 +179,9 @@ cicada_filter_text_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools
 
 cicada_filter_cabocha_SOURCES = cicada_filter_cabocha.cpp
 cicada_filter_cabocha_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_filter_config_SOURCES = cicada_filter_config.cpp
+cicada_filter_config_LDADD   = $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_filter_terminal_SOURCES = cicada_filter_terminal.cpp
 cicada_filter_terminal_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
