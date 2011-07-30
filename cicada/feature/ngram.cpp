@@ -696,7 +696,7 @@ namespace cicada
       base_type::__feature_name = (name.empty() ? std::string("ngram") : name);
       
       ngram_impl->feature_name     = base_type::__feature_name;
-      ngram_impl->feature_name_oov = static_cast<const std::string&>(base_type::__feature_name) + ":oov";
+      ngram_impl->feature_name_oov = static_cast<const std::string&>(base_type::__feature_name) + ":oov-penalty";
       
       pimpl = ngram_impl.release();
 
@@ -781,7 +781,7 @@ namespace cicada
 	features.erase(pimpl->feature_name);
 
       if (oov)
-	features[pimpl->feature_name_oov] = oov;
+	features[pimpl->feature_name_oov] = - oov;
       else
 	features.erase(pimpl->feature_name_oov);
       
@@ -813,7 +813,7 @@ namespace cicada
 	  features.erase(pimpl->feature_name);
 	
 	if (oov)
-	  features[pimpl->feature_name_oov] = oov;
+	  features[pimpl->feature_name_oov] = - oov;
 	else
 	  features.erase(pimpl->feature_name_oov);
 	
@@ -835,7 +835,7 @@ namespace cicada
 	  features.erase(pimpl->feature_name);
 
 	if (oov)
-	  features[pimpl->feature_name_oov] = oov;
+	  features[pimpl->feature_name_oov] = - oov;
 	else
 	  features.erase(pimpl->feature_name_oov);
       }
