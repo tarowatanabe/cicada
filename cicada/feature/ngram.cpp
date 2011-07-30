@@ -43,8 +43,11 @@ namespace cicada
       typedef feature_function_type::state_ptr_set_type state_ptr_set_type;
 
       typedef feature_function_type::edge_type edge_type;
-      
       typedef feature_function_type::rule_type rule_type;
+
+      typedef feature_function_type::feature_set_type feature_set_type;
+      
+      typedef feature_set_type::feature_type feature_type;
       
       typedef rule_type::symbol_set_type phrase_type;
       
@@ -100,7 +103,11 @@ namespace cicada
 	  cluster(x.cluster ? &cluster_type::create(x.cluster->path()) : 0),
 	  coarse(x.coarse),
 	  no_bos_eos(x.no_bos_eos),
-	  skip_sgml_tag(x.skip_sgml_tag)
+	  skip_sgml_tag(x.skip_sgml_tag),
+	  feature_name(x.feature_name),
+	  feature_name_oov(x.feature_name_oov),
+	  id_oov(x.id_oov)
+	  
       {
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -116,6 +123,10 @@ namespace cicada
 	coarse = x.coarse;
 	no_bos_eos = x.no_bos_eos;
 	skip_sgml_tag = x.skip_sgml_tag;
+	
+	feature_name     = x.feature_name;
+	feature_name_oov = x.feature_name_oov;
+	id_oov           = x.id_oov;
 	
 	cache_logprob.clear();
 	cache_estimate.clear();
@@ -256,18 +267,19 @@ namespace cicada
       
       double ngram_score(state_ptr_type& state,
 			 const state_ptr_set_type& states,
-			 const edge_type& edge) const
+			 const edge_type& edge,
+			 int& oov) const
       {
 	if (cluster) {
 	  if (skip_sgml_tag)
-	    return ngram_score(state, states, edge, extract_cluster(cluster), skipper_sgml());
+	    return ngram_score(state, states, edge, oov, extract_cluster(cluster), skipper_sgml());
 	  else
-	    return ngram_score(state, states, edge, extract_cluster(cluster), skipper_epsilon());
+	    return ngram_score(state, states, edge, oov, extract_cluster(cluster), skipper_epsilon());
 	} else {
 	  if (skip_sgml_tag)
-	    return ngram_score(state, states, edge, extract_word(), skipper_sgml());
+	    return ngram_score(state, states, edge, oov, extract_word(), skipper_sgml());
 	  else
-	    return ngram_score(state, states, edge, extract_word(), skipper_epsilon());
+	    return ngram_score(state, states, edge, oov, extract_word(), skipper_epsilon());
 	}
       }
 
@@ -291,6 +303,7 @@ namespace cicada
       double ngram_score(state_ptr_type& state,
 			 const state_ptr_set_type& states,
 			 const edge_type& edge,
+			 int& oov,
 			 Extract extract,
 			 Skipper skipper) const
       {
@@ -312,8 +325,10 @@ namespace cicada
 	  
 	  // we will copy to buffer...
 	  for (phrase_type::const_iterator titer = titer_begin; titer != titer_end; ++ titer)
-	    if (! skipper(*titer))
+	    if (! skipper(*titer)) {
 	      buffer.push_back(extract(*titer));
+	      oov += (ngram.index.vocab()[buffer.back()] == id_oov);
+	    }
 	  
 	  if (static_cast<int>(buffer.size()) <= context_size) {
 	    std::copy(buffer.begin(), buffer.end(), context);
@@ -371,8 +386,10 @@ namespace cicada
 	      biter = buffer.end();
 	    }
 	    
-	  } else if (! skipper(*titer))
+	  } else if (! skipper(*titer)) {
 	    buffer.push_back(extract(*titer));
+	    oov += (ngram.index.vocab()[buffer.back()] == id_oov);
+	  }
 	}
 	
 	if (biter != buffer.end()) {
@@ -594,6 +611,11 @@ namespace cicada
       bool coarse;
       bool no_bos_eos;
       bool skip_sgml_tag;
+      
+      // names...
+      feature_type feature_name;
+      feature_type feature_name_oov;
+      symbol_type::id_type id_oov;
     };
     
     
@@ -669,6 +691,10 @@ namespace cicada
       base_type::__state_size = sizeof(symbol_type) * ngram_impl->order * 2;
       base_type::__feature_name = (name.empty() ? std::string("ngram") : name);
       
+      ngram_impl->feature_name     = base_type::__feature_name;
+      ngram_impl->feature_name_oov = static_cast<const std::string&>(base_type::__feature_name) + ":oov";
+      ngram_impl->id_oov = ngram_impl->ngram.index.vocab()[vocab_type::UNK];
+      
       pimpl = ngram_impl.release();
 
       // ...
@@ -741,21 +767,27 @@ namespace cicada
 		      feature_set_type& estimates,
 		      const bool final) const
     {
-      double score = pimpl->ngram_score(state, states, edge);
+      int oov = 0;
+      double score = pimpl->ngram_score(state, states, edge, oov);
       if (final)
 	score += pimpl->ngram_final_score(state);
       
       if (score != 0.0)
-	features[base_type::feature_name()] = score;
+	features[pimpl->feature_name] = score;
       else
-	features.erase(base_type::feature_name());
+	features.erase(pimpl->feature_name);
+
+      if (oov)
+	features[pimpl->feature_name_oov] = oov;
+      else
+	features.erase(pimpl->feature_name_oov);
       
       if (! final) {
 	const double estimate = pimpl->ngram_estimate(state);
 	if (estimate != 0.0)
-	  estimates[base_type::feature_name()] = estimate;
+	  estimates[pimpl->feature_name] = estimate;
 	else
-	  estimates.erase(base_type::feature_name());
+	  estimates.erase(pimpl->feature_name);
       }
     }
 
@@ -767,30 +799,31 @@ namespace cicada
 			     const bool final) const
     {
       if (pimpl_coarse) {
-	double score = pimpl_coarse->ngram_score(state, states, edge);
+	int oov = 0;
+	double score = pimpl_coarse->ngram_score(state, states, edge, oov);
 	if (final)
 	  score += pimpl_coarse->ngram_final_score(state);
       
 	if (score != 0.0)
-	  features[base_type::feature_name()] = score;
+	  features[pimpl->feature_name] = score;
 	else
-	  features.erase(base_type::feature_name());
+	  features.erase(pimpl->feature_name);
       
 	if (! final) {
 	  const double estimate = pimpl_coarse->ngram_estimate(state);
 	  if (estimate != 0.0)
-	    estimates[base_type::feature_name()] = estimate;
+	    estimates[pimpl->feature_name] = estimate;
 	  else
-	    estimates.erase(base_type::feature_name());
+	    estimates.erase(pimpl->feature_name);
 	}
       } else {
-	// state-less...
+	// state-less.
 	const double score = pimpl->ngram_estimate(edge);
 	
 	if (score != 0.0)
-	  features[base_type::feature_name()] = score;
+	  features[pimpl->feature_name] = score;
 	else
-	  features.erase(base_type::feature_name());
+	  features.erase(pimpl->feature_name);
       }
     }
 
@@ -819,9 +852,9 @@ namespace cicada
       const double score = pimpl->ngram_scan_score(state, edge, dot);
       
       if (score != 0.0)
-	features[base_type::feature_name()] = score;
+	features[pimpl->feature_name] = score;
       else
-	features.erase(base_type::feature_name());
+	features.erase(pimpl->feature_name);
     }
     
     void NGram::apply_complete(state_ptr_type& state,
@@ -836,9 +869,9 @@ namespace cicada
 	const double score = pimpl->ngram_complete_score(state);
 	
 	if (score != 0.0)
-	  features[base_type::feature_name()] = score;
+	  features[pimpl->feature_name] = score;
 	else
-	  features.erase(base_type::feature_name());
+	  features.erase(pimpl->feature_name);
       }
     }
 

@@ -21,6 +21,8 @@ config=""
 ### mert learning
 iteration=20
 weights_init=""
+direction=8
+restart=2
 lower=""
 upper=""
 
@@ -51,6 +53,8 @@ $me [options]
   Training options
   -i, --iteration           MERT iterations
   -w, --weights             initial weights
+  --direction               random directions
+  --restart                 random restarts
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
   -d, --dev, --devset              tuning data (required)
@@ -98,6 +102,14 @@ while test $# -gt 0 ; do
   --weights | -w )
     test $# = 1 && eval "$exit_missing_arg"
     weights_init=$2
+    shift; shift ;;
+  --direction )
+    test $# = 1 && eval "$exit_missing_arg"
+    direction=$2
+    shift; shift ;;
+  --restart )
+    test $# = 1 && eval "$exit_missing_arg"
+    restart=$2
     shift; shift ;;
   --lower | -l )
     test $# = 1 && eval "$exit_missing_arg"
@@ -349,6 +361,8 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			$weights \
 			--value-lower -5 \
 			--value-upper  5 \
+                        --samples-directions $direction \
+                        --samples-restarts   $restart \
                         $lower_bound \
                         $upper_bound \
 			\
