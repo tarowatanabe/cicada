@@ -1,4 +1,5 @@
 2011-8-x
+Added ngram OOV feature which greatly improve translation quality (and that is found in cdec)
 Allow output both of lattice and forest (may potentially be extended to output bitext/alignment/spans etc....?)
 Serious bugfix for feature-vector comparison, which may affect epsilon-removal of lattice (this affect experiments after "compact-feature-vector")
 Faster Cube Pruning for GHKM rule extractions
