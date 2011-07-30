@@ -60,8 +60,8 @@ $me [options]
   --merge                   perform kbest merging
   --interpolate             weights interpolation
 
-  -d, --dev, --devset       tuning data (required)
-  -r, --reference, --refset reference translations (required)
+  -d, --dev, --devset              tuning data (required)
+  -r, --reference, --refset, --ref reference translations (required)
 
   -h, --help                help message
 "
@@ -135,7 +135,7 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     devset=$2
     shift; shift ;;
-  --reference | -r | --refset )
+  --reference | -r | --refset | --ref )
     test $# = 1 && eval "$exit_missing_arg"
     refset=$2
     shift; shift ;;
@@ -447,11 +447,16 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 
   ### interpolate from the previous iterations, if interpolate_ratio is >0 and <1
   if test $do_interpolate -eq 1; then
-    echo "merging weights" >&2
-    qsubwrapper interpolate $cicada/cicada_filter_weights \
+
+    if test "$weights_last" = ""; then
+      cp $weights_learn ${root}weights.$iter
+    else
+      echo "merging weights" >&2
+      qsubwrapper interpolate $cicada/cicada_filter_weights \
 	  --output ${root}weights.$iter \
 	  ${weights_last}:scale=`echo "1.0 - $interpolate_ratio" | bc`  \
           ${weights_learn}:scale=$interpolate_ratio || exit 1
+    fi
   fi
 
 

@@ -18,8 +18,8 @@ hosts_file=""
 ### decoding config
 config=""
 
-### linear learning
-iteration=10
+### mert learning
+iteration=20
 weights_init=""
 lower=""
 upper=""
@@ -53,8 +53,8 @@ $me [options]
   -w, --weights             initial weights
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
-  -d, --dev, --devset       tuning data (required)
-  -r, --reference, --refset reference translations (required)
+  -d, --dev, --devset              tuning data (required)
+  -r, --reference, --refset, --ref reference translations (required)
 
   -h, --help                help message
 "
@@ -118,7 +118,7 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     devset=$2
     shift; shift ;;
-  --reference | -r | --refset )
+  --reference | -r | --refset | --ref )
     test $# = 1 && eval "$exit_missing_arg"
     refset=$2
     shift; shift ;;
@@ -308,17 +308,6 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --tstset ${root}1best-$iter \
       --output ${root}eval-$iter.1best \
       --scorer bleu:order=4 || exit 1
-
-  ### compute oracles
-  echo "oracle translations ${root}kbest-${iter}.oracle" >&2
-  qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
-        --refset $refset \
-        --tstset ${root}kbest-$iter \
-        --output ${root}kbest-${iter}.oracle \
-        --directory \
-        --scorer  bleu:order=4,exact=true \
-        \
-        --debug || exit 1
 
 
   ### kbests upto now...
