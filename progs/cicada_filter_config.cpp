@@ -68,7 +68,7 @@ int main(int argc, char** argv)
       namespace xpressive = boost::xpressive;
       
       const xpressive::sregex re = ((xpressive::bos | xpressive::_ln)
-				    >> *(xpressive::_s) >> "operation" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
+				    >> -*(xpressive::_s) >> "operation" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
 					
       
       config = xpressive::regex_replace(config, re, "");
@@ -78,7 +78,7 @@ int main(int argc, char** argv)
       namespace xpressive = boost::xpressive;
       
       const xpressive::sregex re = ((xpressive::bos | xpressive::_ln)
-				    >> *(xpressive::_s) >> "feature-function" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
+				    >> -*(xpressive::_s) >> "feature-function" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
 					
       
       config = xpressive::regex_replace(config, re, "");
