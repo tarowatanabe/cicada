@@ -40,7 +40,7 @@ namespace cicada
       if (int(lattice_mode) + forest_mode == 0)
 	throw std::runtime_error("specify either lattice or forest");
 
-      name = std::string("remove-bos-eos-") + (lattice_mode ? "lattice" : "forest");
+      name = std::string("remove-bos/eos-") + (lattice_mode ? "lattice" : "forest");
     }
 
     void RemoveBosEos::operator()(data_type& data) const
