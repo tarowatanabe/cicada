@@ -45,7 +45,7 @@ $me [options]
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
   -q, --queue               PBS queue
-  -n, --num                 # of processes to run
+  -n, --np                  # of processes to run
   
   Decoding options
   -c, --config              Configuration file (required)
@@ -90,7 +90,7 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     queue=$2
     shift; shift ;;
-  --num | -n )
+  --np | -n )
     test $# = 1 && eval "$exit_missing_arg"
     np=$2
     shift; shift ;;
