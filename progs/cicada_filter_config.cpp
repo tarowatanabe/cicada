@@ -21,6 +21,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
+#include <boost/xpressive/xpressive.hpp>
+
 #include "utils/compress_stream.hpp"
 
 typedef boost::filesystem::path path_type;
@@ -33,6 +35,8 @@ std::string weight_file;
 std::string kbest;
 std::string directory;
 std::string file;
+
+bool remove_operation = false;
 
 void options(int argc, char** argv);
 
@@ -58,6 +62,16 @@ int main(int argc, char** argv)
     boost::algorithm::replace_all(config, "${kbest}", kbest);
     boost::algorithm::replace_all(config, "${directory}", directory);
     boost::algorithm::replace_all(config, "${file}", file);
+
+    if (remove_operation) {
+      namespace xpressive = boost::xpressive;
+      
+      const xpressive::sregex re = ((xpressive::bos | xpressive::_ln)
+				    >> *(xpressive::_s) >> "operation" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
+					
+      
+      config = xpressive::regex_replace(config, re, "");
+    }
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     os << config;
@@ -84,6 +98,8 @@ void options(int argc, char** argv)
     ("kbest",       po::value<std::string>(&kbest),       "substitute ${kbest}")
     ("directory",   po::value<std::string>(&directory),   "substitute ${directory}")
     ("file",        po::value<std::string>(&file),        "substitute ${file}")
+    
+    ("remove-operation", po::bool_switch(&remove_operation), "remove operation(s)")
     
     ("help", "help message");
   
