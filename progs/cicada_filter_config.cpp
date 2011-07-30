@@ -30,6 +30,7 @@ path_type output_file = "-";
 
 std::string weights;
 std::string weight_file;
+std::string kbest;
 std::string directory;
 std::string file;
 
@@ -54,6 +55,7 @@ int main(int argc, char** argv)
     // replace!
     boost::algorithm::replace_all(config, "${weights}", weights);
     boost::algorithm::replace_all(config, "${weight_file}", weight_file);
+    boost::algorithm::replace_all(config, "${kbest}", kbest);
     boost::algorithm::replace_all(config, "${directory}", directory);
     boost::algorithm::replace_all(config, "${file}", file);
     
@@ -79,6 +81,7 @@ void options(int argc, char** argv)
     
     ("weights",     po::value<std::string>(&weights),     "substitute ${weights}")
     ("weight-file", po::value<std::string>(&weight_file), "substitute ${weight_file}")
+    ("kbest",       po::value<std::string>(&kbest),       "substitute ${kbest}")
     ("directory",   po::value<std::string>(&directory),   "substitute ${directory}")
     ("file",        po::value<std::string>(&file),        "substitute ${file}")
     

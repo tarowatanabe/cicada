@@ -22,6 +22,7 @@ config=""
 iteration=10
 weights_init=""
 C=1e-3
+kbest=1000
 merge="no"
 merge_ratio=0.0
 
@@ -53,6 +54,10 @@ $me [options]
   -i, --iteration           MERT iterations
   -w, --weights             initial weights
   -C, --C                   hyperparameter
+  --kbest                   kbest size
+  --merge                   perform kbest merging
+  --merge-ratio             weights merging ratio
+
   -d, --dev, --devset       tuning data (required)
   -r, --reference, --refset reference translations (required)
 
@@ -102,6 +107,10 @@ while test $# -gt 0 ; do
   --C | -C )
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
+    shift; shift ;;
+  --kbest )
+    test $# = 1 && eval "$exit_missing_arg"
+    kbest=$2
     shift; shift ;;
   --merge )
     merge=yes
@@ -284,6 +293,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   echo "generate config file ${root}cicada.config.$iter" >&2
   qsubwrapper config ${cicada}/cicada_filter_config \
       --weights $weights \
+      --kbest   $kbest \
       --directory ${root}kbest-$iter \
       --input $config \
       --output ${root}cicada.config.$iter || exit 1

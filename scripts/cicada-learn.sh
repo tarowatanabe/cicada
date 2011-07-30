@@ -22,6 +22,8 @@ config=""
 iteration=10
 weights_init=""
 C=1e-3
+kbest=0
+forest="no"
 merge="no"
 merge_ratio=0.0
 
@@ -53,6 +55,11 @@ $me [options]
   -i, --iteration           MERT iterations
   -w, --weights             initial weights
   -C, --C                   hyperparameter
+  --kbest                   kbest size
+  --forest                  forest learning
+  --merge                   perform kbest merging
+  --merge-ratio             weights merging ratio
+
   -d, --dev, --devset       tuning data (required)
   -r, --reference, --refset reference translations (required)
 
@@ -103,6 +110,13 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
     shift; shift ;;
+  --kbest )
+    test $# = 1 && eval "$exit_missing_arg"
+    kbest=$2
+    shift; shift ;;
+  --forest )
+    forest=yes
+    shift ;;
   --merge )
     merge=yes
     shift ;;
@@ -153,6 +167,15 @@ if test "$config" = ""; then
 fi
 if test "$cicada" = ""; then
   echo "no cicada dir?"
+  exit 1
+fi
+
+if test "forest" = "no" -a $kbest -le 0; then
+  kbest=0
+  forest=yes
+fi
+if test "forest" = "yes" -a $kbest -gt 0; then
+  echo "forest-mode or kbest-mode?"
   exit 1
 fi
 
@@ -280,64 +303,109 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     weights="weights=${root}weights.$iter_prev"
   fi
 
+  output=forest
+  if test $kbest -t 0; then
+    output=kbest
+  fi
+
   ### setup config file
   echo "generate config file ${root}cicada.config.$iter" >&2
   qsubwrapper config ${cicada}/cicada_filter_config \
       --weights $weights \
-      --directory ${root}kbest-$iter \
+      --kbest $kbest \
+      --directory ${root}${output}-$iter \
       --input $config \
       --output ${root}cicada.config.$iter || exit 1
   
   ### actual decoding
-  echo "decoding ${root}kbest-$iter" >&2
+  echo "decoding ${root}${output}-$iter" >&2
   qsubwrapper decode -l ${root}decode.$iter.log $cicada/cicada_mpi \
 	--input $devset \
 	--config ${root}cicada.config.$iter \
 	\
 	--debug || exit 1
 
-  ### BLEU
-  echo "BLEU ${root}eval-$iter.1best" >&2
-  qsubwrapper eval $cicada/cicada_eval \
-      --refset $refset \
-      --tstset ${root}kbest-$iter \
-      --output ${root}eval-$iter.1best \
-      --scorer bleu:order=4 || exit 1
+  if test $kbest -eq 0; then
+    echo "1-best ${root}1best-$iter" >&2
+    qsubwrapper onebest -l ${root}1best.$iter.log $cicada/cicada_mpi \
+	--input ${root}${output}-$iter \
+	--input-forest --input-directory \
+	--operation output:kbest=1,${weights},file=${root}1best-$iter \
+	--debug || exit 1
+
+    echo "BLEU ${root}eval-$iter.1best" >&2
+    qsubwrapper eval $cicada/cicada_eval \
+        --refset $refset \
+        --tstset ${root}1best-$iter \
+        --output ${root}eval-$iter.1best \
+        --scorer bleu:order=4 || exit 1
+  else
+    echo "BLEU ${root}eval-$iter.1best" >&2
+    qsubwrapper eval $cicada/cicada_eval \
+        --refset $refset \
+        --tstset ${root}${output}-$iter \
+        --output ${root}eval-$iter.1best \
+        --scorer bleu:order=4 || exit 1
+  fi
 
   ### compute oracles
-  echo "oracle translations ${root}kbest-${iter}.oracle" >&2
-  qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
+  if test $kbest -eq 0; then
+    echo "oracle translations ${root}${output}-${iter}.oracle" >&2
+    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_mpi \
         --refset $refset \
-        --tstset ${root}kbest-$iter \
-        --output ${root}kbest-${iter}.oracle \
+        --tstset ${root}${output}-$iter \
+        --output ${root}${output}-${iter}.oracle \
+        --directory \
+	--forest \
+        --scorer  bleu:order=4,exact=true \
+	--cube-size 400 \
+        \
+        --debug || exit 1
+  else
+    echo "oracle translations ${root}${output}-${iter}.oracle" >&2
+    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
+        --refset $refset \
+        --tstset ${root}${output}-$iter \
+        --output ${root}${output}-${iter}.oracle \
         --directory \
         --scorer  bleu:order=4,exact=true \
         \
         --debug || exit 1
-
+  fi
 
   ### kbests upto now...
   tstset=""
   orcset=""
   for ((i=1;i<=$iter;++i)); do
-    if test -e ${root}kbest-$i; then
-      tstset="$tstset ${root}kbest-$i"
-      orcset="$orcset ${root}kbest-${i}.oracle"
+    if test -e ${root}${output}-$i; then
+      tstset="$tstset ${root}${output}-$i"
+      orcset="$orcset ${root}${output}-${i}.oracle"
     fi
   done
 
-  ## liblinear learning
-  echo "liblinear learning ${root}weights.$iter" >&2
-  qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
+  if test $kbest -eq 0; then
+    echo "learning ${root}weights.$iter" >&2
+    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_mpi \
+                        --forest  $tstset \
+                        --intersected $orcset \
+                        --output ${root}weights.$iter \
+                        \
+                        --learn-lbfgs \
+                        --C $C \
+                        \
+                        --debug=2 || exit 1
+  else
+    echo "learning ${root}weights.$iter" >&2
+    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest_mpi \
                         --kbest  $tstset \
                         --oracle $orcset \
                         --output ${root}weights.$iter \
                         \
-                        --learn-linear \
-                        --solver 1 \
+                        --learn-lbfgs \
                         --C $C \
                         \
                         --debug=2 || exit 1
+  fi
 
 
 done 
