@@ -95,6 +95,8 @@ namespace cicada
 	cache_estimate.clear();
 	
 	initialize_decay();
+
+	id_oov = ngram.index.vocab()[vocab_type::UNK];
       }
 
       NGramImpl(const NGramImpl& x)
@@ -695,7 +697,6 @@ namespace cicada
       
       ngram_impl->feature_name     = base_type::__feature_name;
       ngram_impl->feature_name_oov = static_cast<const std::string&>(base_type::__feature_name) + ":oov";
-      ngram_impl->id_oov = ngram_impl->ngram.index.vocab()[vocab_type::UNK];
       
       pimpl = ngram_impl.release();
 
@@ -709,7 +710,7 @@ namespace cicada
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(coarse_path, coarse_order));
 
 	  ngram_impl->no_bos_eos = no_bos_eos;
-	  ngram_impl->skip_sgml_tag = skip_sgml_tag;
+	  ngram_impl->skip_sgml_tag = skip_sgml_tag;	  
 	  
 	  if (! coarse_cluster_path.empty()) {
 	    if (! boost::filesystem::exists(coarse_cluster_path))
@@ -722,7 +723,7 @@ namespace cicada
 	} else {
 	  std::auto_ptr<impl_type> ngram_impl(new impl_type(*pimpl));
 	  ngram_impl->order = coarse_order;
-	  ngram_impl->coarse = true;
+	  ngram_impl->coarse = true;	  
 	  
 	  pimpl_coarse = ngram_impl.release();
 	}
