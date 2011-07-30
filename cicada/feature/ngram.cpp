@@ -283,18 +283,18 @@ namespace cicada
 	}
       }
 
-      double ngram_estimate(const edge_type& edge) const
+      double ngram_estimate(const edge_type& edge, int& oov) const
       {
 	if (cluster) {
 	  if (skip_sgml_tag)
-	    return ngram_estimate(edge, extract_cluster(cluster), skipper_sgml());
+	    return ngram_estimate(edge, oov, extract_cluster(cluster), skipper_sgml());
 	  else
-	    return ngram_estimate(edge, extract_cluster(cluster), skipper_epsilon());
+	    return ngram_estimate(edge, oov, extract_cluster(cluster), skipper_epsilon());
 	} else {
 	  if (skip_sgml_tag)
-	    return ngram_estimate(edge, extract_word(), skipper_sgml());
+	    return ngram_estimate(edge, oov, extract_word(), skipper_sgml());
 	  else
-	    return ngram_estimate(edge, extract_word(), skipper_epsilon());
+	    return ngram_estimate(edge, oov, extract_word(), skipper_epsilon());
 	}
       }
 
@@ -442,7 +442,7 @@ namespace cicada
       }
       
       template <typename Extract, typename Skipper>
-      double ngram_estimate(const edge_type& edge, Extract extract, Skipper skipper) const
+      double ngram_estimate(const edge_type& edge, int& oov, Extract extract, Skipper skipper) const
       {
 	const int context_size = order - 1;
 	const rule_type& rule = *(edge.rule);
@@ -469,8 +469,10 @@ namespace cicada
 	    }
 	    
 	    buffer.clear();
-	  } else if (! skipper(*titer))
+	  } else if (! skipper(*titer)) {
 	    buffer.push_back(extract(*titer));
+	    oov += (ngram.index.vocab()[buffer.back()] == id_oov);
+	  }
 	}
 	
 	if (! buffer.empty()) {
@@ -808,7 +810,12 @@ namespace cicada
 	  features[pimpl->feature_name] = score;
 	else
 	  features.erase(pimpl->feature_name);
-      
+	
+	if (oov)
+	  features[pimpl->feature_name_oov] = oov;
+	else
+	  features.erase(pimpl->feature_name_oov);
+	
 	if (! final) {
 	  const double estimate = pimpl_coarse->ngram_estimate(state);
 	  if (estimate != 0.0)
@@ -818,12 +825,18 @@ namespace cicada
 	}
       } else {
 	// state-less.
-	const double score = pimpl->ngram_estimate(edge);
+	int oov = 0;
+	const double score = pimpl->ngram_estimate(edge, oov);
 	
 	if (score != 0.0)
 	  features[pimpl->feature_name] = score;
 	else
 	  features.erase(pimpl->feature_name);
+
+	if (oov)
+	  features[pimpl->feature_name_oov] = oov;
+	else
+	  features.erase(pimpl->feature_name_oov);
       }
     }
 
