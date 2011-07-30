@@ -281,6 +281,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   echo "generate config file ${root}cicada.config.$iter" >&2
   qsubwrapper config ${cicada}/cicada_filter_config \
       --weights $weights \
+      --kbest 0 \
       --directory ${root}forest-$iter \
       --input $config \
       --output ${root}cicada.config.$iter || exit 1

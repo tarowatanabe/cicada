@@ -383,11 +383,24 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     fi
   done
 
+  ### previous weights...
+  weights="${weights_init}"
+  for ((i=1;i<$iter;++i)); do
+    if test -e ${root}weights.$i; then
+      weights="$weights ${root}weights.$i"
+    fi
+  done
+
+  if test "$weights" != ""; then
+    weights=" --feature-weights $weights"
+  fi
+
   if test $kbest -eq 0; then
     echo "learning ${root}weights.$iter" >&2
     qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_mpi \
                         --forest  $tstset \
                         --intersected $orcset \
+	                $weights \
                         --output ${root}weights.$iter \
                         \
                         --learn-lbfgs \
@@ -399,6 +412,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest_mpi \
                         --kbest  $tstset \
                         --oracle $orcset \
+	                $weights \
                         --output ${root}weights.$iter \
                         \
                         --learn-lbfgs \
