@@ -11,3 +11,35 @@ LEARN: ciada_learn{,_kbest}{,_mpi}
        The hyperparameter C is independent of data size, and is used as a scaling for L_{1,2} regularizer.
 
 LEARN_ONLINE: cicada_learn_online{,_mpi}
+
+We can easily tune weights by using tree scripts:
+
+cicada-maxent.sh
+   Learn parameters which is "local" to supplied grammar.
+   We need to specify:
+      development data
+      corresponding reference translations
+      cicada.config file listing grammar(s)
+      composition algorithm   (default to compose-cky)
+      hyperparameter constant (default to 1e-3)
+
+cicada-mert.sh
+   MERT script. We need to specify
+      development data
+      corresponding reference translations
+      cicada.config file listing grammar(s), feature functions and operations
+      
+   ${weights}/${directory}/${kbest} will be substituted by the cicada-mert.sh during training.
+   (kbest will be always zero, since we will run hypergraph-MERT)
+
+cicada-learn.sh
+cicada-learn-linear.sh
+   Learning script. We need to specify
+      development data
+      corresponding reference translations
+      cicada.config file listing grammar(s), feature functions and operations
+      hyperparameter constant (default to 1e-3)
+      
+   ${weights}/${directory}/${kbest} will be substituted by the cicada-mert.sh during training.
+   When run in hypergraph-learning mode, kbest will be always set to zero.
+   For learn-linear trainig we can run only in kbest mode, which will be set to 1000 by default.
