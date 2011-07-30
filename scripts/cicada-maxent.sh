@@ -289,5 +289,3 @@ qsubwrapper learn -l ${root}learn.maxent.log $cicada/cicada_learn_mpi \
          --C $C \
          \
          --debug=2 || exit 1
-
-done 
