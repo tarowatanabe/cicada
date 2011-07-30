@@ -58,11 +58,16 @@ int main(int argc, char** argv)
     } while (is);
     
     // replace!
-    boost::algorithm::replace_all(config, "${weights}", weights);
-    boost::algorithm::replace_all(config, "${weight_file}", weight_file);
-    boost::algorithm::replace_all(config, "${kbest}", kbest);
-    boost::algorithm::replace_all(config, "${directory}", directory);
-    boost::algorithm::replace_all(config, "${file}", file);
+    if (! weights.empty())
+      boost::algorithm::replace_all(config, "${weights}", weights);
+    if (! weight_file.empty())
+      boost::algorithm::replace_all(config, "${weight_file}", weight_file);
+    if (! kbest.empty())
+      boost::algorithm::replace_all(config, "${kbest}", kbest);
+    if (! directory.empty())
+      boost::algorithm::replace_all(config, "${directory}", directory);
+    if (! file.empty())
+      boost::algorithm::replace_all(config, "${file}", file);
 
     if (remove_operation) {
       namespace xpressive = boost::xpressive;
