@@ -349,6 +349,11 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --C $C \
                         \
                         --debug=2 || exit 1
+    ### merge from the previous iterations, if merge_ratio is >0 and <1
+    if test $merge_ratio -gt 0 -a $merge_ratio -lt 1; then
+      echo "merging weights" >&2
+    fi
+    
   else
     ### compute oracles
     echo "oracle translations ${root}kbest-${iter}.oracle" >&2
