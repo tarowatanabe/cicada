@@ -177,7 +177,10 @@ if test "$openmpi" != ""; then
 fi
 
 if test "$root" != ""; then
- root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
+  root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
+  if test ! -e $root; then
+    mkdir -p $root
+  fi
 fi
 
 do_interpolate=`echo "($interpolate > 0.0) && ($interpolate < 1.0)" | bc`
@@ -334,7 +337,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     fi
   done
 
-  tstset_oracle=${root}${output}-$iter
+  tstset_oracle=${root}kbest-$iter
   if test "$merge" = "yes"; then
     tstset_oracle=$tstset
   fi
@@ -353,7 +356,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   learn_oracle=$orcset
   unite=""
   if test "$merge" = "yes"; then
-    learn_oracle=${root}${output}-${iter}.oracle
+    learn_oracle=${root}kbest-${iter}.oracle
     unite=" --unite"
   fi
 
@@ -367,7 +370,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
                         --kbest  $tstset \
                         --oracle $learn_oracle \
-	                $unite
+	                $unite \
                         --output $weights_learn \
                         \
                         --learn-linear \

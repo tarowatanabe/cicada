@@ -192,6 +192,10 @@ fi
 
 if test "$root" != ""; then
  root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
+
+  if test ! -e $root; then
+    mkdir -p $root
+  fi
 fi
 
 do_interpolate=`echo "($interpolate > 0.0) && ($interpolate < 1.0)" | bc`

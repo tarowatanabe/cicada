@@ -177,7 +177,10 @@ if test "$openmpi" != ""; then
 fi
 
 if test "$root" != ""; then
- root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
+  root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
+  if test ! -e $root; then
+    mkdir -p $root
+  fi
 fi
 
 ### working dir..
