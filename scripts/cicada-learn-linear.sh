@@ -333,30 +333,41 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       weights_last=${root}weights.$i
     fi
   done
-  
+
+  tstset_oracle=${root}${output}-$iter
   if test "$merge" = "yes"; then
-    ### compute oracles
-    echo "oracle translations ${root}kbest-${iter}.oracle" >&2
-    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
+    tstset_oracle=$tstset
+  fi
+
+  ### compute oracles
+  echo "oracle translations ${root}kbest-${iter}.oracle" >&2
+  qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
         --refset $refset \
-        --tstset $tstset \
+        --tstset $tstset_oracle \
         --output ${root}kbest-${iter}.oracle \
         --directory \
         --scorer  bleu:order=4,exact=true \
         \
         --debug || exit 1
 
-    weights_learn=${root}weights.$iter
-    if test $do_interpolate -eq 1; then
-      weights_learn=${root}weights.${iter}.learn
-    fi
+  learn_oracle=$orcset
+  unite=""
+  if test "$merge" = "yes"; then
+    learn_oracle=${root}${output}-${iter}.oracle
+    unite=" --unite"
+  fi
+
+  weights_learn=${root}weights.$iter
+  if test $do_interpolate -eq 1; then
+    weights_learn=${root}weights.${iter}.learn
+  fi
     
-    ## liblinear learning
-    echo "liblinear learning ${root}weights.$iter" >&2
-    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
+  ## liblinear learning
+  echo "liblinear learning ${root}weights.$iter" >&2
+  qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
                         --kbest  $tstset \
-	                --unite \
-                        --oracle ${root}kbest-${iter}.oracle \
+                        --oracle $learn_oracle \
+	                $unite
                         --output $weights_learn \
                         \
                         --learn-linear \
@@ -364,39 +375,14 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --C $C \
                         \
                         --debug=2 || exit 1
-    
-    ### interpolate from the previous iterations, if interpolate_ratio is >0 and <1
-    if test $do_interpolate -eq 1; then
-      echo "merging weights" >&2
-      qsubwrapper interpolate $cicada/cicada_filter_weights \
+
+  ### interpolate from the previous iterations, if interpolate_ratio is >0 and <1
+  if test $do_interpolate -eq 1; then
+    echo "merging weights" >&2
+    qsubwrapper interpolate $cicada/cicada_filter_weights \
 	  --output ${root}weights.$iter \
 	  ${weights_last}:scale=`echo "1.0 - $interpolate_ratio" | bc`  \
           ${weights_learn}:scale=$interpolate_ratio || exit 1
-    fi
-    
-  else
-    ### compute oracles
-    echo "oracle translations ${root}kbest-${iter}.oracle" >&2
-    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
-        --refset $refset \
-        --tstset ${root}kbest-$iter \
-        --output ${root}kbest-${iter}.oracle \
-        --directory \
-        --scorer  bleu:order=4,exact=true \
-        \
-        --debug || exit 1
-
-    ## liblinear learning
-    echo "liblinear learning ${root}weights.$iter" >&2
-    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
-                        --kbest  $tstset \
-                        --oracle $orcset \
-                        --output ${root}weights.$iter \
-                        \
-                        --learn-linear \
-                        --solver 1 \
-                        --C $C \
-                        \
-                        --debug=2 || exit 1
   fi
+
 done 
