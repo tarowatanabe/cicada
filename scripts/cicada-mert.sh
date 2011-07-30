@@ -3,7 +3,7 @@
 me=`basename $0`
 
 root=""
-cicada=/data/lttools/decoder/cicada/bin
+cicada=""
 openmpi=""
 
 devset=""
@@ -146,6 +146,10 @@ if test "$refset" = ""; then
 fi
 if test "$config" = ""; then
   echo "specify config file"
+  exit 1
+fi
+if test "$cicada" = ""; then
+  echo "no cicada dir?"
   exit 1
 fi
 
