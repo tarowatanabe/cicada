@@ -22,6 +22,8 @@ config=""
 iteration=10
 weights_init=""
 C=1e-3
+merge="no"
+merge_ratio=0.0
 
 ### qsubs
 mem_single=1gb
@@ -100,6 +102,13 @@ while test $# -gt 0 ; do
   --C | -C )
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
+    shift; shift ;;
+  --merge )
+    merge=yes
+    shift ;;
+  --merge-ratio )
+    test $# = 1 && eval "$exit_missing_arg"
+    merge_ratio=$2
     shift; shift ;;
 
   --config | -c )

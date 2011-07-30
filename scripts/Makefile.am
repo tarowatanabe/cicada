@@ -6,5 +6,5 @@ dist_bin_SCRIPTS = \
 	cicada-filter-non-terminal.py \
 	cicada-filter-penntreebank.py \
 	cicada-index.py \
-	cicada-linear.sh \
+	cicada-learn-linear.sh \
 	cicada-mert.sh
