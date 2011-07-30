@@ -314,18 +314,6 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --output ${root}eval-$iter.1best \
       --scorer bleu:order=4 || exit 1
 
-  ### compute oracles
-  echo "oracle translations ${root}kbest-${iter}.oracle" >&2
-  qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
-        --refset $refset \
-        --tstset ${root}kbest-$iter \
-        --output ${root}kbest-${iter}.oracle \
-        --directory \
-        --scorer  bleu:order=4,exact=true \
-        \
-        --debug || exit 1
-
-
   ### kbests upto now...
   tstset=""
   orcset=""
@@ -336,9 +324,46 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     fi
   done
 
-  ## liblinear learning
-  echo "liblinear learning ${root}weights.$iter" >&2
-  qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
+  if test "$merge" = "yes"; then
+    ### compute oracles
+    echo "oracle translations ${root}kbest-${iter}.oracle" >&2
+    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
+        --refset $refset \
+        --tstset $tstset \
+        --output ${root}kbest-${iter}.oracle \
+        --directory \
+        --scorer  bleu:order=4,exact=true \
+        \
+        --debug || exit 1
+
+    ## liblinear learning
+    echo "liblinear learning ${root}weights.$iter" >&2
+    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
+                        --kbest  $tstset \
+	                --unite \
+                        --oracle ${root}kbest-${iter}.oracle \
+                        --output ${root}weights.$iter \
+                        \
+                        --learn-linear \
+                        --solver 1 \
+                        --C $C \
+                        \
+                        --debug=2 || exit 1
+  else
+    ### compute oracles
+    echo "oracle translations ${root}kbest-${iter}.oracle" >&2
+    qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
+        --refset $refset \
+        --tstset ${root}kbest-$iter \
+        --output ${root}kbest-${iter}.oracle \
+        --directory \
+        --scorer  bleu:order=4,exact=true \
+        \
+        --debug || exit 1
+
+    ## liblinear learning
+    echo "liblinear learning ${root}weights.$iter" >&2
+    qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
                         --kbest  $tstset \
                         --oracle $orcset \
                         --output ${root}weights.$iter \
@@ -348,6 +373,5 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --C $C \
                         \
                         --debug=2 || exit 1
-
-
+  fi
 done 
