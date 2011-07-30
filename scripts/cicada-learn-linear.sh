@@ -19,12 +19,12 @@ hosts_file=""
 config=""
 
 ### linear learning
-iteration=10
+iteration=20
 weights_init=""
 C=1e-3
 kbest=1000
 merge="no"
-merge_ratio=0.0
+interpolate=0.0
 
 ### qsubs
 mem_single=1gb
@@ -55,8 +55,8 @@ $me [options]
   -w, --weights             initial weights
   -C, --C                   hyperparameter
   --kbest                   kbest size
-  --merge                   perform kbest merging
-  --merge-ratio             weights merging ratio
+  --merte                   perform kbest merging
+  --interpolate             weights interpolation
 
   -d, --dev, --devset       tuning data (required)
   -r, --reference, --refset reference translations (required)
@@ -115,9 +115,9 @@ while test $# -gt 0 ; do
   --merge )
     merge=yes
     shift ;;
-  --merge-ratio )
+  --interpolate )
     test $# = 1 && eval "$exit_missing_arg"
-    merge_ratio=$2
+    interpolate=$2
     shift; shift ;;
 
   --config | -c )
@@ -179,6 +179,8 @@ fi
 if test "$root" != ""; then
  root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
 fi
+
+do_interpolate=`echo "($interpolate > 0.0) && ($interpolate < 1.0)" | bc`
 
 ### working dir..
 workingdir=`pwd`
@@ -324,6 +326,14 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     fi
   done
 
+  ### last weights
+  weights_last=${weights_init}
+  for ((i=1;i<$iter;++i)); do
+    if test -e ${root}weights.$i; then
+      weights_last=${root}weights.$i
+    fi
+  done
+  
   if test "$merge" = "yes"; then
     ### compute oracles
     echo "oracle translations ${root}kbest-${iter}.oracle" >&2
@@ -336,22 +346,31 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         \
         --debug || exit 1
 
+    weights_learn=${root}weights.$iter
+    if test $do_interpolate -eq 1; then
+      weights_learn=${root}weights.${iter}.learn
+    fi
     ## liblinear learning
     echo "liblinear learning ${root}weights.$iter" >&2
     qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest \
                         --kbest  $tstset \
 	                --unite \
                         --oracle ${root}kbest-${iter}.oracle \
-                        --output ${root}weights.$iter \
+                        --output $weights_learn \
                         \
                         --learn-linear \
                         --solver 1 \
                         --C $C \
                         \
                         --debug=2 || exit 1
-    ### merge from the previous iterations, if merge_ratio is >0 and <1
-    if test $merge_ratio -gt 0 -a $merge_ratio -lt 1; then
+    
+    ### interpolate from the previous iterations, if interpolate_ratio is >0 and <1
+    if test $do_interpolate -eq 1; then
       echo "merging weights" >&2
+      qsubwrapper interpolate $cicada/cicada_filter_weights \
+	  --output ${root}weights.$iter \
+	  ${weights_last}:scale=`echo "1.0 - $interpolate_ratio" | bc`  \
+          ${weights_learn}:scale=$interpolate_ratio || exit 1
     fi
     
   else

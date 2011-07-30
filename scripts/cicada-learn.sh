@@ -19,13 +19,13 @@ hosts_file=""
 config=""
 
 ### linear learning
-iteration=10
+iteration=20
 weights_init=""
 C=1e-3
 kbest=0
 forest="no"
 merge="no"
-merge_ratio=0.0
+interpolate=0.0
 
 ### qsubs
 mem_single=1gb
@@ -58,7 +58,7 @@ $me [options]
   --kbest                   kbest size
   --forest                  forest learning
   --merge                   perform kbest merging
-  --merge-ratio             weights merging ratio
+  --interpolate             weights interpolation
 
   -d, --dev, --devset       tuning data (required)
   -r, --reference, --refset reference translations (required)
@@ -120,9 +120,9 @@ while test $# -gt 0 ; do
   --merge )
     merge=yes
     shift ;;
-  --merge-ratio )
+  --interpolate )
     test $# = 1 && eval "$exit_missing_arg"
-    merge_ratio=$2
+    interpolate=$2
     shift; shift ;;
 
   --config | -c )
@@ -193,6 +193,8 @@ fi
 if test "$root" != ""; then
  root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
 fi
+
+do_interpolate=`echo "($interpolate > 0.0) && ($interpolate < 1.0)" | bc`
 
 ### working dir..
 workingdir=`pwd`
@@ -348,6 +350,16 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --scorer bleu:order=4 || exit 1
   fi
 
+  ### kbests upto now...
+  tstset=""
+  orcset=""
+  for ((i=1;i<=$iter;++i)); do
+    if test -e ${root}${output}-$i; then
+      tstset="$tstset ${root}${output}-$i"
+      orcset="$orcset ${root}${output}-${i}.oracle"
+    fi
+  done
+  
   ### compute oracles
   if test $kbest -eq 0; then
     echo "oracle translations ${root}${output}-${iter}.oracle" >&2
@@ -373,26 +385,19 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --debug || exit 1
   fi
 
-  ### kbests upto now...
-  tstset=""
-  orcset=""
-  for ((i=1;i<=$iter;++i)); do
-    if test -e ${root}${output}-$i; then
-      tstset="$tstset ${root}${output}-$i"
-      orcset="$orcset ${root}${output}-${i}.oracle"
-    fi
-  done
 
   ### previous weights...
-  weights="${weights_init}"
+  weights_prev=${weights_init}
+  weights_last=${weights_init}
   for ((i=1;i<$iter;++i)); do
     if test -e ${root}weights.$i; then
-      weights="$weights ${root}weights.$i"
+      weights_prev="$weights_prev ${root}weights.$i"
+      weights_last=${root}weights.$i
     fi
   done
 
-  if test "$weights" != ""; then
-    weights=" --feature-weights $weights"
+  if test "$weights_prev" != ""; then
+    weights_prev=" --feature-weights $weights_prev"
   fi
 
   if test $kbest -eq 0; then
@@ -400,7 +405,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_mpi \
                         --forest  $tstset \
                         --intersected $orcset \
-	                $weights \
+	                $weights_prev \
                         --output ${root}weights.$iter \
                         \
                         --learn-lbfgs \
@@ -412,7 +417,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_kbest_mpi \
                         --kbest  $tstset \
                         --oracle $orcset \
-	                $weights \
+	                $weights_prev \
                         --output ${root}weights.$iter \
                         \
                         --learn-lbfgs \
