@@ -67,21 +67,21 @@ int main(int argc, char** argv)
     if (remove_operation) {
       namespace xpressive = boost::xpressive;
       
-      const xpressive::sregex re = ((xpressive::bos | xpressive::_ln)
-				    >> -*(xpressive::_s) >> "operation" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
-					
+      const xpressive::sregex re = (xpressive::before(xpressive::bos | xpressive::_ln)
+				    >> (xpressive::s1= -*(xpressive::_s)) >> (xpressive::s2= "operation" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln)));
       
-      config = xpressive::regex_replace(config, re, "");
+      
+      config = xpressive::regex_replace(config, re, "$1# $2");
     }
 
     if (remove_feature_function) {
       namespace xpressive = boost::xpressive;
       
-      const xpressive::sregex re = ((xpressive::bos | xpressive::_ln)
-				    >> -*(xpressive::_s) >> "feature-function" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
+      const xpressive::sregex re = (xpressive::before(xpressive::bos | xpressive::_ln)
+				    >> (xpressive::s1= -*(xpressive::_s)) >> (xpressive::s2= "feature-function" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln)));
 					
       
-      config = xpressive::regex_replace(config, re, "");
+      config = xpressive::regex_replace(config, re, "$1# $2");
     }
     
     utils::compress_ostream os(output_file, 1024 * 1024);
