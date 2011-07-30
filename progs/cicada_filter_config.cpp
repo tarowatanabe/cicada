@@ -37,6 +37,7 @@ std::string directory;
 std::string file;
 
 bool remove_operation = false;
+bool remove_feature_function = false;
 
 void options(int argc, char** argv);
 
@@ -72,6 +73,16 @@ int main(int argc, char** argv)
       
       config = xpressive::regex_replace(config, re, "");
     }
+
+    if (remove_feature_function) {
+      namespace xpressive = boost::xpressive;
+      
+      const xpressive::sregex re = ((xpressive::bos | xpressive::_ln)
+				    >> *(xpressive::_s) >> "feature-function" >> *(xpressive::_s) >> '=' >> *(~xpressive::_ln));
+					
+      
+      config = xpressive::regex_replace(config, re, "");
+    }
     
     utils::compress_ostream os(output_file, 1024 * 1024);
     os << config;
@@ -99,7 +110,8 @@ void options(int argc, char** argv)
     ("directory",   po::value<std::string>(&directory),   "substitute ${directory}")
     ("file",        po::value<std::string>(&file),        "substitute ${file}")
     
-    ("remove-operation", po::bool_switch(&remove_operation), "remove operation(s)")
+    ("remove-operation",        po::bool_switch(&remove_operation),        "remove operation(s)")
+    ("remove-feature-function", po::bool_switch(&remove_feature_function), "remove feature function(s)")
     
     ("help", "help message");
   

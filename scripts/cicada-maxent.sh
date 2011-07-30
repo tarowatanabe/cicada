@@ -250,10 +250,16 @@ qsubwrapper() {
 
 ### setup config file
 ### we will simply remove operation field..
-  
+echo "generate config file ${root}cicada.config.maxent" >&2
+qsubwrapper config ${cicada}/cicada_filter_config \
+      --remove-operation \
+      --remove-feature-function \
+      --input $config \
+      --output ${root}cicada.config.maxent || exit 1
+
 ### actual composition
 echo "composition ${root}forest-maxent" >&2
-qsubwrapper decode -l ${root}forest.log $cicada/cicada_mpi \
+qsubwrapper decode -l ${root}forest.maxent.log $cicada/cicada_mpi \
 	--input $devset \
 	--config ${root}cicada.config.maxent \
         --operation $compose \
@@ -262,7 +268,7 @@ qsubwrapper decode -l ${root}forest.log $cicada/cicada_mpi \
 	--debug || exit 1
   
 echo "oracle translations ${root}forest-maxent.oracle" >&2
-qsubwrapper oracle -l ${root}oracle.log $cicada/cicada_oracle_mpi \
+qsubwrapper oracle -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
         --refset $refset \
         --tstset ${root}forest-maxent \
         --output ${root}forest-maxent.oracle \
@@ -274,7 +280,7 @@ qsubwrapper oracle -l ${root}oracle.log $cicada/cicada_oracle_mpi \
         --debug || exit 1
 
 echo "learning ${root}weights.maxent" >&2
-qsubwrapper learn -l ${root}learn.log $cicada/cicada_learn_mpi \
+qsubwrapper learn -l ${root}learn.maxent.log $cicada/cicada_learn_mpi \
          --forest      ${root}forest-maxent \
          --intersected ${root}forest-maxent.oracle \
          --output ${root}weights.maxent \
