@@ -5,4 +5,6 @@ dist_bin_SCRIPTS = \
 	cicada-filter-fallback-rule.py \
 	cicada-filter-non-terminal.py \
 	cicada-filter-penntreebank.py \
-	cicada-index.py
+	cicada-index.py \
+	cicada-linear.sh \
+	cicada-mert.sh
