@@ -6,7 +6,7 @@ root=""
 cicada=/data/lttools/decoder/cicada/bin
 openmpi=""
 
-tstset=""
+devset=""
 refset=""
 
 ## # of processes, # of cores
@@ -18,7 +18,7 @@ hosts_file=""
 ### decoding config
 config=""
 
-### MERT learning
+### linear learning
 iteration=10
 weights_init=""
 lower=""
@@ -53,7 +53,7 @@ $me [options]
   -w, --weights             initial weights
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
-  -t, --test, --tstset      tuning data (required)
+  -d, --dev, --devset       tuning data (required)
   -r, --reference, --refset reference translations (required)
 
   -h, --help                help message
@@ -114,9 +114,9 @@ while test $# -gt 0 ; do
     shift; shift ;;
 
 ### test set and reference set
-  --test | -t | --tstset )
+  --dev | -d | --devset )
     test $# = 1 && eval "$exit_missing_arg"
-    tstset=$2
+    devset=$2
     shift; shift ;;
   --reference | -r | --refset )
     test $# = 1 && eval "$exit_missing_arg"
@@ -136,32 +136,32 @@ while test $# -gt 0 ; do
   esac
 done
 
-if test "$tstset" = ""; then
+if test "$devset" = ""; then
   echo "specify development data"
-  exit -1
+  exit 1
 fi
 if test "$refset" = ""; then
   echo "specify reference data"
-  exit -1
+  exit 1
 fi
 if test "$config" = ""; then
   echo "specify config file"
-  exit -1
+  exit 1
 fi
 
 if test "$weights_init" != ""; then
   if test ! -e $weights_init; then
     echo "no initial weights: $weights_init ?"
-    exit -1
+    exit 1
   fi
 fi
 
 if test "$openmpi" != ""; then
-  openmpi="${openmpi}/"
+  openmpi=`echo "${openmpi}/" | sed -e 's/\/\/$/\//'`
 fi
 
 if test "$root" != ""; then
-  root="${root}/"
+ root=`echo "${root}/" | sed -e 's/\/\/$/\//'`
 fi
 
 ### working dir..
@@ -181,43 +181,29 @@ if test "$qsub" = ""; then
   fi
 fi
 
-
-qsubsingle() {
-  name=$1
-  shift
-
-  logfile=/dev/null
-  if [ "$1" = "-l" ]; then
-    logfile=$workingdir/$2
-    shift 2
-  fi
-
-  if test "$qsub" != ""; then
-    (
-      echo "#!/bin/sh"
-      echo "#PBS -N $name"
-      echo "#PBS -W block=true"
-      echo "#PBS -e $logfile"
-      echo "#PBS -o /dev/null"
-      echo "#PBS -q $queue"
-      echo "#PBS -l select=1:ncpus=1:mem=${mem_singl}"
-      echo "cd $workingdir"
-      echo "$@"
-    ) |
-    qsub -S /bin/sh > /dev/null
-  else
-    $@ >& $logfile
-  fi
-}
-
 qsubwrapper() {
   name=$1
   shift
+  
+  logfile=""
+  while test $# -gt 0 ; do
+  case $1 in
+  -l )
+    test $# = 1 && eval "$exit_missing_arg"
+    logfile=$2
+    shift; shift ;;
+  -* )
+    exec >&2
+    echo "$me: invalid option $1"
+    exit 1 ;;
+  * )
+    break ;;
+  esac
+  done
 
-  logfile=/dev/null
-  if [ "$1" = "-l" ]; then
-    logfile=$workingdir/$2
-    shift 2
+  stripped=`expr "$1" : '^\(.*\)_mpi$'`
+  if test "$stripped" = ""; then
+    stripped=$1
   fi
 
   if test "$qsub" != ""; then
@@ -225,22 +211,54 @@ qsubwrapper() {
       echo "#!/bin/sh"
       echo "#PBS -N $name"
       echo "#PBS -W block=true"
-      echo "#PBS -e $logfile"
+      echo "#PBS -e /dev/null"
       echo "#PBS -o /dev/null"
       echo "#PBS -q $queue"
-      echo "#PBS -l select=$np:ncpus=$nc:mpiprocs=$nc:mem=${mem_mpi}"
-      echo "#PBS -l place=scatter"
+      if test "$stripped" != "$1" -a $np -gt 1; then
+        echo "#PBS -l select=$np:ncpus=$nc:mpiprocs=$nc:mem=${mem_mpi}"
+        echo "#PBS -l place=scatter"
+      else
+        echo "#PBS -l select=1:ncpus=1:mem=${mem_single}"
+      fi
       echo "cd $workingdir"
-      echo "$@"
+
+      if test "$stripped" != "$1" -a $np -gt 1; then
+        if test "$logfile" != ""; then
+          echo "${openmpi}mpirun $mpinp $@ >& $logfile"
+        else
+          echo "${openmpi}mpirun $mpinp $@"
+        fi
+      else
+	## shift here!
+	shift;
+	if test "$logfile" != ""; then
+          echo "$stripped $@ >& $logfile"
+        else
+          echo "$stripped $@"
+        fi
+      fi
     ) |
-    qsub -S /bin/sh > /dev/null
+    qsub -S /bin/sh || exit 1
   else
-    $@ >& $logfile
+    if test "$stripped" != "$1" -a $np -gt 1; then
+      if test "$logfile" != ""; then
+        ${openmpi}mpirun $mpinp $@ >& $logfile || exit 1
+      else
+        ${openmpi}mpirun $mpinp $@ || exit 1
+      fi
+    else
+      shift
+      if test "$logfile" != ""; then
+        $stripped $@ >& $logfile || exit 1
+      else
+        $stripped $@ || exit 1
+      fi
+    fi
   fi
 }
 
 for ((iter=1;iter<=iteration; ++ iter)); do
-  echo "iteration: $iter"
+  echo "iteration: $iter" >&2
   iter_prev=`expr $iter - 1`
 
   #
@@ -255,37 +273,54 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     weights="weights=${root}weights.$iter_prev"
   fi
 
-  # generate translation and generate hypergraph (kbest=0)
-  # instead of compose-cky, we use parse-cky with ${weights_init} learned by learn.sh!
-
-  qsubsingle config ${cicada}/cicada_filter_config \
+  ### setup config file
+  echo "generate config file ${root}cicada.config.$iter" >&2
+  qsubwrapper config ${cicada}/cicada_filter_config \
       --weights $weights \
       --directory ${root}forest-$iter \
       --input $config \
-      --output ${root}cicada.config.$iter
- 
-#  qsubwrapper decode -l ${root}decode.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
-   qsubsingle decode -l ${root}decode.$iter.log $cicada/cicada \
-	--input $tstset \
+      --output ${root}cicada.config.$iter || exit 1
+  
+  ### actual decoding
+  echo "decoding ${root}forest-$iter" >&2
+  qsubwrapper decode -l ${root}decode.$iter.log $cicada/cicada_mpi \
+	--input $devset \
 	--config ${root}cicada.config.$iter \
 	\
-	--debug
+	--debug || exit 1
 
-  # compute bleu from hypergraph with current weights. this will also server as to how to grab 1best... see kbest=1 !
-#  qsubwrapper onebest -l ${root}1best.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mpi \
-   qsubsingle onebest -l ${root}1best.$iter.log $cicada/cicada \
+  echo "1-best ${root}1best-$iter" >&2
+  qsubwrapper onebest -l ${root}1best.$iter.log $cicada/cicada_mpi \
 	--input ${root}forest-$iter \
 	--input-forest --input-directory \
 	--operation output:kbest=1,${weights},file=${root}1best-$iter \
-	--debug
+	--debug || exit 1
 
-  qsubsingle eval $cicada/cicada_eval --refset $refset --tstset ${root}1best-$iter --output ${root}eval-$iter.1best --scorer bleu:order=4
+  ### BLEU
+  echo "BLEU ${root}eval-$iter.1best" >&2
+  qsubwrapper eval $cicada/cicada_eval \
+      --refset $refset \
+      --tstset ${root}1best-$iter \
+      --output ${root}eval-$iter.1best \
+      --scorer bleu:order=4 || exit 1
 
-  ### forests upto now...
-  tsts=""
+  ### compute oracles
+  echo "oracle translations ${root}kbest-${iter}.oracle" >&2
+  qsubwrapper oracle -l ${root}oracle.$iter.log $cicada/cicada_oracle_kbest_mpi \
+        --refset $refset \
+        --tstset ${root}kbest-$iter \
+        --output ${root}kbest-${iter}.oracle \
+        --directory \
+        --scorer  bleu:order=4,exact=true \
+        \
+        --debug || exit 1
+
+
+  ### kbests upto now...
+  tstset=""
   for ((i=1;i<=$iter;++i)); do
     if test -e ${root}forest-$i; then
-      tsts="$tsts ${root}forest-$i"
+      tstset="$tstset ${root}forest-$i"
     fi
   done
 
@@ -310,10 +345,11 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     upper_bound=" --bound-upper $upper"
   fi
 
-#  qsubwrapper mert -l ${root}mert.$iter.log ${openmpi}mpirun $mpinp $cicada/cicada_mert_mpi \
-  qsubsingle mert -l ${root}mert.$iter.log $cicada/cicada_mert \
+  ## liblinear learning
+  echo "MERT ${root}weights.$iter" >&2
+  qsubwrapper learn -l ${root}mert.$iter.log $cicada/cicada_mert_mpi \
 			--refset $refset \
-			--tstset $tsts \
+			--tstset $tstset \
 			--output ${root}weights.$iter \
 			\
 			$weights \
@@ -325,6 +361,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			--normalize-l1 \
 			--initial-average \
 			\
-			--debug=2
+			--debug=2 || exit 1
+
 
 done 
