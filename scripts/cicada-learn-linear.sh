@@ -22,6 +22,7 @@ config=""
 iteration=20
 weights_init=""
 C=1e-3
+solber=1
 kbest=1000
 merge="no"
 interpolate=0.0
@@ -54,6 +55,9 @@ $me [options]
   -i, --iteration           MERT iterations
   -w, --weights             initial weights
   -C, --C                   hyperparameter
+  --solver                  liblinear solver type. See liblinear FAQ,
+                            or run cicada_learn_kbest --help
+                            (Default: 1, L2-reg, L2-loss SVM)
   --kbest                   kbest size
   --merte                   perform kbest merging
   --interpolate             weights interpolation
@@ -107,6 +111,10 @@ while test $# -gt 0 ; do
   --C | -C )
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
+    shift; shift ;;
+  --solver )
+    test $# = 1 && eval "$exit_missing_arg"
+    solver=$2
     shift; shift ;;
   --kbest )
     test $# = 1 && eval "$exit_missing_arg"
@@ -374,7 +382,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --output $weights_learn \
                         \
                         --learn-linear \
-                        --solver 1 \
+                        --solver $solver \
                         --C $C \
                         \
                         --debug=2 || exit 1
