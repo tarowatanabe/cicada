@@ -111,6 +111,8 @@ class TreeGrammar(UserList.UserList):
 
 (options, args) = opt_parser.parse_args()
 
+### grammars
+
 print "goal = %s" %(options.goal)
 print
 
@@ -142,3 +144,10 @@ if options.tree_grammar:
 if options.fallback:
     print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
     print
+
+### feature-functions
+
+
+
+### operations
+
