@@ -336,7 +336,7 @@ class IndexSCFG:
 
 class IndexGHKM:
     def __init__(self, cicada=None, model_dir="", cky=None):
-        self.indexer = cicada.cicada_index_grammar
+        self.indexer = cicada.cicada_index_tree_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
         self.grammar = "tree-grammar"
@@ -349,7 +349,7 @@ class IndexGHKM:
 
 class IndexTree:
     def __init__(self, cicada=None, model_dir="", cky=None):
-        self.indexer = cicada.cicada_index_grammar
+        self.indexer = cicada.cicada_index_tree_grammar
         self.filter  = cicada.cicada_filter_extract_ghkm
         self.cky = cky
         self.grammar = "tree-grammar"

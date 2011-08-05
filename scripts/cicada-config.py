@@ -13,14 +13,17 @@
 ### 
 
 import UserList
+import os
+import os.path
+
 from optparse import OptionParser, make_option
 
 opt_parser = OptionParser(
     option_list=[
-            
+    
     ### grammars
-    make_option("--grammar",      default="", action="store", type="string", help="indexed grammar"),
-    make_option("--tree-grammar", default="", action="store", type="string", help="indexed tree-grammar"),
+    make_option("--grammar",      default=[], action="append", type="string", help="indexed grammar"),
+    make_option("--tree-grammar", default=[], action="append", type="string", help="indexed tree-grammar"),
     
     ### only affect grammars
     make_option("--max-span", default=15, action="store", type="int",
@@ -29,6 +32,10 @@ opt_parser = OptionParser(
     ### glues
     make_option("--goal", default="[s]", action="store", type="string", help="goal non-terminal (default: [s])"),
     make_option("--glue", default="[x]", action="store", type="string", help="non-terminal for glue rules (default: [x])"),
+    
+    make_option("--insertion", default=None, action="store_true", help="insertion grammar"),
+    make_option("--deletion",  default=None, action="store_true", help="deletion grammar"),
+    make_option("--fallback",  default=None, action="store_true", help="fallback tree-grammar"),
 
     ## operations...
     
@@ -67,7 +74,7 @@ class Grammar(UserList.UserList):
         
         self.grammar_dir = grammar_dir
         
-        for line in open(paht_file):
+        for line in open(path_files):
             
             name = line.strip()
             if not name: continue
@@ -91,7 +98,7 @@ class TreeGrammar(UserList.UserList):
         
         self.grammar_dir = grammar_dir
         
-        for line in open(paht_file):
+        for line in open(path_files):
             
             name = line.strip()
             if not name: continue
@@ -103,3 +110,35 @@ class TreeGrammar(UserList.UserList):
             self.append("tree-grammar = " + path)
 
 (options, args) = opt_parser.parse_args()
+
+print "goal = %s" %(options.goal)
+print
+
+if options.grammar:
+    print "# grammar"
+    for indexed in options.grammar:
+        grammar = Grammar(grammar_dir=indexed)
+        
+        for transducer in grammar:
+            print transducer
+    print
+
+if options.insertion or options.deletion:
+    if options.insertion:
+        print "grammar = insertion:non-terminal=%s" %(options.glue)
+    if options.deletion:
+        print "grammar = deletion:non-terminal=%s" %(options.glue)
+    print
+
+if options.tree_grammar:
+    print "# tree-grammar"
+    for indexed in options.tree_grammar:
+        grammar = TreeGrammar(grammar_dir=indexed)
+    
+        for transducer in grammar:
+            print transducer
+    print
+
+if options.fallback:
+    print "tree-grammar = fallback:non-terminal=%s" %(options.glue)
+    print
