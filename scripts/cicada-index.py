@@ -453,23 +453,22 @@ class Index(UserString.UserString):
             command += " --quantize"
 
         input_path='-'
-        if indexer.cky:
-            input_path='-:cky=true'
-
-        command += " --input %s" %(input_path)
-        
-        path = output
         sep = ':'
+        if indexer.cky:
+            path += sep
+            sep = ','
+            input_path +='cky=true'
         if features:
             path += sep
             sep = ','
-            path += ','.join(features)
+            input_path += ','.join(features)
         if attributes:
             path += sep
             sep = ','
-            path += ','.join(attributes)
+            input_path += ','.join(attributes)
 
-        command += " --output \"%s\"" %(path)
+        command += " --input %s" %(input_path)
+        command += " --output \"%s\"" %(output)
 
         UserString.UserString.__init__(self, command)
         
