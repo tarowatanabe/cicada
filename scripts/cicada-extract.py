@@ -61,12 +61,14 @@ opt_parser = OptionParser(
     make_option("--alignment", default="grow-diag-final-and", action="store", type="string",
                 help="alignment methods (default: grow-diag-final-and)"),
     
+    
     # steps
     make_option("--first-step", default=4, action="store", type="int", metavar='STEP', help="first step (default: 4)"),
     make_option("--last-step",  default=6, action="store", type="int", metavar='STEP', help="last step  (default: 6)"),
 
 
     ## option for lexicon
+    make_option("--lexicon-inverse", default=None, action="store_true", help="use inverse alignment"),
     make_option("--lexicon-prior", default=0.1, action="store", type="float", metavar="PRIOR", help="lexicon model prior (default: 0.1)"),
     
     # option for extraction
@@ -343,6 +345,7 @@ class Alignment:
 
 class Lexicon:
     def __init__(self, cicada=None, corpus=None, alignment=None, lexical_dir="", prior=0.1,
+                 inverse=None,
                  threads=4, mpi=None, pbs=None,
                  debug=None):
         self.threads = threads
@@ -368,6 +371,9 @@ class Lexicon:
         
         command += " --variational-bayes"
         command += " --prior %g" %(prior)
+
+        if inverse:
+            command += " --inverse"
 
         if debug:
             command += " --debug=%d" %(debug)
@@ -609,7 +615,7 @@ class ExtractGHKM(Extract):
             command += " --debug=%d" %(debug)
         else:
             command += " --debug"
-        
+
         self.command = command
 
 
@@ -764,6 +770,7 @@ alignment = Alignment(options.alignment_dir, options.alignment)
 lexicon = Lexicon(cicada=cicada, corpus=corpus, alignment=alignment,
                   lexical_dir=options.lexical_dir,
                   prior=options.lexicon_prior,
+                  inverse=options.lexicon_inverse,
                   threads=options.threads, mpi=mpi, pbs=pbs,
                   debug=options.debug)
 

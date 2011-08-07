@@ -578,7 +578,8 @@ struct ExtractGHKM
     //prune_derivations();
         
     // perform compounds extraction
-    extract_composed(graph, sentence, alignment, rules, dumper);
+    //std::cerr << "extraction" << std::endl;
+    extract_composed(graph, sentence, rules, dumper);
   }
   
   struct Candidate
@@ -625,7 +626,6 @@ struct ExtractGHKM
   template <typename Dumper>
   void extract_composed(const hypergraph_type& graph,
 			const sentence_type& sentence,
-			const alignment_type& alignment,
 			rule_pair_set_type& rule_pairs,
 			const Dumper& dumper)
   {
@@ -663,7 +663,8 @@ struct ExtractGHKM
     for (size_t id = 0; id != derivations.size(); ++ id) {
       derivation_node_type& node = derivations[id];
       
-      //std::cerr << "node id: " << id << std::endl;
+      //std::cerr << "node id: " << id << " range: [" << node.range.first << ", " << node.range.second << ")" << std::endl;
+     
       
       derivation_node_type::edge_set_type derivation_edges_new;
 
@@ -906,6 +907,8 @@ struct ExtractGHKM
       edge_set_type::const_iterator iter_end = edges.end();
       construct_rule(graph, iter, iter_end, rule_source, index, frontier_pos, positions_source, covered, weight);
     }
+
+    //std::cerr << "source: " << rule_source << std::endl;
     
     rule_pair.count = weight;
     
@@ -918,10 +921,19 @@ struct ExtractGHKM
     positions_target.resize(sentence.size());
     
     if (tails.empty()) {
+      //std::cerr << "no tails" << std::endl;
+
+      //std::cerr << "sentence: " << sentence << std::endl;
+      //std::cerr << "range: " << node.range.first << ", " << node.range.second << std::endl;
+
       trees.insert(trees.end(), sentence.begin() + node.range.first, sentence.begin() + node.range.second);
       for (int i = node.range.first; i != node.range.second; ++ i)
 	positions_target[i] = i - node.range.first;
     } else {
+      //std::cerr << "tails: ";
+      //std::copy(tails.begin(), tails.end(), std::ostream_iterator<int>(std::cerr, " "));
+      //std::cerr << std::endl;
+      
       int index = 1;
       range_pos.reserve(tails.size());
       node_set_type::const_iterator titer_end = tails.end();
@@ -955,6 +967,8 @@ struct ExtractGHKM
     
     tree_rule_type rule_target(non_terminal, trees.begin(), trees.end());
 
+    //std::cerr << "target: " << rule_target << std::endl;
+
     //
     // construct word alignment...
     // we can easily reconsruct from positions_{source, target} + covered
@@ -976,7 +990,11 @@ struct ExtractGHKM
 	++ pos_src;
       }
 
+    //std::cerr << "alignment: " << rule_pair.alignment << std::endl;
+    
     if (swap_source_target) {
+      //std::cerr << "swapping" << std::endl;
+      
       // inverse alignment
       rule_pair.alignment.inverse();
       std::sort(rule_pair.alignment.begin(), rule_pair.alignment.end());
@@ -985,7 +1003,15 @@ struct ExtractGHKM
       
       // re-assign index...
       cicada::sort(rule_source, rule_target);
+
+#if 0
+      std::cerr << "swapped source: " << rule_source << std::endl
+		<< "swapped target: " << rule_target << std::endl
+		<< "swapped alignment: " << rule_pair.alignment << std::endl;
+#endif
     }
+
+    //std::cerr << "dumping" << std::endl;
     
     rule_pair.source.clear();
     rule_pair.target.clear();
@@ -1235,6 +1261,8 @@ struct ExtractGHKM
 	  derivations.back().node = id;
 	  derivations.back().range = range_min;
 	}
+
+	//std::cerr << "new derivation: " << derivations.back().range.first << ", " << derivations.back().range.second << std::endl;
 	
 	// construct initial frontiers...
 	hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
