@@ -451,13 +451,15 @@ class Index(UserString.UserString):
             
         if quantize:
             command += " --quantize"
+
+        input_path='-'
+        if indexer.cky:
+            input_path='-:cky=true'
+
+        command += " --input %s" %(input_path)
         
         path = output
         sep = ':'
-        if indexer.cky:
-            path += sep
-            sep = ','
-            path += "cky=true"
         if features:
             path += sep
             sep = ','
