@@ -33,7 +33,10 @@ namespace cicada
       typedef cicada::Parameter param_type;
 	
       param_type param(parameter);
-      if (utils::ipiece(param.name()) != "compose-tree-cky" && utils::ipiece(param.name()) != "compose-tree-cyk")
+      if (utils::ipiece(param.name()) != "compose-tree-cky"
+	  && utils::ipiece(param.name()) != "compose-tree-cyk"
+	  && utils::ipiece(param.name()) != "compose-cky-tree"
+	  && utils::ipiece(param.name()) != "compose-cyk-tree")
 	throw std::runtime_error("this is not a Tree composer");
 	
       bool source = false;

@@ -121,3 +121,8 @@ Threaded cicada:
   It turned out to be difficult: we can clone models and grammars, but 
   the problem is when... Actually, we should clone "after" threads are created,
   assuming that the models/grammars are "untouched" by the main thread.
+
+
+Collapse and binarize the source side of the ghkm/tree grammar
+   Perform collapsing and do binarization
+   Perform lexicalization?

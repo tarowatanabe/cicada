@@ -271,7 +271,7 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::Clear(*piter, debug)));
       else if (param_name == "compose-tree")
 	operations.push_back(operation_ptr_type(new operation::ComposeTree(*piter, tree_grammar, grammar, goal, debug)));
-      else if (param_name == "compose-tree-cky" || param_name == "compose-tree-cyk")
+      else if (param_name == "compose-tree-cky" || param_name == "compose-tree-cyk" || param_name == "compose-cky-tree" || param_name == "compose-cyk-tree")
 	operations.push_back(operation_ptr_type(new operation::ComposeTreeCKY(*piter, tree_grammar, grammar, goal, debug)));
       else if (param_name == "compose-earley")
 	operations.push_back(operation_ptr_type(new operation::ComposeEarley(*piter, grammar, goal, debug)));
