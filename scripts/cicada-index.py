@@ -455,15 +455,15 @@ class Index(UserString.UserString):
         input_path='-'
         sep = ':'
         if indexer.cky:
-            path += sep
+            input_path += sep
             sep = ','
             input_path +='cky=true'
         if features:
-            path += sep
+            input_path += sep
             sep = ','
             input_path += ','.join(features)
         if attributes:
-            path += sep
+            input_path += sep
             sep = ','
             input_path += ','.join(attributes)
 

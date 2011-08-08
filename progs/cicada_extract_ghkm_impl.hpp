@@ -465,6 +465,7 @@ struct ExtractGHKM
   ExtractGHKM(const symbol_type& __non_terminal,
 	      const int __max_nodes,
 	      const int __max_height,
+	      const int __max_scope,
 	      const bool __exhaustive,
 	      const bool __constrained,
 	      const bool __inverse,
@@ -472,6 +473,7 @@ struct ExtractGHKM
     : non_terminal(__non_terminal),
       max_nodes(__max_nodes),
       max_height(__max_height),
+      max_scope(__max_scope),
       exhaustive(__exhaustive),
       constrained(__constrained),
       inverse(__inverse),
@@ -482,6 +484,7 @@ struct ExtractGHKM
   symbol_type non_terminal;
   int max_nodes;
   int max_height;
+  int max_scope;
   
   bool exhaustive;
   bool constrained;
@@ -694,9 +697,8 @@ struct ExtractGHKM
 	const derivation_edge_type& edge_composed = item->edge_composed;
 	
 	// construct rule pair and insert into rule pair list
-	construct_rule_pair(graph, sentence, node, edge_composed.edges, edge_composed.tails, rule_pair);
-	
-	rule_pairs_local[edge_set_local_type(edge_composed.edges.begin(), edge_composed.edges.end())].push_back(rule_pair);
+	if (construct_rule_pair(graph, sentence, node, edge_composed.edges, edge_composed.tails, rule_pair))
+	  rule_pairs_local[edge_set_local_type(edge_composed.edges.begin(), edge_composed.edges.end())].push_back(rule_pair);
 
 	//std::cerr << rule_pair.source << " ||| " << rule_pair.target << std::endl;
 	
@@ -883,8 +885,26 @@ struct ExtractGHKM
       return x.first < y.first;
     }
   };
+
+  struct ScopeFrontierIterator
+  {
+    ScopeFrontierIterator(symbol_type& __prev, int& __scope) : prev(__prev), scope(__scope) {}
+    
+    ScopeFrontierIterator& operator=(const symbol_type& value)
+    {
+      scope += (prev == vocab_type::EMPTY || prev.is_non_terminal()) && value.is_non_terminal();
+      prev = value;
+      return *this;
+    }
+    
+    ScopeFrontierIterator& operator*()  { return *this; }
+    ScopeFrontierIterator& operator++() { return *this; }
+    
+    symbol_type& prev;
+    int& scope;
+  };
   
-  void construct_rule_pair(const hypergraph_type& graph,
+  bool construct_rule_pair(const hypergraph_type& graph,
 			   const sentence_type& sentence,
 			   const derivation_node_type& node,
 			   const edge_set_type& edges,
@@ -1013,6 +1033,18 @@ struct ExtractGHKM
 
     //std::cerr << "dumping" << std::endl;
     
+    if (max_scope > 0) {
+      // compute the maximum scope for the source-side
+      
+      symbol_type prev(vocab_type::NONE);
+      int scope = 0;
+      
+      rule_source.frontier(ScopeFrontierIterator(prev, scope));
+
+      if ((scope + prev.is_non_terminal()) > max_scope)
+	return false;
+    }
+    
     rule_pair.source.clear();
     rule_pair.target.clear();
     
@@ -1024,7 +1056,11 @@ struct ExtractGHKM
     
     os_source << rule_source;
     os_target << rule_target;
+
+    return true;
   }
+  
+
   
   template <typename Iterator, typename PosMap, typename Covered>
   void construct_rule(const hypergraph_type& graph,
@@ -1653,6 +1689,7 @@ struct Task
        const std::string& non_terminal,
        const int max_nodes,
        const int max_height,
+       const int max_scope,
        const bool exhaustive,
        const bool constrained,
        const bool inverse,
@@ -1660,7 +1697,7 @@ struct Task
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_nodes, max_height, exhaustive, constrained, inverse, swap),
+      extractor(non_terminal, max_nodes, max_height, max_scope, exhaustive, constrained, inverse, swap),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

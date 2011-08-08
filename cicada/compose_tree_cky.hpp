@@ -290,7 +290,7 @@ namespace cicada
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
 
-	  //std::cerr << "span: " << first << ".." << last << std::endl;
+	  std::cerr << "span: " << first << ".." << last << std::endl;
 	  
 	  node_map.clear();
 	  

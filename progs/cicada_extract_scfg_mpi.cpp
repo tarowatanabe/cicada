@@ -44,6 +44,7 @@ int max_span_source = 15;
 int max_span_target = 20;
 int min_hole_source = 1;
 int min_hole_target = 1;
+int max_scope = 3;
 bool exhaustive = false;
 bool constrained = false;
 bool ternary = false;
@@ -120,6 +121,7 @@ int main(int argc, char** argv)
     task_type task(queue, output_file, max_length, max_fertility,
 		   max_span_source, max_span_target,
 		   min_hole_source, min_hole_target,
+		   max_scope,
 		   exhaustive, constrained, ternary, sentential, inverse, max_malloc);
     boost::thread worker(boost::ref(task));
 
@@ -341,6 +343,7 @@ void options(int argc, char** argv)
     ("max-span-target", po::value<int>(&max_span_target)->default_value(max_span_target), "maximum target span for rule")
     ("min-hole-source", po::value<int>(&min_hole_source)->default_value(min_hole_source), "minimum hole for antecedent non-terminals")
     ("min-hole-target", po::value<int>(&min_hole_target)->default_value(min_hole_target), "minimum hole for antecedent non-terminals")
+    ("max-scope",       po::value<int>(&max_scope)->default_value(max_scope),             "maximum scope")
     ("exhaustive",      po::bool_switch(&exhaustive),                                     "exhaustive extraction by considering all holes")
     ("constrained",     po::bool_switch(&constrained),                                    "constrained initial phrases")
     ("ternary",         po::bool_switch(&ternary),                                        "extract ternary rules")

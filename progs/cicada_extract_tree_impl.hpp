@@ -405,6 +405,7 @@ struct ExtractTree
     std::string    rule;
     point_set_type positions;
     double count;
+    int scope;
 
     DerivationEdge()
       : edges(), tails(), height(0), internal(0) {}
@@ -425,6 +426,7 @@ struct ExtractTree
       rule.swap(x.rule);
       positions.swap(x.positions);
       std::swap(count, x.count);
+      std::swap(scope, x.scope);
     }
   };
   
@@ -1333,11 +1335,13 @@ struct ExtractTree
   
   ExtractTree(const int __max_nodes,
 	      const int __max_height,
+	      const int __max_scope,
 	      const bool __exhaustive, 
 	      const bool __constrained,
 	      const bool __inverse)
     : max_nodes(__max_nodes),
       max_height(__max_height),
+      max_scope(__max_scope),
       exhaustive(__exhaustive),
       constrained(__constrained),
       inverse(__inverse),
@@ -1346,6 +1350,7 @@ struct ExtractTree
 
   int max_nodes;
   int max_height;
+  int max_scope;
   bool exhaustive;
   bool constrained;
   bool inverse;
@@ -1488,6 +1493,8 @@ struct ExtractTree
 	  
 	  if (edge_source.rule.empty())
 	    construct_rule(source, node_source, graph_source, edge_source);
+
+	  if (max_scope > 0 && edge_source.scope > max_scope) continue;
 	  
 	  if (edge_target.rule.empty())
 	    construct_rule(target, graph_target.derivations[titer->first], graph_target, edge_target);
@@ -1524,6 +1531,25 @@ struct ExtractTree
     }
   }
   
+  // construct rule related data structure
+  struct ScopeFrontierIterator
+  {
+    ScopeFrontierIterator(symbol_type& __prev, int& __scope) : prev(__prev), scope(__scope) {}
+    
+    ScopeFrontierIterator& operator=(const symbol_type& value)
+    {
+      scope += (prev == vocab_type::EMPTY || prev.is_non_terminal()) && value.is_non_terminal();
+      prev = value;
+      return *this;
+    }
+    
+    ScopeFrontierIterator& operator*()  { return *this; }
+    ScopeFrontierIterator& operator++() { return *this; }
+    
+    symbol_type& prev;
+    int& scope;
+  };
+
   // construct rule-pair related data
   covered_type   covered;
   point_set_type positions_relative;
@@ -1562,6 +1588,16 @@ struct ExtractTree
 	edge.positions[i] = *piter;
 	++ piter;
       }
+
+    // compute scope
+    {
+      symbol_type prev(vocab_type::NONE);
+      int scope = 0;
+      
+      tree_rule.frontier(ScopeFrontierIterator(prev, scope));
+
+      edge.scope = scope + prev.is_non_terminal();
+    }
     
     // dump into rule...
     edge.rule.clear();
@@ -1650,13 +1686,14 @@ struct Task
        const path_type& __output,
        const int max_nodes,
        const int max_height,
+       const int max_scope,
        const bool exhaustive,
        const bool constrained,
        const bool inverse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_nodes, max_height, exhaustive, constrained, inverse),
+      extractor(max_nodes, max_height, max_scope, exhaustive, constrained, inverse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

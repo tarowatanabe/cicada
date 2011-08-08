@@ -324,6 +324,7 @@ struct ExtractSCFG
 	      const int __max_span_target,
 	      const int __min_hole_source,
 	      const int __min_hole_target,
+	      const int __max_scope,
 	      const bool __exhaustive,
 	      const bool __constrained,
 	      const bool __ternary,
@@ -335,6 +336,7 @@ struct ExtractSCFG
       max_span_target(__max_span_target),
       min_hole_source(__min_hole_source),
       min_hole_target(__min_hole_target),
+      max_scope(__max_scope),
       exhaustive(__exhaustive),
       constrained(__constrained),
       ternary(__ternary),
@@ -347,6 +349,7 @@ struct ExtractSCFG
   int max_span_target;
   int min_hole_source;
   int min_hole_target;
+  int max_scope;
   bool exhaustive;
   bool constrained;
   bool ternary;
@@ -1225,6 +1228,7 @@ struct Task
        const int max_span_target,
        const int min_hole_source,
        const int min_hole_target,
+       const int max_scope,
        const bool exhaustive,
        const bool constrained,
        const bool ternary,
@@ -1236,6 +1240,7 @@ struct Task
       extractor(max_length, max_fertility,
 		max_span_source, max_span_target, 
 		min_hole_source, min_hole_target,
+		max_scope,
 		exhaustive, constrained, ternary, sentential, inverse),
       max_malloc(__max_malloc) {}
   
