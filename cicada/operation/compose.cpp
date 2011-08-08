@@ -67,7 +67,7 @@ namespace cicada
 
     void ComposeTreeCKY::operator()(data_type& data) const
     {
-      if (! data.hypergraph.is_valid()) return;
+      if (data.lattice.empty()) return;
 
       const lattice_type& lattice = data.lattice;
       hypergraph_type& hypergraph = data.hypergraph;

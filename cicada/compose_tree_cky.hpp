@@ -94,10 +94,6 @@ namespace cicada
       ActiveTree(const tree_transducer_type::id_type& __node)
 	: node(__node), tails(), features(), attributes() {}
       ActiveTree(const tree_transducer_type::id_type& __node,
-		 const feature_set_type& __features,
-		 const attribute_set_type& __attributes)
-	: node(__node), tails(), features(__features), attributes(__attributes) {}
-      ActiveTree(const tree_transducer_type::id_type& __node,
 		 const hypergraph_type::edge_type::node_set_type& __tails,
 		 const feature_set_type& __features,
 		 const attribute_set_type& __attributes)
@@ -113,10 +109,6 @@ namespace cicada
       
       ActiveRule(const transducer_type::id_type& __node)
 	: node(__node), tails(), features(), attributes() {}
-      ActiveRule(const transducer_type::id_type& __node,
-		 const feature_set_type& __features,
-		 const attribute_set_type& __attributes)
-	: node(__node), tails(), features(__features), attributes(__attributes) {}
       ActiveRule(const transducer_type::id_type& __node,
 		 const hypergraph_type::edge_type::node_set_type& __tails,
 		 const feature_set_type& __features,
@@ -297,6 +289,8 @@ namespace cicada
       for (size_t length = 1; length <= lattice.size(); ++ length)
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
+
+	  //std::cerr << "span: " << first << ".." << last << std::endl;
 	  
 	  node_map.clear();
 	  
@@ -479,6 +473,8 @@ namespace cicada
       //
       // we will connect node_graph_rule into node_graph_tree
       //
+      //std::cerr << "patch work: tree-graph size: " << node_graph_tree.size() << std::endl;
+      
       for (size_t node_id = 0; node_id != node_graph_tree.size(); ++ node_id) {
 	const node_set_type& node_set_tree = node_graph_tree[node_id];
 	const node_set_type& node_set_rule = node_graph_rule[node_id];
@@ -617,13 +613,13 @@ namespace cicada
 	  // handling of EPSILON rule...
 	  if (terminal == vocab_type::EPSILON) {
 	    for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	      cell.push_back(typename active_set_type::value_type(aiter->node, aiter->features + piter->features, aiter->attributes));
+	      cell.push_back(typename active_set_type::value_type(aiter->node, aiter->tails, aiter->features + piter->features, aiter->attributes));
 	  } else {
 	    for (typename active_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter) {
 	      const typename transducer_type::id_type node = transducer.next(aiter->node, terminal);
 	      if (node == transducer.root()) continue;
 	      
-	      cell.push_back(typename active_set_type::value_type(node, aiter->features + piter->features, aiter->attributes));
+	      cell.push_back(typename active_set_type::value_type(node, aiter->tails, aiter->features + piter->features, aiter->attributes));
 	    }
 	  }
 	}
@@ -689,6 +685,13 @@ namespace cicada
       //
       
       hypergraph_type::edge_type::node_set_type tails(frontier.size());
+      
+#if 0
+      std::cerr << "rule: " << *rule << std::endl;
+      std::cerr << "rule frontier: ";
+      std::copy(frontier.begin(), frontier.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::cerr << std::endl;
+#endif
       
       if (! frontier.empty()) {
 	int non_terminal_pos = 0;
@@ -768,6 +771,13 @@ namespace cicada
 	result_mapped.first->second = graph.add_node().id;
       
       const hypergraph_type::id_type root_id = result_mapped.first->second;
+
+#if 0
+      std::cerr << "tree-rule: " << *rule << std::endl;
+      std::cerr << "tree-rule frontier: ";
+      std::copy(frontier.begin(), frontier.end(), std::ostream_iterator<int>(std::cerr, " "));
+      std::cerr << std::endl;
+#endif 
       
       int non_terminal_pos = 0;
       
