@@ -1338,13 +1338,15 @@ struct ExtractTree
 	      const int __max_scope,
 	      const bool __exhaustive, 
 	      const bool __constrained,
-	      const bool __inverse)
+	      const bool __inverse,
+	      const bool __collapse)
     : max_nodes(__max_nodes),
       max_height(__max_height),
       max_scope(__max_scope),
       exhaustive(__exhaustive),
       constrained(__constrained),
       inverse(__inverse),
+      collapse(__collapse),
       attr_span_first("span-first"),
       attr_span_last("span-last") {}
 
@@ -1354,6 +1356,7 @@ struct ExtractTree
   bool exhaustive;
   bool constrained;
   bool inverse;
+  bool collapse;
 
   attribute_type attr_span_first;
   attribute_type attr_span_last;
@@ -1690,10 +1693,11 @@ struct Task
        const bool exhaustive,
        const bool constrained,
        const bool inverse,
+       const bool collapse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_nodes, max_height, max_scope, exhaustive, constrained, inverse),
+      extractor(max_nodes, max_height, max_scope, exhaustive, constrained, inverse, collapse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

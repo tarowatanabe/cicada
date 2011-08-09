@@ -469,7 +469,8 @@ struct ExtractGHKM
 	      const bool __exhaustive,
 	      const bool __constrained,
 	      const bool __inverse,
-	      const bool __swap_source_target)
+	      const bool __swap_source_target,
+	      const bool __collapse)
     : non_terminal(__non_terminal),
       max_nodes(__max_nodes),
       max_height(__max_height),
@@ -478,6 +479,7 @@ struct ExtractGHKM
       constrained(__constrained),
       inverse(__inverse),
       swap_source_target(__swap_source_target),
+      collapse(__collapse),
       attr_span_first("span-first"),
       attr_span_last("span-last") {}
 
@@ -490,6 +492,7 @@ struct ExtractGHKM
   bool constrained;
   bool inverse;
   bool swap_source_target;
+  bool collapse;
   
   attribute_type attr_span_first;
   attribute_type attr_span_last;
@@ -903,6 +906,22 @@ struct ExtractGHKM
     symbol_type& prev;
     int& scope;
   };
+
+  struct CollapseFrontierIterator
+  {
+    CollapseFrontierIterator(tree_rule_set_type& __trees) : trees(__trees) {}
+    
+    CollapseFrontierIterator& operator=(const symbol_type& value)
+    {
+      trees.push_back(value);
+      return *this;
+    }
+    
+    CollapseFrontierIterator& operator*()  { return *this; }
+    CollapseFrontierIterator& operator++() { return *this; }
+    
+    tree_rule_set_type& trees;
+  };
   
   bool construct_rule_pair(const hypergraph_type& graph,
 			   const sentence_type& sentence,
@@ -1043,6 +1062,14 @@ struct ExtractGHKM
 
       if ((scope + prev.is_non_terminal()) > max_scope)
 	return false;
+    }
+    
+    if (collapse) {
+      // collapse source-side
+      
+      trees.clear();
+      rule_source.frontier(CollapseFrontierIterator(trees));
+      rule_source = tree_rule_type(rule_source.label, trees.begin(), trees.end());
     }
     
     rule_pair.source.clear();
@@ -1694,10 +1721,11 @@ struct Task
        const bool constrained,
        const bool inverse,
        const bool swap,
+       const bool collapse,
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(non_terminal, max_nodes, max_height, max_scope, exhaustive, constrained, inverse, swap),
+      extractor(non_terminal, max_nodes, max_height, max_scope, exhaustive, constrained, inverse, swap, collapse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

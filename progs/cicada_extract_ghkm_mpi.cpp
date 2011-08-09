@@ -44,6 +44,7 @@ bool exhaustive = false;
 bool constrained = false;
 bool inverse = false;
 bool swap_source_target = false;
+bool collapse = false;
 
 double max_malloc = 8; // 8 GB
 
@@ -114,7 +115,8 @@ int main(int argc, char** argv)
     queue_type queue(queue_size);
     task_type task(queue, output_file, non_terminal,
 		   max_nodes, max_height, max_scope,
-		   exhaustive, constrained, inverse, swap_source_target, max_malloc);
+		   exhaustive, constrained, inverse, swap_source_target, collapse,
+		   max_malloc);
     boost::thread worker(boost::ref(task));
 
     if (mpi_rank == 0) {
@@ -320,6 +322,7 @@ void options(int argc, char** argv)
     ("constrained", po::bool_switch(&constrained),                          "constrained minimum extraction")
     ("inverse",     po::bool_switch(&inverse),                              "inversed word alignment")
     ("swap",        po::bool_switch(&swap_source_target),                   "swap source/target")
+    ("collapse",    po::bool_switch(&collapse),                             "collapse source side")
     
     ("max-malloc", po::value<double>(&max_malloc), "maximum malloc in GB")
     ;

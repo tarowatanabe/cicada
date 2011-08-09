@@ -290,7 +290,7 @@ namespace cicada
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
 
-	  std::cerr << "span: " << first << ".." << last << std::endl;
+	  //std::cerr << "span: " << first << ".." << last << std::endl;
 	  
 	  node_map.clear();
 	  
@@ -300,7 +300,7 @@ namespace cicada
 	  complete_actives(first, last, grammar,      actives_rule, graph, ExtractRuleLHS());
 	  complete_actives(first, last, tree_grammar, actives_tree, graph, ExtractTreeLHS());
 
-	  std::cerr << "passives size: " << passives(first, last).size() << std::endl;
+	  //std::cerr << "passives size: " << passives(first, last).size() << std::endl;
 	  
 	  // handle unary rules...
 	  // TODO: handle unary rules both for tree-grammar and grammar!!!!
@@ -445,7 +445,7 @@ namespace cicada
 	    std::sort(passive_arcs.begin(), passive_arcs.end(), less_non_terminal(non_terminals));
 	  }
 
-	  std::cerr << "finished unary-loop passives size: " << passives(first, last).size() << std::endl;
+	  //std::cerr << "finished unary-loop passives size: " << passives(first, last).size() << std::endl;
 	  
 	  // extend root with passive items at [first, last)
 	  // we need to do this for simple transducers, also...
@@ -595,7 +595,7 @@ namespace cicada
 	
 	if (! verify(transducer, first, last, lattice.shortest_distance(first, last))) continue;
 
-	std::cerr << "table: " << table << " span: " << first << ".." << last << std::endl;
+	//std::cerr << "table: " << table << " span: " << first << ".." << last << std::endl;
 	
 	active_set_type& cell = actives[table](first, last);
 	for (size_t middle = first + 1; middle < last; ++ middle)
