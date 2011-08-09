@@ -170,28 +170,28 @@ cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eva
 
 found=yes
 for prog in $cicadas; do
-  if test ! -e $cicada/$prog; then
+  if test ! -e "$cicada/$prog"; then
     found=no
     break
   fi
 done
 
 if test "$found" = "no"; then
-  for bin in "progs bin"; do
-     found=yes
-     for prog in $cicadas; do
-       if test ! -e $cicada/$bin/$prog; then
-         found=no
-	 break
-       fi
-     done
-     if test "$found" = "yes"; then
-       cicada=$cicada/$bin
-       break
-     fi
+  for bin in progs bin; do
+    found=yes
+    for prog in $cicadas; do
+      if test ! -e "$cicada/$bin/$prog"; then
+        found=no
+        break
+      fi
+    done
+    if test "$found" = "yes"; then
+      cicada=$cicada/$bin
+      break
+    fi
   done
-
-  if test "$found" ="no"; then
+  
+  if test "$found" = "no"; then
     echo "no --cicada | --cicada-dir?"
     exit 1
   fi
