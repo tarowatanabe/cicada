@@ -980,6 +980,10 @@ namespace cicada
 	  if (cky) {
 	    buffer_index.clear();
 	    source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
+	    
+	    //std::cerr << "buffer: ";
+	    //std::copy(buffer_index.begin(), buffer_index.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	    //std::cerr << std::endl;
 	  } else {
 	    source_prev.hyperpath(hyperpath);
 	    encode_path(hyperpath, buffer_index, *edge_map);
@@ -1049,6 +1053,10 @@ namespace cicada
       if (cky) {
 	buffer_index.clear();
 	source_prev.frontier(StaticFrontierIterator<index_type>(buffer_index));
+	
+	//std::cerr << "buffer: ";
+	//std::copy(buffer_index.begin(), buffer_index.end(), std::ostream_iterator<symbol_type>(std::cerr, " "));
+	//std::cerr << std::endl;
       } else {
 	source_prev.hyperpath(hyperpath);
 	encode_path(hyperpath, buffer_index, *edge_map);
@@ -1254,6 +1262,8 @@ namespace cicada
   TreeGrammarStatic::id_type TreeGrammarStatic::next(const id_type& node, const symbol_type& symbol) const
   {
     const impl_type::size_type pos = pimpl->find(symbol.non_terminal(), node);
+    
+    //std::cerr << "next: " << node << " pos: " << pos << std::endl;
     
     return (pimpl->is_valid(pos) ? id_type(pos) : id_type(0));
   }

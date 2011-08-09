@@ -126,3 +126,4 @@ Threaded cicada:
 Collapse and binarize the source side of the ghkm/tree grammar
    Perform collapsing and do binarization
    Perform lexicalization?
+   Perform synchronous binarization? (we need to store all in memory...?)
