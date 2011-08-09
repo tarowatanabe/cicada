@@ -151,6 +151,38 @@ if test "$cicada" = ""; then
   exit 1
 fi
 
+## check cicada...
+cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eval cicada_oracle cicada_oracle_mpi cicada_learn cicada_learn_mpi"
+
+found=yes
+for prog in $cicadas; do
+  if test ! -e $cicada/$prog; then
+    found=no
+    break
+  fi
+done
+
+if test "$found" = "no"; then
+  for bin in "progs bin"; do
+     found=yes
+     for prog in $cicadas; do
+       if test ! -e $cicada/$bin/$prog; then
+         found=no
+	 break
+       fi
+     done
+     if test "$found" = "yes"; then
+       cicada=$cicada/$bin
+       break
+     fi
+  done
+
+  if test "$found" ="no"; then
+    echo "no --cicada | --cicada-dir?"
+    exit 1
+  fi
+fi
+
 if test "$openmpi" != ""; then
   openmpi=`echo "${openmpi}/" | sed -e 's/\/\/$/\//'`
 fi
