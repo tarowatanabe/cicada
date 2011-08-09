@@ -97,6 +97,8 @@ opt_parser = OptionParser(
                 metavar="HEIGHT", help="maximum rule height (default: 4)"),
     make_option("--max-scope", default=0, action="store", type="int",
                 metavar="SCOPE", help="maximum rule scope (default: 0)"),
+    make_option("--collapse", default=None, action="store_true",
+                help="collapse source side for CKY parsing"),
     make_option("--exhaustive", default=None, action="store_true",
                 help="exhaustive extraction in SCFG, GHKM and Tree"),
     make_option("--constrained", default=None, action="store_true",
@@ -550,6 +552,7 @@ class ExtractGHKM(Extract):
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  non_terminal="", max_nodes=15, max_height=4, max_scope=0,
+                 collapse=None,
                  exhaustive=None,
                  constrained=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
@@ -604,7 +607,9 @@ class ExtractGHKM(Extract):
         command += " --max-nodes %d"  %(max_nodes)
         command += " --max-height %d" %(max_height)
         command += " --max-scope %d" %(max_scope)
-
+        
+        if collapse:
+            command += " --collapse"
         if exhaustive:
             command += " --exhaustive"
         if constrained:
@@ -627,6 +632,7 @@ class ExtractTree(Extract):
     def __init__(self, cicada=None, corpus=None, alignment=None,
                  model_dir="",
                  max_nodes=15, max_height=4, max_scope=0,
+                 collapse=None,
                  exhaustive=None,
                  constrained=None,
                  max_malloc=8, threads=4, mpi=None, pbs=None,
@@ -656,6 +662,8 @@ class ExtractTree(Extract):
         command += " --max-height %d" %(max_height)
         command += " --max-scope %d" %(max_scope)
         
+        if collapse:
+            command += " --collapse"
         if exhaustive:
             command += " --exhaustive"
         if constrained:
@@ -814,6 +822,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
                               max_scope=options.max_scope,
+                              collapse=options.collapse,
                               exhaustive=options.exhaustive,
                               constrained=options.constrained,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
@@ -824,6 +833,7 @@ if options.first_step <= 5 and options.last_step >= 5:
                               max_nodes=options.max_nodes,
                               max_height=options.max_height,
                               max_scope=options.max_scope,
+                              collapse=options.collapse,
                               exhaustive=options.exhaustive,
                               constrained=options.constrained,
                               max_malloc=options.max_malloc, threads=options.threads, mpi=mpi, pbs=pbs,
