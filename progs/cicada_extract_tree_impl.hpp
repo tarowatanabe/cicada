@@ -1495,12 +1495,12 @@ struct ExtractTree
 	  derivation_edge_type& edge_target = graph_target.derivations[titer->first].edges[titer->second];
 	  
 	  if (edge_source.rule.empty())
-	    construct_rule(source, node_source, graph_source, edge_source);
+	    construct_rule(source, node_source, graph_source, edge_source, collapse);
 
 	  if (max_scope > 0 && edge_source.scope > max_scope) continue;
 	  
 	  if (edge_target.rule.empty())
-	    construct_rule(target, graph_target.derivations[titer->first], graph_target, edge_target);
+	    construct_rule(target, graph_target.derivations[titer->first], graph_target, edge_target, false);
 	  
 	  rule_pair.source = edge_source.rule;
 	  rule_pair.target = edge_target.rule;
@@ -1552,15 +1552,34 @@ struct ExtractTree
     symbol_type& prev;
     int& scope;
   };
+  
+  struct CollapseFrontierIterator
+  {
+    CollapseFrontierIterator(tree_rule_set_type& __trees) : trees(__trees) {}
+    
+    CollapseFrontierIterator& operator=(const symbol_type& value)
+    {
+      trees.push_back(value);
+      return *this;
+    }
+    
+    CollapseFrontierIterator& operator*()  { return *this; }
+    CollapseFrontierIterator& operator++() { return *this; }
+    
+    tree_rule_set_type& trees;
+  };
 
   // construct rule-pair related data
   covered_type   covered;
   point_set_type positions_relative;
 
+  tree_rule_set_type trees;
+
   void construct_rule(const hypergraph_type& graph,
 		      const derivation_node_type& node,
 		      const derivation_graph_type& derivations,
-		      derivation_edge_type& edge)
+		      derivation_edge_type& edge,
+		      const bool collapse)
   {
     positions_relative.clear();
     covered.clear();
@@ -1592,6 +1611,14 @@ struct ExtractTree
 	++ piter;
       }
 
+    if (collapse) {
+      // collapse tree-rule
+      
+      trees.clear();
+      tree_rule.frontier(CollapseFrontierIterator(trees));
+      tree_rule = tree_rule_type(tree_rule.label, trees.begin(), trees.end());
+    }
+    
     // compute scope
     {
       symbol_type prev(vocab_type::NONE);
