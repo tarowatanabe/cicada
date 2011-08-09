@@ -69,7 +69,7 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     root=$2
     shift; shift ;;
-  --cicada )
+  --cicada | --cicada-dir )
     test $# = 1 && eval "$exit_missing_arg"
     cicada=$2
     shift; shift ;;

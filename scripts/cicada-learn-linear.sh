@@ -74,7 +74,7 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     root=$2
     shift; shift ;;
-  --cicada )
+  --cicada | --cicada-dir )
     test $# = 1 && eval "$exit_missing_arg"
     cicada=$2
     shift; shift ;;
@@ -160,7 +160,15 @@ if test "$devset" = ""; then
   echo "specify development data"
   exit 1
 fi
+if test ! -e $devset; then
+  echo "specify development data"
+  exit 1
+fi
 if test "$refset" = ""; then
+  echo "specify reference data"
+  exit 1
+fi
+if test ! -e $refset; then
   echo "specify reference data"
   exit 1
 fi
