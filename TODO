@@ -124,3 +124,10 @@ Collapse and binarize the source side of the ghkm/tree grammar
    Perform "collapsing" and do binarization
    Perform lexicalization?
    Perform synchronous binarization? (we need to store all in memory...?)
+     and left-to-right and target-left-to-right binarization
+   How to represent intermedidate non-terminals?
+     We need to keep track of both-side....???
+     
+Do we keep pair of source-target lhs???
+  I'm pretty not sure how symbols should be handled during the CKY algorithm.
+  Probably, we need to keep both side and maintain it during unary rules...?
