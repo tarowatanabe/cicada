@@ -1,3 +1,6 @@
+2011-8-x
+(to be filled in)
+
 2011-8-10
 Added ngram OOV feature which greatly improve translation quality (and that is found in cdec)
 Added cicada-{learn,learn-linear,mert,maxlike}.sh to simplify tuning
