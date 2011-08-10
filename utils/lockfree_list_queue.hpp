@@ -137,7 +137,7 @@ namespace utils
       // this is not a copy construct, though...!
       //__alloc_size = 0;
       __size = 0;
-      __max_size = x.max_size;
+      __max_size = x.__max_size;
 
       tail.entry.value().version = 0;
       tail.entry.value().count = 0;
