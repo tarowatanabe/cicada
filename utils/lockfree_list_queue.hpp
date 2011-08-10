@@ -132,6 +132,43 @@ namespace utils
     typedef lockfree_list_queue<Tp,Alloc> __self_type;
     
   public:
+    lockfree_list_queue(const lockfree_list_queue& x) : head(), tail()
+    {
+      // this is not a copy construct, though...!
+      //__alloc_size = 0;
+      __size = 0;
+      __max_size = x.max_size;
+
+      tail.entry.value().version = 0;
+      tail.entry.value().count = 0;
+      
+      node_init0 = allocate(value_type());
+      node_init1 = allocate(value_type());
+      
+      tail.ptr0 = node_init0;
+      tail.ptr1 = node_init1;
+      
+      tail.ptr0->exit.value().count = 0;
+      tail.ptr0->exit.value().transfers_left = 2;
+      tail.ptr0->exit.value().nl_p = false;
+      tail.ptr0->exit.value().to_be_freed = false;
+      tail.ptr0->pred = tail.ptr1;
+      tail.ptr0->next = 0;
+      
+      tail.ptr1->exit.value().count = 0;
+      tail.ptr1->exit.value().transfers_left = 0;
+      tail.ptr1->exit.value().nl_p = false;
+      tail.ptr1->exit.value().to_be_freed = false;
+      
+      // we do not have to set this...?
+      tail.ptr1->pred = 0;
+      tail.ptr1->next = 0;
+
+      //std::cerr << "init: " << tail.ptr0 << " " << tail.ptr1 << std::endl;
+      
+      head = tail;      
+    }
+    
     lockfree_list_queue(size_type max_size=0) : head(), tail()
     {
       //__alloc_size = 0;
@@ -192,7 +229,6 @@ namespace utils
     }
 
   private:
-    lockfree_list_queue(const lockfree_list_queue&) {}
     lockfree_list_queue& operator=(const lockfree_list_queue&) {}
 
   private:

@@ -486,6 +486,10 @@ struct aligned_type
     bool empty() const { return aligned.empty(); }
     
     void clear() { aligned.clear(); }
+    void swap(aligned_map_type& x)
+    {
+      aligned.swap(x.aligned);
+    }
     
     aligned_map_type& operator+=(const aligned_map_type& x)
     {

@@ -174,74 +174,7 @@ int main(int argc, char ** argv)
 }
 
 
-template <typename LearnerSet, typename Maximizer>
-struct TaskMaximize : public Maximizer
-{
-  typedef size_t    size_type;
-  typedef ptrdiff_t difference_type;
-  
-  TaskMaximize(LearnerSet& __learners,
-	       const int __id,
-	       ttable_type& __ttable_source_target,
-	       ttable_type& __ttable_target_source,
-	       aligned_type& __aligned_source_target,
-	       aligned_type& __aligned_target_source)
-    : learners(__learners),
-      id(__id),
-      ttable_source_target(__ttable_source_target),
-      ttable_target_source(__ttable_target_source),
-      aligned_source_target(__aligned_source_target),
-      aligned_target_source(__aligned_target_source) {}
-  
-  void operator()()
-  {
-    for (word_type::id_type source_id = id; source_id < ttable_source_target.size(); source_id += learners.size()) {
-      for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].ttable_counts_source_target.exists(source_id)) {
-	  ttable_source_target[source_id] += learners[i].ttable_counts_source_target[source_id];
-	  learners[i].ttable_counts_source_target.clear(source_id);
-	}
-	
-	if (learners[i].aligned_source_target.exists(source_id)) {
-	  aligned_source_target[source_id] += learners[i].aligned_source_target[source_id];
-	  learners[i].aligned_source_target.clear(source_id);
-	}
-      }
-      
-      if (ttable_source_target.exists(source_id))
-	Maximizer::operator()(ttable_source_target[source_id], ttable_source_target.prior);
-    }
-    
-    for (word_type::id_type target_id = id; target_id < ttable_target_source.size(); target_id += learners.size()) {
-      for (size_t i = 0; i != learners.size(); ++ i) {
-	if (learners[i].ttable_counts_target_source.exists(target_id)) {
-	  ttable_target_source[target_id] += learners[i].ttable_counts_target_source[target_id];
-	  learners[i].ttable_counts_target_source.clear(target_id);
-	}
-	
-	if (learners[i].aligned_target_source.exists(target_id)) {
-	  aligned_target_source[target_id] += learners[i].aligned_target_source[target_id];
-	  learners[i].aligned_target_source.clear(target_id);
-	}
-      }
-      
-      if (ttable_target_source.exists(target_id))
-	Maximizer::operator()(ttable_target_source[target_id], ttable_target_source.prior);
-    }
-  }
-  
-  LearnerSet& learners;
-  const int id;
-
-  ttable_type& ttable_source_target;
-  ttable_type& ttable_target_source;
-  
-  aligned_type& aligned_source_target;
-  aligned_type& aligned_target_source;
-};
-
-template <typename Learner>
-struct TaskLearn : public Learner
+struct LearnMapReduce
 {
   struct bitext_type
   {
@@ -257,21 +190,132 @@ struct TaskLearn : public Learner
   };
   
   typedef std::vector<bitext_type, std::allocator<bitext_type> > bitext_set_type;
-  typedef utils::lockfree_list_queue<bitext_set_type, std::allocator<bitext_set_type> > queue_type;
   
-  TaskLearn(queue_type& __queue,
-	    const LearnBase& __base)
-    : Learner(__base), queue(__queue) {}
+  struct ttable_counts_type
+  {
+    word_type                      word;
+    ttable_type::count_map_type    counts;
+    aligned_type::aligned_map_type aligned;
+    
+    ttable_counts_type() : word(), counts(), aligned() {}
+    
+    void swap(ttable_counts_type& x)
+    {
+      word.swap(x.word);
+      counts.swap(x.counts);
+      aligned.swap(x.aligned);
+    }
+  };
+
+  
+  typedef utils::lockfree_list_queue<bitext_set_type, std::allocator<bitext_set_type> >       queue_bitext_type;
+  typedef utils::lockfree_list_queue<ttable_counts_type, std::allocator<ttable_counts_type> > queue_ttable_type;
+  typedef std::vector<queue_ttable_type, std::allocator<queue_ttable_type> >                  queue_ttable_set_type;
+};
+
+namespace std
+{
+  inline
+  void swap(LearnMapReduce::ttable_counts_type& x, LearnMapReduce::ttable_counts_type& y)
+  {
+    x.swap(y);
+  }
+};
+
+template <typename Maximizer>
+struct LearnReducer : public Maximizer
+{
+  typedef size_t    size_type;
+  typedef ptrdiff_t difference_type;
+  
+  typedef LearnMapReduce map_reduce_type;
+  
+  typedef map_reduce_type::ttable_counts_type ttable_counts_type;
+  typedef map_reduce_type::queue_ttable_type  queue_ttable_type;
+  
+  LearnReducer(queue_ttable_type& __queue,
+	       ttable_type& __ttable,
+	       aligned_type& __aligned)
+    : queue(__queue),
+      ttable(__ttable),
+      aligned(__aligned) {}
+  
+  void operator()()
+  {
+    ttable_type  ttable_reduced;
+    aligned_type aligned_reduced;
+    
+    ttable_counts_type counts;
+    
+    for (;;) {
+      counts.counts.clear();
+      counts.aligned.clear();
+      
+      queue.pop_swap(counts);
+      
+      if (counts.counts.empty() && counts.aligned.empty()) break;
+      
+      if (! counts.counts.empty())
+	ttable_reduced[counts.word] += counts.counts;
+      if (! counts.aligned.empty())
+	aligned_reduced[counts.word] += counts.aligned;
+    }
+    
+    for (word_type::id_type word_id = 0; word_id < aligned_reduced.size(); ++ word_id)
+      if (aligned_reduced.exists(word_id)) {
+	aligned[word_id].swap(aligned_reduced[word_id]);
+	aligned_reduced.clear(word_id);
+      }
+    
+    for (word_type::id_type word_id = 0; word_id < ttable_reduced.size(); ++ word_id)
+      if (ttable_reduced.exists(word_id)) { 
+	ttable[word_id].swap(ttable_reduced[word_id]);
+	ttable_reduced.clear(word_id);
+	
+	Maximizer::operator()(ttable[word_id], ttable.prior);
+      }
+  }
+  
+  queue_ttable_type& queue;
+  
+  ttable_type&  ttable;
+  aligned_type& aligned;
+  
+};
+
+template <typename Learner>
+struct LearnMapper : public Learner
+{
+  typedef LearnMapReduce map_reduce_type;
+  
+  typedef map_reduce_type::bitext_set_type    bitext_set_type;
+  typedef map_reduce_type::ttable_counts_type ttable_counts_type;
+  
+  typedef map_reduce_type::queue_bitext_type      queue_bitext_type;
+  typedef map_reduce_type::queue_ttable_type      queue_ttable_type;
+  typedef map_reduce_type::queue_ttable_set_type  queue_ttable_set_type;
+  
+  LearnMapper(queue_bitext_type& __queue_bitext,
+	      queue_ttable_set_type& __queue_ttable_source_target,
+	      queue_ttable_set_type& __queue_ttable_target_source,
+	      const LearnBase& __base)
+    : Learner(__base),
+      queue_bitext(__queue_bitext),
+      queue_ttable_source_target(__queue_ttable_source_target),
+      queue_ttable_target_source(__queue_ttable_target_source) {}
   
   void operator()()
   {
     Learner::initialize();
 
-    bitext_set_type bitexts;
+    bitext_set_type    bitexts;
     
-    for (;;) {
+
+    const int iter_mask = (1 << 3) - 1;
+    
+    for (int iter = 0;; ++ iter) {
       bitexts.clear();
-      queue.pop_swap(bitexts);
+      queue_bitext.pop_swap(bitexts);
       if (bitexts.empty()) break;
       
       typename bitext_set_type::const_iterator biter_end = bitexts.end();
@@ -281,10 +325,68 @@ struct TaskLearn : public Learner
 	else
 	  Learner::operator()(biter->source, biter->target, biter->alignment);
       }
+
+      if ((iter & iter_mask) == iter_mask)
+	dump();
     }
+    
+    dump();
+  }
+
+  void dump()
+  {
+    const word_type::id_type source_max = utils::bithack::max(Learner::ttable_counts_source_target.size(),
+							      Learner::aligned_source_target.size());
+    const word_type::id_type target_max = utils::bithack::max(Learner::ttable_counts_target_source.size(),
+							      Learner::aligned_target_source.size());
+    
+    ttable_counts_type counts;
+    
+    for (word_type::id_type source_id = 0; source_id != source_max; ++ source_id) {
+      counts.counts.clear();
+      counts.aligned.clear();
+	  
+      if (Learner::ttable_counts_source_target.exists(source_id) && ! Learner::ttable_counts_source_target[source_id].empty())
+	counts.counts.swap(Learner::ttable_counts_source_target[source_id]);
+	  
+      if (Learner::aligned_source_target.exists(source_id) && ! Learner::aligned_source_target[source_id].empty())
+	counts.aligned.swap(Learner::aligned_source_target[source_id]);
+	  
+      if (! counts.counts.empty() && ! counts.aligned.empty()) {
+	counts.word = word_type(source_id);
+	    
+	queue_ttable_source_target[hasher(source_id) % queue_ttable_source_target.size()].push_swap(counts);
+      }
+    }
+	
+    for (word_type::id_type target_id = 0; target_id != target_max; ++ target_id) {
+      counts.counts.clear();
+      counts.aligned.clear();
+	  
+      if (Learner::ttable_counts_target_source.exists(target_id) && ! Learner::ttable_counts_target_source[target_id].empty())
+	counts.counts.swap(Learner::ttable_counts_target_source[target_id]);
+	  
+      if (Learner::aligned_target_source.exists(target_id) && ! Learner::aligned_target_source[target_id].empty())
+	counts.aligned.swap(Learner::aligned_target_source[target_id]);
+	  
+      if (! counts.counts.empty() && ! counts.aligned.empty()) {
+	counts.word = word_type(target_id);
+	    
+	queue_ttable_target_source[hasher(target_id) % queue_ttable_target_source.size()].push_swap(counts);
+      }
+    }
+	
+    Learner::ttable_counts_source_target.clear();
+    Learner::ttable_counts_target_source.clear();
+    Learner::aligned_source_target.clear();
+    Learner::aligned_target_source.clear();
   }
   
-  queue_type& queue;
+  queue_bitext_type& queue_bitext;
+  queue_ttable_set_type& queue_ttable_source_target;
+  queue_ttable_set_type& queue_ttable_target_source;
+  
+  utils::hashmurmur<size_t> hasher;
 };
 
 template <typename Learner, typename Maximizer>
@@ -293,18 +395,27 @@ void learn(ttable_type& ttable_source_target,
 	   aligned_type& aligned_source_target,
 	   aligned_type& aligned_target_source)
 {
-  typedef TaskLearn<Learner> learner_type;
+  typedef LearnMapReduce map_reduce_type;
+  typedef LearnMapper<Learner> mapper_type;
+  typedef LearnReducer<Maximizer> reducer_type;
   
-  typedef typename learner_type::bitext_type     bitext_type;
-  typedef typename learner_type::bitext_set_type bitext_set_type;
-  typedef typename learner_type::queue_type      queue_type;
+  typedef map_reduce_type::bitext_type     bitext_type;
+  typedef map_reduce_type::bitext_set_type bitext_set_type;
   
-  typedef std::vector<learner_type, std::allocator<learner_type> > learner_set_type;
+  typedef map_reduce_type::queue_bitext_type      queue_bitext_type;
+  typedef map_reduce_type::queue_ttable_type      queue_ttable_type;
+  typedef map_reduce_type::queue_ttable_set_type  queue_ttable_set_type;
   
-  typedef TaskMaximize<learner_set_type, Maximizer> maximizer_type;
+  typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
 
-  queue_type       queue(threads * 64);
-  learner_set_type learners(threads, learner_type(queue, LearnBase(ttable_source_target, ttable_target_source)));
+  queue_bitext_type queue_bitext(threads * 64);
+  queue_ttable_set_type queue_ttable_source_target(utils::bithack::max(1, threads / 2));
+  queue_ttable_set_type queue_ttable_target_source(utils::bithack::max(1, threads / 2));
+  
+  mapper_set_type  mappers(threads, mapper_type(queue_bitext,
+						queue_ttable_source_target,
+						queue_ttable_target_source,
+						LearnBase(ttable_source_target, ttable_target_source)));
   
   for (int iter = 0; iter < iteration; ++ iter) {
     if (debug)
@@ -312,9 +423,21 @@ void learn(ttable_type& ttable_source_target,
 
     utils::resource accumulate_start;
     
-    boost::thread_group workers_learn;
-    for (size_t i = 0; i != learners.size(); ++ i)
-      workers_learn.add_thread(new boost::thread(boost::ref(learners[i])));
+    boost::thread_group workers_mapper;
+    boost::thread_group workers_reducer_source_target;
+    boost::thread_group workers_reducer_target_source;
+    
+    for (size_t i = 0; i != mappers.size(); ++ i)
+      workers_mapper.add_thread(new boost::thread(boost::ref(mappers[i])));
+    
+    for (size_t i = 0; i != queue_ttable_source_target.size(); ++ i)
+      workers_reducer_source_target.add_thread(new boost::thread(reducer_type(queue_ttable_source_target[i],
+									      ttable_source_target,
+									      aligned_source_target)));
+    for (size_t i = 0; i != queue_ttable_target_source.size(); ++ i)
+      workers_reducer_target_source.add_thread(new boost::thread(reducer_type(queue_ttable_target_source[i],
+									      ttable_target_source,
+									      aligned_target_source)));
     
     utils::compress_istream is_src(source_file, 1024 * 1024);
     utils::compress_istream is_trg(target_file, 1024 * 1024);
@@ -347,13 +470,13 @@ void learn(ttable_type& ttable_source_target,
       }
       
       if (bitexts.size() == 64) {
-	queue.push_swap(bitexts);
+	queue_bitext.push_swap(bitexts);
 	bitexts.clear();
       }
     }
 
     if (! bitexts.empty())
-      queue.push_swap(bitexts);
+      queue_bitext.push_swap(bitexts);
     
     if (debug && num_bitext >= 10000)
       std::cerr << std::endl;
@@ -362,13 +485,13 @@ void learn(ttable_type& ttable_source_target,
 
     if (is_src || is_trg || (is_align.get() && *is_align))
       throw std::runtime_error("# of samples do not match");
-        
-    for (size_t i = 0; i != learners.size(); ++ i) {
+    
+    for (size_t i = 0; i != mappers.size(); ++ i) {
       bitexts.clear();
-      queue.push_swap(bitexts);
+      queue_bitext.push_swap(bitexts);
     }
     
-    workers_learn.join_all();
+    workers_mapper.join_all();
     
     // merge and normalize...! 
     ttable_source_target.initialize();
@@ -386,25 +509,29 @@ void learn(ttable_type& ttable_source_target,
     aligned_source_target.resize(word_type::allocated());
     aligned_target_source.resize(word_type::allocated());
     
+    // send termination to reducer by sending nulls
+    
+    for (size_t i = 0; i != queue_ttable_source_target.size(); ++ i)
+      queue_ttable_source_target[i].push(queue_ttable_type::value_type());
+    
+    for (size_t i = 0; i != queue_ttable_target_source.size(); ++ i)
+      queue_ttable_target_source[i].push(queue_ttable_type::value_type());
     
     double objective_source_target = 0;
     double objective_target_source = 0;
     
     boost::thread_group workers_maximize;
-    for (size_t i = 0; i != learners.size(); ++ i) {
-      objective_source_target += learners[i].objective_source_target;
-      objective_target_source += learners[i].objective_target_source;
-      
-      workers_maximize.add_thread(new boost::thread(maximizer_type(learners, i,
-								   ttable_source_target, ttable_target_source,
-								   aligned_source_target, aligned_target_source)));
+    for (size_t i = 0; i != mappers.size(); ++ i) {
+      objective_source_target += mappers[i].objective_source_target;
+      objective_target_source += mappers[i].objective_target_source;
     }
     
     if (debug)
       std::cerr << "perplexity for P(target | source): " << objective_source_target << '\n'
 		<< "perplexity for P(source | target): " << objective_target_source << '\n';
     
-    workers_maximize.join_all();
+    workers_reducer_source_target.join_all();
+    workers_reducer_target_source.join_all();
     
     utils::resource accumulate_end;
     
