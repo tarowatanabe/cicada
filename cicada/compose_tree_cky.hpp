@@ -191,9 +191,8 @@ namespace cicada
 			       std::allocator<tail_set_type> > internal_tail_set_type;
     typedef utils::indexed_set<symbol_set_type, hash_sequence<symbol_set_type>, std::equal_to<symbol_set_type>,
 			       std::allocator<symbol_set_type> > internal_symbol_set_type;
-    
+
     typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
-    
 
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
@@ -885,8 +884,13 @@ namespace cicada
 	  graph.connect_edge(edge_id, root);
 	  
 	  result.first->second = edge_id;
-	} else
+
+	  //std::cerr << "init:   " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
+	} else {
 	  edge_id = result.first->second;
+	  
+	  //std::cerr << "shared: " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
+	}
 #endif
 
 #if 0	
