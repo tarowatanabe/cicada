@@ -49,14 +49,19 @@ struct classes_type
   
   typedef std::vector<word_type, std::allocator<word_type> > map_type;
   
-  classes_type() : classes() {}
-
+  classes_type(const bool __unknown=false, const bool __surface=false) : classes(), unknown(__unknown), surface(__surface) {}
+  
   void clear() { classes.clear(); }
   void shrink() { map_type(classes).swap(classes); }
   
   word_type operator[](const word_type& word) const
   {
-    return (word.id() >= classes.size() ? vocab_type::UNK : classes[word.id()]);
+    if (unknown)
+      return (word == vocab_type::BOS || word == vocab_type::EOS ? word : vocab_type::UNK);
+    else if (surface)
+      return word;
+    else
+      return (word.id() >= classes.size() ? vocab_type::UNK : classes[word.id()]);
   }
   
   word_type& operator[](const word_type& word)
@@ -68,6 +73,9 @@ struct classes_type
   }
 
   map_type classes;
+  
+  bool unknown;
+  bool surface;
 };
 
 struct atable_type
@@ -869,6 +877,9 @@ void read_classes(const path_type& path, classes_type& classes)
     
     classes[word] = cluster;
   }
+  
+  classes[vocab_type::BOS] = vocab_type::BOS;
+  classes[vocab_type::EOS] = vocab_type::EOS;
 
   classes.shrink();
 }
