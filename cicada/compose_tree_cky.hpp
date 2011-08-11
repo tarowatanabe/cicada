@@ -885,9 +885,13 @@ namespace cicada
 	    graph.connect_edge(edge_id, root);
 	    
 	    result.first->second = edge_id;
+
+	    //std::cerr << "init:   " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
 	  } else {
 	    edge_id = result.first->second;
 	    root = graph.edges[edge_id].head;
+	    
+	    //std::cerr << "shared: " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
 	  }
 	} else {
 	  edge_id = graph.add_edge(tails.begin(), tails.end()).id;
