@@ -265,7 +265,6 @@ namespace cicada
       tail_map.clear();
       symbol_map.clear();
       label_map.clear();
-      sharable.clear();
       
       node_map.clear();
       node_graph_tree.clear();
