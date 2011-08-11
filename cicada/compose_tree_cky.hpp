@@ -20,6 +20,7 @@
 #include <cicada/lattice.hpp>
 #include <cicada/hypergraph.hpp>
 
+#include <utils/indexed_set.hpp>
 #include <utils/chunk_vector.hpp>
 #include <utils/chart.hpp>
 #include <utils/hashmurmur.hpp>
@@ -170,29 +171,37 @@ namespace cicada
     typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
     typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
 
+    
+    
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;
     typedef rule_type::symbol_set_type                symbol_set_type;
-    typedef boost::fusion::tuple<tail_set_type, symbol_set_type, symbol_type> internal_label_type;
 
-    struct internal_label_hash : public utils::hashmurmur<size_t>
+    template <typename Seq>
+    struct hash_sequence : utils::hashmurmur<size_t>
     {
       typedef utils::hashmurmur<size_t> hasher_type;
-
-      size_t operator()(const internal_label_type& x) const
+      
+      size_t operator()(const Seq& x) const
       {
-	return hasher_type::operator()(boost::fusion::get<0>(x).begin(), boost::fusion::get<0>(x).end(),
-				       hasher_type::operator()(boost::fusion::get<1>(x).begin(), boost::fusion::get<1>(x).end(), boost::fusion::get<2>(x).id()));
+	return hasher_type::operator()(x.begin(), x.end(), 0);
       }
     };
+    
+    typedef utils::indexed_set<tail_set_type, hash_sequence<tail_set_type>, std::equal_to<tail_set_type>,
+			       std::allocator<tail_set_type> > internal_tail_set_type;
+    typedef utils::indexed_set<symbol_set_type, hash_sequence<symbol_set_type>, std::equal_to<symbol_set_type>,
+			       std::allocator<symbol_set_type> > internal_symbol_set_type;
+    
+    typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
+    
 
 #ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<internal_label_type, hypergraph_type::id_type, internal_label_hash, std::equal_to<internal_label_type>,
+    typedef std::tr1::unordered_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 				    std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
 #else
-    typedef sgi::hash_map<internal_label_type, hypergraph_type::id_type, internal_label_hash, std::equal_to<internal_label_type>,
+    typedef sgi::hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 			  std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
 #endif
-
     
     struct less_non_terminal
     {
@@ -254,7 +263,10 @@ namespace cicada
       actives_rule.clear();
       passives.clear();
       
+      tail_map.clear();
+      symbol_map.clear();
       label_map.clear();
+      
       node_map.clear();
       node_graph_tree.clear();
       node_graph_rule.clear();
@@ -858,9 +870,12 @@ namespace cicada
 
 #if 1
 	// we will share internal nodes
+
+	internal_tail_set_type::iterator   titer = tail_map.insert(tail_set_type(tails.begin(), tails.end())).first;
+	internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	
-	std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(tail_set_type(tails.begin(), tails.end()),
-															symbol_set_type(rhs.begin(), rhs.end()),
+	std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(titer - tail_map.begin(),
+															siter - symbol_map.begin(),
 															rule.label), 0));
 	if (result.second) {
 	  root = graph.add_node().id;
@@ -916,7 +931,9 @@ namespace cicada
     node_graph_type       node_graph_rule;
     non_terminal_set_type non_terminals;
 
-    internal_label_map_type label_map;
+    internal_tail_set_type   tail_map;
+    internal_symbol_set_type symbol_map;
+    internal_label_map_type  label_map;
   };
   
   
