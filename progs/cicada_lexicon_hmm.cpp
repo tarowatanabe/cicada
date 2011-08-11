@@ -559,7 +559,7 @@ struct LearnMapper : public Learner
     bitext_set_type    bitexts;
     
 
-    const int iter_mask = (1 << 3) - 1;
+    const int iter_mask = (1 << 4) - 1;
     
     for (int iter = 0;; ++ iter) {
       bitexts.clear();
