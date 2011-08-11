@@ -289,7 +289,7 @@ namespace cicada
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
 
-	  std::cerr << "span: " << first << ".." << last << std::endl;
+	  //std::cerr << "span: " << first << ".." << last << std::endl;
 	  
 	  node_map.clear();
 	  
@@ -299,7 +299,7 @@ namespace cicada
 	  complete_actives(first, last, grammar,      actives_rule, graph, ExtractRuleLHS());
 	  complete_actives(first, last, tree_grammar, actives_tree, graph, ExtractTreeLHS());
 
-	  std::cerr << "passives size: " << passives(first, last).size() << std::endl;
+	  //std::cerr << "passives size: " << passives(first, last).size() << std::endl;
 	  
 	  // handle unary rules...
 	  // TODO: handle unary rules both for tree-grammar and grammar!!!!
@@ -561,6 +561,12 @@ namespace cicada
 	  const typename transducer_type::rule_pair_set_type& rules = transducer.rules(citer->node);
 	  
 	  if (rules.empty()) continue;
+
+#if 0
+	  std::cerr << "# of rules: " << rules.size() << " tails: ";
+	  std::copy(citer->tails.begin(), citer->tails.end(), std::ostream_iterator<int>(std::cerr, " "));
+	  std::cerr << std::endl;
+#endif
 	  
 	  typename transducer_type::rule_pair_set_type::const_iterator riter_end   = rules.end();
 	  for (typename transducer_type::rule_pair_set_type::const_iterator riter = rules.begin(); riter != riter_end; ++ riter)
@@ -760,7 +766,7 @@ namespace cicada
       //const int cat_level = utils::bithack::branch(unique_goal && rule->lhs == goal, 0, level);
       const int& cat_level = level;
 
-      std::cerr << "lhs: " << lhs << ":" << cat_level << " " << *rule << std::endl;
+      //std::cerr << "lhs: " << lhs << ":" << cat_level << " " << *rule << std::endl;
       
       // source lhs
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, cat_level), 0));
