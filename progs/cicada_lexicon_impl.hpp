@@ -86,6 +86,13 @@ struct atable_type
 
     difference_map_type() : positives(), negatives() {}
 
+    difference_map_type& operator=(const difference_map_type& x)
+    {
+      positives = x.positives;
+      negatives = x.negatives;
+      return *this;
+    }
+
     difference_map_type& operator+=(const difference_map_type& x)
     {
       for (index_type i = x.min(); i <= x.max(); ++ i)
@@ -238,6 +245,8 @@ struct atable_type
 
   void estimate_unk()
   {
+    if (atable.empty()) return;
+
     difference_map_type atable_source_target;
     count_dict_type atable_source;
     count_dict_type atable_target;
@@ -257,17 +266,13 @@ struct atable_type
 	atable_source_target += aiter->second;
     }
     
+    count_dict_type::const_iterator siter_end = atable_source.end();
+    for (count_dict_type::const_iterator siter = atable_source.begin(); siter != siter_end; ++ siter)
+      atable[siter->first] = siter->second;
     
-    {
-      count_dict_type::const_iterator aiter_end = atable_source.end();
-      for (count_dict_type::const_iterator aiter = atable_source.begin(); aiter != aiter_end; ++ aiter)
-	atable[aiter->first] = aiter->second;
-    }
-    {
-      count_dict_type::const_iterator aiter_end = atable_target.end();
-      for (count_dict_type::const_iterator aiter = atable_target.begin(); aiter != aiter_end; ++ aiter)
-	atable[aiter->first] = aiter->second;
-    }
+    count_dict_type::const_iterator titer_end = atable_target.end();
+    for (count_dict_type::const_iterator titer = atable_target.begin(); titer != titer_end; ++ titer)
+      atable[titer->first] = titer->second;
     
     atable[class_pair_type(vocab_type::UNK, vocab_type::UNK)] = atable_source_target;
   }

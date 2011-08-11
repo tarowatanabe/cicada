@@ -792,8 +792,8 @@ void learn(const int iteration,
       atable_target_source += mappers[i].atable_counts_target_source;
     }
     
-    //atable_source_target.estimate_unk();
-    //atable_target_source.estimate_unk();
+    atable_source_target.estimate_unk();
+    atable_target_source.estimate_unk();
     
     for (size_t i = 0; i != mappers.size(); ++ i) {
       mappers[i].atable_source_target = atable_source_target;
