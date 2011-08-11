@@ -445,6 +445,7 @@ namespace cicada
       tail_map.clear();
       symbol_map.clear();
       label_map.clear();
+      sharable.clear();
 
       actives_tree.reserve(tree_grammar.size());
       actives_rule.reserve(grammar.size());
@@ -918,8 +919,14 @@ namespace cicada
       
       // projected lhs
       std::pair<typename node_set_type::iterator, bool> result_mapped = node_graph_tree[result.first->second].insert(std::make_pair(rule->label, 0));
-      if (result_mapped.second)
-	result_mapped.first->second = graph.add_node().id;
+      if (result_mapped.second) {
+	const hypergraph_type::id_type root_id = graph.add_node().id;
+	result_mapped.first->second = root_id;
+	
+	if (root_id >= sharable.size())
+	  sharable.resize(root_id + 1, false);
+	sharable[root_id] = true;
+      }
       
       const hypergraph_type::id_type root_id = result_mapped.first->second;
       
@@ -948,6 +955,7 @@ namespace cicada
       
       rhs_type rhs;
       tails_type tails;
+      bool shared = true;
       
       tree_rule_type::const_iterator aiter_end = rule.end();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
@@ -962,8 +970,14 @@ namespace cicada
 	    
 	    node_set_type& node_set = node_graph_tree[frontiers[non_terminal_index]];
 	    std::pair<typename node_set_type::iterator, bool> result = node_set.insert(std::make_pair(aiter->label.non_terminal(), 0));
-	    if (result.second)
-	      result.first->second = graph.add_node().id;
+	    if (result.second) {
+	      const hypergraph_type::id_type node_id = graph.add_node().id;
+	      result.first->second = node_id;
+	      
+	      if (node_id >= sharable.size())
+		sharable.resize(node_id + 1, false);
+	      sharable[node_id] = true;
+	    }
 	    
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
@@ -981,6 +995,9 @@ namespace cicada
 	  if (! aiter->antecedents.empty()) {
 	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
 	    *titer = graph.edges[edge_id].head;
+	    
+	    if (! sharable[*titer])
+	      shared = false;
 	  }
 	  ++ titer;
 	}
@@ -988,10 +1005,9 @@ namespace cicada
       hypergraph_type::id_type edge_id;
       
       if (root == hypergraph_type::invalid) {
-#if 1
 	// we will share internal nodes
 	
-	if (! tails.empty()) {
+	if (! tails.empty() && shared) {
 	  typename internal_tail_set_type::iterator   titer = tail_map.insert(tail_set_type(tails.begin(), tails.end())).first;
 	  typename internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	  
@@ -1001,6 +1017,10 @@ namespace cicada
 	  if (result.second) {
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	    root = graph.add_node().id;
+
+	    if (root >= sharable.size())
+	      sharable.resize(root + 1, false);
+	    sharable[root] = true;
 	    
 	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	    graph.connect_edge(edge_id, root);
@@ -1014,17 +1034,12 @@ namespace cicada
 	  edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	  root = graph.add_node().id;
 	  
+	  if (root >= sharable.size())
+	    sharable.resize(root + 1, false);
+	  
 	  graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	  graph.connect_edge(edge_id, root);
 	}
-#endif
-#if 0
-	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
-	root = graph.add_node().id;
-	
-	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
-	graph.connect_edge(edge_id, root);
-#endif
       } else {
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
@@ -1224,6 +1239,7 @@ namespace cicada
     internal_tail_set_type   tail_map;
     internal_symbol_set_type symbol_map;
     internal_label_map_type  label_map;
+    std::vector<bool, std::allocator<bool> > sharable;
   };
   
   template <typename Function>
