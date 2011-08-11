@@ -893,7 +893,7 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
     alignment_type alignment_source_target;
     alignment_type alignment_target_source;
 
-    const int iter_mask = (1 << 10) - 1;
+    const int iter_mask = (1 << 12) - 1;
     
     for (int iter = 0;; ++ iter) {
       mapper.pop_swap(bitext);

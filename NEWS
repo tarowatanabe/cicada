@@ -1,3 +1,7 @@
+2011-8-x
+Bugfix for alignment by lexicon model. The cause of the bug seem to be an initialization issue...?
+Less memory for Viterbi alignment computation by shrinking at some interval
+
 2011-8-11
 Rework for cicada_lexicon_{model1,hmm}: implement by map/reduce in order to reduce memory requriement
 Serious bugfix for alignment computation: TODO handle UNK words...
