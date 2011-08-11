@@ -980,6 +980,7 @@ namespace cicada
       hypergraph_type::id_type edge_id;
       
       if (root == hypergraph_type::invalid) {
+#if 0
 	// we will share internal nodes
 	
 	std::pair<typename internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(tail_set_type(tails.begin(), tails.end()),
@@ -995,6 +996,11 @@ namespace cicada
 	  result.first->second = edge_id;
 	} else
 	  edge_id = result.first->second;
+#endif
+	root = graph.add_node().id;
+	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	graph.connect_edge(edge_id, root);
       } else {
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
