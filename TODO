@@ -131,3 +131,6 @@ Collapse and binarize the source side of the ghkm/tree grammar
 Do we keep pair of source-target lhs???
   I'm pretty not sure how symbols should be handled during the CKY algorithm.
   Probably, we need to keep both side and maintain it during unary rules...?
+
+Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
+  I'm not sure which is better..
