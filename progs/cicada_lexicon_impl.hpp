@@ -76,23 +76,15 @@ struct atable_type
   typedef ptrdiff_t difference_type;
   typedef int       index_type;
 
-  struct difference_map_type
+  class difference_map_type
   {
+  public:
     typedef size_t    size_type;
     typedef ptrdiff_t difference_type;
     typedef int       index_type;
     
     typedef std::vector<count_type, std::allocator<count_type> > difference_set_type;
-
-    difference_map_type() : positives(), negatives() {}
-
-    difference_map_type& operator=(const difference_map_type& x)
-    {
-      positives = x.positives;
-      negatives = x.negatives;
-      return *this;
-    }
-
+    
     difference_map_type& operator+=(const difference_map_type& x)
     {
       for (index_type i = x.min(); i <= x.max(); ++ i)
