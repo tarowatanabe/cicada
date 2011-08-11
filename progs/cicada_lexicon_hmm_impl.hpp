@@ -55,6 +55,42 @@ struct LearnHMM : public LearnBase
     sentence_type target_class;
 
     point_map_type points;
+
+    void shrink()
+    {
+      forward.clear();
+      backward.clear();
+      
+      emission.clear();
+      transition.clear();
+      scale.clear();
+      
+      posterior.clear();
+      
+      source.clear();
+      target.clear();
+      
+      source_class.clear();
+      target_class.clear();
+      
+      points.clear();
+      
+      forward_type(forward).swap(forward);
+      backward_type(backward).swap(backward);
+      
+      emission_type(emission).swap(emission);
+      transition_type(transition).swap(transition);
+      scale_type(scale).swap(scale);
+      
+      posterior_type(posterior).swap(posterior);
+      
+      sentence_type(source).swap(source);
+      sentence_type(target).swap(target);
+      sentence_type(source_class).swap(source_class);
+      sentence_type(target_class).swap(target_class);
+      
+      point_map_type(points).swap(points);
+    }
     
     void prepare(const sentence_type& __source,
 		 const sentence_type& __target,
@@ -1340,6 +1376,25 @@ struct ViterbiHMM : public ViterbiBase
     viterbi(target, source, ttable_target_source, atable_target_source, classes_target, classes_source, alignment_target_source);
   }
 
+  void shrink()
+  {
+    forward_max.clear();
+    forward_sum.clear();
+    backptr.clear();
+    scale.clear();
+    
+    source_class.clear();
+    target_class.clear();
+    
+    forward_type(forward_max).swap(forward_max);
+    forward_type(forward_sum).swap(forward_sum);
+    backptr_type(backptr).swap(backptr);
+    scale_type(scale).swap(scale);
+    
+    sentence_type(source_class).swap(source_class);
+    sentence_type(target_class).swap(target_class);
+  }
+
   typedef utils::vector2_aligned<prob_type, std::allocator<prob_type> > forward_type;
   typedef std::vector<prob_type, std::allocator<prob_type> >    scale_type;
   
@@ -1452,11 +1507,22 @@ struct ITGHMM : public ViterbiBase
     std::sort(alignment_source_target.begin(), alignment_source_target.end());
     std::sort(alignment_target_source.begin(), alignment_target_source.end());
   }
+
+  void shrink()
+  {
+    costs.clear();
+    matrix_type(costs).swap(costs);
+    
+    hmm_source_target.shrink();
+    hmm_target_source.shrink();
+
+    aligner.shrink();
+  }
+
+  matrix_type costs;
   
   hmm_data_type hmm_source_target;
   hmm_data_type hmm_target_source;
-  
-  matrix_type costs;
   
   detail::ITGAlignment aligner;
 };
@@ -1557,6 +1623,15 @@ struct MaxMatchHMM : public ViterbiBase
     
     std::sort(alignment_source_target.begin(), alignment_source_target.end());
     std::sort(alignment_target_source.begin(), alignment_target_source.end());
+  }
+
+  void shrink()
+  {
+    costs.clear();
+    matrix_type(costs).swap(costs);    
+    
+    hmm_source_target.shrink();
+    hmm_target_source.shrink();
   }
   
   matrix_type costs;

@@ -558,7 +558,6 @@ struct LearnMapper : public Learner
 
     bitext_set_type    bitexts;
     
-
     const int iter_mask = (1 << 5) - 1;
     
     for (int iter = 0;; ++ iter) {
@@ -893,8 +892,10 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
     bitext_type bitext;
     alignment_type alignment_source_target;
     alignment_type alignment_target_source;
+
+    const int iter_mask = (1 << 10) - 1;
     
-    for (;;) {
+    for (int iter = 0;; ++ iter) {
       mapper.pop_swap(bitext);
       if (bitext.id == size_type(-1)) break;
       
@@ -906,6 +907,9 @@ struct ViterbiMapper : public ViterbiMapReduce, public Aligner
       
       reducer_source_target.push(bitext_type(bitext.id, bitext.source, bitext.target, alignment_source_target));
       reducer_target_source.push(bitext_type(bitext.id, bitext.target, bitext.source, alignment_target_source));
+
+      if ((iter & iter_mask) == iter_mask)
+	Aligner::shrink();
     }
   }
 };

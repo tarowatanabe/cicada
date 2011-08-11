@@ -68,11 +68,10 @@ namespace utils
     }
     void swap(vector3& x)
     {
-      using namespace std;
       __base.swap(x.__base);
-      swap(__size1, x.__size1);
-      swap(__size2, x.__size2);
-      swap(__size3, x.__size3);
+      std::swap(__size1, x.__size1);
+      std::swap(__size2, x.__size2);
+      std::swap(__size3, x.__size3);
     }
     
     inline const_reference operator()(size_type pos1, size_type pos2, size_type pos3) const

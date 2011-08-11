@@ -435,6 +435,15 @@ namespace detail
       
       viterbi(costs, result);
     }
+
+    void shrink()
+    {
+      inside.clear();
+      backptr.clear();
+      
+      chart_set_type(inside).swap(inside);
+      backptr_chart_type(backptr).swap(backptr);
+    }
     
     chart_set_type     inside;
     backptr_chart_type backptr;

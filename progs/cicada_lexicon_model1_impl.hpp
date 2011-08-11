@@ -1343,6 +1343,12 @@ struct ViterbiModel1 : public ViterbiBase
     viterbi(source, target, ttable_source_target, alignment_source_target);
     viterbi(target, source, ttable_target_source, alignment_target_source);
   }
+
+  void shrink()
+  {
+    
+  }
+
 };
 
 struct ITGModel1 : public ViterbiBase
@@ -1489,6 +1495,25 @@ struct ITGModel1 : public ViterbiBase
     
     std::sort(alignment_source_target.begin(), alignment_source_target.end());
     std::sort(alignment_target_source.begin(), alignment_target_source.end());
+  }
+
+  void shrink()
+  {
+    costs.clear();
+    prob_source_target.clear();
+    prob_target_source.clear();
+    posterior_source_target.clear();
+    posterior_target_source.clear();
+    
+    matrix_type(costs).swap(costs);
+    
+    prob_set_type(prob_source_target).swap(prob_source_target);
+    prob_set_type(prob_target_source).swap(prob_target_source);
+
+    posterior_set_type(posterior_source_target).swap(posterior_source_target);
+    posterior_set_type(posterior_target_source).swap(posterior_target_source);
+
+    aligner.shrink();
   }
   
   matrix_type costs;
@@ -1647,6 +1672,23 @@ struct MaxMatchModel1 : public ViterbiBase
     std::sort(alignment_target_source.begin(), alignment_target_source.end());
   }
   
+  void shrink()
+  {
+    costs.clear();
+    prob_source_target.clear();
+    prob_target_source.clear();
+    posterior_source_target.clear();
+    posterior_target_source.clear();
+    
+    matrix_type(costs).swap(costs);
+    
+    prob_set_type(prob_source_target).swap(prob_source_target);
+    prob_set_type(prob_target_source).swap(prob_target_source);
+
+    posterior_set_type(posterior_source_target).swap(posterior_source_target);
+    posterior_set_type(posterior_target_source).swap(posterior_target_source);
+  }
+
   matrix_type costs;
 
   prob_set_type      prob_source_target;

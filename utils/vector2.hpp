@@ -101,8 +101,8 @@ namespace utils
     void swap(vector2& x)
     {
       __base.swap(x.__base);
-      boost::swap(__size1, x.__size1);
-      boost::swap(__size2, x.__size2);
+      std::swap(__size1, x.__size1);
+      std::swap(__size2, x.__size2);
     }
 
     void swap(size_type pos1, size_type pos2)

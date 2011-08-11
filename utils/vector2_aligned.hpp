@@ -112,12 +112,12 @@ namespace utils
     }
     void swap(vector2_aligned& x)
     {
-      using namespace std;
       __base.swap(x.__base);
-      swap(__size1, x.__size1);
-      swap(__size2, x.__size2);
-      swap(__size1_aligned, x.__size1_aligned);
-      swap(__size2_aligned, x.__size2_aligned);
+      
+      std::swap(__size1, x.__size1);
+      std::swap(__size2, x.__size2);
+      std::swap(__size1_aligned, x.__size1_aligned);
+      std::swap(__size2_aligned, x.__size2_aligned);
     }
 
     void swap(size_type pos1, size_type pos2)
