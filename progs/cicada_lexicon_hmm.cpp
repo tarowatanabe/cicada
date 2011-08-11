@@ -603,7 +603,7 @@ struct LearnMapper : public Learner
       if (! counts.counts.empty() || ! counts.aligned.empty()) {
 	counts.word = word_type(source_id);
 	
-	queue_ttable_source_target[hasher(source_id) % queue_ttable_source_target.size()].push_swap(counts);
+	queue_ttable_source_target[source_id % queue_ttable_source_target.size()].push_swap(counts);
       }
     }
 	
@@ -620,7 +620,7 @@ struct LearnMapper : public Learner
       if (! counts.counts.empty() || ! counts.aligned.empty()) {
 	counts.word = word_type(target_id);
 	
-	queue_ttable_target_source[hasher(target_id) % queue_ttable_target_source.size()].push_swap(counts);
+	queue_ttable_target_source[target_id % queue_ttable_target_source.size()].push_swap(counts);
       }
     }
 	
