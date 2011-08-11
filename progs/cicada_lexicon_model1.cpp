@@ -280,7 +280,6 @@ struct LearnReducer : public Maximizer
   
   ttable_type&  ttable;
   aligned_type& aligned;
-  
 };
 
 template <typename Learner>
@@ -352,9 +351,9 @@ struct LearnMapper : public Learner
       if (Learner::aligned_source_target.exists(source_id) && ! Learner::aligned_source_target[source_id].empty())
 	counts.aligned.swap(Learner::aligned_source_target[source_id]);
 	  
-      if (! counts.counts.empty() && ! counts.aligned.empty()) {
+      if (! counts.counts.empty() || ! counts.aligned.empty()) {
 	counts.word = word_type(source_id);
-	    
+	
 	queue_ttable_source_target[hasher(source_id) % queue_ttable_source_target.size()].push_swap(counts);
       }
     }
@@ -369,9 +368,9 @@ struct LearnMapper : public Learner
       if (Learner::aligned_target_source.exists(target_id) && ! Learner::aligned_target_source[target_id].empty())
 	counts.aligned.swap(Learner::aligned_target_source[target_id]);
 	  
-      if (! counts.counts.empty() && ! counts.aligned.empty()) {
+      if (! counts.counts.empty() || ! counts.aligned.empty()) {
 	counts.word = word_type(target_id);
-	    
+	
 	queue_ttable_target_source[hasher(target_id) % queue_ttable_target_source.size()].push_swap(counts);
       }
     }
@@ -407,7 +406,7 @@ void learn(ttable_type& ttable_source_target,
   typedef map_reduce_type::queue_ttable_set_type  queue_ttable_set_type;
   
   typedef std::vector<mapper_type, std::allocator<mapper_type> > mapper_set_type;
-
+  
   queue_bitext_type queue_bitext(threads * 64);
   queue_ttable_set_type queue_ttable_source_target(utils::bithack::max(1, threads / 2));
   queue_ttable_set_type queue_ttable_target_source(utils::bithack::max(1, threads / 2));
@@ -510,7 +509,6 @@ void learn(ttable_type& ttable_source_target,
     aligned_target_source.resize(word_type::allocated());
     
     // send termination to reducer by sending nulls
-    
     for (size_t i = 0; i != queue_ttable_source_target.size(); ++ i)
       queue_ttable_source_target[i].push(queue_ttable_type::value_type());
     
@@ -520,15 +518,14 @@ void learn(ttable_type& ttable_source_target,
     double objective_source_target = 0;
     double objective_target_source = 0;
     
-    boost::thread_group workers_maximize;
     for (size_t i = 0; i != mappers.size(); ++ i) {
       objective_source_target += mappers[i].objective_source_target;
       objective_target_source += mappers[i].objective_target_source;
     }
     
     if (debug)
-      std::cerr << "perplexity for P(target | source): " << objective_source_target << '\n'
-		<< "perplexity for P(source | target): " << objective_target_source << '\n';
+      std::cerr << "log-likelihood for P(target | source): " << objective_source_target << '\n'
+		<< "log-likelihood for P(source | target): " << objective_target_source << '\n';
     
     workers_reducer_source_target.join_all();
     workers_reducer_target_source.join_all();
