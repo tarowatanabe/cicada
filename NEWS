@@ -1,8 +1,6 @@
-2011-8-x
-(to be fill-in)
-
 2011-8-11
 Rework for cicada_lexicon_{model1,hmm}: implement by map/reduce in order to reduce memory requriement
+Serious bugfix for alignment computation: TODO handle UNK words...
 
 2011-8-10
 Added ngram OOV feature which greatly improve translation quality (and that is found in cdec)
