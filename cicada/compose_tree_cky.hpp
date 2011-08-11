@@ -870,32 +870,37 @@ namespace cicada
 #if 1
 	// we will share internal nodes
 
-	internal_tail_set_type::iterator   titer = tail_map.insert(tail_set_type(tails.begin(), tails.end())).first;
-	internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
-	
-	std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(titer - tail_map.begin(),
-															siter - symbol_map.begin(),
-															rule.label), 0));
-	if (result.second) {
+	if (! tails.empty()) {
+	  internal_tail_set_type::iterator   titer = tail_map.insert(tail_set_type(tails.begin(), tails.end())).first;
+	  internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
+	  
+	  std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(titer - tail_map.begin(),
+															  siter - symbol_map.begin(),
+															  rule.label), 0));
+	  if (result.second) {
+	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	    root = graph.add_node().id;
+	    
+	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	    graph.connect_edge(edge_id, root);
+	    
+	    result.first->second = edge_id;
+	  } else {
+	    edge_id = result.first->second;
+	    root = graph.edges[edge_id].head;
+	  }
+	} else {
+	  edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	  root = graph.add_node().id;
 	  
-	  edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	  graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	  graph.connect_edge(edge_id, root);
-	  
-	  result.first->second = edge_id;
-
-	  //std::cerr << "init:   " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
-	} else {
-	  edge_id = result.first->second;
-	  
-	  //std::cerr << "shared: " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
 	}
 #endif
 
 #if 0	
-	root = graph.add_node().id;
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	root = graph.add_node().id;
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
 #endif
