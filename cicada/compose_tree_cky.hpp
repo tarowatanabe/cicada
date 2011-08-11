@@ -254,12 +254,11 @@ namespace cicada
       actives_rule.clear();
       passives.clear();
       
+      label_map.clear();
       node_map.clear();
       node_graph_tree.clear();
       node_graph_rule.clear();
       non_terminals.clear();
-
-      label_map.clear();
       
       actives_tree.reserve(tree_grammar.size());
       actives_rule.reserve(grammar.size());
@@ -290,7 +289,7 @@ namespace cicada
 	for (size_t first = 0; first + length <= lattice.size(); ++ first) {
 	  const size_t last = first + length;
 
-	  //std::cerr << "span: " << first << ".." << last << std::endl;
+	  std::cerr << "span: " << first << ".." << last << std::endl;
 	  
 	  node_map.clear();
 	  
@@ -300,7 +299,7 @@ namespace cicada
 	  complete_actives(first, last, grammar,      actives_rule, graph, ExtractRuleLHS());
 	  complete_actives(first, last, tree_grammar, actives_tree, graph, ExtractTreeLHS());
 
-	  //std::cerr << "passives size: " << passives(first, last).size() << std::endl;
+	  std::cerr << "passives size: " << passives(first, last).size() << std::endl;
 	  
 	  // handle unary rules...
 	  // TODO: handle unary rules both for tree-grammar and grammar!!!!
@@ -760,6 +759,8 @@ namespace cicada
     {
       //const int cat_level = utils::bithack::branch(unique_goal && rule->lhs == goal, 0, level);
       const int& cat_level = level;
+
+      std::cerr << "lhs: " << lhs << ":" << cat_level << " " << *rule << std::endl;
       
       // source lhs
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, cat_level), 0));
@@ -849,7 +850,7 @@ namespace cicada
       
       if (root == hypergraph_type::invalid) {
 
-#if 0
+#if 1
 	// we will share internal nodes
 	
 	std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(tail_set_type(tails.begin(), tails.end()),
@@ -866,11 +867,13 @@ namespace cicada
 	} else
 	  edge_id = result.first->second;
 #endif
-	
+
+#if 0	
 	root = graph.add_node().id;
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
 	graph.connect_edge(edge_id, root);
+#endif
 
       } else {
 	edge_id = graph.add_edge(tails.begin(), tails.end()).id;
