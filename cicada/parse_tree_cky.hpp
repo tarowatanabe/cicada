@@ -983,11 +983,12 @@ namespace cicada
 	    tails.push_back(result.first->second);
 	  } else {
 	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
-	    tails.push_back(graph.edges[edge_id].head);
-	    
-	    if (! sharable[*titer])
+	    if (! sharable[node_id])
 	      shared = false;
+	    
+	    tails.push_back(node_id);
 	  }
 	  
 	  rhs.push_back(aiter->label.non_terminal());
