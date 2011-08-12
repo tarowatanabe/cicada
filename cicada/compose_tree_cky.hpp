@@ -750,8 +750,8 @@ namespace cicada
       edge.attributes[attr_span_first] = attribute_set_type::int_type(lattice_first);
       edge.attributes[attr_span_last]  = attribute_set_type::int_type(lattice_last);
       
-      //const int cat_level = utils::bithack::branch(unique_goal && lhs == goal, 0, level);
-      const int& cat_level = level;
+      const int cat_level = utils::bithack::branch(unique_goal && rule->lhs == goal, 0, level);
+      //const int& cat_level = level;
       
       // source lhs
       std::pair<node_map_type::iterator, bool> result = node_map.insert(std::make_pair(std::make_pair(lhs, cat_level), 0));
@@ -782,8 +782,8 @@ namespace cicada
 		    const int lattice_last,
 		    const int level = 0)
     {
-      //const int cat_level = utils::bithack::branch(unique_goal && rule->lhs == goal, 0, level);
-      const int& cat_level = level;
+      const int cat_level = utils::bithack::branch(unique_goal && rule->label == goal, 0, level);
+      //const int& cat_level = level;
 
       //std::cerr << "lhs: " << lhs << ":" << cat_level << " " << *rule << std::endl;
       
