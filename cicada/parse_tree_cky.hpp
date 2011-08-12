@@ -605,7 +605,7 @@ namespace cicada
 					    graph,
 					    first,
 					    last,
-					    item->level);
+					    utils::bithack::branch(unique_goal && rule.rule->label == goal, 0, item->level));
 	      } else
 		node_passive = apply_rule(score,
 					  rule.lhs,
@@ -653,7 +653,7 @@ namespace cicada
 					    graph,
 					    first,
 					    last,
-					    item->level);
+					    utils::bithack::branch(unique_goal && rule.rule->lhs == goal, 0, item->level));
 	      } else
 		node_passive = apply_rule(score,
 					  rule.lhs,
