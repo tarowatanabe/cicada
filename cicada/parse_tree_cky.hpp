@@ -981,27 +981,19 @@ namespace cicada
 	    
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
-	  } else
-	    tails.push_back(0);
-	  
-	  rhs.push_back(aiter->label.non_terminal());
-	} else
-	  rhs.push_back(aiter->label);
-
-      // if we have antecedents traverse and construct
-      tails_type::iterator titer = tails.begin();
-      for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
-	if (aiter->label.is_non_terminal()) {
-	  if (! aiter->antecedents.empty()) {
+	  } else {
 	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
-	    *titer = graph.edges[edge_id].head;
+	    
+	    tails.push_back(graph.edges[edge_id].head);
 	    
 	    if (! sharable[*titer])
 	      shared = false;
 	  }
-	  ++ titer;
-	}
-
+	  
+	  rhs.push_back(aiter->label.non_terminal());
+	} else
+	  rhs.push_back(aiter->label);
+      
       hypergraph_type::id_type edge_id;
       
       if (root == hypergraph_type::invalid) {
