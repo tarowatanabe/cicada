@@ -401,6 +401,7 @@ struct ExtractTree
 
     int height;
     int internal;
+    int compose;
 
     std::string    rule;
     point_set_type positions;
@@ -408,13 +409,18 @@ struct ExtractTree
     int scope;
 
     DerivationEdge()
-      : edges(), tails(), height(0), internal(0) {}
+      : edges(), tails(), height(0), internal(0), compose(1) {}
     DerivationEdge(const edge_set_type& __edges, const node_set_type& __tails)
-      : edges(__edges), tails(__tails), height(0), internal(0) {}
+      : edges(__edges), tails(__tails), height(0), internal(0), compose(1) {}
     DerivationEdge(const edge_set_type& __edges, const node_set_type& __tails,
 		   const int __height,
 		   const int __internal)
-      : edges(__edges), tails(__tails), height(__height), internal(__internal) {}
+      : edges(__edges), tails(__tails), height(__height), internal(__internal), compose(1) {}
+    DerivationEdge(const edge_set_type& __edges, const node_set_type& __tails,
+		   const int __height,
+		   const int __internal,
+		   const int __compose)
+      : edges(__edges), tails(__tails), height(__height), internal(__internal), compose(__compose) {}
     
     void swap(DerivationEdge& x)
     {
@@ -422,6 +428,7 @@ struct ExtractTree
       tails.swap(x.tails);
       std::swap(height, x.height);
       std::swap(internal, x.internal);
+      std::swap(compose, x.compose);
       
       rule.swap(x.rule);
       positions.swap(x.positions);
@@ -447,7 +454,11 @@ struct ExtractTree
   {
     bool operator()(const derivation_edge_type& x, const derivation_edge_type& y) const
     {
-      return x.internal < y.internal || (!(y.internal < x.internal) && x.height < y.height);
+      return (x.compose < y.compose
+	      || (!(y.compose < x.compose)
+		  && (x.internal < y.internal
+		      || (!(y.internal < x.internal)
+			  && x.height < y.height))));
     }
   };
   
@@ -507,12 +518,11 @@ struct ExtractTree
       derivation_edge_type edge_composed;
       
       index_set_type j;
-      bool composed;
       
       Candidate(const index_set_type& __j)
-	: edge(0), edge_composed(), j(__j), composed(true) {}
-      Candidate(const derivation_edge_type& __edge, const index_set_type& __j, const bool __composed)
-	: edge(&__edge), edge_composed(__edge), j(__j), composed(__composed) {}
+	: edge(0), edge_composed(), j(__j) {}
+      Candidate(const derivation_edge_type& __edge, const index_set_type& __j)
+	: edge(&__edge), edge_composed(__edge), j(__j) {}
     };
     typedef Candidate candidate_type;
     typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
@@ -538,11 +548,13 @@ struct ExtractTree
       // we use greater, so that when popped from heap, we will grab "less" in back...
       bool operator()(const candidate_type* x, const candidate_type* y) const
       {
-	return int(x->composed) > int(y->composed) || (x->composed == y->composed && x->edge_composed.internal > y->edge_composed.internal);
+	return (x->edge_composed.compose > y->edge_composed.compose
+		|| (x->edge_composed.compose == y->edge_composed.compose
+		    && x->edge_composed.internal > y->edge_composed.internal));
       }
     };
     
-    void construct_subtrees(const hypergraph_type& graph, const int max_nodes, const int max_height)
+    void construct_subtrees(const hypergraph_type& graph, const int max_nodes, const int max_height, const int max_compose)
     {
       typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
       //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
@@ -578,7 +590,7 @@ struct ExtractTree
 	  const derivation_edge_type& edge = *eiter;
 	  const index_set_type j(edge.tails.size(), -1);
 	  
-	  candidates.push_back(candidate_type(edge, j, false));
+	  candidates.push_back(candidate_type(edge, j));
 	  
 	  cand.push(&candidates.back());
 	  // we will use Algorithm 2 of faster cube-pruning
@@ -591,7 +603,7 @@ struct ExtractTree
 	  
 	  const derivation_edge_type& edge_composed = item->edge_composed;
 	  
-	  if (! item->composed || ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))) {
+	  if (item->edge_composed.compose == 1 || ((max_height <= 0 || edge_composed.height < max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))) {
 	    derivations_new[id].edges.push_back(edge_composed);
 	    
 	    if ((max_height <= 0 || edge_composed.height <= max_height) && (max_nodes <= 0 || edge_composed.internal < max_nodes))
@@ -613,33 +625,42 @@ struct ExtractTree
 	      // we will use Algorithm 2 of faster cube-pruning
 	      // no checking:  && cand_unique.find(&query) == cand_unique.end()
 	      if (j[i] < static_cast<int>(derivations_next[edge.tails[i]].edges.size())) {
-		edges_new.clear();
-		tails_new.clear();
-		
-		const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new, max_nodes);
-		
-		if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
-		  index_set_type::const_iterator jiter_begin = j.begin();
-		  index_set_type::const_iterator jiter_end   = j.end();
-		  node_set_type::const_iterator  titer_begin = edge.tails.begin();
-		  edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
-		  edge_set_type::const_iterator  eiter_end   = edge.edges.end();
+		int composed_size = edge_composed.compose;
+		if (j[i] - 1 >= 0)
+		  composed_size -= derivations[edge.tails[i]].edges[j[i] - 1].compose;
+		composed_size += derivations[edge.tails[i]].edges[j[i]].compose;
+
+		if (max_compose <= 0 || composed_size <= max_compose) {
 		  
-		  const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
+		  edges_new.clear();
+		  tails_new.clear();
 		  
-		  if (max_height <= 0 || rule_stat.first <= max_height) {
-		    candidates.push_back(candidate_type(edge, j, true));
+		  const std::pair<int, bool> composed_stat = compose_tails(derivations_next, j.begin(), j.end(), edge.tails.begin(), edge.internal, tails_new, max_nodes);
+		  
+		  if (max_nodes <= 0 || composed_stat.first <= max_nodes) {
+		    index_set_type::const_iterator jiter_begin = j.begin();
+		    index_set_type::const_iterator jiter_end   = j.end();
+		    node_set_type::const_iterator  titer_begin = edge.tails.begin();
+		    edge_set_type::const_iterator  eiter_begin = edge.edges.begin();
+		    edge_set_type::const_iterator  eiter_end   = edge.edges.end();
 		    
-		    candidate_type& item_next = candidates.back();
+		    const std::pair<int, int> rule_stat = compose_edges(derivations_next, graph, jiter_begin, jiter_end, titer_begin, eiter_begin, eiter_end, edges_new);
 		    
-		    item_next.edge_composed.edges = edges_new;
-		    item_next.edge_composed.tails = tails_new;
-		    item_next.edge_composed.height = rule_stat.first;
-		    item_next.edge_composed.internal = rule_stat.second;
-		    
-		    cand.push(&item_next);
-		    // we will use Algorithm 2 of faster cube-pruning
-		    //cand_unique.insert(&item_next);
+		    if (max_height <= 0 || rule_stat.first <= max_height) {
+		      candidates.push_back(candidate_type(edge, j));
+		      
+		      candidate_type& item_next = candidates.back();
+		      
+		      item_next.edge_composed.edges = edges_new;
+		      item_next.edge_composed.tails = tails_new;
+		      item_next.edge_composed.height = rule_stat.first;
+		      item_next.edge_composed.internal = rule_stat.second;
+		      item_next.edge_composed.compose = composed_size;
+		      
+		      cand.push(&item_next);
+		      // we will use Algorithm 2 of faster cube-pruning
+		      //cand_unique.insert(&item_next);
+		    }
 		  }
 		}
 	      }
@@ -1335,6 +1356,7 @@ struct ExtractTree
   
   ExtractTree(const int __max_nodes,
 	      const int __max_height,
+	      const int __max_compose,
 	      const int __max_scope,
 	      const bool __exhaustive, 
 	      const bool __constrained,
@@ -1342,6 +1364,7 @@ struct ExtractTree
 	      const bool __collapse)
     : max_nodes(__max_nodes),
       max_height(__max_height),
+      max_compose(__max_compose),
       max_scope(__max_scope),
       exhaustive(__exhaustive),
       constrained(__constrained),
@@ -1352,6 +1375,7 @@ struct ExtractTree
 
   int max_nodes;
   int max_height;
+  int max_compose;
   int max_scope;
   bool exhaustive;
   bool constrained;
@@ -1397,8 +1421,8 @@ struct ExtractTree
     //graph_target.prune_derivations();
     
     // construct subtrees...
-    graph_source.construct_subtrees(source, max_nodes, max_height);
-    graph_target.construct_subtrees(target, max_nodes, max_height);
+    graph_source.construct_subtrees(source, max_nodes, max_height, max_compose);
+    graph_target.construct_subtrees(target, max_nodes, max_height, max_compose);
     
     // perform subtree pair extractions...
     extract_pairs(source, target, rules, dumper);
@@ -1716,6 +1740,7 @@ struct Task
        const path_type& __output,
        const int max_nodes,
        const int max_height,
+       const int max_compose,
        const int max_scope,
        const bool exhaustive,
        const bool constrained,
@@ -1724,7 +1749,7 @@ struct Task
        const double __max_malloc)
     : queue(__queue),
       output(__output),
-      extractor(max_nodes, max_height, max_scope, exhaustive, constrained, inverse, collapse),
+      extractor(max_nodes, max_height, max_compose, max_scope, exhaustive, constrained, inverse, collapse),
       max_malloc(__max_malloc) {}
   
   queue_type&   queue;

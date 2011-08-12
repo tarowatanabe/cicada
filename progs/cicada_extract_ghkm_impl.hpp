@@ -639,7 +639,9 @@ struct ExtractGHKM
     // we use greater, so that when popped from heap, we will grab "less" in back...
     bool operator()(const candidate_type* x, const candidate_type* y) const
     {
-      return x->edge_composed.compose > y->edge_composed.compose || (x->edge_composed.compose == y->edge_composed.compose && x->edge_composed.internal > y->edge_composed.internal);
+      return (x->edge_composed.compose > y->edge_composed.compose
+	      || (x->edge_composed.compose == y->edge_composed.compose
+		  && x->edge_composed.internal > y->edge_composed.internal));
     }
   };
   
