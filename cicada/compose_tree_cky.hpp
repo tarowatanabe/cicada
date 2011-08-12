@@ -193,13 +193,19 @@ namespace cicada
 			       std::allocator<symbol_set_type> > internal_symbol_set_type;
 
     typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
+    typedef boost::fusion::tuple<int, int, internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
 
 #ifdef HAVE_TR1_UNORDERED_MAP
     typedef std::tr1::unordered_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 				    std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
+    typedef std::tr1::unordered_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
+				    std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
+
 #else
     typedef sgi::hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
 			  std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
+    typedef sgi::hash_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
+			  std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
 #endif
     
     struct less_non_terminal
@@ -302,7 +308,9 @@ namespace cicada
 	  const size_t last = first + length;
 
 	  //std::cerr << "span: " << first << ".." << last << std::endl;
+
 	  
+	  terminal_map.clear();
 	  node_map.clear();
 	  
 	  extend_actives(first, last, lattice, grammar,      actives_rule, VerifySpan());
@@ -811,8 +819,9 @@ namespace cicada
 #endif 
       
       int non_terminal_pos = 0;
+      int frontier_pos = 0;
       
-      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos, frontier_pos);
       
       graph.edges[edge_id].features   = features;
       graph.edges[edge_id].attributes = attributes;
@@ -826,7 +835,8 @@ namespace cicada
 					     hypergraph_type::id_type root,
 					     const hypergraph_type::edge_type::node_set_type& frontiers,
 					     hypergraph_type& graph,
-					     int& non_terminal_pos)
+					     int& non_terminal_pos,
+					     int& frontier_pos)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
@@ -834,6 +844,8 @@ namespace cicada
       rhs_type rhs;
       tails_type tails;
       bool shared = true;
+
+      const int frontier_first = frontier_pos;
       
       tree_rule_type::const_iterator aiter_end = rule.end();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
@@ -859,8 +871,10 @@ namespace cicada
 	    
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
+
+	    ++ frontier_pos;
 	  } else {
-	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
+	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos, frontier_pos);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    if (! sharable[node_id])
@@ -870,40 +884,66 @@ namespace cicada
 	  }
 	  
 	  rhs.push_back(aiter->label.non_terminal());
-	} else
+	} else {
 	  rhs.push_back(aiter->label);
+	  ++ frontier_pos;
+	}
+      
+      const int frontier_last = frontier_pos;
       
       hypergraph_type::id_type edge_id;
       
       if (root == hypergraph_type::invalid) {
 	// we will share internal nodes
 	
-	if (! tails.empty() && shared) {
-	  internal_tail_set_type::iterator   titer = tail_map.insert(tail_set_type(tails.begin(), tails.end())).first;
-	  internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
+	if (shared) {
 	  
-	  std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(titer - tail_map.begin(),
-															  siter - symbol_map.begin(),
-															  rule.label), 0));
-	  if (result.second) {
-	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
-	    root = graph.add_node().id;
+	  if (! tails.empty()) {
+	    internal_tail_set_type::iterator   titer = tail_map.insert(tail_set_type(tails.begin(), tails.end())).first;
+	    internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	    
-	    if (root >= sharable.size())
-	      sharable.resize(root + 1, false);
-	    sharable[root] = true;
-	    
-	    graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
-	    graph.connect_edge(edge_id, root);
-	    
-	    result.first->second = edge_id;
-	    
-	    //std::cerr << "init:   " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
+	    std::pair<internal_label_map_type::iterator, bool> result = label_map.insert(std::make_pair(internal_label_type(titer - tail_map.begin(),
+															    siter - symbol_map.begin(),
+															    rule.label), 0));
+	    if (result.second) {
+	      edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	      root = graph.add_node().id;
+	      
+	      if (root >= sharable.size())
+		sharable.resize(root + 1, false);
+	      sharable[root] = true;
+	      
+	      graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	      graph.connect_edge(edge_id, root);
+	      
+	      result.first->second = edge_id;
+	    } else {
+	      edge_id = result.first->second;
+	      root = graph.edges[edge_id].head;
+	    }
 	  } else {
-	    edge_id = result.first->second;
-	    root = graph.edges[edge_id].head;
+	    internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
 	    
-	    //std::cerr << "shared: " << edge_id << " " << *(graph.edges[edge_id].rule) << std::endl;
+	    std::pair<terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(frontier_first,
+															       frontier_last,
+															       siter - symbol_map.begin(),
+															       rule.label), 0));
+	    if (result.second) {
+	      edge_id = graph.add_edge(tails.begin(), tails.end()).id;
+	      root = graph.add_node().id;
+	      
+	      if (root >= sharable.size())
+		sharable.resize(root + 1, false);
+	      sharable[root] = true;
+	      
+	      graph.edges[edge_id].rule = rule_type::create(rule_type(rule.label, rhs.begin(), rhs.end()));
+	      graph.connect_edge(edge_id, root);
+	      
+	      result.first->second = edge_id;
+	    } else {
+	      edge_id = result.first->second;
+	      root = graph.edges[edge_id].head;
+	    }
 	  }
 	} else {
 	  edge_id = graph.add_edge(tails.begin(), tails.end()).id;
@@ -953,6 +993,7 @@ namespace cicada
     internal_tail_set_type   tail_map;
     internal_symbol_set_type symbol_map;
     internal_label_map_type  label_map;
+    terminal_label_map_type  terminal_map;
     std::vector<bool, std::allocator<bool> > sharable;
   };
   
