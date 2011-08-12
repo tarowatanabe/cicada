@@ -170,8 +170,6 @@ namespace cicada
     
     typedef google::dense_hash_map<symbol_type, int, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_level_type;
     typedef google::dense_hash_set<symbol_type, boost::hash<symbol_type>, std::equal_to<symbol_type> > closure_type;
-
-    
     
     typedef hypergraph_type::edge_type::node_set_type tail_set_type;
     typedef rule_type::symbol_set_type                symbol_set_type;
@@ -307,7 +305,6 @@ namespace cicada
 	  const size_t last = first + length;
 
 	  //std::cerr << "span: " << first << ".." << last << std::endl;
-
 	  
 	  terminal_map.clear();
 	  node_map.clear();
