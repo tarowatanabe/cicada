@@ -83,6 +83,9 @@ namespace cicada
       closure.set_empty_key(symbol_type());
       closure_head.set_empty_key(symbol_type());
       closure_tail.set_empty_key(symbol_type());
+      
+      label_map.set_empty_key(internal_label_type(-1, -1, symbol_type()));
+      terminal_map.set_empty_key(terminal_label_type(-1, -1, symbol_type()));
     }
     
     struct ActiveTree
@@ -189,22 +192,13 @@ namespace cicada
 			       std::allocator<tail_set_type> > internal_tail_set_type;
     typedef utils::indexed_set<symbol_set_type, hash_sequence<symbol_set_type>, std::equal_to<symbol_set_type>,
 			       std::allocator<symbol_set_type> > internal_symbol_set_type;
-
+    typedef std::vector<int, std::allocator<int> > internal_level_map_type;
+    
     typedef boost::fusion::tuple<internal_tail_set_type::index_type, internal_symbol_set_type::index_type, symbol_type> internal_label_type;
-    typedef boost::fusion::tuple<int, int, internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
+    typedef boost::fusion::tuple<int, internal_symbol_set_type::index_type, symbol_type> terminal_label_type;
 
-#ifdef HAVE_TR1_UNORDERED_MAP
-    typedef std::tr1::unordered_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
-				    std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
-    typedef std::tr1::unordered_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
-				    std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
-
-#else
-    typedef sgi::hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type>,
-			  std::allocator<std::pair<const internal_label_type, hypergraph_type::id_type> > > internal_label_map_type;
-    typedef sgi::hash_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type>,
-			  std::allocator<std::pair<const terminal_label_type, hypergraph_type::id_type> > > terminal_label_map_type;
-#endif
+    typedef google::dense_hash_map<internal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<internal_label_type> > internal_label_map_type;
+    typedef google::dense_hash_map<terminal_label_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<terminal_label_type> > terminal_label_map_type;
     
     struct less_non_terminal
     {
@@ -268,6 +262,7 @@ namespace cicada
       
       tail_map.clear();
       symbol_map.clear();
+      symbol_map_terminal.clear();
       label_map.clear();
       
       node_map.clear();
@@ -811,9 +806,9 @@ namespace cicada
 #endif 
       
       int non_terminal_pos = 0;
-      int frontier_pos = 0;
+      level_map.clear();
       
-      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos, frontier_pos);
+      const hypergraph_type::id_type edge_id = construct_graph(*rule, root_id, frontier, graph, non_terminal_pos);
       
       graph.edges[edge_id].features   = features;
       graph.edges[edge_id].attributes = attributes;
@@ -827,8 +822,7 @@ namespace cicada
 					     hypergraph_type::id_type root,
 					     const hypergraph_type::edge_type::node_set_type& frontiers,
 					     hypergraph_type& graph,
-					     int& non_terminal_pos,
-					     int& frontier_pos)
+					     int& non_terminal_pos)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
       typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tails_type;
@@ -836,8 +830,6 @@ namespace cicada
       rhs_type rhs;
       tails_type tails;
 
-      const int frontier_first = frontier_pos;
-      
       tree_rule_type::const_iterator aiter_end = rule.end();
       for (tree_rule_type::const_iterator aiter = rule.begin(); aiter != aiter_end; ++ aiter)
 	if (aiter->label.is_non_terminal()) {
@@ -859,9 +851,8 @@ namespace cicada
 	    // transform into frontier of the translational forest
 	    tails.push_back(result.first->second);
 
-	    ++ frontier_pos;
 	  } else {
-	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos, frontier_pos);
+	    const hypergraph_type::id_type edge_id = construct_graph(*aiter, hypergraph_type::invalid, frontiers, graph, non_terminal_pos);
 	    const hypergraph_type::id_type node_id = graph.edges[edge_id].head;
 	    
 	    tails.push_back(node_id);
@@ -870,10 +861,7 @@ namespace cicada
 	  rhs.push_back(aiter->label.non_terminal());
 	} else {
 	  rhs.push_back(aiter->label);
-	  ++ frontier_pos;
 	}
-      
-      const int frontier_last = frontier_pos;
       
       hypergraph_type::id_type edge_id;
       
@@ -900,12 +888,16 @@ namespace cicada
 	    root = graph.edges[edge_id].head;
 	  }
 	} else {
-	  internal_symbol_set_type::iterator siter = symbol_map.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
+	  internal_symbol_set_type::iterator siter = symbol_map_terminal.insert(symbol_set_type(rhs.begin(), rhs.end())).first;
+	  level_map.resize(symbol_map_terminal.size(), 0);
+	  const size_t level_terminal = siter - symbol_map_terminal.begin();
 	  
-	  std::pair<terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(frontier_first,
-															     frontier_last,
-															     siter - symbol_map.begin(),
+	  std::pair<terminal_label_map_type::iterator, bool> result = terminal_map.insert(std::make_pair(terminal_label_type(level_map[level_terminal],
+															     level_terminal,
 															     rule.label), 0));
+	  
+	  ++ level_map[level_terminal];
+	  
 	  if (result.second) {
 	    edge_id = graph.add_edge(tails.begin(), tails.end()).id;
 	    root = graph.add_node().id;
@@ -954,8 +946,10 @@ namespace cicada
     node_graph_type       node_graph_rule;
     non_terminal_set_type non_terminals;
 
+    internal_level_map_type  level_map;
     internal_tail_set_type   tail_map;
     internal_symbol_set_type symbol_map;
+    internal_symbol_set_type symbol_map_terminal;
     internal_label_map_type  label_map;
     terminal_label_map_type  terminal_map;
   };
