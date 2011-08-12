@@ -2,7 +2,8 @@
 Bugfix for alignment by lexicon model. The cause of the bug seem to be an initialization issue...?
 Less memory for Viterbi alignment computation by shrinking at some intervals
 Implemented max-compose constraint which set the maximum number of minimum rule compositions in GHKM
-Better composition/parse for string-to-tree by merging sharable nodes only
+Better composition/parse for string-to-tree by sharing internal nodes and terminals
+Better composition/parse for tree-to-{string,tree} by sharing internal nodes and terminals
 
 2011-8-11
 Rework for cicada_lexicon_{model1,hmm}: implement by map/reduce in order to reduce memory requriement
