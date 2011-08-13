@@ -1,0 +1,41 @@
+goal = [s]
+
+grammar = {diectory}/grammar:max-span=15
+
+### glue rules...
+### use straight rule:           [s] ||| [s,1] [x,2] ||| [s,1] [x,2]
+### but do no use inverted rule: [s] ||| [s,1] [x,2] ||| [x,2] [s,1]
+grammar = glue:straight=true,inverted=false,non-terminal=[X],goal=[S]
+
+### simply copy from source-to-target
+grammar = insertion:non-terminal=[x]
+
+### features
+feature-function = ngram: file={ngram-directory}/ngram.en.5.expgram, order=5, name=ngram, coarse-order=3, no-bos-eos=true
+
+### # of word
+feature-function = word-penalty
+
+### # of rules
+feature-function = rule-penalty
+
+
+### CKY composition
+operation = compose-cky
+
+### marker pushing
+operation = push-bos-eos
+
+### feature application by cube-pruning (histograph size = 200)
+operation = apply:prune=true,size=200,${weights}
+
+### density pruning: # of hyperedges of a forest <= # of hyperedges of viterbi tree * density-size
+### this is optional: may be required for MERT
+#operation = prune:density=200,${weights}
+
+### remove marker
+operation = remove-bos-eos:forest=true
+
+### output
+operation = output:directory=${directory},kbest=${kbest},${weights}
+
