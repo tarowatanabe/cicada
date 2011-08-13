@@ -30,7 +30,7 @@
 #include "utils/lexical_cast.hpp"
 
 #include <boost/functional/hash.hpp>
-
+#include <boost/filesystem.hpp>
 
 namespace cicada
 {
