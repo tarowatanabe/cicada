@@ -19,15 +19,19 @@ namespace cicada
   {
     static const char* desc = "\
 date: date/time format\n\
-\tsource=[locale] parser locale\n\
-\ttarget=[locale] generator locale\n\
-\tparser=[locale] parser locale\n\
-\tgenerator=[locale] generator locale\n\
+\tlocale-source=[locale] parser locale\n\
+\tlocale-target=[locale] generator locale\n\
+\tlocale-parser=[locale] parser locale\n\
+\tlocale-generator=[locale] generator locale\n\
 number: number format\n\
-\tsource=[locale] parser locale\n\
-\ttarget=[locale] generator locale\n\
-\tparser=[locale] parser locale\n\
-\tgenerator=[locale] generator locale\n\
+\tsource=[file] parser file\n\
+\ttarget=[file] generator file\n\
+\tparser=[file] parser file\n\
+\tgenerator=[file] generator file\n\
+\tlocale-source=[locale] parser locale\n\
+\tlocale-target=[locale] generator locale\n\
+\tlocale-parser=[locale] parser locale\n\
+\tlocale-generator=[locale] generator locale\n\
     ";
     
     return desc;
@@ -82,19 +86,26 @@ number: number format\n\
       
       format_map_type::iterator iter = formats_map.find(parameter);
       if (iter == formats_map.end()) {
+	std::string file_parser;
+	std::string file_generator;
 	std::string locale_parser;
 	std::string locale_generator;
 	
+	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (utils::ipiece(piter->first) == "parser" || utils::ipiece(piter->first) == "source")
+	  if (utils::ipiece(piter->first) == "locale-parser" || utils::ipiece(piter->first) == "locale-source")
 	    locale_parser = piter->second;
-	  else if (utils::ipiece(piter->first) == "generator" || utils::ipiece(piter->first) == "target")
+	  else if (utils::ipiece(piter->first) == "locale-generator" || utils::ipiece(piter->first) == "locale-target")
 	    locale_generator = piter->second;
+	  else if (utils::ipiece(piter->first) == "parser" || utils::ipiece(piter->first) == "source")
+	    file_parser = piter->second;
+	  else if (utils::ipiece(piter->first) == "generator" || utils::ipiece(piter->first) == "target")
+	    file_generator = piter->second;
 	  else
 	    throw std::runtime_error("unsupported parameter: " + parameter);
 	}
 	
-	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Number(locale_parser, locale_generator)))).first;
+	iter = formats_map.insert(std::make_pair(parameter, format_ptr_type(new format::Number(file_parser, file_generator, locale_parser, locale_generator)))).first;
 	iter->second->__algorithm = parameter;
       }
       
@@ -107,9 +118,9 @@ number: number format\n\
 	std::string locale_generator;
 	
 	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
-	  if (utils::ipiece(piter->first) == "parser" || utils::ipiece(piter->first) == "source")
+	  if (utils::ipiece(piter->first) == "locale-parser" || utils::ipiece(piter->first) == "locale-source")
 	    locale_parser = piter->second;
-	  else if (utils::ipiece(piter->first) == "generator" || utils::ipiece(piter->first) == "target")
+	  else if (utils::ipiece(piter->first) == "locale-generator" || utils::ipiece(piter->first) == "locale-target")
 	    locale_generator = piter->second;
 	  else
 	    throw std::runtime_error("unsupported parameter: " + parameter);

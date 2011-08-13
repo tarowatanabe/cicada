@@ -26,6 +26,8 @@
 #include "utils/sgi_hash_map.hpp"
 #include "utils/hashmurmur.hpp"
 #include "utils/array_power2.hpp"
+#include "utils/compress_stream.hpp"
+#include "utils/lexical_cast.hpp"
 
 #include <boost/functional/hash.hpp>
 
@@ -208,8 +210,10 @@ namespace cicada
     
     
     
-    Number::Number(const std::string& locale_str_source,
-		   const std::string& locale_str_target)
+    void Number::initialize(const path_type& path_source,
+			    const path_type& path_target,
+			    const std::string& locale_str_source,
+			    const std::string& locale_str_target)
     {
       // pre-defined rule-set
 #ifdef HAVE_TR1_UNORDERED_MAP
@@ -308,6 +312,78 @@ namespace cicada
 	rbnf->setLenient(true);
 	sources["numbering"].parsers.push_back(rbnf.release());
       }
+      
+      // user defined rules for source side
+      if (! path_source.empty()) {
+	if (! boost::filesystem::exists(path_source))
+	  throw std::runtime_error("no file? " + path_source.string());
+	
+	UnicodeString rules;
+	
+	utils::compress_istream is(path_target);
+	std::string line;
+	while (std::getline(is, line)) {
+	  rules += icu::UnicodeString::fromUTF8(line);
+	  rules += '\n';
+	}
+	
+	status = U_ZERO_ERROR;
+	UParseError perror;
+	std::auto_ptr<icu::RuleBasedNumberFormat> nf_rule(new icu::RuleBasedNumberFormat(rules, locale_source, perror, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("RuleBasedNumberFormat: ") + u_errorName(status)
+				   + std::string(" offset: ") + utils::lexical_cast<std::string>(perror.offset));
+	
+	if (has_rbnf_rule_set(*nf_rule, "cardinal")) {
+	  UnicodeString rules_local(rules);
+	  
+	  rules_local.findAndReplace("%spellout-numbering", "%%spellout-numbering");
+	  rules_local.findAndReplace("%spellout-ordinal",   "%%spellout-ordinal");
+	  
+	  UErrorCode status = U_ZERO_ERROR;
+	  UParseError perror;
+	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  if (U_FAILURE(status))
+	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	  
+	  rbnf->setLenient(true);
+	  sources["cardinal"].parsers.push_back(rbnf.release());
+	}
+	
+	if (has_rbnf_rule_set(*nf_rule, "ordinal")) {
+	  UnicodeString rules_local(rules);
+	  
+	  rules_local.findAndReplace("%spellout-numbering", "%%spellout-numbering");
+	  rules_local.findAndReplace("%spellout-cardinal",  "%%spellout-cardinal");
+	  
+	  UErrorCode status = U_ZERO_ERROR;
+	  UParseError perror;
+	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  if (U_FAILURE(status))
+	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	  
+	  rbnf->setLenient(true);
+	  sources["ordinal"].parsers.push_back(rbnf.release());
+	}
+	
+	if (has_rbnf_rule_set(*nf_rule, "numbering")) {
+	  UnicodeString rules_local(rules);
+	
+	  rules_local.findAndReplace("%spellout-numbering-year",  "%%spellout-numbering-year");
+	  rules_local.findAndReplace("%spellout-ordinal",  "%%spellout-ordinal");
+	  rules_local.findAndReplace("%spellout-cardinal", "%%spellout-cardinal");
+
+	  UErrorCode status = U_ZERO_ERROR;
+	  UParseError perror;
+	  std::auto_ptr<icu::RuleBasedNumberFormat> rbnf(new icu::RuleBasedNumberFormat(rules_local, locale_source, perror, status));
+	  if (U_FAILURE(status))
+	    throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
+	  
+	  rbnf->setLenient(true);
+	  sources["numbering"].parsers.push_back(rbnf.release());
+	}
+      }
+
     
       status = U_ZERO_ERROR;
       std::auto_ptr<NumberFormat> nf_source(icu::NumberFormat::createInstance(locale_source, status));
@@ -319,7 +395,7 @@ namespace cicada
       sources["any"].parsers.push_back(dynamic_cast<impl_type::parser_type*>(nf_source->clone()));
       
       status = U_ZERO_ERROR;
-      std::auto_ptr<RuleBasedNumberFormat> rbnf_target(new RuleBasedNumberFormat(URBNF_SPELLOUT, locale_target, status));
+      std::auto_ptr<icu::RuleBasedNumberFormat> rbnf_target(new icu::RuleBasedNumberFormat(URBNF_SPELLOUT, locale_target, status));
       if (U_FAILURE(status))
 	throw std::runtime_error(std::string("RuleBasedNumberFormat::spell_out: ") + u_errorName(status));
       
@@ -335,6 +411,50 @@ namespace cicada
 	  targets["cardinal"].generators.push_back(create_rbnf_instance(locale_target, uname));
 	else
 	  targets["any"].generators.push_back(create_rbnf_instance(locale_target, uname));
+      }
+
+      
+      // user defined rules for target side
+      if (! path_target.empty()) {
+	if (! boost::filesystem::exists(path_target))
+	  throw std::runtime_error("no file? " + path_target.string());
+	
+	UnicodeString rules;
+	
+	utils::compress_istream is(path_target);
+	std::string line;
+	while (std::getline(is, line)) {
+	  rules += icu::UnicodeString::fromUTF8(line);
+	  rules += '\n';
+	}
+	
+	status = U_ZERO_ERROR;
+	UParseError perror;
+	std::auto_ptr<icu::RuleBasedNumberFormat> nf_rule(new icu::RuleBasedNumberFormat(rules, locale_target, perror, status));
+	if (U_FAILURE(status))
+	  throw std::runtime_error(std::string("RuleBasedNumberFormat: ") + u_errorName(status)
+				   + std::string(" offset: ") + utils::lexical_cast<std::string>(perror.offset));
+	
+	int32_t num_rule_set = nf_rule->getNumberOfRuleSetNames();
+	for (int32_t i = 0; i < num_rule_set; ++ i) {
+	  const icu::UnicodeString uname = nf_rule->getRuleSetName(i);
+
+	  status = U_ZERO_ERROR;
+	  UParseError perror;
+	  std::auto_ptr<icu::RuleBasedNumberFormat> formatter(new icu::RuleBasedNumberFormat(rules, locale_target, perror, status));
+	  
+	  status = U_ZERO_ERROR;
+	  formatter->setDefaultRuleSet(uname, status);
+	  
+	  if (uname.indexOf("numbering") >= 0 && uname.indexOf("year") < 0)
+	    targets["numbering"].generators.push_back(formatter.release());
+	  else if (uname.indexOf("ordinal") >= 0)
+	    targets["ordinal"].generators.push_back(formatter.release());
+	  else if (uname.indexOf("cardinal") >= 0)
+	    targets["cardinal"].generators.push_back(formatter.release());
+	  else
+	    targets["any"].generators.push_back(formatter.release());
+	}
       }
       
       status = U_ZERO_ERROR;
