@@ -1,11 +1,16 @@
 goal = [s]
 
+tree-grammar = {directory}/tree-grammar:cky=true
+
+### optional phrasal grammar
 grammar = {diectory}/grammar:max-span=15
 
 ### glue rules...
 ### use straight rule:           [s] ||| [s,1] [x,2] ||| [s,1] [x,2]
 ### but do no use inverted rule: [s] ||| [s,1] [x,2] ||| [x,2] [s,1]
-grammar = glue:straight=true,inverted=false,non-terminal=[x],goal=[s]
+### DO WE REALLY NEED THIS?
+### grammar = glue:straight=true,inverted=false,non-terminal=[x],goal=[s]
+
 
 ### simply copy from source-to-target
 grammar = insertion:non-terminal=[x]
@@ -20,8 +25,8 @@ feature-function = word-penalty
 feature-function = rule-penalty
 
 
-### CKY composition
-operation = compose-cky
+### CKY tree composition
+operation = compose-tree-cky
 
 ### marker pushing
 operation = push-bos-eos
