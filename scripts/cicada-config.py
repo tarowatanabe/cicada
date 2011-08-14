@@ -36,6 +36,8 @@ opt_parser = OptionParser(
     make_option("--insertion", default=None, action="store_true", help="insertion grammar"),
     make_option("--deletion",  default=None, action="store_true", help="deletion grammar"),
     make_option("--fallback",  default=None, action="store_true", help="fallback tree-grammar"),
+    
+    ### feature functions
 
     ## operations...
     
@@ -45,16 +47,9 @@ opt_parser = OptionParser(
     make_option("--tree",     default=None, action="store_true", help="tree-to-string"),
     make_option("--tree-cky", default=None, action="store_true", help="string-to-{string,tree}"),
     
-    ### feature application strategy
-    make_option("--apply-cube", default=None, action="store_true", help="feature application strategy (cube_pruning)"),
-    make_option("--apply-grow", default=None, action="store_true", help="feature application strategy (cube_growing)"),
-    
-    ### some recommended configuration
-    make_option("--push-bos-eos", default=None, action="store_true", help="sentence bondary marker pushing"),
-    
     ### outputs
-    make_option("--output-file",      default=None, action="store_true", help="output in a file"),
-    make_option("--output-directory", default=None, action="store_true", help="output in a directory"),
+    make_option("--file",      default=None, action="store_true", help="output in a file"),
+    make_option("--directory", default=None, action="store_true", help="output in a directory"),
     
     ## debug messages
     make_option("--debug", default=0, action="store", type="int"),
@@ -151,3 +146,25 @@ if options.fallback:
 
 ### operations
 
+
+print "# operations"
+if options.scfg:
+    print "operation = compose-cky"
+elif options.phrase:
+    print "operation = compose-phrase"
+elif options.tree:
+    print "operation = compose-tree"
+elif options.tree_cky:
+    print "operation = compose-tree-cky"
+else:
+    raise ValueError, "no operations? --{scfg,phrase,tree,tree-cky}"
+print "operation = push-bos-eos"
+print "operation = apply:prune=true,size=200,${weights}"
+print "operation = remove-bos-eos:forest=true"
+
+if options.file:
+    print "operation = output:file=${file},kbest=${kbest},${weights}"
+elif options.directory:
+    print "operation = output:directory=${directory},kbest=${kbest},${weights}"
+else:
+    raise ValueError, "no output? --{file,directory}"
