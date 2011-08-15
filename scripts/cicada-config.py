@@ -33,6 +33,9 @@ opt_parser = OptionParser(
     make_option("--goal", default="[s]", action="store", type="string", help="goal non-terminal (default: [s])"),
     make_option("--glue", default="[x]", action="store", type="string", help="non-terminal for glue rules (default: [x])"),
     
+    make_option("--straight", default=None, action="store_true", help="straight gulue rule"),
+    make_option("--invert",   default=None, action="store_true", help="invert gulue rule"),
+    
     make_option("--insertion", default=None, action="store_true", help="insertion grammar"),
     make_option("--deletion",  default=None, action="store_true", help="deletion grammar"),
     make_option("--fallback",  default=None, action="store_true", help="fallback tree-grammar"),
@@ -108,6 +111,20 @@ class TreeGrammar(UserList.UserList):
 
 ### grammars
 
+def non_terminal(x, index=0):
+    if not x:
+        raise ValueError, "no non-terminal? %s"  %(x)
+    if x[0] != '[' or x[-1] != ']':
+        raise ValueError, "invalid non-terminal? %s" %(x)
+    if index == 0:
+        return x
+    else:
+        return '[' + x[1:-1] + ',' + str(index) + ']'
+
+
+options.goal = non_terminal(options.goal)
+options.glue = non_terminal(options.glue)
+
 print "goal = %s" %(options.goal)
 print
 
@@ -120,10 +137,30 @@ if options.grammar:
             print transducer
     print
 
+if options.straight or options.invert:
+    
+    straight = "false"
+    invert = "false"
+
+    if options.straight:
+        straight = "true"
+    if options.invert:
+        invert = "true"
+    print "# straight glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
+                                                           non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+                                                           non_terminal(options.goal, 1), non_terminal(options.glue, 2))
+    print "# inverted glue rule: %s ||| %s %s ||| %s %s" %(options.goal,
+                                                           non_terminal(options.goal, 1), non_terminal(options.glue, 2),
+                                                           non_terminal(options.glue, 2), non_terminal(options.goal, 1))
+    print "grammar = glue:goal=%s,non-terminal=%s,straight=%s,invert=%s" %(options.goal, options.glue, straight, invert)
+    print
+
 if options.insertion or options.deletion:
     if options.insertion:
+        print "# insertion grammar %s ||| terminal ||| terminal" %(options.glue)
         print "grammar = insertion:non-terminal=%s" %(options.glue)
     if options.deletion:
+        print "# deletion grammar %s ||| terminal ||| <epsilon>" %(options.glue)
         print "grammar = deletion:non-terminal=%s" %(options.glue)
     print
 
