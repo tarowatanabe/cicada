@@ -42,3 +42,14 @@ wordnet: matching by wordnet synsets
 
 english: English signature
 chinese: Chinese signature
+
+* formatter: number/date formatter (primarity used as an additional grammar)
+
+number: number formatter
+date: date formatter
+
+For number formatter, you can add an extra rule file for each side (parser and generator).
+For the defails of rules, consult site.icu-project.org and see "Rule-based Number Format"
+You can dump predefined rules by
+
+    cicada_format_rbnf --locale <locale, such as "ja"> --resource
