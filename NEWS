@@ -2,6 +2,7 @@
 Bugfix for alignment by lexicon model. The cause of the bug seem to be an initialization issue...?
 Less memory for Viterbi alignment computation by shrinking at some intervals
 Implemented max-compose constraint which set the maximum number of minimum rule compositions in GHKM
+Added sparse/dense option for feature-application to apply only sparse/dense features
 Better composition/parse for string-to-tree by sharing internal nodes and terminals
 Better composition/parse for tree-to-{string,tree} by sharing internal nodes and terminals
 Better left2right and right2left binarizatin by sharing nodes

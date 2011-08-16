@@ -87,7 +87,7 @@ namespace cicada
 	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
 
 	for (model_type::const_iterator iter = __model.begin(); iter != __model.end(); ++ iter)
-	  if (! (*iter)->dense_feature())
+	  if (! (*iter)->sparse_feature())
 	    model_dense.push_back(*iter);
 	
 	if (model_dense.empty())
