@@ -129,11 +129,10 @@ namespace cicada
 				    ? binarized_label(lhs, context.begin(), context.end())
 				    : binarized_label(lhs, std::max(context.begin(), context.end() - order), context.end()));
 	  }
-	  lhs_binarized.push_back(rhs_sorted[positions[0]]);
+	  lhs_binarized.push_back(rhs_sorted[positions.front()]);
 	  
 	  // bottom-up traversal...
-	  
-	  hypergraph_type::id_type tail_prev = tails_sorted[0];
+	  hypergraph_type::id_type tail_prev = tails_sorted.front();
 	  phrase_type::const_reverse_iterator biter = lhs_binarized.rbegin();
 	  for (size_t length = 2; length <= positions.size(); ++ length, ++ biter) {
 	    const bool is_root = length == positions.size();
@@ -156,7 +155,7 @@ namespace cicada
 	    const size_t middle_last  = positions[middle];
 	    
 	    binarized.insert(binarized.end(), rhs_sorted.begin() + middle_first, rhs_sorted.begin() + middle_last);
-	    binarized.push_back(rhs_sorted[positions[last - 1]].non_terminal());
+	    binarized.push_back(rhs_sorted[positions[last - 1]]);
 	    
 	    const size_t suffix_first = positions[last - 1] + 1;
 	    const size_t suffix_last  = (is_root ? static_cast<int>(rhs_sorted.size()) : positions[last - 1] + 1);
