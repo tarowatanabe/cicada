@@ -118,7 +118,7 @@ namespace cicada
 	  context.clear();
 	  lhs_binarized.clear();
 	  lhs_binarized.push_back(lhs);
-	  for (size_t length = positions.size(); length >= 2; -- length) {
+	  for (size_t length = positions.size(); length > 2; -- length) {
 	    const size_t last = positions.size();
 	    const size_t first = last - length;
 	    
