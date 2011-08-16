@@ -75,6 +75,11 @@ namespace cicada
     void push_back(const utils::piece& parameter) { transducers.push_back(transducer_type::create(parameter)); }
     void pop_back() { transducers.pop_back(); }
     void clear() { transducers.clear(); }
+
+    void swap(Grammar& x)
+    {
+      transducers.swap(x.transducers);
+    }
     
     Grammar clone() const
     {
@@ -123,6 +128,15 @@ namespace cicada
     transducer_ptr_set_type transducers;
   };
   
+};
+
+namespace std
+{
+  inline
+  void swap(cicada::Grammar& x, cicada::Grammar& y)
+  {
+    x.swap(y);
+  }
 };
 
 #endif
