@@ -134,9 +134,3 @@ Do we keep pair of source-target lhs???
 
 Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
   I'm not sure which is better..
-
-Binarizer memorize and share internal nodes:
-  For root, we will always differentiate, but for internal nodes, we will share nodes
-  for more compact forest
-
-Revised binarizer to take symbols in a bottom-up fashion, not top-down for better sharing
