@@ -22,7 +22,7 @@ namespace cicada
     Apply::Apply(const std::string& parameter,
 		 const model_type& __model,
 		 const int __debug)
-      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), sparse(false), debug(__debug)
+      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), sparse(false), dense(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
 
@@ -45,6 +45,8 @@ namespace cicada
 	  forced = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "sparse")
 	  sparse = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "dense")
+	  dense = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
@@ -62,6 +64,9 @@ namespace cicada
       default:
 	throw std::runtime_error("specify one of exact/prune/grow/incremental");
       }
+
+      if (sparse && dense)
+	throw std::runtime_error("either sparse|dense|all")
       
       if (sparse) {
 	model_type model_sparse;
@@ -76,6 +81,19 @@ namespace cicada
 	  throw std::runtime_error("we have no sparse features");
 	
 	model_local.swap(model_sparse);
+      } else if (dense) {
+	model_type model_dense;
+
+	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
+
+	for (model_type::const_iterator iter = __model.begin(); iter != __model.end(); ++ iter)
+	  if (! (*iter)->dense_feature())
+	    model_dense.push_back(*iter);
+	
+	if (model_dense.empty())
+	  throw std::runtime_error("we have no dense features");
+	
+	model_local.swap(model_dense);
       }
 
       if (const_cast<model_type&>(! model_local.empty() ? model_local : model).empty())
@@ -91,7 +109,7 @@ namespace cicada
 	weights = &base_type::weights();
       
       name = (std::string("apply-")
-	      + std::string(sparse ? "sparse-" : "")
+	      + std::string(sparse ? "sparse-" : (dense ? "dense-" : ""))
 	      + (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))));
     }
     

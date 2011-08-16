@@ -40,6 +40,7 @@ namespace cicada
   
       bool forced;
       bool sparse;
+      bool dense;
   
       int debug;
     };
