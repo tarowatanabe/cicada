@@ -66,7 +66,7 @@ namespace cicada
       }
 
       if (sparse && dense)
-	throw std::runtime_error("either sparse|dense|all")
+	throw std::runtime_error("either sparse|dense|all");
       
       if (sparse) {
 	model_type model_sparse;
