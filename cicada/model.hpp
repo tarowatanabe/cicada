@@ -201,6 +201,16 @@ namespace cicada
       states_size = 0;
     }
     
+
+    void swap(Model& x)
+    {
+      models.swap(x.models);
+      std::swap(allocator, x.allocator);
+      
+      offsets.swap(x.offsets);
+      std::swap(states_size, x.states_size);
+    }
+    
     bool is_stateless() const { return states_size == 0; }
 
     size_type state_size() const { return states_size; }
@@ -248,6 +258,15 @@ namespace cicada
     offset_set_type offsets;
     int             states_size;
   };
+};
+
+namespace std
+{
+  inline
+  void swap(cicada::Model& x, cicada::Model& y)
+  {
+    x.swap(y);
+  }
 };
 
 

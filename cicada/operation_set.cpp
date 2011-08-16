@@ -58,6 +58,7 @@ apply: feature application\n\
 \tprune=[true|false]  cube-pruning for feature application\n\
 \tgrow=[true|false]   cube-growing for feature application\n\
 \tforced=[true|false] forced feature application\n\
+\tsparse=[true|false] apply sparse features only\n\
 \tweights=weight file for feature\n\
 \tweights-one=[true|false] one initialized weight\n\
 \tfeature=feature function\n\

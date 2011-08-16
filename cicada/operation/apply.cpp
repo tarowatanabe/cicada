@@ -22,10 +22,10 @@ namespace cicada
     Apply::Apply(const std::string& parameter,
 		 const model_type& __model,
 		 const int __debug)
-      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), debug(__debug)
+      : model(__model), weights(0), weights_assigned(0), size(200), weights_one(false), weights_fixed(false), exact(false), prune(false), grow(false), incremental(false), forced(false), sparse(false), debug(__debug)
     {
       typedef cicada::Parameter param_type;
-    
+
       param_type param(parameter);
       if (utils::ipiece(param.name()) != "apply")
 	throw std::runtime_error("this is not a feature-functin applier");
@@ -43,6 +43,8 @@ namespace cicada
 	  incremental = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "forced")
 	  forced = utils::lexical_cast<bool>(piter->second);
+	else if (utils::ipiece(piter->first) == "sparse")
+	  sparse = utils::lexical_cast<bool>(piter->second);
 	else if (utils::ipiece(piter->first) == "weights")
 	  weights = &base_type::weights(piter->second);
 	else if (utils::ipiece(piter->first) == "weights-one")
@@ -60,17 +62,37 @@ namespace cicada
       default:
 	throw std::runtime_error("specify one of exact/prune/grow/incremental");
       }
-    
+      
+      if (sparse) {
+	model_type model_sparse;
+
+	model_type& __model = const_cast<model_type&>(! model_local.empty() ? model_local : model);
+
+	for (model_type::const_iterator iter = __model.begin(); iter != __model.end(); ++ iter)
+	  if ((*iter)->sparse_feature())
+	    model_sparse.push_back(*iter);
+	
+	if (model_sparse.empty())
+	  throw std::runtime_error("we have no sparse features");
+	
+	model_local.swap(model_sparse);
+      }
+
+      if (const_cast<model_type&>(! model_local.empty() ? model_local : model).empty())
+	throw std::runtime_error("no features to apply?")
+      
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
       
       if (weights || weights_one)
 	weights_fixed = true;
-
+      
       if (! weights)
 	weights = &base_type::weights();
-
-      name = std::string("apply-") + (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune")));
+      
+      name = (std::string("apply-")
+	      + std::string(sparse ? "sparse-" : "")
+	      + (exact ? "exact" : (incremental ? "incremental" : (grow ? "grow" : "prune"))));
     }
     
     void Apply::operator()(data_type& data) const

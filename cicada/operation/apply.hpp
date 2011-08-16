@@ -39,6 +39,7 @@ namespace cicada
       bool incremental;
   
       bool forced;
+      bool sparse;
   
       int debug;
     };
