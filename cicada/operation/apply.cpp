@@ -79,7 +79,7 @@ namespace cicada
       }
 
       if (const_cast<model_type&>(! model_local.empty() ? model_local : model).empty())
-	throw std::runtime_error("no features to apply?")
+	throw std::runtime_error("no features to apply?");
       
       if (weights && weights_one)
 	throw std::runtime_error("you have weights, but specified all-one parameter");
