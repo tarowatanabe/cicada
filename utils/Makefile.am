@@ -170,7 +170,8 @@ bitpack64_impl.hpp \
 bitpack8_impl.hpp \
 config.h \
 config.h.in \
-group_aligned_code_offsets.hpp
+group_aligned_code_offsets.hpp \
+stamp-h1
 
 noinst_DATA = .gitignore
 

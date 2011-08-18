@@ -33,6 +33,7 @@ config/lt*.m4
 config/ltmain.sh
 config/missing
 configure
+libtool
 
 
 

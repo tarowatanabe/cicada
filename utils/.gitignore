@@ -33,6 +33,7 @@ config/lt*.m4
 config/ltmain.sh
 config/missing
 configure
+libtool
 
 
 
@@ -80,3 +81,4 @@ bitpack8_impl.hpp
 config.h
 config.h.in
 group_aligned_code_offsets.hpp
+stamp-h1
