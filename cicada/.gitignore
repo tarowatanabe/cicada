@@ -1,0 +1,43 @@
+#ignore objects and archives.
+*.[oa]
+*.lo
+*.la
+
+# libtool related stuff
+.libs
+.deps
+
+
+## ignore backup
+*~
+
+### makefiles
+Makefile
+Makefile.in
+
+### bin-programs
+alignment_main
+attribute_vector_main
+cluster_main
+eval_main
+feature_vector_main
+format_main
+grammar_mutable_main
+grammar_static_main
+grammar_unknown_main
+hypergraph_main
+lattice_main
+matcher_main
+parameter_main
+rule_main
+sentence_main
+sentence_vector_main
+signature_main
+span_vector_main
+stemmer_main
+symbol_main
+tokenizer_main
+transducer_main
+tree_grammar_mutable_main
+tree_grammar_static_main
+tree_rule_main

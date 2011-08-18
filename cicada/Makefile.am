@@ -463,6 +463,17 @@ tree_grammar_mutable_main \
 tree_grammar_static_main \
 tree_rule_main
 
+EXTRA_DIST = .gitignore
+
+.gitignore: .gitignore-orig Makefile
+	cat .gitignore-orig > .gitignore
+	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SCRIPTS); do \
+	  echo $$bin >> .gitignore; \
+	done
+
 alignment_main_SOURCES = alignment_main.cpp
 alignment_main_LDADD = libcicada.la
 
