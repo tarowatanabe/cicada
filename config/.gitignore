@@ -16,15 +16,15 @@ Makefile
 Makefile.in
 
 ### automakes
-.DS_Store
-COPYING
-INSTALL
-aclocal.m4
-autom4te.cache
-config.log
-config.status
-configure
-libtool
+compile
+config.guess
+config.sub
+depcomp
+install-sh
+libtool.m4
+lt*.m4
+ltmain.sh
+missing
 
 
 
