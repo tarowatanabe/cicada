@@ -466,7 +466,7 @@ tree_rule_main
 EXTRA_DIST = .gitignore
 
 .gitignore: .gitignore-orig Makefile
-	cat .gitignore-orig > .gitignore
+	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
 	  echo $$bin >> .gitignore; \
 	done; \
