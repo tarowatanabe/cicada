@@ -165,7 +165,7 @@ group_aligned_code_offsets.py
 
 noinst_DATA = .gitignore
 
-.gitignore: Makefile
+.gitignore:
 	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
 	  echo $$bin >> .gitignore; \

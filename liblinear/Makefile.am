@@ -23,7 +23,7 @@ noinst_PROGRAMS = train predict
 
 noinst_DATA = .gitignore
 
-.gitignore: Makefile
+.gitignore:
 	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
 	  echo $$bin >> .gitignore; \
