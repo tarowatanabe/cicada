@@ -163,6 +163,14 @@ dist_noinst_SCRIPTS = \
 bitpack_gen.py \
 group_aligned_code_offsets.py
 
+IGNORES = \
+bitpack16_impl.hpp \
+bitpack32_impl.hpp \
+bitpack64_impl.hpp \
+bitpack8_impl.hpp \
+config.h \
+config.h.in
+
 noinst_DATA = .gitignore
 
 .gitignore:
@@ -171,6 +179,9 @@ noinst_DATA = .gitignore
 	  echo $$bin >> .gitignore; \
 	done; \
 	for bin in $(SCRIPTS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(IGNORES); do \
 	  echo $$bin >> .gitignore; \
 	done
 
