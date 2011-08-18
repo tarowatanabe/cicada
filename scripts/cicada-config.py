@@ -41,6 +41,7 @@ opt_parser = OptionParser(
     make_option("--fallback",  default=None, action="store_true", help="fallback tree-grammar"),
     
     ### feature functions
+    make_option("--ngram", default=[], action="append", type="string", help="ngram feature"),
 
     ## operations...
     
@@ -179,7 +180,15 @@ if options.fallback:
 
 ### feature-functions
 
-
+print "# ngram feature. If you have multiple ngrams, you should modify name"
+for ngram in options.ngram:
+    print "feature-function = ngram: name=ngram, order=5, no-bos-eos=true, file=%s" %(ngram)
+print "feature-function = word-penalty"
+print "feature-function = rule-penalty"
+print "# feature-function = arity-penalty"
+print "# feature-function = glue-tree-penalty"
+print "# feature-function = rule-shape"
+print
 
 ### operations
 
@@ -205,3 +214,4 @@ elif options.directory:
     print "operation = output:directory=${directory},kbest=${kbest},${weights}"
 else:
     raise ValueError, "no output? --{file,directory}"
+print
