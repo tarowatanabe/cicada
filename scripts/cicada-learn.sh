@@ -22,6 +22,7 @@ config=""
 iteration=20
 weights_init=""
 C=1e-3
+oracle_cube=400
 kbest=0
 forest="no"
 merge="no"
@@ -56,6 +57,7 @@ $me [options]
   -i, --iteration           MERT iterations
   -w, --weights             initial weights
   -C, --C                   hyperparameter
+  --oracle-cube             cube size for oracle computation
   --kbest                   kbest size
   --forest                  forest learning
   --merge                   perform kbest merging
@@ -115,6 +117,10 @@ while test $# -gt 0 ; do
   --C | -C )
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
+    shift; shift ;;
+  --oracle-cube )
+    test $# = 1 && eval "$exit_missing_arg"
+    oracle_cube=$2
     shift; shift ;;
   --kbest )
     test $# = 1 && eval "$exit_missing_arg"
@@ -425,7 +431,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --directory \
 	--forest \
         --scorer  bleu:order=4,exact=true \
-	--cube-size 400 \
+	--cube-size $oracle_cube \
         \
         --debug || exit 1
   else
