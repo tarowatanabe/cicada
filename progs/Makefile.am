@@ -100,7 +100,7 @@ bin_PROGRAMS = \
 
 noinst_DATA = .gitignore
 
-.gitignore:
+.gitignore: Makefile.am
 	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
 	  echo $$bin >> .gitignore; \
