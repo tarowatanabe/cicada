@@ -47,6 +47,7 @@ $me [options]
   --hostfile, --host-file   MPI host file
   -q, --queue               PBS queue
   -n, --np                  # of processes to run
+  --nc                      # of cores to run
   
   Decoding options
   -c, --config              Configuration file (required)
@@ -98,6 +99,11 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     np=$2
     shift; shift ;;
+  --nc )
+    test $# = 1 && eval "$exit_missing_arg"
+    nc=$2
+    shift; shift ;;
+
 
   ## training
   --iteration | -i )
@@ -271,7 +277,7 @@ qsubwrapper() {
   esac
   done
 
-  stripped=`expr "$1" : '^\(.*\)_mpi$'`
+  stripped=`expr "$1" : '\(.*\)_mpi$'`
   if test "$stripped" = ""; then
     stripped=$1
   fi
