@@ -24,7 +24,6 @@ cicada_kbest_main_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_
 cicada_text_main_SOURCES = cicada_text_main.cpp cicada_text_impl.hpp
 cicada_text_main_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
-
 bin_PROGRAMS = \
 	cicada \
 	cicada_mpi \
@@ -98,6 +97,14 @@ bin_PROGRAMS = \
 	mpish \
 	mpipe \
 	thrsh
+
+EXTRA_DIST = .gitignore
+
+.gitignore: .gitignore-orig Makefile
+	cat .gitignore-orig > .gitignore
+	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done
 
 LBFGS_SOURCE = lbfgs.c arithmetic_ansi.h  arithmetic_sse_double.h  arithmetic_sse_float.h  lbfgs.h
 

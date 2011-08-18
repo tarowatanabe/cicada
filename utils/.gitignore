@@ -1,0 +1,55 @@
+#ignore objects and archives.
+*.[oa]
+*.lo
+*.la
+
+# libtool related stuff
+.libs
+.deps
+
+
+## ignore backup
+*~
+
+### makefiles
+Makefile
+Makefile.in
+
+### bin-programs
+sample_arc_list
+sample_b_heap
+sample_base64
+sample_bithack
+sample_bitpack
+sample_bit_vector
+sample_byte_aligned_code
+sample_byte_aligned_vector
+sample_chunk_vector
+sample_compress_stream
+sample_dense_map
+sample_filesystem
+sample_group_aligned_code
+sample_icu_filter
+sample_indexed_set
+sample_istream_line_iterator
+sample_lexical_cast
+sample_lockfree_list_queue
+sample_lockfree_queue
+sample_malloc_stats
+sample_map_file_allocator
+sample_packed_vector
+sample_piece
+sample_program_options
+sample_simple_vector
+sample_sparse_map
+sample_static_allocator
+sample_subprocess
+sample_succinct_vector
+sample_tempfile
+sample_json_string
+sample_vector_map
+sample_vector_set
+sample_vector2
+sample_vertical_coded_vector
+bitpack_gen.py
+group_aligned_code_offsets.py

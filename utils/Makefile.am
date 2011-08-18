@@ -163,6 +163,17 @@ dist_noinst_SCRIPTS = \
 bitpack_gen.py \
 group_aligned_code_offsets.py
 
+EXTRA_DIST = .gitignore
+
+.gitignore: .gitignore-orig Makefile
+	cat .gitignore-orig > .gitignore
+	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SCRIPTS); do \
+	  echo $$bin >> .gitignore; \
+	done
+
 noinst_HEADERS = \
 bitpack_impl.hpp
 
