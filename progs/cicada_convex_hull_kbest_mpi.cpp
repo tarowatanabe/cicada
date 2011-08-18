@@ -135,6 +135,11 @@ struct OutputIterator
 
 int main(int argc, char ** argv)
 {
+  utils::mpi_world mpi_world(argc, argv);
+  
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
   try {
     options(argc, argv);
 
@@ -150,11 +155,11 @@ int main(int argc, char ** argv)
     scorer_document_type scorers(scorer_name);
     read_refset(refset_files, scorers);
 
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "# of references: " << scorers.size() << std::endl;
 
     // read test set
-    if (debug)
+    if (mpi_rank == 0 && debug)
       std::cerr << "reading kbests" << std::endl;
 
     hypothesis_map_type kbests(scorers.size());
@@ -176,11 +181,13 @@ int main(int argc, char ** argv)
     
     compute_envelope(scorers, kbests, weights, direction, segments);
     
-    line_search_type line_search(debug);
-    
-    utils::compress_ostream os(output_file, 1024 * 1024);
-    
-    line_search(segments, value_lower, value_upper, scorers.error_metric(), OutputIterator(os, weights[direction_name]));
+    if (mpi_rank == 0) {
+      line_search_type line_search(debug);
+      
+      utils::compress_ostream os(output_file, 1024 * 1024);
+      
+      line_search(segments, value_lower, value_upper, scorers.error_metric(), OutputIterator(os, weights[direction_name]));
+    }
   }
   catch (const std::exception& err) {
     std::cerr << "error: " << err.what() << std::endl;
@@ -251,94 +258,110 @@ struct EnvelopeTask
   const hypothesis_map_type&  kbests;
 };
 
+enum {
+  envelope_tag = 1000,
+};
+
 void compute_envelope(const scorer_document_type& scorers,
 		      const hypothesis_map_type&  kbests,
 		      const weight_set_type& origin,
 		      const weight_set_type& direction,
 		      segment_document_type& segments)
 {
+  typedef utils::mpi_device_source idevice_type;
+  typedef utils::mpi_device_sink   odevice_type;
+  
+  typedef boost::iostreams::filtering_ostream ostream_type;
+  typedef boost::iostreams::filtering_istream istream_type;
+
+  typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+
   typedef EnvelopeTask task_type;
   typedef task_type::queue_type queue_type;
+
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
   
   queue_type queue;
   
-  boost::thread_group workers;
-  for (int i = 0; i < threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(queue, segments, origin, direction, scorers, kbests)));
+  boost::thread worker(task_type(queue, segments, origin, direction, scorers, kbests));
   
   for (size_t seg = 0; seg != kbests.size(); ++ seg)
     if (! kbests[seg].empty())
       queue.push(seg);
+  queue.push(-1);
   
-  for (int i = 0; i < threads; ++ i)
-    queue.push(-1);
+  worker.join();
   
-  workers.join_all();
-}
+  // merge segments into root
+  if (mpi_rank == 0) {
 
-struct TaskRead
-{
-  typedef utils::lockfree_list_queue<path_type, std::allocator<path_type> > queue_type;
-  
-  TaskRead(queue_type& __queue)
-    : queue(__queue) {}
-  
-  void operator()()
-  {
-    typedef boost::spirit::istream_iterator iter_type;
-    typedef kbest_feature_parser<iter_type> parser_type;
-    
-    parser_type parser;
-    kbest_feature_type kbest;
-
-    for (;;) {
-      path_type path;
-      queue.pop(path);
+    for (int rank = 1; rank != mpi_size; ++ rank) {
+      istream_type is;
+      is.push(idevice_type(rank, envelope_tag, 1024 * 1024));
       
-      if (path.empty()) break;
-      
-      utils::compress_istream is(path, 1024 * 1024);
-      is.unsetf(std::ios::skipws);
-      
-      iter_type iter(is);
-      iter_type iter_end;
-      
-      while (iter != iter_end) {
-	boost::fusion::get<1>(kbest).clear();
-	boost::fusion::get<2>(kbest).clear();
+      std::string line;
+      while (std::getline(is, line)) {
+	const utils::piece line_piece(line);
+	tokenizer_type tokenizer(line_piece);
 	
-	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
-	  if (iter != iter_end)
-	    throw std::runtime_error("kbest parsing failed");
+	tokenizer_type::iterator iter = tokenizer.begin();
+	if (iter == tokenizer.end()) continue;
+	const utils::piece id_str = *iter; 
 	
-	const size_t& id = boost::fusion::get<0>(kbest);
+	++ iter;
+	if (iter == tokenizer.end() || *iter != "|||") continue;
 	
-	if (id >= kbests.size())
-	  kbests.resize(id + 1);
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece x_str = *iter;
 	
-	kbests[id].push_back(hypothesis_type(kbest));
+	++ iter;
+	if (iter == tokenizer.end() || *iter != "|||") continue;
+	
+	++ iter;
+	if (iter == tokenizer.end()) continue;
+	const utils::piece score_str = *iter;
+	
+	const int id = utils::lexical_cast<int>(id_str);
+	
+	if (id >= static_cast<int>(segments.size()))
+	  throw std::runtime_error("invali id?");
+	
+	segments[id].push_back(std::make_pair(utils::decode_base64<double>(x_str),
+					      scorer_type::score_type::decode(score_str)));
       }
     }
+    
+  } else {
+    ostream_type os;
+    os.push(odevice_type(0, envelope_tag, 1024 * 1024));
+    
+    for (size_t seg = 0; seg != segments.size(); ++ seg)
+      if (! segments[seg].empty()) {
+	segment_set_type::const_iterator siter_end = segments[seg].end();
+	for (segment_set_type::const_iterator siter = segments[seg].begin(); siter != siter_end; ++ siter) {
+	  os << seg << " ||| ";
+	  utils::encode_base64(siter->first, std::ostream_iterator<char>(os));
+	  os << " ||| " << siter->second->encode()
+	     << '\n';
+	}
+      }
   }
-  
-  queue_type& queue;
-  hypothesis_map_type kbests;
-};
+}
+
 
 void read_tstset(const path_set_type& files,
 		 hypothesis_map_type& hypotheses)
 {
-  typedef TaskRead task_type;
-  typedef task_type::queue_type queue_type;
-  
-  typedef std::vector<task_type, std::allocator<task_type> > task_set_type;
+  typedef boost::spirit::istream_iterator iter_type;
+  typedef kbest_feature_parser<iter_type> parser_type;
 
-  queue_type queue(threads);
-  task_set_type tasks(threads, task_type(queue));
-    
-  boost::thread_group workers;
-  for (int i = 0; i != threads; ++ i)
-    workers.add_thread(new boost::thread(boost::ref(tasks[i])));
+  const int mpi_rank = MPI::COMM_WORLD.Get_rank();
+  const int mpi_size = MPI::COMM_WORLD.Get_size();
+  
+  parser_type parser;
+  kbest_feature_type kbest;
   
   for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
@@ -346,29 +369,62 @@ void read_tstset(const path_set_type& files,
     
     if (boost::filesystem::is_directory(*fiter)) {
       for (size_t i = 0; /**/; ++ i) {
+	
+	if (i % mpi_size != mpi_rank) continue;
+	
 	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
-
+	
 	if (! boost::filesystem::exists(path)) break;
 	
-	queue.push(path);
+	utils::compress_istream is(path, 1024 * 1024);
+	is.unsetf(std::ios::skipws);
+	
+	iter_type iter(is);
+	iter_type iter_end;
+	
+	while (iter != iter_end) {
+	  boost::fusion::get<1>(kbest).clear();
+	  boost::fusion::get<2>(kbest).clear();
+	  
+	  if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	    if (iter != iter_end)
+	      throw std::runtime_error("kbest parsing failed");
+	  
+	  const size_t& id = boost::fusion::get<0>(kbest);
+	  
+	  if (id != i)
+	    throw std::runtime_error("id mismatch?");
+	  if (i >= hypotheses.size())
+	    throw std::runtime_error("invalid id?");
+	  
+	  hypotheses[id].push_back(hypothesis_type(kbest));
+	}
       }
-    } else
-      queue.push(*fiter);
-  }
-  
-  for (int i = 0; i != threads; ++ i)
-    queue.push(path_type());
-  
-  workers.join_all();
-  
-  for (int i = 0; i != threads; ++ i) {
-    if (tasks[i].kbests.size() > hypotheses.size())
-      throw std::runtime_error("invalid kbests");
-    
-    for (size_t id = 0; id != tasks[i].kbests.size(); ++ id)
-      hypotheses[id].insert(hypotheses[id].end(), tasks[i].kbests[id].begin(), tasks[i].kbests[id].end());
-    
-    tasks[i].kbests.clear();
+    } else {
+      utils::compress_istream is(*fiter, 1024 * 1024);
+      is.unsetf(std::ios::skipws);
+	
+      iter_type iter(is);
+      iter_type iter_end;
+	
+      while (iter != iter_end) {
+	boost::fusion::get<1>(kbest).clear();
+	boost::fusion::get<2>(kbest).clear();
+	  
+	if (! boost::spirit::qi::phrase_parse(iter, iter_end, parser, boost::spirit::standard::blank, kbest))
+	  if (iter != iter_end)
+	    throw std::runtime_error("kbest parsing failed");
+	
+	const size_t& id = boost::fusion::get<0>(kbest);
+	
+	if (id % mpi_size != mpi_rank) continue;
+	
+	if (id >= hypotheses.size())
+	  throw std::runtime_error("invalid id?");
+	
+	hypotheses[id].push_back(hypothesis_type(kbest));
+      }
+    }
   }
 }
 
@@ -468,17 +524,14 @@ void initialize_score(hypothesis_map_type& hypotheses,
 
   queue_type queue;
   
-  boost::thread_group workers;
-  for (int i = 0; i < threads; ++ i)
-    workers.add_thread(new boost::thread(task_type(queue, hypotheses, scorers)));
+  boost::thread worker(task_type(queue, hypotheses, scorers));
   
   for (size_t id = 0; id != hypotheses.size(); ++ id)
-    queue.push(id);
+    if (! hypotheses[id].empty())
+      queue.push(id);
+  queue.push(-1);
   
-  for (int i = 0; i < threads; ++ i)
-    queue.push(-1);
-  
-  workers.join_all();
+  worker.join();
 }
 
 void options(int argc, char** argv)

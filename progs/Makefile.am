@@ -33,6 +33,7 @@ bin_PROGRAMS = \
 	cicada_convex_hull \
 	cicada_convex_hull_mpi \
 	cicada_convex_hull_kbest \
+	cicada_convex_hull_kbest_mpi \
 	cicada_eval \
 	cicada_extract_ghkm \
 	cicada_extract_ghkm_mpi \
@@ -122,6 +123,10 @@ cicada_convex_hull_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost
 
 cicada_convex_hull_kbest_SOURCES = cicada_convex_hull_kbest.cpp
 cicada_convex_hull_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_convex_hull_kbest_mpi_SOURCES = cicada_convex_hull_kbest_mpi.cpp
+cicada_convex_hull_kbest_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_convex_hull_kbest_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_eval_SOURCES = cicada_eval.cpp cicada_text_impl.hpp
 cicada_eval_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)

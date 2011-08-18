@@ -298,17 +298,6 @@ void compute_envelope(const scorer_document_type& scorers,
   typedef boost::iostreams::filtering_ostream ostream_type;
   typedef boost::iostreams::filtering_istream istream_type;
 
-  typedef boost::shared_ptr<ostream_type> ostream_ptr_type;
-  typedef boost::shared_ptr<istream_type> istream_ptr_type;
-
-  typedef boost::shared_ptr<odevice_type> odevice_ptr_type;
-  typedef boost::shared_ptr<idevice_type> idevice_ptr_type;
-  
-  typedef std::vector<ostream_ptr_type, std::allocator<ostream_ptr_type> > ostream_ptr_set_type;
-  typedef std::vector<istream_ptr_type, std::allocator<istream_ptr_type> > istream_ptr_set_type;
-
-  typedef std::vector<odevice_ptr_type, std::allocator<odevice_ptr_type> > odevice_ptr_set_type;
-  typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
 
   typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
 
@@ -373,8 +362,8 @@ void compute_envelope(const scorer_document_type& scorers,
     ostream_type os;
     os.push(odevice_type(0, envelope_tag, 1024 * 1024));
     
-    for (size_t seg = 0; seg != graphs.size(); ++ seg)
-      if (graphs[seg].is_valid()) {
+    for (size_t seg = 0; seg != segments.size(); ++ seg)
+      if (! segments[seg].empty()) {
 	segment_set_type::const_iterator siter_end = segments[seg].end();
 	for (segment_set_type::const_iterator siter = segments[seg].begin(); siter != siter_end; ++ siter) {
 	  os << seg << " ||| ";
@@ -403,7 +392,7 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
       for (int i = 0; /**/; ++ i) {
 	
 	if (i % mpi_size != mpi_rank) continue;
-
+	
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
@@ -453,10 +442,6 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
       }
     }
   }
-  
-  for (size_t id = 0; id != graphs.size(); ++ id)
-    if (graphs[id].goal == hypergraph_type::invalid)
-      std::cerr << "invalid graph at: " << id << std::endl;
 }
 
 void read_refset(const path_set_type& files, scorer_document_type& scorers)
