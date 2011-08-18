@@ -14,3 +14,25 @@
 ### makefiles
 Makefile
 Makefile.in
+
+### automakes
+.DS_Store
+COPYING
+INSTALL
+aclocal.m4
+autom4te.cache
+config.log
+config.status
+config/compile
+config/config.guess
+config/config.sub
+config/depcomp
+config/install-sh
+config/libtool.m4
+config/lt*.m4
+config/ltmain.sh
+config/missing
+configure
+
+
+
