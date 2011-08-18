@@ -316,7 +316,7 @@ qsubwrapper decode -l ${root}forest.maxent.log $cicada/cicada_mpi \
 	--config ${root}cicada.config.maxent \
         --operation $compose \
         --operation output:directory=${root}forest-maxent \
-	\
+ 	\
 	--debug || exit 1
   
 echo "oracle translations ${root}forest-maxent.oracle" >&2
