@@ -1,4 +1,7 @@
 #!/bin/sh
+#
+#  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
+#
 
 me=`basename $0`
 
