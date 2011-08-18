@@ -31,6 +31,7 @@ bin_PROGRAMS = \
 	cicada_alignment \
 	cicada_cluster_word \
 	cicada_convex_hull \
+	cicada_convex_hull_mpi \
 	cicada_convex_hull_kbest \
 	cicada_eval \
 	cicada_extract_ghkm \
@@ -114,6 +115,10 @@ cicada_cluster_word_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftool
 
 cicada_convex_hull_SOURCES = cicada_convex_hull.cpp
 cicada_convex_hull_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
+
+cicada_convex_hull_mpi_SOURCES = cicada_convex_hull_mpi.cpp
+cicada_convex_hull_mpi_CPPFLAGS = $(MPI_CPPFLAGS) $(AM_CPPFLAGS)
+cicada_convex_hull_mpi_LDADD   = $(MPI_LDFLAGS) $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
 
 cicada_convex_hull_kbest_SOURCES = cicada_convex_hull_kbest.cpp
 cicada_convex_hull_kbest_LDADD   = $(LIBCICADA) $(LIBUTILS) $(boost_LDADD) $(perftools_LDADD)
