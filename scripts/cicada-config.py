@@ -190,6 +190,18 @@ print "# feature-function = glue-tree-penalty"
 print "# feature-function = rule-shape"
 print
 
+### inputs
+print "# inputs. We support: input-{id,bitext,sentence,lattice,forest,span,alignemnt,directory}"
+if options.scfg:
+    print "input-sentence = true"
+elif options.phrase:
+    print "input-sentence = true"
+elif options.tree:
+    print "input-forest = true"
+elif options.tree_cky:
+    print "input-sentence = true"
+print
+
 ### operations
 
 
