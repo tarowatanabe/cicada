@@ -22,6 +22,7 @@ compose="compose-cky"
 ### linear learning
 C=1e-3
 oracle_cube=400
+scorer="bleu:order=4,exact=true"
 
 ### qsubs
 mem_single=1gb
@@ -52,6 +53,7 @@ $me [options]
   Training options
   -C, --C                   hyperparameter
   --oracle-cube             cube size for oracle computation
+  --scorer                  scorer (default: blue:order=4,exact=true)
 
   -d, --dev, --devset              tuning data (required)
   -r, --reference, --refset, --ref reference translations (required)
@@ -102,6 +104,10 @@ while test $# -gt 0 ; do
   --oracle-cube )
     test $# = 1 && eval "$exit_missing_arg"
     oracle_cube=$2
+    shift; shift ;;
+  --scorer )
+    test $# = 1 && eval "$exit_missing_arg"
+    scorer=$2
     shift; shift ;;
 
   --config | -c )
@@ -326,7 +332,7 @@ qsubwrapper oracle -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
         --output ${root}forest-maxent.oracle \
         --directory \
 	--forest \
-        --scorer  bleu:order=4,exact=true \
+        --scorer  $scorer \
 	--cube-size $oracle_cube \
         \
         --debug || exit 1

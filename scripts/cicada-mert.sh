@@ -19,6 +19,7 @@ hosts_file=""
 config=""
 
 ### mert learning
+scorer="bleu:order=4,exact=true"
 iteration=20
 weights_init=""
 direction=8
@@ -56,6 +57,7 @@ $me [options]
   -w, --weights             initial weights
   --direction               random directions
   --restart                 random restarts
+  --scorer                  scorer (default: blue:order=4,exact=true)
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
   -d, --dev, --devset              tuning data (required)
@@ -124,6 +126,10 @@ while test $# -gt 0 ; do
   --upper | -u )
     test $# = 1 && eval "$exit_missing_arg"
     lower=$2
+    shift; shift ;;
+  --scorer )
+    test $# = 1 && eval "$exit_missing_arg"
+    scorer=$2
     shift; shift ;;
 
   --config | -c )
@@ -360,7 +366,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --refset $refset \
       --tstset ${root}1best-$iter \
       --output ${root}eval-$iter.1best \
-      --scorer bleu:order=4 || exit 1
+      --scorer $scorer || exit 1
 
 
   ### kbests upto now...
@@ -404,6 +410,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			--value-upper  5 \
                         --samples-directions $direction \
                         --samples-restarts   $restart \
+                        --scorer $scorer \
                         $lower_bound \
                         $upper_bound \
 			\

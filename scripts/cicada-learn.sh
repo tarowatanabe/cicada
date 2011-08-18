@@ -23,6 +23,7 @@ iteration=20
 weights_init=""
 C=1e-3
 oracle_cube=400
+scorer="bleu:order=4,exact=true"
 kbest=0
 forest="no"
 merge="no"
@@ -58,6 +59,7 @@ $me [options]
   -w, --weights             initial weights
   -C, --C                   hyperparameter
   --oracle-cube             cube size for oracle computation
+  --scorer                  scorer (default: blue:order=4,exact=true)
   --kbest                   kbest size
   --forest                  forest learning
   --merge                   perform kbest merging
@@ -121,6 +123,10 @@ while test $# -gt 0 ; do
   --oracle-cube )
     test $# = 1 && eval "$exit_missing_arg"
     oracle_cube=$2
+    shift; shift ;;
+  --scorer )
+    test $# = 1 && eval "$exit_missing_arg"
+    scorer=$2
     shift; shift ;;
   --kbest )
     test $# = 1 && eval "$exit_missing_arg"
@@ -396,14 +402,14 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --refset $refset \
         --tstset ${root}1best-$iter \
         --output ${root}eval-$iter.1best \
-        --scorer bleu:order=4 || exit 1
+        --scorer $scorer || exit 1
   else
     echo "BLEU ${root}eval-$iter.1best" >&2
     qsubwrapper eval $cicada/cicada_eval \
         --refset $refset \
         --tstset ${root}${output}-$iter \
         --output ${root}eval-$iter.1best \
-        --scorer bleu:order=4 || exit 1
+        --scorer $scorer || exit 1
   fi
 
   ### kbests upto now...
@@ -430,7 +436,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --output ${root}${output}-${iter}.oracle \
         --directory \
 	--forest \
-        --scorer  bleu:order=4,exact=true \
+        --scorer  $scorer \
 	--cube-size $oracle_cube \
         \
         --debug || exit 1
@@ -441,7 +447,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --tstset $tstset_oracle \
         --output ${root}${output}-${iter}.oracle \
         --directory \
-        --scorer  bleu:order=4,exact=true \
+        --scorer  $scorer \
         \
         --debug || exit 1
   fi

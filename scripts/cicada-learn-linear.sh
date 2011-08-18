@@ -22,6 +22,7 @@ config=""
 iteration=20
 weights_init=""
 C=1e-3
+scorer="bleu:order=4,exact=true"
 solver=1
 kbest=1000
 merge="no"
@@ -56,6 +57,7 @@ $me [options]
   -i, --iteration           MERT iterations
   -w, --weights             initial weights
   -C, --C                   hyperparameter
+  --scorer                  scorer (default: blue:order=4,exact=true)
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
@@ -117,6 +119,10 @@ while test $# -gt 0 ; do
   --C | -C )
     test $# = 1 && eval "$exit_missing_arg"
     C=$2
+    shift; shift ;;
+  --scorer )
+    test $# = 1 && eval "$exit_missing_arg"
+    scorer=$2
     shift; shift ;;
   --solver )
     test $# = 1 && eval "$exit_missing_arg"
@@ -372,7 +378,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --refset $refset \
       --tstset ${root}kbest-$iter \
       --output ${root}eval-$iter.1best \
-      --scorer bleu:order=4 || exit 1
+      --scorer $scorer || exit 1
 
   ### kbests upto now...
   tstset=""
@@ -404,7 +410,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
         --tstset $tstset_oracle \
         --output ${root}kbest-${iter}.oracle \
         --directory \
-        --scorer  bleu:order=4,exact=true \
+        --scorer  $scorer \
         \
         --debug || exit 1
 
