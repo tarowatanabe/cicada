@@ -14,8 +14,6 @@
 ### makefiles
 Makefile
 Makefile.in
-
-### bin-programs
 cicada
 cicada_mpi
 cicada_alignment

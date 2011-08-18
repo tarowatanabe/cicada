@@ -98,11 +98,14 @@ bin_PROGRAMS = \
 	mpipe \
 	thrsh
 
-EXTRA_DIST = .gitignore
+noinst_DATA = .gitignore
 
-.gitignore: .gitignore-orig Makefile
-	cat .gitignore-orig > .gitignore
+.gitignore: Makefile
+	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SCRIPTS); do \
 	  echo $$bin >> .gitignore; \
 	done
 

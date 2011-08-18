@@ -463,9 +463,9 @@ tree_grammar_mutable_main \
 tree_grammar_static_main \
 tree_rule_main
 
-EXTRA_DIST = .gitignore
+noinst_DATA = .gitignore
 
-.gitignore: .gitignore-orig Makefile
+.gitignore: Makefile
 	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
 	  echo $$bin >> .gitignore; \

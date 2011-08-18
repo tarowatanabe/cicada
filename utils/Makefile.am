@@ -163,10 +163,10 @@ dist_noinst_SCRIPTS = \
 bitpack_gen.py \
 group_aligned_code_offsets.py
 
-EXTRA_DIST = .gitignore
+noinst_DATA = .gitignore
 
-.gitignore: .gitignore-orig Makefile
-	cat .gitignore-orig > .gitignore
+.gitignore: Makefile
+	cat $(top_builddir)/.gitignore > .gitignore
 	for bin in $(PROGRAMS); do \
 	  echo $$bin >> .gitignore; \
 	done; \

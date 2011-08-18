@@ -14,8 +14,6 @@
 ### makefiles
 Makefile
 Makefile.in
-
-### bin-programs
 sample_arc_list
 sample_b_heap
 sample_base64
