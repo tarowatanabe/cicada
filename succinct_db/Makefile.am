@@ -25,6 +25,17 @@ noinst_PROGRAMS = \
 	sample_succinct_trie_db \
 	sample_succinct_trie_database
 
+noinst_DATA = .gitignore
+
+.gitignore: Makefile
+	cat $(top_builddir)/.gitignore > .gitignore
+	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SCRIPTS); do \
+	  echo $$bin >> .gitignore; \
+	done
+
 sample_succinct_trie_SOURCES = sample_succinct_trie.cpp
 sample_succinct_trie_LDADD = $(boost_LDADD) $(LIBUTILS) $(perftools_LDADD)
 

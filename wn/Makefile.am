@@ -21,6 +21,17 @@ libwn_la_LIBADD = \
 noinst_PROGRAMS = \
 	wn_main
 
+noinst_DATA = .gitignore
+
+.gitignore: Makefile
+	cat $(top_builddir)/.gitignore > .gitignore
+	for bin in $(PROGRAMS); do \
+	  echo $$bin >> .gitignore; \
+	done; \
+	for bin in $(SCRIPTS); do \
+	  echo $$bin >> .gitignore; \
+	done
+
 wn_main_SOURCES = wn_main.cpp
 wn_main_LDADD   = libwn.la
 
