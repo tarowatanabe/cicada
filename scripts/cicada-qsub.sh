@@ -146,20 +146,20 @@ if test "$qsub" != ""; then
       fi
     fi
   ) |
-  exec qsub -S /bin/sh || exit 1
+  exec qsub -S /bin/sh
 else
   if test "$stripped" != "$1" -a $np -gt 1; then
     if test "$logfile" != ""; then
-      exec ${openmpi}mpirun $mpinp $@ >& $logfile || exit 1
+      exec ${openmpi}mpirun $mpinp $@ >& $logfile
     else
-      exec ${openmpi}mpirun $mpinp $@ || exit 1
+      exec ${openmpi}mpirun $mpinp $@
     fi
   else
     shift
     if test "$logfile" != ""; then
-      exec $stripped $@ >& $logfile || exit 1
+      exec $stripped $@ >& $logfile
     else
-      exec $stripped $@ || exit 1
+      exec $stripped $@
     fi
   fi
 fi
