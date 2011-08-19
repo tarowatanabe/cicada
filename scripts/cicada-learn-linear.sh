@@ -84,7 +84,7 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     cicada=$2
     shift; shift ;;
-  --mpi )
+  --mpi | --mpi-dir )
     test $# = 1 && eval "$exit_missing_arg"
     openmpi=$2
     shift; shift ;;
