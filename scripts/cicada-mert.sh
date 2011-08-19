@@ -28,6 +28,7 @@ config=""
 scorer="bleu:order=4,exact=true"
 kbest=0
 forest="no"
+iterative="no"
 iteration=20
 weights_init=""
 direction=8
@@ -67,7 +68,8 @@ $me [options]
   --restart                 random restarts   (default: $restart)
   --scorer                  scorer (default: $scorer)
   --kbest                   kbest size                       (default: $kbest)
-  --forest                  forest learning
+  --forest                  forest MERT
+  --iterative               iterative learning
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
   -d, --dev, --devset              tuning data (required)
@@ -147,6 +149,9 @@ while test $# -gt 0 ; do
     shift; shift ;;
   --forest )
     forest=yes
+    shift ;;
+  --iterative )
+    iterative=yes
     shift ;;
 
   --config | -c )
@@ -445,6 +450,11 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     upper_bound=" --bound-upper $upper"
   fi
 
+  iterative_option=""
+  if test "$iterative" = "yes"; then
+    iterative_option=" --iterative"
+  fi
+
   ## MERT
   if $kbest -eq 0; then
     echo "MERT ${root}weights.$iter" >&2
@@ -461,6 +471,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --scorer $scorer \
                         $lower_bound \
                         $upper_bound \
+	                $iterative_option \
 			\
 			--normalize-l1 \
 			--initial-average \
@@ -481,6 +492,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --scorer $scorer \
                         $lower_bound \
                         $upper_bound \
+	                $iterative_option \
 			\
 			--normalize-l1 \
 			--initial-average \
