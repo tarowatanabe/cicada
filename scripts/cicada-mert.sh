@@ -389,7 +389,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   done
 
   ### previous weights...
-  weights="${weights_init}"
+  weights=""
   for ((i=1;i<$iter;++i)); do
     if test -e ${root}weights.$i; then
       weights="$weights ${root}weights.$i"

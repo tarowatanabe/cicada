@@ -414,25 +414,44 @@ namespace cicada
 	  hypergraph_type::edge_type& edge = target.edges[*eiter];
 	  
 	  const rule_type& rule = *edge.rule;
-	  
-	  if (rule.rhs.size() == 1 && (remove_symbol(rule.rhs.front()) || rule.rhs.front() == vocab_type::EPSILON)) {
-	    // we will mark this as deleted,
-	    // and keep bit-vector indicating the node.id has a edge with epsilon...
-	    
-	    epsilons[node.id].push_back(edge.id);
-	    removed[edge.id] = true;
-	    ++ epsilon_remove;
+
+	  if (edge.tails.empty()) {
+	    // we will check terminals...
+	    if (rule.rhs.size() == 1) {
+	      if ((remove_symbol(rule.rhs.front()) || rule.rhs.front() == vocab_type::EPSILON)) {
+		epsilons[node.id].push_back(edge.id);
+		removed[edge.id] = true;
+		++ epsilon_remove;
+	      }
+	    } else {
+	      rhs.clear();
+	      rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
+	      for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
+		if (! (remove_symbol(*siter) || *siter == vocab_type::EPSILON))
+		  rhs.push_back(*siter);
+	      
+	      if (rhs.size() != rule.rhs.size()) {
+		if (rhs.empty()) {
+		  epsilons[node.id].push_back(edge.id);
+		  removed[edge.id] = true;
+		  ++ epsilon_remove;
+		  
+		  rhs.push_back(vocab_type::EPSILON);
+		}
+		
+		edge.rule = rule_type::create(rule_type(rule.lhs, rhs.begin(), rhs.end()));
+	      }
+	    }
 	  } else {
 	    rhs.clear();
 	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
-	    for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter) {
+	    for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
 	      if (! (remove_symbol(*siter) || *siter == vocab_type::EPSILON))
 		rhs.push_back(*siter);
-	    }
 	    
-	    if (rhs.size() != rule.rhs)
+	    if (rhs.size() != rule.rhs.size())
 	      edge.rule = rule_type::create(rule_type(rule.lhs, rhs.begin(), rhs.end()));
-	    
+	      
 	    index_set_type j_ends(edge.tails.size(), 0);
 	    index_set_type j(edge.tails.size(), 0);
 	    
