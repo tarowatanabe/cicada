@@ -952,7 +952,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     
     ostream_type os;
     os.push(odevice_type(0, viterbi_tag, 4096));
-    os.push(boost::iostreams::gzip_decompressor());
+    os.push(boost::iostreams::gzip_compressor());
     
     for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
       const int id = mpi_id * mpi_size + mpi_rank;
