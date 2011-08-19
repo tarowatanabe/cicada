@@ -31,8 +31,7 @@ mem=1gb
 queue=ltg
 
 usage="\
-$me name [options] prgram args
-  General options
+$me name [options] cicada-program args
   --mpi                     MPI implementation
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
