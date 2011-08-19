@@ -3,6 +3,9 @@
 #  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 
+### we assume PBSPro. If you want to apply this to other environgmnet, adjust 
+### #PBS stuff and qsub related commands
+
 me=`basename $0`
 
 exit_missing_arg="\
@@ -107,6 +110,12 @@ fi
 
 
 if test "$qsub" != ""; then
+    
+  if test "$name" = ""; then
+    echo "no process name under qsub (specify by --name)"
+    exit 1
+  fi
+
   (
     echo "#!/bin/sh"
     echo "#PBS -N $name"

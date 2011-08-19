@@ -3,6 +3,9 @@
 #  Copyright(C) 2011 Taro Watanabe <taro.watanabe@nict.go.jp>
 #
 
+### we assume PBSPro. If you want to apply this to other environgmnet, adjust 
+### #PBS stuff and qsub related commands
+
 me=`basename $0`
 
 root=""
