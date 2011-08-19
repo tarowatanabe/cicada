@@ -249,12 +249,30 @@ namespace cicada
       
       scorer_ptr_type create() { return scorer_type::create(parameter); }
       
+      void swap(ScorerDocument& x)
+      {
+	scorers.swap(x.scorers);
+	parameter.swap(x.parameter);
+      }
+      
     private:
       scorer_set_type scorers;
       std::string     parameter;
     };
     
   };
+};
+
+namespace std
+{
+  
+  inline
+  void swap(cicada::eval::ScorerDocument& x,
+	    cicada::eval::ScorerDocument& y)
+  {
+    x.swap(y);
+  }
+
 };
 
 #endif

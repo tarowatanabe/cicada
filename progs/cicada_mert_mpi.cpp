@@ -106,6 +106,7 @@ int samples_restarts   = 4;
 int samples_directions = 10;
 
 bool initial_average = false;
+bool iterative = false;
 
 double tolerance = 1e-4;
 
@@ -117,8 +118,6 @@ bool weight_normalize_l1 = false;
 bool weight_normalize_l2 = false;
 
 int debug = 0;
-
-
 
 template <typename Iterator, typename Generator>
 inline
@@ -692,9 +691,9 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, envelope_notify_tag);
     
     bcast_weights(0, origin);
-
+    
     bcast_weights(0, direction);
-
+    
     segments.clear();
     segments.resize(scorers.size());
     
@@ -1106,6 +1105,7 @@ void options(int argc, char** argv)
     ("samples-restarts",   po::value<int>(&samples_restarts),   "# of random sampling for initial starting point")
     ("samples-directions", po::value<int>(&samples_directions), "# of ramdom sampling for directions")
     ("initial-average",    po::bool_switch(&initial_average),   "averaged initial parameters")
+    ("iterative",          po::bool_switch(&iterative),         "iterative training of MERT")
     
     ("tolerance", po::value<double>(&tolerance)->default_value(tolerance), "tolerance")
     

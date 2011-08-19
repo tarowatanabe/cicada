@@ -66,7 +66,7 @@ typedef feature_set_type::feature_type feature_type;
 
 typedef std::vector<weight_set_type, std::allocator<weight_set_type> > weight_set_collection_type;
 
-typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
@@ -95,6 +95,7 @@ int samples_restarts   = 4;
 int samples_directions = 10;
 
 bool initial_average = false;
+bool iterative = false;
 
 double tolerance = 1e-4;
 
@@ -848,6 +849,7 @@ void options(int argc, char** argv)
     ("samples-restarts",   po::value<int>(&samples_restarts),   "# of random sampling for initial starting point")
     ("samples-directions", po::value<int>(&samples_directions), "# of ramdom sampling for directions")
     ("initial-average",    po::bool_switch(&initial_average),   "averaged initial parameters")
+    ("iterative",          po::bool_switch(&iterative),         "iterative training of MERT")
     
     ("tolerance", po::value<double>(&tolerance)->default_value(tolerance), "tolerance")
     
