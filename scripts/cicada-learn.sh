@@ -474,8 +474,9 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     fi
   done
 
-  if test "$weights_prev" != ""; then
-    weights_prev=" --feature-weights $weights_prev"
+  weights_option=""
+  if test "$weights_last" != ""; then
+    weights_option=" --weights $weights_last"
   fi
 
   learn_oracle=$orcset
@@ -496,7 +497,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --forest  $tstset \
                         --intersected $learn_oracle \
                         $unite \
-	                $weights_prev \
+	                $weights_option \
                         --output $weights_learn \
                         \
                         --learn-lbfgs \
@@ -509,7 +510,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
                         --kbest  $tstset \
                         --oracle $learn_oracle \
 	                $unite \
-	                $weights_prev \
+	                $weights_option \
                         --output $weights_learn \
                         \
                         --learn-lbfgs \
