@@ -25,6 +25,7 @@ noinst_DATA = .gitignore
 
 .gitignore: Makefile.am
 	cat $(top_builddir)/.gitignore > .gitignore
+	echo "*.model" >> .gitignore
 	for bin in $(PROGRAMS); do \
 	  echo $$bin >> .gitignore; \
 	done; \
