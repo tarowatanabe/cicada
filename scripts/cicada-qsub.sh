@@ -108,6 +108,17 @@ if test "$openmpi" != ""; then
   openmpi=`echo "${openmpi}/" | sed -e 's/\/\/$/\//'`
 fi
 
+mpinp=""
+if test "$qsub" = ""; then
+  mpinp="--np $np"
+  if test "$hosts" != ""; then
+    mpinp="$mpinp --host $hosts"
+  fi
+  if test "$host_file" != ""; then
+    mipnp="$mpinp --hostfile $host_file"
+  fi
+fi
+
 
 if test "$qsub" != ""; then
     

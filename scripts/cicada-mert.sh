@@ -26,6 +26,8 @@ config=""
 
 ### mert learning
 scorer="bleu:order=4,exact=true"
+kbest=0
+forest="no"
 iteration=20
 weights_init=""
 direction=8
@@ -64,6 +66,8 @@ $me [options]
   --direction               random directions (default: $direction)
   --restart                 random restarts   (default: $restart)
   --scorer                  scorer (default: $scorer)
+  --kbest                   kbest size                       (default: $kbest)
+  --forest                  forest learning
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
   -d, --dev, --devset              tuning data (required)
@@ -137,6 +141,13 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     scorer=$2
     shift; shift ;;
+  --kbest )
+    test $# = 1 && eval "$exit_missing_arg"
+    kbest=$2
+    shift; shift ;;
+  --forest )
+    forest=yes
+    shift ;;
 
   --config | -c )
     test $# = 1 && eval "$exit_missing_arg"
@@ -184,7 +195,7 @@ if test "$cicada" = ""; then
 fi
 
 ## check cicada...
-cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eval cicada_oracle cicada_oracle_mpi cicada_mert cicada_mert_mpi"
+cicadas="cicada_filter_config cicada_filter_weights cicada cicada_mpi cicada_eval cicada_oracle cicada_oracle_mpi cicada_mert cicada_mert_mpi cicada_mert_kbest cicada_mert_kbest_mpi"
 
 found=yes
 for prog in $cicadas; do
@@ -213,6 +224,15 @@ if test "$found" = "no"; then
     echo "no --cicada | --cicada-dir?" >&2
     exit 1
   fi
+fi
+
+if test "forest" = "no" -a $kbest -le 0; then
+  kbest=0
+  forest=yes
+fi
+if test "forest" = "yes" -a $kbest -gt 0; then
+  echo "forest-mode or kbest-mode?" >&2
+  exit 1
 fi
 
 if test "$weights_init" != ""; then
@@ -350,12 +370,17 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     weights="weights=${root}weights.$iter_prev"
   fi
 
+  output=forest
+  if test $kbest -gt 0; then
+    output=kbest
+  fi
+
   ### setup config file
   echo "generate config file ${root}cicada.config.$iter" >&2
   qsubwrapper config ${cicada}/cicada_filter_config \
       --weights $weights \
-      --kbest 0 \
-      --directory ${root}forest-$iter \
+      --kbest $kbest \
+      --directory ${root}${output}-$iter \
       --input $config \
       --output ${root}cicada.config.$iter || exit 1
   
@@ -367,27 +392,35 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 	\
 	--debug || exit 1
 
-  echo "1-best ${root}1best-$iter" >&2
-  qsubwrapper onebest -l ${root}1best.$iter.log $cicada/cicada_mpi \
-	--input ${root}forest-$iter \
+  if test $kbest -eq 0; then
+    echo "1-best ${root}1best-$iter" >&2
+    qsubwrapper onebest -l ${root}1best.$iter.log $cicada/cicada_mpi \
+	--input ${root}${output}-$iter \
 	--input-forest --input-directory \
 	--operation output:kbest=1,${weights},file=${root}1best-$iter \
 	--debug || exit 1
 
-  ### BLEU
-  echo "BLEU ${root}eval-$iter.1best" >&2
-  qsubwrapper eval $cicada/cicada_eval \
+    echo "BLEU ${root}eval-$iter.1best" >&2
+    qsubwrapper eval $cicada/cicada_eval \
       --refset $refset \
       --tstset ${root}1best-$iter \
       --output ${root}eval-$iter.1best \
       --scorer $scorer || exit 1
+  else
+    echo "BLEU ${root}eval-$iter.1best" >&2
+    qsubwrapper eval $cicada/cicada_eval \
+        --refset $refset \
+        --tstset ${root}${output}-$iter \
+        --output ${root}eval-$iter.1best \
+        --scorer $scorer || exit 1
+  fi
 
 
   ### kbests upto now...
   tstset=""
   for ((i=1;i<=$iter;++i)); do
-    if test -e ${root}forest-$i; then
-      tstset="$tstset ${root}forest-$i"
+    if test -e ${root}${output}-$i; then
+      tstset="$tstset ${root}${output}-$i"
     fi
   done
 
@@ -412,9 +445,10 @@ for ((iter=1;iter<=iteration; ++ iter)); do
     upper_bound=" --bound-upper $upper"
   fi
 
-  ## liblinear learning
-  echo "MERT ${root}weights.$iter" >&2
-  qsubwrapper learn -l ${root}mert.$iter.log $cicada/cicada_mert_mpi \
+  ## MERT
+  if $kbest -eq 0; then
+    echo "MERT ${root}weights.$iter" >&2
+    qsubwrapper learn -l ${root}mert.$iter.log $cicada/cicada_mert_mpi \
 			--refset $refset \
 			--tstset $tstset \
 			--output ${root}weights.$iter \
@@ -432,6 +466,26 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			--initial-average \
 			\
 			--debug=2 || exit 1
-
+  else
+    echo "MERT ${root}weights.$iter" >&2
+    qsubwrapper learn -l ${root}mert.$iter.log $cicada/cicada_mert_kbest_mpi \
+			--refset $refset \
+			--tstset $tstset \
+			--output ${root}weights.$iter \
+			\
+			$weights_prev \
+			--value-lower -5 \
+			--value-upper  5 \
+                        --samples-directions $direction \
+                        --samples-restarts   $restart \
+                        --scorer $scorer \
+                        $lower_bound \
+                        $upper_bound \
+			\
+			--normalize-l1 \
+			--initial-average \
+			\
+			--debug=2 || exit 1
+  fi
 
 done 
