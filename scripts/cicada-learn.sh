@@ -379,7 +379,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   fi
 
   output=forest
-  if test $kbest -t 0; then
+  if test $kbest -gt 0; then
     output=kbest
   fi
 
