@@ -41,12 +41,10 @@ $me name [options] prgram args
   --nc                      # of cores to run
   --mem                     memory used by each node (default: $mem)
   --log, -l                 logfile
+  --name                    process name
 
   -h, --help                help message
 "
-
-name=$1
-shift
 
 while test $# -gt 0; do
   case $1 in
@@ -82,6 +80,11 @@ while test $# -gt 0; do
     test $# = 1 && eval "$exit_missing_arg"
     logfile=$2
     shift; shift ;;
+  --name )
+    test $# = 1 && eval "$exit_missing_arg"
+    name=$2
+    shift; shift ;;
+
   --help | -h )
     echo "$usage"
     exit ;;
@@ -98,6 +101,11 @@ stripped=`expr "$1" : '\(.*\)_mpi$'`
 if test "$stripped" = ""; then
   stripped=$1
 fi
+
+if test "$openmpi" != ""; then
+  openmpi=`echo "${openmpi}/" | sed -e 's/\/\/$/\//'`
+fi
+
 
 if test "$qsub" != ""; then
   (
