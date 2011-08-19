@@ -169,7 +169,7 @@ while test $# -gt 0 ; do
 ### error...
    -* )
     exec >&2
-    echo "$me: invalid option $1"
+    echo "$me: invalid option $1" 
     echo "$help"
     exit 1 ;;
   * )
@@ -178,27 +178,27 @@ while test $# -gt 0 ; do
 done
 
 if test "$devset" = ""; then
-  echo "specify development data"
+  echo "specify development data" >&2
   exit 1
 fi
 if test ! -e $devset; then
-  echo "specify development data"
+  echo "specify development data" >&2
   exit 1
 fi
 if test "$refset" = ""; then
-  echo "specify reference data"
+  echo "specify reference data" >&2
   exit 1
 fi
 if test ! -e $refset; then
-  echo "specify reference data"
+  echo "specify reference data" >&2
   exit 1
 fi
 if test "$config" = ""; then
-  echo "specify config file"
+  echo "specify config file" >&2
   exit 1
 fi
 if test "$cicada" = ""; then
-  echo "no cicada dir?"
+  echo "no cicada dir?" >&2
   exit 1
 fi
 
@@ -229,7 +229,7 @@ if test "$found" = "no"; then
   done
   
   if test "$found" = "no"; then
-    echo "no --cicada | --cicada-dir?"
+    echo "no --cicada | --cicada-dir?" >&2
     exit 1
   fi
 fi
@@ -239,13 +239,13 @@ if test "forest" = "no" -a $kbest -le 0; then
   forest=yes
 fi
 if test "forest" = "yes" -a $kbest -gt 0; then
-  echo "forest-mode or kbest-mode?"
+  echo "forest-mode or kbest-mode?" >&2
   exit 1
 fi
 
 if test "$weights_init" != ""; then
   if test ! -e $weights_init; then
-    echo "no initial weights: $weights_init ?"
+    echo "no initial weights: $weights_init ?" >&2
     exit 1
   fi
 fi
@@ -294,7 +294,7 @@ qsubwrapper() {
     shift; shift ;;
   -* )
     exec >&2
-    echo "$me: invalid option $1"
+    echo "$me: invalid option $1" >&2
     exit 1 ;;
   * )
     break ;;

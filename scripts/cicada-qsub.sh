@@ -112,7 +112,7 @@ fi
 if test "$qsub" != ""; then
     
   if test "$name" = ""; then
-    echo "no process name under qsub (specify by --name)"
+    echo "no process name under qsub (specify by --name)" >&2
     exit 1
   fi
 

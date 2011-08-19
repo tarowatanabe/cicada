@@ -149,28 +149,28 @@ while test $# -gt 0 ; do
 done
 
 if test "$devset" = ""; then
-  echo "specify development data"
+  echo "specify development data" >&2
   exit 1
 fi
 if test ! -e $devset; then
-  echo "specify development data"
+  echo "specify development data" >&2
   exit 1
 fi
 if test "$refset" = ""; then
-  echo "specify reference data"
+  echo "specify reference data" >&2
   exit 1
 fi
 if test ! -e $refset; then
-  echo "specify reference data"
+  echo "specify reference data" >&2
   exit 1
 fi
 
 if test "$config" = ""; then
-  echo "specify config file"
+  echo "specify config file" >&2
   exit 1
 fi
 if test "$cicada" = ""; then
-  echo "no cicada dir?"
+  echo "no cicada dir?" >&2
   exit 1
 fi
 
@@ -201,7 +201,7 @@ if test "$found" = "no"; then
   done
   
   if test "$found" = "no"; then
-    echo "no --cicada | --cicada-dir?"
+    echo "no --cicada | --cicada-dir?" >&2
     exit 1
   fi
 fi
@@ -248,7 +248,7 @@ qsubwrapper() {
     shift; shift ;;
   -* )
     exec >&2
-    echo "$me: invalid option $1"
+    echo "$me: invalid option $1" >&2
     exit 1 ;;
   * )
     break ;;
