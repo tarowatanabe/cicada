@@ -329,8 +329,7 @@ int main(int argc, char ** argv)
     
     hypergraph_set_type graphs(scorers.size());
     
-    if (mpi_rank != 0)
-      read_tstset(tstset_files, graphs, scorers_size);
+    read_tstset(tstset_files, graphs, scorers_size);
 
     // collect and share feature names!
     for (int rank = 0; rank < mpi_size; ++ rank) {
@@ -689,6 +688,9 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
   typedef std::vector<idevice_ptr_type, std::allocator<idevice_ptr_type> > idevice_ptr_set_type;
 
   typedef boost::tokenizer<utils::space_separator, utils::piece::const_iterator, utils::piece> tokenizer_type;
+
+  typedef cicada::semiring::Envelope envelope_type;
+  typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
   
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
@@ -708,7 +710,8 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     
     segments.clear();
     segments.resize(scorers.size());
-    
+
+    // start reading...
     istream_ptr_set_type is(mpi_size);
     idevice_ptr_set_type dev(mpi_size);
     for (int rank = 1; rank < mpi_size; ++ rank) {
@@ -716,8 +719,34 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       
       is[rank].reset(new istream_type());
       is[rank]->push(*dev[rank]);
+      
+      dev[rank]->test();
     }
-
+    
+    // compute local envelopes
+    envelope_set_type envelopes;
+    
+    for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
+      const int id = mpi_id * mpi_size + mpi_rank;
+      
+      envelopes.clear();
+      envelopes.resize(graphs[mpi_id].nodes.size());
+      
+      cicada::inside(graphs[mpi_id], envelopes, cicada::semiring::EnvelopeFunction<weight_set_type>(origin, direction));
+      
+      const envelope_type& envelope = envelopes[graphs[mpi_id].goal];
+      const_cast<envelope_type&>(envelope).sort();
+      
+      envelope_type::const_iterator eiter_end = envelope.end();
+      for (envelope_type::const_iterator eiter = envelope.begin(); eiter != eiter_end; ++ eiter) {
+	const envelope_type::line_ptr_type& line = *eiter;
+	
+	const sentence_type yield = line->yield(cicada::operation::sentence_traversal());
+	
+	segments[id].push_back(std::make_pair(line->x, scorers[id]->score(yield)));
+      }
+    }
+    
     std::string line;
     
     int non_found_iter = 0;
@@ -769,9 +798,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     }
     
   } else {
-    typedef cicada::semiring::Envelope envelope_type;
-    typedef std::vector<envelope_type, std::allocator<envelope_type> >  envelope_set_type;
-
     bcast_weights(0, origin);
     
     bcast_weights(0, direction);
@@ -783,7 +809,7 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     os.precision(20);
     
     for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
-      const int id = mpi_id * (mpi_size - 1) + (mpi_rank - 1);
+      const int id = mpi_id * mpi_size + mpi_rank;
 
       envelopes.clear();
       envelopes.resize(graphs[mpi_id].nodes.size());
@@ -805,7 +831,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       }
     }
   }
-
 }
 
 typedef cicada::semiring::Logprob<double> weight_type;
@@ -845,6 +870,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
 
     bcast_weights(0, weights);
 
+    // start reading
     istream_ptr_set_type is(mpi_size);
     idevice_ptr_set_type dev(mpi_size);
     for (int rank = 1; rank < mpi_size; ++ rank) {
@@ -852,12 +878,28 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       is[rank].reset(new istream_type());
       is[rank]->push(*dev[rank]);
+
+      dev[rank]->test();
+    }
+    
+    sentence_type yield;
+    scorer_type::score_ptr_type score;
+
+    for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
+      const int id = mpi_id * mpi_size + mpi_rank;
+
+      weight_type weight;
+      
+      cicada::viterbi(graphs[mpi_id], yield, weight, cicada::operation::sentence_traversal(), cicada::operation::weight_function<weight_type>(weights)); 
+      
+      if (! score)
+	score = scorers[id]->score(yield);
+      else
+	*score += *(scorers[id]->score(yield));
     }
 
     std::string line;
-    
-    scorer_type::score_ptr_type score;
-    
+        
     int non_found_iter = 0;
     while (1) {
       bool found = false;
@@ -909,7 +951,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     os.precision(20);
     
     for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
-      const int id = mpi_id * (mpi_size - 1) + (mpi_rank - 1);
+      const int id = mpi_id * mpi_size + mpi_rank;
       
       weight_type weight;
       
@@ -929,20 +971,23 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
 
   graphs.clear();
 
+  size_t iter = 0;
   path_set_type::const_iterator titer_end = tstset_files.end();
-  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
+  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer, ++ iter) {
     
     if (debug && mpi_rank == 0)
       std::cerr << "file: " << *titer << std::endl;
+
+    const size_t id_offset = size_t(iterative) * scorers_size * iter;
       
     if (boost::filesystem::is_directory(*titer)) {
 
       for (int i = 0; /**/; ++ i) {
 
-	if (i % (mpi_size - 1) != (mpi_rank - 1)) continue;
-	
+	if ((i + id_offset) % mpi_size != mpi_rank) continue;
+							       
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
-
+											  
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
@@ -950,16 +995,17 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
 	int id;
 	std::string sep;
 	hypergraph_type hypergraph;
-      
+	
 	weight_set_type origin;
 	weight_set_type direction;
       
 	while (is >> id >> sep >> hypergraph) {
-	
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?");
 	  
-	  const int mpi_id = id / (mpi_size - 1);
+	  id += id_offset;
+	  
+	  const int mpi_id = id / mpi_size;
 	  
 	  if (mpi_id >= static_cast<int>(graphs.size()))
 	    graphs.resize(mpi_id + 1);
@@ -978,13 +1024,14 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const 
       weight_set_type direction;
       
       while (is >> id >> sep >> hypergraph) {
+	id += id_offset;
 	
-	if (id % (mpi_size - 1) != (mpi_rank - 1)) continue;
+	if (id % mpi_size != mpi_rank) continue;
 	
 	if (sep != "|||")
 	  throw std::runtime_error("format error?");
 	
-	const int mpi_id = id / (mpi_size - 1);
+	const int mpi_id = id / mpi_size;
 	
 	if (mpi_id >= static_cast<int>(graphs.size()))
 	  graphs.resize(mpi_id + 1);
