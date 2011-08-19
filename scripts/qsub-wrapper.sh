@@ -30,4 +30,3 @@ mem_single=1gb
 mem_mpi=8gb
 queue=ltg
 
-
