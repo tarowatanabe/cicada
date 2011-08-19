@@ -227,6 +227,7 @@ operation/remove_annotation.hpp \
 operation/remove_bos_eos.hpp \
 operation/remove_epsilon.hpp \
 operation/remove_feature.hpp \
+operation/remove_sgml_tag.hpp \
 operation/sort_tail.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp \
@@ -251,6 +252,7 @@ operation/remove_annotation.cpp \
 operation/remove_bos_eos.cpp \
 operation/remove_epsilon.cpp \
 operation/remove_feature.cpp \
+operation/remove_sgml_tag.cpp \
 operation/sort_tail.cpp \
 operation/span_forest.cpp \
 operation/viterbi.cpp
@@ -335,6 +337,8 @@ quantizer.hpp \
 remove_annotation.hpp \
 remove_bos_eos.hpp \
 remove_epsilon.hpp \
+remove_sgml_tag.hpp \
+remove_symbol.hpp \
 rule.hpp \
 semiring.hpp \
 sentence.hpp \

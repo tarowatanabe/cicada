@@ -131,7 +131,7 @@ namespace cicada
 		const int antecedent_index = utils::bithack::branch(__non_terminal_index <= 0, non_terminal_pos, __non_terminal_index - 1);
 		++ non_terminal_pos;
 		
-		if (j_ends[antecedent_index] > 0) {
+		if (j_ends[antecedent_index]) {
 		  const hypergraph_type::node_type& node_antecedent = target.nodes[edge.tails[antecedent_index]];
 		  const hypergraph_type::edge_type& edge_antecedent = target.edges[node_antecedent.edges[j[antecedent_index]]];
 		  
@@ -179,7 +179,7 @@ namespace cicada
 	    // proceed to the next...
 	    size_type index = 0;
 	    for (/**/; index != j.size(); ++ index) 
-	      if (j_ends[index] != 0){
+	      if (j_ends[index]) {
 		++ j[index];
 		if (j[index] < j_ends[index]) break;
 		j[index] = 0;
