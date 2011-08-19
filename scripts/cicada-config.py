@@ -221,9 +221,9 @@ print "operation = apply:prune=true,size=200,${weights}"
 print "operation = remove-bos-eos:forest=true"
 
 if options.file:
-    print "operation = output:file=${file},kbest=${kbest},${weights}"
+    print "operation = output:file=${file},kbest=${kbest},unique=true,${weights}"
 elif options.directory:
-    print "operation = output:directory=${directory},kbest=${kbest},${weights}"
+    print "operation = output:directory=${directory},kbest=${kbest},unique=true,${weights}"
 else:
     raise ValueError, "no output? --{file,directory}"
 print
