@@ -807,8 +807,8 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     envelope_set_type envelopes;
     
     ostream_type os;
-    os.push(odevice_type(0, envelope_tag, 4096));
     os.push(boost::iostreams::gzip_compressor());
+    os.push(odevice_type(0, envelope_tag, 4096));
     
     for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
       const int id = mpi_id * mpi_size + mpi_rank;
@@ -951,8 +951,8 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     sentence_type yield;
     
     ostream_type os;
-    os.push(odevice_type(0, viterbi_tag, 4096));
     os.push(boost::iostreams::gzip_compressor());
+    os.push(odevice_type(0, viterbi_tag, 4096));
     
     for (int mpi_id = 0; mpi_id < static_cast<int>(graphs.size()); ++ mpi_id) {
       const int id = mpi_id * mpi_size + mpi_rank;
