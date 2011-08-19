@@ -1064,7 +1064,8 @@ void bcast_weights(const int rank, weight_set_type& weights)
   
   if (mpi_rank == rank) {
     boost::iostreams::filtering_ostream os;
-    os.push(utils::mpi_device_bcast_sink(rank, 1024));
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(utils::mpi_device_bcast_sink(rank, 4096));
     
     static const weight_set_type::feature_type __empty;
     
@@ -1085,7 +1086,8 @@ void bcast_weights(const int rank, weight_set_type& weights)
     weights.allocate();
     
     boost::iostreams::filtering_istream is;
-    is.push(utils::mpi_device_bcast_source(rank, 1024));
+    is.push(boost::iostreams::gzip_decompressor());
+    is.push(utils::mpi_device_bcast_source(rank, 4096));
     
     std::string feature;
     std::string value;
@@ -1094,6 +1096,7 @@ void bcast_weights(const int rank, weight_set_type& weights)
       weights[feature] = utils::decode_base64<double>(value);
   }
 }
+
 
 void options(int argc, char** argv)
 
