@@ -385,7 +385,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
       --output ${root}cicada.config.$iter || exit 1
   
   ### actual decoding
-  echo "decoding ${root}forest-$iter" >&2
+  echo "decoding ${root}${output}-$iter" >&2
   qsubwrapper decode -l ${root}decode.$iter.log $cicada/cicada_mpi \
 	--input $devset \
 	--config ${root}cicada.config.$iter \
