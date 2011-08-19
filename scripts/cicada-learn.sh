@@ -317,6 +317,14 @@ qsubwrapper() {
       else
         echo "#PBS -l select=1:ncpus=1:mem=${mem_single}"
       fi
+
+      if test "$TMPDIR_SPEC" != ""; then
+        echo "export TMPDIR_SPEC=$TMPDIR_SPEC"
+      fi
+      if test "$TMPDIR" != ""; then
+        echo "export TMPDIR=$TMPDIR"
+      fi
+
       echo "cd $workingdir"
 
       if test "$stripped" != "$1" -a $np -gt 1; then
