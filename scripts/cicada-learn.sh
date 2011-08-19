@@ -465,11 +465,9 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 
 
   ### previous weights...
-  weights_prev=${weights_init}
   weights_last=${weights_init}
   for ((i=1;i<$iter;++i)); do
     if test -e ${root}weights.$i; then
-      weights_prev="$weights_prev ${root}weights.$i"
       weights_last=${root}weights.$i
     fi
   done

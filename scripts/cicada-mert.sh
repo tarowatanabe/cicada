@@ -389,15 +389,15 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   done
 
   ### previous weights...
-  weights=""
+  weights_prev=""
   for ((i=1;i<$iter;++i)); do
     if test -e ${root}weights.$i; then
-      weights="$weights ${root}weights.$i"
+      weights_prev="$weights_prev ${root}weights.$i"
     fi
   done
 
-  if test "$weights" != ""; then
-    weights=" --feature-weights $weights"
+  if test "$weights_prev" != ""; then
+    weights_prev=" --feature-weights $weights_prev"
   fi
 
   lower_bound=""
@@ -416,7 +416,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
 			--tstset $tstset \
 			--output ${root}weights.$iter \
 			\
-			$weights \
+			$weights_prev \
 			--value-lower -5 \
 			--value-upper  5 \
                         --samples-directions $direction \
