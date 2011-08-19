@@ -57,14 +57,14 @@ $me [options]
   -c, --config              Configuration file (required)
   
   Training options
-  -i, --iteration           MERT iterations
+  -i, --iteration           PRO iterations    (default: $iteration)
   -w, --weights             initial weights
-  -C, --C                   hyperparameter
-  --scorer                  scorer (default: blue:order=4,exact=true)
+  -C, --C                   hyperparameter    (default: $C)
+  --scorer                  scorer (default: $scorer)
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
-  --kbest                   kbest size
+  --kbest                   kbest size             (default: $kbest)
   --merte                   perform kbest merging
   --interpolate             weights interpolation
 

@@ -51,12 +51,12 @@ $me [options]
   
   Decoding options
   -c, --config              Configuration file (required)
-  --compose                 Composition algorithm (default: compose-cky)
+  --compose                 Composition algorithm (default: $compose)
   
   Training options
-  -C, --C                   hyperparameter
-  --oracle-cube             cube size for oracle computation
-  --scorer                  scorer (default: blue:order=4,exact=true)
+  -C, --C                   hyperparameter                   (default: $C)
+  --oracle-cube             cube size for oracle computation (default: $oracle_cube)
+  --scorer                  scorer (default: $scorer)
 
   -d, --dev, --devset              tuning data (required)
   -r, --reference, --refset, --ref reference translations (required)

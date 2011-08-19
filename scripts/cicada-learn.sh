@@ -58,12 +58,12 @@ $me [options]
   -c, --config              Configuration file (required)
   
   Training options
-  -i, --iteration           MERT iterations
+  -i, --iteration           PRO iterations                   (default: $iteration)
   -w, --weights             initial weights
-  -C, --C                   hyperparameter
-  --oracle-cube             cube size for oracle computation
-  --scorer                  scorer (default: blue:order=4,exact=true)
-  --kbest                   kbest size
+  -C, --C                   hyperparameter                   (default: $C)
+  --oracle-cube             cube size for oracle computation (default: $oracle_cube)
+  --scorer                  scorer (default: $scorer)
+  --kbest                   kbest size                       (default: $kbest)
   --forest                  forest learning
   --merge                   perform kbest merging
   --interpolate             weights interpolation

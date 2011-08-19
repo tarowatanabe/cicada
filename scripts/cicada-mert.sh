@@ -56,11 +56,11 @@ $me [options]
   -c, --config              Configuration file (required)
   
   Training options
-  -i, --iteration           MERT iterations
+  -i, --iteration           MERT iterations   (default: $iteration)
   -w, --weights             initial weights
-  --direction               random directions
-  --restart                 random restarts
-  --scorer                  scorer (default: blue:order=4,exact=true)
+  --direction               random directions (default: $direction)
+  --restart                 random restarts   (default: $restart)
+  --scorer                  scorer (default: $scorer)
   -l, --lower               lower-bound for features
   -u, --uppper              upper-bound for features
   -d, --dev, --devset              tuning data (required)
