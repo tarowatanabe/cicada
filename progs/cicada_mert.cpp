@@ -66,7 +66,7 @@ typedef feature_set_type::feature_type feature_type;
 
 typedef std::vector<weight_set_type, std::allocator<weight_set_type> > weight_set_collection_type;
 
-typedef std::deque<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
+typedef std::vector<hypergraph_type, std::allocator<hypergraph_type> > hypergraph_set_type;
 
 typedef cicada::eval::Scorer         scorer_type;
 typedef cicada::eval::ScorerDocument scorer_document_type;
@@ -156,7 +156,7 @@ bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundItera
   return true;
 }
 
-void read_tstset(const path_set_type& files, hypergraph_set_type& graphs);
+void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const size_t scorers_size);
 void read_refset(const path_set_type& file, scorer_document_type& scorers);
 
 void options(int argc, char** argv);
@@ -257,19 +257,28 @@ int main(int argc, char ** argv)
     
     read_refset(refset_files, scorers);
 
+    const size_t scorers_size = scorers.size();
+    
+    if (iterative && tstset_files.size() > 1) {
+      scorer_document_type scorers_iterative(scorer_name);
+      scorers_iterative.resize(scorers.size() * tstset_files.size());
+      
+      for (size_t i = 0; i != tstset_files.size(); ++ i)
+	std::copy(scorers.begin(), scorers.end(), scorers_iterative.begin() + scorers.size() * i);
+      
+      scorers.swap(scorers_iterative);
+    }
+
     if (debug)
       std::cerr << "# of references: " << scorers.size() << std::endl;
-
-    // read test set
-    if (tstset_files.empty())
-      tstset_files.push_back("-");
+    
 
     if (debug)
       std::cerr << "reading hypergraphs" << std::endl;
 
     hypergraph_set_type graphs(scorers.size());
     
-    read_tstset(tstset_files, graphs);
+    read_tstset(tstset_files, graphs, scorers_size);
 
     // collect initial weights
     weight_set_collection_type weights;
@@ -711,13 +720,16 @@ double ViterbiComputer::operator()(const weight_set_type& weights) const
   return score->score() * score_factor;
 }
 
-void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
+void read_tstset(const path_set_type& files, hypergraph_set_type& graphs, const size_t scorers_size)
 {
+  size_t iter = 0;
   path_set_type::const_iterator titer_end = tstset_files.end();
-  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer) {
+  for (path_set_type::const_iterator titer = tstset_files.begin(); titer != titer_end; ++ titer, ++ iter) {
     
     if (debug)
       std::cerr << "file: " << *titer << std::endl;
+
+    const size_t id_offset = size_t(iterative) * scorers_size * iter;
       
     if (boost::filesystem::is_directory(*titer)) {
 
@@ -739,7 +751,9 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	
 	  if (sep != "|||")
 	    throw std::runtime_error("format error?");
-	
+
+	  id += id_offset;
+
 	  if (id >= static_cast<int>(graphs.size()))
 	    throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
 	
@@ -747,7 +761,6 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	}
       }
     } else {
-      
       utils::compress_istream is(*titer, 1024 * 1024);
       
       int id;
@@ -761,6 +774,8 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
 	
 	if (sep != "|||")
 	  throw std::runtime_error("format error?");
+
+	id += id_offset;
 	
 	if (id >= static_cast<int>(graphs.size()))
 	  throw std::runtime_error("tstset size exceeds refset size?" + utils::lexical_cast<std::string>(id));
