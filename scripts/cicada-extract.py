@@ -148,11 +148,9 @@ stdout = sys.stdout
 sys.stdout = sys.stderr
 
 def run_command(command):
-    fp = os.popen(command)
-    while 1:
-        data = fp.read(1)
-        if not data: break
-        stdout.write(data)
+    retcode = subprocess.Popen(command, shell=True).wait()
+    if retcode < 0:
+        sys.exit(retcode)
 
 def compressed_file(file):
     if not file:
