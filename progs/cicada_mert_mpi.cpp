@@ -876,7 +876,6 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     idevice_ptr_set_type dev(mpi_size);
     for (int rank = 1; rank < mpi_size; ++ rank) {
       dev[rank].reset(new idevice_type(rank, viterbi_tag, 4096));
-      
       is[rank].reset(new istream_type());
       
       is[rank]->push(boost::iostreams::gzip_decompressor());
