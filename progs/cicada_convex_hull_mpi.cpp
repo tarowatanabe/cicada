@@ -323,7 +323,8 @@ void compute_envelope(const scorer_document_type& scorers,
 
     for (int rank = 1; rank != mpi_size; ++ rank) {
       istream_type is;
-      is.push(idevice_type(rank, envelope_tag, 1024 * 1024));
+      is.push(boost::iostreams::gzip_decompressor());
+      is.push(idevice_type(rank, envelope_tag, 4096));
       
       std::string line;
       while (std::getline(is, line)) {
@@ -360,7 +361,8 @@ void compute_envelope(const scorer_document_type& scorers,
     
   } else {
     ostream_type os;
-    os.push(odevice_type(0, envelope_tag, 1024 * 1024));
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(odevice_type(0, envelope_tag, 4096));
     
     for (size_t seg = 0; seg != segments.size(); ++ seg)
       if (! segments[seg].empty()) {
