@@ -160,7 +160,8 @@ namespace cicada
 	function(_function),
 	cube_size_max(_cube_size_max)
     { 
-      cand_unique.set_empty_key(0);
+      // we don't need this for alg. 2
+      //cand_unique.set_empty_key(0);
     }
     
     void operator()(const hypergraph_type& graph_in,
@@ -210,7 +211,8 @@ namespace cicada
       cand.clear();
       cand.reserve(node.edges.size() * cube_size_max);
       
-      cand_unique.clear();
+      // we don't need this for alg. 2
+      //cand_unique.clear();
       
       node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
       for (node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter) {
@@ -220,7 +222,7 @@ namespace cicada
 	const candidate_type* item = make_candidate(edge, j, graph_out, is_goal);
 	
 	cand.push(item);
-	// for faster cube pruning, we do not insert here!
+	// for faster cube pruning (alg 2, 3), we do not insert here!
 	//cand_unique.insert(item); 
       }
       
@@ -234,7 +236,7 @@ namespace cicada
 	const candidate_type* item = cand.top();
 	cand.pop();
 	
-	push_succ(*item, is_goal, cand, cand_unique, graph_out);
+	push_succ(*item, is_goal, cand, graph_out);
 	append_item(*item, is_goal, buf, graph_out);
       }
       
@@ -318,7 +320,6 @@ namespace cicada
     size_type push_succ(const candidate_type& candidate,
 			const bool is_goal,
 			candidate_heap_type& cand,
-			candidate_set_unique_type& candidates_unique,
 			hypergraph_type& graph_out)
     {
 #if 0
@@ -334,12 +335,12 @@ namespace cicada
 	++ j[i];
 
 	if (j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size())) {
-	  if (candidates_unique.find(&query) == candidates_unique.end()) {
+	  if (cand_unique.find(&query) == cand_unique.end()) {
 	    // new candidate...
 	    const candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
 	    
 	    cand.push(candidate_new);
-	    candidates_unique.insert(candidate_new);
+	    cand_unique.insert(candidate_new);
 	    
 	    ++ inserted;
 	  }
@@ -379,12 +380,12 @@ namespace cicada
 	
 	for (/**/; j[i] < static_cast<int>(D[candidate.in_edge->tails[i]].size()); ++ j[i]) {
 	  
-	  if (candidates_unique.find(&query) == candidates_unique.end()) {
+	  if (cand_unique.find(&query) == cand_unique.end()) {
 	    // new candidate...
 	    const candidate_type* candidate_new = make_candidate(*candidate.in_edge, j, graph_out, is_goal);
 	    
 	    cand.push(candidate_new);
-	    candidates_unique.insert(candidate_new);
+	    cand_unique.insert(candidate_new);
 	    
 	    ++ inserted;
 	    
@@ -471,7 +472,7 @@ namespace cicada
 	    if (i != k && j[k]) {
 	      -- j[k];
 	      
-	      if (candidates_unique.find(&query) == candidates_unique.end())
+	      if (cand_unique.find(&query) == cand_unique.end())
 		predecessor = false;
 	      
 	      ++ j[k];
@@ -487,7 +488,7 @@ namespace cicada
       }
       
       // this candidate is already popped
-      candidates_unique.insert(&candidate);
+      cand_unique.insert(&candidate);
       
       return inserted;
 #endif
@@ -532,7 +533,7 @@ namespace cicada
     state_set_type      node_states;
 
     candidate_heap_type       cand;
-    candidate_set_unique_type cand_unique;
+    //candidate_set_unique_type cand_unique;
 
     const model_type& model;
     const function_type& function;
