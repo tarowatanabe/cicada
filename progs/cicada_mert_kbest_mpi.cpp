@@ -162,7 +162,7 @@ bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundItera
 }
 
 
-void read_tstset(const path_set_type& files, hypothesis_map_type& kbests);
+void read_tstset(const path_set_type& files, hypothesis_map_type& kbests, const size_t scorers_size);
 void read_refset(const path_set_type& file, scorer_document_type& scorers);
 
 void initialize_score(hypothesis_map_type& hypotheses,
@@ -303,6 +303,18 @@ int main(int argc, char ** argv)
     
     read_refset(refset_files, scorers);
     
+    const size_t scorers_size = scorers.size();
+    
+    if (iterative && tstset_files.size() > 1) {
+      scorer_document_type scorers_iterative(scorer_name);
+      scorers_iterative.resize(scorers.size() * tstset_files.size());
+      
+      for (size_t i = 0; i != tstset_files.size(); ++ i)
+	std::copy(scorers.begin(), scorers.end(), scorers_iterative.begin() + scorers.size() * i);
+      
+      scorers.swap(scorers_iterative);
+    }
+    
     if (debug && mpi_rank == 0)
       std::cerr << "# of references: " << scorers.size() << std::endl;
     
@@ -312,11 +324,9 @@ int main(int argc, char ** argv)
     
     hypothesis_map_type kbests(scorers.size());
     
-    if (mpi_rank != 0) {
-      read_tstset(tstset_files, kbests);
-      
-      initialize_score(kbests, scorers);
-    }
+    read_tstset(tstset_files, kbests, scorers_size);
+    
+    initialize_score(kbests, scorers);
     
     // collect and share feature names!
     for (int rank = 0; rank < mpi_size; ++ rank) {
@@ -701,8 +711,22 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
       
       is[rank]->push(boost::iostreams::gzip_decompressor());
       is[rank]->push(*dev[rank]);
-    }
 
+      dev[rank]->test();
+    }
+    
+    EnvelopeKBest::line_set_type lines;
+    EnvelopeKBest envelopes(origin, direction);
+    
+    for (size_t id = 0; id != kbests.size(); ++ id) 
+      if (! kbests[id].empty()) {
+	envelopes(kbests[id], lines);
+	
+	EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
+	for (EnvelopeKBest::line_set_type::const_iterator liter = lines.begin(); liter != liter_end; ++ liter)
+	  segments[id].push_back(std::make_pair(liter->x, liter->hypothesis->score));
+      }
+    
     std::string line;
     
     int non_found_iter = 0;
@@ -770,7 +794,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     // revise this......
     for (size_t id = 0; id != kbests.size(); ++ id) 
       if (! kbests[id].empty()) {
-	
 	envelopes(kbests[id], lines);
 	
 	EnvelopeKBest::line_set_type::const_iterator liter_end = lines.end();
@@ -820,6 +843,7 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       MPI::COMM_WORLD.Send(0, 0, MPI::INT, rank, viterbi_notify_tag);
 
     bcast_weights(0, weights);
+    
 
     istream_ptr_set_type is(mpi_size);
     idevice_ptr_set_type dev(mpi_size);
@@ -829,11 +853,35 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
       
       is[rank]->push(boost::iostreams::gzip_decompressor());
       is[rank]->push(*dev[rank]);
+      
+      dev[rank]->test();
     }
 
-    std::string line;
-    
     scorer_type::score_ptr_type score;
+    
+    for (size_t id = 0; id != kbests.size(); ++ id)
+      if (! kbests[id].empty()) {
+	double score_viterbi = - std::numeric_limits<double>::infinity();
+	scorer_type::score_ptr_type score_ptr;
+	
+	hypothesis_set_type::const_iterator kiter_end = kbests[id].end();
+	for (hypothesis_set_type::const_iterator kiter = kbests[id].begin(); kiter != kiter_end; ++ kiter) {
+	  const hypothesis_type& hyp(*kiter);
+	  const double score_curr = cicada::dot_product(weights, hyp.features.begin(), hyp.features.end(), 0.0);
+	  
+	  if (score_curr > score_viterbi) {
+	    score_viterbi = score_curr;
+	    score_ptr = hyp.score;
+	  }
+	}
+	
+	if (! score)
+	  score = score_ptr;
+	else
+	  *score += *score_ptr;
+      }
+    
+    std::string line;
     
     int non_found_iter = 0;
     while (1) {
@@ -935,18 +983,14 @@ void initialize_score(hypothesis_map_type& hypotheses,
 }
 
 void read_tstset(const path_set_type& files,
-		 hypothesis_map_type& hypotheses)
+		 hypothesis_map_type& hypotheses,
+		 const size_t scorers_size)
 {
   typedef boost::spirit::istream_iterator iter_type;
   typedef kbest_feature_parser<iter_type> parser_type;
 
   const int mpi_rank = MPI::COMM_WORLD.Get_rank();
   const int mpi_size = MPI::COMM_WORLD.Get_size();
-
-  if (mpi_rank == 0) return;
-  
-  const int mpi_rank_shifted = mpi_rank - 1;
-  const int mpi_size_shifted = mpi_size - 1;
   
   if (files.empty())
     throw std::runtime_error("no files?");
@@ -954,12 +998,20 @@ void read_tstset(const path_set_type& files,
   parser_type parser;
   kbest_feature_type kbest;
   
-  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+  size_t iter = 0;
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter, ++ iter) {
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no file: " + fiter->string());
 
+    if (debug && mpi_rank == 0)
+      std::cerr << "file: " << *fiter << std::endl;
+    
+    const size_t id_offset = size_t(iterative) * scorers_size * iter;
+
     if (boost::filesystem::is_directory(*fiter)) {
-      for (size_t i = mpi_rank_shifted; /**/; i += mpi_size_shifted) {
+      for (size_t i = 0; /**/; ++ i) {
+	if ((i + id_offset) % mpi_size != mpi_rank) continue;
+	
 	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 
 	if (! boost::filesystem::exists(path)) break;
@@ -978,11 +1030,11 @@ void read_tstset(const path_set_type& files,
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
 	  
-	  const size_t& id = boost::fusion::get<0>(kbest);
+	  const size_t id = boost::fusion::get<0>(kbest) + id_offset;
 	  
 	  if (id >= hypotheses.size())
 	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
-	  if (id != i)
+	  if (id != i + id_offset)
 	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
 	  
 	  hypotheses[id].push_back(hypothesis_type(kbest));
@@ -1003,12 +1055,12 @@ void read_tstset(const path_set_type& files,
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
 	
-	const size_t& id = boost::fusion::get<0>(kbest);
+	const size_t id = boost::fusion::get<0>(kbest) + id_offset;
 	
 	if (id >= hypotheses.size())
 	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
 	
-	if (static_cast<int>(id % mpi_size_shifted)  == mpi_rank_shifted)
+	if (static_cast<int>(id % mpi_size)  == mpi_rank)
 	  hypotheses[id].push_back(hypothesis_type(kbest));
       }
     }

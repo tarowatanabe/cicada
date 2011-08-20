@@ -152,7 +152,7 @@ bool valid_bounds(Iterator first, Iterator last, BoundIterator lower, BoundItera
   return true;
 }
 
-void read_tstset(const path_set_type& files, hypothesis_map_type& kbests);
+void read_tstset(const path_set_type& files, hypothesis_map_type& kbests, const size_t scorers_size);
 void read_refset(const path_set_type& file, scorer_document_type& scorers);
 
 void initialize_score(hypothesis_map_type& hypotheses,
@@ -249,19 +249,28 @@ int main(int argc, char ** argv)
     scorer_document_type scorers(scorer_name);
     read_refset(refset_files, scorers);
 
+    const size_t scorers_size = scorers.size();
+    
+    if (iterative && tstset_files.size() > 1) {
+      scorer_document_type scorers_iterative(scorer_name);
+      scorers_iterative.resize(scorers.size() * tstset_files.size());
+      
+      for (size_t i = 0; i != tstset_files.size(); ++ i)
+	std::copy(scorers.begin(), scorers.end(), scorers_iterative.begin() + scorers.size() * i);
+      
+      scorers.swap(scorers_iterative);
+    }
+
     if (debug)
       std::cerr << "# of references: " << scorers.size() << std::endl;
 
-    // read test set
-    if (tstset_files.empty())
-      tstset_files.push_back("-");
 
     if (debug)
       std::cerr << "reading kbests" << std::endl;
 
     hypothesis_map_type kbests(scorers.size());
     
-    read_tstset(tstset_files, kbests);
+    read_tstset(tstset_files, kbests, scorers_size);
 
     initialize_score(kbests, scorers);
 
@@ -749,7 +758,8 @@ void initialize_score(hypothesis_map_type& hypotheses,
 }
 
 void read_tstset(const path_set_type& files,
-		 hypothesis_map_type& hypotheses)
+		 hypothesis_map_type& hypotheses,
+		 const size_t scorers_size)
 {
   typedef boost::spirit::istream_iterator iter_type;
   typedef kbest_feature_parser<iter_type> parser_type;
@@ -760,9 +770,12 @@ void read_tstset(const path_set_type& files,
   parser_type parser;
   kbest_feature_type kbest;
   
-  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter) {
+  size_t iter = 0;
+  for (path_set_type::const_iterator fiter = files.begin(); fiter != files.end(); ++ fiter, ++ iter) {
     if (! boost::filesystem::exists(*fiter) && *fiter != "-")
       throw std::runtime_error("no file: " + fiter->string());
+
+    const size_t id_offset = size_t(iterative) * scorers_size * iter;
 
     if (boost::filesystem::is_directory(*fiter)) {
       for (size_t i = 0; /**/; ++ i) {
@@ -784,11 +797,11 @@ void read_tstset(const path_set_type& files,
 	    if (iter != iter_end)
 	      throw std::runtime_error("kbest parsing failed");
 	  
-	  const size_t& id = boost::fusion::get<0>(kbest);
+	  const size_t id = boost::fusion::get<0>(kbest) + id_offset;
 	  
 	  if (id >= hypotheses.size())
 	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
-	  if (id != i)
+	  if (id != i + id_offset)
 	    throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
 	  
 	  hypotheses[id].push_back(hypothesis_type(kbest));
@@ -809,7 +822,7 @@ void read_tstset(const path_set_type& files,
 	  if (iter != iter_end)
 	    throw std::runtime_error("kbest parsing failed");
 	
-	const size_t& id = boost::fusion::get<0>(kbest);
+	const size_t id = boost::fusion::get<0>(kbest) + id_offset;
 	
 	if (id >= hypotheses.size())
 	  throw std::runtime_error("invalid id: " + utils::lexical_cast<std::string>(id));
