@@ -716,7 +716,6 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     idevice_ptr_set_type dev(mpi_size);
     for (int rank = 1; rank < mpi_size; ++ rank) {
       dev[rank].reset(new idevice_type(rank, envelope_tag, 4096));
-      
       is[rank].reset(new istream_type());
       
       is[rank]->push(boost::iostreams::gzip_decompressor());

@@ -696,9 +696,10 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     istream_ptr_set_type is(mpi_size);
     idevice_ptr_set_type dev(mpi_size);
     for (int rank = 1; rank < mpi_size; ++ rank) {
-      dev[rank].reset(new idevice_type(rank, envelope_tag, 1024 * 1024));
-      
+      dev[rank].reset(new idevice_type(rank, envelope_tag, 4096));
       is[rank].reset(new istream_type());
+      
+      is[rank]->push(boost::iostreams::gzip_decompressor());
       is[rank]->push(*dev[rank]);
     }
 
@@ -763,8 +764,8 @@ void EnvelopeComputer::operator()(segment_document_type& segments, const weight_
     EnvelopeKBest envelopes(origin, direction);
     
     ostream_type os;
-    os.push(odevice_type(0, envelope_tag, 1024 * 1024));
-    os.precision(20);
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(odevice_type(0, envelope_tag, 4096));
     
     // revise this......
     for (size_t id = 0; id != kbests.size(); ++ id) 
@@ -823,9 +824,10 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     istream_ptr_set_type is(mpi_size);
     idevice_ptr_set_type dev(mpi_size);
     for (int rank = 1; rank < mpi_size; ++ rank) {
-      dev[rank].reset(new idevice_type(rank, viterbi_tag, 1024 * 1024));
-      
+      dev[rank].reset(new idevice_type(rank, viterbi_tag, 4096));
       is[rank].reset(new istream_type());
+      
+      is[rank]->push(boost::iostreams::gzip_decompressor());
       is[rank]->push(*dev[rank]);
     }
 
@@ -876,8 +878,8 @@ double ViterbiComputer::operator()(const weight_set_type& __weights) const
     bcast_weights(0, weights);
     
     ostream_type os;
-    os.push(odevice_type(0, viterbi_tag, 1024 * 1024));
-    os.precision(20);
+    os.push(boost::iostreams::gzip_compressor());
+    os.push(odevice_type(0, viterbi_tag, 4096));
     
     for (size_t id = 0; id != kbests.size(); ++ id)
       if (! kbests[id].empty()) {
