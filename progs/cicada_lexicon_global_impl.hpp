@@ -28,6 +28,8 @@
 #include <google/dense_hash_map>
 #include <google/dense_hash_set>
 
+#include "liblinear/linear.h"
+
 typedef boost::filesystem::path path_type;
 
 typedef cicada::Symbol   word_type;
@@ -140,6 +142,48 @@ void read_bitexts(const path_type& path_source,
   
   word_set_type(vocab).swap(vocab);
 }
+
+template <int Solver>
+struct OptimizerLinear
+{
+  typedef std::vector<double, std::allocator<double> > parameter_set_type;
+
+  typedef struct model        model_type;
+  typedef struct parameter    parameter_type;
+  typedef struct problem      problem_type;
+  typedef struct feature_node feature_node_type;
+
+  typedef std::vector<feature_node_type, std::allocator<feature_node_type> > feature_node_set_type;
+  typedef std::vector<feature_node_type*, std::allocator<feature_node_type*> > feature_node_map_type;
+  typedef std::vector<int, std::allocator<int> > label_set_type;
+
+  typedef size_t size_type;
+  typedef size_t offset_type;
+  typedef std::vector<offset_type, std::allocator<offset_type> > offset_set_type;
+  
+  OptimizerLinear(const bitext_set_type& bitexts,
+		  const word_type& word)
+  {
+    
+    
+  }
+  
+  static void print_string_stderr(const char *s)
+  {
+    fputs(s,stderr);
+    fflush(stderr);
+  }
+  
+  static void print_string_none(const char *s)
+  {
+    
+  }
+
+  void operator()(parameter_set_type& x)
+  {
+    
+  }
+};
 
 struct Optimizer
 {
