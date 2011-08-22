@@ -20,6 +20,9 @@
 #include <set>
 #include <stdexcept>
 
+#include <cicada/symbol.hpp>
+#include <cicada/sentence.hpp>
+
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/phoenix.hpp>
@@ -41,7 +44,9 @@ struct span_pair_type
   span_pair_type(const span_type& __source, const span_type& __target)
     : source(__source), target(__target) {}
 };
-typedef std::vector<std::string, std::allocator<std::string> > sentence_type;
+
+typedef cicada::Symbol   word_type;
+typedef cicada::Sentence sentence_type;
 
 struct itg_type
 {
