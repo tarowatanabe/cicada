@@ -134,6 +134,3 @@ Do we keep pair of source-target lhs???
 
 Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
   I'm not sure which is better..
-
-qsub wrapper...???
-  add MPI/qsub wrappers...

@@ -35,8 +35,7 @@ merge="no"
 interpolate=0.0
 
 ### qsubs
-mem_single=1gb
-mem_mpi=8gb
+mem=8gb
 queue=ltg
 
 exit_missing_arg="\
@@ -55,7 +54,8 @@ $me [options]
   -q, --queue               PBS queue
   -n, --np                  # of processes to run
   --nc                      # of cores to run
-  
+  --mem                     memory used by each node (default: $mem)
+
   Decoding options
   -c, --config              Configuration file (required)
   
@@ -111,7 +111,10 @@ while test $# -gt 0 ; do
     test $# = 1 && eval "$exit_missing_arg"
     nc=$2
     shift; shift ;;
-
+  --mem )
+    test $# = 1 && eval "$exit_missing_arg"
+    mem=$2
+    shift; shift ;;
 
   ## training
   --iteration | -i )
@@ -303,10 +306,10 @@ qsubwrapper() {
       echo "#PBS -o /dev/null"
       echo "#PBS -q $queue"
       if test "$stripped" != "$1" -a $np -gt 1; then
-        echo "#PBS -l select=$np:ncpus=$nc:mpiprocs=$nc:mem=${mem_mpi}"
+        echo "#PBS -l select=${np}:ncpus=${nc}:mpiprocs=${nc}:mem=${mem}"
         echo "#PBS -l place=scatter"
       else
-        echo "#PBS -l select=1:ncpus=1:mem=${mem_single}"
+        echo "#PBS -l select=1:ncpus=1:mem=${mem}"
       fi
 
       if test "$TMPDIR_SPEC" != ""; then
