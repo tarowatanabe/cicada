@@ -23,15 +23,6 @@ aclocal.m4
 autom4te.cache
 config.log
 config.status
-config/compile
-config/config.guess
-config/config.sub
-config/depcomp
-config/install-sh
-config/libtool.m4
-config/lt*.m4
-config/ltmain.sh
-config/missing
 configure
 libtool
 
@@ -69,6 +60,7 @@ cicada_filter_kbest
 cicada_filter_charniak
 cicada_filter_conll
 cicada_filter_penntreebank
+cicada_filter_pialign
 cicada_filter_terminal
 cicada_filter_text
 cicada_filter_weights
