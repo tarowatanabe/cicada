@@ -143,8 +143,7 @@ void read_bitexts(const path_type& path_source,
   word_set_type(vocab).swap(vocab);
 }
 
-template <int Solver>
-struct OptimizerLinear
+struct OptimizerLinearBase
 {
   typedef std::vector<double, std::allocator<double> > parameter_set_type;
 
@@ -162,8 +161,8 @@ struct OptimizerLinear
   typedef std::vector<offset_type, std::allocator<offset_type> > offset_set_type;
   
   
-  OptimizerLinear(const bitext_set_type& bitexts,
-		  const word_type& word)
+  OptimizerLinearBase(const bitext_set_type& bitexts,
+		      const word_type& word)
   {
     const size_t symbol_size = word_type::allocated();
     offset_set_type offsets;
@@ -208,10 +207,6 @@ struct OptimizerLinear
       features.push_back(const_cast<feature_node_type*>(&(*feature_nodes.begin())) + offsets[pos]);
   }
   
-  label_set_type labels;
-  feature_node_map_type features;
-  feature_node_set_type feature_nodes;
-  
   static void print_string_stderr(const char *s)
   {
     fputs(s,stderr);
@@ -223,6 +218,18 @@ struct OptimizerLinear
     
   }
 
+  label_set_type labels;
+  feature_node_map_type features;
+  feature_node_set_type feature_nodes;
+};
+
+template <int Solver>  
+struct OptimizerLinear : public OptimizerLinearBase
+{
+  OptimizerLinear(const bitext_set_type& bitexts,
+		  const word_type& word)
+    : OptimizerLinearBase(bitexts, word) {}
+  
   void operator()(parameter_set_type& x)
   {
     
