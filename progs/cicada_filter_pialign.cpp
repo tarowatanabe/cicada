@@ -19,9 +19,12 @@
 #include <iterator>
 #include <set>
 #include <stdexcept>
+#include <memory>
 
 #include <cicada/symbol.hpp>
 #include <cicada/sentence.hpp>
+
+#include <utils/compress_stream.hpp>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -30,9 +33,11 @@
 #include <boost/fusion/tuple.hpp>
 #include <boost/fusion/include/adapt_struct.hpp>
 #include <boost/fusion/include/std_pair.hpp>
-
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 
+
+typedef boost::filesystem::path path_type;
 typedef std::pair<int, int> span_type;
 struct span_pair_type
 {
@@ -504,7 +509,11 @@ int main(int argc, char** argv)
 {
   try {
     namespace po = boost::program_options;
-
+    
+    path_type input_file = "-";
+    path_type output_file = "-";
+    path_type output_source_file;
+    path_type output_target_file;
     int max_length = 7;
     int max_span = 15;
     bool phrase_mode = false;
@@ -513,6 +522,12 @@ int main(int argc, char** argv)
   
     po::options_description desc("options");
     desc.add_options()
+      ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
+      ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
+      
+      ("source", po::value<path_type>(&output_source_file), "output source yield")
+      ("target", po::value<path_type>(&output_target_file), "output target yield")
+
       ("max-length", po::value<int>(&max_length)->default_value(max_length), "max terminal length")
       ("max-span",   po::value<int>(&max_span)->default_value(max_span),     "max span")
     
@@ -533,25 +548,31 @@ int main(int argc, char** argv)
   
     if (int(phrase_mode) + block_mode + exhaustive_mode == 0)
       phrase_mode = true;
-  
+    
     if (int(phrase_mode) + block_mode + exhaustive_mode > 1)
       throw std::runtime_error("either phrase|block|exhaustive");
-
+    
     typedef boost::spirit::istream_iterator iter_type;
+    
+    utils::compress_istream is(input_file, 1024 * 1024);
+    utils::compress_ostream os(output_file, 1024 * 1024);
+    
+    std::auto_ptr<std::ostream> os_src(! output_source_file.empty() ? new utils::compress_ostream(output_source_file) : 0);
+    std::auto_ptr<std::ostream> os_trg(! output_target_file.empty() ? new utils::compress_ostream(output_target_file) : 0);
 
-    std::cin.unsetf(std::ios::skipws);
-    std::cout.precision(20);
-
+    is.unsetf(std::ios::skipws);
+    os.precision(20);
+    
     derivation_parser<iter_type> parser;
-  
-    iter_type iter(std::cin);
+    
+    iter_type iter(is);
     iter_type end;
   
     itg_type itg;
     sentence_type source;
     sentence_type target;
 
-    HieroGrammar grammar(std::cout, max_span, max_length);
+    HieroGrammar grammar(os, max_span, max_length);
   
     while (iter != end) {
       itg.clear();
@@ -564,6 +585,11 @@ int main(int argc, char** argv)
 
       span_derivation_source(itg, source);
       span_derivation_target(itg, target);
+
+      if (os_src.get())
+	*os_src << source << '\n';
+      if (os_trg.get())
+	*os_trg << target << '\n';
     
       //print_tree(std::cout, itg) << std::endl;
     
