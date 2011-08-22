@@ -459,7 +459,7 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   fi
 
   ## MERT
-  if $kbest -eq 0; then
+  if test $kbest -eq 0; then
     echo "MERT ${root}weights.$iter" >&2
     qsubwrapper learn -l ${root}mert.$iter.log $cicada/cicada_mert_mpi \
 			--refset $refset \
