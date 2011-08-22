@@ -47,9 +47,9 @@ $me [options]
   --mpi                     MPI directory
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
-  -q, --queue               PBS queue
-  -n, --np                  # of processes to run
-  --nc                      # of cores to run
+  -q, --queue               PBS queue                (default: $queue)
+  -n, --np                  # of processes to run    (default: $np)
+  --nc                      # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
   
   Decoding options
@@ -59,7 +59,7 @@ $me [options]
   Training options
   -C, --C                   hyperparameter                   (default: $C)
   --oracle-cube             cube size for oracle computation (default: $oracle_cube)
-  --scorer                  scorer (default: $scorer)
+  --scorer                  scorer                           (default: $scorer)
 
   -d, --dev, --devset              tuning data (required)
   -r, --reference, --refset, --ref reference translations (required)

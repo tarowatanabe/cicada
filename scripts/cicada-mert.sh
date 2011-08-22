@@ -53,9 +53,9 @@ $me [options]
   --mpi                     MPI directory
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
-  -q, --queue               PBS queue
-  -n, --np                  # of processes to run
-  --nc                      # of cores to run
+  -q, --queue               PBS queue                (default: $queue)
+  -n, --np                  # of processes to run    (default: $np)
+  --nc                      # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
 
   Decoding options
@@ -66,8 +66,8 @@ $me [options]
   -w, --weights             initial weights
   --direction               random directions (default: $direction)
   --restart                 random restarts   (default: $restart)
-  --scorer                  scorer (default: $scorer)
-  --kbest                   kbest size                       (default: $kbest)
+  --scorer                  scorer            (default: $scorer)
+  --kbest                   kbest size        (default: $kbest)
   --forest                  forest MERT
   --iterative               iterative learning
   -l, --lower               lower-bound for features

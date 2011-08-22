@@ -38,9 +38,9 @@ $me name [options] cicada-program args
   --mpi                     MPI implementation
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
-  -q, --queue               PBS queue
-  -n, --np                  # of processes to run
-  --nc                      # of cores to run
+  -q, --queue               PBS queue                (default: $queue)
+  -n, --np                  # of processes to run    (default: $np)
+  --nc                      # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
   --log, -l                 logfile
   --name                    process name

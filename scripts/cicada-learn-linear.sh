@@ -51,9 +51,9 @@ $me [options]
   --mpi                     MPI directory
   --host, --hosts           MPI hosts
   --hostfile, --host-file   MPI host file
-  -q, --queue               PBS queue
-  -n, --np                  # of processes to run
-  --nc                      # of cores to run
+  -q, --queue               PBS queue                (default: $queue)
+  -n, --np                  # of processes to run    (default: $np)
+  --nc                      # of cores to run        (default: $nc)
   --mem                     memory used by each node (default: $mem)
 
   Decoding options
@@ -63,7 +63,7 @@ $me [options]
   -i, --iteration           PRO iterations    (default: $iteration)
   -w, --weights             initial weights
   -C, --C                   hyperparameter    (default: $C)
-  --scorer                  scorer (default: $scorer)
+  --scorer                  scorer            (default: $scorer)
   --solver                  liblinear solver type. See liblinear FAQ,
                             or run cicada_learn_kbest --help
                             (Default: 1, L2-reg, L2-loss SVM)
