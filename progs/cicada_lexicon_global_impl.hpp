@@ -161,12 +161,56 @@ struct OptimizerLinear
   typedef size_t offset_type;
   typedef std::vector<offset_type, std::allocator<offset_type> > offset_set_type;
   
+  
   OptimizerLinear(const bitext_set_type& bitexts,
 		  const word_type& word)
   {
+    const size_t symbol_size = word_type::allocated();
+    offset_set_type offsets;
+
+    bitext_set_type::const_iterator biter_end = bitexts.end();
+    for (bitext_set_type::const_iterator biter = bitexts.begin(); biter != biter_end; ++ biter) {
+
+      feature_node_type feat;
+      
+      sentence_type::const_iterator titer_end = biter->target.end();
+      for (sentence_type::const_iterator titer = biter->target.begin(); titer != titer_end; ++ titer) {
+	
+	labels.push_back(*titer == word ? 1 : -1);
+	offsets.push_back(feature_nodes.size());
+	
+	sentence_type::const_iterator siter_end = biter->source.end();
+	for (sentence_type::const_iterator siter = biter->source.begin(); siter != siter_end; ++ siter) {
+	  feat.index = siter->id() + 1;
+	  feat.value = 1;
+	  
+	  feature_nodes.push_back(feat);
+	}
+	
+	// bias
+	feat.index = symbol_size + 1;
+	feat.value = 1;
+	feature_nodes.push_back(feat);
+	
+	// termination
+	feat.index = -1;
+	feat.value = 0;
+	feature_nodes.push_back(feat);
+      }
+    }
+
+    // setup labels and features based on feature_nodes and offsets
+    label_set_type(labels).swap(labels);
+    feature_node_set_type(feature_nodes).swap(feature_nodes);
     
-    
+    features.reserve(offsets.size());
+    for (size_type pos = 0; pos != offsets.size(); ++ pos)
+      features.push_back(const_cast<feature_node_type*>(&(*feature_nodes.begin())) + offsets[pos]);
   }
+  
+  label_set_type labels;
+  feature_node_map_type features;
+  feature_node_set_type feature_nodes;
   
   static void print_string_stderr(const char *s)
   {
