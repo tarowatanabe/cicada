@@ -164,7 +164,7 @@ struct OptimizerLinearBase
   OptimizerLinearBase(const bitext_set_type& bitexts,
 		      const word_type& word)
   {
-    const size_t symbol_size = word_type::allocated();
+    const size_t bias_index = word_type::allocated() + 1;
     offset_set_type offsets;
 
     bitext_set_type::const_iterator biter_end = bitexts.end();
@@ -187,7 +187,7 @@ struct OptimizerLinearBase
 	}
 	
 	// bias
-	feat.index = symbol_size + 1;
+	feat.index = bias_index;
 	feat.value = 1;
 	feature_nodes.push_back(feat);
 	
@@ -232,7 +232,49 @@ struct OptimizerLinear : public OptimizerLinearBase
   
   void operator()(parameter_set_type& x)
   {
+    problem_type problem;
     
+    problem.l = labels.size();
+    problem.n = word_type::allocated() + 1; // + 1 for bias
+    problem.y = &(*labels.begin());
+    problem.x = &(*features.begin());
+    problem.bias = 1;
+    
+    parameter_type parameter;
+    parameter.solver_type = Solver;
+    parameter.eps = std::numeric_limits<double>::infinity();
+    parameter.C = 1.0 / (C * labels.size()); // renormalize!
+    parameter.nr_weight    = 0;
+    parameter.weight_label = 0;
+    parameter.weight       = 0;
+    
+    if (parameter.eps == std::numeric_limits<double>::infinity()) {
+      if (parameter.solver_type == L2R_LR || parameter.solver_type == L2R_L2LOSS_SVC)
+	parameter.eps = 0.01;
+      else if (parameter.solver_type == L2R_L2LOSS_SVC_DUAL || parameter.solver_type == L2R_L1LOSS_SVC_DUAL || parameter.solver_type == MCSVM_CS || parameter.solver_type == L2R_LR_DUAL)
+	parameter.eps = 0.1;
+      else if (parameter.solver_type == L1R_L2LOSS_SVC || parameter.solver_type == L1R_LR)
+	parameter.eps = 0.01;
+    }
+    
+    if (debug >= 2)
+      set_print_string_function(print_string_stderr);
+    else
+      set_print_string_function(print_string_none);
+    
+    const char* error_message = check_parameter(&problem, &parameter);
+    if (error_message)
+      throw std::runtime_error(std::string("error: ") + error_message);
+    
+    
+    const model_type* model = train(&problem, &parameter);
+    
+    for (int j = 0; j != model->nr_feature; ++ j) {
+      
+      
+    }
+    
+    free_and_destroy_model(const_cast<model_type**>(&model));
   }
 };
 
