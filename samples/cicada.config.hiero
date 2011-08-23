@@ -2,7 +2,7 @@ goal = [s]
 
 ### grammars
 ### see cicada --grammar-list
-grammar = {diectory}/grammar:max-span=15
+grammar = {grammar diectory}/grammar:max-span=15
 
 ### glue rules...
 ### use straight rule:           [s] ||| [s,1] [x,2] ||| [s,1] [x,2]
