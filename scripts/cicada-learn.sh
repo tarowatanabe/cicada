@@ -8,6 +8,12 @@
 
 me=`basename $0`
 
+### working dir..
+workingdir=`pwd`
+
+### this is a test, whether we can run under cluster or not...
+qsub=`which qsub 2> /dev/null`
+
 root=""
 cicada=""
 openmpi=""
@@ -267,12 +273,6 @@ fi
 
 do_interpolate=`echo "($interpolate > 0.0) && ($interpolate < 1.0)" | bc`
 
-### working dir..
-workingdir=`pwd`
-
-### this is a test, whether we can run under cluster or not...
-qsub=`which qsub 2> /dev/null`
-
 mpinp=""
 if test "$qsub" = ""; then
   mpinp="--np $np"
@@ -329,6 +329,9 @@ qsubwrapper() {
       fi
       if test "$TMPDIR" != ""; then
         echo "export TMPDIR=$TMPDIR"
+      fi
+      if test "$LD_LIBRARY_PATH" != ""; then
+        echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
       fi
 
       echo "cd $workingdir"

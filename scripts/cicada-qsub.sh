@@ -147,6 +147,9 @@ if test "$qsub" != ""; then
     if test "$TMPDIR" != ""; then
       echo "export TMPDIR=$TMPDIR"
     fi
+    if test "$LD_LIBRARY_PATH" != ""; then
+      echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+    fi
 
     echo "cd $workingdir"
 
