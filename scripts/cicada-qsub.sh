@@ -173,16 +173,16 @@ if test "$qsub" != ""; then
 else
   if test "$stripped" != "$1" -a $np -gt 1; then
     if test "$logfile" != ""; then
-      exec ${openmpi}mpirun $mpinp $@ >& $logfile
+      exec ${openmpi}mpirun $mpinp "$@" >& $logfile
     else
-      exec ${openmpi}mpirun $mpinp $@
+      exec ${openmpi}mpirun $mpinp "$@"
     fi
   else
     shift
     if test "$logfile" != ""; then
-      exec $stripped $@ >& $logfile
+      exec $stripped "$@" >& $logfile
     else
-      exec $stripped $@
+      exec $stripped "$@"
     fi
   fi
 fi

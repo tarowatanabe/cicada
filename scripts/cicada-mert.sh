@@ -350,16 +350,16 @@ qsubwrapper() {
   else
     if test "$stripped" != "$1" -a $np -gt 1; then
       if test "$logfile" != ""; then
-        ${openmpi}mpirun $mpinp $@ >& $logfile || exit 1
+        ${openmpi}mpirun $mpinp "$@" >& $logfile || exit 1
       else
-        ${openmpi}mpirun $mpinp $@ || exit 1
+        ${openmpi}mpirun $mpinp "$@" || exit 1
       fi
     else
       shift
       if test "$logfile" != ""; then
-        $stripped $@ >& $logfile || exit 1
+        $stripped "$@" >& $logfile || exit 1
       else
-        $stripped $@ || exit 1
+        $stripped "$@" || exit 1
       fi
     fi
   fi
