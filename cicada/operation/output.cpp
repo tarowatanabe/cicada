@@ -394,25 +394,38 @@ namespace cicada
 	}
 	
 	if (forest_mode) {
-	  std::vector<shortest_length_function::value_type, std::allocator<shortest_length_function::value_type> > lengths_shortest(data.hypergraph.nodes.size());
-	  std::vector<longest_length_function::value_type, std::allocator<longest_length_function::value_type> >   lengths_longest(data.hypergraph.nodes.size());
+	  if (data.hypergraph.is_valid()) {
+	    std::vector<shortest_length_function::value_type, std::allocator<shortest_length_function::value_type> > lengths_shortest(data.hypergraph.nodes.size());
+	    std::vector<longest_length_function::value_type, std::allocator<longest_length_function::value_type> >   lengths_longest(data.hypergraph.nodes.size());
 	    
-	  cicada::inside(data.hypergraph, lengths_shortest, shortest_length_function());
-	  cicada::inside(data.hypergraph, lengths_longest, longest_length_function());
+	    cicada::inside(data.hypergraph, lengths_shortest, shortest_length_function());
+	    cicada::inside(data.hypergraph, lengths_longest, longest_length_function());
 	    
-	  const int length_shortest = - log(lengths_shortest.back());
-	  const int length_longest  =   log(lengths_longest.back());
-	  
-	  if (no_id)
-	    os << "hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
-	       << "hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
-	       << "hypergraph-shortest-leaf: " << length_shortest << '\n'
-	       << "hypergraph-longest-leaf: "  << length_longest << '\n';
-	  else
-	    os << id << " ||| hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
-	       << id << " ||| hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
-	       << id << " ||| hypergraph-shortest-leaf: " << length_shortest << '\n'
-	       << id << " ||| hypergraph-longest-leaf: "  << length_longest << '\n';
+	    const int length_shortest = - log(lengths_shortest.back());
+	    const int length_longest  =   log(lengths_longest.back());
+	    
+	    if (no_id)
+	      os << "hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
+		 << "hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
+		 << "hypergraph-shortest-leaf: " << length_shortest << '\n'
+		 << "hypergraph-longest-leaf: "  << length_longest << '\n';
+	    else
+	      os << id << " ||| hypergraph-num-node: " << data.hypergraph.nodes.size() << '\n'
+		 << id << " ||| hypergraph-num-edge: " << data.hypergraph.edges.size() << '\n'
+		 << id << " ||| hypergraph-shortest-leaf: " << length_shortest << '\n'
+		 << id << " ||| hypergraph-longest-leaf: "  << length_longest << '\n';
+	  } else {
+	    if (no_id)
+	      os << "hypergraph-num-node: " << 0 << '\n'
+		 << "hypergraph-num-edge: " << 0 << '\n'
+		 << "hypergraph-shortest-leaf: " << 0 << '\n'
+		 << "hypergraph-longest-leaf: "  << 0 << '\n';
+	    else
+	      os << id << " ||| hypergraph-num-node: " << 0 << '\n'
+		 << id << " ||| hypergraph-num-edge: " << 0 << '\n'
+		 << id << " ||| hypergraph-shortest-leaf: " << 0 << '\n'
+		 << id << " ||| hypergraph-longest-leaf: "  << 0 << '\n';
+	  }
 	}
       } else if (graphviz) {
 	if (! no_id)
