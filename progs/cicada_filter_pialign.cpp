@@ -216,9 +216,9 @@ struct HieroGrammar
     friend
     std::ostream& operator<<(std::ostream& os, const rule_pair_type& x)
     {
-      std::copy(x.source.begin(), x.source.end(), std::ostream_iterator<std::string>(os, " "));
+      std::copy(x.source.begin(), x.source.end(), std::ostream_iterator<word_type>(os, " "));
       os << "||| ";
-      std::copy(x.target.begin(), x.target.end(), std::ostream_iterator<std::string>(os, " "));
+      std::copy(x.target.begin(), x.target.end(), std::ostream_iterator<word_type>(os, " "));
       os << "|||";
       point_set_type::const_iterator piter_end = x.alignment.end();
       for (point_set_type::const_iterator piter = x.alignment.begin(); piter != piter_end; ++ piter)
@@ -240,10 +240,13 @@ struct HieroGrammar
   void operator()(const itg_type& itg,
 		  const sentence_type& source,
 		  const sentence_type& target,
+		  alignment_type& alignment,
 		  Blocker blocker)
   {
     span_pair_set_type spans;
-    alignment_type     alignment(source.size());
+    
+    alignment.clear();
+    alignment.resize(source.size());
     
     operator()(itg, source, target, spans, alignment, blocker);
   }
@@ -514,6 +517,7 @@ int main(int argc, char** argv)
     path_type output_file = "-";
     path_type output_source_file;
     path_type output_target_file;
+    path_type output_alignment_file;
     int max_length = 7;
     int max_span = 15;
     bool phrase_mode = false;
@@ -525,8 +529,9 @@ int main(int argc, char** argv)
       ("input",     po::value<path_type>(&input_file)->default_value(input_file),   "input file")
       ("output",    po::value<path_type>(&output_file)->default_value(output_file), "output")
       
-      ("source", po::value<path_type>(&output_source_file), "output source yield")
-      ("target", po::value<path_type>(&output_target_file), "output target yield")
+      ("source",    po::value<path_type>(&output_source_file),    "output source yield")
+      ("target",    po::value<path_type>(&output_target_file),    "output target yield")
+      ("alignment", po::value<path_type>(&output_alignment_file), "output word-for-word alignment")
 
       ("max-length", po::value<int>(&max_length)->default_value(max_length), "max terminal length")
       ("max-span",   po::value<int>(&max_span)->default_value(max_span),     "max span")
@@ -557,8 +562,9 @@ int main(int argc, char** argv)
     utils::compress_istream is(input_file, 1024 * 1024);
     utils::compress_ostream os(output_file, 1024 * 1024);
     
-    std::auto_ptr<std::ostream> os_src(! output_source_file.empty() ? new utils::compress_ostream(output_source_file) : 0);
-    std::auto_ptr<std::ostream> os_trg(! output_target_file.empty() ? new utils::compress_ostream(output_target_file) : 0);
+    std::auto_ptr<std::ostream> os_src(! output_source_file.empty() ? new utils::compress_ostream(output_source_file, 1024 * 1024) : 0);
+    std::auto_ptr<std::ostream> os_trg(! output_target_file.empty() ? new utils::compress_ostream(output_target_file, 1024 * 1024) : 0);
+    std::auto_ptr<std::ostream> os_align(! output_alignment_file.empty() ? new utils::compress_ostream(output_alignment_file, 1024 * 1024) : 0);
 
     is.unsetf(std::ios::skipws);
     os.precision(20);
@@ -571,6 +577,8 @@ int main(int argc, char** argv)
     itg_type itg;
     sentence_type source;
     sentence_type target;
+
+    HieroGrammar::alignment_type alignment;
 
     HieroGrammar grammar(os, max_span, max_length);
   
@@ -594,11 +602,30 @@ int main(int argc, char** argv)
       //print_tree(std::cout, itg) << std::endl;
     
       if (phrase_mode)
-	grammar(itg, source, target, BlockerModel());
+	grammar(itg, source, target, alignment, BlockerModel());
       else if (block_mode)
-	grammar(itg, source, target, BlockerBlock());
+	grammar(itg, source, target, alignment, BlockerBlock());
       else
-	grammar(itg, source, target, BlockerTerminal());
+	grammar(itg, source, target, alignment, BlockerTerminal());
+      
+      // dump alignment...
+      if (os_align.get()) {
+	bool initial = true;
+	for (size_t src = 0; src != alignment.size(); ++ src) 
+	  if (! alignment[src].empty()) {
+	    const HieroGrammar::alignment_type::value_type& align = alignment[src];
+	    
+	    HieroGrammar::alignment_type::value_type::const_iterator aiter_end = align.end();
+	    for (HieroGrammar::alignment_type::value_type::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
+	      if (! initial)
+		*os_align << ' ';
+	      *os_align << src << '-' << *aiter;
+	      
+	      initial = false;
+	    }
+	  }
+	*os_align << '\n';
+      }
     }
   }
   catch (std::exception& err) {
