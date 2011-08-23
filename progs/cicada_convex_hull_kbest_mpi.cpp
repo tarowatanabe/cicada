@@ -35,9 +35,6 @@
 #include "utils/base64.hpp"
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
-#include "utils/mpi_device_bcast.hpp"
-#include "utils/mpi_stream.hpp"
-#include "utils/mpi_stream_simple.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -370,10 +367,7 @@ void read_tstset(const path_set_type& files,
       throw std::runtime_error("no file: " + fiter->string());
     
     if (boost::filesystem::is_directory(*fiter)) {
-      for (size_t i = 0; /**/; ++ i) {
-	
-	if (i % mpi_size != mpi_rank) continue;
-	
+      for (size_t i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*fiter) / (utils::lexical_cast<std::string>(i) + ".gz");
 	
 	if (! boost::filesystem::exists(path)) break;

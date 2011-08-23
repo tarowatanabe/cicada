@@ -42,9 +42,6 @@
 #include "utils/base64.hpp"
 #include "utils/mpi.hpp"
 #include "utils/mpi_device.hpp"
-#include "utils/mpi_device_bcast.hpp"
-#include "utils/mpi_stream.hpp"
-#include "utils/mpi_stream_simple.hpp"
 
 #include <boost/tokenizer.hpp>
 #include <boost/program_options.hpp>
@@ -391,12 +388,9 @@ void read_tstset(const path_set_type& files, hypergraph_set_type& graphs)
       
     if (boost::filesystem::is_directory(*titer)) {
 
-      for (int i = 0; /**/; ++ i) {
-	
-	if (i % mpi_size != mpi_rank) continue;
-	
+      for (int i = mpi_rank; /**/; i += mpi_size) {
 	const path_type path = (*titer) / (utils::lexical_cast<std::string>(i) + ".gz");
-
+	
 	if (! boost::filesystem::exists(path)) break;
 	
 	utils::compress_istream is(path, 1024 * 1024);
