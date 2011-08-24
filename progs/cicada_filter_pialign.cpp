@@ -263,9 +263,10 @@ struct TreeSource : public Grammar
       forest.connect_edge(edge.id, node_id);
       
       // compute alignment matrix
-      for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
-	for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
-	  alignment[src].insert(trg);
+      if (itg.spans.target.first != itg.spans.target.second)
+	for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
+	  for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
+	    alignment[src].insert(trg);
       
       // return parent...
       return node_id;
@@ -355,9 +356,10 @@ struct TreeTarget : public Grammar
       forest.connect_edge(edge.id, node_id);
       
       // compute alignment matrix
-      for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
-	for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
-	  alignment[src].insert(trg);
+      if (itg.spans.target.first != itg.spans.target.second)
+	for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
+	  for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
+	    alignment[src].insert(trg);
       
       // return parent...
       return node_id;
@@ -506,9 +508,10 @@ struct HieroGrammar : public Grammar
     if (blocker(itg) || itg.antecedent.empty()) {
       spans.push_back(itg.spans);
       
-      for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
-	for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
-	  alignment[src].insert(trg);
+      if (itg.spans.target.first != itg.spans.target.second)
+	for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
+	  for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
+	    alignment[src].insert(trg);
 
     } else if (max_span <= 0 || length_source <= max_span) {
       span_pair_set_type spans1;
