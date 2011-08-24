@@ -535,6 +535,8 @@ int main(int argc, char** argv)
     bool phrase_mode = false;
     bool block_mode = false;
     bool exhaustive_mode = false;
+
+    int debug = 0;
   
     po::options_description desc("options");
     desc.add_options()
@@ -561,7 +563,8 @@ int main(int argc, char** argv)
       ("phrase",     po::bool_switch(&phrase_mode),     "phrase-wise model alignment (many-to-many)")
       ("block",      po::bool_switch(&block_mode),      "block-wise alignment (one-to-many)")
       ("exhaustive", po::bool_switch(&exhaustive_mode), "exhaustive alignment (one-to-one)")
-    
+      
+      ("debug", po::value<int>(&debug)->implicit_value(1), "debug level")
       ("help", "help message");
   
     po::variables_map vm;
