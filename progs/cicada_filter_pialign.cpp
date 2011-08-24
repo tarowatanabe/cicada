@@ -364,13 +364,8 @@ struct TreeTarget : public Grammar
     } else {
       hypergraph_type::id_type tails[2];
       
-      if (! itg.inverse) {
-	tails[0] = operator()(itg.antecedent.front(), source, target, forest, alignment, blocker);
-	tails[1] = operator()(itg.antecedent.back(),  source, target, forest, alignment, blocker);
-      } else {
-	tails[1] = operator()(itg.antecedent.front(), source, target, forest, alignment, blocker);
-	tails[0] = operator()(itg.antecedent.back(),  source, target, forest, alignment, blocker);
-      }
+      tails[  itg.inverse] = operator()(itg.antecedent.front(), source, target, forest, alignment, blocker);
+      tails[! itg.inverse] = operator()(itg.antecedent.back(),  source, target, forest, alignment, blocker);
       
       hypergraph_type::edge_type& edge = forest.add_edge(tails, tails + 2);
       edge.rule = rule_binary;
