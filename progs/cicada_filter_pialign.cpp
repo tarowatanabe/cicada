@@ -22,7 +22,10 @@
 #include <memory>
 
 #include <cicada/symbol.hpp>
+#include <cicada/vocab.hpp>
 #include <cicada/sentence.hpp>
+#include <cicada/hypergraph.hpp>
+#include <cicada/remove_epsilon.hpp>
 
 #include <utils/compress_stream.hpp>
 
@@ -50,6 +53,7 @@ struct span_pair_type
     : source(__source), target(__target) {}
 };
 
+typedef cicada::Vocab    vocab_type;
 typedef cicada::Symbol   word_type;
 typedef cicada::Sentence sentence_type;
 
@@ -197,9 +201,202 @@ struct Grammar
   typedef std::vector<point_type, std::allocator<point_type> > point_set_type;
 };
 
+struct TreeSource : public Grammar
+{
+  typedef cicada::HyperGraph hypergraph_type;
+  
+  typedef hypergraph_type::rule_type     rule_type;
+  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
+  typedef std::vector<word_type, std::allocator<word_type> >                               rhs_set_type;
+  
+  TreeSource(std::ostream& __os,
+	     const bool __remove_epsilon)  
+    :  os(__os), remove_epsilon(__remove_epsilon)
+  {
+    rule_type::symbol_set_type rhs(2, vocab_type::X);
+    
+    rule_binary = rule_type::create(rule_type(vocab_type::X, rhs));
+  }
+  
+  template <typename Blocker>
+  void operator()(const itg_type& itg,
+		  const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment,
+		  Blocker blocker)
+  {
+    alignment.clear();
+    alignment.resize(source.size());
+    
+    hypergraph_type forest;
+    
+    forest.goal = operator()(itg, source, target, forest, alignment, blocker);
+    
+    if (forest.is_valid()) {
+      forest.topologically_sort();
+      if (remove_epsilon)
+	cicada::remove_epsilon(forest);
+    }
+    
+    os << forest << '\n';
+  }
+  
+  template <typename Blocker>
+  hypergraph_type::id_type operator()(const itg_type& itg,
+				      const sentence_type& source,
+				      const sentence_type& target,
+				      hypergraph_type& forest,
+				      alignment_type& alignment,
+				      Blocker blocker)
+  {
+    if (blocker(itg) || itg.antecedent.empty())  {
+      rhs_set_type  rhs(source.begin() + itg.spans.source.first, source.begin() + itg.spans.source.second);
+      
+      hypergraph_type::edge_type& edge = forest.add_edge();
+      edge.rule = rule_type::create(rhs.empty()
+				    ? rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1)
+				    : rule_type(vocab_type::X, rhs.begin(), rhs.end()));
+      
+      const hypergraph_type::id_type node_id = forest.add_node().id;
+      
+      forest.connect_edge(edge.id, node_id);
+      
+      // compute alignment matrix
+      for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
+	for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
+	  alignment[src].insert(trg);
+      
+      // return parent...
+      return node_id;
+    } else {
+      hypergraph_type::id_type tails[2];
+      
+      tails[0] = operator()(itg.antecedent.front(), source, target, forest, alignment, blocker);
+      tails[1] = operator()(itg.antecedent.back(),  source, target, forest, alignment, blocker);
+      
+      hypergraph_type::edge_type& edge = forest.add_edge(tails, tails + 2);
+      edge.rule = rule_binary;
+      
+      const hypergraph_type::id_type node_id = forest.add_node().id;
+      
+      forest.connect_edge(edge.id, node_id);
+      
+      return  node_id;
+    }
+  }
+  
+  std::ostream& os;
+  const bool remove_epsilon;
+  
+  rule_ptr_type rule_binary;
+};
+
+struct TreeTarget : public Grammar
+{
+  typedef cicada::HyperGraph hypergraph_type;
+  
+  typedef hypergraph_type::rule_type     rule_type;
+  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
+  typedef std::vector<word_type, std::allocator<word_type> >                               rhs_set_type;
+  
+  TreeTarget(std::ostream& __os,
+	     const bool __remove_epsilon)  
+    :  os(__os),
+       remove_epsilon(__remove_epsilon)
+  {
+    rule_type::symbol_set_type rhs(2, vocab_type::X);
+    
+    rule_binary = rule_type::create(rule_type(vocab_type::X, rhs));
+  }
+  
+  template <typename Blocker>
+  void operator()(const itg_type& itg,
+		  const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment,
+		  Blocker blocker)
+  {
+    alignment.clear();
+    alignment.resize(source.size());
+    
+    hypergraph_type forest;
+    
+    forest.goal = operator()(itg, source, target, forest, alignment, blocker);
+    
+    if (forest.is_valid()) {
+      forest.topologically_sort();
+      if (remove_epsilon)
+	cicada::remove_epsilon(forest);
+    }
+    
+    os << forest << '\n';
+  }
+  
+  template <typename Blocker>
+  hypergraph_type::id_type operator()(const itg_type& itg,
+				      const sentence_type& source,
+				      const sentence_type& target,
+				      hypergraph_type& forest,
+				      alignment_type& alignment,
+				      Blocker blocker)
+  {
+    if (blocker(itg) || itg.antecedent.empty())  {
+      rhs_set_type  rhs(target.begin() + itg.spans.target.first, target.begin() + itg.spans.target.second);
+      
+      hypergraph_type::edge_type& edge = forest.add_edge();
+      edge.rule = rule_type::create(rhs.empty()
+				    ? rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1)
+				    : rule_type(vocab_type::X, rhs.begin(), rhs.end()));
+      
+      const hypergraph_type::id_type node_id = forest.add_node().id;
+      
+      forest.connect_edge(edge.id, node_id);
+      
+      // compute alignment matrix
+      for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
+	for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
+	  alignment[src].insert(trg);
+      
+      // return parent...
+      return node_id;
+    } else {
+      hypergraph_type::id_type tails[2];
+      
+      if (! itg.inverse) {
+	tails[0] = operator()(itg.antecedent.front(), source, target, forest, alignment, blocker);
+	tails[1] = operator()(itg.antecedent.back(),  source, target, forest, alignment, blocker);
+      } else {
+	tails[1] = operator()(itg.antecedent.front(), source, target, forest, alignment, blocker);
+	tails[0] = operator()(itg.antecedent.back(),  source, target, forest, alignment, blocker);
+      }
+      
+      hypergraph_type::edge_type& edge = forest.add_edge(tails, tails + 2);
+      edge.rule = rule_binary;
+      
+      const hypergraph_type::id_type node_id = forest.add_node().id;
+      
+      forest.connect_edge(edge.id, node_id);
+      
+      return  node_id;
+    }
+  }
+  
+  std::ostream& os;
+  const bool remove_epsilon;
+  
+  rule_ptr_type rule_binary;
+};
+
 struct GHKMGrammar : public Grammar
 {
-  // transform itg_type into a paired hypergraph structure
+  //
+  // transform itg_type into a paired hypergraph structure by traversing in
+  // post-traversal order.
+  // (Thus, we need not construct hypergraph explicitly...?)
+  //
+  
   GHKMGrammar(std::ostream& __os,
 	      const int __max_nodes,
 	      const int __max_height,
@@ -220,10 +417,13 @@ struct GHKMGrammar : public Grammar
 		  alignment_type& alignment,
 		  Blocker blocker)
   {
+    alignment.clear();
+    alignment.resize(source.size());
     
   }
   
   std::ostream& os;
+  
   const int max_nodes;
   const int max_height;
   const int max_compose;
@@ -565,13 +765,17 @@ int main(int argc, char** argv)
     int max_height  = 4;
     int max_compose = 0;
     int max_scope   = 0;
-    
-    bool scfg_mode = false;
-    bool ghkm_mode = false;
 
     bool frontier_source_mode = false;
     bool frontier_target_mode = false;
-
+    
+    bool remove_epsilon = false;
+    
+    bool scfg_mode = false;
+    bool ghkm_mode = false;
+    bool tree_source_mode = false;
+    bool tree_target_mode = false;
+    
     bool phrase_mode = false;
     bool block_mode = false;
     bool exhaustive_mode = false;
@@ -597,8 +801,12 @@ int main(int argc, char** argv)
       ("frontier-source", po::bool_switch(&frontier_source_mode),               "take frontier of source side (string-to-* model)")
       ("frontier-target", po::bool_switch(&frontier_target_mode),               "take frontier of target side (*-to-string model)")
       
+      ("remove-epsilon", po::bool_switch(&remove_epsilon), "remove <epsilon> from trees")
+
       ("scfg", po::bool_switch(&scfg_mode), "extract SCFG rules")
       ("ghkm", po::bool_switch(&ghkm_mode), "extract GHKM rules")
+      ("tree-source", po::bool_switch(&tree_source_mode), "extract source tree")
+      ("tree-target", po::bool_switch(&tree_target_mode), "extract target tree")
     
       ("phrase",     po::bool_switch(&phrase_mode),     "phrase-wise model alignment (many-to-many)")
       ("block",      po::bool_switch(&block_mode),      "block-wise alignment (one-to-many)")
@@ -615,17 +823,17 @@ int main(int argc, char** argv)
       std::cout << argv[0] << " [options]" << '\n' << desc << '\n';
       return 0;
     }
-  
-    if (int(phrase_mode) + block_mode + exhaustive_mode == 0)
-      phrase_mode = true;
-    
+      
     if (int(phrase_mode) + block_mode + exhaustive_mode > 1)
       throw std::runtime_error("either phrase|block|exhaustive");
 
-    if (scfg_mode && ghkm_mode)
-      throw std::runtime_error("either scfg|ghkm");
+    if (int(phrase_mode) + block_mode + exhaustive_mode == 0)
+      phrase_mode = true;
     
-    if (int(scfg_mode) + ghkm_mode == 0)
+    if (int(scfg_mode) + ghkm_mode + tree_source_mode + tree_target_mode > 1)
+      throw std::runtime_error("either scfg|ghkm|tree-source|tree-target");
+    
+    if (int(scfg_mode) + ghkm_mode + tree_source_mode + tree_target_mode == 0)
       scfg_mode = true;
     
     typedef boost::spirit::istream_iterator iter_type;
@@ -652,37 +860,57 @@ int main(int argc, char** argv)
     Grammar::alignment_type alignment;
 
     HieroGrammar scfg_grammar(os, max_span, max_length);
-  
+    GHKMGrammar  ghkm_grammar(os, max_nodes, max_height, max_compose, max_scope, frontier_source_mode, frontier_target_mode);
+    TreeSource   tree_source(os, remove_epsilon);
+    TreeTarget   tree_target(os, remove_epsilon);
+    
     while (iter != end) {
       itg.clear();
     
       if (! boost::spirit::qi::phrase_parse(iter, end, parser, boost::spirit::standard::space, itg))
 	throw std::runtime_error("parsing failed");
-
+      
       source.clear();
       target.clear();
 
       span_derivation_source(itg, source);
       span_derivation_target(itg, target);
-
+      
       if (os_src.get())
 	*os_src << source << '\n';
       if (os_trg.get())
 	*os_trg << target << '\n';
       
       //print_tree(std::cout, itg) << std::endl;
-    
-      if (ghkm_mode) {
+      
+      if (scfg_mode) {
 	if (phrase_mode)
 	  scfg_grammar(itg, source, target, alignment, BlockerModel());
 	else if (block_mode)
 	  scfg_grammar(itg, source, target, alignment, BlockerBlock());
 	else
 	  scfg_grammar(itg, source, target, alignment, BlockerTerminal());
+      } else if (tree_source_mode) {
+	if (phrase_mode)
+	  tree_source(itg, source, target, alignment, BlockerModel());
+	else if (block_mode)
+	  tree_source(itg, source, target, alignment, BlockerBlock());
+	else
+	  tree_source(itg, source, target, alignment, BlockerTerminal());
+      } else if (tree_target_mode) {
+	if (phrase_mode)
+	  tree_target(itg, source, target, alignment, BlockerModel());
+	else if (block_mode)
+	  tree_target(itg, source, target, alignment, BlockerBlock());
+	else
+	  tree_target(itg, source, target, alignment, BlockerTerminal());	
       } else {
-	
-	
-	
+	if (phrase_mode)
+	  ghkm_grammar(itg, source, target, alignment, BlockerModel());
+	else if (block_mode)
+	  ghkm_grammar(itg, source, target, alignment, BlockerBlock());
+	else
+	  ghkm_grammar(itg, source, target, alignment, BlockerTerminal());
       }
       
       // dump alignment...
