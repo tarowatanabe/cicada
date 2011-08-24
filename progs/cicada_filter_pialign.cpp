@@ -459,12 +459,12 @@ struct GHKMGrammar : public Grammar
     if (forest_source.is_valid()) {
       forest_source.topologically_sort();
       cicada::remove_epsilon(forest_source);
-      compute_node_map(forest_source, nodes_map_source, edge_map_source);
+      compute_node_map(forest_source, nodes_map_source, edges_map_source);
     }
     if (forest_target.is_valid()) {
       forest_target.topologically_sort();
       cicada::remove_epsilon(forest_target);
-      compute_node_map(forest_target, nodes_map_target, edge_map_target);
+      compute_node_map(forest_target, nodes_map_target, edges_map_target);
     }
     
     if (! forest_source.is_valid() || ! forest_target.is_valid()) return;
