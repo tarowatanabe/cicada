@@ -406,6 +406,9 @@ struct GHKMGrammar : public Grammar
 
   typedef std::pair<hypergraph_type::id_type, hypergraph_type::id_type> id_pair_type;
   
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_set_type;
+  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_map_type;
   
   GHKMGrammar(std::ostream& __os,
 	      const int __max_nodes,
@@ -446,23 +449,71 @@ struct GHKMGrammar : public Grammar
     
     forest_source.goal = id_pair.first;
     forest_target.goal = id_pair.second;
+
+    nodes_map_source.clear();
+    nodes_map_target.clear();
+    nodes_map_source.resize(spans.size());
+    nodes_map_target.resize(spans.size());
+
     
     if (forest_source.is_valid()) {
       forest_source.topologically_sort();
       cicada::remove_epsilon(forest_source);
+      compute_node_map(forest_source, nodes_map_source, edge_map_source);
     }
     if (forest_target.is_valid()) {
       forest_target.topologically_sort();
       cicada::remove_epsilon(forest_target);
+      compute_node_map(forest_target, nodes_map_target, edge_map_target);
     }
     
     if (! forest_source.is_valid() || ! forest_target.is_valid()) return;
     
     // then, compute pairing
+    std::cerr << "started: " << nodes_map_source.size() << std::endl;
+    for (size_t i = 0; i != nodes_map_source.size(); ++ i) {
+      if (! nodes_map_source[i].empty() && ! nodes_map_target[i].empty()) {
+	std::cerr << "mapped: " << i << std::endl;
+	
+	if (nodes_map_source[i].size() > 1)
+	  std::cerr << "larget source? " << nodes_map_source[i].size() << std::endl;
+	if (nodes_map_target[i].size() > 1)
+	  std::cerr << "larget target? " << nodes_map_target[i].size() << std::endl;
+      }
+    }
     
+    // compute source-pairing...
     
   }
   
+  struct attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
+  {
+    attribute_set_type::int_type operator()(const attribute_set_type::int_type& x) const { return x; }
+    attribute_set_type::int_type operator()(const attribute_set_type::float_type& x) const { return -1; }
+    attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
+  };
+
+  void compute_node_map(const hypergraph_type& forest, node_map_type& nodes_map, edge_map_type& edges_map)
+  {
+    edges_map.resize(forest.edges.size());
+
+    hypergraph_type::edge_set_type::const_iterator eiter_end = forest.edges.end();
+    for (hypergraph_type::edge_set_type::const_iterator eiter = forest.edges.begin(); eiter != eiter_end; ++ eiter) {
+      const hypergraph_type::edge_type& edge = *eiter;
+      
+      attribute_set_type::const_iterator aiter = edge.attributes.find(attr_node_id);
+      if (aiter == edge.attributes.end())
+	throw std::runtime_error("no attributes?");
+      
+      const int pos = boost::apply_visitor(attribute_integer(), aiter->second);
+      if (pos < 0)
+	throw std::runtime_error("invalid attribute?");
+      
+      nodes_map[pos].push_back(edge.id);
+      edges_map[edge.id] = pos;
+    }
+  }
+
   template <typename Blocker>
   id_pair_type operator()(const itg_type& itg,
 			  const sentence_type& source,
@@ -508,7 +559,7 @@ struct GHKMGrammar : public Grammar
       return std::make_pair(node_id_source, node_id_target);
     } else {
       const id_pair_type id_pair_front = operator()(itg.antecedent.front(), source, target, spans, forest_source, forest_target, alignment, blocker);
-      const id_pair_type id_pair_back  = operator()(itg.antecedent.back(), source, target, spans, forest_source, forest_target, alignment, blocker);
+      const id_pair_type id_pair_back  = operator()(itg.antecedent.back(),  source, target, spans, forest_source, forest_target, alignment, blocker);
       
       hypergraph_type::id_type tails_source[2];
       hypergraph_type::id_type tails_target[2];
@@ -552,6 +603,11 @@ struct GHKMGrammar : public Grammar
   const bool frontier_target;
   
   span_pair_set_type spans;
+  node_map_type      nodes_map_source;
+  node_map_type      nodes_map_target;
+  edge_map_type      edges_map_source;
+  edge_map_type      edges_map_target;
+
   hypergraph_type forest_source;
   hypergraph_type forest_target;
 
