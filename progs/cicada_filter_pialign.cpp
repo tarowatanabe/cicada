@@ -208,8 +208,6 @@ struct TreeSource : public Grammar
   typedef hypergraph_type::rule_type     rule_type;
   typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
-  typedef std::vector<word_type, std::allocator<word_type> >                               rhs_set_type;
-  
   TreeSource(std::ostream& __os,
 	     const bool __remove_epsilon)  
     :  os(__os), remove_epsilon(__remove_epsilon)
@@ -251,12 +249,12 @@ struct TreeSource : public Grammar
 				      Blocker blocker)
   {
     if (blocker(itg) || itg.antecedent.empty())  {
-      rhs_set_type  rhs(source.begin() + itg.spans.source.first, source.begin() + itg.spans.source.second);
+      rule_type::symbol_set_type rhs(source.begin() + itg.spans.source.first, source.begin() + itg.spans.source.second);
       
       hypergraph_type::edge_type& edge = forest.add_edge();
       edge.rule = rule_type::create(rhs.empty()
 				    ? rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1)
-				    : rule_type(vocab_type::X, rhs.begin(), rhs.end()));
+				    : rule_type(vocab_type::X, rhs));
       
       const hypergraph_type::id_type node_id = forest.add_node().id;
       
@@ -300,8 +298,6 @@ struct TreeTarget : public Grammar
   typedef hypergraph_type::rule_type     rule_type;
   typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
-  typedef std::vector<word_type, std::allocator<word_type> >                               rhs_set_type;
-  
   TreeTarget(std::ostream& __os,
 	     const bool __remove_epsilon)  
     :  os(__os),
@@ -344,12 +340,12 @@ struct TreeTarget : public Grammar
 				      Blocker blocker)
   {
     if (blocker(itg) || itg.antecedent.empty())  {
-      rhs_set_type  rhs(target.begin() + itg.spans.target.first, target.begin() + itg.spans.target.second);
+      rule_type::symbol_set_type rhs(target.begin() + itg.spans.target.first, target.begin() + itg.spans.target.second);
       
       hypergraph_type::edge_type& edge = forest.add_edge();
       edge.rule = rule_type::create(rhs.empty()
 				    ? rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1)
-				    : rule_type(vocab_type::X, rhs.begin(), rhs.end()));
+				    : rule_type(vocab_type::X, rhs));
       
       const hypergraph_type::id_type node_id = forest.add_node().id;
       
@@ -394,6 +390,23 @@ struct GHKMGrammar : public Grammar
   // (Thus, we need not construct hypergraph explicitly...?)
   //
   
+  //
+  // we need to map the itg-derivation-post-order-traversal id into spans and rules
+  //
+  typedef cicada::HyperGraph hypergraph_type;
+  
+  typedef hypergraph_type::rule_type     rule_type;
+  typedef hypergraph_type::rule_ptr_type rule_ptr_type;
+
+  typedef hypergraph_type::feature_set_type   feature_set_type;
+  typedef hypergraph_type::attribute_set_type attribute_set_type;
+
+  typedef attribute_set_type::attribute_type attribute_type;
+  typedef feature_set_type::feature_type     feature_type;
+
+  typedef std::pair<hypergraph_type::id_type, hypergraph_type::id_type> id_pair_type;
+  
+  
   GHKMGrammar(std::ostream& __os,
 	      const int __max_nodes,
 	      const int __max_height,
@@ -405,7 +418,13 @@ struct GHKMGrammar : public Grammar
       max_nodes(__max_nodes), max_height(__max_height),
       max_compose(__max_compose), max_scope(__max_scope),
       frontier_source(__frontier_source),
-      frontier_target(__frontier_target) {}
+      frontier_target(__frontier_target),
+      attr_node_id("node-id")
+  {
+    rule_type::symbol_set_type rhs(2, vocab_type::X);
+    
+    rule_binary = rule_type::create(rule_type(vocab_type::X, rhs));
+  }
   
   template <typename Blocker>
   void operator()(const itg_type& itg,
@@ -417,6 +436,109 @@ struct GHKMGrammar : public Grammar
     alignment.clear();
     alignment.resize(source.size());
     
+    // first, compute epsilon-removed tree
+    
+    spans.clear();
+    forest_source.clear();
+    forest_target.clear();
+    
+    const id_pair_type id_pair = operator()(itg, source, target, spans, forest_source, forest_target, alignment, blocker);
+    
+    forest_source.goal = id_pair.first;
+    forest_target.goal = id_pair.second;
+    
+    if (forest_source.is_valid()) {
+      forest_source.topologically_sort();
+      cicada::remove_epsilon(forest_source);
+    }
+    if (forest_target.is_valid()) {
+      forest_target.topologically_sort();
+      cicada::remove_epsilon(forest_target);
+    }
+    
+    if (! forest_source.is_valid() || ! forest_target.is_valid()) return;
+    
+    // then, compute pairing
+    
+    
+  }
+  
+  template <typename Blocker>
+  id_pair_type operator()(const itg_type& itg,
+			  const sentence_type& source,
+			  const sentence_type& target,
+			  span_pair_set_type& spans,
+			  hypergraph_type& forest_source,
+			  hypergraph_type& forest_target,
+			  alignment_type& alignment,
+			  Blocker blocker)
+  {
+    if (blocker(itg) || itg.antecedent.empty())  {
+      rule_type::symbol_set_type rhs_source(source.begin() + itg.spans.source.first, source.begin() + itg.spans.source.second);
+      rule_type::symbol_set_type rhs_target(target.begin() + itg.spans.target.first, target.begin() + itg.spans.target.second);
+      
+      hypergraph_type::edge_type& edge_source = forest_source.add_edge();
+      hypergraph_type::edge_type& edge_target = forest_target.add_edge();
+      
+      edge_source.rule = rule_type::create(rhs_source.empty()
+					   ? rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1)
+					   : rule_type(vocab_type::X, rhs_source));
+      edge_target.rule = rule_type::create(rhs_target.empty()
+					   ? rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1)
+					   : rule_type(vocab_type::X, rhs_target));
+
+      edge_source.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
+      edge_target.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
+      
+      const hypergraph_type::id_type node_id_source = forest_source.add_node().id;
+      const hypergraph_type::id_type node_id_target = forest_target.add_node().id;
+      
+      forest_source.connect_edge(edge_source.id, node_id_source);
+      forest_target.connect_edge(edge_target.id, node_id_target);
+      
+      // compute alignment matrix
+      if (itg.spans.target.first != itg.spans.target.second)
+	for (int src = itg.spans.source.first; src != itg.spans.source.second; ++ src)
+	  for (int trg = itg.spans.target.first; trg != itg.spans.target.second; ++ trg)
+	    alignment[src].insert(trg);
+
+      // push-back spans...
+      spans.push_back(itg.spans);
+      
+      return std::make_pair(node_id_source, node_id_target);
+    } else {
+      const id_pair_type id_pair_front = operator()(itg.antecedent.front(), source, target, spans, forest_source, forest_target, alignment, blocker);
+      const id_pair_type id_pair_back  = operator()(itg.antecedent.back(), source, target, spans, forest_source, forest_target, alignment, blocker);
+      
+      hypergraph_type::id_type tails_source[2];
+      hypergraph_type::id_type tails_target[2];
+
+      tails_source[0] = id_pair_front.first;
+      tails_source[1] = id_pair_back.first;
+      
+      tails_target[  itg.inverse] = id_pair_front.second;
+      tails_target[! itg.inverse] = id_pair_back.second;
+      
+      hypergraph_type::edge_type& edge_source = forest_source.add_edge(tails_source, tails_source + 2);
+      hypergraph_type::edge_type& edge_target = forest_target.add_edge(tails_target, tails_target + 2);
+      
+      edge_source.rule = rule_binary;
+      edge_target.rule = rule_binary;
+      
+      edge_source.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
+      edge_target.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
+      
+      const hypergraph_type::id_type node_id_source = forest_source.add_node().id;
+      const hypergraph_type::id_type node_id_target = forest_target.add_node().id;
+      
+      forest_source.connect_edge(edge_source.id, node_id_source);
+      forest_target.connect_edge(edge_target.id, node_id_target);
+      
+      // push-back spans...
+      spans.push_back(itg.spans);
+      
+      return std::make_pair(node_id_source, node_id_target);
+    }
   }
   
   std::ostream& os;
@@ -428,6 +550,14 @@ struct GHKMGrammar : public Grammar
   
   const bool frontier_source;
   const bool frontier_target;
+  
+  span_pair_set_type spans;
+  hypergraph_type forest_source;
+  hypergraph_type forest_target;
+
+  rule_ptr_type rule_binary;
+
+  const attribute_type attr_node_id;
 };
 
 struct HieroGrammar : public Grammar
