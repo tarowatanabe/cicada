@@ -186,15 +186,55 @@ void span_derivation_target(itg_type& itg, sentence_type& sentence)
   itg.spans.target.second = sentence.size();
 }
 
-struct HieroGrammar
+struct Grammar
 {
   typedef std::vector<span_pair_type, std::allocator<span_pair_type> > span_pair_set_type;
   
   typedef std::set<int, std::less<int>, std::allocator<int> > index_set_type;
   typedef std::vector<index_set_type, std::allocator<index_set_type> > alignment_type;
-
+  
   typedef std::pair<int, int> point_type;
   typedef std::vector<point_type, std::allocator<point_type> > point_set_type;
+};
+
+struct GHKMGrammar : public Grammar
+{
+  // transform itg_type into a paired hypergraph structure
+  GHKMGrammar(std::ostream& __os,
+	      const int __max_nodes,
+	      const int __max_height,
+	      const int __max_compose,
+	      const int __max_scope,
+	      const bool __frontier_source,
+	      const bool __frontier_target)
+    : os(__os),
+      max_nodes(__max_nodes), max_height(__max_height),
+      max_compos(__max_compose), max_scope(__max_scope),
+      frontier_source(__frontier_source),
+      frontier_target(__frontier_target) {}
+  
+  template <typename Blocker>
+  void operator()(const itg_type& itg,
+		  const sentence_type& source,
+		  const sentence_type& target,
+		  alignment_type& alignment,
+		  Blocker blocker)
+  {
+    
+  }
+  
+  std::ostream& os;
+  const int max_nodes;
+  const int max_height;
+  const int max_compose;
+  const int max_scope;
+  
+  const bool frontier_source;
+  const bool frontier_target;
+};
+
+struct HieroGrammar : public Grammar
+{
 
   typedef sentence_type phrase_type;
   
@@ -609,7 +649,7 @@ int main(int argc, char** argv)
     sentence_type source;
     sentence_type target;
 
-    HieroGrammar::alignment_type alignment;
+    Grammar::alignment_type alignment;
 
     HieroGrammar scfg_grammar(os, max_span, max_length);
   
@@ -650,10 +690,10 @@ int main(int argc, char** argv)
 	bool initial = true;
 	for (size_t src = 0; src != alignment.size(); ++ src) 
 	  if (! alignment[src].empty()) {
-	    const HieroGrammar::alignment_type::value_type& align = alignment[src];
+	    const Grammar::alignment_type::value_type& align = alignment[src];
 	    
-	    HieroGrammar::alignment_type::value_type::const_iterator aiter_end = align.end();
-	    for (HieroGrammar::alignment_type::value_type::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
+	    Grammar::alignment_type::value_type::const_iterator aiter_end = align.end();
+	    for (Grammar::alignment_type::value_type::const_iterator aiter = align.begin(); aiter != aiter_end; ++ aiter) {
 	      if (! initial)
 		*os_align << ' ';
 	      *os_align << src << '-' << *aiter;
