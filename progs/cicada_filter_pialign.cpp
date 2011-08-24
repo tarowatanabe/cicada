@@ -209,7 +209,7 @@ struct GHKMGrammar : public Grammar
 	      const bool __frontier_target)
     : os(__os),
       max_nodes(__max_nodes), max_height(__max_height),
-      max_compos(__max_compose), max_scope(__max_scope),
+      max_compose(__max_compose), max_scope(__max_scope),
       frontier_source(__frontier_source),
       frontier_target(__frontier_target) {}
   
