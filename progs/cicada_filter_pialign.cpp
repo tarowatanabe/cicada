@@ -520,6 +520,18 @@ int main(int argc, char** argv)
     path_type output_alignment_file;
     int max_length = 7;
     int max_span = 15;
+    
+    int max_nodes   = 15;
+    int max_height  = 4;
+    int max_compose = 0;
+    int max_scope   = 0;
+    
+    bool scfg_mode = false;
+    bool ghkm_mode = false;
+
+    bool frontier_source_mode = false;
+    bool frontier_target_mode = false;
+
     bool phrase_mode = false;
     bool block_mode = false;
     bool exhaustive_mode = false;
@@ -532,9 +544,19 @@ int main(int argc, char** argv)
       ("source",    po::value<path_type>(&output_source_file),    "output source yield")
       ("target",    po::value<path_type>(&output_target_file),    "output target yield")
       ("alignment", po::value<path_type>(&output_alignment_file), "output word-for-word alignment")
-
+      
       ("max-length", po::value<int>(&max_length)->default_value(max_length), "max terminal length")
       ("max-span",   po::value<int>(&max_span)->default_value(max_span),     "max span")
+      
+      ("max-nodes",   po::value<int>(&max_nodes)->default_value(max_nodes),     "max nodes")
+      ("max-height",  po::value<int>(&max_height)->default_value(max_height),   "max height")
+      ("max-compose", po::value<int>(&max_compose)->default_value(max_compose), "max compose")
+      ("max-scope",   po::value<int>(&max_scope)->default_value(max_scope),     "max scope")
+      ("frontier-source", po::bool_switch(&frontier_source_mode),               "take frontier of source side (string-to-* model)")
+      ("frontier-target", po::bool_switch(&frontier_target_mode),               "take frontier of target side (*-to-string model)")
+      
+      ("scfg", po::bool_switch(&scfg_mode), "extract SCFG rules")
+      ("ghkm", po::bool_switch(&ghkm_mode), "extract GHKM rules")
     
       ("phrase",     po::bool_switch(&phrase_mode),     "phrase-wise model alignment (many-to-many)")
       ("block",      po::bool_switch(&block_mode),      "block-wise alignment (one-to-many)")
@@ -556,6 +578,12 @@ int main(int argc, char** argv)
     
     if (int(phrase_mode) + block_mode + exhaustive_mode > 1)
       throw std::runtime_error("either phrase|block|exhaustive");
+
+    if (scfg_mode && ghkm_mode)
+      throw std::runtime_error("either scfg|ghkm");
+    
+    if (int(scfg_mode) + ghkm_mode == 0)
+      scfg_mode = true;
     
     typedef boost::spirit::istream_iterator iter_type;
     
@@ -580,7 +608,7 @@ int main(int argc, char** argv)
 
     HieroGrammar::alignment_type alignment;
 
-    HieroGrammar grammar(os, max_span, max_length);
+    HieroGrammar scfg_grammar(os, max_span, max_length);
   
     while (iter != end) {
       itg.clear();
@@ -598,15 +626,21 @@ int main(int argc, char** argv)
 	*os_src << source << '\n';
       if (os_trg.get())
 	*os_trg << target << '\n';
-    
+      
       //print_tree(std::cout, itg) << std::endl;
     
-      if (phrase_mode)
-	grammar(itg, source, target, alignment, BlockerModel());
-      else if (block_mode)
-	grammar(itg, source, target, alignment, BlockerBlock());
-      else
-	grammar(itg, source, target, alignment, BlockerTerminal());
+      if (ghkm_mode) {
+	if (phrase_mode)
+	  scfg_grammar(itg, source, target, alignment, BlockerModel());
+	else if (block_mode)
+	  scfg_grammar(itg, source, target, alignment, BlockerBlock());
+	else
+	  scfg_grammar(itg, source, target, alignment, BlockerTerminal());
+      } else {
+	
+	
+	
+      }
       
       // dump alignment...
       if (os_align.get()) {
