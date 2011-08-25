@@ -55,7 +55,7 @@ namespace cicada
 	const hypergraph_type::node_type& node = *niter;
 	
 	const size_t edge_size = node.edges.size();
-	for (const size_t e = 0; e != edge_size; ++ e) {
+	for (size_t e = 0; e != edge_size; ++ e) {
 	  const hypergraph_type::edge_type& edge = target.edges[node.edges[e]];
 	  
 	  const rule_type& rule = *edge.rule;
