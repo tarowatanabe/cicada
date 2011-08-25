@@ -28,6 +28,7 @@
 #include <cicada/hypergraph.hpp>
 #include <cicada/remove_epsilon.hpp>
 #include <cicada/remove_unary.hpp>
+#include <cicada/tree_rule.hpp>
 
 #include <utils/compress_stream.hpp>
 #include <utils/chunk_vector.hpp>
@@ -410,6 +411,8 @@ struct GHKMGrammar : public Grammar
   //
   typedef cicada::HyperGraph hypergraph_type;
   
+  typedef cicada::TreeRule   tree_rule_type;
+  
   typedef hypergraph_type::rule_type     rule_type;
   typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
@@ -559,8 +562,7 @@ struct GHKMGrammar : public Grammar
     construct_derivation(graph_target, admissible_source, nodes_map_target, derivation_target);
     
     // extract composed sub-tree pairs from derivation_source and derivation_target
-    extract_composed();
-    
+    extract_composed(source, target, alignment);
   }
 
   // we will extract pairs from derivatins...
@@ -595,7 +597,9 @@ struct GHKMGrammar : public Grammar
   typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
   typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
   
-  void extract_composed()
+  void extract_composed(const sentence_type& source,
+			const sentence_type& target,
+			const alignment_type& alignment)
   {
     derivations.clear();
     derivations.resize(spans.size());
@@ -618,16 +622,16 @@ struct GHKMGrammar : public Grammar
 	  throw std::runtime_error("do not match with tails-size?");
 	
 	//
-	// we need to compute alignment... HOW?
+	// we need to compute aligns... HOW?
 	// we need mapping from target-side into source-side
 	//
-	index_set_type alignment(edge.target.tails.size());
-	for (size_t i = 0; i != alignment.size(); ++ i) {
+	index_set_type aligns(edge.target.tails.size());
+	for (size_t i = 0; i != aligns.size(); ++ i) {
 	  const size_t itg_pos = nodes_map_target[edge.source.tails[i]];
 	  
 	  size_t pos = 0;
 	  for (/**/; pos != edge.source.tails.size() && itg_pos != nodes_map_source[edge.source.tails[pos]]; ++ pos);
-	  alignment[i] = pos;
+	  aligns[i] = pos;
 	}
 	
 	
@@ -643,6 +647,7 @@ struct GHKMGrammar : public Grammar
 	  
 	  {
 	    // construct... sub-tree-pair!
+	    
 	    
 	  }
 
@@ -671,7 +676,7 @@ struct GHKMGrammar : public Grammar
 		const int& composed_size_target = composed_size_source;
 
 		if (max_compose <= 0 || composed_size_source <= max_compose) {
-		  const std::pair<int, int> composed_stat = compose_tails(j, edge.source.tails, edge.target.tails, alignment,
+		  const std::pair<int, int> composed_stat = compose_tails(j, edge.source.tails, edge.target.tails, aligns,
 									  edge.source.internal,
 									  edge.target.internal,
 									  tails_source_new,
@@ -694,7 +699,7 @@ struct GHKMGrammar : public Grammar
 		      edge_set_type::const_iterator  eiter_end   = edge.target.edges.end();
 		      int i = 0;
 		      
-		      target_stat = compose_edges(j, edge.target.tails, alignment, i, eiter_begin, eiter_end, edges_target_new);
+		      target_stat = compose_edges(j, edge.target.tails, aligns, i, eiter_begin, eiter_end, edges_target_new);
 		    }
 		    
 		    
@@ -730,7 +735,7 @@ struct GHKMGrammar : public Grammar
   template <typename Iterator>
   std::pair<int, int> compose_edges(const index_set_type& j,
 				    const tail_set_type& tails,
-				    const index_set_type& alignment,
+				    const index_set_type& aligns,
 				    int& i,
 				    Iterator& iter,
 				    Iterator last,
@@ -749,13 +754,13 @@ struct GHKMGrammar : public Grammar
     hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
     for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
       if (iter != last && graph_target.edges[*iter].head == *titer) {
-	const std::pair<int, int> result = compose_edges(j, tails, alignment, i, iter, last, edges_new);
+	const std::pair<int, int> result = compose_edges(j, tails, aligns, i, iter, last, edges_new);
 	
 	height = utils::bithack::max(height, result.first + 1);
 	num_tails += result.second;
       } else if (i != tails.size()) {
-	if (j[alignment[i]] >= 0) {
-	  const derivation_pair_type& edge = derivations[nodes_map_target[tails[i]]][j[alignment[i]]];
+	if (j[aligns[i]] >= 0) {
+	  const derivation_pair_type& edge = derivations[nodes_map_target[tails[i]]][j[aligns[i]]];
 	  edges_new.insert(edges_new.end(), edge.target.edges.begin(), edge.target.edges.end());
 	  
 	  height = utils::bithack::max(height, edge.target.height + 1);
@@ -812,7 +817,7 @@ struct GHKMGrammar : public Grammar
   std::pair<int, int> compose_tails(const index_set_type& j,
 				    const tail_set_type& tails_source,
 				    const tail_set_type& tails_target,
-				    const index_set_type& alignment,
+				    const index_set_type& aligns,
 				    int internal_source,
 				    int internal_target,
 				    tail_set_type& tails_source_new,
@@ -832,10 +837,10 @@ struct GHKMGrammar : public Grammar
 	  return std::make_pair(internal_source, internal_target);
       }
       
-      if (j[alignment[i]] < 0)
+      if (j[aligns[i]] < 0)
 	tails_target_new.push_back(tails_target[i]);
       else {
-	const derivation_pair_type& edge = derivations[nodes_map_target[tails_target[i]]][j[alignment[i]]];
+	const derivation_pair_type& edge = derivations[nodes_map_target[tails_target[i]]][j[aligns[i]]];
 	
 	tails_target_new.insert(tails_target_new.end(), edge.target.tails.begin(), edge.target.tails.end());
 	
