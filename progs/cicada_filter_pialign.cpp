@@ -30,6 +30,7 @@
 #include <cicada/remove_unary.hpp>
 
 #include <utils/compress_stream.hpp>
+#include <utils/chunk_vector.hpp>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -419,9 +420,8 @@ struct GHKMGrammar : public Grammar
 
   typedef std::pair<hypergraph_type::id_type, hypergraph_type::id_type> id_pair_type;
   
-  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_set_type;
-  typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
-  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_map_type;
+  typedef std::vector<size_t, std::allocator<size_t> > admissible_set_type;
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > node_map_type;
   
   typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
   typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
@@ -436,6 +436,11 @@ struct GHKMGrammar : public Grammar
     int compose;
     
     DerivationEdge() : edges(), tails(), height(0), internal(0), compose(1) {}
+    DerivationEdge(const edge_set_type& __edges,
+		   const tail_set_type& __tails,
+		   const int& __height,
+		   const int& __internal)
+      : edges(__edges), tails(__tails), height(__height), internal(__internal), compose(1) {}
   };
   
   typedef DerivationEdge derivation_edge_type;
@@ -476,78 +481,170 @@ struct GHKMGrammar : public Grammar
     // first, compute epsilon-removed tree
     
     spans.clear();
-    forest_source.clear();
-    forest_target.clear();
+    graph_source.clear();
+    graph_target.clear();
     
-    const id_pair_type id_pair = operator()(itg, source, target, spans, forest_source, forest_target, alignment, blocker);
+    const id_pair_type id_pair = operator()(itg, source, target, spans, graph_source, graph_target, alignment, blocker);
     
-    forest_source.goal = id_pair.first;
-    forest_target.goal = id_pair.second;
+    graph_source.goal = id_pair.first;
+    graph_target.goal = id_pair.second;
     
-    nodes_map_source.clear();
-    nodes_map_target.clear();
-    nodes_map_source.resize(spans.size());
-    nodes_map_target.resize(spans.size());
+    admissible_source.clear();
+    admissible_target.clear();
+    admissible_source.resize(spans.size(), 0);
+    admissible_target.resize(spans.size(), 0);
     
-    if (forest_source.is_valid()) {
-      forest_source.topologically_sort();
-      cicada::remove_epsilon(forest_source);
+    if (graph_source.is_valid()) {
+      graph_source.topologically_sort();
+      cicada::remove_epsilon(graph_source);
       if (remove_unary)
-	cicada::remove_unary(forest_source);
-      compute_node_map(forest_source, nodes_map_source, edges_map_source);
+	cicada::remove_unary(graph_source);
+      compute_node_map(graph_source, admissible_source, nodes_map_source);
     }
-    if (forest_target.is_valid()) {
-      forest_target.topologically_sort();
-      cicada::remove_epsilon(forest_target);
+    if (graph_target.is_valid()) {
+      graph_target.topologically_sort();
+      cicada::remove_epsilon(graph_target);
       if (remove_unary)
-	cicada::remove_unary(forest_target);
-      compute_node_map(forest_target, nodes_map_target, edges_map_target);
+	cicada::remove_unary(graph_target);
+      compute_node_map(graph_target, admissible_target, nodes_map_target);
     }
     
-    if (! forest_source.is_valid() || ! forest_target.is_valid()) return;
-    
-    // then, compute pairing
-    std::cerr << "started: " << nodes_map_source.size() << std::endl;
-    for (size_t i = 0; i != nodes_map_source.size(); ++ i) {
-      if (! nodes_map_source[i].empty() && ! nodes_map_target[i].empty()) {
-	std::cerr << "mapped: " << i << std::endl;
-	
-	if (nodes_map_source[i].size() > 1)
-	  std::cerr << "larget source? " << nodes_map_source[i].size() << std::endl;
-	if (nodes_map_target[i].size() > 1)
-	  std::cerr << "larget target? " << nodes_map_target[i].size() << std::endl;
-      }
-    }
+    if (! graph_source.is_valid() || ! graph_target.is_valid()) return;
 
     derivation_source.clear();
     derivation_target.clear();
     derivation_source.resize(spans.size());
     derivation_target.resize(spans.size());
     
-    // here, we assume no-forest!
-    // compute minimum-frontiers for the source-side...
-    for (size_t edge_id = 0; edge_id != forest_source.edges.size(); ++ edge_id) {
-      const hypergraph_type::edge_type& edge = forest_source.edges[edge_id];
-      
-      const size_t itg_pos = edges_map_source[edge_id];
-      
-      if (nodes_map_target[itg_pos].empty()) continue;
-      
-      edge_set_type edges(1, edge_id);
-      tail_set_type tails(1, itg_pos);
-      
-      edge_set_type edges_new;
-      tail_set_type tails_new;
-      
-      // exhaustively enumerate tails/edges until we reach admissible nodes...
-      
-      
+    // construct derivation graph
+    //std::cerr << "source" << std::endl;
+    construct_derivation(graph_source, admissible_target, nodes_map_source, derivation_source);
+    
+    //std::cerr << "target" << std::endl;
+    construct_derivation(graph_target, admissible_source, nodes_map_target, derivation_target);
+    
+    // extract composed sub-tree pairs from derivation_source and derivation_target
+    extract_composed();
+    
+  }
+
+  struct Candidate
+  {
+    const derivation_edge_type* edge;
+    derivation_edge_type        composed;
+    
+    index_set_type j;
+    
+    Candidate(const derivation_edge_type& __edge, const index_set_type& __j)
+      : edge(&__edge), composed(__edge), j(__j) {}
+  };
+  typedef Candidate candidate_type;
+  typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
+  
+  struct compare_heap_type
+  {
+    // we use greater, so that when popped from heap, we will grab "less" in back...
+    bool operator()(const candidate_type* x, const candidate_type* y) const
+    {
+      return (x->composed.compose > y->composed.compose
+	      || (x->composed.compose == y->composed.compose
+		  && x->composed.internal > y->composed.internal));
+    }
+  };
+  
+  void extract_composed()
+  {
+    
+    
+  }
+  
+  template <typename Iterator, typename Tails>
+  std::pair<int, int> construct_tails(const hypergraph_type& graph,
+				      Iterator& iter,
+				      Iterator last,
+				      Tails& tails)
+  {
+    if (iter == last) return std::make_pair(0, 0);
+    
+    const hypergraph_type::edge_type& edge = graph.edges[*iter];
+    ++ iter;
+    
+    int max_height = 1;
+    int num_tails = edge.tails.size();
+    
+    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+      if (iter != last && *titer == graph.edges[*iter].head) {
+	const std::pair<int, int> result = construct_tails(graph, iter, last, tails);
+	
+	max_height = utils::bithack::max(max_height, result.first + 1);
+	num_tails += result.second;
+      } else
+	tails.push_back(*titer);
     }
     
-    // compute minimum-frontiers for the target-side
-    
-    
-    
+    return std::make_pair(max_height, num_tails);
+  }
+
+  void construct_derivation(const hypergraph_type& graph,
+			    const admissible_set_type& admissible,
+			    const node_map_type& nodes_map,
+			    derivation_graph_type& derivation)
+  {
+    for (size_t edge_id = 0; edge_id != graph.edges.size(); ++ edge_id) {
+      const hypergraph_type::edge_type& edge = graph.edges[edge_id];
+      
+      const size_t itg_pos = nodes_map[edge.head];
+      
+      if (! admissible[itg_pos]) continue;
+      
+      edge_set_type edges(1, edge_id);
+      tail_set_type tails;
+      hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+      for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	if (! admissible[nodes_map[*titer]])
+	  tails.push_back(*titer);
+
+      //std::cerr << "edges: " << *edge.rule;
+      
+      tail_set_type tails_next;
+      while (! tails.empty()) {
+	const hypergraph_type::node_type& node = graph.nodes[tails.front()];
+	
+	if (node.edges.size() != 1)
+	  throw std::runtime_error("invalid node with multiple edges?");
+	
+	edges.push_back(node.edges.front());
+	
+	tails_next.clear();
+	
+	const hypergraph_type::edge_type& edge = graph.edges[node.edges.front()];
+	hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+	for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
+	  if (! admissible[nodes_map[*titer]])
+	    tails_next.push_back(*titer);
+	
+	//std::cerr << " + " << *edge.rule;
+	
+	tails_next.insert(tails_next.end(), tails.begin() + 1, tails.end());
+	
+	tails.swap(tails_next);
+      }
+      
+      // we have a set of edges!
+      // we will re-construct sub-tree's admissible tails
+      
+      tails.clear();
+      edge_set_type::const_iterator eiter = edges.begin();
+      edge_set_type::const_iterator eiter_end = edges.end();
+      const std::pair<int, int> rule_stat = construct_tails(graph, eiter, eiter_end, tails);
+
+      //std::cerr << " tails: ";
+      //std::copy(tails.begin(), tails.end(), std::ostream_iterator<int>(std::cerr, " "));
+      //std::cerr << std::endl;
+      
+      derivation[itg_pos].push_back(derivation_edge_type(edges, tails, rule_stat.first, rule_stat.second));
+    }
   }
   
   struct attribute_integer : public boost::static_visitor<attribute_set_type::int_type>
@@ -557,10 +654,10 @@ struct GHKMGrammar : public Grammar
     attribute_set_type::int_type operator()(const attribute_set_type::string_type& x) const { return -1; }
   };
 
-  void compute_node_map(const hypergraph_type& forest, node_map_type& nodes_map, edge_map_type& edges_map)
+  void compute_node_map(const hypergraph_type& forest, admissible_set_type& admissible, node_map_type& nodes_map)
   {
-    edges_map.resize(forest.edges.size());
-
+    nodes_map.resize(forest.nodes.size());
+    
     hypergraph_type::edge_set_type::const_iterator eiter_end = forest.edges.end();
     for (hypergraph_type::edge_set_type::const_iterator eiter = forest.edges.begin(); eiter != eiter_end; ++ eiter) {
       const hypergraph_type::edge_type& edge = *eiter;
@@ -573,8 +670,8 @@ struct GHKMGrammar : public Grammar
       if (pos < 0)
 	throw std::runtime_error("invalid attribute?");
       
-      nodes_map[pos].push_back(edge.id);
-      edges_map[edge.id] = pos;
+      ++ admissible[pos];
+      nodes_map[edge.head] = pos;
     }
   }
 
@@ -583,8 +680,8 @@ struct GHKMGrammar : public Grammar
 			  const sentence_type& source,
 			  const sentence_type& target,
 			  span_pair_set_type& spans,
-			  hypergraph_type& forest_source,
-			  hypergraph_type& forest_target,
+			  hypergraph_type& graph_source,
+			  hypergraph_type& graph_target,
 			  alignment_type& alignment,
 			  Blocker blocker)
   {
@@ -592,8 +689,8 @@ struct GHKMGrammar : public Grammar
       rule_type::symbol_set_type rhs_source(source.begin() + itg.spans.source.first, source.begin() + itg.spans.source.second);
       rule_type::symbol_set_type rhs_target(target.begin() + itg.spans.target.first, target.begin() + itg.spans.target.second);
       
-      hypergraph_type::edge_type& edge_source = forest_source.add_edge();
-      hypergraph_type::edge_type& edge_target = forest_target.add_edge();
+      hypergraph_type::edge_type& edge_source = graph_source.add_edge();
+      hypergraph_type::edge_type& edge_target = graph_target.add_edge();
       
       edge_source.rule = rule_type::create(rhs_source.empty()
 					   ? rule_type(vocab_type::X, &vocab_type::EPSILON, (&vocab_type::EPSILON) + 1)
@@ -605,11 +702,11 @@ struct GHKMGrammar : public Grammar
       edge_source.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
       edge_target.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
       
-      const hypergraph_type::id_type node_id_source = forest_source.add_node().id;
-      const hypergraph_type::id_type node_id_target = forest_target.add_node().id;
+      const hypergraph_type::id_type node_id_source = graph_source.add_node().id;
+      const hypergraph_type::id_type node_id_target = graph_target.add_node().id;
       
-      forest_source.connect_edge(edge_source.id, node_id_source);
-      forest_target.connect_edge(edge_target.id, node_id_target);
+      graph_source.connect_edge(edge_source.id, node_id_source);
+      graph_target.connect_edge(edge_target.id, node_id_target);
       
       // compute alignment matrix
       if (itg.spans.target.first != itg.spans.target.second)
@@ -622,8 +719,8 @@ struct GHKMGrammar : public Grammar
       
       return std::make_pair(node_id_source, node_id_target);
     } else {
-      const id_pair_type id_pair_front = operator()(itg.antecedent.front(), source, target, spans, forest_source, forest_target, alignment, blocker);
-      const id_pair_type id_pair_back  = operator()(itg.antecedent.back(),  source, target, spans, forest_source, forest_target, alignment, blocker);
+      const id_pair_type id_pair_front = operator()(itg.antecedent.front(), source, target, spans, graph_source, graph_target, alignment, blocker);
+      const id_pair_type id_pair_back  = operator()(itg.antecedent.back(),  source, target, spans, graph_source, graph_target, alignment, blocker);
       
       hypergraph_type::id_type tails_source[2];
       hypergraph_type::id_type tails_target[2];
@@ -634,8 +731,8 @@ struct GHKMGrammar : public Grammar
       tails_target[  itg.inverse] = id_pair_front.second;
       tails_target[! itg.inverse] = id_pair_back.second;
       
-      hypergraph_type::edge_type& edge_source = forest_source.add_edge(tails_source, tails_source + 2);
-      hypergraph_type::edge_type& edge_target = forest_target.add_edge(tails_target, tails_target + 2);
+      hypergraph_type::edge_type& edge_source = graph_source.add_edge(tails_source, tails_source + 2);
+      hypergraph_type::edge_type& edge_target = graph_target.add_edge(tails_target, tails_target + 2);
       
       edge_source.rule = rule_binary;
       edge_target.rule = rule_binary;
@@ -643,11 +740,11 @@ struct GHKMGrammar : public Grammar
       edge_source.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
       edge_target.attributes[attr_node_id] = attribute_set_type::int_type(spans.size());
       
-      const hypergraph_type::id_type node_id_source = forest_source.add_node().id;
-      const hypergraph_type::id_type node_id_target = forest_target.add_node().id;
+      const hypergraph_type::id_type node_id_source = graph_source.add_node().id;
+      const hypergraph_type::id_type node_id_target = graph_target.add_node().id;
       
-      forest_source.connect_edge(edge_source.id, node_id_source);
-      forest_target.connect_edge(edge_target.id, node_id_target);
+      graph_source.connect_edge(edge_source.id, node_id_source);
+      graph_target.connect_edge(edge_target.id, node_id_target);
       
       // push-back spans...
       spans.push_back(itg.spans);
@@ -668,15 +765,15 @@ struct GHKMGrammar : public Grammar
   const bool remove_unary;
   
   span_pair_set_type spans;
-  node_map_type      nodes_map_source;
-  node_map_type      nodes_map_target;
-  edge_map_type      edges_map_source;
-  edge_map_type      edges_map_target;
+  admissible_set_type admissible_source;
+  admissible_set_type admissible_target;
+  node_map_type nodes_map_source;
+  node_map_type nodes_map_target;
   derivation_graph_type derivation_source;
   derivation_graph_type derivation_target;
 
-  hypergraph_type forest_source;
-  hypergraph_type forest_target;
+  hypergraph_type graph_source;
+  hypergraph_type graph_target;
 
   rule_ptr_type rule_binary;
 
