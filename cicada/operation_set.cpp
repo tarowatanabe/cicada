@@ -32,6 +32,7 @@
 #include "operation/remove_epsilon.hpp"
 #include "operation/remove_feature.hpp"
 #include "operation/remove_sgml_tag.hpp"
+#include "operation/remove_unary.hpp"
 #include "operation/sort_tail.hpp"
 #include "operation/span_forest.hpp"
 #include "operation/intersect.hpp"
@@ -212,6 +213,7 @@ remove-sgml-tag: remove sgml tag(s)\n\
 \tlattice=[true|false] remove sgml tag(s) for lattice\n\
 \tforest=[true|false] remove sgml tag(s) for forest\n\
 \tremove-bos-eos=[true|false] also remove BOS/EOS tags\n\
+remove-unary: remove unary rules from forest\n\
 sort-tail: sort tail nodes (and re-index non-terminal index)\n\
 span-forest: annotate terminal span\n\
 viterbi: compute viterbi tree\n\
@@ -328,6 +330,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::RemoveFeature(*piter, debug)));
       else if (param_name == "remove-sgml-tag")
 	operations.push_back(operation_ptr_type(new operation::RemoveSGMLTag(*piter, debug)));
+      else if (param_name == "remove-unary")
+	operations.push_back(operation_ptr_type(new operation::RemoveUnary(*piter, debug)));
       else if (param_name == "debinarize")
 	operations.push_back(operation_ptr_type(new operation::Debinarize(*piter, debug)));
       else if (param_name == "expected-ngram")

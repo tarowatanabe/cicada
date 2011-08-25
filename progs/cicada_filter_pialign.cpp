@@ -20,6 +20,7 @@
 #include <set>
 #include <stdexcept>
 #include <memory>
+#include <deque>
 
 #include <cicada/symbol.hpp>
 #include <cicada/vocab.hpp>
@@ -410,6 +411,25 @@ struct GHKMGrammar : public Grammar
   typedef std::vector<node_set_type, std::allocator<node_set_type> > node_map_type;
   typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_map_type;
   
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > edge_set_type;
+  typedef std::vector<hypergraph_type::id_type, std::allocator<hypergraph_type::id_type> > tail_set_type;
+  
+  struct DerivationEdge
+  {
+    edge_set_type edges;
+    tail_set_type tails;
+    
+    int height;
+    int internal;
+    int compose;
+    
+    DerivationEdge() : edges(), tails(), height(0), internal(0), compose(1) {}
+  };
+  
+  typedef DerivationEdge derivation_edge_type;
+  typedef std::deque<derivation_edge_type, std::allocator<derivation_edge_type> > derivation_edge_set_type;
+  typedef std::vector<derivation_edge_set_type, std::allocator<derivation_edge_set_type> > derivation_graph_type;
+  
   GHKMGrammar(std::ostream& __os,
 	      const int __max_nodes,
 	      const int __max_height,
@@ -449,12 +469,11 @@ struct GHKMGrammar : public Grammar
     
     forest_source.goal = id_pair.first;
     forest_target.goal = id_pair.second;
-
+    
     nodes_map_source.clear();
     nodes_map_target.clear();
     nodes_map_source.resize(spans.size());
     nodes_map_target.resize(spans.size());
-
     
     if (forest_source.is_valid()) {
       forest_source.topologically_sort();
@@ -481,8 +500,35 @@ struct GHKMGrammar : public Grammar
 	  std::cerr << "larget target? " << nodes_map_target[i].size() << std::endl;
       }
     }
+
+    derivation_source.clear();
+    derivation_target.clear();
+    derivation_source.resize(spans.size());
+    derivation_target.resize(spans.size());
     
-    // compute source-pairing...
+    // here, we assume no-forest!
+    // compute minimum-frontiers for the source-side...
+    for (size_t edge_id = 0; edge_id != forest_source.edges.size(); ++ edge_id) {
+      const hypergraph_type::edge_type& edge = forest_source.edges[edge_id];
+      
+      const size_t itg_pos = edges_map_source[edge_id];
+      
+      if (nodes_map_target[itg_pos].empty()) continue;
+      
+      edge_set_type edges(1, edge_id);
+      tail_set_type tails(1, itg_pos);
+      
+      edge_set_type edges_new;
+      tail_set_type tails_new;
+      
+      // exhaustively enumerate tails/edges until we reach admissible nodes...
+      
+      
+    }
+    
+    // compute minimum-frontiers for the target-side
+    
+    
     
   }
   
@@ -607,6 +653,8 @@ struct GHKMGrammar : public Grammar
   node_map_type      nodes_map_target;
   edge_map_type      edges_map_source;
   edge_map_type      edges_map_target;
+  derivation_graph_type derivation_source;
+  derivation_graph_type derivation_target;
 
   hypergraph_type forest_source;
   hypergraph_type forest_target;

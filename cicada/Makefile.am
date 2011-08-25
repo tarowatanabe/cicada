@@ -228,6 +228,7 @@ operation/remove_bos_eos.hpp \
 operation/remove_epsilon.hpp \
 operation/remove_feature.hpp \
 operation/remove_sgml_tag.hpp \
+operation/remove_unary.hpp \
 operation/sort_tail.hpp \
 operation/span_forest.hpp \
 operation/traversal.hpp \
@@ -253,6 +254,7 @@ operation/remove_bos_eos.cpp \
 operation/remove_epsilon.cpp \
 operation/remove_feature.cpp \
 operation/remove_sgml_tag.cpp \
+operation/remove_unary.cpp \
 operation/sort_tail.cpp \
 operation/span_forest.cpp \
 operation/viterbi.cpp
@@ -339,6 +341,7 @@ remove_bos_eos.hpp \
 remove_epsilon.hpp \
 remove_sgml_tag.hpp \
 remove_symbol.hpp \
+remove_unary.hpp \
 rule.hpp \
 semiring.hpp \
 sentence.hpp \
