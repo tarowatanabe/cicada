@@ -442,6 +442,13 @@ struct GHKMGrammar : public Grammar
 		   const int& __height,
 		   const int& __internal)
       : edges(__edges), tails(__tails), height(__height), internal(__internal), compose(1) {}
+    DerivationEdge(const edge_set_type& __edges,
+		   const tail_set_type& __tails,
+		   const int& __height,
+		   const int& __internal,
+		   const int& __compose)
+      : edges(__edges), tails(__tails), height(__height), internal(__internal), compose(__compose) {}
+
   };
   
   typedef DerivationEdge derivation_edge_type;
@@ -593,6 +600,11 @@ struct GHKMGrammar : public Grammar
     derivations.clear();
     derivations.resize(spans.size());
     
+    edge_set_type edges_source_new;
+    edge_set_type edges_target_new;
+    tail_set_type tails_source_new;
+    tail_set_type tails_target_new;
+    
     // first, compute pairing...
     for (size_t itg_pos = 0; itg_pos != spans.size(); ++ itg_pos)
       if (admissible_source[itg_pos] && admissible_target[itg_pos]) {
@@ -601,6 +613,23 @@ struct GHKMGrammar : public Grammar
 	
 	const derivation_pair_type edge(derivation_source[itg_pos].front(),
 					derivation_target[itg_pos].front());
+
+	if (edge.source.tails.size() != edge.target.tails.size())
+	  throw std::runtime_error("do not match with tails-size?");
+	
+	//
+	// we need to compute alignment... HOW?
+	// we need mapping from target-side into source-side
+	//
+	index_set_type alignment(edge.target.tails.size());
+	for (size_t i = 0; i != alignment.size(); ++ i) {
+	  const size_t itg_pos = nodes_map_target[edge.source.tails[i]];
+	  
+	  size_t pos = 0;
+	  for (/**/; pos != edge.source.tails.size() && itg_pos != nodes_map_source[edge.source.tails[pos]]; ++ pos);
+	  alignment[i] = pos;
+	}
+	
 	
 	index_set_type j(edge.source.tails.size(), -1);
 	candidates.push_back(candidate_type(edge, j));
@@ -628,10 +657,63 @@ struct GHKMGrammar : public Grammar
 	  for (size_t i = 0; i != j.size(); ++ i)
 	    if (! derivations[nodes_map_source[edge.source.tails[i]]].empty()) {
 	      ++ j[i];
-
+	      
 	      if (j[i] < static_cast<int>(derivations[nodes_map_source[edge.source.tails[i]]].size())) {
-		
-		
+		edges_source_new.clear();
+		edges_target_new.clear();
+		tails_source_new.clear();
+		tails_target_new.clear();
+
+		int composed_size_source = edge_composed.source.compose;
+		if (j[i] - 1 >= 0)
+		  composed_size_source -= derivations[edge.source.tails[i]][j[i] - 1].source.compose;
+		composed_size_source += derivations[edge.source.tails[i]][j[i]].source.compose;
+		const int& composed_size_target = composed_size_source;
+
+		if (max_compose <= 0 || composed_size_source <= max_compose) {
+		  const std::pair<int, int> composed_stat = compose_tails(j, edge.source.tails, edge.target.tails, alignment,
+									  edge.source.internal,
+									  edge.target.internal,
+									  tails_source_new,
+									  tails_target_new);
+		  
+		  if (max_nodes <= 0 || (composed_stat.first <= max_nodes && composed_stat.second <= max_nodes)) {
+		    
+		    std::pair<int, int> source_stat;
+		    std::pair<int, int> target_stat;
+		    {
+		      edge_set_type::const_iterator  eiter_begin = edge.source.edges.begin();
+		      edge_set_type::const_iterator  eiter_end   = edge.source.edges.end();
+		      int i = 0;
+		      
+		      source_stat = compose_edges(j, edge.source.tails, i, eiter_begin, eiter_end, edges_source_new);
+		    }
+
+		    {
+		      edge_set_type::const_iterator  eiter_begin = edge.target.edges.begin();
+		      edge_set_type::const_iterator  eiter_end   = edge.target.edges.end();
+		      int i = 0;
+		      
+		      target_stat = compose_edges(j, edge.target.tails, alignment, i, eiter_begin, eiter_end, edges_target_new);
+		    }
+		    
+		    
+		    if (max_height <= 0 || (source_stat.first <= max_height && target_stat.first <= max_height)) {
+		      candidates.push_back(candidate_type(derivation_pair_type(derivation_edge_type(edges_source_new,
+												    tails_source_new,
+												    source_stat.first,
+												    source_stat.second,
+												    composed_size_source),
+									       derivation_edge_type(edges_target_new,
+												    tails_target_new,
+												    target_stat.first,
+												    target_stat.second,
+												    composed_size_target)), j));
+		      
+		      cands.push(&candidates.back());
+		    }
+		  }
+		}
 	      }
 
 	      if (item->j[i] != -1) break;
@@ -644,7 +726,130 @@ struct GHKMGrammar : public Grammar
 	std::sort(derivations[itg_pos].begin(), derivations[itg_pos].end(), less_derivation_pair_type());
       }
   }
-  
+
+  template <typename Iterator>
+  std::pair<int, int> compose_edges(const index_set_type& j,
+				    const tail_set_type& tails,
+				    const index_set_type& alignment,
+				    int& i,
+				    Iterator& iter,
+				    Iterator last,
+				    edge_set_type& edges_new)
+  {
+    // this should not happen...
+    if (iter == last) return std::make_pair(0, 0);
+    
+    edges_new.push_back(*iter);
+    const hypergraph_type::edge_type& edge = graph_target.edges[*iter];
+    ++ iter;
+    
+    int height = 1;
+    int num_tails = edge.tails.size();
+    
+    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+      if (iter != last && graph_target.edges[*iter].head == *titer) {
+	const std::pair<int, int> result = compose_edges(j, tails, alignment, i, iter, last, edges_new);
+	
+	height = utils::bithack::max(height, result.first + 1);
+	num_tails += result.second;
+      } else if (i != tails.size()) {
+	if (j[alignment[i]] >= 0) {
+	  const derivation_pair_type& edge = derivations[nodes_map_target[tails[i]]][j[alignment[i]]];
+	  edges_new.insert(edges_new.end(), edge.target.edges.begin(), edge.target.edges.end());
+	  
+	  height = utils::bithack::max(height, edge.target.height + 1);
+	  num_tails += edge.target.internal;
+	}
+	++ i;
+      } else 
+	throw std::runtime_error("# of tails and # of frontier do not match");
+    }
+    
+  }
+
+  template <typename Iterator>
+  std::pair<int, int> compose_edges(const index_set_type& j,
+				    const tail_set_type& tails,
+				    int& i,
+				    Iterator& iter,
+				    Iterator last,
+				    edge_set_type& edges_new)
+  {
+    // this should not happen...
+    if (iter == last) return std::make_pair(0, 0);
+    
+    edges_new.push_back(*iter);
+    const hypergraph_type::edge_type& edge = graph_source.edges[*iter];
+    ++ iter;
+    
+    int height = 1;
+    int num_tails = edge.tails.size();
+    
+    hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
+    for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer) {
+      if (iter != last && graph_source.edges[*iter].head == *titer) {
+	const std::pair<int, int> result = compose_edges(j, tails, i, iter, last, edges_new);
+	
+	height = utils::bithack::max(height, result.first + 1);
+	num_tails += result.second;
+      } else if (i != tails.size()) {
+	if (j[i] >= 0) {
+	  const derivation_pair_type& edge = derivations[nodes_map_source[tails[i]]][j[i]];
+	  edges_new.insert(edges_new.end(), edge.source.edges.begin(), edge.source.edges.end());
+	  
+	  height = utils::bithack::max(height, edge.source.height + 1);
+	  num_tails += edge.source.internal;
+	}
+	++ i;
+      } else
+	throw std::runtime_error("# of tails and # of frontier do not match");
+    }
+    
+    return std::make_pair(height, num_tails);
+  }
+
+  std::pair<int, int> compose_tails(const index_set_type& j,
+				    const tail_set_type& tails_source,
+				    const tail_set_type& tails_target,
+				    const index_set_type& alignment,
+				    int internal_source,
+				    int internal_target,
+				    tail_set_type& tails_source_new,
+				    tail_set_type& tails_target_new)
+  {
+    for (size_t i = 0; i != j.size(); ++ i) {
+      if (j[i] < 0)
+	tails_source_new.push_back(tails_source[i]);
+      else {
+	const derivation_pair_type& edge = derivations[nodes_map_source[tails_source[i]]][j[i]];
+	
+	tails_source_new.insert(tails_source_new.end(), edge.source.tails.begin(), edge.source.tails.end());
+	
+	internal_source += edge.source.internal;
+
+	if (max_nodes > 0 && internal_source > max_nodes)
+	  return std::make_pair(internal_source, internal_target);
+      }
+      
+      if (j[alignment[i]] < 0)
+	tails_target_new.push_back(tails_target[i]);
+      else {
+	const derivation_pair_type& edge = derivations[nodes_map_target[tails_target[i]]][j[alignment[i]]];
+	
+	tails_target_new.insert(tails_target_new.end(), edge.target.tails.begin(), edge.target.tails.end());
+	
+	internal_target += edge.target.internal;
+	
+	if (max_nodes > 0 && internal_target > max_nodes)
+	  return std::make_pair(internal_source, internal_target);
+      }
+    }
+    
+    return std::make_pair(internal_source, internal_target);
+  }
+
+
   template <typename Iterator, typename Tails>
   std::pair<int, int> construct_tails(const hypergraph_type& graph,
 				      Iterator& iter,
@@ -757,7 +962,11 @@ struct GHKMGrammar : public Grammar
       if (pos < 0)
 	throw std::runtime_error("invalid attribute?");
       
-      ++ admissible[pos];
+      if (admissible[pos])
+	throw std::runtime_error("multiple edges?");
+
+      // we store node-id + 1 so that we can easily investigate asmissibility
+      admissible[pos] = edge.head + 1;
       nodes_map[edge.head] = pos;
     }
   }
