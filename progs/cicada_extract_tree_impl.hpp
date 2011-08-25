@@ -665,7 +665,7 @@ struct ExtractTree
 		}
 	      }
 	      
-	      if (item->j[i] != 0) break;
+	      if (item->j[i] != -1) break;
 	      
 	      -- j[i];
 	    }

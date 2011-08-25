@@ -448,6 +448,33 @@ struct GHKMGrammar : public Grammar
   typedef std::deque<derivation_edge_type, std::allocator<derivation_edge_type> > derivation_edge_set_type;
   typedef std::vector<derivation_edge_set_type, std::allocator<derivation_edge_set_type> > derivation_graph_type;
   
+  struct DerivationPair
+  {
+    derivation_edge_type source;
+    derivation_edge_type target;
+
+    DerivationPair() : source(), target() {}
+    DerivationPair(const derivation_edge_type& __source,
+		   const derivation_edge_type& __target)
+      : source(__source), target(__target) {}
+  };
+  typedef DerivationPair derivation_pair_type;
+  typedef std::deque<derivation_pair_type, std::allocator<derivation_pair_type> > derivation_pair_set_type;
+  typedef std::vector<derivation_pair_set_type, std::allocator<derivation_pair_set_type> > derivation_pair_graph_type;
+  
+  struct less_derivation_pair_type
+  {
+    bool operator()(const derivation_pair_type& x, const derivation_pair_type& y) const
+    {
+      return (x.source.compose < y.source.compose
+	      && (!(y.source.compose < x.source.compose)
+		  || (x.source.internal < y.source.internal
+		      && (!(y.source.internal < x.source.internal)
+			  && x.target.internal < y.target.internal))));
+    }
+  };
+
+  
   GHKMGrammar(std::ostream& __os,
 	      const int __max_nodes,
 	      const int __max_height,
@@ -530,30 +557,31 @@ struct GHKMGrammar : public Grammar
   }
 
   // we will extract pairs from derivatins...
-  
+
   typedef std::vector<int, std::allocator<int> > index_set_type;
 
   struct Candidate
   {
-    const derivation_edge_type* edge;
-    derivation_edge_type        composed;
-    
+    derivation_pair_type composed;
     index_set_type j;
     
-    Candidate(const derivation_edge_type& __edge, const index_set_type& __j)
-      : edge(&__edge), composed(__edge), j(__j) {}
+    Candidate(const derivation_pair_type& __edge, const index_set_type& __j)
+      : composed(__edge), j(__j) {}
   };
   typedef Candidate candidate_type;
   typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
   
   struct compare_heap_type
   {
+    
     // we use greater, so that when popped from heap, we will grab "less" in back...
     bool operator()(const candidate_type* x, const candidate_type* y) const
     {
-      return (x->composed.compose > y->composed.compose
-	      || (x->composed.compose == y->composed.compose
-		  && x->composed.internal > y->composed.internal));
+      return (x->composed.source.compose > y->composed.source.compose
+	      || (! (y->composed.source.compose > x->composed.source.compose)
+		  && (x->composed.source.internal > y->composed.source.internal
+		      || ( !(y->composed.source.internal > x->composed.source.internal)
+			   && x->composed.target.internal > y->composed.target.internal))));
     }
   };
   
@@ -562,10 +590,59 @@ struct GHKMGrammar : public Grammar
   
   void extract_composed()
   {
-    candidates.clear();
-    cands.clear();
+    derivations.clear();
+    derivations.resize(spans.size());
     
-    
+    // first, compute pairing...
+    for (size_t itg_pos = 0; itg_pos != spans.size(); ++ itg_pos)
+      if (admissible_source[itg_pos] && admissible_target[itg_pos]) {
+	candidates.clear();
+	cands.clear();
+	
+	const derivation_pair_type edge(derivation_source[itg_pos].front(),
+					derivation_target[itg_pos].front());
+	
+	index_set_type j(edge.source.tails.size(), -1);
+	candidates.push_back(candidate_type(edge, j));
+	cands.push(&candidates.back());
+	
+	while (! cands.empty()) {
+	  const candidate_type* item = cands.top();
+	  cands.pop();
+	  
+	  const derivation_pair_type& edge_composed = item->composed;
+	  
+	  {
+	    // construct... sub-tree-pair!
+	    
+	  }
+
+	  // include into derivations[itg_pos]! 
+	  if ((max_height <= 0 || (edge_composed.source.height <= max_height && edge_composed.target.height <= max_height))
+	      && (max_nodes <= 0 || (edge_composed.source.internal < max_nodes && edge_composed.target.internal < max_nodes)))
+	    derivations[itg_pos].push_back(edge_composed);
+	  
+	  // push-successor...
+	  index_set_type j = item->j;
+	  
+	  for (size_t i = 0; i != j.size(); ++ i)
+	    if (! derivations[nodes_map_source[edge.source.tails[i]]].empty()) {
+	      ++ j[i];
+
+	      if (j[i] < static_cast<int>(derivations[nodes_map_source[edge.source.tails[i]]].size())) {
+		
+		
+	      }
+
+	      if (item->j[i] != -1) break;
+	      
+	      -- j[i];
+	    }
+	}
+	
+	// finished...
+	std::sort(derivations[itg_pos].begin(), derivations[itg_pos].end(), less_derivation_pair_type());
+      }
   }
   
   template <typename Iterator, typename Tails>
@@ -648,7 +725,7 @@ struct GHKMGrammar : public Grammar
       edge_set_type::const_iterator eiter = edges.begin();
       edge_set_type::const_iterator eiter_end = edges.end();
       const std::pair<int, int> rule_stat = construct_tails(graph, eiter, eiter_end, tails);
-
+      
       //std::cerr << " tails: ";
       //std::copy(tails.begin(), tails.end(), std::ostream_iterator<int>(std::cerr, " "));
       //std::cerr << std::endl;
@@ -781,6 +858,8 @@ struct GHKMGrammar : public Grammar
   node_map_type nodes_map_target;
   derivation_graph_type derivation_source;
   derivation_graph_type derivation_target;
+  
+  derivation_pair_graph_type derivations;
 
   candidate_set_type  candidates;
   candidate_heap_type cands;

@@ -618,22 +618,6 @@ struct ExtractGHKM
   typedef Candidate candidate_type;
   typedef utils::chunk_vector<candidate_type, 4096 / sizeof(candidate_type), std::allocator<candidate_type> > candidate_set_type;
 
-  struct candidate_hash_type : public utils::hashmurmur<size_t>
-  {
-    size_t operator()(const candidate_type* x) const
-    {
-      return (x == 0 ? size_t(0) : utils::hashmurmur<size_t>::operator()(x->j.begin(), x->j.end(), intptr_t(x->edge)));
-    }
-  };
-  
-  struct candidate_equal_type
-  {
-    bool operator()(const candidate_type* x, const candidate_type* y) const
-    {
-      return (x == y) || (x && y && x->edge == y->edge && x->j == y->j);
-    }
-  };
-  
   struct compare_heap_type
   {
     // we use greater, so that when popped from heap, we will grab "less" in back...
@@ -654,12 +638,9 @@ struct ExtractGHKM
     typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
     //typedef utils::b_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type, 512 / sizeof(const candidate_type*)> candidate_heap_type;
     typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
-    typedef google::dense_hash_set<const candidate_type*, candidate_hash_type, candidate_equal_type > candidate_unique_type;
     
     candidate_set_type    candidates;
     candidate_heap_type   cand;
-    candidate_unique_type cand_unique;
-    cand_unique.set_empty_key(0);
     
     // difficult...
     // we need to keep track of how many nodes / maximum height in the composed rules...
@@ -691,8 +672,6 @@ struct ExtractGHKM
       derivation_node_type::edge_set_type derivation_edges_new;
 
       candidates.clear();
-      // we will use Algorithm 2 of faster cube-pruning
-      //cand_unique.clear();
       
       cand.clear();
       cand.reserve(node.edges.size() * 100);
@@ -705,8 +684,6 @@ struct ExtractGHKM
 	candidates.push_back(candidate_type(edge, j));
 	
 	cand.push(&candidates.back());
-	// we will use Algorithm 2 of faster cube-pruning
-	//cand_unique.insert(&candidates.back());
       }
       
       while (! cand.empty()) {
@@ -740,8 +717,6 @@ struct ExtractGHKM
 	    
 	    //std::cerr << "i = " << i << " j[i] = " << j[i] << std::endl;
 	    
-	    // we will use Algorithm 2 of faster cube-pruning
-	    // no-check for cand_unique  && cand_unique.find(&query) == cand_unique.end()
 	    if (j[i] < static_cast<int>(derivations[edge.tails[i]].edges.size())) {
 	      
 	      int composed_size = edge_composed.compose;
@@ -781,14 +756,12 @@ struct ExtractGHKM
 		    item_next.edge_composed.compose = composed_size;
 		  
 		    cand.push(&item_next);
-		    // we will use Algorithm 2 of faster cube-pruning
-		    //cand_unique.insert(&item_next);
 		  }
 		}
 	      }
 	    }
 	    
-	    if (item->j[i] != 0) break;
+	    if (item->j[i] != -1) break;
 	    
 	    -- j[i];
 	  }
