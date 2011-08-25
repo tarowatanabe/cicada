@@ -1588,7 +1588,7 @@ struct ExtractTree
     weight_type weight = derivations.weights_outside[node.node] / derivations.weights_inside.back();
     
     int frontier_pos = 0;
-    int index = 0;
+    int index = 1;
     
     edge_set_type::const_iterator iter = edge.edges.begin();
     edge_set_type::const_iterator iter_end = edge.edges.end();

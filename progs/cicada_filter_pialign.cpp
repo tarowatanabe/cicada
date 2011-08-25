@@ -484,6 +484,32 @@ struct GHKMGrammar : public Grammar
     }
   };
 
+  struct rule_pair_type
+  {
+    tree_rule_type source;
+    tree_rule_type target;
+    point_set_type alignment;
+    
+    rule_pair_type() : source(), target(), alignment() {}
+    
+    void clear()
+    {
+      source.clear();
+      target.clear();
+      alignment.clear();
+    }
+
+    friend
+    std::ostream& operator<<(std::ostream& os, const rule_pair_type& x)
+    {
+      os << x.source << " ||| " << x.target << " |||";
+      point_set_type::const_iterator piter_end = x.alignment.end();
+      for (point_set_type::const_iterator piter = x.alignment.begin(); piter != piter_end; ++ piter)
+	os << ' ' << piter->first << '-' << piter->second;
+      return os;
+    }
+  };
+
   
   GHKMGrammar(std::ostream& __os,
 	      const int __max_nodes,
@@ -608,6 +634,8 @@ struct GHKMGrammar : public Grammar
     edge_set_type edges_target_new;
     tail_set_type tails_source_new;
     tail_set_type tails_target_new;
+
+    rule_pair_type rule_pair;
     
     // first, compute pairing...
     for (size_t itg_pos = 0; itg_pos != spans.size(); ++ itg_pos)
@@ -645,11 +673,9 @@ struct GHKMGrammar : public Grammar
 	  
 	  const derivation_pair_type& edge_composed = item->composed;
 	  
-	  {
-	    // construct... sub-tree-pair!
-	    
-	    
-	  }
+	  construct_rule_pair(source, target, alignment, edge_composed, rule_pair);
+	  
+	  os << rule_pair << " ||| 1" << '\n';
 
 	  // include into derivations[itg_pos]! 
 	  if ((max_height <= 0 || (edge_composed.source.height <= max_height && edge_composed.target.height <= max_height))
@@ -731,7 +757,57 @@ struct GHKMGrammar : public Grammar
 	std::sort(derivations[itg_pos].begin(), derivations[itg_pos].end(), less_derivation_pair_type());
       }
   }
+  
+  typedef std::vector<bool, std::allocator<bool> > covered_type;
+  typedef std::vector<int, std::allocator<int> >   position_set_type;
 
+  covered_type   covered_source;
+  covered_type   covered_target;
+  position_set_type positions_target;
+  position_set_type positions_source;
+  position_set_type positions_relative;
+  
+  void construct_rule_pair(const sentence_type& source,
+			   const sentence_type& target,
+			   const alignment_type& alignment,
+			   const derivation_pair_type& derivation,
+			   rule_pair_type& rule_pair)
+  {
+    rule_pair.clear();
+
+    covered_source.clear();
+    covered_target.clear();
+    
+    positions_source.clear();
+    positions_target.clear();
+
+    covered_source.resize(source.size(), false);
+    covered_target.resize(target.size(), false);
+    
+    positions_source.resize(source.size(), -1);
+    positions_target.resize(target.size(), -1);
+    
+    positions_relative.clear();
+    
+    int frontier_pos = 0;
+    int index = 0;
+
+    edge_set_type::const_iterator iter     = derivation.source.edges.begin();
+    edge_set_type::const_iterator iter_end = derivation.source.edges.end();
+  }
+  
+  template <typename Iterator>
+  void construct_rule(Iterator& iter,
+		      Iterator last,
+		      tree_rule_type& tree_rule,
+		      int& index,
+		      int& frontier_pos,
+		      position_set_type& pos_map,
+		      covered_type& covered)
+  {
+    
+  }
+  
   template <typename Iterator>
   std::pair<int, int> compose_edges(const index_set_type& j,
 				    const tail_set_type& tails,

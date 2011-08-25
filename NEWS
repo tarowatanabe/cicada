@@ -3,10 +3,12 @@ Bugfix for alignment by lexicon model. The cause of the bug seem to be an initia
 Less memory for Viterbi alignment computation by shrinking at some intervals
 Implemented max-compose constraint which set the maximum number of minimum rule compositions in GHKM
 Added sparse/dense option for feature-application to apply only sparse/dense features
+Added remove-unary which remove unaries in forests
 Better composition/parse for string-to-tree by sharing internal nodes and terminals
 Better composition/parse for tree-to-{string,tree} by sharing internal nodes and terminals
 Better left2right and right2left binarizatin by sharing nodes
 Added pialign derivation to hiero grammar/hypergraph conversion filter (TODO: perform GHKM extraction)
+Butfix for faster cube-pruning (Alg. 2) of {tree,string}-to-{tree,string} extractions: we need to start from NULL combination.
 
 2011-8-11
 Rework for cicada_lexicon_{model1,hmm}: implement by map/reduce in order to reduce memory requriement
