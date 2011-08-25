@@ -1498,6 +1498,8 @@ struct ExtractTree
 
 	  if (max_scope > 0 && edge_source.scope > max_scope) continue;
 	  
+	  // TODO: we need to consider mapping between frontiers!
+	  // HOW TO COMPUTE THIS...!!!
 	  if (edge_target.rule.empty())
 	    construct_rule(target, graph_target.derivations[titer->first], graph_target, edge_target, false);
 	  

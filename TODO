@@ -141,3 +141,6 @@ pialign filter to directly extract GHKM rules
   in bottom-up fashion.
   Then, perform compound rule extraction
 
+
+Bugfix for tree-to-tree rule extraction:
+  We need to re-index target-side...
