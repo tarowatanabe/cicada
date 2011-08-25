@@ -27,6 +27,7 @@
 #include <cicada/sentence.hpp>
 #include <cicada/hypergraph.hpp>
 #include <cicada/remove_epsilon.hpp>
+#include <cicada/remove_unary.hpp>
 
 #include <utils/compress_stream.hpp>
 
@@ -210,8 +211,11 @@ struct TreeSource : public Grammar
   typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
   TreeSource(std::ostream& __os,
-	     const bool __remove_epsilon)  
-    :  os(__os), remove_epsilon(__remove_epsilon)
+	     const bool __remove_epsilon,
+	     const bool __remove_unary)  
+    :  os(__os),
+       remove_epsilon(__remove_epsilon),
+       remove_unary(__remove_unary)
   {
     rule_type::symbol_set_type rhs(2, vocab_type::X);
     
@@ -236,6 +240,8 @@ struct TreeSource : public Grammar
       forest.topologically_sort();
       if (remove_epsilon)
 	cicada::remove_epsilon(forest);
+      if (remove_unary)
+	cicada::remove_unary(forest);
     }
     
     os << forest << '\n';
@@ -288,6 +294,7 @@ struct TreeSource : public Grammar
   
   std::ostream& os;
   const bool remove_epsilon;
+  const bool remove_unary;
   
   rule_ptr_type rule_binary;
 };
@@ -300,9 +307,11 @@ struct TreeTarget : public Grammar
   typedef hypergraph_type::rule_ptr_type rule_ptr_type;
 
   TreeTarget(std::ostream& __os,
-	     const bool __remove_epsilon)  
+	     const bool __remove_epsilon,
+	     const bool __remove_unary)  
     :  os(__os),
-       remove_epsilon(__remove_epsilon)
+       remove_epsilon(__remove_epsilon),
+       remove_unary(__remove_unary)
   {
     rule_type::symbol_set_type rhs(2, vocab_type::X);
     
@@ -327,6 +336,8 @@ struct TreeTarget : public Grammar
       forest.topologically_sort();
       if (remove_epsilon)
 	cicada::remove_epsilon(forest);
+      if (remove_unary)
+	cicada::remove_unary(forest);
     }
     
     os << forest << '\n';
@@ -379,6 +390,7 @@ struct TreeTarget : public Grammar
   
   std::ostream& os;
   const bool remove_epsilon;
+  const bool remove_unary;
   
   rule_ptr_type rule_binary;
 };
@@ -436,12 +448,14 @@ struct GHKMGrammar : public Grammar
 	      const int __max_compose,
 	      const int __max_scope,
 	      const bool __frontier_source,
-	      const bool __frontier_target)
+	      const bool __frontier_target,
+	      const bool __remove_unary)
     : os(__os),
       max_nodes(__max_nodes), max_height(__max_height),
       max_compose(__max_compose), max_scope(__max_scope),
       frontier_source(__frontier_source),
       frontier_target(__frontier_target),
+      remove_unary(__remove_unary),
       attr_node_id("node-id")
   {
     rule_type::symbol_set_type rhs(2, vocab_type::X);
@@ -478,11 +492,15 @@ struct GHKMGrammar : public Grammar
     if (forest_source.is_valid()) {
       forest_source.topologically_sort();
       cicada::remove_epsilon(forest_source);
+      if (remove_unary)
+	cicada::remove_unary(forest_source);
       compute_node_map(forest_source, nodes_map_source, edges_map_source);
     }
     if (forest_target.is_valid()) {
       forest_target.topologically_sort();
       cicada::remove_epsilon(forest_target);
+      if (remove_unary)
+	cicada::remove_unary(forest_target);
       compute_node_map(forest_target, nodes_map_target, edges_map_target);
     }
     
@@ -647,6 +665,7 @@ struct GHKMGrammar : public Grammar
   
   const bool frontier_source;
   const bool frontier_target;
+  const bool remove_unary;
   
   span_pair_set_type spans;
   node_map_type      nodes_map_source;
@@ -1002,6 +1021,7 @@ int main(int argc, char** argv)
     bool frontier_target_mode = false;
     
     bool remove_epsilon = false;
+    bool remove_unary = false;
     
     bool scfg_mode = false;
     bool ghkm_mode = false;
@@ -1034,6 +1054,7 @@ int main(int argc, char** argv)
       ("frontier-target", po::bool_switch(&frontier_target_mode),               "take frontier of target side (*-to-string model)")
       
       ("remove-epsilon", po::bool_switch(&remove_epsilon), "remove <epsilon> from trees")
+      ("remove-unary",   po::bool_switch(&remove_unary),   "remove unary rules from trees")
 
       ("scfg", po::bool_switch(&scfg_mode), "extract SCFG rules")
       ("ghkm", po::bool_switch(&ghkm_mode), "extract GHKM rules")
@@ -1092,9 +1113,9 @@ int main(int argc, char** argv)
     Grammar::alignment_type alignment;
 
     HieroGrammar scfg_grammar(os, max_span, max_length);
-    GHKMGrammar  ghkm_grammar(os, max_nodes, max_height, max_compose, max_scope, frontier_source_mode, frontier_target_mode);
-    TreeSource   tree_source(os, remove_epsilon);
-    TreeTarget   tree_target(os, remove_epsilon);
+    GHKMGrammar  ghkm_grammar(os, max_nodes, max_height, max_compose, max_scope, frontier_source_mode, frontier_target_mode, remove_unary);
+    TreeSource   tree_source(os, remove_epsilon, remove_unary);
+    TreeTarget   tree_target(os, remove_epsilon, remove_unary);
     
     while (iter != end) {
       itg.clear();
