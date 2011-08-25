@@ -31,6 +31,7 @@
 
 #include <utils/compress_stream.hpp>
 #include <utils/chunk_vector.hpp>
+#include <utils/std_heap.hpp>
 
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/karma.hpp>
@@ -528,6 +529,10 @@ struct GHKMGrammar : public Grammar
     
   }
 
+  // we will extract pairs from derivatins...
+  
+  typedef std::vector<int, std::allocator<int> > index_set_type;
+
   struct Candidate
   {
     const derivation_edge_type* edge;
@@ -552,8 +557,13 @@ struct GHKMGrammar : public Grammar
     }
   };
   
+  typedef std::vector<const candidate_type*, std::allocator<const candidate_type*> > candidate_heap_base_type;
+  typedef utils::std_heap<const candidate_type*,  candidate_heap_base_type, compare_heap_type> candidate_heap_type;
+  
   void extract_composed()
   {
+    candidates.clear();
+    cands.clear();
     
     
   }
@@ -771,6 +781,9 @@ struct GHKMGrammar : public Grammar
   node_map_type nodes_map_target;
   derivation_graph_type derivation_source;
   derivation_graph_type derivation_target;
+
+  candidate_set_type  candidates;
+  candidate_heap_type cands;
 
   hypergraph_type graph_source;
   hypergraph_type graph_target;
