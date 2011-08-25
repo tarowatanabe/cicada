@@ -1426,6 +1426,29 @@ struct ExtractTree
 #endif
   
   range_tail_map_type range_tails;
+
+  struct FrontierLinear
+  {
+    int operator()(const int index) const
+    {
+      return index;
+    }
+  };
+
+  struct FrontierAlignment
+  {
+    typedef std::vector<int, std::allocator<int> >  index_map_type;
+    
+    FrontierAlignment(const size_t size=0)
+      : maps(size) {}
+    
+    int operator()(const int index) const
+    {
+      return maps[index];
+    }
+
+    index_map_type maps;
+  };
   
   template <typename Dumper>
   void extract_pairs(const hypergraph_type& source,
@@ -1461,6 +1484,9 @@ struct ExtractTree
 	  
 	  range_tail.second.push_back(graph_target.ranges[node_tail.node]);
 	}
+
+	// sort!
+	std::sort(range_tail.second.begin(), range_tail.second.end());
 	
 	range_tails[range_tail].push_back(std::make_pair(id, id_edge));
       }
@@ -1486,6 +1512,9 @@ struct ExtractTree
 	  }
 	}
 	
+	// we do not have to do this...!
+	// std::sort(range_tail.second.begin(), range_tail.second.end());
+	
 	range_tail_map_type::const_iterator riter = range_tails.find(range_tail);
 	if (riter == range_tails.end()) continue;
 	
@@ -1494,14 +1523,27 @@ struct ExtractTree
 	  derivation_edge_type& edge_target = graph_target.derivations[titer->first].edges[titer->second];
 	  
 	  if (edge_source.rule.empty())
-	    construct_rule(source, node_source, graph_source, edge_source, collapse);
+	    construct_rule(FrontierLinear(), source, node_source, graph_source, edge_source, collapse);
 
 	  if (max_scope > 0 && edge_source.scope > max_scope) continue;
 	  
 	  // TODO: we need to consider mapping between frontiers!
 	  // HOW TO COMPUTE THIS...!!!
-	  if (edge_target.rule.empty())
-	    construct_rule(target, graph_target.derivations[titer->first], graph_target, edge_target, false);
+	  if (edge_target.rule.empty()) {
+	    FrontierAlignment align(range_tail.second.size());
+	    
+	    for (size_t i = 0; i != edge_target.tails.size(); ++ i) {
+	      const derivation_node_type& node_tail = graph_target.derivations[edge_target.tails[i]];
+	      const range_type range = graph_target.ranges[node_tail.node];
+	      
+	      size_t pos = 0;
+	      for (/**/; pos != range_tail.second.size() && range_tail.second[pos] != range; ++ pos);
+	      
+	      align.maps[i] = pos;
+	    }
+	    
+	    construct_rule(align, target, graph_target.derivations[titer->first], graph_target, edge_target, false);
+	  }
 	  
 	  rule_pair.source = edge_source.rule;
 	  rule_pair.target = edge_target.rule;
@@ -1576,7 +1618,9 @@ struct ExtractTree
 
   tree_rule_set_type trees;
 
-  void construct_rule(const hypergraph_type& graph,
+  template <typename FrontierAlignment>
+  void construct_rule(const FrontierAlignment& frontier_alignment,
+		      const hypergraph_type& graph,
 		      const derivation_node_type& node,
 		      const derivation_graph_type& derivations,
 		      derivation_edge_type& edge,
@@ -1590,12 +1634,12 @@ struct ExtractTree
     weight_type weight = derivations.weights_outside[node.node] / derivations.weights_inside.back();
     
     int frontier_pos = 0;
-    int index = 1;
+    int index = 0;
     
     edge_set_type::const_iterator iter = edge.edges.begin();
     edge_set_type::const_iterator iter_end = edge.edges.end();
     
-    construct_rule(derivations, graph, iter, iter_end, tree_rule, index, frontier_pos, positions_relative, covered, weight);
+    construct_rule(frontier_alignment, derivations, graph, iter, iter_end, tree_rule, index, frontier_pos, positions_relative, covered, weight);
 
     // count assignment..
     edge.count = weight;
@@ -1639,8 +1683,9 @@ struct ExtractTree
     os << tree_rule;
   }
   
-  template <typename Derivations, typename Iterator, typename PosMap, typename Covered>
-  void construct_rule(const Derivations& derivations,
+  template <typename FrontierAlignment, typename Derivations, typename Iterator, typename PosMap, typename Covered>
+  void construct_rule(const FrontierAlignment& frontier_alignment, 
+		      const Derivations& derivations,
 		      const hypergraph_type& graph,
 		      Iterator& iter,
 		      Iterator last,
@@ -1680,14 +1725,15 @@ struct ExtractTree
 	const id_type node_id = edge.tails[tail_pos];
 	
 	if (iter != last && node_id == graph.edges[*iter].head)
-	  construct_rule(derivations, graph, iter, last, *titer, index, frontier_pos, pos_map, covered, weight);
+	  construct_rule(frontier_alignment, derivations, graph, iter, last, *titer, index, frontier_pos, pos_map, covered, weight);
 	else {
 	  for (int pos = derivations.ranges[node_id].first; pos != derivations.ranges[node_id].second; ++ pos)
 	    covered[pos] = false;
 	  
 	  weight *= derivations.weights_inside[node_id];
 	  
-	  titer->label = titer->label.non_terminal(index ++);
+	  titer->label = titer->label.non_terminal(frontier_alignment(index) + 1);
+	  ++ index;
 	  ++ frontier_pos;
 	}
 	
