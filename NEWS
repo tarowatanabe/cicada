@@ -8,6 +8,7 @@ Better composition/parse for string-to-tree by sharing internal nodes and termin
 Better composition/parse for tree-to-{string,tree} by sharing internal nodes and terminals
 Better left2right and right2left binarizatin by sharing nodes
 Added pialign derivation to hiero grammar/hypergraph conversion filter (TODO: perform GHKM extraction)
+Added cicada_extract_sort which merge and re-sort counts
 Butfix for faster cube-pruning (Alg. 2) of {tree,string}-to-{tree,string} extractions: we need to start from NULL combination.
 
 2011-8-11
