@@ -1649,12 +1649,14 @@ struct ExtractTree
     edge.positions.reserve(derivations.alignment_map.size());
     edge.positions.resize(derivations.alignment_map.size(), -1);
     
-    point_set_type::const_iterator piter = positions_relative.begin();
-    for (size_t i = 0; i != covered.size(); ++ i)
-      if (covered[i]) {
-	edge.positions[i] = *piter;
-	++ piter;
-      }
+    if (! positions_relative.empty()) {
+      point_set_type::const_iterator piter = positions_relative.begin();
+      for (size_t i = 0; i != covered.size(); ++ i)
+	if (covered[i]) {
+	  edge.positions[i] = *piter;
+	  ++ piter;
+	}
+    }
 
     if (collapse) {
       // collapse tree-rule

@@ -655,13 +655,12 @@ struct GHKMGrammar : public Grammar
 	//
 	index_set_type aligns(edge.target.tails.size());
 	for (size_t i = 0; i != aligns.size(); ++ i) {
-	  const size_t itg_pos = nodes_map_target[edge.source.tails[i]];
+	  const size_t itg_pos = nodes_map_target[edge.target.tails[i]];
 	  
 	  size_t pos = 0;
 	  for (/**/; pos != edge.source.tails.size() && itg_pos != nodes_map_source[edge.source.tails[pos]]; ++ pos);
 	  aligns[i] = pos;
 	}
-	
 	
 	index_set_type j(edge.source.tails.size(), -1);
 	candidates.push_back(candidate_type(edge, j));
@@ -761,11 +760,13 @@ struct GHKMGrammar : public Grammar
   typedef std::vector<bool, std::allocator<bool> > covered_type;
   typedef std::vector<int, std::allocator<int> >   position_set_type;
 
-  covered_type   covered_source;
-  covered_type   covered_target;
+  
   position_set_type positions_target;
   position_set_type positions_source;
+
+  covered_type   covered;
   position_set_type positions_relative;
+  index_set_type aligns;  
   
   void construct_rule_pair(const sentence_type& source,
 			   const sentence_type& target,
@@ -775,25 +776,83 @@ struct GHKMGrammar : public Grammar
   {
     rule_pair.clear();
 
-    covered_source.clear();
-    covered_target.clear();
-    
     positions_source.clear();
     positions_target.clear();
 
-    covered_source.resize(source.size(), false);
-    covered_target.resize(target.size(), false);
-    
     positions_source.resize(source.size(), -1);
     positions_target.resize(target.size(), -1);
     
-    positions_relative.clear();
+    {
+      positions_relative.clear();
+      
+      covered.clear();
+      covered.resize(source.size(), false);
     
-    int frontier_pos = 0;
-    int index = 0;
+      int index = 0;
+      int frontier_pos = 0;
+      
+      edge_set_type::const_iterator iter     = derivation.source.edges.begin();
+      edge_set_type::const_iterator iter_end = derivation.source.edges.end();
+      
+      construct_rule(iter, iter_end, rule_pair.source, index, frontier_pos, positions_relative, covered);
+      
+      if (! positions_relative.empty()) {
+	position_set_type::const_iterator piter = positions_relative.begin();
+	for (size_t i = 0; i != covered.size(); ++ i)
+	  if (covered[i]) {
+	    positions_source[i] = *piter;
+	    ++ piter;
+	  }
+      }
+    }
+    
+    {
+      // conctruct non-terminal alignment...
+      aligns.resize(derivation.target.tails.size());
+      for (size_t i = 0; i != aligns.size(); ++ i) {
+	const size_t itg_pos = nodes_map_target[derivation.target.tails[i]];
+	
+	size_t pos = 0;
+	for (/**/; pos != derivation.source.tails.size() && itg_pos != nodes_map_source[derivation.source.tails[pos]]; ++ pos);
+	aligns[i] = pos;
+      }
 
-    edge_set_type::const_iterator iter     = derivation.source.edges.begin();
-    edge_set_type::const_iterator iter_end = derivation.source.edges.end();
+      positions_relative.clear();
+      
+      covered.clear();
+      covered.resize(target.size(), false);
+      
+      int index = 0;
+      int frontier_pos = 0;
+      
+      edge_set_type::const_iterator iter     = derivation.target.edges.begin();
+      edge_set_type::const_iterator iter_end = derivation.target.edges.end();
+      
+      construct_rule(aligns, iter, iter_end, rule_pair.target, index, frontier_pos, positions_relative, covered);
+      
+      if (! positions_relative.empty()) {
+	position_set_type::const_iterator piter = positions_relative.begin();
+	for (size_t i = 0; i != covered.size(); ++ i)
+	  if (covered[i]) {
+	    positions_target[i] = *piter;
+	    ++ piter;
+	  }
+      }
+    }
+    
+    // construct alignment-vector...
+    for (size_t src = 0; src != positions_source.size(); ++ src)
+      if (positions_source[src] >= 0 && ! alignment[src].empty()) {
+	alignment_type::value_type::const_iterator aiter_begin = alignment[src].begin();
+	alignment_type::value_type::const_iterator aiter_end   = alignment[src].end();
+	
+	for (alignment_type::value_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)  {
+	  if (positions_target[*aiter] < 0)
+	    throw std::runtime_error("invalid alignment...?");
+	  
+	  rule_pair.alignment.push_back(std::make_pair(positions_source[src], positions_target[*aiter]));
+	}
+      }
   }
   
   template <typename Iterator>
@@ -805,8 +864,112 @@ struct GHKMGrammar : public Grammar
 		      position_set_type& pos_map,
 		      covered_type& covered)
   {
+    // pre-order traversal...
     
+    if (iter == last) {
+      // this should not happen...???
+      tree_rule.label = tree_rule.label.non_terminal();
+      return;
+    }
+    
+    const hypergraph_type::edge_type& edge = graph_source.edges[*iter];
+    ++ iter;
+    
+    const size_t itg_pos = nodes_map_source[edge.head];
+    const int edge_first = spans[itg_pos].source.first;
+    const int edge_last  = spans[itg_pos].source.second;
+    
+    for (int pos = edge_first; pos != edge_last; ++ pos)
+      covered[pos] = true;
+    
+    tree_rule = tree_rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end());
+    
+    size_t tail_pos = 0;
+    tree_rule_type::iterator titer_end = tree_rule.end();
+    for (tree_rule_type::iterator titer = tree_rule.begin(); titer != titer_end; ++ titer) {
+      if (titer->label.is_non_terminal()) {
+	const hypergraph_type::id_type node_id = edge.tails[tail_pos];
+	++ tail_pos;
+	
+	if (iter != last && node_id == graph_source.edges[*iter].head)
+	  construct_rule(iter, last, *titer, index, frontier_pos, pos_map, covered);
+	else {
+	  const size_t itg_pos = nodes_map_source[node_id];
+	  const int edge_first = spans[itg_pos].source.first;
+	  const int edge_last  = spans[itg_pos].source.second;
+	  
+	  for (int pos = edge_first; pos != edge_last; ++ pos)
+	    covered[pos] = false;
+	  
+	  titer->label = titer->label.non_terminal(index + 1);
+	  ++ index;
+	  ++ frontier_pos;
+	}
+      } else {
+	pos_map.push_back(frontier_pos);
+	++ frontier_pos;
+      }
+    }
   }
+
+  template <typename Iterator>
+  void construct_rule(const index_set_type& aligns,
+		      Iterator& iter,
+		      Iterator last,
+		      tree_rule_type& tree_rule,
+		      int& index,
+		      int& frontier_pos,
+		      position_set_type& pos_map,
+		      covered_type& covered)
+  {
+    // pre-order traversal...
+    
+    if (iter == last) {
+      // this should not happen...???
+      tree_rule.label = tree_rule.label.non_terminal();
+      return;
+    }
+    
+    const hypergraph_type::edge_type& edge = graph_target.edges[*iter];
+    ++ iter;
+    
+    const size_t itg_pos = nodes_map_target[edge.head];
+    const int edge_first = spans[itg_pos].target.first;
+    const int edge_last  = spans[itg_pos].target.second;
+    
+    for (int pos = edge_first; pos != edge_last; ++ pos)
+      covered[pos] = true;
+    
+    tree_rule = tree_rule_type(edge.rule->lhs, edge.rule->rhs.begin(), edge.rule->rhs.end());
+    
+    size_t tail_pos = 0;
+    tree_rule_type::iterator titer_end = tree_rule.end();
+    for (tree_rule_type::iterator titer = tree_rule.begin(); titer != titer_end; ++ titer) {
+      if (titer->label.is_non_terminal()) {
+	const hypergraph_type::id_type node_id = edge.tails[tail_pos];
+	++ tail_pos;
+	
+	if (iter != last && node_id == graph_target.edges[*iter].head)
+	  construct_rule(aligns, iter, last, *titer, index, frontier_pos, pos_map, covered);
+	else {
+	  const size_t itg_pos = nodes_map_target[node_id];
+	  const int edge_first = spans[itg_pos].target.first;
+	  const int edge_last  = spans[itg_pos].target.second;
+	  
+	  for (int pos = edge_first; pos != edge_last; ++ pos)
+	    covered[pos] = false;
+	  
+	  titer->label = titer->label.non_terminal(aligns[index] + 1);
+	  ++ index;
+	  ++ frontier_pos;
+	}
+      } else {
+	pos_map.push_back(frontier_pos);
+	++ frontier_pos;
+      }
+    }
+  }
+
   
   template <typename Iterator>
   std::pair<int, int> compose_edges(const index_set_type& j,

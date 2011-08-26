@@ -1018,16 +1018,18 @@ struct ExtractGHKM
     rule_pair.alignment.clear();
     int pos_src = 0;
     
-    for (size_t src = 0; src != covered.size(); ++ src)
-      if (covered[src]) {
-	point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
-	point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
-	
-	for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
-	  rule_pair.alignment.push_back(std::make_pair(positions_source[pos_src], positions_target[*aiter]));
-	
-	++ pos_src;
-      }
+    if (! positions_source.empty()) {
+      for (size_t src = 0; src != covered.size(); ++ src)
+	if (covered[src]) {
+	  point_set_type::const_iterator aiter_begin = alignment_source_target[src].begin();
+	  point_set_type::const_iterator aiter_end   = alignment_source_target[src].end();
+	  
+	  for (point_set_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)
+	    rule_pair.alignment.push_back(std::make_pair(positions_source[pos_src], positions_target[*aiter]));
+	  
+	  ++ pos_src;
+	}
+    }
 
     //std::cerr << "alignment: " << rule_pair.alignment << std::endl;
     
