@@ -10,6 +10,7 @@ Added sparse/dense option for feature-application to apply only sparse/dense fea
 Added remove-unary which remove unaries in forests
 Added pialign derivation to hiero grammar/hypergraph conversion filter (TODO: perform GHKM extraction)
 Added cicada_extract_sort which merge and re-sort counts
+Added posterior operation to compute "posterior" given particular semiring (tropical/logprob/log) and weights
 Modified "input" option for cicada_extract_score{,_mpi} (and no more --counts/--list)
 
 2011-8-11
