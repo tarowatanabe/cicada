@@ -221,6 +221,7 @@ operation/normalize.hpp \
 operation/output.hpp \
 operation/parse.hpp \
 operation/permute.hpp \
+operation/posterior.hpp \
 operation/prune.hpp \
 operation/push_bos_eos.hpp \
 operation/remove_annotation.hpp \
@@ -247,6 +248,7 @@ operation/normalize.cpp \
 operation/output.cpp \
 operation/parse.cpp \
 operation/permute.cpp \
+operation/posterior.cpp \
 operation/prune.cpp \
 operation/push_bos_eos.cpp \
 operation/remove_annotation.cpp \
@@ -329,6 +331,7 @@ parse_coarse.hpp \
 parse_tree.hpp \
 parse_tree_cky.hpp \
 permute.hpp \
+posterior.hpp \
 prune.hpp \
 prune_beam.hpp \
 prune_density.hpp \

@@ -25,6 +25,7 @@
 #include "operation/debinarize.hpp"
 #include "operation/expected_ngram.hpp"
 #include "operation/parse.hpp"
+#include "operation/posterior.hpp"
 #include "operation/prune.hpp"
 #include "operation/push_bos_eos.hpp"
 #include "operation/remove_annotation.hpp"
@@ -190,6 +191,11 @@ parse-tree-cky: parsing for tree-matching\n\
 permute: permute tree (monolingual tree only)\n\
 \tsize=permute size\n\
 \texclude=[a non-terminal] to prohibit permutation.\n\
+posterior: compute posterior features\n\
+\tscale=scaling for score\n\
+\tsemiring=[tropical|logprob|log] semiring to perform score computation\n\
+\tweights=weight file for feature\n\
+\tweights-one=[true|false] one initialzied weight\n\
 prune: pruning\n\
 \tbeam=beam pruning threshold in threshold > 0.0\n\
 \tdensity=density pruning threshold in threshold > 1.0\n\
@@ -306,6 +312,8 @@ viterbi: compute viterbi tree\n\
 	operations.push_back(operation_ptr_type(new operation::GenerateEarley(*piter, grammar, goal, debug)));
       else if (param_name == "apply")
 	operations.push_back(operation_ptr_type(new operation::Apply(*piter, model, debug)));
+      else if (param_name == "posterior")
+	operations.push_back(operation_ptr_type(new operation::Posterior(*piter, debug)));
       else if (param_name == "prune")
 	operations.push_back(operation_ptr_type(new operation::Prune(*piter, debug)));
       else if (param_name == "viterbi")

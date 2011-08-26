@@ -70,6 +70,9 @@ namespace cicada
       
       if (int(beam_mode) + density_mode + kbest_mode + edge_mode == 0)
 	throw std::runtime_error("you may want to specify either kbest, beam or density pruning");
+      
+      if (int(semiring_tropical) + semiring_logprob + semiring_log > 1)
+	throw std::runtime_error("you can specify one of tropical, logprob, log");
 
       if (int(semiring_tropical) + semiring_logprob + semiring_log == 0)
 	semiring_tropical = true;
