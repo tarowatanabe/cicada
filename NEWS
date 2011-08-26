@@ -1,4 +1,7 @@
 2011-8-x
+New: pialign derivation to hiero grammar/hypergraph conversion filter (TODO: perform GHKM extraction)
+New: posterior operation to compute "posterior" given particular semiring (tropical/logprob/log) and weights
+New: remove-unary which remove unaries in forests
 Bugfix for alignment by lexicon model. The cause of the bug seem to be an initialization issue...?
 Bugfix for faster cube-pruning (Alg. 2) of {tree,string}-to-{tree,string} extractions: we need to start from NULL combination.
 Better composition/parse for string-to-tree by sharing internal nodes and terminals
@@ -7,10 +10,7 @@ Better left2right and right2left binarizatin by sharing nodes
 Less memory for Viterbi alignment computation by shrinking at some intervals
 Added max-compose constraint which set the maximum number of minimum rule compositions in GHKM
 Added sparse/dense option for feature-application to apply only sparse/dense features
-Added remove-unary which remove unaries in forests
-Added pialign derivation to hiero grammar/hypergraph conversion filter (TODO: perform GHKM extraction)
 Added cicada_extract_sort which merge and re-sort counts
-Added posterior operation to compute "posterior" given particular semiring (tropical/logprob/log) and weights
 Modified "input" option for cicada_extract_score{,_mpi} (and no more --counts/--list)
 
 2011-8-11
