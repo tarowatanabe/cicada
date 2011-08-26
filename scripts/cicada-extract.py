@@ -725,7 +725,7 @@ class ExtractScore(Extract):
         
         command = prog_name
         
-        command += " --list \"%s\"" %(self.counts)
+        command += " --input \"%s\"" %(self.counts)
         command += " --output \"%s\"" %(self.scores)
         command += " --lexicon-source-target \"%s\"" %(lexicon.source_target)
         command += " --lexicon-target-source \"%s\"" %(lexicon.target_source)

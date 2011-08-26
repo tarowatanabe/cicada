@@ -42,13 +42,11 @@ struct greater_file_size
   }
 };
 
-path_set_type counts_files;
-path_type     list_file;
+path_set_type input_files;
+path_type output_file = "";
 
 path_type lexicon_source_target_file;
 path_type lexicon_target_source_file;
-
-path_type output_file = "";
 
 bool score_phrase = false;
 bool score_scfg   = false;
@@ -80,8 +78,6 @@ int main(int argc, char** argv)
   try {
     options(argc, argv);
 
-    if (counts_files.empty() && (list_file.empty() || (! boost::filesystem::exists(list_file) && list_file != "-")))
-      throw std::runtime_error("no count files?");
     if (output_file.empty())
       throw std::runtime_error("no output file?");
     if (lexicon_source_target_file.empty() || ! boost::filesystem::exists(lexicon_source_target_file))
@@ -94,29 +90,31 @@ int main(int argc, char** argv)
     
     threads = utils::bithack::max(1, threads);
 
-    // sort input files by its size...
-    if (! list_file.empty()) {
-      const path_type path = (boost::filesystem::is_directory(list_file) ? list_file / "files" : list_file);
+    path_set_type counts_files;
+    
+    for (path_set_type::const_iterator fiter = input_files.begin(); fiter != input_files.end(); ++ fiter) {
+      if (! boost::filesystem::exists(*fiter))
+	throw std::runtime_error("no file? " + fiter->string());
       
-      if (! boost::filesystem::exists(path) && path != "-")
-	throw std::runtime_error("no file? " + path.string());
-
-      const path_type dirname = (path == "-" ? path_type() : path.parent_path());
-      
-      utils::compress_istream is(path, 1024 * 1024);
-      std::string line;
-      while (std::getline(is, line)) 
-	if (! line.empty()) {
-	  const path_type path(line);
-	  
-	  if (boost::filesystem::exists(path))
+      if (boost::filesystem::is_directory(*fiter)) {
+	const path_type path = *fiter / "files";
+	
+	if (! boost::filesystem::exists(path))
+	  throw std::runtime_error("no files? " + path.string());
+	
+	utils::compress_istream is(path, 1024 * 1024);
+	std::string line;
+	while (std::getline(is, line))
+	  if (! line.empty()) {
+	    const path_type path(*fiter / line);
+	    
+	    if (! boost::filesystem::exists(path))
+	      throw std::runtime_error("no file? " + path.string());
+	    
 	    counts_files.push_back(path);
-	  else if (! dirname.empty() && boost::filesystem::exists(dirname / path))
-	    counts_files.push_back(dirname / path);
-	}
-
-      if (counts_files.empty())
-	throw std::runtime_error("no count files?");
+	  }
+      } else
+	counts_files.push_back(*fiter);
     }
     
     std::sort(counts_files.begin(), counts_files.end(), greater_file_size());
@@ -414,11 +412,10 @@ void options(int argc, char** argv)
   po::options_description opts_config("configuration options");
   
   opts_config.add_options()
-    ("counts",                 po::value<path_set_type>(&counts_files)->multitoken(), "counts files")
-    ("list",                   po::value<path_type>(&list_file),                      "count file list")
-    ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),     "lexicon model for lex(target | source)")
-    ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),     "lexicon model for lex(source | target)")
-    ("output",                 po::value<path_type>(&output_file),                    "output directory")
+    ("input",                  po::value<path_set_type>(&input_files)->multitoken(), "input files")
+    ("output",                 po::value<path_type>(&output_file),                   "output directory")
+    ("lexicon-source-target",  po::value<path_type>(&lexicon_source_target_file),    "lexicon model for lex(target | source)")
+    ("lexicon-target-source",  po::value<path_type>(&lexicon_target_source_file),    "lexicon model for lex(source | target)")
     
     ("score-phrase", po::bool_switch(&score_phrase), "score phrase pair counts")
     ("score-scfg",   po::bool_switch(&score_scfg),   "score synchronous-CFG counts")
