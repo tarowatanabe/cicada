@@ -65,7 +65,11 @@ namespace cicada
 	
 	// assign features!
 	edge.features.clear();
-	edge.features[feat_posterior] = cicada::semiring::log(weight);
+	
+	const double logweight = cicada::semiring::log(weight);
+	
+	if (logweight != 0.0)
+	  edge.features[feat_posterior] = logweight;
       }
     }
     
