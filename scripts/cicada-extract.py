@@ -150,7 +150,7 @@ sys.stdout = sys.stderr
 def run_command(command):
     retcode = subprocess.Popen(command, shell=True).wait()
     if retcode < 0:
-        sys.exit(retcode)
+        raise ValueError, "cannnot run? " + command
 
 def compressed_file(file):
     if not file:
@@ -375,9 +375,11 @@ class Lexicon:
         
         command += " --variational-bayes"
         command += " --prior %g" %(prior)
-
+        
         if inverse:
             command += " --inverse"
+
+        command += " --threads %d" %(threads)
 
         if debug:
             command += " --debug=%d" %(debug)
