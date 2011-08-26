@@ -58,7 +58,7 @@ namespace cicada
       for (hypergraph_type::edge_set_type::iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
 	hypergraph_type::edge_type& edge = *eiter;
 	
-	weight_type weight = outside[edge.head] * function(edge);
+	weight_type weight = outside[edge.head] * function(edge) / weight_total;
 	hypergraph_type::edge_type::node_set_type::const_iterator titer_end = edge.tails.end();
 	for (hypergraph_type::edge_type::node_set_type::const_iterator titer = edge.tails.begin(); titer != titer_end; ++ titer)
 	  weight *= inside[*titer];
