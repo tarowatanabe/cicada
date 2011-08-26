@@ -25,7 +25,6 @@ typedef std::vector<path_type, std::allocator<path_type> > path_set_type;
 path_set_type input_files;
 path_type output_file;
 
-bool output_directory_mode = false;
 double max_malloc = 8;
 int threads = 1;
 
@@ -230,7 +229,6 @@ void options(int argc, char** argv)
   opts_config.add_options()
     ("input",      po::value<path_set_type>(&input_files)->multitoken(), "input file(s)")
     ("output",     po::value<path_type>(&output_file),                   "output file")
-    ("directory",  po::bool_switch(&output_directory_mode),              "output in a directory")
     ("max-malloc", po::value<double>(&max_malloc),                       "maximum malloc in GB")
     ("threads",    po::value<int>(&threads),                             "# of threads")
 
