@@ -759,7 +759,23 @@ struct GHKMGrammar : public Grammar
   
   typedef std::vector<bool, std::allocator<bool> > covered_type;
   typedef std::vector<int, std::allocator<int> >   position_set_type;
-
+  typedef std::vector<tree_rule_type, std::allocator<tree_rule_type> > tree_rule_set_type;
+  
+  struct CollapseFrontierIterator
+  {
+    CollapseFrontierIterator(tree_rule_set_type& __trees) : trees(__trees) {}
+    
+    CollapseFrontierIterator& operator=(const word_type& value)
+    {
+      trees.push_back(value);
+      return *this;
+    }
+    
+    CollapseFrontierIterator& operator*()  { return *this; }
+    CollapseFrontierIterator& operator++() { return *this; }
+    
+    tree_rule_set_type& trees;
+  };
   
   position_set_type positions_target;
   position_set_type positions_source;
@@ -767,7 +783,8 @@ struct GHKMGrammar : public Grammar
   covered_type   covered;
   position_set_type positions_relative;
   index_set_type aligns;  
-  
+  tree_rule_set_type trees;
+
   void construct_rule_pair(const sentence_type& source,
 			   const sentence_type& target,
 			   const alignment_type& alignment,
@@ -841,18 +858,31 @@ struct GHKMGrammar : public Grammar
     }
     
     // construct alignment-vector...
-    for (size_t src = 0; src != positions_source.size(); ++ src)
-      if (positions_source[src] >= 0 && ! alignment[src].empty()) {
-	alignment_type::value_type::const_iterator aiter_begin = alignment[src].begin();
-	alignment_type::value_type::const_iterator aiter_end   = alignment[src].end();
-	
-	for (alignment_type::value_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)  {
-	  if (positions_target[*aiter] < 0)
-	    throw std::runtime_error("invalid alignment...?");
+    if (! positions_relative.empty())
+      for (size_t src = 0; src != positions_source.size(); ++ src)
+	if (positions_source[src] >= 0 && ! alignment[src].empty()) {
+	  alignment_type::value_type::const_iterator aiter_begin = alignment[src].begin();
+	  alignment_type::value_type::const_iterator aiter_end   = alignment[src].end();
 	  
-	  rule_pair.alignment.push_back(std::make_pair(positions_source[src], positions_target[*aiter]));
+	  for (alignment_type::value_type::const_iterator aiter = aiter_begin; aiter != aiter_end; ++ aiter)  {
+	    if (positions_target[*aiter] < 0)
+	      throw std::runtime_error("invalid alignment...?");
+	    
+	    rule_pair.alignment.push_back(std::make_pair(positions_source[src], positions_target[*aiter]));
+	  }
 	}
-      }
+
+    if (frontier_source) {
+      trees.clear();
+      rule_pair.source.frontier(CollapseFrontierIterator(trees));
+      rule_pair.source = tree_rule_type(rule_pair.source.label, trees.begin(), trees.end());
+    }
+
+    if (frontier_target) {
+      trees.clear();
+      rule_pair.target.frontier(CollapseFrontierIterator(trees));
+      rule_pair.target = tree_rule_type(rule_pair.target.label, trees.begin(), trees.end());
+    }
   }
   
   template <typename Iterator>
