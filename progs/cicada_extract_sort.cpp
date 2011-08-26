@@ -107,6 +107,8 @@ struct Task
     for (size_t iter = 0; /**/; ++ iter) {
       queue.pop_swap(line);
       if (line.empty()) break;
+
+      if (! parser(line, rule_pair)) continue;
       
       std::pair<rule_pair_set_type::iterator, bool> result = rule_pairs.insert(rule_pair);
       if (! result.second)
