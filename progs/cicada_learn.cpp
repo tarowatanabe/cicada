@@ -801,6 +801,7 @@ void options(int argc, char** argv)
   opts_command.add_options()
     ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),      "forest path")
     ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(), "intersected forest path")
+    ("oracle",      po::value<path_set_type>(&intersected_path)->multitoken(), "oracle forest path(s) (an alias for --intersected)")
     ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
     

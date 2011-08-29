@@ -1172,8 +1172,9 @@ void options(int argc, char** argv)
   
   po::options_description opts_command("command line options");
   opts_command.add_options()
-    ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),       "forest path(s)")
-    ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(),  "intersected forest path(s)")
+    ("forest",      po::value<path_set_type>(&forest_path)->multitoken(),      "forest path(s)")
+    ("intersected", po::value<path_set_type>(&intersected_path)->multitoken(), "intersected forest path(s)")
+    ("oracle",      po::value<path_set_type>(&intersected_path)->multitoken(), "oracle forest path(s) (an alias for --intersected)")
     ("weights",     po::value<path_type>(&weights_path),      "initial parameter")
     ("output",      po::value<path_type>(&output_path),       "output parameter")
     
