@@ -1,134 +1,118 @@
-%%2d-year:
-0: hundred[ and >%spellout-numbering>];
-1: oh-=%spellout-numbering=;
-10: =%spellout-numbering=;
-%spellout-numbering-year:
--x: minus >>;
-x.x: =#,###0.#=;
-0: =%spellout-numbering=;
-1000/100: << >%%2d-year>;
-10000: =%spellout-numbering=;
 %spellout-numbering:
 0: =%spellout-cardinal=;
-%spellout-numbering-verbose:
-0: =%spellout-cardinal-verbose=;
+
 %spellout-cardinal:
--x: minus >>;
+-x: - >>;
 x.x: << point >>;
-0: zero;
-1: one;
-2: two;
-3: three;
-4: four;
-5: five;
-6: six;
-7: seven;
-8: eight;
-9: nine;
-10: ten;
-11: eleven;
-12: twelve;
-13: thirteen;
-14: fourteen;
-15: fifteen;
-16: sixteen;
-17: seventeen;
-18: eighteen;
-19: nineteen;
-20: twenty[->>];
-30: thirty[->>];
-40: forty[->>];
-50: fifty[->>];
-60: sixty[->>];
-70: seventy[->>];
-80: eighty[->>];
-90: ninety[->>];
-100: << hundred[ >>];
-1000: << thousand[ >>];
-1000000: << million[ >>];
-1000000000: << billion[ >>];
-1000000000000: << trillion[ >>];
-1000000000000000: << quadrillion[ >>];
-1000000000000000000: =#,##0=;
-%%and:
-1: ' and =%spellout-cardinal-verbose=;
-100: ' =%spellout-cardinal-verbose=;
-%%commas:
-1: ' and =%spellout-cardinal-verbose=;
-100: , =%spellout-cardinal-verbose=;
-1000: , <%spellout-cardinal-verbose< thousand[>%%commas>];
-1000000: , =%spellout-cardinal-verbose=;
-%spellout-cardinal-verbose:
--x: minus >>;
-x.x: << point >>;
-0: =%spellout-numbering=;
-100: << hundred[>%%and>];
-1000: << thousand[>%%and>];
-100000/1000: << thousand[>%%commas>];
-1000000: << million[>%%commas>];
-1000000000: << billion[>%%commas>];
-1000000000000: << trillion[>%%commas>];
-1000000000000000: << quadrillion[>%%commas>];
-1000000000000000000: =#,##0=;
+0: =%%digits=;
+1000:                  <0<[.>%%digits3>] thousand;
+1,000,000:             <0<[.>%%digits6>] million;
+1,000,000,000:         <0<[.>%%digits9>] billion;
+1,000,000,000,000:     <0<[.>%%digits12>] trillion;
+1,000,000,000,000,000: =#,###0=;
+
+%%digits:
+-x: ->>;
+0: =0=;
+
+%%digits2:
+0:  =00=;
+10: <0<[>%%digits>];
+
+%%digits3:
+0:   =000=;
+10:  <00<[>%%digits>];
+100: <0<[>%%digits2>];
+
+%%digits4:
+0:    =0000=;
+10:   <000<[>%%digits>];
+100:  <00<[>%%digits2>];
+1000: <0<[>%%digits3>];
+
+%%digits5:
+0:     =00000=;
+10:    <0000<[>%%digits>];
+100:   <000<[>%%digits2>];
+1000:  <00<[>%%digits3>];
+10000: <0<[>%%digits4>];
+
+%%digits6:
+0:      =000000=;
+10:     <00000<[>%%digits>];
+100:    <0000<[>%%digits2>];
+1000:   <000<[>%%digits3>];
+10000:  <00<[>%%digits4>];
+100000: <0<[>%%digits5>];
+
+%%digits7:
+0:       =0000000=;
+10:      <000000<[>%%digits>];
+100:     <00000<[>%%digits2>];
+1000:    <0000<[>%%digits3>];
+10000:   <000<[>%%digits4>];
+100000:  <00<[>%%digits5>];
+1000000: <0<[>%%digits6>];
+
+%%digits8:
+0:        =00000000=;
+10:       <0000000<[>%%digits>];
+100:      <000000<[>%%digits2>];
+1000:     <00000<[>%%digits3>];
+10000:    <0000<[>%%digits4>];
+100000:   <000<[>%%digits5>];
+1000000:  <00<[>%%digits6>];
+10000000: <0<[>%%digits7>];
+
+%%digits9:
+0:         =000000000=;
+10:        <00000000<[>%%digits>];
+100:       <0000000<[>%%digits2>];
+1000:      <000000<[>%%digits3>];
+10000:     <00000<[>%%digits4>];
+100000:    <0000<[>%%digits5>];
+1000000:   <000<[>%%digits6>];
+10000000:  <00<[>%%digits7>];
+100000000: <0<[>%%digits8>];
+
+%%digits10:
+0:          =0000000000=;
+10:         <000000000<[>%%digits>];
+100:        <00000000<[>%%digits2>];
+1000:       <0000000<[>%%digits3>];
+10000:      <000000<[>%%digits4>];
+100000:     <00000<[>%%digits5>];
+1000000:    <0000<[>%%digits6>];
+10000000:   <000<[>%%digits7>];
+100000000:  <00<[>%%digits8>];
+1000000000: <0<[>%%digits9>];
+
+%%digits11:
+0:           =00000000000=;
+10:          <0000000000<[>%%digits>];
+100:         <000000000<[>%%digits2>];
+1000:        <00000000<[>%%digits3>];
+10000:       <0000000<[>%%digits4>];
+100000:      <000000<[>%%digits5>];
+1000000:     <00000<[>%%digits6>];
+10000000:    <0000<[>%%digits7>];
+100000000:   <000<[>%%digits8>];
+1000000000:  <00<[>%%digits9>];
+10000000000: <0<[>%%digits10>];
+
+%%digits12:
+0:            =000000000000=;
+10:           <00000000000<[>%%digits>];
+100:          <0000000000<[>%%digits2>];
+1000:         <000000000<[>%%digits3>];
+10000:        <00000000<[>%%digits4>];
+100000:       <0000000<[>%%digits5>];
+1000000:      <000000<[>%%digits6>];
+10000000:     <00000<[>%%digits7>];
+100000000:    <0000<[>%%digits8>];
+1000000000:   <000<[>%%digits9>];
+10000000000:  <00<[>%%digits10>];
+100000000000: <0<[>%%digits11>];
+
 %%lenient-parse:
 &[last primary ignorable ] << ' ' << ',' << '-' << '­';
-%%tieth:
-0: tieth;
-1: ty-=%spellout-ordinal=;
-%%th:
-0: th;
-1: ' =%spellout-ordinal=;
-%spellout-ordinal:
--x: minus >>;
-x.x: =#,##0.#=;
-0: zeroth;
-1: first;
-2: second;
-3: third;
-4: fourth;
-5: fifth;
-6: sixth;
-7: seventh;
-8: eighth;
-9: ninth;
-10: tenth;
-11: eleventh;
-12: twelfth;
-13: =%spellout-numbering=th;
-20: twen>%%tieth>;
-30: thir>%%tieth>;
-40: for>%%tieth>;
-50: fif>%%tieth>;
-60: six>%%tieth>;
-70: seven>%%tieth>;
-80: eigh>%%tieth>;
-90: nine>%%tieth>;
-100: <%spellout-numbering< hundred>%%th>;
-1000: <%spellout-numbering< thousand>%%th>;
-1000000: <%spellout-numbering< million>%%th>;
-1000000000: <%spellout-numbering< billion>%%th>;
-1000000000000: <%spellout-numbering< trillion>%%th>;
-1000000000000000: <%spellout-numbering< quadrillion>%%th>;
-1000000000000000000: =#,##0=.;
-%%and-o:
-0: th;
-1: ' and =%spellout-ordinal-verbose=;
-100: ' =%spellout-ordinal-verbose=;
-%%commas-o:
-0: th;
-1: ' and =%spellout-ordinal-verbose=;
-100: , =%spellout-ordinal-verbose=;
-1000: , <%spellout-cardinal-verbose< thousand>%%commas-o>;
-1000000: , =%spellout-ordinal-verbose=;
-%spellout-ordinal-verbose:
--x: minus >>;
-x.x: =#,##0.#=;
-0: =%spellout-ordinal=;
-100: <%spellout-numbering-verbose< hundred>%%and-o>;
-1000: <%spellout-numbering-verbose< thousand>%%and-o>;
-100000/1000: <%spellout-numbering-verbose< thousand>%%commas-o>;
-1000000: <%spellout-numbering-verbose< million>%%commas-o>;
-1000000000: <%spellout-numbering-verbose< billion>%%commas-o>;
-1000000000000: <%spellout-numbering-verbose< trillion>%%commas-o>;
-1000000000000000: <%spellout-numbering-verbose< quadrillion>%%commas-o>;
-1000000000000000000: =#,##0=.;

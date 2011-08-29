@@ -1,7 +1,3 @@
-%spellout-numbering-year:
-x.x: =#,###0.#=;
-0: =%spellout-numbering=;
-
 %spellout-numbering:
 0: =%spellout-cardinal=;
 
@@ -167,7 +163,6 @@ x.x: <<.>>;
 10000000000000:  <00<[>%%digits13>];
 100000000000000: <0<[>%%digits14>];
 
-
 %%digits16:
 0:                =0000000000000000=;
 10:               <000000000000000<[>%%digits>];
@@ -185,3 +180,6 @@ x.x: <<.>>;
 10000000000000:   <000<[>%%digits13>];
 100000000000000:  <00<[>%%digits14>];
 1000000000000000: <0<[>%%digits15>];
+
+%%lenient-parse:
+&[last primary ignorable ] << ' ' << ',' << '-' << '­';
