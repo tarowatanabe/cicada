@@ -501,8 +501,8 @@ for ((iter=1;iter<=iteration; ++ iter)); do
   if test $kbest -eq 0; then
     echo "learning ${root}weights.$iter" >&2
     qsubwrapper learn -l ${root}learn.$iter.log $cicada/cicada_learn_mpi \
-                        --forest  $tstset \
-                        --intersected $learn_oracle \
+                        --forest $tstset \
+                        --oracle $learn_oracle \
                         $unite \
 	                $weights_option \
                         --output $weights_learn \

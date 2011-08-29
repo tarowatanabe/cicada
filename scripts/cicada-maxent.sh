@@ -360,8 +360,8 @@ qsubwrapper oracle -l ${root}oracle.maxent.log $cicada/cicada_oracle_mpi \
 
 echo "learning ${root}weights.maxent" >&2
 qsubwrapper learn -l ${root}learn.maxent.log $cicada/cicada_learn_mpi \
-         --forest      ${root}forest-maxent \
-         --intersected ${root}forest-maxent.oracle \
+         --forest ${root}forest-maxent \
+         --oracle ${root}forest-maxent.oracle \
          --output ${root}weights.maxent \
          \
          --learn-lbfgs \
