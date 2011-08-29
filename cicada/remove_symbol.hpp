@@ -416,7 +416,7 @@ namespace cicada
 	  if (edge.tails.empty()) {
 	    // we will check terminals...
 	    if (rule.rhs.size() == 1) {
-	      if ((remove_symbol(rule.rhs.front()) || rule.rhs.front() == vocab_type::EPSILON)) {
+	      if (remove_symbol(rule.rhs.front()) {
 		epsilons[node.id].push_back(edge.id);
 		removed[edge.id] = true;
 		++ epsilon_remove;
@@ -425,7 +425,7 @@ namespace cicada
 	      rhs.clear();
 	      rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	      for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
-		if (! (remove_symbol(*siter) || *siter == vocab_type::EPSILON))
+		if (! remove_symbol(*siter))
 		  rhs.push_back(*siter);
 	      
 	      if (rhs.size() != rule.rhs.size()) {
@@ -444,7 +444,7 @@ namespace cicada
 	    rhs.clear();
 	    rule_type::symbol_set_type::const_iterator siter_end = rule.rhs.end();
 	    for (rule_type::symbol_set_type::const_iterator siter = rule.rhs.begin(); siter != siter_end; ++ siter)
-	      if (! (remove_symbol(*siter) || *siter == vocab_type::EPSILON))
+	      if (! remove_symbol(*siter))
 		rhs.push_back(*siter);
 	    
 	    if (rhs.size() != rule.rhs.size())
