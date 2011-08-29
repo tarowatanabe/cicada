@@ -134,9 +134,3 @@ Do we keep pair of source-target lhs???
 
 Remove sub-tree sharing in compose-tree-cky and parse-tree-cky?
   I'm not sure which is better..
-
-
-pialign filter to directly extract GHKM rules
-  Transform ITG-derivation into hypergraph so that we can efficiently enumerate
-  in bottom-up fashion.
-  Then, perform compound rule extraction
