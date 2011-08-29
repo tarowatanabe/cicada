@@ -113,7 +113,7 @@ struct Task
       if (! result.second)
 	const_cast<rule_pair_type&>(*result.first).increment(rule_pair.counts.begin(), rule_pair.counts.end());
       
-      if (iter & iter_mask == iter_mask && utils::malloc_stats::used() > malloc_threshold) {
+      if ((iter & iter_mask) == iter_mask && utils::malloc_stats::used() > malloc_threshold) {
 	dump(rule_pairs);
 	rule_pairs.clear();
       }
