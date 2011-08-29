@@ -266,13 +266,22 @@ struct OptimizerLinear : public OptimizerLinearBase
     if (error_message)
       throw std::runtime_error(std::string("error: ") + error_message);
     
-    
     const model_type* model = train(&problem, &parameter);
+
+    const size_t vocabulary_size = word_type::allocated();
+    const word_type::id_type id_bias = vocab_type::EPSILON.id();
     
-    for (int j = 0; j != model->nr_feature; ++ j) {
-      
-      
-    }
+    x.clear();
+    x.reserve(vocabulary_size);
+    x.resize(vocabulary_size, 0.0);
+    
+    // is this correct???
+    x[id_bias] = model->w[model->nr_feature];
+    
+    const double scale = model->label[0];
+    for (int j = 0; j != model->nr_feature; ++ j)
+      if (model->w[j] != 0.0)
+	x[j - 1] = model->w[j] * scale;
     
     free_and_destroy_model(const_cast<model_type**>(&model));
   }
