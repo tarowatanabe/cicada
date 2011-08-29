@@ -54,17 +54,17 @@ namespace cicada
     void operator()(const hypergraph_type& source, hypergraph_type& target)
     {
       // debinarization by stripping off the ^ from syntactic categories...
-      
-      // bottom-up topological order to find binarised antecedents...
-      if (! source.is_valid()) {
-	target.clear();
-	return;
-      }
-      
+
       target = source;
       
+      if (! source.is_valid())
+	return;
+      
+      // bottom-up topological order to find binarised antecedents...
+            
       removed_type removed(target.edges.size(), false);
       binarized_type binarized(target.nodes.size(), false);
+      bool is_binarized = false;
       
       // first, check whether it is binarized!
       hypergraph_type::node_set_type::const_iterator niter_end = target.nodes.end();
@@ -83,8 +83,12 @@ namespace cicada
 	  hypergraph_type::node_type::edge_set_type::const_iterator eiter_end = node.edges.end();
 	  for (hypergraph_type::node_type::edge_set_type::const_iterator eiter = node.edges.begin(); eiter != eiter_end; ++ eiter)
 	    removed[*eiter] = true;
+	  
+	  is_binarized = true;
 	}
       }
+      
+      if (! is_binarized) return;
 
       tail_set_type tails;
       rhs_type      rhs;
