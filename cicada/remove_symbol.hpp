@@ -416,7 +416,7 @@ namespace cicada
 	  if (edge.tails.empty()) {
 	    // we will check terminals...
 	    if (rule.rhs.size() == 1) {
-	      if (remove_symbol(rule.rhs.front()) {
+	      if (remove_symbol(rule.rhs.front())) {
 		epsilons[node.id].push_back(edge.id);
 		removed[edge.id] = true;
 		++ epsilon_remove;
