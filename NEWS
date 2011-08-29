@@ -7,6 +7,7 @@ Bugfix for alignment by lexicon model. The cause of the bug seem to be an initia
 Bugfix for faster cube-pruning (Alg. 2) of {tree,string}-to-{tree,string} extractions: we need to start from NULL combination.
 Better composition/parse for string-to-tree by sharing internal nodes and terminals
 Better composition/parse for tree-to-{string,tree} by sharing internal nodes and terminals
+Better epsilon/bos-eos/sgml-tag removal w/o recursion
 Better left2right and right2left binarizatin by sharing nodes
 Less memory for Viterbi alignment computation by shrinking at some intervals
 Added max-compose constraint which set the maximum number of minimum rule compositions in GHKM
