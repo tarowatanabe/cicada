@@ -1040,6 +1040,7 @@ struct GHKMGrammar : public Grammar
 	throw std::runtime_error("# of tails and # of frontier do not match");
     }
     
+    return std::make_pair(height, num_tails);
   }
 
   template <typename Iterator>
