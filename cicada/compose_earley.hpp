@@ -17,7 +17,7 @@
 #include <cicada/grammar.hpp>
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
-#include <cicada/sort.hpp>
+#include <cicada/sort_topologically.hpp>
 
 #include <google/dense_hash_set>
 #include <google/dense_hash_map>

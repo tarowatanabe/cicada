@@ -8,7 +8,7 @@
 
 #include <cicada/hypergraph.hpp>
 #include <cicada/semiring.hpp>
-#include <cicada/sort.hpp>
+#include <cicada/sort_topologically.hpp>
 #include <cicada/inside_outside.hpp>
 
 namespace cicada

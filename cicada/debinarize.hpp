@@ -11,7 +11,7 @@
 #include <vector>
 
 #include <cicada/hypergraph.hpp>
-#include <cicada/sort.hpp>
+#include <cicada/sort_topologically.hpp>
 
 #include <utils/bithack.hpp>
 #include <utils/simple_vector.hpp>

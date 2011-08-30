@@ -17,7 +17,7 @@
 #include <cicada/grammar.hpp>
 #include <cicada/transducer.hpp>
 #include <cicada/hypergraph.hpp>
-#include <cicada/sort.hpp>
+#include <cicada/sort_topologically.hpp>
 #include <cicada/span_vector.hpp>
 #include <cicada/sentence.hpp>
 

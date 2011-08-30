@@ -8,7 +8,7 @@
 
 #include <cicada/hypergraph.hpp>
 #include <cicada/lattice.hpp>
-#include <cicada/sort.hpp>
+#include <cicada/sort_topologically.hpp>
 
 namespace cicada
 {

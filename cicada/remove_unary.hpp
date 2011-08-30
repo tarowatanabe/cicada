@@ -8,7 +8,7 @@
 
 #include <cicada/hypergraph.hpp>
 #include <cicada/vocab.hpp>
-#include <cicada/sort.hpp>
+#include <cicada/sort_topologically.hpp>
 
 #include <utils/hashmurmur.hpp>
 #include <utils/mathop.hpp>
