@@ -170,9 +170,16 @@ namespace cicada
 	  for (state_ptr_set_type::const_iterator siter = states.begin() + 1; siter != siter_end; ++ siter) {
 	    const int next = *reinterpret_cast<const int*>(*siter);
 	    
+	    if (prev >= 0 && next >= 0) {
+	      // fire feature!
+	      
+	      
+	      
+	    }
 	    
-	    
-	    prev = next;
+	    // we will check for the "aligned" words
+	    if (next >= 0)
+	      prev = next;
 	  }
 	  *reinterpret_cast<int*>(state) = prev;
 	}
