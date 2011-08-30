@@ -242,7 +242,7 @@ namespace cicada
 			const lattice_type& lattice,
 			const span_set_type& spans,
 			const sentence_set_type& targets,
-			const ngram_count_set_type& ngram_counts) {}
+			const ngram_count_set_type& ngram_counts);
 	
       private:
 	const sentence_type* sentence;
