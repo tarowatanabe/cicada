@@ -143,7 +143,7 @@ namespace cicada
 	if (utils::ipiece(param.name()) != "path")
 	  throw std::runtime_error("is this really path feature function? " + parameter);
 	
-	__state_size   = sizeof(int);
+	__state_size   = sizeof(int) * 2;
 	__feature_name = "path";
       }
       
@@ -160,17 +160,25 @@ namespace cicada
 	  attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
 	  if (titer == edge.attributes.end())
 	    throw std::runtime_error("we do not support non alignment forest");
+
+	  attribute_set_type::const_iterator siter = edge.attributes.find(attr_source_position);
+	  if (siter == edge.attributes.end())
+	    throw std::runtime_error("we do not support non alignment forest");
 	  
-	  *reinterpret_cast<int*>(state) = boost::apply_visitor(__attribute_integer(), titer->second);
-	} else if (states.size() == 1)
-	  *reinterpret_cast<int*>(state) = *reinterpret_cast<const int*>(states[0]);
-	else {
-	  int prev = *reinterpret_cast<const int*>(states.front());
+	  reinterpret_cast<int*>(state)[0] = boost::apply_visitor(__attribute_integer(), titer->second);
+	  reinterpret_cast<int*>(state)[1] = boost::apply_visitor(__attribute_integer(), siter->second);
+	} else if (states.size() == 1) {
+	  reinterpret_cast<int*>(state)[0] = reinterpret_cast<const int*>(states[0])[0];
+	  reinterpret_cast<int*>(state)[1] = reinterpret_cast<const int*>(states[0])[1];
+	} else {
+	  int prev_target = reinterpret_cast<const int*>(states.front())[0];
+	  int prev_source = reinterpret_cast<const int*>(states.front())[1];
 	  state_ptr_set_type::const_iterator siter_end = states.end();
 	  for (state_ptr_set_type::const_iterator siter = states.begin() + 1; siter != siter_end; ++ siter) {
-	    const int next = *reinterpret_cast<const int*>(*siter);
+	    const int next_target = reinterpret_cast<const int*>(*siter)[0];
+	    const int next_source = reinterpret_cast<const int*>(*siter)[1];
 	    
-	    if (prev >= 0 && next >= 0) {
+	    if (prev_target >= 0 && next_target >= 0) {
 	      // fire feature!
 	      
 	      
@@ -178,10 +186,13 @@ namespace cicada
 	    }
 	    
 	    // we will check for the "aligned" words
-	    if (next >= 0)
-	      prev = next;
+	    if (next_target >= 0) {
+	      prev_target = next_target;
+	      prev_source = next_source;
+	    }
 	  }
-	  *reinterpret_cast<int*>(state) = prev;
+	  reinterpret_cast<int*>(state)[0] = prev_target;
+	  reinterpret_cast<int*>(state)[1] = prev_source;
 	}
       }
       
