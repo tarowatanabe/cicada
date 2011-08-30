@@ -29,14 +29,12 @@ namespace cicada
     void operator()(const hypergraph_type& x, hypergraph_type& graph)
     {
       typedef std::vector<symbol_type, std::allocator<symbol_type> > rhs_type;
-      typedef std::vector<id_type, std::allocator<id_type> >         tails_type;
 
       graph = x;
       
       if (! graph.is_valid()) return;
       
       rhs_type   rhs;
-      tails_type tails;
       
       hypergraph_type::edge_set_type::iterator eiter_end = graph.edges.end();
       for (hypergraph_type::edge_set_type::iterator eiter = graph.edges.begin(); eiter != eiter_end; ++ eiter) {
@@ -44,12 +42,12 @@ namespace cicada
 
 	if (edge.tails.empty()) continue;
 	
-	rhs.clear();
-	tails.clear();
-	
 	const symbol_type& lhs = edge.rule->lhs;
+
+	rhs.clear();
 	rhs.insert(rhs.end(), edge.rule->rhs.begin(), edge.rule->rhs.end());
-	tails.resize(edge.tails.size());
+	
+	edge_type::node_set_type tails(edge.tails.size());
 	
 	int pos = 0;
 	rhs_type::iterator riter_end = rhs.end();
@@ -64,11 +62,8 @@ namespace cicada
 	    ++ pos;
 	  }
 	
-	// re-assign edge's rule and edge's tails...
-	
 	edge.rule = rule_type::create(rule_type(lhs, rhs.begin(), rhs.end()));
-	
-	std::copy(tails.begin(), tails.end(), edge.tails.begin());
+	edge.tails = tails;
       }
     }    
   };
