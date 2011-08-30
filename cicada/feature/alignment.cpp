@@ -135,6 +135,7 @@ namespace cicada
 
             
       Path::Path(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
+	: sentence(0)
       {
 	typedef cicada::Parameter parameter_type;
 	
@@ -146,7 +147,20 @@ namespace cicada
 	__state_size   = sizeof(int) * 2;
 	__feature_name = "path";
       }
-      
+
+      void Path::operator()(const feature_function_type& feature_function,
+			    const size_type& id,
+			    const hypergraph_type& hypergraph,
+			    const lattice_type& lattice,
+			    const span_set_type& spans,
+			    const sentence_set_type& targets,
+			    const ngram_count_set_type& ngram_counts)
+      {
+	sentence = 0;
+	if (! targets.empty())
+	  sentence = &targets.front();
+      }
+	
       // define state-full features...
       void Path::operator()(const feature_function_type& feature_function,
 			    state_ptr_type& state,

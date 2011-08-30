@@ -244,6 +244,8 @@ namespace cicada
 			const sentence_set_type& targets,
 			const ngram_count_set_type& ngram_counts) {}
 	
+      private:
+	const sentence_type* sentence;
       };
       
       class NullPath : public Base
