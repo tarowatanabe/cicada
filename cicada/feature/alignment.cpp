@@ -156,8 +156,26 @@ namespace cicada
 			    feature_set_type& estimates,
 			    const bool final) const
       {
-	
-	
+	if (states.empty()) {
+	  attribute_set_type::const_iterator titer = edge.attributes.find(attr_target_position);
+	  if (titer == edge.attributes.end())
+	    throw std::runtime_error("we do not support non alignment forest");
+	  
+	  *reinterpret_cast<int*>(state) = boost::apply_visitor(__attribute_integer(), titer->second);
+	} else if (states.size() == 1)
+	  *reinterpret_cast<int*>(state) = *reinterpret_cast<const int*>(states[0]);
+	else {
+	  int prev = *reinterpret_cast<const int*>(states.front());
+	  state_ptr_set_type::const_iterator siter_end = states.end();
+	  for (state_ptr_set_type::const_iterator siter = states.begin() + 1; siter != siter_end; ++ siter) {
+	    const int next = *reinterpret_cast<const int*>(*siter);
+	    
+	    
+	    
+	    prev = next;
+	  }
+	  *reinterpret_cast<int*>(state) = prev;
+	}
       }
       
       NullPath::NullPath(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
