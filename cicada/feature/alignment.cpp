@@ -513,7 +513,7 @@ namespace cicada
       {
 	static_cast<Base&>(*this) = static_cast<const Base&>(x);
 	pimpl->clear();
-	normalizers = x.normalziers;
+	normalizers = x.normalizers;
 	return *this;
       }
       
