@@ -77,6 +77,14 @@ namespace cicada
     
     typedef std::pair<symbol_type, id_type> symbol_id_type;
     typedef google::dense_hash_map<symbol_id_type, hypergraph_type::id_type, utils::hashmurmur<size_t>, std::equal_to<symbol_id_type> > node_map_type;
+    
+    struct filter_edge
+    {
+      bool operator()(const hypergraph_type::edge_type& edge) const
+      {
+	return edge.id == 0;
+      }
+    };
 
     void operator()(const lattice_type& lattice,
 		    hypegraph_type& graph)
@@ -91,7 +99,25 @@ namespace cicada
       // initialize actives by axioms... (terminals)
       
       // root...
-      actives(0, 1).push_back(active_type());
+      // we will insert pseudo edge, but this will be "removed"
+      
+      hypergraph_type::edge_type& edge = graph.add_edge();
+      edge.rule = rule_type::create(rule_type(tag, rule_type::symbol_set_type(vocab_type::S, vocab_type::EPSILON)));
+      
+      edge.attributes[attr_dependency_pos] = attribute_set_type::int_type(0);
+      
+      const hypergraph_type::id_type node_id = graph.add_node().id;
+      non_terminals.push_back(vocab_type::S);
+      
+      graph.connect_edge(egge.id, node_id);
+
+      actives(0, 1).push_back(active_type(0, node_id));
+
+      if (edge.id != 0)
+	throw std::runtime_error("invalid edge id?");
+      if (node_id != 0)
+	throw std::runtime_error("invalid node id?");
+
       id_type id = 1;
       for (size_t pos = 0; pos != lattice.size(); ++ pos) {
 	// here, we will construct a partial hypergraph...
@@ -115,7 +141,13 @@ namespace cicada
 	    actives(pos + 1, pos + aiter->distance + 1).push_back(active_type(id, node_id));
 	  }
 	} else {
-	  throw std::runtime_error("currently, not supported!");
+	  lattice_type::arc_set_type::const_iterator aiter_end = lattice[pos].end();
+	  for (lattice_type::arc_set_type::const_iterator aiter = lattice[pos].begin(); aiter != aiter_end; ++ aiter, ++ id) {
+	    // enumerate grammar...
+	    
+	    
+	    
+	  }
 	}
       }
 
@@ -202,7 +234,6 @@ namespace cicada
       
       item_set_type::const_iterator giter_end = goals.end();
       for (item_set_type::const_iterator giter = goals.begin(); giter != giter_end; ++ giter) {
-	
 	hypegraph_type::edge_type& edge = graph.add_edge(&(giter->node), &(giter->node) + 1);
 	edge.rule = rule_type::create(rule_type(vocab_type::GOAL, rule_type::symbol_set_type(1, non_terminals[giter->node])));
 	
@@ -210,7 +241,9 @@ namespace cicada
       }
       
       // topologically sort!
-      graph.topologically_sort();
+      hypergraph_type sorted;
+      topologically_sort(graph, sorted, filter_edge(), true);
+      graph.swap(sorted);
     }
     
   private:
