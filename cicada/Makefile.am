@@ -293,6 +293,7 @@ compose_phrase.hpp \
 compose_tree.hpp \
 compose_tree_cky.hpp \
 debinarize.hpp \
+dependency.hpp \
 dot_product.hpp \
 edit_distance_forest.hpp \
 eval.hpp \
@@ -382,6 +383,7 @@ alignment.cpp \
 attribute.cpp \
 attribute_vector.cpp \
 cluster.cpp \
+dependency.cpp \
 feature.cpp \
 feature_function.cpp \
 format.cpp \
