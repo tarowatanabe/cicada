@@ -27,7 +27,21 @@
 
 namespace cicada
 {
-  // arc standard...!
+  // arc standard parser based on the deduction system presented in
+  //
+  // @InProceedings{kuhlmann-gomezrodriguez-satta:2011:ACL-HLT2011,
+  //   author    = {Kuhlmann, Marco  and  G\'{o}mez-Rodr\'{i}guez, Carlos  and  Satta, Giorgio},
+  //   title     = {Dynamic Programming Algorithms for Transition-Based Dependency Parsers},
+  //   booktitle = {Proceedings of the 49th Annual Meeting of the Association for Computational Linguistics: Human Language Technologies},
+  //   month     = {June},
+  //   year      = {2011},
+  //   address   = {Portland, Oregon, USA},
+  //   publisher = {Association for Computational Linguistics},
+  //   pages     = {673--682},
+  //   url       = {http://www.aclweb.org/anthology/P11-1068}
+  //  }
+  //
+
   struct ComposeDependencyArcStandard
   {
     typedef size_t    size_type;
