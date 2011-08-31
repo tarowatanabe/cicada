@@ -279,9 +279,9 @@ namespace cicada
 
     typedef graphviz_impl::iterator_type iterator_type;
     
-    graphviz_impl::grammar_rule_type&    grammar_rule        = graphviz_impl::instance_rule();
-    graphviz_impl::grammar_tail_type&    grammar_tail        = graphviz_impl::instance_tail();
-    graphviz_impl::grammar_feature_type& grammar_feature     = graphviz_impl::instance_feature();
+    graphviz_impl::grammar_rule_type&      grammar_rule      = graphviz_impl::instance_rule();
+    graphviz_impl::grammar_tail_type&      grammar_tail      = graphviz_impl::instance_tail();
+    graphviz_impl::grammar_feature_type&   grammar_feature   = graphviz_impl::instance_feature();
     graphviz_impl::grammar_attribute_type& grammar_attribute = graphviz_impl::instance_attribute();
     
     os << "digraph { rankdir=BT; ordering=in;";
