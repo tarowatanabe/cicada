@@ -218,6 +218,7 @@ namespace cicada
 	yield_graphviz(false),
 	yield_treebank(false),
 	yield_alignment(false),
+	yield_dependency(false),
 	yield_span(false),
 	
 	debinarize(false),
@@ -276,6 +277,8 @@ namespace cicada
 	    yield_treebank = true;
 	  else if (value == "alignment" || value == "align")
 	    yield_alignment = true;
+	  else if (value == "dependency" || value == "dep")
+	    yield_dependency = true;
 	  else if (value == "span")
 	    yield_span = true;
 	  else
@@ -301,10 +304,10 @@ namespace cicada
       if (! directory.empty() && ! file.empty())
 	throw std::runtime_error("you cannot output both in directory and file");
 	
-      if (int(yield_string) + yield_terminal_pos + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_span > 1)
+      if (int(yield_string) + yield_terminal_pos + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_dependency + yield_span > 1)
 	throw std::runtime_error("only string, tree or alignment yield for kbest");
 	
-      if (int(yield_string) + yield_terminal_pos + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_span == 0)
+      if (int(yield_string) + yield_terminal_pos + yield_tree + yield_graphviz + yield_treebank + yield_alignment + yield_dependency + yield_span == 0)
 	yield_string = true;
 	
       if (graphviz && statistics)

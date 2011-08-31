@@ -48,6 +48,7 @@ namespace cicada
       bool yield_graphviz;
       bool yield_treebank;
       bool yield_alignment;
+      bool yield_dependency;
       bool yield_span;
 
       bool debinarize;
