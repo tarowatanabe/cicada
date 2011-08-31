@@ -136,6 +136,11 @@ vocabulary: vocabulary feature\n\
 relative-position: relative alignment feature\n\
 \tcluster=[word class file]\n\
 \tstemmer=[stemmer spec]\n\
+path: path features\n\
+\tcluster-source=[word class file]\n\
+\tcluster-target=[word class file]\n\
+\tstemmer-source=[stemmer spec]\n\
+\tstemmer-target=[stemmer spec]\n\
 null-path: path involving epsilon\n\
 target-bigram: target bigram feature\n\
 \tcluster=[word class file]\n\
@@ -205,6 +210,8 @@ word-pair: word pair feature\n\
       return feature_function_ptr_type(new feature::RelativePosition(parameter));
     else if (param_name == "null-path")
       return feature_function_ptr_type(new feature::NullPath(parameter));
+    else if (param_name == "path")
+      return feature_function_ptr_type(new feature::Path(parameter));
     else if (param_name == "target-bigram")
       return feature_function_ptr_type(new feature::TargetBigram(parameter));
     else if (param_name == "word-pair")

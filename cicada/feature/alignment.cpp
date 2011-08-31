@@ -6,6 +6,14 @@
 #include "parameter.hpp"
 
 #include "utils/piece.hpp"
+#include "utils/bithack.hpp"
+#include "utils/lexical_cast.hpp"
+#include "utils/hashmurmur.hpp"
+#include "utils/sgi_hash_map.hpp"
+#include "utils/simple_vector.hpp"
+
+#include "boost/fusion/tuple.hpp"
+#include "boost/array.hpp"
 
 namespace cicada
 {
@@ -133,9 +141,83 @@ namespace cicada
 	target_size = std::max(0, target_size);
       }
 
+      class PathImpl : public Base
+      {
+      public:
+	typedef boost::fusion::tuple<symbol_type, symbol_type, symbol_type, symbol_type, int> item_type;
+	typedef boost::array<feature_type, 5> features_type;
+	
+#ifdef HAVE_TR1_UNORDERED_MAP
+	typedef std::tr1::unordered_map<item_type, features_type, utils::hashmurmur<size_t>, std::equal_to<item_type>,
+					std::allocator<std::pair<const item_type, features_type> > > feature_map_type;
+#else
+	typedef sgi::hash_map<item_type, features_type, utils::hashmurmur<size_t>, std::equal_to<item_type>,
+			      std::allocator<std::pair<const item_type, features_type> > > feature_map_type;
+#endif
+
+      public:
+	void operator()(const symbol_type& source_prev,
+			const symbol_type& target_prev,
+			const symbol_type& target_curr,
+			const symbol_type& target_next,
+			const int distance,
+			feature_set_type& features)
+	{
+	  const item_type item(source_prev, target_prev, target_curr, target_next, distance);
+	  
+	  feature_map_type::iterator iter = maps.find(item);
+	  if (iter == maps.end()) {
+	    iter = maps.insert(std::make_pair(item, features_type())).first;
+
+	    const std::string distance_str  = utils::lexical_cast<std::string>(distance);
+	    const std::string distance_mark = (distance > 0 ? "P" : (distance < 0 ? "N" : "Z"));
+	    
+	    iter->second[0] = "path:" + distance_str;
+
+	    iter->second[1] = ("path:"
+			       + static_cast<const std::string&>(source_prev)
+			       + '+' + static_cast<const std::string&>(target_curr)
+			       + ':' + distance_mark);
+	    
+	    iter->second[2] = ("path:"
+			       + static_cast<const std::string&>(source_prev)
+			       + '+' + static_cast<const std::string&>(target_prev)
+			       + '+' + static_cast<const std::string&>(target_curr)
+			       + '+' + static_cast<const std::string&>(target_next)
+			       + ':' + distance_mark);
+	    
+	    iter->second[3] = ("path:"
+			       + static_cast<const std::string&>(source_prev)
+			       + '+' + static_cast<const std::string&>(target_curr)
+			       + ':' + distance_str);
+	    
+	    iter->second[4] = ("path:"
+			       + static_cast<const std::string&>(source_prev)
+			       + '+' + static_cast<const std::string&>(target_prev)
+			       + '+' + static_cast<const std::string&>(target_curr)
+			       + '+' + static_cast<const std::string&>(target_next)
+			       + ':' + distance_str);
+	    
+	    std::sort(iter->second.begin(), iter->second.end());
+	  }
+	  
+	  features_type::const_iterator fiter_end = iter->second.end();
+	  for (features_type::const_iterator fiter = iter->second.begin(); fiter != fiter_end; ++ fiter)
+	    features[*fiter] += 1.0;
+	}
+	
+	void clear()
+	{
+	  maps.clear();
+	}
+	
+      public:
+        feature_map_type maps;
+      };
+
             
       Path::Path(const std::string& parameter, size_type& __state_size, feature_type& __feature_name)
-	: sentence(0)
+	: pimpl(new PathImpl()), normalizers_source(), normalizers_target(), sentence(0)
       {
 	typedef cicada::Parameter parameter_type;
 	
@@ -144,10 +226,52 @@ namespace cicada
 	if (utils::ipiece(param.name()) != "path")
 	  throw std::runtime_error("is this really path feature function? " + parameter);
 	
+	for (parameter_type::const_iterator piter = param.begin(); piter != param.end(); ++ piter) {
+	  if (utils::ipiece(piter->first) == "cluster-source") {
+	    if (! boost::filesystem::exists(piter->second))
+	      throw std::runtime_error("no cluster file: " + piter->second);
+	    
+	    normalizers_source.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
+	  } else if (utils::ipiece(piter->first) == "cluster-target") {
+	    if (! boost::filesystem::exists(piter->second))
+	      throw std::runtime_error("no cluster file: " + piter->second);
+	    
+	    normalizers_target.push_back(normalizer_type(&cicada::Cluster::create(piter->second)));
+	  } else if (utils::ipiece(piter->first) == "stemmer-source")
+	    normalizers_source.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
+	  else if (utils::ipiece(piter->first) == "stemmer-target")
+	    normalizers_target.push_back(normalizer_type(&cicada::Stemmer::create(piter->second)));
+	  else
+	    std::cerr << "WARNING: unsupported parameter for path: " << piter->first << "=" << piter->second << std::endl;
+	}
+
+	if (normalizers_source.size() > 1)
+	  throw std::runtime_error("we do no support multiple normalizers (yet)");
+	if (normalizers_target.size() > 1)
+	  throw std::runtime_error("we do no support multiple normalizers (yet)");
+	
 	__state_size   = sizeof(int) + sizeof(symbol_type);
 	__feature_name = "path";
       }
 
+      Path::Path(const Path& x)
+	: Base(static_cast<const Base&>(x)),
+	  pimpl(new PathImpl()),
+	  normalizers_source(x.normalizers_source),
+	  normalizers_target(x.normalizers_target),
+	  sentence(0) {}
+      
+      Path::~Path() { if (pimpl) delete pimpl; }
+      
+      Path& Path::operator=(const Path& x)
+      {
+	static_cast<Base&>(*this) = static_cast<const Base&>(x);
+	pimpl->clear();
+	normalizers_source = x.normalizers_source;
+	normalizers_target = x.normalizers_target;
+	return *this;
+      }
+      
       void Path::operator()(const feature_function_type& feature_function,
 			    const size_type& id,
 			    const hypergraph_type& hypergraph,
@@ -159,6 +283,9 @@ namespace cicada
 	sentence = 0;
 	if (! targets.empty())
 	  sentence = &targets.front();
+	
+	if (pimpl->maps.size() > 1024 * 1024)
+	  pimpl->maps.clear();
       }
 	
       // define state-full features...
@@ -186,12 +313,23 @@ namespace cicada
 	  symbol_type* state_source = reinterpret_cast<symbol_type*>(state_target + 1);
 	  
 	  *state_target = pos_target;
-	  *state_source = edge.rule->rhs.front();
+	  *state_source = (normalizers_source.empty() ? vocab_type::EPSILON : normalizers_source.front()(edge.rule->rhs.front()));
 	  
 	  if (pos_source == 0 && pos_target >= 0) {
 	    // fire path from BOS!
+	    const int distance = pos_target + 1;
 	    
+	    const symbol_type target_prev = (normalizers_target.empty() || ! sentence || pos_target == 0
+					     ? vocab_type::BOS
+					     : normalizers_target.front()(sentence->operator[](pos_target - 1)));
+	    const symbol_type target_curr = (normalizers_target.empty() || ! sentence
+					     ? vocab_type::EPSILON
+					     : normalizers_target.front()(sentence->operator[](pos_target)));
+	    const symbol_type target_next = (normalizers_target.empty() || ! sentence || pos_target + 1 >= sentence->size()
+					     ? vocab_type::EOS
+					     : normalizers_target.front()(sentence->operator[](pos_target + 1)));
 	    
+	    pimpl->operator()(vocab_type::BOS, target_prev, target_curr, target_next, distance, features);
 	  }
 	} else if (states.size() == 1) {
 	  int*         state_target = reinterpret_cast<int*>(state);
@@ -210,14 +348,30 @@ namespace cicada
 	    const int         next_target = *reinterpret_cast<const int*>(*siter);
 	    const symbol_type next_source = *reinterpret_cast<const symbol_type*>(reinterpret_cast<const int*>(*siter) + 1);
 	    
-	    if (prev_target >= 0 && next_target >= 0) {
+	    if (next_target >= 0) {
 	      // fire feature!
 	      
+	      const symbol_type target_prev = (normalizers_target.empty() || ! sentence || next_target == 0
+					       ? vocab_type::BOS
+					       : normalizers_target.front()(sentence->operator[](next_target - 1)));
+	      const symbol_type target_curr = (normalizers_target.empty() || ! sentence
+					       ? vocab_type::EPSILON
+					       : normalizers_target.front()(sentence->operator[](next_target)));
+	      const symbol_type target_next = (normalizers_target.empty() || ! sentence || next_target + 1 >= sentence->size()
+					       ? vocab_type::EOS
+					       : normalizers_target.front()(sentence->operator[](next_target + 1)));
+
 	      
-	    }
-	    
-	    // we will check for the "aligned" words
-	    if (next_target >= 0) {
+	      if (prev_target < 0) {
+		const int distance = next_target + 1; // distance from BOS
+		
+		pimpl->operator()(vocab_type::BOS, target_prev, target_curr, target_next, distance, features);
+	      } else {
+		const int distance = next_target - prev_target;
+		
+		pimpl->operator()(prev_source, target_prev, target_curr, target_next, distance, features);
+	      }
+	      
 	      prev_target = next_target;
 	      prev_source = next_source;
 	    }
@@ -227,10 +381,20 @@ namespace cicada
 	  *reinterpret_cast<symbol_type*>(reinterpret_cast<int*>(state) + 1) = prev_source;
 	}
 	
-	if (final && *reinterpret_cast<int*>(state) >= 0) {
+	if (final && sentence) {
+	  const int         prev_target = *reinterpret_cast<const int*>(states.front());
+	  const symbol_type prev_source = *reinterpret_cast<const symbol_type*>(reinterpret_cast<const int*>(states.front()) + 1);
+
 	  // fire feature for EOS...
+	  const int distance = sentence->size() - prev_target;
 	  
+	  const symbol_type target_prev = (prev_target < 0
+					   ? vocab_type::BOS
+					   : (normalizers_target.empty() || ! sentence
+					      ? vocab_type::EPSILON
+					      : normalizers_target.front()(sentence->operator[](prev_target))));
 	  
+	  pimpl->operator()(prev_source, target_prev, vocab_type::EOS, vocab_type::EOS, distance, features);
 	}
       }
       

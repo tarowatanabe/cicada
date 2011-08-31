@@ -224,9 +224,19 @@ namespace cicada
 	int target_size;
       };
 
+      class PathImpl;
+
       struct Path : public Base
       {
+	typedef ClusterStemmer normalizer_type;
+	typedef std::vector<normalizer_type, std::allocator<normalizer_type> > normalizer_set_type;
+	
+	typedef PathImpl impl_type;
+	
 	Path(const std::string& parameter, size_type& __state_size, feature_type& __feature_name);
+	Path(const Path&);
+	~Path();
+	Path& operator=(const Path& );
 	
 	void operator()(const feature_function_type& feature_function,
 			state_ptr_type& state,
@@ -245,6 +255,9 @@ namespace cicada
 			const ngram_count_set_type& ngram_counts);
 	
       private:
+	impl_type* pimpl;
+	normalizer_set_type normalizers_source;
+	normalizer_set_type normalizers_target;
 	const sentence_type* sentence;
       };
       
